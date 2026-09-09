@@ -57,7 +57,13 @@
         { "$ref": "#/$defs/SubmitPullRequestReviewOutput" },
         { "$ref": "#/$defs/DismissPullRequestReviewOutput" },
         { "$ref": "#/$defs/ReplyToPullRequestReviewCommentOutput" },
-        { "$ref": "#/$defs/ResolvePullRequestReviewThreadOutput" }
+        { "$ref": "#/$defs/ResolvePullRequestReviewThreadOutput" },
+        { "$ref": "#/$defs/CreateWorkItemOutput" },
+        { "$ref": "#/$defs/UpdateWorkItemOutput" },
+        { "$ref": "#/$defs/CommentOnWorkItemOutput" },
+        { "$ref": "#/$defs/AssignWorkItemOutput" },
+        { "$ref": "#/$defs/LinkWorkItemsOutput" },
+        { "$ref": "#/$defs/UploadWorkItemAttachmentOutput" }
       ]
     },
     "CreateIssueOutput": {
@@ -900,6 +906,123 @@
         }
       },
       "required": ["type", "alert_number", "fix_description", "fix_code"],
+      "additionalProperties": false
+    },
+    "CreateWorkItemOutput": {
+      "title": "Create Azure DevOps Work Item Output",
+      "description": "Output for creating an Azure DevOps work item",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_create_work_item" },
+        "title": { "type": "string", "minLength": 6, "maxLength": 255 },
+        "description": { "type": "string", "minLength": 31, "maxLength": 65000 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "temporary_id": { "type": "string", "pattern": "^#aw_[A-Za-z0-9_]{3,12}$" }
+      },
+      "required": ["type", "title", "description", "temporary_id"],
+      "additionalProperties": false
+    },
+    "UpdateWorkItemOutput": {
+      "title": "Update Azure DevOps Work Item Output",
+      "description": "Output for updating an Azure DevOps work item",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_update_work_item" },
+        "id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "state": { "type": "string" },
+        "area_path": { "type": "string" },
+        "iteration_path": { "type": "string" },
+        "assignee": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["type", "id"],
+      "additionalProperties": false
+    },
+    "CommentOnWorkItemOutput": {
+      "title": "Comment on Azure DevOps Work Item Output",
+      "description": "Output for commenting on an Azure DevOps work item",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_comment_on_work_item" },
+        "work_item_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "body": { "type": "string", "minLength": 10, "maxLength": 65000 }
+      },
+      "required": ["type", "work_item_id", "body"],
+      "additionalProperties": false
+    },
+    "AssignWorkItemOutput": {
+      "title": "Assign Azure DevOps Work Item Output",
+      "description": "Output for assigning an Azure DevOps work item",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_assign_work_item" },
+        "work_item_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "assignee": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "required": ["type", "work_item_id", "assignee"],
+      "additionalProperties": false
+    },
+    "LinkWorkItemsOutput": {
+      "title": "Link Azure DevOps Work Items Output",
+      "description": "Output for linking two Azure DevOps work items",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_link_work_items" },
+        "source_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "target_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "link_type": {
+          "type": "string",
+          "enum": ["parent", "child", "related", "predecessor", "successor", "duplicate", "duplicate-of"]
+        },
+        "comment": { "type": "string", "minLength": 5, "maxLength": 1024 }
+      },
+      "required": ["type", "source_id", "target_id", "link_type"],
+      "additionalProperties": false
+    },
+    "UploadWorkItemAttachmentOutput": {
+      "title": "Upload Azure DevOps Work Item Attachment Output",
+      "description": "Output for attaching a staged workspace file to an Azure DevOps work item",
+      "type": "object",
+      "properties": {
+        "type": { "const": "ado_upload_workitem_attachment" },
+        "work_item_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "file_path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "staged_file": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
+        "comment": { "type": "string", "minLength": 3, "maxLength": 1024 }
+      },
+      "required": ["type", "work_item_id", "file_path", "staged_file"],
       "additionalProperties": false
     }
   }

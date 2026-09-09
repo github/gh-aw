@@ -22,9 +22,9 @@ Configure the coding agent sandbox type to control how the AI engine is isolated
 sandbox:
   agent: awf
 
-# Disable coding agent sandbox - requires an operator-authored justification
+# Disable coding agent sandbox - requires an explicit feature flag
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 
@@ -37,23 +37,20 @@ If `sandbox` is not specified in your workflow, it defaults to `sandbox.agent: a
 
 **Disabling Coding Agent Sandbox**
 
-Setting `sandbox.agent: false` disables the agent firewall while keeping the MCP gateway enabled. This removes a trust boundary and should only be used when strictly necessary.
+Setting `sandbox.agent: false` disables the agent firewall while keeping the MCP gateway enabled. This removes a trust boundary and is only supported when `strict: false`.
 
-To disable the agent sandbox, you **must** add `features.dangerously-disable-sandbox-agent` with a literal justification string of at least 20 characters. The justification must explain why the trust boundary is being removed and is stored for diagnostics and audit. The following values are rejected by the compiler:
-
-- Boolean `true` — no longer accepted as a legacy shorthand
-- Expressions such as `${{ inputs.reason }}` — must be a static literal
-- Strings shorter than 20 characters after trimming whitespace
+To disable the agent sandbox, you **must** set `features.dangerously-disable-sandbox-agent: true`. Missing, false, and non-boolean values are rejected by the compiler.
 
 ```yaml wrap
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
+strict: false
 ```
 
 > [!WARNING]
-> Disabling the agent sandbox removes a security trust boundary. The `dangerously-disable-sandbox-agent` value is a permanent, reviewable record of why this workflow runs without the agent firewall. Write a reason that will be meaningful to future reviewers.
+> Disabling the agent sandbox removes a security trust boundary and is always rejected in strict mode. Only use this opt-out in controlled environments where the agent can be trusted with direct network access.
 
 ### Runtime Profiles
 
@@ -63,11 +60,11 @@ sandbox:
 | --- | --- |
 | `docker` (default) | Default Docker runtime, rootless AWF, network isolation |
 | `docker-sudo-iptables` | Docker with privileged AWF, legacy `iptables` networking, and host/service access |
-| `gvisor` | gVisor with strict network isolation |
-| `docker-sbx` | KVM microVM; the compiler handles the required privileged setup |
+| `gvisor` | **Deprecated:** gVisor with strict network isolation |
+| `docker-sbx` | **Deprecated:** KVM microVM; the compiler handles the required privileged setup |
 | `cloud-hypervisor` | Preview KVM runtime with its required privileged launcher |
 
-Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default.
+Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default. Prefer `docker`; `gvisor` and `docker-sbx` are deprecated and will be removed in a future release.
 
 ```yaml wrap
 sandbox:
@@ -89,7 +86,7 @@ features:
 sandbox:
   mcp:
     port: 8080
-    api-key: "${{ secrets.MCP_GATEWAY_API_KEY }}"
+    agent-id: "${{ secrets.MCP_GATEWAY_AGENT_ID }}"
 ```
 
 ### Combined Configuration

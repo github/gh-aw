@@ -235,7 +235,18 @@ function buildModel(gatewayConfig, modelStr) {
   }
 
   // Determine the pi-ai api type for the provider.
-  const api = provider === "anthropic" ? "anthropic-messages" : "openai-completions";
+  // Real OpenAI models are only published under "openai-responses" in Pi's upstream
+  // model catalog; OpenAI's Chat Completions endpoint rejects function tools whenever
+  // reasoning_effort is anything other than "none" (see
+  // https://developers.openai.com/api/docs/guides/responses-vs-chat-completions), so
+  // routing the "openai" provider through /responses keeps tool calling working.
+  // GitHub Copilot's gateway keeps its existing chat-completions-style protocol.
+  let api = "openai-completions";
+  if (provider === "anthropic") {
+    api = "anthropic-messages";
+  } else if (provider === "openai") {
+    api = "openai-responses";
+  }
 
   return {
     id: modelId,

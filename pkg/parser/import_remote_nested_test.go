@@ -196,7 +196,7 @@ func TestLocalImportResolutionBaseline(t *testing.T) {
 // The preferred convention is "./serena.md" (explicit relative path), which is the
 // pattern used by shared/mcp/serena-go.md.
 func TestSiblingImportResolution(t *testing.T) {
-	serenaContent := "---\nmcp-servers:\n  serena:\n    image: ghcr.io/oraios/serena\n---\n"
+	serenaContent := "---\nmcp-servers:\n  serena:\n    container: ghcr.io/oraios/serena\n---\n"
 
 	tests := []struct {
 		name          string
@@ -759,10 +759,10 @@ func TestMixedImportStylesInSingleFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(extraDir, 0o755), "create shared/extra dir")
 
 	// shared/mcp/base.md – leaf with one MCP server
-	writeFile(t, mcpDir, "base.md", "---\nmcp-servers:\n  base-server:\n    image: example/base\n---\n")
+	writeFile(t, mcpDir, "base.md", "---\nmcp-servers:\n  base-server:\n    container: example/base\n---\n")
 
 	// shared/extra/extra-server.md – leaf with another MCP server in a different directory
-	writeFile(t, extraDir, "extra-server.md", "---\nmcp-servers:\n  extra-server:\n    image: example/extra\n---\n")
+	writeFile(t, extraDir, "extra-server.md", "---\nmcp-servers:\n  extra-server:\n    container: example/extra\n---\n")
 
 	// shared/mcp/meta.md – imports both a sibling (./) and a root-relative path
 	writeFile(t, mcpDir, "meta.md",
@@ -800,7 +800,7 @@ func TestChainedMixedImportStyles(t *testing.T) {
 
 	// chain-c.md – leaf, carries an MCP server definition
 	writeFile(t, chainDir, "chain-c.md",
-		"---\nmcp-servers:\n  chain-c-server:\n    image: example/chain-c\n---\n")
+		"---\nmcp-servers:\n  chain-c-server:\n    container: example/chain-c\n---\n")
 
 	// chain-b.md – imports chain-c.md using a bare filename (backward-compatible)
 	writeFile(t, chainDir, "chain-b.md",
@@ -837,7 +837,7 @@ func TestCrossDirectoryAbsoluteImport(t *testing.T) {
 
 	// shared/dir-b/file-b.md – leaf with an MCP server
 	writeFile(t, dirB, "file-b.md",
-		"---\nmcp-servers:\n  dir-b-server:\n    image: example/dir-b\n---\n")
+		"---\nmcp-servers:\n  dir-b-server:\n    container: example/dir-b\n---\n")
 
 	// shared/dir-a/file-a.md – cross-directory root-relative import
 	writeFile(t, dirA, "file-a.md",
@@ -868,11 +868,11 @@ func TestMultipleSiblingStylesFromSameDirectory(t *testing.T) {
 
 	// Three leaf files in the same directory, each contributing one MCP server
 	writeFile(t, sharedDir, "server-a.md",
-		"---\nmcp-servers:\n  server-a:\n    image: example/a\n---\n")
+		"---\nmcp-servers:\n  server-a:\n    container: example/a\n---\n")
 	writeFile(t, sharedDir, "server-b.md",
-		"---\nmcp-servers:\n  server-b:\n    image: example/b\n---\n")
+		"---\nmcp-servers:\n  server-b:\n    container: example/b\n---\n")
 	writeFile(t, sharedDir, "server-c.md",
-		"---\nmcp-servers:\n  server-c:\n    image: example/c\n---\n")
+		"---\nmcp-servers:\n  server-c:\n    container: example/c\n---\n")
 
 	// hub.md imports all three siblings using three different path styles
 	writeFile(t, sharedDir, "hub.md",

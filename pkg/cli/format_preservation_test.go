@@ -219,6 +219,7 @@ engine: claude
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := addSourceToWorkflow(tt.content, tt.source)
 
 			if tt.shouldErr {
@@ -274,6 +275,7 @@ This workflow is designed to test whether the formatting is preserved.`
 	require.NoError(t, err, "setup should succeed")
 
 	t.Run("comments preserved", func(t *testing.T) {
+		t.Parallel()
 		assert.Contains(t, result, "# Daily run at 9 AM UTC on weekdays",
 			"YAML comments should be preserved in the output - comment block may have been stripped during processing")
 		assert.Contains(t, result, "# Auto-stop workflow after 2 hours",
@@ -285,11 +287,13 @@ This workflow is designed to test whether the formatting is preserved.`
 	})
 
 	t.Run("whitespace preserved", func(t *testing.T) {
+		t.Parallel()
 		assert.Contains(t, result, "\n\n",
 			"blank lines should be preserved in the output - check YAML parser configuration")
 	})
 
 	t.Run("indentation preserved", func(t *testing.T) {
+		t.Parallel()
 		assert.Contains(t, result, "    workflow_dispatch:",
 			"4-space indentation should be preserved - check YAML parser configuration")
 		assert.Contains(t, result, "        # Daily run at 9 AM UTC on weekdays",
@@ -297,11 +301,13 @@ This workflow is designed to test whether the formatting is preserved.`
 	})
 
 	t.Run("source field added", func(t *testing.T) {
+		t.Parallel()
 		assert.Contains(t, result, "source: test/repo/workflow.md@v1.0.0",
 			"source field should be added to frontmatter")
 	})
 
 	t.Run("content structure preserved", func(t *testing.T) {
+		t.Parallel()
 		assert.Contains(t, result, "# Test Formatting Preservation",
 			"markdown heading should be preserved in the output")
 		assert.Contains(t, result, "This workflow is designed to test whether the formatting is preserved.",

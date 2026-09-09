@@ -173,6 +173,8 @@ export interface SanitizeOptions {
   maxLength?: number;
   /** `@mention` aliases that should NOT be neutralized. */
   allowedAliases?: string[];
+  /** Maximum distinct allowed aliases to preserve. */
+  maxMentions?: number;
   /** Maximum bot-trigger references before filtering (default: 10). */
   maxBotMentions?: number;
 }

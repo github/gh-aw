@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import crypto from "crypto";
 import http from "http";
 const core = { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), setFailed: vi.fn() };
 global.core = core;
@@ -744,6 +745,20 @@ describe("runtime_import", () => {
           fs.writeFileSync(path.join(tempDir, "outside.md"), "Outside content");
           // Use ../../ to escape .github/workflows and go up to the temp directory
           await expect(processRuntimeImport("../../outside.md", !1, tempDir)).rejects.toThrow("Security: Path");
+        }),
+        it("should reject symlinks escaping the .github folder", async () => {
+          fs.writeFileSync(path.join(tempDir, "outside.md"), "Outside content");
+          fs.symlinkSync(path.join(tempDir, "outside.md"), path.join(workflowsDir, "outside-link.md"));
+
+          await expect(processRuntimeImport("outside-link.md", !1, tempDir)).rejects.toThrow("must remain within its allowed folder after resolving symlinks");
+        }),
+        it("should reject symlinks escaping the .agents folder", async () => {
+          const agentsDir = path.join(tempDir, ".agents");
+          fs.mkdirSync(agentsDir, { recursive: true });
+          fs.writeFileSync(path.join(tempDir, "outside.md"), "Outside content");
+          fs.symlinkSync(path.join(tempDir, "outside.md"), path.join(agentsDir, "outside-link.md"));
+
+          await expect(processRuntimeImport(".agents/outside-link.md", !1, tempDir)).rejects.toThrow("must remain within its allowed folder after resolving symlinks");
         }));
       it("should implicitly close an unterminated inline skill block so it cannot swallow spliced-in content", async () => {
         const content = "## skill: `reporting`\n\nGuidelines here.\n";
@@ -815,6 +830,47 @@ describe("runtime_import", () => {
           fs.writeFileSync(path.join(workflowsDir, "inline.md"), "inline content");
           const result = await processRuntimeImports("Before {{#runtime-import inline.md}} after", tempDir);
           expect(result).toBe("Before inline content after");
+        }),
+        it("should resolve needs output expressions in runtime-imported content from hash env vars", async () => {
+          const issueNumbersExpr = "needs.select.outputs.issue_numbers";
+          const markerExpr = "needs.select.outputs.marker";
+          const issueNumbersEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(issueNumbersExpr).digest("hex").slice(0, 8).toUpperCase();
+          const markerEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(markerExpr).digest("hex").slice(0, 8).toUpperCase();
+          process.env[issueNumbersEnv] = "[]";
+          process.env[markerEnv] = "ordinary-string";
+          fs.writeFileSync(path.join(workflowsDir, "prompt.md"), "Issue numbers: `${{ needs.select.outputs.issue_numbers }}`\nMarker: `${{ needs.select.outputs.marker }}`");
+          try {
+            const result = await processRuntimeImports("{{#runtime-import prompt.md}}", tempDir);
+            expect(result).toBe("Issue numbers: `[]`\nMarker: `ordinary-string`");
+          } finally {
+            delete process.env[issueNumbersEnv];
+            delete process.env[markerEnv];
+          }
+        }),
+        it("should resolve hash env expressions through nested runtime imports", async () => {
+          const nestedExpr = "needs.select.outputs.nested_value";
+          const nestedEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(nestedExpr).digest("hex").slice(0, 8).toUpperCase();
+          process.env[nestedEnv] = "nested-output";
+          fs.writeFileSync(path.join(workflowsDir, "outer.md"), "Outer\n{{#runtime-import nested.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "nested.md"), "Nested: `${{ needs.select.outputs.nested_value }}`");
+          try {
+            const result = await processRuntimeImports("{{#runtime-import outer.md}}", tempDir);
+            expect(result).toBe("Outer\nNested: `nested-output`");
+          } finally {
+            delete process.env[nestedEnv];
+          }
+        }),
+        it("should resolve hash env expressions through legacy import macros", async () => {
+          const legacyExpr = "needs.select.outputs.legacy_value";
+          const legacyEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(legacyExpr).digest("hex").slice(0, 8).toUpperCase();
+          process.env[legacyEnv] = "legacy-output";
+          fs.writeFileSync(path.join(workflowsDir, "legacy.md"), "Legacy: `${{ needs.select.outputs.legacy_value }}`");
+          try {
+            const result = await processRuntimeImports("{{#import legacy.md}}", tempDir);
+            expect(result).toBe("Legacy: `legacy-output`");
+          } finally {
+            delete process.env[legacyEnv];
+          }
         }),
         it("should process imports with files containing special characters", async () => {
           fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content with $pecial ch@racters!");
@@ -1255,6 +1311,22 @@ describe("runtime_import", () => {
           }
         });
 
+        it("should return hash-based env var value for needs output expressions when set", () => {
+          const issueNumbersExpr = "needs.select.outputs.issue_numbers";
+          const markerExpr = "needs.select.outputs.marker";
+          const issueNumbersEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(issueNumbersExpr).digest("hex").slice(0, 8).toUpperCase();
+          const markerEnv = "GH_AW_EXPR_" + crypto.createHash("sha256").update(markerExpr).digest("hex").slice(0, 8).toUpperCase();
+          process.env[issueNumbersEnv] = "[]";
+          process.env[markerEnv] = "ordinary-string";
+          try {
+            expect(evaluateExpression(issueNumbersExpr)).toBe("[]");
+            expect(evaluateExpression(markerExpr)).toBe("ordinary-string");
+          } finally {
+            delete process.env[issueNumbersEnv];
+            delete process.env[markerEnv];
+          }
+        });
+
         it("should return env var value for inputs.* expressions when set (workflow_call)", () => {
           process.env.GH_AW_INPUTS_ERRORS = "some error list";
           try {
@@ -1300,17 +1372,19 @@ describe("runtime_import", () => {
           }
         });
 
-        it("should not resolve hyphenated inputs.* when context.payload.inputs is empty", () => {
+        it("should resolve hyphenated inputs.* from hash-based env var when context.payload.inputs is empty", () => {
           // For workflow_call, context.payload.inputs is empty. Hyphenated input names
           // can't be resolved via the simple env var conversion (which produces
           // GH_AW_INPUTS_TASK-DESCRIPTION instead of the compiler's GH_AW_EXPR_<hash>).
-          // The compiler handles this via placeholder substitution in the heredoc-inlined
-          // prompt; runtime-import expressions rely on context.payload.inputs.
+          // Runtime-import expressions resolve through the same hash-based env var.
           global.context.payload.inputs = {};
+          const expr = "inputs.task-description";
+          const envVar = "GH_AW_EXPR_" + crypto.createHash("sha256").update(expr).digest("hex").slice(0, 8).toUpperCase();
+          process.env[envVar] = "workflow-call value";
           try {
-            const result = evaluateExpression("inputs.task-description");
-            expect(result).toContain("inputs.task-description");
+            expect(evaluateExpression(expr)).toBe("workflow-call value");
           } finally {
+            delete process.env[envVar];
             delete global.context.payload.inputs;
           }
         });

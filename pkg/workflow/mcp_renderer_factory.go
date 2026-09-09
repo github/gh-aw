@@ -164,7 +164,7 @@ func buildMCPRendererFactory(workflowData *WorkflowData, format string, includeC
 // buildStandardJSONMCPRenderers constructs MCPToolRenderers with the standard rendering callbacks
 // shared across JSON-format engines (Claude, Gemini, Copilot, Codex gateway).
 //
-// All standard tool callbacks (GitHub, Playwright, CacheMemory, AgenticWorkflows,
+// All standard tool callbacks (GitHub, CacheMemory, AgenticWorkflows,
 // SafeOutputs, MCPScripts) are wired to the corresponding unified renderer methods
 // via createRenderer. Cache-memory is always a no-op for these engines.
 //
@@ -178,9 +178,6 @@ func buildStandardJSONMCPRenderers(
 	return MCPToolRenderers{
 		RenderGitHub: func(yaml *strings.Builder, githubTool map[string]any, isLast bool, workflowData *WorkflowData) {
 			createRenderer(isLast).RenderGitHubMCP(yaml, githubTool, workflowData)
-		},
-		RenderPlaywright: func(yaml *strings.Builder, playwrightTool any, isLast bool) {
-			createRenderer(isLast).RenderPlaywrightMCP(yaml, playwrightTool)
 		},
 		RenderCacheMemory: noOpCacheMemoryRenderer,
 		RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {

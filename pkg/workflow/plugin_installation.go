@@ -112,18 +112,70 @@ func pluginStagingName(parsed parsedSkillRefSpec, index int) string {
 	return fmt.Sprintf("plugin-%d-%s", index, strings.Join(repoParts[2:], "__"))
 }
 
+// pluginAppTokenStepID returns the step ID used to mint (and later reference) the
+// GitHub App installation token for the index-th plugin's github-app credential.
+func pluginAppTokenStepID(index int) string {
+	return fmt.Sprintf("plugin-app-token-%d", index)
+}
+
+// pluginTokenExpression resolves the checkout token expression for the index-th plugin,
+// based on its optional per-plugin github-token/github-app credential. Returns an empty
+// string when no credential is configured, in which case the checkout step omits the
+// "token" input entirely and actions/checkout falls back to the workflow's default token.
+func pluginTokenExpression(workflowData *WorkflowData, index int) string {
+	if workflowData == nil || index < 0 || index >= len(workflowData.PluginReferences) {
+		return ""
+	}
+	ref := workflowData.PluginReferences[index]
+	if ref.GitHubApp != nil {
+		token := fmt.Sprintf("${{ steps.%s.outputs.token }}", pluginAppTokenStepID(index))
+		if ref.GitHubApp.shouldIgnoreMissingKey() {
+			token = combineTokenExpressions(token, getEffectiveGitHubToken(""))
+		}
+		return token
+	}
+	return ref.GitHubToken
+}
+
+// generatePluginAuthTokenSteps mints GitHub App installation tokens for every plugin
+// whose github-app credential is configured. Each minting step is emitted before the
+// engine's plugin installation steps (which include the checkout step consuming the
+// minted token), regardless of which agentic engine is selected: the checkout of a
+// plugin's pinned commit is engine-agnostic and always happens before any
+// engine-specific installation command runs.
+func (c *Compiler) generatePluginAuthTokenSteps(workflowData *WorkflowData) []GitHubActionStep {
+	if workflowData == nil || len(workflowData.PluginReferences) == 0 {
+		return nil
+	}
+
+	var steps []GitHubActionStep
+	for i, ref := range workflowData.PluginReferences {
+		if ref.GitHubApp == nil {
+			continue
+		}
+		repoParts := strings.Split(parseSkillRefSpec(ref.Plugin).repoPath, "/")
+		if len(repoParts) < 2 {
+			continue
+		}
+		lines := c.buildGitHubAppTokenMintStepWithMeta(
+			ref.GitHubApp,
+			nil,
+			repoParts[1],
+			strings.Join(repoParts[:2], "/"),
+			fmt.Sprintf("Generate GitHub App token for agent plugin %d", i+1),
+			pluginAppTokenStepID(i),
+		)
+		steps = append(steps, GitHubActionStep(strings.Split(strings.TrimSuffix(strings.Join(lines, ""), "\n"), "\n")))
+	}
+	return steps
+}
+
 func generatePluginInstallationSteps(workflowData *WorkflowData, spec pluginInstallSpec) []GitHubActionStep {
 	if workflowData == nil || len(workflowData.Plugins) == 0 {
 		return nil
 	}
 
-	// Each plugin contributes at most two steps. Guard the capacity computation so
-	// the multiplication can never overflow for an unexpectedly large plugin list.
-	capacity := len(workflowData.Plugins)
-	if capacity <= math.MaxInt/2 {
-		capacity *= 2
-	}
-	steps := make([]GitHubActionStep, 0, capacity)
+	steps := make([]GitHubActionStep, 0, pluginInstallationStepCapacity(len(workflowData.Plugins)))
 	checkoutAction := getActionPinForData("actions/checkout", workflowData)
 	for i, plugin := range workflowData.Plugins {
 		parsed := parseSkillRefSpec(plugin)
@@ -141,15 +193,7 @@ func generatePluginInstallationSteps(workflowData *WorkflowData, spec pluginInst
 		checkoutPath := pluginCheckoutPath(i)
 		installPath := pluginCheckoutSubpath(parsed, i)
 
-		steps = append(steps, GitHubActionStep{
-			"      - name: Checkout agent plugin " + parsed.repoPath,
-			"        uses: " + checkoutAction,
-			"        with:",
-			"          repository: " + repository,
-			"          ref: " + parsed.ref,
-			"          path: " + checkoutPath,
-			"          persist-credentials: false",
-		})
+		steps = append(steps, newPluginCheckoutStep(workflowData, checkoutAction, parsed, repository, checkoutPath, i))
 
 		if spec.CustomInstall != nil {
 			steps = append(steps, spec.CustomInstall(parsed, checkoutPath, installPath, i)...)
@@ -184,4 +228,27 @@ func generatePluginInstallationSteps(workflowData *WorkflowData, spec pluginInst
 	}
 
 	return steps
+}
+
+func pluginInstallationStepCapacity(pluginCount int) int {
+	if pluginCount <= math.MaxInt/2 {
+		return pluginCount * 2
+	}
+	return pluginCount
+}
+
+func newPluginCheckoutStep(workflowData *WorkflowData, checkoutAction string, parsed parsedSkillRefSpec, repository, checkoutPath string, index int) GitHubActionStep {
+	step := GitHubActionStep{
+		"      - name: Checkout agent plugin " + parsed.repoPath,
+		"        uses: " + checkoutAction,
+		"        with:",
+		"          repository: " + repository,
+		"          ref: " + parsed.ref,
+		"          path: " + checkoutPath,
+		"          persist-credentials: false",
+	}
+	if tokenExpr := pluginTokenExpression(workflowData, index); tokenExpr != "" {
+		step = append(step, "          token: "+tokenExpr)
+	}
+	return step
 }

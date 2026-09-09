@@ -240,7 +240,7 @@ test_empty_servers() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -271,7 +271,7 @@ test_null_servers() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -310,7 +310,7 @@ test_valid_http_server() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -347,7 +347,7 @@ test_server_without_url() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -395,7 +395,7 @@ test_mixed_servers() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -500,7 +500,7 @@ test_optional_server_failure_degrades_to_warning() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -550,7 +550,7 @@ test_required_server_failure_is_fatal() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -598,7 +598,7 @@ test_all_optional_servers_fail_is_error() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -661,7 +661,7 @@ test_optional_server_from_env_degrades_to_warning() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF
@@ -721,7 +721,7 @@ test_env_optional_list_does_not_affect_other_servers() {
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "test-key"
+    "agentId": "test-key"
   }
 }
 EOF

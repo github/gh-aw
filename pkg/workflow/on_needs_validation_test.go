@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -142,5 +144,95 @@ func TestValidateOnGitHubAppNeedsExpressions(t *testing.T) {
 		err := c.validateOnNeeds(data)
 		require.Error(t, err, "expected on.github-app validation error")
 		require.ErrorContains(t, err, "on.github-app.client-id", "error field should use yaml key client-id")
+	})
+}
+
+func TestValidatePromptNeedsAvailableBeforeActivation(t *testing.T) {
+	t.Run("rejects runtime-import reference to explicit-needs job not in activation needs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+		promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+		require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+		require.NoError(t, os.MkdirAll(promptsDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(promptsDir, "runtime.md"), []byte("Value: ${{ needs.select.outputs.value }}"), 0600))
+
+		c := NewCompiler()
+		c.markdownPath = filepath.Join(workflowsDir, "workflow.md")
+		data := &WorkflowData{
+			MarkdownContent: "{{#runtime-import .github/prompts/runtime.md}}",
+			Jobs: map[string]any{
+				"select": map[string]any{
+					"needs": "other",
+				},
+			},
+		}
+
+		err := c.validateOnNeeds(data)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "prompt references needs.select.*")
+		require.ErrorContains(t, err, "not available before activation")
+	})
+
+	t.Run("allows runtime-import reference to explicit-needs job in on.needs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+		promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+		require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+		require.NoError(t, os.MkdirAll(promptsDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(promptsDir, "runtime.md"), []byte("Value: ${{ needs.select.outputs.value }}"), 0600))
+
+		c := NewCompiler()
+		c.markdownPath = filepath.Join(workflowsDir, "workflow.md")
+		data := &WorkflowData{
+			MarkdownContent: "{{#runtime-import .github/prompts/runtime.md}}",
+			OnNeeds:         []string{"select", "other"},
+			Jobs: map[string]any{
+				"select": map[string]any{
+					"needs": "other",
+				},
+				"other": map[string]any{},
+			},
+		}
+
+		require.NoError(t, c.validateOnNeeds(data))
+	})
+
+	t.Run("allows no-explicit-needs runtime-import reference because activation auto-adds it", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+		promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+		require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+		require.NoError(t, os.MkdirAll(promptsDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(promptsDir, "runtime.md"), []byte("Value: ${{ needs.select.outputs.value }}"), 0600))
+
+		c := NewCompiler()
+		c.markdownPath = filepath.Join(workflowsDir, "workflow.md")
+		data := &WorkflowData{
+			MarkdownContent: "{{#runtime-import .github/prompts/runtime.md}}",
+			Jobs: map[string]any{
+				"select": map[string]any{},
+			},
+		}
+
+		require.NoError(t, c.validateOnNeeds(data))
+	})
+
+	t.Run("allows no-explicit-needs reference from frontmatter import only", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+		sharedDir := filepath.Join(workflowsDir, "shared")
+		require.NoError(t, os.MkdirAll(sharedDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "runtime.md"), []byte("Value: ${{ needs.select.outputs.value }}"), 0600))
+
+		c := NewCompiler()
+		c.markdownPath = filepath.Join(workflowsDir, "workflow.md")
+		data := &WorkflowData{
+			ImportPaths: []string{".github/workflows/shared/runtime.md"},
+			Jobs: map[string]any{
+				"select": map[string]any{},
+			},
+		}
+
+		require.NoError(t, c.validateOnNeeds(data))
 	})
 }

@@ -1,6 +1,30 @@
 {
   "$schema": "./compat.schema.json",
-  "blockedVersions": [],
+  "blockedVersions": [
+    "v0.82.8",
+    "v0.82.9",
+    "v0.82.10",
+    "v0.82.11",
+    "v0.82.12",
+    "v0.82.13",
+    "v0.82.14",
+    "v0.82.15",
+    "v0.83.0",
+    "v0.83.1",
+    "v0.83.2",
+    "v0.83.3",
+    "v0.83.4",
+    "v0.83.5",
+    "v0.84.0",
+    "v0.84.1",
+    "v0.84.2",
+    "v0.84.3",
+    "v0.84.4",
+    "v0.85.0",
+    "v0.85.1",
+    "v0.85.2",
+    "v0.85.3"
+  ],
   "minimumVersion": "v0.65.3",
   "minRecommendedVersion": "v0.65.3",
   "agent-compat-v1": {
@@ -10,7 +34,7 @@
         "min-gh-aw": "0.72.0",
         "max-gh-aw": "*",
         "min-agent": "1.0.21",
-        "max-agent": "1.0.80",
+        "max-agent": "1.0.83",
         "open": true
       },
       {

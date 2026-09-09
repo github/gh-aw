@@ -383,9 +383,3 @@ func applyGradersArtifact(artifacts []string, gradersOnly bool) []string {
 func isEvalsArtifactRequested(evalsOnly bool, artifactSets []string) bool {
 	return evalsOnly || slices.Contains(artifactSets, string(ArtifactSetEvals))
 }
-
-// isGradersArtifactRequested reports whether grader artifacts were explicitly requested,
-// either via --graders or by including --artifacts graders.
-func isGradersArtifactRequested(gradersOnly bool, artifactSets []string) bool {
-	return gradersOnly || slices.Contains(artifactSets, string(ArtifactSetGraders))
-}

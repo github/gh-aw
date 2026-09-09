@@ -48,12 +48,12 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Instructions Janitor

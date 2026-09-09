@@ -10,15 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGetEngineArtifactPaths_NoOutputFiles verifies that engines with no declared output
-// files return nil from getEngineArtifactPaths.
-func TestGetEngineArtifactPaths_NoOutputFiles(t *testing.T) {
-	// Claude engine declares no output files
-	claudeEngine := NewClaudeEngine()
-	require.Empty(t, claudeEngine.GetDeclaredOutputFiles(), "Claude engine should declare no output files")
+func TestGetEngineArtifactPaths_ClaudeDebugLog(t *testing.T) {
+	paths := getEngineArtifactPaths(NewClaudeEngine())
 
-	paths := getEngineArtifactPaths(claudeEngine)
-	assert.Nil(t, paths, "getEngineArtifactPaths should return nil when engine has no output files")
+	assert.Contains(t, paths, claudeDebugLogFile)
+	assert.Contains(t, paths, RedactedURLsLogPath)
 }
 
 // TestGetEngineArtifactPaths_WithOutputFiles verifies that engines with declared output files

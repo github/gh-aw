@@ -140,6 +140,7 @@ var typeConflictGotWantPattern = regexp.MustCompile(`(?:^|: )got (\w+), want (\w
 var knownOneOfFieldHints = map[string]string{
 	"/engine":                "Valid engine names: claude, codex, copilot, gemini, pi.\n\nExample:\nengine: copilot\n# or with options:\nengine:\n  id: copilot\nmax-turns: 15  # top-level field, not nested under engine",
 	"/tools/github/toolsets": "Valid toolsets: all, default, action-friendly, context, repos, issues, pull_requests, actions, code_security, dependabot, discussions, experiments, gists, labels, notifications, orgs, projects, search, secret_protection, security_advisories, stargazers, users.\n\nExample:\ntools:\n  github:\n    toolsets: default\n    # or as an array:\n    toolsets: [default, repos]",
+	"/tools/linear/toolsets": "Valid toolsets: all, attachments, comments, customers, cycles, diffs, documentation, documents, initiatives, issues, milestones, projects, status_updates, teams, users.\n\nExample:\ntools:\n  linear:\n    toolsets: [issues, projects]",
 }
 
 // synthesizeOneOfTypeConflictMessage produces a plain-English error message when every
@@ -312,8 +313,8 @@ func findFrontmatterBounds(lines []string) (startIdx int, endIdx int, frontmatte
 var knownFieldValidValues = map[string]string{
 	// Both entries mirror $defs/github_actions_permissions in main_workflow_schema.json.
 	// Update both when the schema changes.
-	"/permissions":    "Valid permission scopes: actions, all, attestations, checks, code-quality, copilot-requests, contents, deployments, discussions, id-token, issues, metadata, models, organization-projects, packages, pages, pull-requests, repository-projects, security-events, statuses, vulnerability-alerts",
-	"/on/permissions": "Valid permission scopes: actions, all, attestations, checks, code-quality, copilot-requests, contents, deployments, discussions, id-token, issues, metadata, models, organization-projects, packages, pages, pull-requests, repository-projects, security-events, statuses, vulnerability-alerts",
+	"/permissions":    "Valid permission scopes: actions, all, attestations, checks, code-quality, copilot-requests, contents, deployments, discussions, id-token, issues, metadata, models, organization-custom-org-roles, organization-custom-repository-roles, organization-projects, packages, pages, pull-requests, repository-projects, security-events, statuses, vulnerability-alerts",
+	"/on/permissions": "Valid permission scopes: actions, all, attestations, checks, code-quality, copilot-requests, contents, deployments, discussions, id-token, issues, metadata, models, organization-custom-org-roles, organization-custom-repository-roles, organization-projects, packages, pages, pull-requests, repository-projects, security-events, statuses, vulnerability-alerts",
 }
 
 // knownFieldScopes maps well-known JSON schema paths to a slice of valid scope names.
@@ -325,12 +326,14 @@ var knownFieldScopes = map[string][]string{
 	"/permissions": {
 		"actions", "all", "attestations", "checks", "code-quality", "copilot-requests", "contents", "deployments",
 		"discussions", "id-token", "issues", "metadata", "models",
+		"organization-custom-org-roles", "organization-custom-repository-roles",
 		"organization-projects", "packages", "pages", "pull-requests",
 		"repository-projects", "security-events", "statuses", "vulnerability-alerts",
 	},
 	"/on/permissions": {
 		"actions", "all", "attestations", "checks", "code-quality", "copilot-requests", "contents", "deployments",
 		"discussions", "id-token", "issues", "metadata", "models",
+		"organization-custom-org-roles", "organization-custom-repository-roles",
 		"organization-projects", "packages", "pages", "pull-requests",
 		"repository-projects", "security-events", "statuses", "vulnerability-alerts",
 	},

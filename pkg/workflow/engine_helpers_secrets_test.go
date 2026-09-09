@@ -22,11 +22,11 @@ func TestFilterEnvForSecrets(t *testing.T) {
 			name: "allows whitelisted secrets",
 			env: map[string]string{
 				"COPILOT_GITHUB_TOKEN": "${{ secrets.COPILOT_GITHUB_TOKEN }}",
-				"MCP_GATEWAY_API_KEY":  "${{ secrets.MCP_GATEWAY_API_KEY }}",
+				"MCP_GATEWAY_AGENT_ID": "${{ secrets.MCP_GATEWAY_AGENT_ID }}",
 				"NORMAL_ENV_VAR":       "some-value",
 			},
-			allowedSecrets: []string{"COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_API_KEY"},
-			wantKeys:       []string{"COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_API_KEY", "NORMAL_ENV_VAR"},
+			allowedSecrets: []string{"COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_AGENT_ID"},
+			wantKeys:       []string{"COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_AGENT_ID", "NORMAL_ENV_VAR"},
 			wantRemoved:    0,
 		},
 		{
@@ -146,7 +146,7 @@ func TestGetRequiredSecretNames_Copilot(t *testing.T) {
 		assert.Contains(t, secrets, "COPILOT_PROVIDER_BEARER_TOKEN")
 	})
 
-	t.Run("includes MCP gateway API key when MCP servers present", func(t *testing.T) {
+	t.Run("includes MCP gateway agent ID when MCP servers present", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Tools: map[string]any{
 				"github": map[string]any{},
@@ -158,9 +158,9 @@ func TestGetRequiredSecretNames_Copilot(t *testing.T) {
 
 		secrets := engine.GetRequiredSecretNames(workflowData)
 
-		// Should include COPILOT_GITHUB_TOKEN, MCP_GATEWAY_API_KEY, and GITHUB_MCP_SERVER_TOKEN
+		// Should include COPILOT_GITHUB_TOKEN, MCP_GATEWAY_AGENT_ID, and GITHUB_MCP_SERVER_TOKEN
 		assert.Contains(t, secrets, "COPILOT_GITHUB_TOKEN")
-		assert.Contains(t, secrets, "MCP_GATEWAY_API_KEY")
+		assert.Contains(t, secrets, "MCP_GATEWAY_AGENT_ID")
 		assert.Contains(t, secrets, "GITHUB_MCP_SERVER_TOKEN")
 	})
 
@@ -220,7 +220,7 @@ func TestGetRequiredSecretNames_Claude(t *testing.T) {
 		assert.Contains(t, secrets, "ANTHROPIC_API_KEY")
 	})
 
-	t.Run("includes MCP gateway API key when MCP servers present", func(t *testing.T) {
+	t.Run("includes MCP gateway agent ID when MCP servers present", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Tools: map[string]any{
 				"github": map[string]any{},
@@ -232,9 +232,9 @@ func TestGetRequiredSecretNames_Claude(t *testing.T) {
 
 		secrets := engine.GetRequiredSecretNames(workflowData)
 
-		// Should include ANTHROPIC_API_KEY and MCP_GATEWAY_API_KEY
+		// Should include ANTHROPIC_API_KEY and MCP_GATEWAY_AGENT_ID
 		assert.Contains(t, secrets, "ANTHROPIC_API_KEY")
-		assert.Contains(t, secrets, "MCP_GATEWAY_API_KEY")
+		assert.Contains(t, secrets, "MCP_GATEWAY_AGENT_ID")
 	})
 
 	t.Run("WIF: skips ANTHROPIC_API_KEY when github-oidc+anthropic configured", func(t *testing.T) {
@@ -273,7 +273,7 @@ func TestGetRequiredSecretNames_Claude(t *testing.T) {
 		secrets := engine.GetRequiredSecretNames(workflowData)
 
 		assert.NotContains(t, secrets, "ANTHROPIC_API_KEY")
-		assert.Contains(t, secrets, "MCP_GATEWAY_API_KEY")
+		assert.Contains(t, secrets, "MCP_GATEWAY_AGENT_ID")
 	})
 
 	t.Run("model-provider=github switches required secret to copilot token", func(t *testing.T) {
@@ -309,21 +309,23 @@ func TestGetRequiredSecretNames_Codex(t *testing.T) {
 		assert.Contains(t, secrets, "OPENAI_API_KEY")
 	})
 
-	t.Run("includes MCP gateway API key when MCP servers present", func(t *testing.T) {
+	t.Run("includes MCP gateway agent ID when MCP servers present", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Tools: map[string]any{
-				"playwright": map[string]any{},
+				"example": map[string]any{
+					"type":    "http",
+					"url":     "https://example.com/mcp",
+					"allowed": []any{"read"},
+				},
 			},
-			ParsedTools: &ToolsConfig{
-				Playwright: &PlaywrightToolConfig{},
-			},
+			ParsedTools: &ToolsConfig{},
 		}
 
 		secrets := engine.GetRequiredSecretNames(workflowData)
 
-		// Should include Codex secrets and MCP_GATEWAY_API_KEY
+		// Should include Codex secrets and MCP_GATEWAY_AGENT_ID
 		assert.Contains(t, secrets, "CODEX_API_KEY")
 		assert.Contains(t, secrets, "OPENAI_API_KEY")
-		assert.Contains(t, secrets, "MCP_GATEWAY_API_KEY")
+		assert.Contains(t, secrets, "MCP_GATEWAY_AGENT_ID")
 	})
 }

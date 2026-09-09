@@ -385,7 +385,11 @@ func downloadArtifactsIndividually(ctx context.Context, opts downloadArtifactsOp
 	if err := downloadArtifactsByName(ctx, opts, downloadableNames); err != nil {
 		return err
 	}
-	if fileutil.IsDirEmpty(opts.outputDir) {
+	artifacts, err := listArtifacts(opts.outputDir)
+	if err != nil {
+		return err
+	}
+	if len(artifacts) == 0 {
 		// Downloads were attempted but none succeeded; treat as no artifacts.
 		return ErrNoArtifacts
 	}
@@ -429,9 +433,9 @@ func buildBulkDownloadArgs(opts downloadArtifactsOptions) []string {
 	ghArgs := []string{"run", "download", strconv.FormatInt(opts.runID, 10), "--dir", opts.outputDir}
 	if opts.owner != "" && opts.repo != "" {
 		if opts.hostname != "" && opts.hostname != "github.com" {
-			ghArgs = append(ghArgs, "-R", opts.hostname+"/"+opts.owner+"/"+opts.repo)
+			ghArgs = append(ghArgs, "-R", filepath.Join(opts.hostname, opts.owner, opts.repo))
 		} else {
-			ghArgs = append(ghArgs, "-R", opts.owner+"/"+opts.repo)
+			ghArgs = append(ghArgs, "-R", filepath.Join(opts.owner, opts.repo))
 		}
 	}
 	return ghArgs
@@ -493,7 +497,11 @@ func recoverBulkDownloadArtifacts(ctx context.Context, opts downloadArtifactsOpt
 		}
 	}
 
-	if skippedNonZipArtifacts && fileutil.IsDirEmpty(opts.outputDir) {
+	artifacts, err := listArtifacts(opts.outputDir)
+	if err != nil {
+		return err
+	}
+	if skippedNonZipArtifacts && len(artifacts) == 0 {
 		// All artifacts were non-zip (none could be extracted) so nothing was downloaded.
 		// Treat this the same as a run with no artifacts — the audit will rely solely on
 		// workflow logs rather than artifact content.

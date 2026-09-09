@@ -16,6 +16,7 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("expires", c.Expires).
 			AddStringSlice("labels", c.Labels).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
+			AddIfNotEmpty("body_footer", c.BodyFooter).
 			AddStringSlice("assignees", c.Assignees).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddTemplatableBool("group", c.Group).

@@ -146,8 +146,8 @@ This is a test workflow without network permissions.
 		if !strings.Contains(string(lockContent), "awf --config") {
 			t.Error("Should contain AWF wrapper by default for Claude engine")
 		}
-		if strings.Contains(string(lockContent), "sudo -E awf") {
-			t.Error("Should NOT use sudo -E awf in network isolation mode (default)")
+		if strings.Contains(string(lockContent), "sudo -E ") {
+			t.Error("Should NOT use sudo in network isolation mode (default)")
 		}
 	})
 
@@ -186,8 +186,8 @@ This is a test workflow with explicit defaults network permissions.
 		if !strings.Contains(string(lockContent), "awf --config") {
 			t.Error("Should contain AWF wrapper for Claude engine with network: defaults")
 		}
-		if strings.Contains(string(lockContent), "sudo -E awf") {
-			t.Error("Should NOT use sudo -E awf in network isolation mode (default)")
+		if strings.Contains(string(lockContent), "sudo -E ") {
+			t.Error("Should NOT use sudo in network isolation mode (default)")
 		}
 	})
 
@@ -226,8 +226,8 @@ This is a test workflow with empty network permissions (deny all).
 		if !strings.Contains(string(lockContent), "awf --config") {
 			t.Error("Should contain AWF wrapper for Claude engine with network: {}")
 		}
-		if strings.Contains(string(lockContent), "sudo -E awf") {
-			t.Error("Should NOT use sudo -E awf in network isolation mode (default)")
+		if strings.Contains(string(lockContent), "sudo -E ") {
+			t.Error("Should NOT use sudo in network isolation mode (default)")
 		}
 	})
 
@@ -268,8 +268,8 @@ This is a test workflow with explicit network permissions.
 		if !strings.Contains(string(lockContent), "awf --config") {
 			t.Error("Should contain AWF wrapper with explicit network permissions")
 		}
-		if strings.Contains(string(lockContent), "sudo -E awf") {
-			t.Error("Should NOT use sudo -E awf in network isolation mode (default)")
+		if strings.Contains(string(lockContent), "sudo -E ") {
+			t.Error("Should NOT use sudo in network isolation mode (default)")
 		}
 		if !strings.Contains(string(lockContent), "allowDomains") {
 			t.Error("Should contain allowDomains in AWF config JSON")

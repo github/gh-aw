@@ -13,7 +13,7 @@ This document provides a technical analysis of mdflow and GitHub Agentic Workflo
 ### Key Findings
 
 1. **Custom Engine Opportunities**: mdflow's architecture demonstrates local-execution patterns applicable to gh-aw custom engines
-2. **Template System**: mdflow's LiquidJS template system with special variables offers inspiration for enhanced gh-aw template capabilities
+2. **Template System**: mdflow's LiquidJS template system with special variables offers inspiration for expanded gh-aw template capabilities
 3. **Import Mechanism**: mdflow's import system (glob, line ranges, symbol extraction) supports capabilities not currently available in gh-aw
 4. **Security vs Flexibility**: Fundamental tradeoff between mdflow's "trust the user" model and gh-aw's "security-first" approach
 
@@ -61,7 +61,7 @@ tools:
 
 ---
 
-### Opportunity 2: Enhanced Template Variable System
+### Opportunity 2: Extended Template Variable System
 
 **mdflow Pattern**:
 ```yaml
@@ -703,7 +703,7 @@ gh aw init pr-reviewer --basic
 gh aw init daily-report --template mdflow
 ```
 
-#### 2. **Enhanced Import System**
+#### 2. **Extended Import System**
 - Add glob pattern support
 - Implement line range imports
 - Support URL imports (from GitHub only initially)
@@ -790,7 +790,7 @@ gh aw compile
 └─→ .lock.yml (GitHub Actions) # Production
 ```
 
-#### 2. **Enhanced MCP Ecosystem**
+#### 2. **Expanded MCP Ecosystem**
 - MCP server registry
 - Registry-based discovery and installation
 - Shared configurations
@@ -971,7 +971,7 @@ gh aw run-local workflow.md --debug --step-by-step
 
 ---
 
-### Engine 3: template-expander (Enhanced Templating Engine)
+### Engine 3: template-expander (Extended Templating Engine)
 
 **Purpose**: Provide advanced template features beyond GitHub Actions expressions.
 
@@ -1323,7 +1323,7 @@ CI/CD Execution (gh-aw):
 
 **Impact**: Lower barrier to entry, faster adoption
 
-#### 2. **Enhanced Import System** (Adopt mdflow patterns)
+#### 2. **Extended Import System** (Adopt mdflow patterns)
 - Implement glob pattern imports
 - Add line range support
 - Enable URL imports (GitHub only initially)

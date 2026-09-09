@@ -7,10 +7,11 @@ on:
   schedule: daily
   workflow_dispatch:
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine: pi
+model: copilot/auto
 strict: true
 network:
   allowed:
@@ -39,9 +40,6 @@ evals:
   - id: issues_closed_or_noop
     question: Were completed parent issues closed with a comment, or does the agent output confirm no issues were ready to close?
 
-sandbox:
-  agent:
-    runtime: docker-sbx
 ---
 
 # Sub-Issue Closer 🔒

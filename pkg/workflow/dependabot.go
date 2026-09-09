@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -60,14 +61,14 @@ type GoDependency struct {
 }
 
 // GenerateDependabotManifests generates manifest files and dependabot.yml for detected dependencies
-func (c *Compiler) GenerateDependabotManifests(workflowDataList []*WorkflowData, workflowDir string, forceOverwrite bool) error {
+func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowDataList []*WorkflowData, workflowDir string, forceOverwrite bool) error {
 	dependabotLog.Print("Starting Dependabot manifest generation")
 
 	// Track which ecosystems have dependencies
 	ecosystems := make(map[string]struct {
 	})
 
-	if added, err := c.generateNpmManifests(workflowDataList, workflowDir, forceOverwrite); err != nil {
+	if added, err := c.generateNpmManifests(ctx, workflowDataList, workflowDir, forceOverwrite); err != nil {
 		return err
 	} else if added {
 		ecosystems["npm"] = struct{}{}

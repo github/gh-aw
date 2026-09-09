@@ -1006,7 +1006,7 @@ This is a test workflow.
 
 	// Test with refreshStopTime=false (should preserve existing stop time if lock exists)
 	t.Run("compileWorkflowWithRefresh false", func(t *testing.T) {
-		err := compileWorkflowWithRefresh(context.Background(), workflowFile, false, false, "", false, false)
+		err := compileWorkflowWithRefreshAndActionRef(context.Background(), workflowFile, false, false, "", "", false, false)
 		if err != nil {
 			t.Logf("Compilation failed (expected in test environment): %v", err)
 			// In a test environment without full setup, compilation may fail,
@@ -1016,7 +1016,7 @@ This is a test workflow.
 
 	// Test with refreshStopTime=true (should regenerate stop time)
 	t.Run("compileWorkflowWithRefresh true", func(t *testing.T) {
-		err := compileWorkflowWithRefresh(context.Background(), workflowFile, false, false, "", true, false)
+		err := compileWorkflowWithRefreshAndActionRef(context.Background(), workflowFile, false, false, "", "", true, false)
 		if err != nil {
 			t.Logf("Compilation failed (expected in test environment): %v", err)
 			// In a test environment without full setup, compilation may fail,

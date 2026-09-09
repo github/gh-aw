@@ -80,7 +80,8 @@ type Compiler struct {
 	// buildInitialWorkflowData for the workflow's configured model; any returned pricing is merged
 	// into WorkflowData.ModelCosts so it is embedded in GH_AW_INFO_MODEL_COSTS in the lock.yml.
 	// Injected by the cli package (which has access to the embedded catalog and models.dev download).
-	modelPricingResolver func(ctx context.Context, provider, model string) (map[string]float64, bool)
+	modelPricingResolver     func(ctx context.Context, provider, model string) (map[string]float64, bool)
+	configuredModelValidator func(data *WorkflowData) []string
 }
 
 type allowedDomain struct {

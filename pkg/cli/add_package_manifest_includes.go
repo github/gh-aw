@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -51,6 +52,14 @@ func extractManifestIncludes(value any, manifestPath string) ([]repositoryPackag
 	var warnings []string
 	appendRawEntry := func(item any) error {
 		if include, ok := stringValue(item); ok {
+			include = strings.TrimSpace(include)
+			if path.Base(filepath.ToSlash(include)) == repositoryPackageManifestFileName {
+				cleaned, err := cleanManifestImportPath(include)
+				if err != nil {
+					return fmt.Errorf("invalid Agentic Workflow manifest %q: include %q is invalid: %w", manifestPath, include, err)
+				}
+				include = cleaned
+			}
 			rawIncludes = append(rawIncludes, repositoryPackageInclude{Source: include})
 			return nil
 		}
@@ -83,7 +92,7 @@ func extractManifestIncludes(value any, manifestPath string) ([]repositoryPackag
 	normalized := make([]repositoryPackageInclude, 0, len(rawIncludes))
 	seen := make(map[repositoryPackageInclude]struct{})
 	for _, include := range rawIncludes {
-		if !include.isMapping() && !isSupportedManifestIncludePath(include.Source) {
+		if !include.isMapping() && !isSupportedManifestIncludePath(include.Source) && !isManifestImportPath(include.Source) {
 			warnings = append(warnings, fmt.Sprintf("Ignoring includes entry %q in %s: use workflow files (workflows/, agentic-workflows/, .github/workflows/), skill directories (skills/, .github/skills/), agent markdown files (agents/, .github/agents/), or a source/destination mapping", include.Source, manifestPath))
 			continue
 		}
@@ -115,15 +124,35 @@ func parseManifestIncludeMapping(mapping map[string]any, manifestPath string) (r
 	if err != nil {
 		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes source %q is invalid: %w. Sources must be package-relative paths without '..' segments. Example:\nincludes:\n  - source: payload/workflows/reviewer.md\n    destination: %sreviewer.md", manifestPath, source, err, constants.WorkflowsDirSlash)
 	}
-	sourceKind, err := manifestIncludeKindForPath(cleanedSource)
-	if err != nil {
-		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes source %q is invalid: %w", manifestPath, source, err)
+	_, wildcard := manifestIncludeWildcardParent(cleanedSource)
+	if strings.Contains(cleanedSource, "*") && !wildcard {
+		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes source %q is invalid: wildcards must be a single trailing /*", manifestPath, source)
 	}
 
 	cleanedDestination, err := cleanManifestRelativePath(destination)
 	if err != nil {
 		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes destination %q is invalid: %w. Destinations must be repository-root-relative paths without '..' segments. Example:\nincludes:\n  - source: payload/workflows/reviewer.md\n    destination: %sreviewer.md", manifestPath, destination, err, constants.WorkflowsDirSlash)
 	}
+
+	if wildcard {
+		if cleanedDestination != constants.WorkflowsDir {
+			return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes destination %q is invalid: wildcard destinations must be the %s folder", manifestPath, destination, constants.WorkflowsDir)
+		}
+		if kind != "" && kind != manifestIncludeKindAgenticWorkflow && kind != manifestIncludeKindActionWorkflow {
+			return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes entry declares unsupported kind %q. Use kind: %s or kind: %s", manifestPath, kind, manifestIncludeKindAgenticWorkflow, manifestIncludeKindActionWorkflow)
+		}
+		return repositoryPackageInclude{
+			Source:      cleanedSource,
+			Destination: cleanedDestination,
+			Kind:        kind,
+		}, nil
+	}
+
+	sourceKind, err := manifestIncludeKindForPath(cleanedSource)
+	if err != nil {
+		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes source %q is invalid: %w", manifestPath, source, err)
+	}
+
 	if err := validateManifestIncludeDestination(cleanedDestination, sourceKind); err != nil {
 		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes destination %q is invalid: %w", manifestPath, destination, err)
 	}
@@ -143,7 +172,7 @@ func parseManifestIncludeMapping(mapping map[string]any, manifestPath string) (r
 // paths that escape their root.
 func cleanManifestRelativePath(p string) (string, error) {
 	slashed := filepath.ToSlash(p)
-	if strings.HasPrefix(slashed, "/") || strings.HasPrefix(slashed, "\\") || filepath.IsAbs(p) || isWindowsDriveRelativePath(slashed) {
+	if slashed != "" && ((slashed[0] == '/' || slashed[0] == '\\') || filepath.IsAbs(p) || isWindowsDriveRelativePath(slashed)) {
 		return "", errors.New("absolute paths are not allowed")
 	}
 	cleaned := path.Clean(slashed)
@@ -228,6 +257,7 @@ func extractManifestFiles(value any, manifestPath string) ([]string, []string) {
 		normalized = append(normalized, file)
 	}
 
+	addPackageManifestLog.Printf("Extracted %d files entries from %s (%d warnings)", len(normalized), manifestPath, len(warnings))
 	return normalized, warnings
 }
 
@@ -265,6 +295,7 @@ func splitManifestIncludePaths(includes []repositoryPackageInclude) (installable
 			installable = append(installable, include)
 		}
 	}
+	addPackageManifestLog.Printf("Split %d includes entries into %d installable, %d skill dir(s), %d agent file(s)", len(includes), len(installable), len(skillDirs), len(agentFiles))
 	return installable, skillDirs, agentFiles
 }
 
@@ -335,6 +366,7 @@ func extractManifestAgentFiles(value any, manifestPath string) ([]string, []stri
 		seen[file] = struct{}{}
 		normalized = append(normalized, file)
 	}
+	addPackageManifestLog.Printf("Extracted %d agent files from %s (%d warnings)", len(normalized), manifestPath, len(warnings))
 	return normalized, warnings
 }
 
@@ -369,7 +401,102 @@ func isSupportedAgentFilePath(p string) bool {
 }
 
 func isSupportedManifestIncludePath(p string) bool {
+	if strings.Contains(filepath.ToSlash(p), "*") {
+		parent, ok := manifestIncludeWildcardParent(p)
+		return ok && isSupportedManifestWildcardParent(parent)
+	}
 	return isSupportedPackageInstallablePath(p) || isSupportedSkillDirPath(p) || isSupportedAgentFilePath(p)
+}
+
+func manifestIncludeWildcardParent(p string) (string, bool) {
+	slashed := filepath.ToSlash(p)
+	if !strings.HasSuffix(slashed, "/*") || strings.Count(slashed, "*") != 1 {
+		return "", false
+	}
+	parent := strings.TrimSuffix(slashed, "/*")
+	if parent == "" {
+		return "", false
+	}
+	cleaned, err := cleanManifestRelativePath(parent)
+	if err != nil || cleaned != parent {
+		return "", false
+	}
+	return parent, true
+}
+
+func isSupportedManifestWildcardParent(parent string) bool {
+	switch parent {
+	case "workflows", "agentic-workflows", constants.WorkflowsDir,
+		"skills", "agents", constants.GithubDir + packageSkillsDirectory,
+		constants.GithubDir + packageAgentsDirectory:
+		return true
+	default:
+		return false
+	}
+}
+
+func expandManifestWildcardMatches(include repositoryPackageInclude, parent string, candidates []string, isSupported func(string) bool) ([]repositoryPackageInclude, error) {
+	sort.Strings(candidates)
+	matches := make([]repositoryPackageInclude, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate = filepath.ToSlash(candidate)
+		relative := strings.TrimPrefix(candidate, parent+"/")
+		if relative == candidate || relative == "" || strings.Contains(relative, "/") {
+			continue
+		}
+		source := path.Join(parent, relative)
+		if isSupported(source) {
+			match := repositoryPackageInclude{Source: source}
+			if include.isMapping() {
+				sourceKind, err := manifestIncludeKindForPath(source)
+				if err != nil {
+					continue
+				}
+				if include.Kind != "" && include.Kind != sourceKind {
+					return nil, fmt.Errorf("includes wildcard %q declares kind %q but matched source %q is a %s", include.Source, include.Kind, source, sourceKind)
+				}
+				match.Destination = path.Join(include.Destination, path.Base(source))
+				match.Kind = sourceKind
+			}
+			matches = append(matches, match)
+		}
+	}
+	return matches, nil
+}
+
+func expandManifestWildcardCandidates(include repositoryPackageInclude, parent string, fileCandidates, dirCandidates []string) ([]repositoryPackageInclude, error) {
+	isSupportedFile := func(source string) bool {
+		if include.isMapping() {
+			_, err := manifestIncludeKindForPath(source)
+			return err == nil
+		}
+		return isSupportedPackageInstallablePath(source) || isSupportedAgentFilePath(source)
+	}
+	expanded, err := expandManifestWildcardMatches(include, parent, fileCandidates, isSupportedFile)
+	if err != nil {
+		return nil, err
+	}
+	if include.isMapping() {
+		return expanded, nil
+	}
+	dirMatches, err := expandManifestWildcardMatches(include, parent, dirCandidates, isSupportedSkillDirPath)
+	if err != nil {
+		return nil, err
+	}
+	return append(expanded, dirMatches...), nil
+}
+
+func deduplicateManifestIncludes(includes []repositoryPackageInclude) []repositoryPackageInclude {
+	deduplicated := make([]repositoryPackageInclude, 0, len(includes))
+	seen := make(map[repositoryPackageInclude]struct{}, len(includes))
+	for _, include := range includes {
+		if _, exists := seen[include]; exists {
+			continue
+		}
+		seen[include] = struct{}{}
+		deduplicated = append(deduplicated, include)
+	}
+	return deduplicated
 }
 
 func isSupportedSkillDirectoryPrefix(cleaned string) bool {

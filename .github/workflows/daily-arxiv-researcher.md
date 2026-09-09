@@ -10,9 +10,8 @@ permissions:
   contents: read
   copilot-requests: write
 
-engine:
-  id: crush
-model: copilot/claude-sonnet-4.5
+engine: copilot
+model: large
 
 timeout-minutes: 20
 max-ai-credits: 300
@@ -39,7 +38,6 @@ network:
     - export.arxiv.org
 
 imports:
-  - shared/crush.md
   - shared/mcp/kreuzberg.md
 
 safe-outputs:
@@ -143,7 +141,7 @@ steps:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 features:
   gh-aw-detection: true
 ---

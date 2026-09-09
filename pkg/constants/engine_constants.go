@@ -276,6 +276,12 @@ const (
 	// runtime to start the sidecar without any argument parsing.
 	CopilotSDKServerArgsEnvVar = "GH_AW_COPILOT_SDK_SERVER_ARGS"
 
+	// CopilotSDKToolConfigEnvVar is the environment variable that holds the
+	// compiler-owned SDK tool contract. The built-in SDK driver uses this
+	// contract for model-visible tool filtering, permission enforcement, and
+	// deterministic custom-tool registration.
+	CopilotSDKToolConfigEnvVar = "GH_AW_COPILOT_SDK_TOOL_CONFIG"
+
 	// CopilotSDKDriverEnvVar is set to "1" when the copilot_sdk_driver.cjs program
 	// is used as the execution command instead of inline SDK handling inside the harness.
 	// The harness checks this flag to run the driver as a regular subprocess via runProcess

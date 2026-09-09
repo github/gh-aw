@@ -10,6 +10,11 @@
       "desc": "Optional workflow description that is rendered as a comment in the generated GitHub Actions YAML file (.lock.yml)",
       "leaf": true
     },
+    "intent": {
+      "type": "string",
+      "desc": "Optional statement of the durable outcome the workflow exists to achieve.",
+      "leaf": true
+    },
     "emoji": {
       "type": "string",
       "desc": "Optional emoji to represent the workflow visually in listings and UI surfaces.",
@@ -310,6 +315,11 @@
           "desc": "Environment name that requires manual approval before the workflow can run.",
           "leaf": true
         },
+        "cooldown": {
+          "type": "string",
+          "desc": "Minimum time after the most recent completed workflow run where the agent job started before another agent run may start.",
+          "leaf": true
+        },
         "reaction": {
           "type": "string|integer|object",
           "desc": "AI reaction to add/remove on triggering item.",
@@ -473,6 +483,18 @@
         "organization-projects": {
           "type": "string",
           "desc": "Permission level for organization projects (read/write/none).",
+          "enum": ["read", "write", "none"],
+          "leaf": true
+        },
+        "organization-custom-org-roles": {
+          "type": "string",
+          "desc": "Permission level for organization custom org roles (read/write/none).",
+          "enum": ["read", "write", "none"],
+          "leaf": true
+        },
+        "organization-custom-repository-roles": {
+          "type": "string",
+          "desc": "Permission level for organization custom repository roles (read/write/none).",
           "enum": ["read", "write", "none"],
           "leaf": true
         },
@@ -900,6 +922,11 @@
               "enum": [true, false],
               "leaf": true
             },
+            "ca-cert": {
+              "type": "string",
+              "desc": "Host path to an additional CA certificate for API proxy upstream TLS verification.",
+              "leaf": true
+            },
             "runtime": {
               "type": "string",
               "desc": "Sandbox runtime profile for the agent container.",
@@ -1037,9 +1064,9 @@
               "desc": "Port number for the MCP gateway HTTP server (default: 8080)",
               "leaf": true
             },
-            "api-key": {
+            "agent-id": {
               "type": "string",
-              "desc": "API key for authenticating with the MCP gateway (supports ${{ secrets.* }} syntax)",
+              "desc": "Agent/session identifier for authenticating with the MCP gateway (supports ${{ secrets.* }} syntax)",
               "leaf": true
             },
             "domain": {
@@ -1843,6 +1870,76 @@
             }
           }
         },
+        "linear": {
+          "type": "null|object",
+          "desc": "Linear tools provided by Linear's official hosted MCP server",
+          "children": {
+            "token": {
+              "type": "string",
+              "desc": "Optional Linear API key or OAuth access token secret reference. Defaults to ${{ secrets.LINEAR_API_KEY }}.",
+              "leaf": true
+            },
+            "toolsets": {
+              "type": "string|array",
+              "desc": "Linear MCP toolset name(s) to enable. Toolsets are expanded to gateway-enforced allowed tools.",
+              "enum": ["all", "attachments", "comments", "customers", "cycles", "diffs", "documentation", "documents", "initiatives", "issues", "milestones", "projects", "status_updates", "teams", "users"],
+              "leaf": true,
+              "array": true
+            },
+            "allowed": {
+              "type": "array",
+              "desc": "List of allowed Linear MCP tool names or wildcard patterns. When toolsets are set, every pattern must match a tool in those toolsets.",
+              "array": true
+            },
+            "required": {
+              "type": "boolean",
+              "desc": "Whether failure to connect to Linear should fail MCP gateway startup. Defaults to true.",
+              "enum": [true, false],
+              "leaf": true
+            }
+          }
+        },
+        "jira": {
+          "type": "boolean|object",
+          "desc": "Jira tools provided by Atlassian's remote Rovo MCP service.",
+          "enum": [false],
+          "children": {
+            "url": {
+              "type": "string",
+              "desc": "Atlassian Rovo MCP endpoint.",
+              "leaf": true
+            },
+            "allowed": {
+              "type": "array",
+              "desc": "Approved read-only Jira MCP tools the agent may call. Required; write-capable tools are not supported. \"*\" expands to all approved read-only tools; the full, unrestricted MCP tool set can never be enabled.",
+              "enum": [
+                "*",
+                "getIssueLinkTypes",
+                "getJiraIssue",
+                "getJiraIssueRemoteIssueLinks",
+                "getJiraIssueTypeMetaWithFields",
+                "getJiraProjectIssueTypesMetadata",
+                "getTransitionsForJiraIssue",
+                "getVisibleJiraProjects",
+                "lookupJiraAccountId",
+                "searchJiraIssuesUsingJql"
+              ],
+              "array": true
+            },
+            "auth": {
+              "type": "object",
+              "desc": "Non-interactive authentication for GitHub Actions.",
+              "children": {
+                "type": {},
+                "token": {
+                  "type": "string",
+                  "desc": "Atlassian service account API key, sent with the HTTP bearer scheme.",
+                  "leaf": true
+                }
+              }
+            }
+          }
+        },
         "bash": {
           "type": "null|boolean|array",
           "desc": "Bash shell command execution tool.",
@@ -1873,22 +1970,17 @@
         },
         "playwright": {
           "type": "null|object",
-          "desc": "Playwright browser automation tool for web scraping, testing, and UI interactions in containerized browsers",
+          "desc": "Playwright CLI browser automation tool for web scraping, testing, and UI interactions",
           "children": {
             "version": {
               "type": "string|number",
-              "desc": "Optional version pin.",
+              "desc": "Optional @playwright/cli npm package version pin.",
               "leaf": true
-            },
-            "args": {
-              "type": "array",
-              "desc": "Optional additional arguments to append to the generated MCP server command (MCP mode only)",
-              "array": true
             },
             "mode": {
               "type": "string",
-              "desc": "Integration mode: 'cli' (recommended) installs @playwright/cli via npm for token-efficient CLI invocations — use play...",
-              "enum": ["cli", "mcp"],
+              "desc": "Integration mode. Only 'cli' is supported; 'mcp' is rejected with migration guidance.",
+              "enum": ["cli"],
               "leaf": true
             }
           }
@@ -3625,6 +3717,7 @@
   "sortOrder": [
     "name",
     "description",
+    "intent",
     "on",
     "engine",
     "permissions",

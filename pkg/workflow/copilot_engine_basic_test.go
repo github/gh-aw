@@ -108,6 +108,9 @@ func TestCopilotEngineInstallationSteps(t *testing.T) {
 	if !strings.Contains(sdkInstallStep, expectedSDKInstall) {
 		t.Fatalf("Expected SDK install command %q, got:\n%s", expectedSDKInstall, sdkInstallStep)
 	}
+	if !strings.Contains(sdkInstallStep, copilotSDKWebFetchDependency) {
+		t.Fatalf("Expected SDK install command to include %q, got:\n%s", copilotSDKWebFetchDependency, sdkInstallStep)
+	}
 }
 
 func TestCopilotEngineInstallationSteps_WithLSPConfig(t *testing.T) {
@@ -262,7 +265,7 @@ func TestCopilotEngineInstallationWithCommandAndCopilotSDK(t *testing.T) {
 			name:          "ts-node command installs ts-node and typescript alongside sdk",
 			command:       "ts-node driver.ts",
 			expectedName:  "name: Install GitHub Copilot SDK (TypeScript)",
-			expectedRun:   "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion) + " ts-node typescript",
+			expectedRun:   "npm install --ignore-scripts --no-save @github/copilot-sdk@" + string(constants.DefaultCopilotSDKVersion) + " " + copilotSDKWebFetchDependency + " ts-node typescript",
 			expectedSteps: 1,
 		},
 		{

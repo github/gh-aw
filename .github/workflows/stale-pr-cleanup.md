@@ -20,7 +20,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [pull_requests, repos, issues]
   bash:
     - "jq *"
@@ -46,7 +46,7 @@ evals:
     question: Were the appropriate stale PR comments, labels, and closures applied when needed, or was noop used correctly when no action was required?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Stale PR Cleanup Agent 🧹

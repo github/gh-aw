@@ -72,23 +72,25 @@ With the JavaScript global flag (`/pattern/g`), zero-width matches can cause inf
 
 ## Validation Tests
 
-All error patterns must pass these tests:
+All error patterns must pass the same safety checks used by the repo’s unit suite:
 
-### Go Tests (pkg/workflow/engine_error_patterns_infinite_loop_test.go)
+### Go tests
 
 ```go
 // Test that pattern doesn't match empty string
 func TestPatternSafety(t *testing.T) {
     pattern := "your-pattern"
     regex := regexp.MustCompile(pattern)
-    
+
     if regex.MatchString("") {
         t.Error("Pattern matches empty string!")
     }
 }
 ```
 
-### JavaScript Tests (pkg/workflow/js/validate_errors.test.cjs)
+Run the relevant package tests with `make test-unit`.
+
+### JavaScript tests
 
 ```javascript
 test("should not match empty string", () => {
@@ -97,16 +99,17 @@ test("should not match empty string", () => {
 });
 ```
 
-## Safety Mechanisms in validate_errors.cjs
+Use the relevant `*.test.cjs` suite under `actions/setup/js/` or `pkg/workflow/js/` for the area you changed, or run the repo’s JavaScript checks via `make test-js`.
 
-The `validate_errors.cjs` script has built-in protections:
+## Safety Mechanisms in the validation layer
 
-1. **Zero-width detection**: Checks if `regex.lastIndex` stops advancing
-2. **Iteration warning**: Warns at 1000 iterations
-3. **Hard limit**: Stops at 10,000 iterations to prevent hang
+The repo’s validation helpers include built-in protections for dangerous regex patterns:
+
+1. **Zero-width detection**: Checks whether a regex stops advancing across iterations
+2. **Iteration warning**: Warns when repeated runs approach a hang threshold
+3. **Hard limit**: Stops execution before runaway loops can lock the process
 
 ```javascript
-// Safety check in validate_errors.cjs
 if (regex.lastIndex === lastIndex) {
   core.error(`Infinite loop detected! Pattern: ${pattern.pattern}`);
   break;
@@ -191,17 +194,13 @@ Pattern: `\berror\b.*` // Requires word "error"
 Before committing pattern changes:
 
 - [ ] Run `make test-unit`
-- [ ] Check `TestAllEnginePatternsSafe` passes
-- [ ] Check `TestErrorPatternsNoInfiniteLoopPotential` passes
-- [ ] Run JavaScript tests: `cd pkg/workflow/js && npm test`
-- [ ] Verify pattern matches intended error messages
-- [ ] Verify pattern doesn't match informational text
+- [ ] Verify the relevant engine error-pattern tests still pass
+- [ ] Run the JavaScript checks for the changed area with `make test-js` or the targeted Vitest suite
+- [ ] Verify the pattern matches intended error messages
+- [ ] Verify the pattern does not match informational text or empty-string edge cases
 
 ## References
 
 - Go regex syntax: https://pkg.go.dev/regexp/syntax
 - JavaScript regex: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions
-- Test files:
-  - `pkg/workflow/engine_error_patterns_infinite_loop_test.go`
-  - `pkg/workflow/js/validate_errors.test.cjs`
-  - `pkg/workflow/error_pattern_tuning_test.go`
+- Current repo validation: `make test-unit` and `make test-js`

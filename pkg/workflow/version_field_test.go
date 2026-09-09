@@ -92,91 +92,22 @@ func TestVersionField(t *testing.T) {
 			t.Errorf("Expected to find v2.0.0 in args, got: %v", configs[0].Args)
 		}
 
-		// Test Playwright tool with "version" field
-		frontmatterPlaywright := map[string]any{
-			"tools": map[string]any{
-				"playwright": map[string]any{
-					"version": "v1.41.0",
-				},
-			},
-		}
+	})
 
-		configs, err = parser.ExtractMCPConfigurations(frontmatterPlaywright, "")
-		if err != nil {
-			t.Fatalf("Error parsing Playwright with version field: %v", err)
+	t.Run("Playwright CLI version field extraction", func(t *testing.T) {
+		config := parsePlaywrightTool(map[string]any{"version": "0.1.18"})
+		if config.Version != "0.1.18" {
+			t.Errorf("Expected 0.1.18, got %s", config.Version)
 		}
+	})
 
-		if len(configs) == 0 {
-			t.Fatal("No configs returned")
-		}
-
-		found = false
-		for _, arg := range configs[0].Args {
-			if strings.Contains(arg, "mcr.microsoft.com/playwright:v1.41.0") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected to find v1.41.0 in args, got: %v", configs[0].Args)
-		}
-
-		// Test Playwright tool with integer version
-		frontmatterPlaywrightInt := map[string]any{
-			"tools": map[string]any{
-				"playwright": map[string]any{
-					"version": 20,
-				},
-			},
-		}
-
-		configs, err = parser.ExtractMCPConfigurations(frontmatterPlaywrightInt, "")
-		if err != nil {
-			t.Fatalf("Error parsing Playwright with integer version: %v", err)
-		}
-
-		if len(configs) == 0 {
-			t.Fatal("No configs returned")
-		}
-
-		found = false
-		for _, arg := range configs[0].Args {
-			if strings.Contains(arg, "mcr.microsoft.com/playwright:20") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected to find :20 in args, got: %v", configs[0].Args)
-		}
-
-		// Test Playwright tool with float version
-		frontmatterPlaywrightFloat := map[string]any{
-			"tools": map[string]any{
-				"playwright": map[string]any{
-					"version": 1.41,
-				},
-			},
-		}
-
-		configs, err = parser.ExtractMCPConfigurations(frontmatterPlaywrightFloat, "")
-		if err != nil {
-			t.Fatalf("Error parsing Playwright with float version: %v", err)
-		}
-
-		if len(configs) == 0 {
-			t.Fatal("No configs returned")
-		}
-
-		found = false
-		for _, arg := range configs[0].Args {
-			if strings.Contains(arg, "mcr.microsoft.com/playwright:1.41") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected to find :1.41 in args, got: %v", configs[0].Args)
+	t.Run("Custom mcp-servers.playwright is not classified as CLI tool", func(t *testing.T) {
+		config := parsePlaywrightTool(map[string]any{
+			"command": "npx",
+			"args":    []any{"--yes", "@playwright/mcp@0.0.79"},
+		})
+		if config != nil {
+			t.Errorf("Expected nil PlaywrightToolConfig for custom MCP server entry, got: %+v", config)
 		}
 	})
 }

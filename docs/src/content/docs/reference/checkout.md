@@ -124,6 +124,26 @@ checkout: false
 
 This is equivalent to omitting the checkout step from the agent job. Custom dev-mode steps (such as "Checkout actions folder") are unaffected.
 
+## Target-Only Checkout (`permissions.contents: none`)
+
+Sidecar (MultiRepoOps) workflows often need to operate on a target repository without checking out the repository that hosts the workflow itself. Setting `permissions.contents: none` suppresses only the default workflow-repository checkout and the "Checkout PR branch" step; any other explicitly configured `checkout:` entries (such as a target repository) are still checked out normally:
+
+```yaml wrap
+permissions:
+  contents: none
+checkout:
+  - repository: octo-org/target-repository
+    path: target
+    github-app:
+      client-id: ${{ vars.TARGET_APP_CLIENT_ID }}
+      private-key: ${{ secrets.TARGET_APP_PRIVATE_KEY }}
+      owner: octo-org
+      repositories:
+        - target-repository
+```
+
+This differs from `checkout: false`, which disables checkout entirely (including any additional configured repositories). With `permissions.contents: none`, only the workflow's own repository is skipped.
+
 ## `pull_request_target` Checkout
 
 For `pull_request_target` workflows, the "Checkout PR branch" step is auto-disabled when no `checkout:` key is present in frontmatter. This prevents hard failures when the PR head branch is deleted (merged/closed events) or inaccessible (fork PRs).

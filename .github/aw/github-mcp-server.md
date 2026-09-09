@@ -44,6 +44,8 @@ tools:
 ```
 
 > ⚠️ **Do NOT use `mode: remote`** in GitHub Actions workflows. Remote mode does not work with the GitHub Actions token (`GITHUB_TOKEN`) — it requires a special PAT or GitHub App token with MCP access. The default `mode: local` (Docker-based) works with `GITHUB_TOKEN` and should always be used.
+>
+> GitHub App authentication only scopes the token. It does not replace DIFC guard policy labels. When safe outputs are enabled, compile the workflow and confirm the lock file includes both `mcp_servers.github.guard-policies.allow-only` and `mcp_servers.safeoutputs.guard-policies.write-sink`.
 
 ### Toolset Options
 

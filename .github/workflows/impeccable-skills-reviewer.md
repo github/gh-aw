@@ -19,7 +19,10 @@ permissions:
 features:
   gh-aw-detection: true
 
-model: claude-sonnet-4.6
+network:
+  allowed: [defaults, go]
+
+model: claude-sonnet-5
 engine:
   id: copilot
   max-continuations: 6

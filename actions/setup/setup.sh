@@ -40,24 +40,32 @@ create_dir() {
   fi
 }
 
+# Git Bash does not automatically convert Windows environment-variable paths.
+# Preserve RUNNER_TEMP for JavaScript consumers, but use a Bash-compatible path here.
+if [[ "$(uname -o 2>/dev/null)" == "Msys" ]] && command -v cygpath >/dev/null 2>&1; then
+  RUNNER_TEMP_BASH="$(cygpath -u "${RUNNER_TEMP}")"
+else
+  RUNNER_TEMP_BASH="${RUNNER_TEMP}"
+fi
+
 # GH_AW_ROOT uses RUNNER_TEMP for write access on both GitHub-hosted and self-hosted runners.
 # RUNNER_TEMP is guaranteed to be set by GitHub Actions and is always writable.
-GH_AW_ROOT="${RUNNER_TEMP}/gh-aw"
+GH_AW_ROOT="${RUNNER_TEMP_BASH}/gh-aw"
 
 # Verify RUNNER_TEMP is set and the directory has write access
-if [ -z "${RUNNER_TEMP}" ]; then
+if [ -z "${RUNNER_TEMP_BASH}" ]; then
   echo "::error::RUNNER_TEMP environment variable is not set. This script must run in a GitHub Actions environment."
   exit 1
 fi
 
-if [ ! -d "${RUNNER_TEMP}" ]; then
-  echo "::error::RUNNER_TEMP directory does not exist: ${RUNNER_TEMP}"
+if [ ! -d "${RUNNER_TEMP_BASH}" ]; then
+  echo "::error::RUNNER_TEMP directory does not exist: ${RUNNER_TEMP_BASH}"
   exit 1
 fi
 
-if [ ! -w "${RUNNER_TEMP}" ]; then
-  echo "::error::RUNNER_TEMP directory is not writable: ${RUNNER_TEMP}"
-  echo "::error::The runner user ($(whoami)) does not have write access to ${RUNNER_TEMP}"
+if [ ! -w "${RUNNER_TEMP_BASH}" ]; then
+  echo "::error::RUNNER_TEMP directory is not writable: ${RUNNER_TEMP_BASH}"
+  echo "::error::The runner user ($(whoami)) does not have write access to ${RUNNER_TEMP_BASH}"
   exit 1
 fi
 
@@ -66,9 +74,9 @@ fi
 # (runtime tree). When RUNNER_TEMP=/tmp both paths collapse into /tmp/gh-aw, giving
 # the agent write access to compiled scripts, prompts, and MCP configs that must stay
 # immutable. Fail fast here rather than silently running with a broken security boundary.
-RESOLVED_RUNNER_TEMP="$(cd "${RUNNER_TEMP}" && pwd -P)"
+RESOLVED_RUNNER_TEMP="$(cd "${RUNNER_TEMP_BASH}" && pwd -P)"
 if [ -z "${RESOLVED_RUNNER_TEMP}" ]; then
-  echo "::error::Failed to resolve canonical path for RUNNER_TEMP: ${RUNNER_TEMP}"
+  echo "::error::Failed to resolve canonical path for RUNNER_TEMP: ${RUNNER_TEMP_BASH}"
   exit 1
 fi
 if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
@@ -76,10 +84,13 @@ if [ "${RESOLVED_RUNNER_TEMP%/}" = "/tmp" ]; then
   exit 1
 fi
 
-debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
+debug_log "Using RUNNER_TEMP: ${RUNNER_TEMP_BASH} (resolved: ${RESOLVED_RUNNER_TEMP}, writable: yes)"
 
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-${GH_AW_ROOT}/actions}"
+if [[ "$(uname -o 2>/dev/null)" == "Msys" ]] && command -v cygpath >/dev/null 2>&1; then
+  DESTINATION="$(cygpath -u "${DESTINATION}")"
+fi
 
 # Get safe-output-custom-tokens flag from input (default: false)
 SAFE_OUTPUT_CUSTOM_TOKENS_ENABLED="${INPUT_SAFE_OUTPUT_CUSTOM_TOKENS:-false}"
@@ -310,6 +321,7 @@ SAFE_OUTPUTS_FILES=(
   "read_buffer.cjs"
   "mcp_scripts_validation.cjs"
   "memory_custom_validation.cjs"
+  "memory_file_eligibility.cjs"
   "messages.cjs"
   "messages_core.cjs"
   "messages_footer.cjs"

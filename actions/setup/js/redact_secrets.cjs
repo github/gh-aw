@@ -75,6 +75,9 @@ const BUILT_IN_PATTERNS = [
 
   // Anthropic tokens
   { name: "Anthropic API Key", pattern: /sk-ant-api03-[a-zA-Z0-9_-]{95}/g },
+
+  // Linear tokens
+  { name: "Linear API Key", pattern: /lin_api_[0-9A-Za-z]{40}/g },
 ];
 
 /**

@@ -428,6 +428,7 @@ type compileCmdOptions struct {
 	showAllErrors             bool
 	fix                       bool
 	stats                     bool
+	models                    bool
 	failFast                  bool
 	noCheckUpdate             bool
 	staged                    bool
@@ -472,6 +473,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	showAllErrors, _ := cmd.Flags().GetBool("show-all")
 	fix, _ := cmd.Flags().GetBool("fix")
 	stats, _ := cmd.Flags().GetBool("stats")
+	models, _ := cmd.Flags().GetBool("models")
 	failFast, _ := cmd.Flags().GetBool("fail-fast")
 	noCheckUpdate, _ := cmd.Flags().GetBool("no-check-update")
 	scheduleSeed, _ := cmd.Flags().GetString("schedule-seed")
@@ -488,7 +490,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		validate: validate, watch: watch, noEmit: noEmit, purge: purge, strict: strict, trial: trial, dependabot: dependabot,
 		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
 		zizmor: zizmor, poutine: poutine, actionlint: actionlint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
-		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, failFast: failFast, noCheckUpdate: noCheckUpdate,
+		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
 	}
 }
@@ -521,7 +523,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
-		Stats: o.stats, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
+		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
 		ValidateImages: o.validateImages, PriorManifestFile: o.priorManifestFile, GHESCompat: o.ghes, UseSamples: o.useSamples,
 	}
 }
@@ -546,7 +548,9 @@ func runCompileCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	if _, err := cli.CompileWorkflows(cmd.Context(), opts.toCompileConfig(args)); err != nil {
+	config := opts.toCompileConfig(args)
+	cli.PrepareCompileModelValidation(cmd.Context(), &config)
+	if _, err := cli.CompileWorkflows(cmd.Context(), config); err != nil {
 		return err
 	}
 	return nil
@@ -793,6 +797,7 @@ func configureCompileToolFlags() {
 	compileCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
 	compileCmd.Flags().Bool("show-all", false, "Display all compilation errors instead of only the highest-priority subset (default: top 5)")
 	compileCmd.Flags().Bool("stats", false, "Display statistics table sorted by workflow file size (shows jobs, steps, scripts, and shells)")
+	compileCmd.Flags().Bool("models", false, "Warn when models configured in models or engine.models are absent from the active model inventory")
 	compileCmd.Flags().Bool("fail-fast", false, "Stop at the first validation error instead of collecting all errors")
 	compileCmd.Flags().Bool("no-check-update", false, "Skip checking for gh-aw updates")
 	compileCmd.Flags().String("schedule-seed", "", "Override the repository slug (owner/repo) used as seed for fuzzy schedule scattering (e.g., \"github/gh-aw\"). Bypasses git remote detection entirely. Use this when your git remote is not named \"origin\" and you have multiple remotes configured")

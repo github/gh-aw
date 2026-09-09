@@ -30,7 +30,7 @@ import WorkflowHero from '../../components/WorkflowHero.astro';
 
 Wake up to ready-to-review repository improvements — automated triage, CI insights, docs updates, and test enhancements. Use event-triggered and scheduled jobs to augment your existing, deterministic CI/CD with AI-powered intelligence.
 
-GitHub Agentic Workflows deliver repository automation: simple markdown workflows running the coding agents you know and love, in GitHub Actions, with strong guardrails and security-first design principles. Supported AI engines include GitHub Copilot, Claude Code, Google Gemini and OpenAI Codex.
+GitHub Agentic Workflows deliver repository automation: simple markdown workflows running the coding agents you know and love, in GitHub Actions, with strong guardrails and security-first design principles. Supported AI engines include GitHub Copilot, Claude Code, Google Gemini and OpenAI Codex. Supported sandbox runtimes include standard Docker and preview `cloud-hypervisor`.
 
 Developed by GitHub, GitHub Agentic Workflows run with strong guardrails, using safe outputs and sandboxed execution to help keep your repository safe.
 
@@ -49,8 +49,8 @@ Developed by GitHub, GitHub Agentic Workflows run with strong guardrails, using 
   <FeatureCard icon="key" title="Guardrails Built-In" href="#guardrails-built-in">
     Sandboxing, scoped permissions, and safe outputs reduce risk of compromise
   </FeatureCard>
-  <FeatureCard icon="mark-github" title="GitHub Integration" href="/gh-aw/reference/github-tools/">
-    Deep integration with Actions, Issues, PRs, Discussions, and repository management
+  <FeatureCard icon="server" title="Self-Hosted &amp; ARC Runners" href="/gh-aw/reference/self-hosted-runners/">
+    Deploy on Linux self-hosted runners, including ARC with Docker-in-Docker
   </FeatureCard>
   <FeatureCard icon="server" title="Use at Scale in Organizations" href="/gh-aw/guides/using-at-scale/">
     Use at scale in you organization or enterprise across multiple repositories
@@ -61,15 +61,6 @@ Developed by GitHub, GitHub Agentic Workflows run with strong guardrails, using 
 
 AI agents can be manipulated by prompt injection or malicious content. GitHub Agentic Workflows uses layered controls: sandboxing, scoped permissions, gated outputs and threat detection. See the [Security Architecture](/gh-aw/introduction/architecture/) for a full breakdown of the layered defense-in-depth model.
 
-```mermaid
-flowchart LR
-    INPUT["Repository + Prompt Input"] --> TOKENS["Read-only Token, No Secrets in Agent"]
-    TOKENS --> SANDBOX["Sandbox + Network Controls"]
-    SANDBOX --> SAFE["Safe Outputs"]
-    SAFE --> DETECT["Threat Detection"]
-    DETECT --> APPLY["Scoped Write Job"]
-```
-
 <FeatureGrid columns={3}>
   <FeatureCard icon="checklist" title="Compile-time validation" href="/gh-aw/introduction/architecture/#compilation-time-security">
     Schema validation, expression allowlisting, action pinning, and security
@@ -78,9 +69,8 @@ flowchart LR
   <FeatureCard icon="key" title="Credential Isolation" href="/gh-aw/introduction/architecture/#agent-workflow-firewall-awf">
     The API proxy isolates the agent from credentials
   </FeatureCard>
-  <FeatureCard icon="container" title="Sandbox & Firewall" href="/gh-aw/introduction/architecture/#agent-workflow-firewall-awf">
-    The agent runs in a container with firewall;
-    explicit opt-outs broaden its access.
+  <FeatureCard icon="container" title="MicroVM Isolation" href="/gh-aw/reference/glossary/#cloud-hypervisor">
+    Run agents in Cloud Hypervisor microVMs on compatible runners
   </FeatureCard>
   <FeatureCard icon="filter" title="Integrity Filtering" href="/gh-aw/reference/integrity/">
     Reduce prompt-injection risk by filtering untrusted GitHub content

@@ -260,8 +260,8 @@ type SecurityProvider interface {
 	GetDefaultDetectionModel() string
 
 	// GetRequiredSecretNames returns the list of secret names that this engine needs for execution
-	// This includes engine-specific auth tokens and the MCP gateway API key when MCP servers are present
-	// Returns: slice of secret names (e.g., ["COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_API_KEY"])
+	// This includes engine-specific auth tokens and the MCP gateway agent ID when MCP servers are present
+	// Returns: slice of secret names (e.g., ["COPILOT_GITHUB_TOKEN", "MCP_GATEWAY_AGENT_ID"])
 	GetRequiredSecretNames(workflowData *WorkflowData) []string
 
 	// GetSupportedEnvVarKeys returns the list of engine.env variable names that this engine

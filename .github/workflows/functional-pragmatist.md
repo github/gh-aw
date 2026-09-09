@@ -21,6 +21,7 @@ network:
     - defaults
     - github
     - go
+    - node
 
 imports:
   - shared/reporting.md
@@ -43,6 +44,10 @@ tools:
     - "*"
 
 timeout-minutes: 45
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: true
 
 

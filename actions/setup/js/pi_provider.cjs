@@ -28,8 +28,8 @@
 "use strict";
 
 const { fetchAWFReflect, AWF_API_PROXY_REFLECT_URL, AWF_REFLECT_OUTPUT_PATH, AWF_REFLECT_TIMEOUT_MS, AWF_MODELS_URL_TIMEOUT_MS } = require("./awf_reflect.cjs");
+const { emitInfrastructureIncomplete } = require("./safeoutputs_cli.cjs");
 const fs = require("fs");
-const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 // Default logger: prefixed with "[gh-aw/pi-provider]" for easy grepping.
@@ -119,8 +119,9 @@ function resolveProviderRequestTarget(model) {
     case "openai-codex-responses":
       return { api, method, url: joinApiUrl(baseUrl, "/responses") };
     case "anthropic":
-    case "anthropic-messages":
       return { api, method, url: joinApiUrl(baseUrl, "/messages") };
+    case "anthropic-messages":
+      return { api, method, url: joinApiUrl(baseUrl, "/v1/messages") };
     case "mistral-conversations":
       return { api, method, url: joinApiUrl(baseUrl, "/conversations") };
     default:
@@ -142,22 +143,15 @@ function formatResponseHeaderNames(headers) {
 }
 
 /**
- * Build a structured report_incomplete payload for infrastructure failures.
- *
- * @param {string} details
- * @returns {string}
- */
-function buildInfrastructureIncompletePayload(details) {
-  return JSON.stringify({
-    type: "report_incomplete",
-    reason: "infrastructure_error",
-    details,
-  });
-}
-
-/**
- * Append a report_incomplete safe output when provider infrastructure fails
+ * Emit a report_incomplete safe output when provider infrastructure fails
  * before any safe outputs have been recorded.
+ *
+ * This Pi extension runs inside the AWF agent sandbox, where the directory
+ * backing GH_AW_SAFE_OUTPUTS is mounted read-only (writes fail with EROFS).
+ * Emission is therefore delegated to the `safeoutputs` CLI (see
+ * safeoutputs_cli.cjs), which forwards the call to the MCP gateway process
+ * that owns write access to the real outputs file — the same channel used
+ * by every other safe-output tool call the agent makes.
  *
  * @param {string} details
  * @param {(msg: string) => void} logger
@@ -176,14 +170,11 @@ function emitInfrastructureIncompleteIfNoSafeOutputs(details, logger) {
       logger(`report_incomplete skipped: safe outputs already recorded at ${safeOutputsPath}`);
       return;
     }
-
-    fs.mkdirSync(path.dirname(safeOutputsPath), { recursive: true });
-    fs.appendFileSync(safeOutputsPath, buildInfrastructureIncompletePayload(details) + "\n", { encoding: "utf8" });
-    logger(`report_incomplete emitted: ${safeOutputsPath}`);
   } catch (error) {
-    const message = getErrorMessage(error);
-    logger(`report_incomplete emission failed: ${message}`);
+    logger(`report_incomplete pre-check failed, proceeding with emission: ${getErrorMessage(error)}`);
   }
+
+  emitInfrastructureIncomplete(details, { safeOutputsPath, logger });
 }
 
 /**
@@ -277,7 +268,12 @@ function registerConfiguredProviders(pi, logger) {
       ["openai", "codex"],
       {
         apiKey: openAIKey,
-        api: "openai-completions",
+        // Real OpenAI models are only published under "openai-responses" in Pi's
+        // upstream model catalog. OpenAI's Chat Completions endpoint rejects function
+        // tools whenever reasoning_effort is anything other than "none", so routing
+        // through /responses keeps tool calling working for reasoning-capable models.
+        // See: https://developers.openai.com/api/docs/guides/responses-vs-chat-completions
+        api: "openai-responses",
         ...(process.env.OPENAI_BASE_URL ? { baseUrl: process.env.OPENAI_BASE_URL } : {}),
       },
       logger
@@ -311,11 +307,14 @@ function piProviderExtension(pi) {
   const log = DEFAULT_LOGGER;
   /** @type {{ api: string, method: string, url: string }|null} */
   let lastProviderRequest = null;
-  /** @type {{ status: number, responseHeaders: string }|null} */
+  /** @type {{ status: number, responseHeaders: string, succeeded: boolean }|null} */
   let lastProviderResponse = null;
+  let providerRequestCount = 0;
+  let successfulProviderResponseCount = 0;
   registerConfiguredProviders(pi, log);
 
   pi.on("before_provider_request", (_event, ctx) => {
+    providerRequestCount += 1;
     lastProviderRequest = resolveProviderRequestTarget(ctx && ctx.model);
     lastProviderResponse = null;
     const provider = ctx?.model?.provider || "(unknown provider)";
@@ -324,10 +323,15 @@ function piProviderExtension(pi) {
   });
 
   pi.on("after_provider_response", (event, ctx) => {
+    const succeeded = event.status >= 200 && event.status < 300;
+    if (succeeded) {
+      successfulProviderResponseCount += 1;
+    }
     const request = lastProviderRequest || resolveProviderRequestTarget(ctx && ctx.model);
     lastProviderResponse = {
       status: event.status,
       responseHeaders: formatResponseHeaderNames(event.headers),
+      succeeded,
     };
     const provider = ctx?.model?.provider || "(unknown provider)";
     const model = ctx?.model?.id || getConfiguredModel() || "(unknown model)";
@@ -345,7 +349,10 @@ function piProviderExtension(pi) {
     log(
       `provider_error provider=${message.provider || "(unknown provider)"} model=${message.model || "(unknown model)"} api=${request.api} status=${status} method=${request.method} url=${request.url} response_headers=${responseHeaders} error=${JSON.stringify(message.errorMessage)}`
     );
-    emitInfrastructureIncompleteIfNoSafeOutputs(`Pi provider request failed before safe outputs were emitted: ${message.errorMessage}`, log);
+    if (lastProviderResponse?.succeeded) {
+      successfulProviderResponseCount -= 1;
+      lastProviderResponse.succeeded = false;
+    }
   });
 
   pi.on("agent_start", async () => {
@@ -394,6 +401,11 @@ function piProviderExtension(pi) {
       });
       logReflectFailure({ phase: "agent_end", provider, model, result, logger: log });
     }
+
+    if (providerRequestCount > 0 && successfulProviderResponseCount === 0) {
+      emitInfrastructureIncompleteIfNoSafeOutputs(`All ${providerRequestCount} Pi provider requests failed before safe outputs were emitted.`, log);
+      process.exitCode = 1;
+    }
   });
 }
 
@@ -406,6 +418,5 @@ _piExports.resolveGatewayUrl = resolveGatewayUrl;
 _piExports.registerConfiguredProviders = registerConfiguredProviders;
 _piExports.resolveProviderRequestTarget = resolveProviderRequestTarget;
 _piExports.formatResponseHeaderNames = formatResponseHeaderNames;
-_piExports.buildInfrastructureIncompletePayload = buildInfrastructureIncompletePayload;
 _piExports.emitInfrastructureIncompleteIfNoSafeOutputs = emitInfrastructureIncompleteIfNoSafeOutputs;
 _piExports.logReflectFailure = logReflectFailure;

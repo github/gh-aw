@@ -1784,62 +1784,6 @@ safe-outputs:
 	}
 }
 
-// --- extractResources tests ---
-
-// TestExtractResources_BasicList verifies that resource paths are extracted from the resources field.
-func TestExtractResources_BasicList(t *testing.T) {
-	content := `---
-engine: copilot
-on: issues
-resources:
-  - triage-issue.md
-  - close-stale.md
-  - my-action.yml
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.NoError(t, err, "should not error for valid resources")
-	assert.Equal(t, []string{"triage-issue.md", "close-stale.md", "my-action.yml"}, resources, "should extract all listed resources")
-}
-
-func TestExtractResources_IncludesGraderEvaluator(t *testing.T) {
-	content := `---
-engine: copilot
-on: issues
-resources:
-  - .github/workflows/graders/example-operational-value.sh
-graders:
-  operational-value:
-    run: .github/workflows/graders/example-operational-value.sh
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.NoError(t, err)
-	assert.Equal(t, []string{".github/workflows/graders/example-operational-value.sh"}, resources)
-}
-
-func TestExtractResources_IncludesDisabledGraderEvaluator(t *testing.T) {
-	content := `---
-on: issues
-graders:
-  operational-value:
-    enabled: false
-    run: ./graders/example-operational-value.sh
-  retries:
-    enabled: true
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"./graders/example-operational-value.sh"}, resources)
-}
-
 func TestFetchAndSaveRemoteResources_InstallsAndRestoresGraderEvaluator(t *testing.T) {
 	tmpDir := t.TempDir()
 	setupMinimalGitRepo(t, tmpDir)
@@ -1891,6 +1835,43 @@ graders:
 	restored, err := os.ReadFile(installedPath)
 	require.NoError(t, err)
 	assert.Equal(t, evaluatorContent, restored)
+}
+
+// TestFetchAndSaveRemoteResources_InstallsRepoRootGraderEvaluatorFromNestedPackage verifies that
+// a repository-root anchored grader evaluator (not under ".github/workflows") is fetched from
+// its exact repository-root path even when the declaring workflow belongs to a nested package,
+// instead of being incorrectly prefixed with the package's own directory.
+func TestFetchAndSaveRemoteResources_InstallsRepoRootGraderEvaluatorFromNestedPackage(t *testing.T) {
+	tmpDir := t.TempDir()
+	setupMinimalGitRepo(t, tmpDir)
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+
+	const evaluatorPath = ".github/graders/shared-operational-value.sh"
+	content := `---
+on: workflow_dispatch
+graders:
+  operational-value:
+    run: .github/graders/shared-operational-value.sh
+---
+
+# Workflow
+`
+	evaluatorContent := []byte("#!/usr/bin/env bash\necho shared\n")
+	download := func(_ context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+		assert.Equal(t, evaluatorPath, filePath)
+		return evaluatorContent, nil
+	}
+
+	spec := &WorkflowSpec{
+		RepoSpec:     RepoSpec{RepoSlug: "owner/repo", Version: "main", PackagePath: "packages/repo-assist"},
+		WorkflowPath: "packages/repo-assist/workflows/graded.md",
+	}
+	require.NoError(t, fetchAndSaveRemoteResourcesWithDownloader(t.Context(), content, spec, workflowsDir, false, false, nil, download))
+
+	installed, err := os.ReadFile(filepath.Join(tmpDir, filepath.FromSlash(evaluatorPath)))
+	require.NoError(t, err)
+	assert.Equal(t, evaluatorContent, installed)
 }
 
 func TestFetchAndSaveRemoteResources_InstallsLocalDotGraderEvaluator(t *testing.T) {
@@ -1956,57 +1937,6 @@ graders:
 	require.NoError(t, fetchAndSaveRemoteResourcesWithDownloader(t.Context(), content, spec, workflowsDir, false, true, nil, download))
 	assert.NoFileExists(t, filepath.Join(outsideDir, "example-operational-value.sh"))
 }
-
-// TestExtractResources_MacroRejected verifies that an entry with GitHub Actions expression syntax causes an error.
-func TestExtractResources_MacroRejected(t *testing.T) {
-	content := `---
-engine: copilot
-on: issues
-resources:
-  - plain-workflow.md
-  - ${{ vars.WORKFLOW }}.md
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.Error(t, err, "should error when a resource entry contains macro syntax")
-	assert.Nil(t, resources, "should return nil resources on error")
-	require.ErrorContains(t, err, "${{", "error message should mention the disallowed syntax")
-}
-
-// TestExtractResources_AllMacrosRejected verifies that all-macro lists return an error.
-func TestExtractResources_AllMacrosRejected(t *testing.T) {
-	content := `---
-engine: copilot
-on: issues
-resources:
-  - ${{ vars.WORKFLOW_A }}
-  - ${{ vars.WORKFLOW_B }}
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.Error(t, err, "should error when all resources are macros")
-	assert.Nil(t, resources)
-}
-
-// TestExtractResources_NoResourcesField verifies that nil is returned when no resources field.
-func TestExtractResources_NoResourcesField(t *testing.T) {
-	content := `---
-engine: copilot
-on: issues
----
-
-# Workflow
-`
-	resources, err := extractResources(content)
-	require.NoError(t, err, "should not error when no resources field")
-	assert.Empty(t, resources, "should return nil when no resources field")
-}
-
-// --- fetchAndSaveRemoteResources tests ---
 
 // TestFetchAndSaveRemoteResources_NoResources verifies that the function is a no-op when the
 // workflow has no resources field.

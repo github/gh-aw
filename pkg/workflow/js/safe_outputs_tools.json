@@ -1,5 +1,71 @@
 [
   {
+    "name": "linear_create_issue",
+    "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team ID, and project ID are trusted workflow configuration and are not agent inputs.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Final Linear issue title. Standard Safe Outputs title sanitization is applied.",
+          "x-safe-output-sanitization": "title"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 65000,
+          "description": "Linear issue description in Markdown. Standard Safe Outputs content sanitization is applied.",
+          "x-safe-output-sanitization": "content"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "linear_add_comment",
+    "description": "Add a comment to the Linear issue fixed by safe-outputs.linear-add-comment.target. The target and Linear credential are trusted workflow configuration and are not agent inputs.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["body"],
+      "properties": {
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65000,
+          "description": "Comment body in Markdown. Standard Safe Outputs content sanitization is applied.",
+          "x-safe-output-sanitization": "content"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "linear_update_issue",
+    "description": "Use this to update explicitly enabled fields on the Linear issue fixed by safe-outputs.linear-update-issue.target. The target and Linear credential are trusted workflow configuration and are not agent inputs. Provide at least one of title or body.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Replacement Linear issue title. Standard Safe Outputs title sanitization is applied.",
+          "x-safe-output-sanitization": "title"
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 65000,
+          "description": "Replacement Linear issue description in Markdown. Standard Safe Outputs content sanitization is applied.",
+          "x-safe-output-sanitization": "content"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "create_issue",
     "description": "WRITE-ONCE: do NOT call this tool with empty or placeholder arguments to probe or discover its schema \u2014 required fields (title, body) are listed in this schema; if you are not ready to open the real issue, call `noop` instead. Creates a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. Compatibility: labels may be passed as either an array of strings or a comma-separated string; string input is split, trimmed, and normalized to an array.",
     "inputSchema": {
@@ -74,6 +140,127 @@
         "integrity": {
           "type": "string",
           "description": "Trustworthiness level of the message source (e.g., \"low\", \"medium\", \"high\")."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "jira_create_issue",
+    "description": "Jira create issue: Create a new issue in Jira. This writes to Jira, not GitHub. Provide ordinary text; description is converted to Atlassian Document Format internally.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["project_key", "issue_type", "summary"],
+      "properties": {
+        "project_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Jira project key that owns the new issue, for example ENG."
+        },
+        "issue_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Human-readable Jira issue type name, for example Task or Bug."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Short Jira issue summary, for example Investigate parser failure."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32767,
+          "pattern": ".*\\S.*",
+          "description": "Optional plain-text Jira issue description. Converted to Atlassian Document Format internally."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "jira_update_issue",
+    "description": "Jira update issue: Update the summary or description of an existing Jira issue. This writes to Jira, not GitHub, and does not transition the issue or change its labels. Provide at least one field to update.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["issue_key"],
+      "properties": {
+        "issue_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Optional replacement Jira issue summary."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32767,
+          "pattern": ".*\\S.*",
+          "description": "Optional replacement plain-text Jira issue description. Converted to Atlassian Document Format internally."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "jira_add_comment",
+    "description": "Jira add comment: Add a comment to an existing Jira issue. This writes to Jira, not GitHub. Provide ordinary text; the body is converted to Atlassian Document Format internally.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["issue_key", "body"],
+      "properties": {
+        "issue_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32767,
+          "pattern": ".*\\S.*",
+          "description": "Plain-text comment body. Converted to Atlassian Document Format internally."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "jira_add_label",
+    "description": "Jira add label: Add one label to an existing Jira issue without replacing or removing its current labels. This writes to Jira, not GitHub.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["issue_key", "label"],
+      "properties": {
+        "issue_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\S.*",
+          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]+$",
+          "description": "One Jira label to add, for example needs-investigation. Use letters, numbers, periods, hyphens, and underscores. Existing labels are preserved."
         }
       },
       "additionalProperties": false
@@ -2081,6 +2268,149 @@
         "primary": "pull_request_number",
         "anyOf": ["pull_request_number", "pr_number", "pr", "pull_number"]
       }
+    }
+  },
+  {
+    "name": "ado_create_work_item",
+    "description": "Experimental. Create an Azure DevOps work item and return a temporary #aw_ ID for later work-item tools in this run.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["title", "description"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 255,
+          "description": "Concise work-item title summarizing the problem or task in a few words."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 31,
+          "maxLength": 65000,
+          "description": "Detailed work-item description in Markdown, including context, repro steps, and acceptance criteria."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "description": "Optional tags. Tags cannot contain semicolons and may be restricted by allowed-tags."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ado_update_work_item",
+    "description": "Experimental. Update explicitly enabled fields (title, body, state, area path, iteration path, assignee, or tags) on an Azure DevOps work item to reflect the latest triage decision.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": ["number", "string"],
+          "description": "Positive work-item ID or a temporary #aw_ ID returned by ado_create_work_item."
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 255, "description": "New work-item title to apply, replacing the existing title." },
+        "body": { "type": "string", "maxLength": 65000, "description": "New Markdown description to apply, replacing the existing description." },
+        "state": { "type": "string", "minLength": 1, "maxLength": 128, "description": "New work-item state, such as Active, Resolved, or Closed." },
+        "area_path": { "type": "string", "minLength": 1, "maxLength": 512, "description": "New area path, such as MyProject\\Platform, scoping the work item to a team." },
+        "iteration_path": { "type": "string", "minLength": 1, "maxLength": 512, "description": "New iteration path, such as MyProject\\Sprint 1, scoping the work item to a sprint." },
+        "assignee": { "type": "string", "minLength": 1, "maxLength": 256, "description": "New Azure DevOps identity, such as an email address or display name, to assign." },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "description": "New tags to apply. Tags cannot contain semicolons and may be restricted by allowed-tags."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ado_comment_on_work_item",
+    "description": "Experimental. Add a Markdown comment to an explicitly scoped Azure DevOps work item, for example to record findings or link related context.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["work_item_id", "body"],
+      "properties": {
+        "work_item_id": {
+          "type": ["number", "string"],
+          "description": "Positive work-item ID or a temporary #aw_ ID returned by ado_create_work_item."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 65000,
+          "description": "Comment text in Markdown describing the update, decision, or question for the work item."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ado_assign_work_item",
+    "description": "Experimental. Assign an allowed Azure DevOps identity, such as an email address or display name, to a work item to route ownership for follow-up.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["work_item_id", "assignee"],
+      "properties": {
+        "work_item_id": {
+          "type": ["number", "string"],
+          "description": "Positive work-item ID or a temporary #aw_ ID returned by ado_create_work_item."
+        },
+        "assignee": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Azure DevOps identity, such as an email address or display name."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ado_link_work_items",
+    "description": "Experimental. Create a relationship, such as parent or related, between two explicitly scoped Azure DevOps work items to track dependencies.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["source_id", "target_id", "link_type"],
+      "properties": {
+        "source_id": {
+          "type": ["number", "string"],
+          "description": "Positive source work-item ID or a temporary #aw_ ID."
+        },
+        "target_id": {
+          "type": ["number", "string"],
+          "description": "Positive target work-item ID or a temporary #aw_ ID."
+        },
+        "link_type": {
+          "type": "string",
+          "enum": ["parent", "child", "related", "predecessor", "successor", "duplicate", "duplicate-of"],
+          "description": "Relationship type to create between the two work items, such as parent, child, or related."
+        },
+        "comment": { "type": "string", "minLength": 5, "maxLength": 1024, "description": "Optional Markdown comment describing why the link was created." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ado_upload_workitem_attachment",
+    "description": "Experimental. Upload one workspace file and attach it to an Azure DevOps work item, for example to include a screenshot or log file as evidence.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["work_item_id", "file_path"],
+      "properties": {
+        "work_item_id": {
+          "type": ["number", "string"],
+          "description": "Positive work-item ID or a temporary #aw_ ID returned by ado_create_work_item."
+        },
+        "file_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "Workspace-relative file path, for example 'reports/screenshot.png'. Absolute paths, traversal, colons, and symbolic links are rejected."
+        },
+        "comment": { "type": "string", "minLength": 3, "maxLength": 1024, "description": "Optional Markdown comment describing the attached file." }
+      },
+      "additionalProperties": false
     }
   }
 ]

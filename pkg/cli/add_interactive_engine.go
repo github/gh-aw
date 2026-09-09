@@ -236,15 +236,13 @@ func (c *AddInteractiveConfig) configureEngineAPISecret(engine string) error {
 // (permissions.copilot-requests: write). Extracted as a package-level constant so both the
 // form definition and applyCopilotAuthMethodChoice reference the same sentinel.
 const authMethodCopilotRequests = "copilot-requests"
+const authMethodPAT = "pat"
 
 // selectCopilotAuthMethod prompts the user to choose between copilot-requests (org billing)
 // and a Personal Access Token for Copilot authentication.
 // Sets c.UseCopilotRequests when org billing is chosen.
 func (c *AddInteractiveConfig) selectCopilotAuthMethod() error {
 	addInteractiveLog.Print("Prompting user for Copilot authentication method")
-
-	const authMethodPAT = "pat"
-
 	// Detect org Copilot CLI billing status before building the form.
 	// c.RepoOverride is in "owner/repo" format; we need just the org login.
 	// When no org login is available the result is inconclusive (same as a
@@ -324,10 +322,12 @@ func copilotAuthMethodDescription(probe orgCopilotBillingProbeResult, source sec
 func (c *AddInteractiveConfig) applyCopilotAuthMethodChoice(authMethod string) {
 	if authMethod == authMethodCopilotRequests {
 		c.UseCopilotRequests = true
+		c.UseCopilotPAT = false
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected copilot-requests: permissions.copilot-requests: write will be added to your workflow"))
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No COPILOT_GITHUB_TOKEN secret is required — Copilot usage is billed to your org's Copilot seat."))
 	} else {
 		c.UseCopilotRequests = false
+		c.UseCopilotPAT = authMethod == authMethodPAT
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected authentication: COPILOT_GITHUB_TOKEN"))
 	}
 }

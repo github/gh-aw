@@ -9,10 +9,11 @@ on:
     - cron: "weekly on monday around 15:00"  # ~3 PM UTC on Mondays (scattered)
   workflow_dispatch:
 permissions:
+  copilot-requests: write
   issues: read
 tracker-id: weekly-issue-summary
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine: pi
+model: copilot/auto
 network:
   allowed:
     - defaults

@@ -790,3 +790,95 @@ func extractGHAWRepoTokensJSON(t *testing.T, lock string) string {
 	}
 	return strings.TrimSpace(out.String())
 }
+
+// TestUseSamplesReplaysReplaceLabel is a regression test for
+// https://github.com/github/gh-aw/issues/54811: a `replace-label` safe output
+// configured with `samples:` must validate at compile time and be collected
+// into GH_AW_SAMPLES as a `replace_label` MCP `tools/call` so that
+// `--use-samples` suites actually perform the label transition instead of
+// silently replaying nothing.
+func TestUseSamplesReplaysReplaceLabel(t *testing.T) {
+	const md = `---
+on:
+  issues:
+    types: [opened]
+permissions: read-all
+engine:
+  id: claude
+safe-outputs:
+  replace-label:
+    allowed-transitions:
+      - from: old
+        to: new
+    samples:
+      - item_number: "${{ github.event.issue.number }}"
+        label_to_remove: old
+        label_to_add: new
+---
+
+Replace-label workflow replayed deterministically from samples.
+`
+
+	tmpFile, err := os.CreateTemp("", "use-samples-replace-label-*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.WriteString(md); err != nil {
+		t.Fatal(err)
+	}
+	tmpFile.Close()
+
+	compiler := NewCompiler()
+	compiler.SetUseSamples(true)
+	if err := compiler.CompileWorkflow(tmpFile.Name()); err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	lockPath := strings.TrimSuffix(tmpFile.Name(), ".md") + ".lock.yml"
+	defer os.Remove(lockPath)
+	b, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read lock: %v", err)
+	}
+	lock := string(b)
+
+	samplesJSON := extractGHAWSamplesJSON(t, lock)
+	if !strings.Contains(samplesJSON, `"tool":"replace_label"`) {
+		t.Fatalf("GH_AW_SAMPLES should contain a replace_label entry; got %s", samplesJSON)
+	}
+	if !strings.Contains(samplesJSON, "${{ github.event.issue.number }}") {
+		t.Fatalf("GH_AW_SAMPLES should preserve the runtime expression; got %s", samplesJSON)
+	}
+}
+
+// TestSafeOutputsMissingSamples verifies the diagnostic helper that backs the
+// compile-time warning emitted when samples replay is enabled but an enabled
+// safe output declares no samples — the failure mode reported in
+// https://github.com/github/gh-aw/issues/54811 where a sampled run succeeded
+// with an empty GH_AW_SAMPLES and left the fixture untouched.
+func TestSafeOutputsMissingSamples(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		if got := safeOutputsMissingSamples(nil); got != nil {
+			t.Fatalf("expected nil for nil config, got %v", got)
+		}
+	})
+
+	t.Run("enabled handler without samples is reported", func(t *testing.T) {
+		config := &SafeOutputsConfig{ReplaceLabel: &ReplaceLabelConfig{}}
+		got := safeOutputsMissingSamples(config)
+		if len(got) != 1 || got[0] != "replace-label" {
+			t.Fatalf("expected [replace-label], got %v", got)
+		}
+	})
+
+	t.Run("handler with samples is not reported", func(t *testing.T) {
+		config := &SafeOutputsConfig{ReplaceLabel: &ReplaceLabelConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{
+				Samples: []map[string]any{{"item_number": 1, "label_to_remove": "old", "label_to_add": "new"}},
+			},
+		}}
+		if got := safeOutputsMissingSamples(config); len(got) != 0 {
+			t.Fatalf("expected no missing samples, got %v", got)
+		}
+	})
+}

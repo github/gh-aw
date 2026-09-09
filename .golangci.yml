@@ -26,7 +26,6 @@ linters:
     - perfsprint     # Replace fmt.Sprintf with faster alternatives where possible
     - bodyclose      # Check HTTP response bodies are closed
     - gocheckcompilerdirectives  # Validate go compiler directive comments
-    - recvcheck      # Check receiver type consistency
     - copyloopvar    # Detect loop variable copies
     - exptostd       # Replace golang.org/x/exp functions with std equivalents
     - durationcheck  # Check for two durations multiplied together
@@ -38,7 +37,13 @@ linters:
     - errcheck       # Disabled due to exclude-functions not working properly in golangci-lint v2
     - gocritic       # Disabled due to disabled-checks not working properly in golangci-lint v2
     - revive         # Disabled due to exclude-rules not working properly in golangci-lint v2
+    - recvcheck      # Value MarshalJSON and pointer mutation methods are both required
   settings:
+    modernize:
+      disable:
+        - errorsastype
+        - reflecttypeassert
+        - stringscut
     depguard:
       rules:
         # golang.org/x/crypto is a direct dependency (used for nacl/box), which
@@ -54,7 +59,7 @@ linters:
       replace-local: false       # Forbid local replace directives (e.g., replace foo => ../foo)
       replace-allow-list:
         # actionlint@v1.7.12 requires yaml/v4@rc.3, which exposes yaml.ParserError
-        # and related types that were removed in rc.6. gosec@v2.28.0 pulls in rc.6
+        # and related types that were removed in rc.6. gosec@v2.29.0 pulls in rc.6
         # transitively, so we pin the whole module to rc.3 here.
         - go.yaml.in/yaml/v4
 
@@ -64,7 +69,7 @@ linters-settings:
     replace-local: false       # Forbid local replace directives (e.g., replace foo => ../foo)
     replace-allow-list:
       # actionlint@v1.7.12 requires yaml/v4@rc.3, which exposes yaml.ParserError
-      # and related types that were removed in rc.6. gosec@v2.28.0 pulls in rc.6
+      # and related types that were removed in rc.6. gosec@v2.29.0 pulls in rc.6
       # transitively, so we pin the whole module to rc.3 here.
       - go.yaml.in/yaml/v4
   errcheck:
@@ -96,21 +101,20 @@ linters-settings:
     enable-all: true
 
 issues:
-  exclude-generated: lax
-  exclude-dirs-use-default: false
-  exclude-use-default: false
-  exclude-rules:
-    - linters:
-        - staticcheck
-      text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
-      path: pkg/workflow/compiler_orchestrator\.go
-    - linters:
-        - staticcheck
-      text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
-      path: pkg/workflow/dispatch_workflow_validation\.go
-    - linters:
-        - unconvert
-      path: _test\.go # Allow explicit conversions in tests for clarity
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - staticcheck
+        text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
+        path: pkg/workflow/compiler_orchestrator\.go
+      - linters:
+          - staticcheck
+        text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
+        path: pkg/workflow/dispatch_workflow_validation\.go
+      - linters:
+          - unconvert
+        path: _test\.go # Allow explicit conversions in tests for clarity
 
 formatters:
   enable:

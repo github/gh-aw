@@ -12,7 +12,8 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+  model-provider: openai
+model: openai/gpt-5.3-codex
 network:
   allowed:
     - defaults
@@ -20,13 +21,13 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   edit:
   bash: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [actions, repos]
 safe-outputs:
   create-discussion:

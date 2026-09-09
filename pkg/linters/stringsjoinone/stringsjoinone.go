@@ -78,19 +78,22 @@ func analyzeJoinOne(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.Ge
 		return
 	}
 
-	pass.Report(analysis.Diagnostic{
+	diag := analysis.Diagnostic{
 		Pos:     call.Pos(),
 		End:     call.End(),
 		Message: fmt.Sprintf("strings.Join called with a single-element slice; use %s directly", replacementText),
-		SuggestedFixes: []analysis.SuggestedFix{{
+	}
+	if !astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		diag.SuggestedFixes = []analysis.SuggestedFix{{
 			Message: "Replace strings.Join call with " + replacementText,
 			TextEdits: []analysis.TextEdit{{
 				Pos:     call.Pos(),
 				End:     call.End(),
 				NewText: []byte(replacementText),
 			}},
-		}},
-	})
+		}}
+	}
+	pass.Report(diag)
 }
 
 // isSafeToDiscardSeparator reports whether sep is a compile-time constant and

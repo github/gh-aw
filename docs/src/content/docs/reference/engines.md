@@ -335,7 +335,7 @@ Arguments are added in order and placed before the `--prompt` flag. Consult the 
 
 ### Custom Engine Command
 
-Override the default engine executable using the `command` field. Useful for testing pre-release versions, custom builds, or non-standard installations. Installation steps are automatically skipped.
+Override the default engine executable using the `command` field. Useful for testing pre-release versions, custom builds, or non-standard installations. Engine installation steps are automatically skipped; when the firewall is enabled, gh-aw still installs its configured AWF binary.
 
 ```yaml wrap
 engine:

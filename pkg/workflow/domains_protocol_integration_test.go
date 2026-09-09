@@ -42,7 +42,6 @@ Test protocol-specific domain filtering.
 				"https://secure.example.com",
 				"http://legacy.example.com",
 				"example.org",
-				"api.github.com", // Copilot default
 			},
 			checkAWFArgs: true,
 		},

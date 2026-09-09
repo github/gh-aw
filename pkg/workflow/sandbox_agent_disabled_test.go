@@ -75,7 +75,7 @@ func TestSandboxAgentFalse(t *testing.T) {
 		markdown := `---
 engine: copilot
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: false
@@ -106,7 +106,7 @@ Test workflow with agent sandbox disabled.
 		result := string(lockContent)
 
 		// The compiled workflow should NOT contain AWF commands
-		assert.NotContains(t, result, "sudo -E awf", "Workflow should not contain AWF command when agent sandbox is disabled")
+		assert.NotContains(t, result, "sudo -E ", "Workflow should not contain privileged AWF command when agent sandbox is disabled")
 		assert.NotContains(t, result, "awf --", "Workflow should not contain AWF wrapper when agent sandbox is disabled")
 
 		// Should contain direct copilot command instead
@@ -123,7 +123,7 @@ Test workflow with agent sandbox disabled.
 		// MCP gateway should still be present (always enabled)
 		assert.Contains(t, result, "Start MCP Gateway", "MCP gateway should be present even when agent sandbox is disabled")
 		assert.Contains(t, result, "MCP_GATEWAY_PORT", "Gateway port should be set")
-		assert.Contains(t, result, "MCP_GATEWAY_API_KEY", "Gateway API key should be set")
+		assert.Contains(t, result, "MCP_GATEWAY_AGENT_ID", "Gateway agent ID should be set")
 	})
 
 	t.Run("sandbox.agent: false is refused in strict mode", func(t *testing.T) {
@@ -131,6 +131,8 @@ Test workflow with agent sandbox disabled.
 
 		markdown := `---
 engine: copilot
+features:
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: true
@@ -154,13 +156,13 @@ Test workflow with agent sandbox disabled in strict mode.
 		require.ErrorContains(t, err, "sandbox.agent: false")
 	})
 
-	t.Run("sandbox.agent: false shows warning at compile time", func(t *testing.T) {
+	t.Run("sandbox.agent: false does not show a deprecation warning", func(t *testing.T) {
 		workflowsDir := t.TempDir()
 
 		markdown := `---
 engine: copilot
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: false
@@ -184,9 +186,9 @@ Test workflow.
 		err = compiler.CompileWorkflow(workflowPath)
 		require.NoError(t, err)
 
-		// Should have incremented warning count
+		// Supported non-strict usage should not increment the warning count
 		finalWarnings := compiler.GetWarningCount()
-		assert.Greater(t, finalWarnings, initialWarnings, "Expected warning to be emitted for sandbox.agent: false")
+		assert.Equal(t, initialWarnings, finalWarnings, "Expected no warning for supported sandbox.agent: false")
 	})
 }
 
@@ -197,7 +199,7 @@ func TestSandboxAgentFalseWithTools(t *testing.T) {
 	markdown := `---
 engine: copilot
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: false
@@ -236,7 +238,7 @@ Test workflow with tools and agent sandbox disabled.
 
 	// Verify gateway configuration is present
 	assert.Contains(t, result, "MCP_GATEWAY_PORT", "Gateway port should be present")
-	assert.Contains(t, result, "MCP_GATEWAY_API_KEY", "Gateway API key should be present")
+	assert.Contains(t, result, "MCP_GATEWAY_AGENT_ID", "Gateway agent ID should be present")
 	assert.Contains(t, result, "MCP_GATEWAY_DOMAIN", "Gateway domain should be present")
 }
 

@@ -27,13 +27,19 @@ def main() -> None:
     with open(args.metrics) as f:
         m = json.load(f)
 
-    regular_runs = int(m.get("regular_runs", 0))
-    detection_runs = int(m.get("detection_runs", 0))
-    regular_success_rate = float(m.get("regular_success_rate", 0.0))
-    detection_success_rate = float(m.get("detection_success_rate", 0.0))
-    regular_failure = int(m.get("regular_failure_count", 0))
-    detection_failure = int(m.get("detection_failure_count", 0))
-    misconfigured_count = int(m.get("misconfigured_count", 0))
+    def get_int(key: str, default: int = 0) -> int:
+        return int(m.get(key, default))
+
+    def get_float(key: str, default: float = 0.0) -> float:
+        return float(m.get(key, default))
+
+    regular_runs = get_int("regular_runs")
+    detection_runs = get_int("detection_runs")
+    regular_success_rate = get_float("regular_success_rate")
+    detection_success_rate = get_float("detection_success_rate")
+    regular_failure = get_int("regular_failure_count")
+    detection_failure = get_int("detection_failure_count")
+    misconfigured_count = get_int("misconfigured_count")
 
     regular_success = regular_runs - regular_failure
     detection_success = detection_runs - detection_failure
@@ -80,9 +86,16 @@ def main() -> None:
     ax2.set_ylabel("Success Rate (%)", fontsize=12)
     ax2.set_ylim(0, 110)
 
-    handles1, labels1 = ax1.get_legend_handles_labels()
-    handles2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(handles1 + handles2, labels1 + labels2, loc="upper right", fontsize=10)
+    def combined_legend_entries(*axes):
+        handles, labels = [], []
+        for ax in axes:
+            ax_handles, ax_labels = ax.get_legend_handles_labels()
+            handles += ax_handles
+            labels += ax_labels
+        return handles, labels
+
+    handles, labels = combined_legend_entries(ax1, ax2)
+    ax1.legend(handles, labels, loc="upper right", fontsize=10)
 
     plt.tight_layout()
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)

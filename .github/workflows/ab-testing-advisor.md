@@ -33,10 +33,10 @@ safe-outputs:
     title-prefix: "[ab-advisor] "
 description: Daily A/B testing advisor that picks a random agentic workflow without an experiments section, devises an experiment campaign to improve it, and creates a GitHub issue with the implementation task
 emoji: 🧪
-model: copilot/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
-  bare: true
-  id: pi
+  id: codex
+  model-provider: openai
 strict: true
 timeout-minutes: 30
 tools:
@@ -45,7 +45,7 @@ tools:
   cache-memory: true
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
     - actions
@@ -54,7 +54,7 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 evals:
   - id: experiment_issue_created
     question: Did the agent create a GitHub issue with an A/B experiment campaign for a selected workflow?

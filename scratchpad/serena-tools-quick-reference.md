@@ -17,7 +17,7 @@
 
 ## Tool Call Breakdown
 
-```
+```text
 Builtin:      ████████████████████████████████████ 34 (77.27%)
 Serena:       █████████ 9 (20.45%)
 SafeOutputs:  █ 1 (2.27%)

@@ -141,8 +141,8 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 
 	// Skip installation if custom command is specified
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		codexEngineLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
-		return []GitHubActionStep{}
+		codexEngineLog.Printf("Skipping Codex CLI installation: custom command specified (%s)", workflowData.EngineConfig.Command)
+		return buildNpmEngineInstallStepsWithAWF(nil, workflowData, false)
 	}
 
 	steps := BuildStandardNpmEngineInstallStepsNoCooldown(
@@ -462,7 +462,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 		"GITHUB_PERSONAL_ACCESS_TOKEN": effectiveGitHubToken,
 		"GITHUB_STEP_SUMMARY":          AgentStepSummaryPath,
 		"RUNNER_TEMP":                  "${{ runner.temp }}",
-		"RUST_LOG":                     "${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,ocodex_exec=debug' || 'warn' }}",
+		"RUST_LOG":                     "${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,codex_exec=debug' || 'warn' }}",
 	}
 	if provider == LLMProviderGitHub {
 		copilotToken := llmProviderSecretExpression(provider, workflowData)
@@ -481,6 +481,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 		env["GH_AW_VERSION"] = "dev"
 	}
 	applySafeOutputEnvToMap(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	if firewallEnabled {
 		maps.Copy(env, getGitIdentityEnvVars())
@@ -554,7 +555,7 @@ func (e *CodexEngine) expandNeutralToolsToCodexTools(toolsConfig *ToolsConfig) *
 	// Copy raw map
 	maps.Copy(result.raw, toolsConfig.raw)
 
-	// Handle playwright tool by converting it to an MCP tool configuration with copilot agent tools
+	// Playwright is a CLI tool and must not be added to the MCP configuration.
 	if toolsConfig.Playwright != nil {
 		applyCodexPlaywrightTool(result, toolsConfig.Playwright)
 	}
@@ -565,27 +566,10 @@ func (e *CodexEngine) expandNeutralToolsToCodexTools(toolsConfig *ToolsConfig) *
 func applyCodexPlaywrightTool(result *ToolsConfig, playwright *PlaywrightToolConfig) {
 	playwrightConfig := &PlaywrightToolConfig{
 		Version: playwright.Version,
-		Args:    playwright.Args,
 		Mode:    playwright.Mode,
 	}
 	result.Playwright = playwrightConfig
-
-	// In CLI mode, playwright is not an MCP server — remove from raw map and skip MCP config entry.
-	if playwrightConfig.IsCLIMode() {
-		delete(result.raw, "playwright")
-		return
-	}
-
-	playwrightMCP := map[string]any{
-		"allowed": GetPlaywrightTools(),
-	}
-	if playwrightConfig.Version != "" {
-		playwrightMCP["version"] = playwrightConfig.Version
-	}
-	if len(playwrightConfig.Args) > 0 {
-		playwrightMCP["args"] = playwrightConfig.Args
-	}
-	result.raw["playwright"] = playwrightMCP
+	delete(result.raw, "playwright")
 }
 
 // expandNeutralToolsToCodexToolsFromMap is a backward compatibility wrapper

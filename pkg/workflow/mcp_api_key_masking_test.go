@@ -12,7 +12,7 @@ import (
 )
 
 // TestSafeOutputsNoLongerGeneratesHTTPAPIKey verifies that safe-outputs no longer
-// creates an HTTP server API key now that it runs as a stdio MCP container.
+// creates an HTTP server agent ID now that it runs as a stdio MCP container.
 func TestSafeOutputsAPIKeyImmediateMasking(t *testing.T) {
 	workflowData := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{
@@ -102,7 +102,7 @@ func TestMCPScriptsAPIKeyImmediateMasking(t *testing.T) {
 	}
 }
 
-// TestMCPGatewayAPIKeyImmediateMasking verifies that the MCP Gateway API key
+// TestMCPGatewayAPIKeyImmediateMasking verifies that the MCP Gateway agent ID
 // is masked immediately after generation, before any export or other operations.
 func TestMCPGatewayAPIKeyImmediateMasking(t *testing.T) {
 	workflowData := &WorkflowData{
@@ -120,13 +120,13 @@ func TestMCPGatewayAPIKeyImmediateMasking(t *testing.T) {
 	require.NoError(t, compiler.generateMCPSetup(&yaml, workflowData.Tools, mockEngine, workflowData))
 	output := yaml.String()
 
-	// Find the MCP gateway API key generation
-	keyGenIdx := strings.Index(output, "MCP_GATEWAY_API_KEY=$(openssl rand -base64 45")
-	require.Greater(t, keyGenIdx, -1, "Should find MCP Gateway API key generation")
+	// Find the MCP gateway agent ID generation
+	keyGenIdx := strings.Index(output, "MCP_GATEWAY_AGENT_ID=$(openssl rand -base64 45")
+	require.Greater(t, keyGenIdx, -1, "Should find MCP Gateway agent ID generation")
 
 	// Find the masking line
-	maskIdx := strings.Index(output[keyGenIdx:], "echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"")
-	require.Greater(t, maskIdx, -1, "Should find MCP Gateway API key masking")
+	maskIdx := strings.Index(output[keyGenIdx:], "echo \"::add-mask::${MCP_GATEWAY_AGENT_ID}\"")
+	require.Greater(t, maskIdx, -1, "Should find MCP Gateway agent ID masking")
 
 	// Extract the section between generation and masking
 	betweenGenAndMask := output[keyGenIdx : keyGenIdx+maskIdx]
@@ -140,14 +140,14 @@ func TestMCPGatewayAPIKeyImmediateMasking(t *testing.T) {
 	assert.NotContains(t, betweenGenAndMask, "DEBUG=", "DEBUG should be set after masking")
 
 	// The export should come after masking
-	exportAfterGenIdx := strings.Index(output[keyGenIdx:], "export MCP_GATEWAY_API_KEY")
+	exportAfterGenIdx := strings.Index(output[keyGenIdx:], "export MCP_GATEWAY_AGENT_ID")
 	if exportAfterGenIdx > 0 {
 		// Verify masking comes before the export (masking should be line 2, export should be line 3)
-		assert.Less(t, maskIdx, exportAfterGenIdx, "API key masking should come before export")
+		assert.Less(t, maskIdx, exportAfterGenIdx, "agent ID masking should come before export")
 	}
 }
 
-// TestAPIKeyMaskingNoEmptyDeclaration verifies that API keys are not declared
+// TestAPIKeyMaskingNoEmptyDeclaration verifies that agent IDs are not declared
 // as empty variables before assignment, which would create a timing window.
 func TestAPIKeyMaskingNoEmptyDeclaration(t *testing.T) {
 	workflowData := &WorkflowData{
@@ -177,9 +177,9 @@ func TestAPIKeyMaskingNoEmptyDeclaration(t *testing.T) {
 	require.NoError(t, compiler.generateMCPSetup(&yaml, workflowData.Tools, mockEngine, workflowData))
 	output := yaml.String()
 
-	// Verify no empty API key declarations before assignment
+	// Verify no empty agent ID declarations before assignment
 	assert.NotContains(t, output, "API_KEY=\"\"\n          API_KEY=$(openssl",
 		"Should not have empty API_KEY declaration before assignment")
-	assert.NotContains(t, output, "MCP_GATEWAY_API_KEY=\"\"\n          MCP_GATEWAY_API_KEY=$(openssl",
-		"Should not have empty MCP_GATEWAY_API_KEY declaration before assignment")
+	assert.NotContains(t, output, "MCP_GATEWAY_AGENT_ID=\"\"\n          MCP_GATEWAY_AGENT_ID=$(openssl",
+		"Should not have empty MCP_GATEWAY_AGENT_ID declaration before assignment")
 }

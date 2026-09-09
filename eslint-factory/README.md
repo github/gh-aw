@@ -28,6 +28,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`no-json-stringify-equality`](#no-json-stringify-equality) | Disallow comparing two `JSON.stringify()` results for equality |
 | [`no-json-stringify-set-or-map`](#no-json-stringify-set-or-map) | Disallow `JSON.stringify()` directly on `Set` or `Map` instances |
 | [`no-math-minmax-array-spread`](#no-math-minmax-array-spread) | Disallow spreading a non-literal array into `Math.min(...)` / `Math.max(...)` |
+| [`no-misplaced-error-code-definition`](#no-misplaced-error-code-definition) | Require exported error-code constants to be defined in `error_codes.cjs` |
 | [`no-throw-plain-object`](#no-throw-plain-object) | Disallow throwing plain object literals |
 | [`no-unsafe-catch-error-property`](#no-unsafe-catch-error-property) | Disallow unsafe property access on `catch` error bindings |
 | [`no-unsafe-promise-catch-error-property`](#no-unsafe-promise-catch-error-property) | Disallow unsafe property access in promise rejection handlers |
@@ -44,12 +45,14 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fetch-response-body-try-catch`](#require-fetch-response-body-try-catch) | Require try/catch around `.json()` or `.text()` on Responses from `fetch(...)` |
 | [`require-fetch-timeout`](#require-fetch-timeout) | Require `fetch(...)` calls to include a non-nullish abort `signal` option |
 | [`require-fetch-try-catch`](#require-fetch-try-catch) | Require try/catch around awaited `fetch(...)` calls, including chained promise forms without rejection handlers |
+| [`require-fs-chmod-try-catch`](#require-fs-chmod-try-catch) | Require try/catch around `fs.chmodSync` and `fs.fchmodSync` |
 | [`require-fs-close-sync`](#require-fs-close-sync) | Require `fs.openSync(...)` file descriptors to be closed with `fs.closeSync(fd)` in the same function |
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
+| [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
 | [`require-new-url-try-catch`](#require-new-url-try-catch) | Require try/catch around `new URL(variable)` calls |
 | [`require-parseInt-radix`](#require-parseInt-radix) | Require an explicit radix argument to `parseInt()` |
 | [`require-nan-check-after-env-numeric-parse`](#require-nan-check-after-env-numeric-parse) | Require NaN validation after parsing numeric values from `process.env` |
@@ -73,7 +76,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-escaped-regexp-interpolation`](#require-escaped-regexp-interpolation) | Require regex-escaping of interpolated values in `new RegExp()` template literals |
 | [`require-lastindex-reset-before-global-exec-loop`](#require-lastindex-reset-before-global-exec-loop) | Require resetting stateful regexes before global `exec()` loops |
 | [`require-page-counter-increment-in-while-true-loop`](#require-page-counter-increment-in-while-true-loop) | Require page counters to advance in manual `while (true)` pagination loops |
-| [`require-getexecoutput-exitcode-check`](#require-getexecoutput-exitcode-check) | Require `exitCode` to be read after `getExecOutput(..., { ignoreReturnCode: true })` |
+| [`require-getexecoutput-exitcode-check`](#require-getexecoutput-exitcode-check) | Require `exitCode` / returned exit code to be read after `getExecOutput()` or `exec()` with `{ ignoreReturnCode: true }` |
 | [`prefer-actions-exec-over-child-process`](#prefer-actions-exec-over-child-process) | Prefer `@actions/exec` over `child_process` to spawn processes that run to completion |
 
 ### `no-empty-catch-block`
@@ -181,6 +184,19 @@ Disallow spreading an array of unknown size into `Math.min(...)` / `Math.max(...
 
 **Safe alternative:**
 - `values.reduce((a, b) => Math.max(a, b), -Infinity)` / `values.reduce((a, b) => Math.min(a, b), Infinity)` — folds the array without expanding it into arguments, using the same identity value `Math.max()` / `Math.min()` return on an empty array so the empty-input result matches the spread form instead of throwing.
+
+### `no-misplaced-error-code-definition`
+
+Require exported constants whose names end in `_ERROR_CODE` or `_REASON_CODE` to be defined in the centralized `error_codes.cjs` registry. Local-only constants are allowed because they do not establish a shared code outside the registry.
+
+**Flagged form:**
+```js
+const POLICY_FILE_PROTECTION_DENIED_REASON_CODE = "POLICY_FILE_PROTECTION_DENIED";
+module.exports = { POLICY_FILE_PROTECTION_DENIED_REASON_CODE };
+```
+
+**Safe alternative:**
+Define and export the constant from `error_codes.cjs`, then import it where needed.
 
 ### `prefer-number-isnan`
 
@@ -381,6 +397,21 @@ try {
 }
 ```
 
+### `require-fs-chmod-try-catch`
+
+Require `fs.chmodSync` and `fs.fchmodSync` calls to be wrapped in `try/catch`.
+
+Why: these calls can throw for missing files or descriptors, permission errors, and unsupported filesystems. A call-site catch preserves useful error context.
+
+**Detected forms:**
+- `fs.chmodSync(path, mode)` and `fs["chmodSync"](path, mode)`.
+- `fs.fchmodSync(fd, mode)`.
+- Bindings imported or required from `fs` / `node:fs`, including destructured bindings.
+
+**Out of scope:**
+- Objects that are not resolved to the Node `fs` / `node:fs` module.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
 ### `require-fs-close-sync`
 
 Require file descriptors returned by `fs.openSync(...)` to be closed with `fs.closeSync(fd)` in the same enclosing function.
@@ -512,6 +543,35 @@ try {
   // use tmpDir here
 } catch (err) {
   throw new Error("fs.mkdtempSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-realpathsync-try-catch`
+
+Require `fs.realpathSync` calls to be wrapped in `try/catch`.
+
+Why: `realpathSync` throws synchronously when the target path is missing, permissions are denied, or a symlink cycle is encountered. Wrapping the call preserves call-site-specific error context and ensures path containment checks are not skipped on failure.
+
+**Detected forms:**
+- `fs.realpathSync(path)` — direct call on a known `require("fs")` result.
+- `fs["realpathSync"](path)` — computed string-literal property access.
+- `const { realpathSync } = require("fs"); realpathSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace imports: `import * as fs from "fs"; fs.realpathSync(path)`.
+- ESM named imports: `import { realpathSync } from "fs"; realpathSync(path)`.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- Calls already inside a `try` block with a `catch` clause.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Known limitation — no autofix for `VariableDeclaration`:** when the flagged call appears as a variable initializer, the rule reports the error but emits no autofix suggestion. Only `ExpressionStatement` and `ReturnStatement` positions receive an autofix suggestion.
+
+**Safe alternative:**
+```js
+try {
+  const resolved = fs.realpathSync(path);
+} catch (err) {
+  throw new Error("fs.realpathSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
@@ -1069,14 +1129,16 @@ req.on("error", reject);
 
 ### `require-getexecoutput-exitcode-check`
 
-Require the `exitCode` returned by `@actions/exec`'s `getExecOutput()` to be read (destructured or accessed) whenever the call passes `{ ignoreReturnCode: true }`.
+Require the `exitCode` returned by `@actions/exec`'s `getExecOutput()` or the exit code returned by `exec()` to be read (destructured, accessed, or captured) whenever the call passes `{ ignoreReturnCode: true }`.
 
-Why: `getExecOutput()` throws automatically on a non-zero exit code by default. Passing `ignoreReturnCode: true` suppresses that behavior, making the caller solely responsible for detecting failure. Discarding `exitCode` (e.g. only destructuring `{ stdout }`) silently swallows command failures — the action proceeds with empty or stale output as if the command had succeeded.
+Why: `getExecOutput()` and `exec()` throw automatically on a non-zero exit code by default. Passing `ignoreReturnCode: true` suppresses that behavior, making the caller solely responsible for detecting failure. Discarding `exitCode` or the returned exit code (e.g. only destructuring `{ stdout }` from `getExecOutput()`, or a bare `await exec.exec(...)` statement whose returned exit code is never captured) silently swallows command failures — the action proceeds with empty or stale output as if the command had succeeded.
 
 **Flagged form:**
 ```js
 const { stdout } = await exec.getExecOutput("git", ["diff", "--name-only"], { ignoreReturnCode: true });
 return stdout.split("\n");
+
+await exec.exec("git", ["diff", "--exit-code", "."], { ignoreReturnCode: true });
 ```
 
 **Safe alternative:**
@@ -1086,6 +1148,11 @@ if (exitCode !== 0) {
   throw new Error(`git diff failed with exit code ${exitCode}`);
 }
 return stdout.split("\n");
+
+const exitCode = await exec.exec("git", ["diff", "--exit-code", "."], { ignoreReturnCode: true });
+if (exitCode !== 0) {
+  throw new Error(`git diff failed with exit code ${exitCode}`);
+}
 ```
 
 **Out of scope:**

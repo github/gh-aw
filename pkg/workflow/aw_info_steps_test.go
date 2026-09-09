@@ -48,7 +48,7 @@ permissions:
   pull-requests: read
 engine: copilot
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: false

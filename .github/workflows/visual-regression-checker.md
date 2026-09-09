@@ -22,7 +22,6 @@ imports:
 tools:
   cli-proxy: true
   playwright:
-    mode: cli
   bash:
     - "npm *"
     - "npx *"
@@ -35,7 +34,11 @@ network:
     - playwright
     - local
     - node
+jobs:
+  agent:
+    timeout-minutes: 15
 safe-outputs:
+  timeout-minutes: 10
   add-comment:
     max: 1
 timeout-minutes: 15
@@ -54,10 +57,12 @@ steps:
 
   - name: Install dependencies
     working-directory: ./docs
+    timeout-minutes: 5
     run: npm ci
 
   - name: Build documentation
     working-directory: ./docs
+    timeout-minutes: 5
     run: npm run build
 
   - name: Start docs server
@@ -70,6 +75,7 @@ steps:
 
   - name: Wait for server readiness
     # runner-guard:ignore RGS-012 -- loopback-only port/readiness checks for the docs server started in this job; no external network or secrets are involved.
+    timeout-minutes: 2
     run: |
       MAX_WAIT=90
       WAITED=0

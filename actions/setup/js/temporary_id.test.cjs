@@ -817,6 +817,20 @@ describe("temporary_id.cjs", () => {
       expect(refs.has("aw_bbbb12")).toBe(true);
     });
 
+    it("should extract temporary IDs from Azure DevOps work-item fields", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const refs = extractTemporaryIdReferences({
+        type: "ado_link_work_items",
+        id: "#aw_item1",
+        work_item_id: "#aw_item2",
+        source_id: "#aw_item3",
+        target_id: "#aw_item4",
+      });
+
+      expect(refs).toEqual(new Set(["aw_item1", "aw_item2", "aw_item3", "aw_item4"]));
+    });
+
     it("should extract temporary IDs from blocked_by dependencies", async () => {
       const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
 

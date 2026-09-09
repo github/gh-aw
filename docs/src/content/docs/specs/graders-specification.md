@@ -129,9 +129,9 @@ The configuration key MUST be `graders`.
 
 - Built-in grader entries MAY be `null` to enable defaults.
 - Custom grader entries MUST be objects and MUST include `script`.
-- The reserved `value` entry MUST be an object and MUST include `function`.
+- The reserved `operational-value` entry MUST be an object and MUST include `run`.
 
-Supported object fields include `enabled`, `name`, `description`, `unit`, `direction`, `threshold`, `min`, `max`, `config`, `script`, and `function`. Only the reserved `value` grader accepts `function`.
+Supported object fields include `enabled`, `name`, `description`, `unit`, `direction`, `threshold`, `min`, `max`, `config`, `script`, and `run`. Only the reserved `operational-value` grader accepts `run`.
 
 ---
 
@@ -202,6 +202,10 @@ An operational-value observation MUST include:
 The effective evidence cutoff MUST NOT follow either the requested evidence time or the maturity time. A replayed observation MUST be identified by `(runId, evaluatorDigest, evidenceAt)`.
 
 Historical regrading MUST reuse the original case, run subject, and archived evaluator. It MUST verify that the archived evaluator matches the digest recorded by both the original manifest and result and the evaluator at the recorded commit in a trusted local checkout before execution. It MUST emit a new observation and MUST NOT mutate the original run artifact.
+
+A historical report MUST apply one current evaluator digest to every included run so observations remain comparable. It MUST discover completed runs no earlier than the contract's adoption time. For runs without grader artifacts, it MUST provide the available workflow run subject and a null case and event, allowing the evaluator to reconstruct assignment from accepted evidence. It MUST preserve unavailable and failed observations and MUST NOT coerce missing evidence to zero.
+
+Historical report caches MUST be partitioned by repository, workflow ID, evaluator digest, and UTC week. Only mature numeric observations MAY be treated as final cache entries. Report output MUST retain every run-level observation. Aggregates MUST NOT treat repeated opportunity keys within one week as independent observations; the latest observation for each key in that week is used for the weekly mean.
 
 ---
 

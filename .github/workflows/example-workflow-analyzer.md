@@ -12,6 +12,10 @@ permissions:
   actions: read
 engine: claude
 timeout-minutes: 30
+tools:
+  github:
+    mode: local
+
 imports:
   - uses: shared/meta-analysis-base.md
     with:
@@ -27,7 +31,7 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Weekly Workflow Analysis

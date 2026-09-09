@@ -274,6 +274,9 @@ permissions:
   contents: read
   issues: read
 strict: false
+safe-outputs:
+  noop: {}
+  report-incomplete: {}
 tools:
   github:
     mode: local
@@ -311,6 +314,20 @@ Test that determine-automatic-lockdown is generated even when app is configured.
 	// Guard policy env vars must reference the lockdown step outputs
 	assert.Contains(t, lockContent, "GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}", "Guard min-integrity env var should reference lockdown step output")
 	assert.Contains(t, lockContent, "GITHUB_MCP_GUARD_REPOS: ${{ steps.determine-automatic-lockdown.outputs.repos }}", "Guard repos env var should reference lockdown step output")
+	githubMCPIndex := strings.Index(lockContent, `"github": {`)
+	require.NotEqual(t, -1, githubMCPIndex, "GitHub MCP server should be configured")
+	githubMCPConfig := lockContent[githubMCPIndex:]
+	assert.Contains(t, githubMCPConfig, `"allow-only"`, "GitHub MCP server should include an automatic allow-only guard policy")
+	assert.Contains(t, githubMCPConfig, `"min-integrity": "$GITHUB_MCP_GUARD_MIN_INTEGRITY"`, "GitHub guard policy should use automatic min-integrity output")
+	assert.Contains(t, githubMCPConfig, `"repos": "$GITHUB_MCP_GUARD_REPOS"`, "GitHub guard policy should use automatic repos output")
+
+	safeOutputsMCPIndex := strings.Index(lockContent, `"safeoutputs": {`)
+	require.NotEqual(t, -1, safeOutputsMCPIndex, "safeoutputs MCP server should be configured")
+	safeOutputsMCPConfig := lockContent[safeOutputsMCPIndex:]
+	assert.Contains(t, safeOutputsMCPConfig, `"write-sink"`, "safeoutputs MCP server should include a write-sink guard policy")
+	assert.Contains(t, safeOutputsMCPConfig, `"accept": [`, "safeoutputs write-sink policy should include accept list")
+	assert.Contains(t, safeOutputsMCPConfig, `"*"`, "safeoutputs write-sink policy should accept all runtime safe-output sink labels")
+	assert.Contains(t, safeOutputsMCPConfig, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`, "safeoutputs write-sink policy should use runtime sink visibility")
 
 	// App token should still be minted (now in agent job) and consumed via step output
 	assert.Contains(t, lockContent, "id: github-mcp-app-token", "GitHub App token step should still be generated")

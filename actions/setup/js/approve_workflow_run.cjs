@@ -9,7 +9,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { matchesSimpleGlob } = require("./glob_pattern_helpers.cjs");
 const { isRepoAllowed, parseAllowedRepos } = require("./repo_helpers.cjs");
-const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
+const { SAFE_OUTPUT_E007, POLICY_FILE_PROTECTION_DENIED_REASON_CODE } = require("./error_codes.cjs");
 const path = require("node:path");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
@@ -369,7 +369,7 @@ async function main(config = {}) {
         if (protection.action !== "allow") {
           const error = `Workflow run ${runId} cannot be approved because pull request #${pullRequestNumber} modifies protected files (${protection.files.join(", ")})`;
           core.warning(error);
-          return { success: false, error };
+          return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error };
         }
       }
 

@@ -145,6 +145,9 @@ const GraderManifestFilename Filename = "grader_manifest.json"
 // by trace_graders.cjs. Contains deterministic metric values computed from trace files.
 const GraderResultsFilename Filename = "grader_results.json"
 
+// GraderPayloadFilename is the filename of the preprocessed trace payload consumed by graders.
+const GraderPayloadFilename Filename = "grader_payload.json"
+
 // OperationalValueEvaluatorFilename is the filename of the frozen operational-value evaluator archived for replay.
 const OperationalValueEvaluatorFilename Filename = "operational_value_evaluator.sh"
 
@@ -262,6 +265,7 @@ const CheckCommandPositionStepID StepID = "check_command_position"
 const RemoveTriggerLabelStepID StepID = "remove_trigger_label"
 const GetTriggerLabelStepID StepID = "get_trigger_label"
 const CheckRateLimitStepID StepID = "check_rate_limit"
+const CheckCooldownStepID StepID = "check_cooldown"
 const CheckSkipRolesStepID StepID = "check_skip_roles"
 const CheckSkipBotsStepID StepID = "check_skip_bots"
 const CheckSkipIfCheckFailingStepID StepID = "check_skip_if_check_failing"
@@ -289,6 +293,7 @@ const SkipNoMatchCheckOkOutput = "skip_no_match_check_ok"
 const CommandPositionOkOutput = "command_position_ok"
 const MatchedCommandOutput = "matched_command"
 const RateLimitOkOutput = "rate_limit_ok"
+const CooldownOkOutput = "cooldown_ok"
 const SkipRolesOkOutput = "skip_roles_ok"
 const SkipBotsOkOutput = "skip_bots_ok"
 const SkipIfCheckFailingOkOutput = "skip_if_check_failing_ok"

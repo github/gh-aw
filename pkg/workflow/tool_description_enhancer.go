@@ -13,6 +13,24 @@ var toolDescriptionEnhancerLog = logger.New("workflow:tool_description_enhancer"
 type toolConstraintBuilder func(*SafeOutputsConfig) []string
 
 var toolConstraintBuilders = map[string]toolConstraintBuilder{
+	"ado_create_work_item": func(safeOutputs *SafeOutputsConfig) []string {
+		return createWorkItemConstraints(safeOutputs.CreateWorkItems)
+	},
+	"ado_update_work_item": func(safeOutputs *SafeOutputsConfig) []string {
+		return updateWorkItemConstraints(safeOutputs.UpdateWorkItems)
+	},
+	"ado_comment_on_work_item": func(safeOutputs *SafeOutputsConfig) []string {
+		return commentOnWorkItemConstraints(safeOutputs.CommentOnWorkItems)
+	},
+	"ado_assign_work_item": func(safeOutputs *SafeOutputsConfig) []string {
+		return assignWorkItemConstraints(safeOutputs.AssignWorkItems)
+	},
+	"ado_link_work_items": func(safeOutputs *SafeOutputsConfig) []string {
+		return linkWorkItemsConstraints(safeOutputs.LinkWorkItems)
+	},
+	"ado_upload_workitem_attachment": func(safeOutputs *SafeOutputsConfig) []string {
+		return uploadWorkItemAttachmentConstraints(safeOutputs.UploadWorkItemAttachments)
+	},
 	"create_issue": func(safeOutputs *SafeOutputsConfig) []string { return createIssueConstraints(safeOutputs.CreateIssues) },
 	"set_issue_field": func(safeOutputs *SafeOutputsConfig) []string {
 		return setIssueFieldConstraints(safeOutputs.SetIssueField)

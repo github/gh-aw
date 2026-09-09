@@ -38,6 +38,11 @@ func fetchWorkflowRunMetadata(ctx context.Context, runID int64, owner, repo, hos
 }
 
 func buildWorkflowRunMetadataArgs(runID int64, owner, repo, hostname string) []string {
+	args := buildWorkflowRunAPIArgs(runID, owner, repo, hostname)
+	return append(args, "--jq", "{databaseId: .id, number: .run_number, url: .html_url, status: .status, conclusion: .conclusion, workflowName: .name, workflowPath: .path, createdAt: .created_at, startedAt: .run_started_at, updatedAt: .updated_at, event: .event, headBranch: .head_branch, headSha: .head_sha, displayTitle: .display_title, attempt: .run_attempt, repository: .repository.full_name, actor: .actor.login}")
+}
+
+func buildWorkflowRunAPIArgs(runID int64, owner, repo, hostname string) []string {
 	endpoint := fmt.Sprintf("repos/{owner}/{repo}/actions/runs/%d", runID)
 	if owner != "" && repo != "" {
 		endpoint = fmt.Sprintf("repos/%s/%s/actions/runs/%d", owner, repo, runID)
@@ -46,7 +51,7 @@ func buildWorkflowRunMetadataArgs(runID int64, owner, repo, hostname string) []s
 	if hostname != "" && hostname != "github.com" {
 		args = append(args, "--hostname", hostname)
 	}
-	return append(args, endpoint, "--jq", "{databaseId: .id, number: .run_number, url: .html_url, status: .status, conclusion: .conclusion, workflowName: .name, workflowPath: .path, createdAt: .created_at, startedAt: .run_started_at, updatedAt: .updated_at, event: .event, headBranch: .head_branch, headSha: .head_sha, displayTitle: .display_title}")
+	return append(args, endpoint)
 }
 
 func classifyWorkflowRunMetadataError(runID int64, err error, output []byte) error {

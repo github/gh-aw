@@ -396,6 +396,30 @@ func TestBuildEvalsEngineStepsUsesEvalsPhase(t *testing.T) {
 	}
 }
 
+func TestBuildEvalsEngineStepsOmitsMainAgent(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "copilot",
+		EngineConfig: &EngineConfig{
+			ID:    "copilot",
+			Agent: "my-agent",
+		},
+		Evals: &EvalsConfig{
+			Questions: []EvalDefinition{
+				{ID: "check", Question: "Did the agent complete the task?"},
+			},
+		},
+	}
+
+	steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+	if strings.Contains(steps, "--agent") {
+		t.Fatalf("evals engine steps must not contain the main job's --agent flag; got:\n%s", steps)
+	}
+	if data.EngineConfig.Agent != "my-agent" {
+		t.Fatalf("original EngineConfig.Agent was mutated; expected %q, got %q", "my-agent", data.EngineConfig.Agent)
+	}
+}
+
 func TestBuildEvalsEngineStepsUsesEvalsMaxAICreditsDefault(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

@@ -216,7 +216,6 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 	}
 }
 
-// TestRenderPlaywrightMCPConfigTOML verifies the TOML format helper for Codex engine
 // TestRenderSafeOutputsMCPConfigTOML verifies the Safe Outputs TOML format via the production MCPConfigRendererUnified path
 func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 	var output strings.Builder

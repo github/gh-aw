@@ -95,7 +95,7 @@ func TestBuildExternalDetectorPathSetup(t *testing.T) {
 			wantCommandPrefix: true,
 		},
 		{
-			name: "copilot custom command skips installed binary setup",
+			name: "copilot custom command still stages standard binary",
 			data: &WorkflowData{
 				AI: "copilot",
 				SafeOutputs: &SafeOutputsConfig{
@@ -108,8 +108,8 @@ func TestBuildExternalDetectorPathSetup(t *testing.T) {
 				},
 			},
 			engineID:          "copilot",
-			wantHostSetup:     false,
-			wantCommandPrefix: false,
+			wantHostSetup:     true,
+			wantCommandPrefix: true,
 		},
 		{
 			name: "non-copilot engine skips setup",
@@ -159,7 +159,7 @@ func TestExternalDetectorExecutionStepStagesInstalledCopilotBinary(t *testing.T)
 	}
 }
 
-func TestExternalDetectorExecutionStepSkipsInstalledCopilotBinaryForCustomCommand(t *testing.T) {
+func TestExternalDetectorExecutionStepStagesInstalledCopilotBinaryForCustomCommand(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
 		AI: "copilot",
@@ -174,11 +174,11 @@ func TestExternalDetectorExecutionStepSkipsInstalledCopilotBinaryForCustomComman
 	}
 
 	steps := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
-	if containsExternalDetectorCopilotPathPrefix(steps) {
-		t.Errorf("did not expect external detector execution to prepend installed Copilot bin dir for custom command;\ngot:\n%s", steps)
+	if !containsExternalDetectorCopilotPathPrefix(steps) {
+		t.Errorf("expected external detector execution to prepend standard Copilot bin dir for custom command;\ngot:\n%s", steps)
 	}
-	if strings.Contains(steps, "GH_AW_COPILOT_SRC") {
-		t.Errorf("did not expect external detector execution to stage installed Copilot binary for custom command;\ngot:\n%s", steps)
+	if !strings.Contains(steps, "GH_AW_COPILOT_SRC") {
+		t.Errorf("expected external detector execution to stage standard Copilot binary for custom command;\ngot:\n%s", steps)
 	}
 }
 

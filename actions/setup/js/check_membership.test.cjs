@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createRequire } from "module";
+
+const realRequire = createRequire(import.meta.url);
 
 describe("check_membership.cjs", () => {
   let mockCore;
@@ -95,6 +98,9 @@ describe("check_membership.cjs", () => {
             await mockCore.summary.addRaw(`${reason}\n${remediation}`).write();
           },
         };
+      }
+      if (modulePath === "./error_recovery.cjs") {
+        return realRequire(modulePath);
       }
       throw new Error(`Module not found: ${modulePath}`);
     };
@@ -240,6 +246,99 @@ describe("check_membership.cjs", () => {
       });
       expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "fork_pull_request");
+    });
+
+    it("should retry a transient pull request provenance failure", async () => {
+      vi.useFakeTimers();
+      try {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "octocat",
+              item_type: "pull_request",
+              item_number: "42",
+            }),
+          },
+        };
+        process.env.GH_AW_REQUIRED_ROLES = "write";
+        const apiError = Object.assign(new Error("Internal Server Error"), { status: 500 });
+        mockGithub.rest.pulls.get.mockRejectedValueOnce(apiError).mockResolvedValue({
+          data: {
+            head: { repo: { full_name: "testorg/testrepo" } },
+            base: { repo: { full_name: "testorg/testrepo" } },
+          },
+        });
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: { permission: "write" },
+        });
+
+        const runPromise = runScript();
+        await vi.runAllTimersAsync();
+        await runPromise;
+
+        expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(2);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("should not retry a permanent pull request provenance failure", async () => {
+      mockContext.eventName = "workflow_dispatch";
+      mockContext.actor = "github-actions[bot]";
+      mockContext.payload = {
+        inputs: {
+          aw_context: JSON.stringify({
+            command_name: "triage",
+            actor: "octocat",
+            item_type: "pull_request",
+            item_number: "42",
+          }),
+        },
+      };
+      process.env.GH_AW_REQUIRED_ROLES = "write";
+      const apiError = Object.assign(new Error("Not Found"), { status: 404 });
+      mockGithub.rest.pulls.get.mockRejectedValue(apiError);
+
+      await runScript();
+
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(1);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "api_error");
+    });
+
+    it("should fail closed after exhausting transient provenance retries", async () => {
+      vi.useFakeTimers();
+      try {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "octocat",
+              item_type: "pull_request",
+              item_number: "42",
+            }),
+          },
+        };
+        process.env.GH_AW_REQUIRED_ROLES = "write";
+        const apiError = Object.assign(new Error("Internal Server Error"), { status: 500 });
+        mockGithub.rest.pulls.get.mockRejectedValue(apiError);
+
+        const runPromise = runScript();
+        await vi.runAllTimersAsync();
+        await runPromise;
+
+        expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(4);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+        expect(mockCore.setOutput).toHaveBeenCalledWith("result", "api_error");
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

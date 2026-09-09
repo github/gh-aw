@@ -23,11 +23,11 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
       - default
 

@@ -51,6 +51,7 @@ var compilePostProcessingLog = logger.New("cli:compile_post_processing")
 
 // generateDependabotManifestsWrapper generates Dependabot manifests for compiled workflows
 func generateDependabotManifestsWrapper(
+	ctx context.Context,
 	compiler *workflow.Compiler,
 	workflowDataList []*workflow.WorkflowData,
 	workflowsDir string,
@@ -59,7 +60,7 @@ func generateDependabotManifestsWrapper(
 ) error {
 	compilePostProcessingLog.Print("Generating Dependabot manifests for compiled workflows")
 
-	if err := compiler.GenerateDependabotManifests(workflowDataList, workflowsDir, forceOverwrite); err != nil {
+	if err := compiler.GenerateDependabotManifests(ctx, workflowDataList, workflowsDir, forceOverwrite); err != nil {
 		if strict {
 			return fmt.Errorf("failed to generate Dependabot manifests: %w", err)
 		}

@@ -62,3 +62,7 @@ func badParenCountGTR(s, sub string) bool {
 func badParenYodaCountEQL(s, sub string) bool {
 	return 0 == (strings.Count(s, sub)) // want `use !strings\.Contains\(s, sub\) instead of strings\.Count comparison`
 }
+
+func badCountWithComments(s, sub string) bool {
+	return strings.Count(s, sub /* substr */) > 0 // want `use strings\.Contains\(s, sub\) instead of strings\.Count comparison`
+}

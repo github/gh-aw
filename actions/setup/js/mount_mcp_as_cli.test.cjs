@@ -352,7 +352,7 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
       tempDir = undefined;
     }
     delete process.env.RUNNER_TEMP;
-    delete process.env.MCP_GATEWAY_API_KEY;
+    delete process.env.MCP_GATEWAY_AGENT_ID;
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
     delete global.core;
@@ -381,7 +381,7 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-mount-test-"));
     process.env.RUNNER_TEMP = tempDir;
-    process.env.MCP_GATEWAY_API_KEY = "super-secret-gateway-key";
+    process.env.MCP_GATEWAY_AGENT_ID = "super-secret-gateway-agent";
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
 
@@ -416,6 +416,6 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
     expect(mode).not.toBe(0o755);
 
     const scriptContent = fs.readFileSync(scriptPath, "utf8");
-    expect(scriptContent).toContain("super-secret-gateway-key");
+    expect(scriptContent).toContain("super-secret-gateway-agent");
   });
 });

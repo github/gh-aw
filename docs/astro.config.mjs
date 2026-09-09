@@ -104,10 +104,10 @@ export default defineConfig({
     "/tools/agentic-authoring/": "/gh-aw/setup/creating-workflows/",
 
     // Samples → Patterns renames
-    "/samples/coding-development/": "/gh-aw/patterns/daily-ops/",
-    "/samples/quality-testing/": "/gh-aw/patterns/daily-ops/",
+    "/samples/coding-development/": "/gh-aw/patterns/deterministic-ops/",
+    "/samples/quality-testing/": "/gh-aw/patterns/deterministic-ops/",
     "/samples/triage-analysis/": "/gh-aw/patterns/issue-ops/",
-    "/samples/research-planning/": "/gh-aw/patterns/daily-ops/",
+    "/samples/research-planning/": "/gh-aw/patterns/deterministic-ops/",
 
     // Setup renames
     "/setup/agentic-authoring/": "/gh-aw/setup/creating-workflows/",
@@ -127,7 +127,7 @@ export default defineConfig({
     "/guides/chatops/": "/gh-aw/patterns/chat-ops/",
     "/guides/issueops/": "/gh-aw/patterns/issue-ops/",
     "/guides/labelops/": "/gh-aw/patterns/label-ops/",
-    "/guides/dailyops/": "/gh-aw/patterns/daily-ops/",
+    "/guides/dailyops/": "/gh-aw/patterns/deterministic-ops/",
     "/guides/dispatchops/": "/gh-aw/patterns/dispatch-ops/",
     "/guides/monitoring/": "/gh-aw/experimental/monitoring-with-projects/",
     "/guides/multirepoops/": "/gh-aw/patterns/multi-repo-ops/",
@@ -141,7 +141,7 @@ export default defineConfig({
 
     // Examples → Patterns renames
     "/examples/comment-triggered/chatops/": "/gh-aw/patterns/chat-ops/",
-    "/examples/scheduled/dailyops/": "/gh-aw/patterns/daily-ops/",
+    "/examples/scheduled/dailyops/": "/gh-aw/patterns/deterministic-ops/",
     "/examples/issue-pr-events/issueops/": "/gh-aw/patterns/issue-ops/",
     "/examples/issue-pr-events/labelops/": "/gh-aw/patterns/label-ops/",
     "/examples/issue-pr-events/projectops/": "/gh-aw/patterns/project-ops/",
@@ -149,7 +149,7 @@ export default defineConfig({
     // Patterns unhyphenated → hyphenated slugs
     "/patterns/centralrepoops/": "/gh-aw/patterns/central-repo-ops/",
     "/patterns/chatops/": "/gh-aw/patterns/chat-ops/",
-    "/patterns/dailyops/": "/gh-aw/patterns/daily-ops/",
+    "/patterns/dailyops/": "/gh-aw/patterns/deterministic-ops/",
     "/patterns/dataops/": "/gh-aw/patterns/deterministic-ops/",
     "/patterns/dispatchops/": "/gh-aw/patterns/dispatch-ops/",
     "/patterns/issueops/": "/gh-aw/patterns/issue-ops/",
@@ -192,10 +192,10 @@ export default defineConfig({
     "/examples/comment-triggered/": "/gh-aw/patterns/chat-ops/",
     "/examples/issue-pr-events/": "/gh-aw/patterns/issue-ops/",
     "/examples/issue-pr-events/triage-analysis/": "/gh-aw/patterns/issue-ops/",
-    "/examples/issue-pr-events/coding-development/": "/gh-aw/patterns/daily-ops/",
-    "/examples/issue-pr-events/quality-testing/": "/gh-aw/patterns/daily-ops/",
-    "/examples/scheduled/": "/gh-aw/patterns/daily-ops/",
-    "/examples/scheduled/research-planning/": "/gh-aw/patterns/daily-ops/",
+    "/examples/issue-pr-events/coding-development/": "/gh-aw/patterns/deterministic-ops/",
+    "/examples/issue-pr-events/quality-testing/": "/gh-aw/patterns/deterministic-ops/",
+    "/examples/scheduled/": "/gh-aw/patterns/deterministic-ops/",
+    "/examples/scheduled/research-planning/": "/gh-aw/patterns/deterministic-ops/",
     "/examples/manual/": "/gh-aw/patterns/dispatch-ops/",
     "/examples/project-tracking/": "/gh-aw/patterns/project-ops/",
     "/guides/audit-with-agents/": "/gh-aw/reference/audit/",
@@ -334,7 +334,10 @@ export default defineConfig({
         starlightLinksValidator({
           errorOnRelativeLinks: true,
           errorOnLocalLinks: true,
-          exclude: ({ file, link }) => file.includes("/src/generated/workshop-markdown/") && link.includes("?__gh_aw_workshop_local__=") && link.startsWith("/gh-aw/workshop/?__gh_aw_workshop_local__="),
+          exclude: ({ file, link }) =>
+            (file.includes("/src/generated/workshop-markdown/") && link.includes("?__gh_aw_workshop_local__=") && link.startsWith("/gh-aw/workshop/?__gh_aw_workshop_local__=")) ||
+            link === "/gh-aw/gallery/ai-issue-triage/" ||
+            link === "/gh-aw/gallery/ci-failure-investigation/",
         }),
       ],
       sidebar: [
@@ -410,6 +413,7 @@ export default defineConfig({
             { label: "LabelOps", link: "/patterns/label-ops/" },
             { label: "MemoryOps", link: "/patterns/memory-ops/" },
             { label: "MonitorOps", link: "/patterns/monitor-ops/" },
+            { label: "FeatureOps", link: "/patterns/feature-grower/" },
             { label: "MultiRepoOps", link: "/patterns/multi-repo-ops/" },
             { label: "OrchestratorOps", link: "/patterns/orchestrator-ops/" },
             { label: "ProjectOps", link: "/patterns/project-ops/" },

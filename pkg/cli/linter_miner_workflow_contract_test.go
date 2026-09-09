@@ -26,7 +26,8 @@ func TestLinterMinerWorkflowSubAgentModelContract(t *testing.T) {
 	text := string(content)
 	assert.Contains(t, text, "## agent: `code-pattern-scanner`", "Workflow should define the code-pattern-scanner sub-agent")
 	assert.Contains(t, text, "## agent: `linter-writer`", "Workflow should define the linter-writer sub-agent")
-	assert.Contains(t, text, "model: copilot/mai-code-1-flash-picker", "Discussion miner should use the supported MAI Flash model")
+	assert.Contains(t, text, "model: copilot/mai-code-1-flash-picker", "Workflow should use the supported MAI Flash model")
+	assert.NotContains(t, text, "model: copilot/gpt-5.4", "Workflow should not use the unavailable GPT-5.4 model")
 	assert.NotContains(t, text, "model: inherited", "Sub-agents should not use the unsupported model: inherited value")
 	assert.NotContains(t, text, "model: kiwi", "Sub-agents should not use the unavailable kiwi model")
 }

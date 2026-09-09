@@ -214,11 +214,15 @@ func (c *Compiler) buildAgentFailureCoreVars(data *WorkflowData, mainJobName str
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID))
 
 	expiresHours := DefaultActionFailureIssueExpiresHours
-	repoConfig, err := c.loadRepoConfig()
-	if err != nil {
-		notifyCommentLog.Printf("Warning: failed to load repo config for action failure issue expiration (using default %d hours): %v. Check that %s exists and matches schema requirements", DefaultActionFailureIssueExpiresHours, err, RepoConfigFileName)
+	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailureAsIssue != nil && data.SafeOutputs.ReportFailureAsIssue.String() == "false" {
+		expiresHours = 0
 	} else {
-		expiresHours = repoConfig.ActionFailureIssueExpiresHours()
+		repoConfig, err := c.loadRepoConfig()
+		if err != nil {
+			notifyCommentLog.Printf("Warning: failed to load repo config for action failure issue expiration (using default %d hours): %v. Check that %s exists and matches schema requirements", DefaultActionFailureIssueExpiresHours, err, RepoConfigFileName)
+		} else {
+			expiresHours = repoConfig.ActionFailureIssueExpiresHours()
+		}
 	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: %q\n", strconv.Itoa(expiresHours)))
 	if data.EngineConfig != nil && data.EngineConfig.ID != "" {
@@ -492,7 +496,7 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ConditionNode {
 	// Build the condition for this job:
 	// 1. always() - run even if agent fails
-	// 2. agent was activated (not skipped) OR lockdown check failed in activation job
+	// 2. agent was activated (not skipped) OR an activation guardrail failed
 	// 3. IF comment_id exists: add_comment job either doesn't exist OR hasn't created a comment yet
 	alwaysFunc := BuildFunctionCall("always")
 	agentNotSkipped := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", mainJobName)), BuildStringLiteral("skipped"))
@@ -516,6 +520,14 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	if hasMaxDailyAICGuardrail(data) {
 		dailyAICExceeded := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.daily_ai_credits_exceeded", constants.ActivationJobName)), BuildStringLiteral("true"))
 		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, dailyAICExceeded)
+	}
+	if len(data.SkillReferences) > 0 || len(data.Skills) > 0 {
+		skillInstallFailureCount := BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.skill_install_failure_count", constants.ActivationJobName))
+		skillInstallFailed := BuildAnd(
+			BuildNotEquals(skillInstallFailureCount, BuildStringLiteral("")),
+			BuildNotEquals(skillInstallFailureCount, BuildStringLiteral("0")),
+		)
+		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, skillInstallFailed)
 	}
 	if isSteeringIssueEnabled(data) {
 		steeringIssueExists := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.steering_issue_number", constants.ActivationJobName)), BuildStringLiteral(""))

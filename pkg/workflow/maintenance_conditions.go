@@ -4,6 +4,51 @@ import "github.com/github/gh-aw/pkg/logger"
 
 var maintenanceConditionsLog = logger.New("workflow:maintenance_conditions")
 
+// maintenanceNoOperationValue is the sentinel value used for the workflow_dispatch
+// "operation" choice input to represent "no operation selected". It replaces an
+// empty string option, since actionlint rejects empty strings as workflow_dispatch
+// choice options and requires the default to be one of the declared options.
+// The workflow_call "operation" input remains a plain string with an empty-string
+// default (not subject to the choice/options restriction), so the empty value and
+// this sentinel value are treated as "no operation" throughout the generated conditions.
+const maintenanceNoOperationValue = "none"
+
+// buildOperationIsEmptyCondition creates a condition that is true when the
+// `inputs.operation` value represents "no operation selected", i.e. it is
+// either an empty string (workflow_call default) or the choice sentinel value
+// used by the workflow_dispatch "operation" input.
+func buildOperationIsEmptyCondition() ConditionNode {
+	return BuildOr(
+		BuildEquals(
+			BuildPropertyAccess("inputs.operation"),
+			BuildStringLiteral(""),
+		),
+		BuildEquals(
+			BuildPropertyAccess("inputs.operation"),
+			BuildStringLiteral(maintenanceNoOperationValue),
+		),
+	)
+}
+
+// buildOperationIsNotEmptyCondition creates a condition that is true when the
+// `inputs.operation` value represents an operation being selected, i.e. it is
+// neither the empty string (workflow_call default) nor the choice sentinel
+// value used by the workflow_dispatch "operation" input. Built directly from
+// BuildNotEquals (rather than negating buildOperationIsEmptyCondition) so it
+// renders using the same `!=` style as the other operation exclusion checks.
+func buildOperationIsNotEmptyCondition() ConditionNode {
+	return BuildAnd(
+		BuildNotEquals(
+			BuildPropertyAccess("inputs.operation"),
+			BuildStringLiteral(""),
+		),
+		BuildNotEquals(
+			BuildPropertyAccess("inputs.operation"),
+			BuildStringLiteral(maintenanceNoOperationValue),
+		),
+	)
+}
+
 // buildNotForkCondition creates a condition to check the repository is not a fork.
 func buildNotForkCondition() ConditionNode {
 	return &NotNode{
@@ -26,10 +71,7 @@ func buildNotDispatchOrCallOrEmptyOperation() ConditionNode {
 				BuildStringLiteral("workflow_call"),
 			),
 		),
-		BuildEquals(
-			BuildPropertyAccess("inputs.operation"),
-			BuildStringLiteral(""),
-		),
+		buildOperationIsEmptyCondition(),
 	)
 }
 
@@ -145,10 +187,7 @@ func buildRunOperationCondition(excludedOperations ...string) ConditionNode {
 			BuildEventTypeEquals("workflow_dispatch"),
 			BuildEventTypeEquals("workflow_call"),
 		),
-		BuildNotEquals(
-			BuildPropertyAccess("inputs.operation"),
-			BuildStringLiteral(""),
-		),
+		buildOperationIsNotEmptyCondition(),
 	)
 
 	// Exclude each dedicated operation

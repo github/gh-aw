@@ -18,9 +18,10 @@ env:
   GH_AW_HARNESS_MAX_RETRIES: "4"
 tracker-id: avenger-ci
 max-turns: 50
-model: claude-haiku-4-5
+model: openai/gpt-5.3-codex
 engine:
-  id: claude
+  id: codex
+  model-provider: openai
 network:
   allowed:
     - defaults
@@ -28,14 +29,14 @@ network:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default]
   bash: ["*"]
   edit:
 sandbox:
   agent:
     id: awf
-    runtime: gvisor
+    runtime: cloud-hypervisor
     mounts:
       - "/usr/bin/make:/usr/bin/make:ro"
       - "/usr/local/bin/node:/usr/local/bin/node:ro"

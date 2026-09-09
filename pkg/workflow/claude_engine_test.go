@@ -182,7 +182,7 @@ func TestClaudeEngineNonAWFKeepsStderrOutOfTranscript(t *testing.T) {
 	require.Len(t, steps, 1)
 
 	stepContent := strings.Join([]string(steps[0]), "\n")
-	assert.Contains(t, stepContent, "--debug-file /tmp/gh-aw/agent/claude-debug.log")
+	assert.Contains(t, stepContent, "--debug-file /tmp/gh-aw/claude-debug.log")
 	assert.Contains(t, stepContent, `${GH_AW_MODEL_DETECTION_CLAUDE:+ --model "$GH_AW_MODEL_DETECTION_CLAUDE"} | tee -a /tmp/gh-aw/agent-stdio.log`)
 	assert.NotContains(t, stepContent, "2>&1 | tee -a /tmp/gh-aw/agent-stdio.log")
 	assert.NotContains(t, stepContent, "awf")
@@ -234,7 +234,7 @@ func TestClaudeEngineAllowsMountedMCPCLICommandsInRestrictedBash(t *testing.T) {
 	stepContent := strings.Join([]string(steps[0]), "\n")
 	assert.Contains(t, stepContent, "Bash(echo)", "Expected original restricted bash command")
 	assert.Contains(t, stepContent, "Bash(mymcp:*)", "Expected mounted custom MCP CLI allowlist command")
-	assert.Contains(t, stepContent, "Bash(playwright:*)", "Expected mounted playwright CLI allowlist command")
+	assert.Contains(t, stepContent, "Bash(playwright-cli:*)", "Expected Playwright CLI allowlist command")
 	assert.Contains(t, stepContent, "Bash(safeoutputs:*)", "Expected mounted safeoutputs CLI allowlist command")
 	// Permission mode must be acceptEdits when bash is restricted (not wildcard)
 	assert.Contains(t, stepContent, "--permission-mode acceptEdits", "Expected acceptEdits with restricted bash")

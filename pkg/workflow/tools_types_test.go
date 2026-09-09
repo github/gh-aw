@@ -410,8 +410,8 @@ func TestPlaywrightConfigParsing(t *testing.T) {
 	t.Run("parses playwright config map", func(t *testing.T) {
 		toolsMap := map[string]any{
 			"playwright": map[string]any{
-				"version": "v1.41.0",
-				"args":    []any{"--headless"},
+				"version": "0.1.18",
+				"mode":    "cli",
 			},
 		}
 
@@ -422,12 +422,12 @@ func TestPlaywrightConfigParsing(t *testing.T) {
 			t.Fatal("expected non-nil config")
 		}
 
-		if config.Version != "v1.41.0" {
-			t.Errorf("expected version 'v1.41.0', got %q", config.Version)
+		if config.Version != "0.1.18" {
+			t.Errorf("expected version '0.1.18', got %q", config.Version)
 		}
 
-		if len(config.Args) != 1 {
-			t.Errorf("expected 1 arg, got %d", len(config.Args))
+		if !config.IsCLIMode() {
+			t.Error("expected CLI mode")
 		}
 	})
 }

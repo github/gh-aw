@@ -32,6 +32,7 @@ module.exports = [
       "gh-aw-custom/require-json-parse-try-catch": "warn",
       "gh-aw-custom/require-mkdirsync-try-catch": "warn",
       "gh-aw-custom/require-mkdtempsync-try-catch": "warn",
+      "gh-aw-custom/require-realpathsync-try-catch": "warn",
       "gh-aw-custom/require-rmsync-try-catch": "warn",
       "gh-aw-custom/require-parseInt-radix": "warn",
       "gh-aw-custom/require-return-after-core-setfailed": "warn",
@@ -47,6 +48,7 @@ module.exports = [
       "gh-aw-custom/require-execsync-try-catch": "warn",
       "gh-aw-custom/require-execfilesync-try-catch": "warn",
       "gh-aw-custom/require-fs-io-try-catch": "warn",
+      "gh-aw-custom/require-fs-chmod-try-catch": "warn",
       "gh-aw-custom/no-setfailed-then-exit-zero": "warn",
       "gh-aw-custom/no-err-stack-then-string-fallback": "warn",
       "gh-aw-custom/no-caught-error-interpolation": "warn",
@@ -71,6 +73,7 @@ module.exports = [
       "gh-aw-custom/no-string-fallback-for-non-string-message": "warn",
       "gh-aw-custom/require-getexecoutput-exitcode-check": "warn",
       "gh-aw-custom/prefer-actions-exec-over-child-process": "warn",
+      "gh-aw-custom/no-misplaced-error-code-definition": "warn",
     },
   },
   {

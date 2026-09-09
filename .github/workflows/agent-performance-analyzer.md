@@ -16,8 +16,10 @@ engine:
 max-tool-denials: 3
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
+  github:
+    mode: local
   cli-proxy: true
   bash: [":*"]
   repo-memory:

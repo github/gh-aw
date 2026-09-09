@@ -7,6 +7,8 @@ var safeOutputsToolsComputationLog = logger.New("workflow:safe_outputs_tools_com
 // computeEnabledToolNames returns the set of predefined tool names that are enabled
 // by the workflow's SafeOutputsConfig. Dynamic tools (dispatch-workflow, custom jobs,
 // call-workflow) are excluded because they are generated separately.
+//
+//nolint:largefunc // Built-in tool enablement is kept as one exhaustive mapping.
 func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 } {
 	enabledTools := make(map[string]struct {
@@ -19,6 +21,39 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 	if data.SafeOutputs.CreateIssues != nil {
 		enabledTools["create_issue"] = struct {
 		}{}
+	}
+	if data.SafeOutputs.CreateWorkItems != nil {
+		enabledTools["ado_create_work_item"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.UpdateWorkItems != nil {
+		enabledTools["ado_update_work_item"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.CommentOnWorkItems != nil {
+		enabledTools["ado_comment_on_work_item"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.AssignWorkItems != nil {
+		enabledTools["ado_assign_work_item"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.LinkWorkItems != nil {
+		enabledTools["ado_link_work_items"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.UploadWorkItemAttachments != nil {
+		enabledTools["ado_upload_workitem_attachment"] = struct {
+		}{}
+	}
+	if data.SafeOutputs.LinearCreateIssue != nil {
+		enabledTools["linear_create_issue"] = struct{}{}
+	}
+	if data.SafeOutputs.LinearAddComment != nil {
+		enabledTools["linear_add_comment"] = struct{}{}
+	}
+	if data.SafeOutputs.LinearUpdateIssue != nil {
+		enabledTools["linear_update_issue"] = struct{}{}
 	}
 	if data.SafeOutputs.CreateAgentSessions != nil {
 		enabledTools["create_agent_session"] = struct {

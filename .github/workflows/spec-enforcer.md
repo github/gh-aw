@@ -18,6 +18,7 @@ network:
   - defaults
   - github
   - go
+  - node
 imports:
 - shared/reporting.md
 - shared/otlp.md
@@ -35,9 +36,10 @@ safe-outputs:
 description: Generates and maintains specification-driven test suites for each Go package, relying on README.md specifications rather than source code
 emoji: 📋
 max-turns: 100
-model: copilot/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
-  id: pi
+  id: codex
+  model-provider: openai
 name: Package Specification Enforcer
 strict: true
 timeout-minutes: 30
@@ -48,7 +50,7 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 tracker-id: spec-enforcer
@@ -59,7 +61,7 @@ evals:
     question: Was a pull request created with new or updated test suites, or was noop used when no packages required test generation?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Package Specification Enforcer

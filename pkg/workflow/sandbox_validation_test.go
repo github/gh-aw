@@ -5,6 +5,7 @@ package workflow
 import (
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,101 +80,6 @@ func TestSandboxTypeCaseSensitivity(t *testing.T) {
 	}
 }
 
-// TestGetSandboxDisableJustification tests the full justification validation logic,
-// including all the rejection cases required by the acceptance criteria:
-//   - boolean true fails (no longer a legacy shorthand)
-//   - expressions fail
-//   - too-short strings fail
-//   - whitespace-padded strings fail
-//   - a 20+ character literal reason passes
-func TestGetSandboxDisableJustification(t *testing.T) {
-	makeData := func(value any) *WorkflowData {
-		return &WorkflowData{
-			Features: map[string]any{
-				"dangerously-disable-sandbox-agent": value,
-			},
-		}
-	}
-
-	t.Run("boolean true is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData(true))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "string", "should explain that a string is required")
-	})
-
-	t.Run("boolean false is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData(false))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "string", "should explain that a string is required")
-	})
-
-	t.Run("empty string is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData(""))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "20", "should mention minimum length")
-	})
-
-	t.Run("short string is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData("too short"))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "20", "should mention minimum length")
-	})
-
-	t.Run("whitespace-padded short string is rejected", func(t *testing.T) {
-		// 22 spaces - long enough on paper but collapses to empty after TrimSpace
-		_, err := getSandboxDisableJustification(makeData("                      "))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "20", "should mention minimum length")
-	})
-
-	t.Run("whitespace-padded string where trimmed is below minimum is rejected", func(t *testing.T) {
-		// "short" padded with whitespace to 25 total chars still fails (trimmed is 5)
-		_, err := getSandboxDisableJustification(makeData("          short          "))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "20", "should mention minimum length")
-	})
-
-	t.Run("GitHub Actions expression is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData("${{ inputs.reason }}"))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "expression")
-	})
-
-	t.Run("longer expression with surrounding text is rejected", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(makeData("reason: ${{ inputs.reason }} end"))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "expression")
-	})
-
-	t.Run("20+ character literal reason passes", func(t *testing.T) {
-		justification, err := getSandboxDisableJustification(makeData("controlled environment with no internet access"))
-		require.NoError(t, err)
-		assert.Equal(t, "controlled environment with no internet access", justification)
-	})
-
-	t.Run("justification is trimmed before return", func(t *testing.T) {
-		justification, err := getSandboxDisableJustification(makeData("  controlled environment with no internet access  "))
-		require.NoError(t, err)
-		assert.Equal(t, "controlled environment with no internet access", justification)
-	})
-
-	t.Run("feature missing returns error", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(&WorkflowData{Features: map[string]any{}})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "missing")
-	})
-
-	t.Run("nil features returns error", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(&WorkflowData{})
-		require.Error(t, err)
-	})
-
-	t.Run("nil workflow data returns error", func(t *testing.T) {
-		_, err := getSandboxDisableJustification(nil)
-		require.Error(t, err)
-	})
-}
-
 // TestValidateSandboxConfigTrustBoundaryMessage tests that the compiler diagnostic
 // says the sandbox removal is a trust boundary change, not just a validator check.
 func TestValidateSandboxConfigTrustBoundaryMessage(t *testing.T) {
@@ -245,31 +151,12 @@ func TestValidateSandboxConfigMCPEnvironmentVariableNames(t *testing.T) {
 	})
 }
 
-// TestValidateSandboxConfigStoresJustification tests that a valid justification is
-// stored in AgentSandboxConfig.DisableReason for downstream diagnostics and audit.
-func TestValidateSandboxConfigStoresJustification(t *testing.T) {
-	const reason = "controlled environment with no internet access"
-	workflowData := &WorkflowData{
-		Features: map[string]any{
-			"dangerously-disable-sandbox-agent": reason,
-		},
-		SandboxConfig: &SandboxConfig{
-			Agent: &AgentSandboxConfig{Disabled: true},
-		},
-	}
-
-	err := validateSandboxConfig(workflowData)
-	require.NoError(t, err, "valid justification should pass validation")
-	assert.Equal(t, reason, workflowData.SandboxConfig.Agent.DisableReason,
-		"justification must be stored on AgentSandboxConfig for audit/logging")
-}
-
 func TestValidateSandboxConfigRejectsCodexCopilotWithoutAgentSandbox(t *testing.T) {
 	workflowData := &WorkflowData{
 		Model:        "copilot/auto",
 		EngineConfig: &EngineConfig{ID: "codex"},
 		Features: map[string]any{
-			"dangerously-disable-sandbox-agent": "controlled environment with no internet access",
+			"dangerously-disable-sandbox-agent": true,
 		},
 		SandboxConfig: &SandboxConfig{
 			Agent: &AgentSandboxConfig{Disabled: true},
@@ -413,5 +300,32 @@ func TestValidateSandboxConfigAllowHostPorts(t *testing.T) {
 		require.Error(t, err, "allow-host-ports on the default docker runtime should fail validation")
 		assert.Contains(t, err.Error(), "allow-host-ports")
 		assert.Contains(t, err.Error(), string(AgentRuntimeDockerSudoIptables))
+	})
+}
+
+func TestValidateSandboxConfigDynamicEnclaveDelegationControlPort(t *testing.T) {
+	t.Run("port leaving room for the control port passes validation", func(t *testing.T) {
+		data := dynamicEnclaveWorkflowData()
+		data.Tools = map[string]any{"github": map[string]any{"mode": "remote"}}
+		data.SandboxConfig.MCP.Port = int(constants.MaxNetworkPort) - enclaveDelegationControlPortOffset
+		require.NoError(t, validateSandboxConfig(data))
+	})
+
+	t.Run("port that overflows the derived control port fails validation", func(t *testing.T) {
+		data := dynamicEnclaveWorkflowData()
+		data.Tools = map[string]any{"github": map[string]any{"mode": "remote"}}
+		data.SandboxConfig.MCP.Port = int(constants.MaxNetworkPort) - enclaveDelegationControlPortOffset + 1
+		err := validateSandboxConfig(data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sandbox.mcp.port")
+		assert.Contains(t, err.Error(), "dynamic enclave delegation control port")
+	})
+
+	t.Run("port near the max is fine without dynamic enclave delegation", func(t *testing.T) {
+		data := &WorkflowData{
+			Tools:         map[string]any{"github": map[string]any{"mode": "remote"}},
+			SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}, MCP: &MCPGatewayRuntimeConfig{Port: int(constants.MaxNetworkPort) - 1}},
+		}
+		require.NoError(t, validateSandboxConfig(data))
 	})
 }

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"encoding/json"
+
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -22,6 +24,7 @@ type TokenCoreMetrics struct {
 type TokenUsageEntry struct {
 	Schema    string `json:"_schema,omitempty"` // Self-describing record type, e.g. "token-usage/v0.26.0"
 	Timestamp string `json:"timestamp"`
+	Event     string `json:"event"`
 	RequestID string `json:"request_id"`
 	Provider  string `json:"provider"`
 	Model     string `json:"model"`
@@ -29,8 +32,11 @@ type TokenUsageEntry struct {
 	Status    int    `json:"status"`
 	Streaming bool   `json:"streaming"`
 	TokenCoreMetrics
-	DurationMs    int `json:"duration_ms"`
-	ResponseBytes int `json:"response_bytes"`
+	DurationMs              int             `json:"duration_ms"`
+	ResponseBytes           int             `json:"response_bytes"`
+	AICreditsThisResponse   json.RawMessage `json:"ai_credits_this_response,omitempty"`
+	AICreditsTotal          json.RawMessage `json:"ai_credits_total,omitempty"`
+	InputTokensIncludeCache json.RawMessage `json:"input_tokens_include_cache,omitempty"`
 }
 
 // AmbientContextMetrics captures token footprint for the first LLM invocation.
@@ -53,6 +59,7 @@ type TokenUsageSummary struct {
 	CacheEfficiency       float64                     `json:"cache_efficiency"`
 	TotalEffectiveTokens  int                         `json:"total_effective_tokens,omitempty"`
 	TotalAIC              float64                     `json:"total_aic,omitempty"`
+	AICFound              bool                        `json:"-"`
 	AmbientContext        *AmbientContextMetrics      `json:"ambient_context,omitempty"`
 	ByModel               map[string]*ModelTokenUsage `json:"by_model"`
 	SubagentModelRequests []SubagentModelRequest      `json:"subagent_model_requests,omitempty"`
@@ -116,8 +123,8 @@ type agentUsageEntry struct {
 	// AmbientContextTokens is the first-request ambient input token count emitted by parse_token_usage.cjs.
 	AmbientContextTokens *int `json:"ambient_context"`
 	// AICredits is the pre-computed total AI Credits value written by parse_token_usage.cjs.
-	// When present and positive it is used directly so we don't need per-model pricing.
-	AICredits float64 `json:"ai_credits"`
+	// When present and valid it is used directly so we don't need per-model pricing.
+	AICredits json.RawMessage `json:"ai_credits"`
 }
 
 // proxyEventsEntry is a JSONL record from api-proxy-logs/events.jsonl.

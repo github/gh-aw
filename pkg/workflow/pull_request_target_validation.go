@@ -62,7 +62,7 @@ var pullRequestTargetGitHubExpressionPattern = regexp.MustCompile(`^\$\{\{\s*([^
 // When the workflow frontmatter sets strict: false, effectiveStrictMode is lowered so the
 // dangerous-trigger strict-only warning is skipped; the insecure-checkout check still runs
 // and emits a non-strict warning when checkout is not explicitly disabled.
-func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, markdownPath string) error {
+func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, markdownPath string) error { //nolint:largefunc // Trigger checks share parsed state and diagnostics.
 	// Fast path: skip expensive YAML parsing when the On field cannot possibly contain
 	// a pull_request_target trigger. This avoids yaml.Unmarshal on every
 	// validateWorkflowData call for the common case of non-pull_request_target workflows.
@@ -98,13 +98,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		return nil
 	}
 
-	effectiveStrictMode := c.strictMode
-	if workflowData.RawFrontmatter != nil {
-		if strictBool, ok := workflowData.RawFrontmatter["strict"].(bool); ok && !strictBool {
-			pullRequestTargetLog.Print("Frontmatter strict: false detected, disabling strict mode error for pull_request_target validation")
-			effectiveStrictMode = false
-		}
-	}
+	effectiveStrictMode := c.effectiveStrictMode(workflowData.RawFrontmatter)
 
 	// In strict mode, always emit a warning that pull_request_target is a very dangerous trigger,
 	// regardless of whether checkout is disabled. The workflow still runs with full write

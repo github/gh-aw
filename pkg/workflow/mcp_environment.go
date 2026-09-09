@@ -60,13 +60,15 @@ var mcpEnvironmentLog = logger.New("workflow:mcp_environment")
 
 // collectMCPEnvironmentVariables collects all MCP-related environment variables
 // from the workflow configuration to be passed to both Start MCP gateway and MCP Gateway steps
-func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, workflowData *WorkflowData, hasAgenticWorkflows bool) map[string]string {
+func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, workflowData *WorkflowData, hasAgenticWorkflows bool) map[string]string { //nolint:largefunc // Existing MCP environment collection remains centralized.
 	envVars := make(map[string]string)
 
 	// Check for GitHub MCP server token
 	hasGitHub := slices.Contains(mcpTools, "github")
+	rawGitHubTool, hasGitHubInTools := tools["github"]
+	githubToolEnabledInTools := hasGitHubInTools && rawGitHubTool != false
 	if hasGitHub {
-		toolConfig, _ := tools["github"].(map[string]any)
+		toolConfig, _ := rawGitHubTool.(map[string]any)
 
 		// Check if GitHub App is configured for token minting
 		appConfigured := hasGitHubApp(toolConfig)
@@ -97,21 +99,23 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		// determine-automatic-lockdown step is not generated.
 		// Security: Pass step outputs through environment variables to prevent template injection.
 		guardPoliciesExplicit := len(getGitHubGuardPolicies(toolConfig)) > 0
-		if !guardPoliciesExplicit {
+		if githubToolEnabledInTools && !guardPoliciesExplicit {
 			envVars["GITHUB_MCP_GUARD_MIN_INTEGRITY"] = "${{ steps.determine-automatic-lockdown.outputs.min_integrity }}"
 			envVars["GITHUB_MCP_GUARD_REPOS"] = "${{ steps.determine-automatic-lockdown.outputs.repos }}"
 		}
 	}
 
 	// Emit GH_AW_SINK_VISIBILITY for all workflows where the determine-automatic-lockdown step
-	// runs (i.e., any workflow with a GitHub tool, including mode:gh-proxy). This avoids
+	// runs (i.e., any workflow with a GitHub tool or a dynamic enclave). This avoids
 	// embedding a ${{ }} expression directly in the run: heredoc, which zizmor flags as
 	// template injection. The value is the raw step output (no toJSON), and the surrounding
 	// JSON double-quotes in the heredoc produce a valid JSON string at runtime:
 	//   "sink-visibility": "${GH_AW_SINK_VISIBILITY}"  →  "sink-visibility": "public"
-	_, hasGitHubInTools := tools["github"]
-	if hasGitHubInTools {
+	if githubToolEnabledInTools || enclaveDynamicRepositoryPolicyEnabled(workflowData) {
 		envVars[sinkVisibilityEnvVar] = "${{ steps.determine-automatic-lockdown.outputs.visibility }}"
+	}
+	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+		envVars["GH_AW_TIMEOUT_MINUTES"] = resolveStepTimeoutValue(workflowData)
 	}
 
 	// Check for safe-outputs env vars
@@ -159,23 +163,11 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GITHUB_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
 	}
 
-	// Check for Playwright domain secrets
-	hasPlaywright := slices.Contains(mcpTools, "playwright")
-	if hasPlaywright {
-		// Extract all expressions from playwright custom args using ExpressionExtractor
-		if playwrightTool, ok := tools["playwright"]; ok {
-			playwrightConfig := parsePlaywrightTool(playwrightTool)
-			customArgs := getPlaywrightCustomArgs(playwrightConfig)
-			playwrightArgSecrets := extractExpressionsFromPlaywrightArgs(customArgs)
-			maps.Copy(envVars, playwrightArgSecrets)
-		}
-	}
-
 	// Check for HTTP MCP servers with secrets in headers (e.g., Tavily)
 	// These need to be available as environment variables when the MCP gateway starts
 	for toolName, toolValue := range tools {
 		// Skip standard tools that are handled above
-		if toolName == "github" || toolName == "playwright" ||
+		if toolName == "github" ||
 			toolName == "cache-memory" || toolName == "agentic-workflows" ||
 			toolName == "safe-outputs" || toolName == "mcp-scripts" {
 			continue

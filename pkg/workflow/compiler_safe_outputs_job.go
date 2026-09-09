@@ -324,6 +324,15 @@ type safeOutputsHandlerOutputsAndActionState struct {
 // processed by the consolidated handler manager step (as opposed to a dedicated job/step).
 func hasHandlerManagerTypes(data *WorkflowData) bool {
 	return data.SafeOutputs.CreateIssues != nil ||
+		data.SafeOutputs.CreateWorkItems != nil ||
+		data.SafeOutputs.UpdateWorkItems != nil ||
+		data.SafeOutputs.CommentOnWorkItems != nil ||
+		data.SafeOutputs.AssignWorkItems != nil ||
+		data.SafeOutputs.LinkWorkItems != nil ||
+		data.SafeOutputs.UploadWorkItemAttachments != nil ||
+		data.SafeOutputs.LinearCreateIssue != nil ||
+		data.SafeOutputs.LinearAddComment != nil ||
+		data.SafeOutputs.LinearUpdateIssue != nil ||
 		data.SafeOutputs.AddComments != nil ||
 		data.SafeOutputs.CreateDiscussions != nil ||
 		data.SafeOutputs.CloseIssues != nil ||
@@ -380,7 +389,7 @@ func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOu
 // staging artifact produced by the agent job, when the workflow uses the upload_artifact safe
 // output, so the handler manager can process staged files.
 func (c *Compiler) appendUploadArtifactStagingDownloadStep(data *WorkflowData, agentArtifactPrefix string, state *safeOutputsHandlerOutputsAndActionState) {
-	if data.SafeOutputs.UploadArtifact != nil {
+	if usesSafeOutputsArtifactStaging(data.SafeOutputs) {
 		consolidatedSafeOutputsJobLog.Print("Adding upload-artifact staging download step")
 		stagingArtifactName := agentArtifactPrefix + SafeOutputsUploadArtifactStagingArtifactName
 		state.steps = append(state.steps,
@@ -403,6 +412,8 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 		if err != nil {
 			return err
 		}
+		handlerManagerSteps = injectLinearCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
+		handlerManagerSteps = injectJiraCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		state.steps = append(state.steps, handlerManagerSteps...)
 		state.safeOutputStepNames = append(state.safeOutputStepNames, "process_safe_outputs")
 		addHandlerManagerOutputs(data, state.outputs)
@@ -602,23 +613,26 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[string]string) []string {
 	var preambleTokenSteps []string
 	if data.SafeOutputs.GitHubApp != nil {
-		outputs["app_token_minting_failed"] = "${{ steps.safe-outputs-app-token.outcome == 'failure' }}"
 		appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
 		if appPermissions != nil && len(appPermissions.permissions) == 0 {
-			appPermissions = NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
-				PermissionMetadata: PermissionRead,
-			})
+			// No enabled handler (e.g. a Linear-only configuration) consumes GitHub
+			// permissions from this global app, so skip minting an unrelated
+			// installation token purely because a top-level github-app was
+			// configured or auto-copied via applyTopLevelGitHubAppFallbacks.
+			safeOutputsPermissionsLog.Print("No GitHub-backed safe output handler enabled; skipping global GitHub App token minting")
+		} else {
+			outputs["app_token_minting_failed"] = "${{ steps.safe-outputs-app-token.outcome == 'failure' }}"
+			var appTokenFallbackRepo string
+			if hasWorkflowCallTrigger(data.On) {
+				appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+			}
+			preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForRepository(
+				data.SafeOutputs.GitHubApp,
+				appPermissions,
+				appTokenFallbackRepo,
+				inferSingleCheckoutRepositoryForGitHubAppOwner(data),
+			)...)
 		}
-		var appTokenFallbackRepo string
-		if hasWorkflowCallTrigger(data.On) {
-			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
-		}
-		preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForRepository(
-			data.SafeOutputs.GitHubApp,
-			appPermissions,
-			appTokenFallbackRepo,
-			inferSingleCheckoutRepositoryForGitHubAppOwner(data),
-		)...)
 	}
 	if headApp := getSafeOutputsHeadApp(data.SafeOutputs); headApp != nil {
 		headRepoSlug := getSafeOutputsHeadRepoSlug(data.SafeOutputs)
@@ -676,7 +690,7 @@ func (c *Compiler) calculatePreambleInsertIndex(steps []string, data *WorkflowDa
 		insertIndex += strings.Count(generateOTLPAttributesMaskStep(), stepNameLinePrefix)
 	}
 	insertIndex += len(buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin))
-	if data.SafeOutputs.UploadArtifact != nil {
+	if usesSafeOutputsArtifactStaging(data.SafeOutputs) {
 		// The staging download step has uploadArtifactStagingDownloadStepCount YAML string entries.
 		insertIndex += uploadArtifactStagingDownloadStepCount
 	}

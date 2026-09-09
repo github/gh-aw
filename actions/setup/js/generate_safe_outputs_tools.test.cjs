@@ -98,6 +98,28 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("missing_tool");
   });
 
+  it("preserves namespaced public names", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        ...sampleSourceTools,
+        {
+          name: "ado_create_work_item",
+          description: "Creates an Azure DevOps work item.",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ ado_create_work_item: { max: 1 } }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("ado_create_work_item");
+  });
+
   it("applies description suffix from tools_meta", () => {
     fs.writeFileSync(configPath, JSON.stringify({ create_issue: { max: 5 } }));
     fs.writeFileSync(

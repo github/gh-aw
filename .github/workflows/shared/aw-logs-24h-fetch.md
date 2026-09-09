@@ -21,7 +21,7 @@ steps:
   - name: Download logs from last 24 hours
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: ./gh-aw logs --start-date -1d --count 3000 --artifacts usage -o /tmp/gh-aw/aw-mcp/logs
+    run: ./gh-aw logs --start-date -1d --count 3000 --artifacts usage --audit --max-storage 10240 --prune-older-runs -o /tmp/gh-aw/aw-mcp/logs
 ---
 
 ## Agentic Workflow Logs (Last 24h)
@@ -37,6 +37,7 @@ Workflow logs have been pre-downloaded to `/tmp/gh-aw/aw-mcp/logs/`.
 └── run-(id)/             # One directory per workflow run
     ├── aw_info.json      # Run metadata (engine, workflow, status, tokens)
     ├── run_summary.json  # Per-job/step conclusions (job_details[].name/conclusion/steps[])
+    ├── audit.json        # Per-run audit report built from downloaded data
     ├── activation/       # Activation job logs
     └── agent/            # Agent job logs
 ```

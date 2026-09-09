@@ -23,7 +23,7 @@ These rules deliberately balance bias toward progress with quality over quantity
 
 ## Survey the repository before choosing a strategy
 
-Do not begin maintenance workflow design from a generic task portfolio. First inspect the target repository so the initial strategy reflects its technology, activity, backlog, and maintainer practices.
+Do not begin maintenance workflow design from a generic task portfolio. First inspect the target repository so the initial strategy reflects its technology, activity, backlog, and maintainer practices. For broad automation requests, use this survey to mine candidate intents; for an explicit, narrow request, skip the survey unless repository evidence can materially disambiguate the outcome.
 
 Build a bounded baseline from:
 
@@ -38,7 +38,7 @@ Build a bounded baseline from:
 
 Use deterministic GitHub queries and repository inspection for this survey. Bound every query, state the observation window and limits, and mark unavailable data instead of guessing. Distinguish observations from recommendations in the design summary.
 
-Derive the first portfolio from the evidence. For example:
+Derive evidence-backed candidate intents before the first portfolio. For each candidate, record the concise outcome, observed evidence, feasibility, expected value, risk, and uncertainties; do not persist this analysis in workflow frontmatter. Select and augment an intent using [intent.md](intent.md), then derive the first portfolio from it. For example:
 
 - a large unlabelled issue backlog favors bounded classification before code changes
 - many unanswered but active issues favors investigation and substantive responses
@@ -180,8 +180,8 @@ When a run legitimately produces no action after checking all bounded queues and
 
 Build the workflow in stages:
 
-1. **Survey the repository.** Record the project shape, contribution rules, validation commands, protected paths, activity window, issue and pull request health, labels, releases, CI reliability, and existing automation. Keep observed facts separate from strategy recommendations.
-2. **Choose the initial portfolio.** Start with two or three low-risk families such as labelling, investigation, and owned-PR maintenance. Add code-writing tasks only after observing output quality.
+1. **Survey the repository and mine intents.** Record the project shape, contribution rules, validation commands, protected paths, activity window, issue and pull request health, labels, releases, CI reliability, and existing automation. Keep observed facts separate from evidence-backed candidate intents and strategy recommendations.
+2. **Select and augment an intent, then choose the initial portfolio.** Start with two or three low-risk families such as labelling, investigation, and owned-PR maintenance. Add code-writing tasks only after observing output quality.
 3. **Define live signals and applicability.** Document how each signal changes priority, when each task is eligible, and its fallback.
 4. **Define state and deduplication.** Specify cursors, timestamps, ownership markers, and retention. Avoid storing repository data that can be fetched cheaply.
 5. **Configure triggers and pressure valves.** Add a fuzzy schedule, optional manual or slash-command entrypoint, concurrency, and an open-PR guard.

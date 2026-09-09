@@ -11,6 +11,9 @@ func (c *Compiler) resolveFrontmatterPluginRefs(workflowData *WorkflowData) erro
 	if workflowData == nil || len(workflowData.Plugins) == 0 {
 		return nil
 	}
+	if len(workflowData.PluginReferences) != 0 && len(workflowData.PluginReferences) != len(workflowData.Plugins) {
+		return fmt.Errorf("plugins: internal error, PluginReferences length (%d) does not match Plugins length (%d)", len(workflowData.PluginReferences), len(workflowData.Plugins))
+	}
 
 	for i, plugin := range workflowData.Plugins {
 		parsed := parseSkillRefSpec(plugin)
@@ -36,6 +39,9 @@ func (c *Compiler) resolveFrontmatterPluginRefs(workflowData *WorkflowData) erro
 			return fmt.Errorf("plugins[%d]: resolved %q to invalid commit SHA %q; expected a full 40-character lowercase hexadecimal SHA", i, plugin, sha)
 		}
 		workflowData.Plugins[i] = parsed.repoPath + "@" + sha
+		if len(workflowData.PluginReferences) != 0 {
+			workflowData.PluginReferences[i].Plugin = workflowData.Plugins[i]
+		}
 	}
 
 	return nil

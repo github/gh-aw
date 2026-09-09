@@ -81,7 +81,7 @@ jobs:
   super_linter:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run Super-Linter
         uses: super-linter/super-linter@v7
         env:
@@ -123,7 +123,7 @@ jobs:
       group: my-runner-group
       labels: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 ```
 
 When imports define the same `jobs.<job-id>.setup-steps` or `jobs.<job-id>.pre-steps`, gh-aw merges that field deterministically: imported steps run first, then main-workflow steps. The two fields stay separate; `setup-steps` are never folded into `pre-steps` or vice versa.
@@ -185,7 +185,7 @@ jobs:
     env:
       NODE_ENV: production
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: npm ci && npm run build
 ```
 
@@ -234,8 +234,9 @@ jobs:
     steps:
       - id: get_release
         run: echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
----
+```
 
+```markdown
 Generate highlights for release ${{ needs.release.outputs.version }}.
 ```
 

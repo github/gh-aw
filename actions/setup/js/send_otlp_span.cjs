@@ -708,6 +708,87 @@ function buildExperimentAttributes(assignments) {
   return attrs;
 }
 
+/**
+ * Build summary attributes and per-result events from valid deterministic grader output.
+ * Free-form grader messages, details, and errors are intentionally excluded because
+ * custom graders may derive them from trace content containing sensitive values.
+ *
+ * @param {any} graderOutput
+ * @param {number} eventTimeMs
+ * @returns {{attributes: Array<{key: string, value: object}>, events: Array<{timeUnixNano: string, name: string, attributes: Array<{key: string, value: object}>}>}}
+ */
+function buildGraderTelemetry(graderOutput, eventTimeMs) {
+  if (!graderOutput || typeof graderOutput !== "object" || !Array.isArray(graderOutput.results) || graderOutput.results.length === 0) {
+    return { attributes: [], events: [] };
+  }
+
+  const results = graderOutput.results.filter(result => result && typeof result === "object" && typeof result.id === "string" && result.id);
+  if (results.length === 0) {
+    return { attributes: [], events: [] };
+  }
+
+  const countByStatus = status => results.filter(result => result.status === status).length;
+  const attributes = [
+    buildAttr("gh-aw.graders.count", results.length),
+    buildAttr("gh-aw.graders.passed", countByStatus("pass")),
+    buildAttr("gh-aw.graders.failed", countByStatus("fail")),
+    buildAttr("gh-aw.graders.errors", countByStatus("error")),
+    buildAttr("gh-aw.graders.unavailable", countByStatus("unavailable")),
+    buildAttr("gh-aw.graders.other", results.length - countByStatus("pass") - countByStatus("fail") - countByStatus("error") - countByStatus("unavailable")),
+  ];
+  const timeUnixNano = toNanoString(eventTimeMs);
+  const events = results.map(result => {
+    const resultAttributes = [buildAttr("gh-aw.grader.id", result.id)];
+    if (typeof result.name === "string" && result.name) resultAttributes.push(buildAttr("gh-aw.grader.name", result.name));
+    if (typeof result.status === "string" && result.status) resultAttributes.push(buildAttr("gh-aw.grader.status", result.status));
+    if (typeof result.source === "string" && result.source) resultAttributes.push(buildAttr("gh-aw.grader.source", result.source));
+    if (typeof result.unit === "string" && result.unit) resultAttributes.push(buildAttr("gh-aw.grader.unit", result.unit));
+    if (typeof result.value === "number" && Number.isFinite(result.value)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.value", result.value));
+    if (typeof result.passed === "boolean") resultAttributes.push(buildAttr("gh-aw.grader.passed", result.passed));
+    if (typeof result.severity === "string" && result.severity) resultAttributes.push(buildAttr("gh-aw.grader.severity", result.severity));
+    if (typeof result.baselineValue === "number" && Number.isFinite(result.baselineValue)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.baseline_value", result.baselineValue));
+    if (typeof result.deltaFromBaseline === "number" && Number.isFinite(result.deltaFromBaseline)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.delta_from_baseline", result.deltaFromBaseline));
+    return { timeUnixNano, name: "grader.result", attributes: resultAttributes };
+  });
+
+  return { attributes, events };
+}
+
+/**
+ * Build summary attributes and per-result events from BinEval JSONL records.
+ * Only bounded, structured fields are included; free-form questions are excluded.
+ *
+ * @param {any[]} evalResults
+ * @param {number} eventTimeMs
+ * @returns {{attributes: Array<{key: string, value: object}>, events: Array<{timeUnixNano: string, name: string, attributes: Array<{key: string, value: object}>}>}}
+ */
+function buildEvalTelemetry(evalResults, eventTimeMs) {
+  if (!Array.isArray(evalResults)) {
+    return { attributes: [], events: [] };
+  }
+  const results = evalResults.filter(result => result && typeof result === "object" && typeof result.id === "string" && result.id);
+  if (results.length === 0) {
+    return { attributes: [], events: [] };
+  }
+
+  const normalizedAnswers = results.map(result => {
+    const answer = typeof result.answer === "string" ? result.answer.trim().toUpperCase() : "UNKNOWN";
+    return answer === "YES" || answer === "NO" ? answer : "UNKNOWN";
+  });
+  const countAnswer = answer => normalizedAnswers.filter(value => value === answer).length;
+  const attributes = [buildAttr("gh-aw.evals.count", results.length), buildAttr("gh-aw.evals.yes", countAnswer("YES")), buildAttr("gh-aw.evals.no", countAnswer("NO")), buildAttr("gh-aw.evals.unknown", countAnswer("UNKNOWN"))];
+  const timeUnixNano = toNanoString(eventTimeMs);
+  const events = results.map((result, index) => {
+    const resultAttributes = [buildAttr("gh-aw.eval.id", result.id), buildAttr("gh-aw.eval.answer", normalizedAnswers[index])];
+    if (typeof result.model === "string" && result.model) {
+      resultAttributes.push(buildAttr("gh-aw.eval.model", result.model));
+    }
+    return { timeUnixNano, name: "eval.result", attributes: resultAttributes };
+  });
+
+  return { attributes, events };
+}
+
 // ---------------------------------------------------------------------------
 // Custom OTLP attributes (GH_AW_OTLP_ATTRIBUTES)
 // ---------------------------------------------------------------------------
@@ -780,12 +861,49 @@ function parseOTLPHeaders(raw) {
   for (const pair of raw.split(",")) {
     const eqIdx = pair.indexOf("=");
     if (eqIdx <= 0) continue; // skip malformed pairs (no =) or empty keys (= at start)
-    // Decode before trimming so percent-encoded whitespace (%20) at edges is preserved correctly.
-    const key = decodeURIComponent(pair.slice(0, eqIdx)).trim();
-    const value = decodeURIComponent(pair.slice(eqIdx + 1)).trim();
-    if (key) result[key] = value;
+    try {
+      // Decode before trimming so percent-encoded whitespace (%20) at edges is preserved correctly.
+      const key = decodeURIComponent(pair.slice(0, eqIdx)).trim();
+      const value = decodeURIComponent(pair.slice(eqIdx + 1)).trim();
+      if (key) result[key] = value;
+    } catch {
+      // Ignore only the malformed pair so other configured headers remain usable.
+    }
   }
   return result;
+}
+
+const EMPTY_OTLP_AUTHORIZATION_SCHEMES = new Set([
+  "api-key",
+  "apikey",
+  "basic",
+  "bearer",
+  "concealed",
+  "digest",
+  "dpop",
+  "dsn",
+  "gnap",
+  "hoba",
+  "mutual",
+  "negotiate",
+  "oauth",
+  "privatetoken",
+  "scram-sha-1",
+  "scram-sha-256",
+  "sentry",
+  "vapid",
+]);
+
+/**
+ * @param {string} raw
+ * @returns {boolean}
+ */
+function hasEmptyOTLPAuthorizationHeader(raw) {
+  const headers = parseOTLPHeaders(raw);
+  return Object.entries(headers).some(([key, value]) => {
+    const normalizedKey = key.toLowerCase();
+    return (normalizedKey === "authorization" || normalizedKey === "x-sentry-auth") && (value === "" || EMPTY_OTLP_AUTHORIZATION_SCHEMES.has(value.toLowerCase()));
+  });
 }
 
 /**
@@ -1045,6 +1163,9 @@ function parseOTLPEndpoints() {
         .filter(e => e && typeof e.url === "string" && e.url.trim() !== "")
         .filter(e => {
           const hasHeaders = typeof e.headers === "string" && e.headers !== "";
+          if (hasHeaders && hasEmptyOTLPAuthorizationHeader(e.headers)) {
+            return false;
+          }
           if (ignoreMissingCredentials && !hasHeaders) {
             // Enterprise-default endpoint configured without matching credentials:
             // treat as unconfigured instead of exporting unauthenticated telemetry.
@@ -1447,6 +1568,20 @@ function readJSONIfExists(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch {
     return null;
+  }
+}
+
+/**
+ * Safely read and parse a JSONL file. Returns an empty array on any error.
+ *
+ * @param {string} filePath - Absolute path to the JSONL file
+ * @returns {any[]}
+ */
+function readJSONLIfExists(filePath) {
+  try {
+    return parseJsonlContent(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return [];
   }
 }
 
@@ -1991,6 +2126,8 @@ function readAgentRuntimeMetrics() {
  * - `/tmp/gh-aw/agent_usage.json` – per-type token breakdown written by parse_token_usage.cjs;
  *                                    provides `input_tokens`, `output_tokens`,
  *                                    `cache_read_tokens`, and `cache_write_tokens` counters
+ * - `/tmp/gh-aw/agent/graders/grader_results.json` – deterministic grader
+ *                                    summary attributes and per-result span events
  *
  * @param {string} spanName - OTLP span name (e.g. `"gh-aw.job.conclusion"`)
  * @param {{ startMs?: number }} [options]
@@ -2152,6 +2289,23 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // setup action post-step emits this run-level span.
   if (jobName === "conclusion") {
     const usageActivity = readJSONIfExists("/tmp/gh-aw/usage/activity/summary.json");
+    for (const [attributeName, sectionName, fieldName] of [
+      ["gh-aw.integrity.filtered_events", "integrity", "total_filtered"],
+      ["gh-aw.firewall.requests", "firewall", "total_requests"],
+      ["gh-aw.firewall.allowed_requests", "firewall", "allowed_requests"],
+      ["gh-aw.firewall.blocked_requests", "firewall", "blocked_requests"],
+      ["gh-aw.mcp.tool_calls", "gateway", "total_calls"],
+      ["gh-aw.mcp.failed_tool_calls", "gateway", "failed_calls"],
+      ["gh-aw.mcp.input_bytes", "gateway", "total_input_size"],
+      ["gh-aw.mcp.max_input_bytes", "gateway", "max_input_size"],
+      ["gh-aw.mcp.output_bytes", "gateway", "total_output_size"],
+      ["gh-aw.mcp.max_output_bytes", "gateway", "max_output_size"],
+    ]) {
+      const value = usageActivity?.[sectionName]?.[fieldName];
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+        attributes.push(buildAttr(attributeName, value));
+      }
+    }
     const workingSet = usageActivity?.working_set;
     const measurementState = workingSet?.measurement_state;
     if (measurementState === "measured" || measurementState === "partial" || measurementState === "unavailable") {
@@ -2327,6 +2481,9 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     }
   }
 
+  const graderTelemetry = jobName === "agent" ? buildGraderTelemetry(readJSONIfExists("/tmp/gh-aw/agent/graders/grader_results.json"), endMs) : { attributes: [], events: [] };
+  const evalTelemetry = jobName === "evals" ? buildEvalTelemetry(readJSONLIfExists("/tmp/gh-aw/evals.jsonl"), endMs) : { attributes: [], events: [] };
+
   const resourceAttributes = buildGitHubActionsResourceAttributes({
     repository,
     runId,
@@ -2385,7 +2542,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
       });
   };
 
-  const spanEvents = buildSpanEvents(endMs);
+  const spanEvents = [...buildSpanEvents(endMs), ...graderTelemetry.events, ...evalTelemetry.events];
 
   // Prefer the timestamp written at the very beginning of the Execute Agent CLI step
   // (captures true step start on the host, before the AWF container launches) so the
@@ -2480,6 +2637,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     }
   }
 
+  // Grader results are run-level outcomes. They belong only on the agent job's
+  // conclusion span, rather than its dedicated child span or downstream jobs
+  // which may have downloaded the agent artifact.
+  attributes.push(...graderTelemetry.attributes);
+  attributes.push(...evalTelemetry.attributes);
+
   // Only attach token-usage attributes to jobs that actually executed model usage.
   // Most downstream jobs (conclusion, safe_outputs) may have agent_usage.json on
   // disk via artifact download but must NOT emit token data — otherwise every
@@ -2564,6 +2727,8 @@ module.exports = {
   OTEL_JSONL_PATH,
   appendToOTLPJSONL,
   buildExperimentAttributes,
+  buildGraderTelemetry,
+  buildEvalTelemetry,
   parseOTLPCustomAttributes,
   buildCustomOTLPAttributes,
 };

@@ -21,6 +21,13 @@ const SAMPLE_VALIDATION_CONFIG = {
       temporary_id: { type: "string" },
     },
   },
+  linear_create_issue: {
+    defaultMax: 1,
+    fields: {
+      title: { required: true, type: "string", sanitize: true, maxLength: 128, rejectIfOversized: true },
+      body: { required: true, type: "string", sanitize: true, maxLength: 65000, minLength: 20, rejectIfOversized: true },
+    },
+  },
   add_comment: {
     defaultMax: 1,
     dataEnabled: true,
@@ -1325,6 +1332,36 @@ describe("safe_output_type_validator", () => {
 
       expect(result.isValid).toBe(false);
       expect(result.error).toContain("too short");
+    });
+  });
+
+  describe("rejectIfOversized validation", () => {
+    it("should reject an oversized linear_create_issue title instead of truncating it", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+
+      const oversizedTitle = "x".repeat(129);
+      const result = validateItem({ type: "linear_create_issue", title: oversizedTitle, body: "A sufficiently detailed body." }, "linear_create_issue", 1);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("exceeds maximum length");
+    });
+
+    it("should reject an oversized linear_create_issue body instead of truncating it", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+
+      const oversizedBody = "x".repeat(65001);
+      const result = validateItem({ type: "linear_create_issue", title: "Valid title", body: oversizedBody }, "linear_create_issue", 1);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("exceeds maximum length");
+    });
+
+    it("should accept a linear_create_issue title/body within the configured limits", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+
+      const result = validateItem({ type: "linear_create_issue", title: "Valid title", body: "A sufficiently detailed body." }, "linear_create_issue", 1);
+
+      expect(result.isValid).toBe(true);
     });
   });
 

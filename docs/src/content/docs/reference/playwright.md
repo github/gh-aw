@@ -7,59 +7,60 @@ sidebar:
 
 Playwright enables headless browser control for accessibility testing, visual regression detection, end-to-end testing, and web scraping.
 
-## Modes
+## Configuration
 
-Playwright supports two integration modes. **CLI mode is recommended** for all new workflows — it is token-efficient (no large MCP schemas in context), avoids Docker overhead, and lets the agent reach local dev servers via `localhost` directly.
-
-### CLI Mode (Recommended)
+The built-in Playwright tool is CLI-only by default. It is token-efficient because it does not load MCP tool schemas into the agent context, avoids Docker overhead, and reaches local development servers through `localhost`. If an older workflow still sets `mode: cli`, it continues to work for compatibility, but omitting `mode` is preferred.
 
 ```yaml wrap
 tools:
   playwright:
-    mode: cli
 ```
 
-CLI mode installs `@playwright/cli` as a global npm package on the runner. The agent invokes `playwright-cli <command>` from bash:
+The compiler installs `@playwright/cli` as a global npm package, its skills, and
+Chromium before the agent runs. The default `open` browser is Chromium. Select
+additional browsers with `browsers`. Playwright's `chromium` download is the
+Chrome for Testing distribution; `chrome` and `chrome-for-testing` are accepted
+aliases:
+
+```yaml wrap
+tools:
+  playwright:
+    browsers: [chrome, firefox]
+```
+
+The supported values are `chrome`, `chrome-for-testing`, `chromium`, `firefox`,
+and `webkit`.
+Requested browsers are downloaded with retries before the agent starts; package
+and browser installation during agent execution is prohibited. The agent
+invokes `playwright-cli <command>` from bash:
 
 ```bash wrap
-playwright-cli browser_navigate --url "https://example.com"
-playwright-cli browser_take_screenshot --filename /tmp/screenshot.png --full-page true
-playwright-cli browser_snapshot
-playwright-cli browser_evaluate --expression "document.title"
-playwright-cli browser_run_code --code "async (page) => { await page.goto('https://example.com'); return await page.title(); }"
+playwright-cli open "https://example.com"
+playwright-cli screenshot --filename /tmp/screenshot.png
+playwright-cli snapshot
+playwright-cli eval "() => document.title"
+playwright-cli run-code "async (page) => { await page.goto('https://example.com'); return await page.title(); }"
 ```
 
-### MCP Mode (Deprecated)
-
-MCP mode is deprecated and emits a compile-time warning. Migrate to `mode: cli` for the reasons listed above. MCP mode runs Playwright in a Docker container with `--network host`, so `localhost` resolves to the Docker host and bridge IP detection is required to reach local servers.
-
-```yaml wrap
-tools:
-  playwright:
-    mode: mcp  # deprecated — use mode: cli instead
-```
-
-## Configuration
+With a restricted `tools.bash` allowlist, `playwright-cli:*` is added
+automatically. Explicit Bash entries are needed only for supporting lifecycle
+commands such as `npm`, `curl`, and `kill`.
 
 ### Version
 
-The `version` field has different meaning per mode:
-
-| Mode | Pins | Default |
-|------|------|---------|
-| `cli` (recommended) | `@playwright/cli` npm package | `0.1.13` |
-| `mcp` (deprecated) | Playwright browser Docker image | built-in |
+The `version` field pins the `@playwright/cli` npm package. Omit it to use the compiler default.
 
 ```yaml wrap
 tools:
   playwright:
-    mode: cli
-    version: "0.1.13"
+    version: "0.1.18"
 ```
 
 ### Network Access
 
-Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. By default, Playwright can only reach `localhost` and `127.0.0.1`. Use ecosystem identifiers and explicit domains together:
+Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. Playwright can reach `localhost` and `127.0.0.1` by default. A local server
+started in the same AWF sandbox does not require `network.allowed: local`. Use
+ecosystem identifiers and explicit external domains together:
 
 ```yaml wrap
 network:
@@ -72,9 +73,95 @@ network:
 
 Allowing `example.com` automatically allows its subdomains.
 
-### Browser Support
+### AWF Sandbox Policy
 
-Chromium (Chrome/Edge), Firefox, and WebKit (Safari) are all available in both modes.
+When the workflow runs inside the AWF sandbox (`sandbox.agent` enabled, or the
+firewall enabled by default for the configured engine), the compiler injects
+an additional policy prompt reinforcing the secure browser topology: bind
+local servers to `127.0.0.1` only, wait for a loopback readiness check before
+navigating, keep `localhost`/`127.0.0.1` on the proxy bypass list, and never
+install packages or browsers at runtime. This guidance takes precedence over
+generic Playwright CLI skill suggestions such as `npm install`/`npx` fallback
+installation or navigating to arbitrary example domains.
+
+### Browser Support and Sessions
+
+Chromium is the default. Use Firefox or WebKit with `--browser` when selected
+for provisioning:
+
+```bash wrap
+playwright-cli open "https://example.com"                  # Chromium
+playwright-cli -s=firefox open "https://example.com" --browser=firefox
+playwright-cli -s=webkit open "https://example.com" --browser=webkit
+playwright-cli -s=firefox close
+playwright-cli -s=webkit close
+```
+
+Named sessions (`-s=<name>`) keep cookies and storage isolated, which is useful
+for comparing authenticated and anonymous flows.
+
+### Publishing Screenshots
+
+Files under `/tmp` are ephemeral. To let users retrieve a screenshot, configure
+an artifact safe output and have the agent publish the file:
+
+```aw wrap
+---
+safe-outputs:
+  upload-artifact:
+    allowed-paths: ["/tmp/*.png"]
+    max-uploads: 1
+    retention-days: 7
+---
+
+Capture `/tmp/home.png`, then call `upload_artifact` with
+`name: "home-screenshot"` and `path: "/tmp/home.png"`.
+```
+
+## Migrate from Playwright MCP
+
+Remove `mode: mcp`. The built-in integration is CLI-only, so no replacement
+`mode` field is needed. The compiler now reports `mode: mcp` as an error.
+
+Replace MCP tool calls in prompts with equivalent `playwright-cli` commands run through bash:
+
+| Playwright MCP tool | Playwright CLI command |
+| --- | --- |
+| `browser_navigate` | `playwright-cli goto <url>` |
+| `browser_snapshot` | `playwright-cli snapshot` |
+| `browser_take_screenshot` | `playwright-cli screenshot --filename <path>` |
+| `browser_click` | `playwright-cli click <ref>` |
+| `browser_evaluate` | `playwright-cli eval "() => document.title"` |
+
+Use `localhost` directly for development servers because Playwright CLI runs on the runner. Remove Playwright MCP container arguments and MCP-specific tool names such as `mcp__playwright__browser_navigate` from prompts and engine allowlists.
+
+## What if you really want to use MCP?
+
+The built-in tool no longer manages Playwright MCP. Configure it as a custom server under `mcp-servers` and select the package version explicitly:
+
+```aw wrap
+---
+mcp-servers:
+  playwright:
+    command: npx
+    args:
+      - --yes
+      - "@playwright/mcp@0.0.79"
+      - --no-sandbox
+    allowed:
+      - browser_navigate
+      - browser_snapshot
+      - browser_take_screenshot
+
+network:
+  allowed:
+    - defaults
+    - node
+    - playwright
+---
+```
+
+Custom MCP servers are not covered by the built-in Playwright compatibility or version tracking. Pin and update the package deliberately, restrict `allowed` to the required tools, and follow the [custom MCP server guidance](/gh-aw/guides/mcps/#manually-configuring-a-custom-mcp-server).
 
 ## Common Use Cases
 
@@ -87,7 +174,6 @@ on:
 
 tools:
   playwright:
-    mode: cli
 
 network:
   allowed:
@@ -110,13 +196,15 @@ safe-outputs:
 Use Playwright to check docs.example.com for WCAG 2.1 Level AA compliance.
 
 ```bash
-playwright-cli browser_navigate --url "https://docs.example.com"
-playwright-cli browser_snapshot
+playwright-cli open "https://docs.example.com"
+playwright-cli snapshot
 ```
 
-Run automated accessibility checks using axe-core and report missing alt text,
-insufficient color contrast, missing ARIA labels, and keyboard navigation issues.
-Create an issue for each category found.
+Use snapshots for structural and manual checks of headings, labels, alternative
+text, and keyboard flows. Comprehensive WCAG checks (such as axe-core and
+programmatic contrast analysis) require dependencies prepared before the agent
+runs; the AWF sandbox prohibits runtime installation. Create focused issues for
+actionable findings.
 ```
 
 ### Visual Regression Testing
@@ -135,7 +223,7 @@ on:
       - 'docs/astro.config.mjs'
 
 steps:
-  - uses: actions/checkout@v6
+  - uses: actions/checkout@v7
     with:
       persist-credentials: false
   - working-directory: ./docs
@@ -150,8 +238,7 @@ steps:
 
 tools:
   playwright:
-    mode: cli
-    version: "0.1.13"  # pins `@playwright/cli` npm package; see Configuration > Version
+    version: "0.1.18"  # pins `@playwright/cli` npm package; see Configuration > Version
   bash:
     - "npm *"
     - "curl http://localhost:*"
@@ -160,7 +247,6 @@ network:
   allowed:
     - defaults
     - playwright
-    - local
     - node
 
 permissions:
@@ -184,9 +270,9 @@ on the home, getting-started, and reference pages across three viewports:
 For each viewport, resize and screenshot:
 
 ```bash
-playwright-cli browser_resize --width 375 --height 812
-playwright-cli browser_navigate --url "http://localhost:4321/"
-playwright-cli browser_take_screenshot --filename /tmp/mobile-screenshot.png --full-page true
+playwright-cli open "http://localhost:4321/"
+playwright-cli resize 375 812
+playwright-cli screenshot --filename=/tmp/mobile-screenshot.png --full-page
 ```
 
 Compare against baseline and report differences as a PR comment with screenshots.
@@ -202,14 +288,12 @@ on:
 
 tools:
   playwright:
-    mode: cli
   bash: [":*"]
 
 network:
   allowed:
     - defaults
     - playwright
-    - "localhost"
 
 permissions:
   contents: read
@@ -218,8 +302,8 @@ permissions:
 # E2E Testing
 
 Start the dev server on localhost:3000, then drive a full user journey with
-`playwright-cli browser_navigate --url "http://localhost:3000"`. Report any
-failures with screenshots.
+`playwright-cli open "http://localhost:3000"`. Report any failures with
+screenshots.
 ```
 
 ## Learn More

@@ -8,6 +8,10 @@ engine: copilot
 safe-outputs:
   replace-label:
     max: 5
+    samples:
+      - item_number: 1
+        label_to_remove: in-progress
+        label_to_add: done
 ---
 
 # Test Copilot Replace Label

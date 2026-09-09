@@ -536,6 +536,12 @@ MCP Gateway v0.1.5 introduces stricter MCP server validation:
 
 ### Bug Fixes
 
+#### Order nested imported steps by dependency and detect subdirectory cycles
+
+Imported `steps`, `pre-agent-steps`, and `post-steps` now place prerequisites
+before the files that import them, regardless of traversal order. Import cycles
+in subdirectories now fail compilation instead of producing a lock file.
+
 #### Create organization and enterprise defaults with explicit variable visibility
 
 `gh aw env update` now sends the required visibility when creating organization

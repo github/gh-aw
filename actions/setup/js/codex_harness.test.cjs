@@ -15,6 +15,7 @@ const {
   isMissingApiKeyError,
   isServerError,
   isInvalidModelError,
+  isUnsupportedModelToolsError,
   isInvalidRequestError,
   isReconnectExhaustedError,
   countPermissionDeniedIssues,
@@ -609,6 +610,39 @@ env_key = "OPENAI_API_KEY"
     });
   });
 
+  describe("isUnsupportedModelToolsError", () => {
+    it("returns true for the observed 'tools' unknown_parameter turn.failed event", () => {
+      const output =
+        '{"type":"thread.started","thread_id":"01a0545e-6060-7472-9d50-d4a643611434"}\n' +
+        '{"type":"turn.started"}\n' +
+        String.raw`{"type":"error","message":"{\n  \"error\": {\n    \"message\": \"Invalid value: 'custom'\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"tools\",\n    \"code\": \"unknown_parameter\"\n  }\n}"}` +
+        "\n" +
+        String.raw`{"type":"turn.failed","error":{"message":"{\n  \"error\": {\n    \"message\": \"Invalid value: 'custom'\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"tools\",\n    \"code\": \"unknown_parameter\"\n  }\n}"}}`;
+      expect(isUnsupportedModelToolsError(output)).toBe(true);
+    });
+
+    it("returns true regardless of the order of param/code fields", () => {
+      const output = '{"type":"turn.failed","error":{"code":"unknown_parameter","param":"tools"}}';
+      expect(isUnsupportedModelToolsError(output)).toBe(true);
+    });
+
+    it("returns true for a provider metadata.raw envelope", () => {
+      const output = String.raw`{"type":"turn.failed","error":{"message":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"tools\\\",\\n    \\\"code\\\": \\\"unknown_parameter\\\"}\"}}}"}}`;
+      expect(isUnsupportedModelToolsError(output)).toBe(true);
+    });
+
+    it("returns false for an unrelated invalid_request_error (e.g. empty message array)", () => {
+      const output = String.raw`{"type":"turn.failed","error":{"message":"{\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"messages[4].content\\\",\\n    \\\"code\\\": \\\"empty_array\\\"}\"}}}"}}`;
+      expect(isUnsupportedModelToolsError(output)).toBe(false);
+    });
+
+    it("returns false for unrelated errors and empty output", () => {
+      expect(isUnsupportedModelToolsError("rate_limit_exceeded")).toBe(false);
+      expect(isUnsupportedModelToolsError('{"type":"item.completed","item":{"type":"tool_call_output","output":"unknown_parameter tools"}}')).toBe(false);
+      expect(isUnsupportedModelToolsError("")).toBe(false);
+    });
+  });
+
   describe("permission-denied classification helpers", () => {
     it("counts repeated permission-denied signals", () => {
       const output = "permission denied\npermissions denied\nEACCES: permission denied";
@@ -745,6 +779,45 @@ process.exit(1);`,
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("isInvalidRequestError=true");
       expect(result.stderr).toContain("invalid_request_error (HTTP 400) — not retrying");
+    });
+
+    it("does not retry the observed unsupported-model 'tools' unknown_parameter failure", () => {
+      const tempDir = makeHarnessTempDir("codex-unsupported-model-tools-");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const promptPath = path.join(tempDir, "prompt.txt");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+fs.appendFileSync(process.env.CODEX_HARNESS_STUB_CALLS, "called\\n");
+process.stderr.write(JSON.stringify({ type: "thread.started", thread_id: "01a0545e-6060-7472-9d50-d4a643611434" }) + "\\n");
+process.stderr.write(JSON.stringify({ type: "turn.started" }) + "\\n");
+const errorMessage = JSON.stringify({ error: { message: "Invalid value: 'custom'", type: "invalid_request_error", param: "tools", code: "unknown_parameter" } });
+process.stderr.write(JSON.stringify({ type: "error", message: errorMessage }) + "\\n");
+process.stderr.write(JSON.stringify({ type: "turn.failed", error: { message: errorMessage } }) + "\\n");
+process.exit(1);`,
+        "utf8"
+      );
+      fs.writeFileSync(promptPath, "fix the bug", "utf8");
+
+      const result = spawnSync(process.execPath, ["codex_harness.cjs", process.execPath, stubPath, "exec", "--prompt-file", promptPath], {
+        cwd: path.dirname(require.resolve("./codex_harness.cjs")),
+        env: {
+          ...process.env,
+          CODEX_HARNESS_STUB_CALLS: callsPath,
+          CODEX_API_KEY: "fake-key-for-test",
+          GH_AW_HARNESS_MAX_RETRIES: "1",
+          GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(1);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("isUnsupportedModelToolsError=true");
+      expect(result.stderr).toContain("configured model does not support Codex's required tool-calling schema");
+      expect(result.stderr).toContain("not retrying");
     });
 
     it("exits 0 when the AWF API proxy returns HTTP 403 max-AI-credits as an authentication failure", () => {

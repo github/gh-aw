@@ -11,17 +11,18 @@ permissions:
   issues: read
   pull-requests: read
 tracker-id: daily-awf-spec-compiler-surfacing
-model: copilot/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
-  id: pi
+  id: codex
+  model-provider: openai
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, issues, pull_requests]
   repo-memory:
     branch-name: memory/awf-feature-surfacing

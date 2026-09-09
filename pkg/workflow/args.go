@@ -1,11 +1,6 @@
 package workflow
 
-import (
-	"encoding/json"
-	"strings"
-
-	"github.com/github/gh-aw/pkg/logger"
-)
+import "github.com/github/gh-aw/pkg/logger"
 
 var argsLog = logger.New("workflow:args")
 
@@ -41,25 +36,4 @@ func getGitHubCustomArgs(githubTool any) []string {
 		return extractCustomArgs(toolConfig)
 	}
 	return nil
-}
-
-// getPlaywrightCustomArgs extracts custom args from Playwright tool configuration
-func getPlaywrightCustomArgs(playwrightConfig *PlaywrightToolConfig) []string {
-	if playwrightConfig != nil && len(playwrightConfig.Args) > 0 {
-		return playwrightConfig.Args
-	}
-	return nil
-}
-
-// writeArgsToYAML writes custom args to YAML with proper JSON quoting and escaping
-// indent specifies the indentation string for each argument line
-func writeArgsToYAML(yaml *strings.Builder, args []string, indent string) {
-	argsLog.Printf("Writing %d args to YAML", len(args))
-
-	for _, arg := range args {
-		yaml.WriteString(",\n")
-		// Use json.Marshal to properly quote and escape the argument
-		quotedArg, _ := json.Marshal(arg) //nolint:jsonmarshalignoredeerror // marshaling a string cannot fail
-		yaml.WriteString(indent + string(quotedArg))
-	}
 }

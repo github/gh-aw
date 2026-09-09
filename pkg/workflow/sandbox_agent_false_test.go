@@ -21,7 +21,7 @@ network:
     - defaults
     - github.com
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 strict: false
@@ -56,8 +56,8 @@ Test workflow to verify sandbox.agent: false is accepted when the feature flag i
 		lockStr := string(lockContent)
 
 		// Verify that AWF firewall is NOT present (agent sandbox disabled)
-		if strings.Contains(lockStr, "sudo -E awf") {
-			t.Error("Expected AWF firewall to be disabled, but found 'sudo -E awf' command in lock file")
+		if strings.Contains(lockStr, "sudo -E ") {
+			t.Error("Expected AWF firewall to be disabled, but found privileged AWF command in lock file")
 		}
 
 		// Verify that MCP gateway IS present (gateway always enabled)
@@ -195,7 +195,7 @@ Test workflow to verify sandbox.agent: false is rejected without the feature fla
 		}
 	})
 
-	t.Run("sandbox.agent: false with short justification is rejected", func(t *testing.T) {
+	t.Run("sandbox.agent: false with feature false is rejected", func(t *testing.T) {
 		workflowsDir := t.TempDir()
 
 		markdown := `---
@@ -205,17 +205,17 @@ network:
     - defaults
     - github.com
 features:
-  dangerously-disable-sandbox-agent: "too short"
+  dangerously-disable-sandbox-agent: false
 sandbox:
   agent: false
 strict: false
 on: workflow_dispatch
 ---
 
-Test workflow to verify sandbox.agent: false is rejected when feature justification is too short.
+Test workflow to verify sandbox.agent: false is rejected when the feature is false.
 `
 
-		workflowPath := filepath.Join(workflowsDir, "test-agent-false-short-flag.md")
+		workflowPath := filepath.Join(workflowsDir, "test-agent-false-disabled-flag.md")
 		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
@@ -224,14 +224,14 @@ Test workflow to verify sandbox.agent: false is rejected when feature justificat
 		compiler := NewCompiler()
 		err = compiler.CompileWorkflow(workflowPath)
 		if err == nil {
-			t.Fatal("Expected compilation to fail when justification is too short, but got nil error")
+			t.Fatal("Expected compilation to fail when the feature is false, but got nil error")
 		}
-		if !strings.Contains(err.Error(), "at least 20 characters") {
-			t.Fatalf("Expected error to mention minimum length, got: %v", err)
+		if !strings.Contains(err.Error(), "dangerously-disable-sandbox-agent") {
+			t.Fatalf("Expected error to reference 'dangerously-disable-sandbox-agent', got: %v", err)
 		}
 	})
 
-	t.Run("sandbox.agent: false with expression justification is rejected", func(t *testing.T) {
+	t.Run("sandbox.agent: false with string feature is rejected", func(t *testing.T) {
 		workflowsDir := t.TempDir()
 
 		markdown := `---
@@ -241,17 +241,17 @@ network:
     - defaults
     - github.com
 features:
-  dangerously-disable-sandbox-agent: "${{ inputs.reason }}"
+  dangerously-disable-sandbox-agent: "true"
 sandbox:
   agent: false
 strict: false
 on: workflow_dispatch
 ---
 
-Test workflow to verify sandbox.agent: false is rejected when feature uses an expression.
+Test workflow to verify sandbox.agent: false is rejected when the feature is not a boolean.
 `
 
-		workflowPath := filepath.Join(workflowsDir, "test-agent-false-expression-flag.md")
+		workflowPath := filepath.Join(workflowsDir, "test-agent-false-string-flag.md")
 		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
@@ -260,10 +260,10 @@ Test workflow to verify sandbox.agent: false is rejected when feature uses an ex
 		compiler := NewCompiler()
 		err = compiler.CompileWorkflow(workflowPath)
 		if err == nil {
-			t.Fatal("Expected compilation to fail when justification uses an expression, but got nil error")
+			t.Fatal("Expected compilation to fail when the feature is a string, but got nil error")
 		}
-		if !strings.Contains(err.Error(), "expressions") {
-			t.Fatalf("Expected error to mention expressions are not allowed, got: %v", err)
+		if !strings.Contains(err.Error(), "dangerously-disable-sandbox-agent") {
+			t.Fatalf("Expected error to reference 'dangerously-disable-sandbox-agent', got: %v", err)
 		}
 	})
 }

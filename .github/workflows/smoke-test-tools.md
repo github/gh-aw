@@ -14,12 +14,13 @@ on:
     names: ["smoke"]
   status-comment: true
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
 name: Agent Container Smoke Test
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine: pi
+model: copilot/auto
 strict: true
 runtimes:
   node:
@@ -55,12 +56,12 @@ imports:
   - shared/otlp.md
   - shared/token-telemetry-check.md
   - shared/reporting.md
+  - shared/playwright-title-test.md
 features:
   gh-aw-detection: false
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 ---
 
 # Smoke Test: Agent Container Tools

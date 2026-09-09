@@ -5,13 +5,17 @@ import "github.com/github/gh-aw/pkg/logger"
 var compilerYAMLPolicyLog = logger.New("workflow:compiler_yaml_policy")
 
 // effectiveStrictMode computes the effective strict mode for a workflow.
-// Priority: CLI flag (c.strictMode) > frontmatter strict field > default (true).
+// Priority: CLI flag or repository config > frontmatter strict field > default (true).
 // This should be used when emitting metadata/env vars to correctly reflect the
 // workflow's strictness as inferred from the source (frontmatter).
 func (c *Compiler) effectiveStrictMode(frontmatter map[string]any) bool {
 	if c.strictMode {
 		// CLI flag takes precedence
 		compilerYAMLPolicyLog.Print("Strict mode enabled by CLI flag")
+		return true
+	}
+	if repoConfig, err := c.loadRepoConfig(); err == nil && repoConfig.Strict {
+		compilerYAMLPolicyLog.Print("Strict mode enforced by repository config")
 		return true
 	}
 	if strictVal, exists := frontmatter["strict"]; exists {

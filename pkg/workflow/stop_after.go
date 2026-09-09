@@ -15,17 +15,45 @@ import (
 
 var stopAfterLog = logger.New("workflow:stop_after")
 
+// parseOnStopAfterValue extracts and validates the "stop-after" key from an on: map.
+// This is the single source of truth for reading on.stop-after so that the typed
+// FrontmatterConfig.OnStopAfter field (populated in ParseFrontmatterConfig) and
+// extractStopAfterFromOn never diverge on how the raw key is interpreted.
+// Accepts either a literal string (relative delta or absolute timestamp) or a
+// GitHub Actions expression (e.g. "${{ inputs.stop-after }}"), which is passed
+// through verbatim for evaluation at workflow runtime.
+func parseOnStopAfterValue(onMap map[string]any) (string, error) {
+	if onMap == nil {
+		return "", nil
+	}
+	stopAfter, exists := onMap["stop-after"]
+	if !exists {
+		return "", nil
+	}
+	str, ok := stopAfter.(string)
+	if !ok {
+		return "", fmt.Errorf("stop-after value must be a string, got %T. Example: stop-after: \"+1d\"", stopAfter)
+	}
+	return str, nil
+}
+
 // extractStopAfterFromOn extracts the stop-after value from the on: section
 func (c *Compiler) extractStopAfterFromOn(frontmatter map[string]any, workflowData ...*WorkflowData) (string, error) {
-	// Use cached On field from ParsedFrontmatter if available (when workflowData is provided)
-	var onSection any
-	var exists bool
-	if len(workflowData) > 0 && workflowData[0] != nil && workflowData[0].ParsedFrontmatter != nil && workflowData[0].ParsedFrontmatter.On != nil {
-		onSection = workflowData[0].ParsedFrontmatter.On
-		exists = true
-	} else {
-		onSection, exists = frontmatter["on"]
+	// Prefer the typed field populated by ParseFrontmatterConfig when available, so
+	// production code has a single source of truth instead of reparsing the raw map.
+	// ParseFrontmatterConfig silently leaves OnStopAfter empty on a parse error (e.g. a
+	// non-string value), so fall back to re-parsing the raw on: map in that edge case to
+	// surface the original compile error instead of silently treating it as unset.
+	if len(workflowData) > 0 && workflowData[0] != nil && workflowData[0].ParsedFrontmatter != nil {
+		pf := workflowData[0].ParsedFrontmatter
+		if pf.OnStopAfter != "" {
+			return pf.OnStopAfter, nil
+		}
+		return parseOnStopAfterValue(pf.On)
 	}
+
+	// Fallback: no typed ParsedFrontmatter available, so parse the raw frontmatter map.
+	onSection, exists := frontmatter["on"]
 
 	if !exists {
 		return "", nil
@@ -37,16 +65,20 @@ func (c *Compiler) extractStopAfterFromOn(frontmatter map[string]any, workflowDa
 		// Simple string format like "on: push" - no stop-after possible
 		return "", nil
 	case map[string]any:
-		// Complex object format - look for stop-after
-		if stopAfter, exists := on["stop-after"]; exists {
-			if str, ok := stopAfter.(string); ok {
-				return str, nil
-			}
-			return "", fmt.Errorf("stop-after value must be a string, got %T. Example: stop-after: \"+1d\"", stopAfter)
-		}
-		return "", nil
+		// Complex object format - look for stop-after via the shared typed-field parser
+		return parseOnStopAfterValue(on)
 	default:
 		return "", errors.New("invalid on: section format. Expected a string or an object of triggers. Example:\non:\n  issues:\n    types: [opened]")
+	}
+}
+
+// logStopAfterExpressionPassthrough logs (and, in verbose mode, prints) that a
+// GitHub Actions expression stop-after value is being passed through verbatim
+// rather than resolved at compile time.
+func (c *Compiler) logStopAfterExpressionPassthrough(stopTime string) {
+	stopAfterLog.Printf("Stop-after value is a GitHub Actions expression, passing through verbatim: %s", stopTime)
+	if c.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Stop-after is a GitHub Actions expression, resolved at runtime: "+stopTime))
 	}
 }
 
@@ -60,54 +92,70 @@ func (c *Compiler) processStopAfterConfiguration(frontmatter map[string]any, wor
 	}
 	workflowData.StopTime = stopAfter
 
-	// Resolve relative stop-after to absolute time if needed
-	if workflowData.StopTime != "" {
-		stopAfterLog.Printf("Stop-after value specified: %s", workflowData.StopTime)
-		// Check if there's already a lock file with a stop time (recompilation case)
-		lockFile := stringutil.MarkdownToLockFile(markdownPath)
-		existingStopTime := ExtractStopTimeFromLockFile(lockFile)
-
-		// If refresh flag is set, always regenerate the stop time
-		if c.refreshStopTime {
-			stopAfterLog.Print("Refresh flag set, regenerating stop time")
-			resolvedStopTime, err := resolveStopTime(workflowData.StopTime, time.Now().UTC())
-			if err != nil {
-				return fmt.Errorf("invalid stop-after format, expected a relative delta such as \"+25h\" or an absolute timestamp such as \"2025-01-15 14:30:00\": %w", err)
-			}
-			originalStopTime := stopAfter
-			workflowData.StopTime = resolvedStopTime
-			stopAfterLog.Printf("Resolved stop time from %s to %s", originalStopTime, resolvedStopTime)
-
-			if c.verbose && isRelativeStopTime(originalStopTime) {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Refreshed relative stop-after to: "+resolvedStopTime))
-			} else if c.verbose && originalStopTime != resolvedStopTime {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
-			}
-		} else if existingStopTime != "" {
-			// Preserve existing stop time during recompilation (default behavior)
-			stopAfterLog.Printf("Preserving existing stop time from lock file: %s", existingStopTime)
-			workflowData.StopTime = existingStopTime
-			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Preserving existing stop time from lock file: "+existingStopTime))
-			}
-		} else {
-			// First compilation or no existing stop time, generate new one
-			stopAfterLog.Print("First compilation, generating new stop time")
-			resolvedStopTime, err := resolveStopTime(workflowData.StopTime, time.Now().UTC())
-			if err != nil {
-				return fmt.Errorf("invalid stop-after format, expected a relative delta such as \"+25h\" or an absolute timestamp such as \"2025-01-15 14:30:00\": %w", err)
-			}
-			originalStopTime := stopAfter
-			workflowData.StopTime = resolvedStopTime
-
-			if c.verbose && isRelativeStopTime(originalStopTime) {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Resolved relative stop-after to: "+resolvedStopTime))
-			} else if c.verbose && originalStopTime != resolvedStopTime {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
-			}
-		}
+	// GitHub Actions expressions (e.g. "${{ inputs.stop-after }}") are resolved at
+	// workflow runtime, not at compile time, so pass them through verbatim without
+	// attempting to parse them as a relative delta or absolute timestamp.
+	if isExpression(workflowData.StopTime) {
+		c.logStopAfterExpressionPassthrough(workflowData.StopTime)
+		return nil
 	}
 
+	if workflowData.StopTime == "" {
+		return nil
+	}
+	return c.resolveAndApplyStopTime(workflowData, markdownPath, stopAfter)
+}
+
+// resolveAndApplyStopTime resolves a relative or absolute stop-after value to an
+// absolute timestamp, preserving an existing lock file's stop time across
+// recompilations unless the refresh flag is set.
+func (c *Compiler) resolveAndApplyStopTime(workflowData *WorkflowData, markdownPath string, originalStopTime string) error {
+	stopAfterLog.Printf("Stop-after value specified: %s", workflowData.StopTime)
+	// Check if there's already a lock file with a stop time (recompilation case)
+	lockFile := stringutil.MarkdownToLockFile(markdownPath)
+	existingStopTime := ExtractStopTimeFromLockFile(lockFile)
+
+	// If refresh flag is set, always regenerate the stop time
+	if c.refreshStopTime {
+		stopAfterLog.Print("Refresh flag set, regenerating stop time")
+		resolvedStopTime, err := resolveStopTime(workflowData.StopTime, time.Now().UTC())
+		if err != nil {
+			return fmt.Errorf("invalid stop-after format, expected a relative delta such as \"+25h\" or an absolute timestamp such as \"2025-01-15 14:30:00\": %w", err)
+		}
+		workflowData.StopTime = resolvedStopTime
+		stopAfterLog.Printf("Resolved stop time from %s to %s", originalStopTime, resolvedStopTime)
+
+		if c.verbose && isRelativeStopTime(originalStopTime) {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Refreshed relative stop-after to: "+resolvedStopTime))
+		} else if c.verbose && originalStopTime != resolvedStopTime {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+		}
+		return nil
+	}
+
+	if existingStopTime != "" {
+		// Preserve existing stop time during recompilation (default behavior)
+		stopAfterLog.Printf("Preserving existing stop time from lock file: %s", existingStopTime)
+		workflowData.StopTime = existingStopTime
+		if c.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Preserving existing stop time from lock file: "+existingStopTime))
+		}
+		return nil
+	}
+
+	// First compilation or no existing stop time, generate new one
+	stopAfterLog.Print("First compilation, generating new stop time")
+	resolvedStopTime, err := resolveStopTime(workflowData.StopTime, time.Now().UTC())
+	if err != nil {
+		return fmt.Errorf("invalid stop-after format, expected a relative delta such as \"+25h\" or an absolute timestamp such as \"2025-01-15 14:30:00\": %w", err)
+	}
+	workflowData.StopTime = resolvedStopTime
+
+	if c.verbose && isRelativeStopTime(originalStopTime) {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Resolved relative stop-after to: "+resolvedStopTime))
+	} else if c.verbose && originalStopTime != resolvedStopTime {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+	}
 	return nil
 }
 

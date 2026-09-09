@@ -94,7 +94,7 @@ tools:
   cache-memory: true
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - discussions
 tracker-id: daily-compiler-quality
@@ -103,7 +103,7 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 evals:
   - id: files_analyzed
     question: Did the agent analyze compiler code files for quality standards such as readability and maintainability?

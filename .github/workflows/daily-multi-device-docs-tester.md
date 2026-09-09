@@ -21,9 +21,10 @@ sandbox:
     id: awf
 tracker-id: daily-multi-device-docs-tester
 max-turns: 80  # 10 devices × ~5 turns each + setup/report overhead
-model: copilot/gpt-5.4
+model: openai/gpt-5.4
 engine:
   id: pi
+  model-provider: openai
 strict: true
 timeout-minutes: 30
 runtimes:
@@ -35,7 +36,6 @@ tools:
     mode: gh-proxy
   timeout: 120  # Multi-device runs include preview startup and Playwright tests
   playwright:
-    mode: cli
   bash:
     - "*"
 safe-outputs:
@@ -63,6 +63,13 @@ imports:
 
   - shared/otlp.md
 pre-agent-steps:
+  - name: Checkout agentics workflows
+    uses: actions/checkout@v7
+    with:
+      repository: githubnext/agentics
+      path: .agentics
+      persist-credentials: false
+      sparse-checkout: workflows
   - name: Resolve slide deck PDF
     env:
       EXPR_GITHUB_WORKSPACE: ${{ github.workspace }}
@@ -104,6 +111,7 @@ pre-agent-steps:
   - name: Install and build docs
     env:
       EXPR_GITHUB_WORKSPACE: ${{ github.workspace }}
+      AGENTICS_WORKFLOWS_DIR: ${{ github.workspace }}/.agentics/workflows
     run: |
       cd "$EXPR_GITHUB_WORKSPACE/docs" || exit 1
       npm install

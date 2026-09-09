@@ -26,6 +26,34 @@ func TestFooterConfiguration(t *testing.T) {
 	assert.Equal(t, "false", *config.CreateIssues.Footer)
 }
 
+func TestBodyFooterConfiguration(t *testing.T) {
+	compiler := NewCompiler()
+	frontmatter := map[string]any{
+		"name": "Test",
+		"safe-outputs": map[string]any{
+			"create-issue": map[string]any{
+				"body-footer": "Issue footer from {workflow_name}",
+			},
+			"create-pull-request": map[string]any{
+				"body-footer": "Pull request footer from {workflow_name}",
+			},
+		},
+	}
+
+	config := compiler.extractSafeOutputsConfig(frontmatter)
+	require.NotNil(t, config)
+	require.NotNil(t, config.CreateIssues)
+	require.NotNil(t, config.CreatePullRequests)
+	assert.Equal(t, "Issue footer from {workflow_name}", config.CreateIssues.BodyFooter)
+	assert.Equal(t, "Pull request footer from {workflow_name}", config.CreatePullRequests.BodyFooter)
+
+	issueConfig := issueHandlerRegistry["create_issue"](config)
+	assert.Equal(t, "Issue footer from {workflow_name}", issueConfig["body_footer"])
+
+	pullRequestConfig := pullRequestHandlerRegistry["create_pull_request"](config)
+	assert.Equal(t, "Pull request footer from {workflow_name}", pullRequestConfig["body_footer"])
+}
+
 func TestAddCommentFooterConfiguration(t *testing.T) {
 	t.Run("footer: false on add-comment", func(t *testing.T) {
 		compiler := NewCompiler()

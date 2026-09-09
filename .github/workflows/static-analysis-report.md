@@ -15,6 +15,8 @@ engine: claude
 network:
   allowed: [defaults, go]
 tools:
+  github:
+    mode: local
   cache-memory: true
   timeout: 600
 safe-outputs:
@@ -119,10 +121,45 @@ steps:
       
       echo "Compile with security tools completed"
       echo "Output saved to /tmp/gh-aw/agent/compile-output.txt"
+  - name: Assert static analysis output completeness
+    run: |
+      set -e
+      echo "Verifying all static analysis tools executed and produced output..."
+      COMPILE_LOG="/tmp/gh-aw/agent/compile-output.txt"
+
+      # Each tool has a unique, scanner-specific invocation marker so this check cannot
+      # be satisfied by another tool's log output (e.g. actionlint's summary mentions
+      # "shellcheck/pyflakes" but never emits the dedicated shellcheck marker below).
+      declare -A TOOL_MARKERS=(
+        [zizmor]="Running zizmor"
+        [poutine]="Running poutine security scanner"
+        [actionlint]="Running actionlint ("
+        [runner-guard]="Running runner-guard taint analysis"
+        [syft]="Running syft"
+        [grype]="Running grype"
+        [yamllint]="Running yamllint"
+        [shellcheck]="Running shellcheck on"
+      )
+
+      MISSING_TOOLS=0
+      for tool in zizmor poutine actionlint runner-guard syft grype yamllint shellcheck; do
+        marker="${TOOL_MARKERS[$tool]}"
+        if ! grep -qF "$marker" "$COMPILE_LOG"; then
+          echo "Error: Static analysis tool '$tool' produced zero output (missing marker: \"$marker\") in $COMPILE_LOG"
+          MISSING_TOOLS=$((MISSING_TOOLS + 1))
+        fi
+      done
+
+      if [ $MISSING_TOOLS -gt 0 ]; then
+        echo "Error: $MISSING_TOOLS static analysis tool(s) failed to produce execution output in pipeline"
+        exit 1
+      fi
+
+      echo "Static analysis tool output completeness check passed."
 
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Static Analysis Report

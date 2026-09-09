@@ -49,7 +49,7 @@ post-steps:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   bash:
   - git
@@ -65,7 +65,7 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
     - issues

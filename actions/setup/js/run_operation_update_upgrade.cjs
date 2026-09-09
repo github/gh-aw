@@ -65,6 +65,7 @@ function formatTimestamp(date) {
  *   GH_TOKEN           - GitHub token for gh CLI auth and git push
  *   GH_AW_OPERATION    - 'update', 'upgrade', 'disable', or 'enable'
  *   GH_AW_CMD_PREFIX   - Command prefix: './gh-aw' (dev) or 'gh aw' (release)
+ *   GH_AW_UPGRADE_OPTIONS - JSON array of supported options passed to upgrade
  *
  * @returns {Promise<void>}
  */
@@ -249,14 +250,23 @@ const AUTO_UPGRADE_ISSUE_MARKER = `<!-- gh-aw-workflow-id: ${AUTO_UPGRADE_WORKFL
 async function mainNotifyIssue() {
   const cmdPrefixStr = process.env.GH_AW_CMD_PREFIX || "gh aw";
   const [bin, ...prefixArgs] = cmdPrefixStr.split(" ").filter(Boolean);
+  let upgradeOptions;
+  try {
+    upgradeOptions = JSON.parse(process.env.GH_AW_UPGRADE_OPTIONS || "[]");
+  } catch (error) {
+    throw new Error(`${ERR_SYSTEM}: GH_AW_UPGRADE_OPTIONS is not valid JSON: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!Array.isArray(upgradeOptions) || upgradeOptions.some(option => option !== "--pre-releases")) {
+    throw new Error(`${ERR_SYSTEM}: GH_AW_UPGRADE_OPTIONS contains an unsupported option`);
+  }
 
   const owner = context.repo.owner;
   const repo = context.repo.repo;
 
   // Run gh aw upgrade to apply changes locally
-  const fullCmd = [bin, ...prefixArgs, "upgrade"].join(" ");
+  const fullCmd = [bin, ...prefixArgs, "upgrade", ...upgradeOptions].join(" ");
   core.info(`Running: ${fullCmd}`);
-  const exitCode = await exec.exec(bin, [...prefixArgs, "upgrade"]);
+  const exitCode = await exec.exec(bin, [...prefixArgs, "upgrade", ...upgradeOptions]);
   if (exitCode !== 0) {
     throw new Error(`${ERR_SYSTEM}: Command '${fullCmd}' failed with exit code ${exitCode}`);
   }

@@ -19,6 +19,19 @@ import sys
 from typing import Optional
 
 
+def _run_subprocess(cmd: list, error_prefix: str, not_found_message: str, input_data: Optional[str] = None) -> str:
+    """Run a subprocess command, printing a consistent error and exiting on failure."""
+    try:
+        result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"{error_prefix}: {e.stderr}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(not_found_message, file=sys.stderr)
+        sys.exit(1)
+
+
 def run_gh_command(repo: Optional[str], limit: int) -> str:
     """Run gh discussion list command and return JSON output."""
     json_fields = "number,title,author,createdAt,updatedAt,body,category,labels,comments,answer,url"
@@ -28,34 +41,17 @@ def run_gh_command(repo: Optional[str], limit: int) -> str:
     if repo:
         cmd.extend(["--repo", repo])
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Error running gh command: {e.stderr}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print("Error: gh CLI not found. Please install GitHub CLI.", file=sys.stderr)
-        sys.exit(1)
+    return _run_subprocess(cmd, "Error running gh command", "Error: gh CLI not found. Please install GitHub CLI.")
 
 
 def apply_jq_filter(data: str, jq_filter: str) -> str:
     """Apply jq filter to JSON data."""
-    try:
-        result = subprocess.run(
-            ["jq", jq_filter],
-            input=data,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Error applying jq filter: {e.stderr}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print("Error: jq not found. Please install jq.", file=sys.stderr)
-        sys.exit(1)
+    return _run_subprocess(
+        ["jq", jq_filter],
+        "Error applying jq filter",
+        "Error: jq not found. Please install jq.",
+        input_data=data,
+    )
 
 
 def generate_schema_response(data: str) -> str:

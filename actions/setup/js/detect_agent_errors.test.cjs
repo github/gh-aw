@@ -18,6 +18,7 @@ const {
   isInvocationCapExceededError,
   isMaxCacheMissesExceededError,
   isAgenticEngineTimeout,
+  isUnsupportedModelToolsError,
   isStepTimeout,
   INFERENCE_ACCESS_ERROR_PATTERN,
   MCP_POLICY_BLOCKED_PATTERN,
@@ -158,6 +159,24 @@ describe("detect_agent_errors.cjs", () => {
     it("matches the Copilot SDK driver policy-enablement error", () => {
       const errorOutput = "[copilot-sdk-driver] [sdk-driver] error: Execution failed: Error: No model available. Check policy enablement under GitHub Settings > Copilot";
       expect(MODEL_NOT_SUPPORTED_PATTERN.test(errorOutput)).toBe(true);
+    });
+
+    it("classifies the raw Codex custom-tools rejection from unsupported models", () => {
+      const errorOutput = String.raw`{"type":"turn.failed","error":{"message":"{\n  \"error\": {\n    \"message\": \"Invalid value: 'custom'\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"tools\",\n    \"code\": \"unknown_parameter\"\n  }\n}"}}`;
+      expect(isUnsupportedModelToolsError(errorOutput)).toBe(true);
+      expect(detectErrors(errorOutput).modelNotSupportedError).toBe(true);
+    });
+
+    it("classifies the raw Codex rejection when the error fields are reordered", () => {
+      const errorOutput = String.raw`{"type":"turn.failed","error":{"message":"{\"error\":{\"param\":\"tools\",\"message\":\"Invalid value: 'custom'\"}}"}}`;
+      expect(isUnsupportedModelToolsError(errorOutput)).toBe(true);
+      expect(detectErrors(errorOutput).modelNotSupportedError).toBe(true);
+    });
+
+    it("does not combine custom-value and tools fields from separate error objects", () => {
+      const errorOutput = String.raw`{"type":"turn.failed","error":{"message":"{\"first\":{\"message\":\"Invalid value: 'custom'\"},\"second\":{\"param\":\"tools\"}}"}}`;
+      expect(isUnsupportedModelToolsError(errorOutput)).toBe(false);
+      expect(detectErrors(errorOutput).modelNotSupportedError).toBe(false);
     });
 
     it("does not match 'No model available' without the policy-enablement hint", () => {

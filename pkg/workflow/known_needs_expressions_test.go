@@ -77,6 +77,30 @@ func TestGenerateKnownNeedsExpressions(t *testing.T) {
 			},
 		},
 		{
+			name: "with custom job before activation and explicit outputs",
+			data: &WorkflowData{
+				Jobs: map[string]any{
+					"select": map[string]any{
+						"runs-on": "ubuntu-latest",
+						"needs":   "pre_activation",
+						"outputs": map[string]any{
+							"issue_numbers": "${{ steps.values.outputs.issue_numbers }}",
+							"marker":        "${{ steps.values.outputs.marker }}",
+						},
+					},
+				},
+			},
+			preActivationJobCreated: true,
+			checkExpressions: []string{
+				"needs.pre_activation.outputs.activated",
+				"needs.select.outputs.issue_numbers",
+				"needs.select.outputs.marker",
+			},
+			notExpectedExprs: []string{
+				"needs.select.outputs.output",
+			},
+		},
+		{
 			name: "with custom job without explicit needs",
 			data: &WorkflowData{
 				Jobs: map[string]any{

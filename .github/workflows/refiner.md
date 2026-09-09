@@ -18,7 +18,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [pull_requests, repos, issues]
 safe-outputs:
   steer: true
@@ -46,7 +46,7 @@ evals:
     question: Was a refinement pull request created with improvements, or was a comment or noop used when no changes were needed?
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Code Refiner

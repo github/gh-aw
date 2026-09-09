@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -28,44 +27,20 @@ type ImportCycleError struct {
 
 // Error returns the error message for ImportCycleError
 func (e *ImportCycleError) Error() string {
-	if len(e.Chain) == 0 {
-		return "circular import detected"
+	if len(e.Chain) < 2 {
+		return "circular import detected. Imports must form a directed acyclic graph. Example: remove an import that completes the cycle"
 	}
-	return "circular import detected: " + strings.Join(e.Chain, " → ")
+	importer := e.Chain[len(e.Chain)-2]
+	imported := e.Chain[len(e.Chain)-1]
+	return fmt.Sprintf(
+		"circular import detected: %s. Imports must form a directed acyclic graph. Example: remove the import of %q from %q",
+		strings.Join(e.Chain, " → "), imported, importer)
 }
 
-// FormatImportCycleError formats an import cycle error with a delightful multiline indented display
+// FormatImportCycleError marks an import cycle error as ready for CLI display.
 func FormatImportCycleError(err *ImportCycleError) error {
 	importErrorLog.Printf("Formatting import cycle error: chain=%v, workflow=%s", err.Chain, err.WorkflowFile)
-
-	if len(err.Chain) < 2 {
-		return errors.New("circular import detected (invalid chain)")
-	}
-
-	// Build a multiline, indented representation of the import chain
-	var messageBuilder strings.Builder
-	messageBuilder.WriteString("Import cycle detected\n\n")
-	messageBuilder.WriteString("The following import chain creates a circular dependency:\n\n")
-
-	// Show each step in the chain with indentation to emphasize the flow
-	for i, file := range err.Chain {
-		indent := strings.Repeat("  ", i)
-		if i == 0 {
-			fmt.Fprintf(&messageBuilder, "%s%s (starting point)\n", indent, file)
-		} else if i == len(err.Chain)-1 {
-			// Last item is the back-edge - highlight it
-			fmt.Fprintf(&messageBuilder, "%s↳ %s ⚠️  cycles back to %s\n", indent, file, err.Chain[0])
-		} else {
-			fmt.Fprintf(&messageBuilder, "%s↳ imports %s\n", indent, file)
-		}
-	}
-
-	messageBuilder.WriteString("\nTo fix this issue:\n")
-	messageBuilder.WriteString("1. Review the import dependencies in the files listed above\n")
-	messageBuilder.WriteString("2. Remove one of the imports to break the cycle\n")
-	messageBuilder.WriteString("3. Consider restructuring your workflow imports to avoid circular dependencies\n")
-
-	return &FormattedParserError{formatted: messageBuilder.String(), cause: err}
+	return &FormattedParserError{formatted: err.Error(), cause: err}
 }
 
 // FormattedParserError is a sentinel error type returned by FormatImportError (and similar

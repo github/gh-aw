@@ -118,7 +118,7 @@ jobs:
   conformance:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run conformance checks
         run: ./scripts/check-safe-outputs-conformance.sh
 ```

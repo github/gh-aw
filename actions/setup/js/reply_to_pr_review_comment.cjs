@@ -12,7 +12,7 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getPRNumber } = require("./update_context_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
-const { parseBoolTemplatable } = require("./templatable.cjs");
+const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
@@ -44,6 +44,7 @@ async function main(config = {}) {
   const requiredTitlePrefix = config.required_title_prefix || "";
   if (requiredLabels.length > 0) core.info(`Required labels (all): ${requiredLabels.join(", ")}`);
   if (requiredTitlePrefix) core.info(`Required title prefix: ${requiredTitlePrefix}`);
+  const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
   let allowedMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
     allowedMentionAliases = config.allowedMentionAliases;
@@ -174,7 +175,7 @@ async function main(config = {}) {
       }
 
       // Inject CAUTION at top of body unconditionally if threat detection warning was raised
-      let finalBody = sanitizeContent(body, { allowedAliases: allowedMentionAliases });
+      let finalBody = sanitizeContent(body, { allowedAliases: allowedMentionAliases, maxMentions });
       const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
       if (detectionCaution) {
         finalBody = detectionCaution + "\n\n" + finalBody;

@@ -154,11 +154,13 @@ func TestConstantValues(t *testing.T) {
 		{"CheckSkipIfMatchStepID", string(CheckSkipIfMatchStepID), "check_skip_if_match"},
 		{"CheckSkipIfNoMatchStepID", string(CheckSkipIfNoMatchStepID), "check_skip_if_no_match"},
 		{"CheckCommandPositionStepID", string(CheckCommandPositionStepID), "check_command_position"},
+		{"CheckCooldownStepID", string(CheckCooldownStepID), "check_cooldown"},
 		{"IsTeamMemberOutput", IsTeamMemberOutput, "is_team_member"},
 		{"StopTimeOkOutput", StopTimeOkOutput, "stop_time_ok"},
 		{"SkipCheckOkOutput", SkipCheckOkOutput, "skip_check_ok"},
 		{"SkipNoMatchCheckOkOutput", SkipNoMatchCheckOkOutput, "skip_no_match_check_ok"},
 		{"CommandPositionOkOutput", CommandPositionOkOutput, "command_position_ok"},
+		{"CooldownOkOutput", CooldownOkOutput, "cooldown_ok"},
 		{"ActivatedOutput", ActivatedOutput, "activated"},
 		{"DefaultActivationJobRunnerImage", DefaultActivationJobRunnerImage, "ubuntu-slim"},
 	}

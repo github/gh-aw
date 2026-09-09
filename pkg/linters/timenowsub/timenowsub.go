@@ -73,19 +73,22 @@ func analyzeTimeNowSub(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	}
 	sinceText := qualifier + ".Since(" + argText + ")"
 
-	pass.Report(analysis.Diagnostic{
+	diag := analysis.Diagnostic{
 		Pos:     outer.Pos(),
 		End:     outer.End(),
 		Message: fmt.Sprintf("%s.Now().Sub(%s) can be simplified to %s", qualifier, argText, sinceText),
-		SuggestedFixes: []analysis.SuggestedFix{{
+	}
+	if !astutil.HasOverlappingComment(pass.Files, outer.Pos(), outer.End()) {
+		diag.SuggestedFixes = []analysis.SuggestedFix{{
 			Message: fmt.Sprintf("Replace %s.Now().Sub(%s) with %s", qualifier, argText, sinceText),
 			TextEdits: []analysis.TextEdit{{
 				Pos:     outer.Pos(),
 				End:     outer.End(),
 				NewText: []byte(sinceText),
 			}},
-		}},
-	})
+		}}
+	}
+	pass.Report(diag)
 }
 
 // timeNowQualifier reports the imported identifier used for time.Now().

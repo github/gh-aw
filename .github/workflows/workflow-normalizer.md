@@ -10,8 +10,10 @@ permissions:
   actions: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 tracker-id: workflow-normalizer
 timeout-minutes: 30
+max-turns: 30
 network:
   allowed:
     - defaults
@@ -21,6 +23,8 @@ tools:
   agentic-workflows:
   github:
     toolsets: [default]
+  bash:
+    - "*"
 safe-outputs:
   create-issue:
     expires: 1d
@@ -35,6 +39,10 @@ imports:
 sandbox:
   agent:
     runtime: cloud-hypervisor
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 ---
 
 # Workflow Normalizer
@@ -99,6 +107,9 @@ Read the pre-fetched workflow run data from `/tmp/gh-aw/aw-mcp/logs/`:
 ### Step 2: Analyze Workflow Prompts
 
 Use a single `python3` or `bash` script to scan all active reporting workflow files in one pass.
+Do not use GitHub search or read tools to inspect individual issues, pull requests, or workflow
+files; those calls return redundant payloads and can exhaust the context budget. Use the local
+checkout or one `gh`/`bash` command to collect only the fields needed for the report.
 For each file, return a structured compliance table with:
 - `header_guidelines`: whether the file enforces h3 (`###`) or lower
 - `progressive_disclosure`: whether `<details>` usage is mentioned
@@ -117,7 +128,12 @@ From the compliance table, document workflows that are `non-compliant` because t
 
 Create **one** issue that consolidates all non-compliant workflows found.
 
-Before creating the issue, query closed pull requests with `gh pr list --state closed --author Copilot --limit 1000 --json number,title,closedAt,mergedAt`. Normalize both the candidate title and each PR title by repeatedly removing leading bracketed prefixes (for example `[workflow-style]` or `[WIP]`), lowercasing, replacing non-alphanumeric runs with one space, and trimming.
+Before creating the issue, make one exact `search_pull_requests` query for closed Copilot
+pull requests matching the candidate title, requesting only `number`, `title`, `closed_at`, and
+`merged_at`. Normalize both the candidate title and each returned PR title by repeatedly removing
+leading bracketed prefixes (for example `[workflow-style]` or `[WIP]`), lowercasing, replacing
+non-alphanumeric runs with one space, and trimming. Do not call `pull_request_read` or read pull
+request bodies.
 
 If any normalized title matches the candidate and `mergedAt` is null, do **not** create the issue. Use `noop` instead, naming the matching PR numbers and close dates. Do not treat a closed PR as a reason to retry automatically; a maintainer must create or approve a follow-up issue after reviewing the prior attempt.
 
@@ -193,7 +209,9 @@ Create a summary comment or discussion showing:
 1. Read recent workflow run data from `/tmp/gh-aw/aw-mcp/logs/` using the pre-fetched `run-*/aw_info.json` and `run-*/run_summary.json` files.
 2. Read workflow markdown files from `.github/workflows/`
 3. Create issues using the `create-issue` safe output
-4. Keep track of workflows already reported to avoid duplicates (check for existing open issues with same title)
+4. Keep track of workflows already reported to avoid duplicates. Check for an existing open issue
+   with one exact `search_issues` query requesting only `number`, `title`, and `state`; do not read
+   issue bodies or inspect unrelated issues.
 5. Focus on actionable improvements, not nitpicking
 
 Remember: The goal is to create a consistent, delightful user experience across all workflow reports by applying sound design principles and clear communication patterns.

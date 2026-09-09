@@ -290,6 +290,9 @@ func TestListArtifacts(t *testing.T) {
 		"workflow-logs/job-1.txt",
 		"workflow-logs/job-2.txt",
 		"agent_output/output.json",
+		"nested/" + runAPIResponseFileName,
+		jobsAPIResponseFileName,
+		runAPIResponseFileName,
 	}
 
 	for _, file := range testFiles {
@@ -308,18 +311,27 @@ func TestListArtifacts(t *testing.T) {
 		t.Fatalf("Failed to list artifacts: %v", err)
 	}
 
-	// Verify all test files are in the list
-	for _, expectedFile := range testFiles {
+	// Verify real artifact files are in the list
+	expectedFiles := []string{
+		"aw_info.json",
+		"agent-stdio.log",
+		"safe_output.jsonl",
+		"workflow-logs/job-1.txt",
+		"workflow-logs/job-2.txt",
+		"agent_output/output.json",
+		"nested/" + runAPIResponseFileName,
+	}
+	for _, expectedFile := range expectedFiles {
 		found := slices.Contains(artifacts, expectedFile)
 		if !found {
 			t.Errorf("Expected artifact %s not found in list: %v", expectedFile, artifacts)
 		}
 	}
 
-	// Verify the summary file itself is not in the list
+	// Verify synthesized cache/summary files are not in the list
 	for _, artifact := range artifacts {
-		if artifact == runSummaryFileName {
-			t.Errorf("Summary file %s should not be in artifacts list", runSummaryFileName)
+		if artifact == runSummaryFileName || artifact == jobsAPIResponseFileName || artifact == runAPIResponseFileName {
+			t.Errorf("Synthesized file %s should not be in artifacts list", artifact)
 		}
 	}
 }

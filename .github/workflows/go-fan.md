@@ -44,13 +44,13 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 tracker-id: go-fan-daily
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Go Fan 🐹 - Daily Go Module Reviewer

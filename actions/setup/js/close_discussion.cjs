@@ -13,6 +13,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { ERR_NOT_FOUND } = require("./error_codes.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
+const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 
 /**
@@ -168,6 +169,7 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const githubClient = await createAuthenticatedGitHubClient(config);
   const allowBody = config.allow_body !== false; // default true; false only when explicitly set to false
+  const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
   let allowedMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
     allowedMentionAliases = config.allowedMentionAliases;
@@ -307,7 +309,7 @@ async function main(config = {}) {
           core.info("close_discussion: allow-body is false — closing without a comment");
         }
       } else if (item.body) {
-        const sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases });
+        const sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases, maxMentions });
         const comment = await addDiscussionComment(githubClient, discussion.id, sanitizedBody);
         core.info(`Added comment to discussion #${discussionNumber}: ${comment.url}`);
         commentUrl = comment.url;

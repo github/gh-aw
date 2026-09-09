@@ -3577,6 +3577,9 @@ async function main() {
           for (const item of reportIncompleteItems) {
             core.info(`  report_incomplete reason: ${item.reason}`);
           }
+          // Continue after marking the step failed so optional issue reporting can still run.
+          // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+          core.setFailed("Agent reported that it could not complete the task");
         }
       }
     }

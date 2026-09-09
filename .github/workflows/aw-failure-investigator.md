@@ -1,9 +1,10 @@
 ---
 emoji: "🔍"
-description: Investigates [aw] failures from the last 6 hours, correlates with open agentic-workflows issues, closes fixed issues, and opens focused fix sub-issues when needed
+description: Investigates [aw] failures from the last 6 hours, correlates with open agentic-workflows issues, closes consolidated failures as duplicates, and opens focused fix sub-issues when needed
 on:
   schedule:
-    - cron: "every 6h"
+    - cron: "every 30m"
+  cooldown: 6h
   workflow_dispatch:
 max-daily-ai-credits: 10000
 permissions:
@@ -31,11 +32,11 @@ experiments:
     issue: 36105
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [actions, issues, pull_requests]
   bash: ["*"]
 cache:
@@ -49,6 +50,12 @@ safe-outputs:
     labels: [agentic-workflows, automation, cookie]
     max: 2
     group: true
+  close-issue:
+    target: "*"
+    required-labels: [agentic-workflows]
+    required-title-prefix: "[aw]"
+    state-reason: duplicate
+    max: 100
   update-issue:
     target: "*"
     max: 10
@@ -354,6 +361,8 @@ evals:
     question: Did the agent investigate agentic workflow failures from the last 6 hours and produce findings?
   - id: issues_created_or_closed
     question: Were fix sub-issues created for unresolved failures, or were resolved tracking issues closed?
+  - id: consolidated_failures_closed
+    question: When failures were consolidated into or matched against an existing issue, were all corresponding source failure issues closed as duplicates with comments referencing that issue?
 
 ---
 
@@ -373,7 +382,7 @@ Investigate agentic workflow failures from the last 6 hours and produce actionab
 1. Find recent failures from agentic workflows in the last 6 hours.
 2. Correlate findings with currently open `agentic-workflows` issues.
 3. Perform large-scale failure analysis using logs + audit + audit-diff.
-4. Close fixed/stale issues first, then create only the minimum necessary linked fix sub-issues.
+4. When repeated failures are already tracked by an open `agentic-workflows` issue, do not open a new issue for them — close the new duplicate source failure issues and associate them with the existing issue. Close fixed/stale issues first, then create only the minimum necessary linked fix sub-issues for genuinely uncovered failures, and close every source failure issue represented by a consolidated issue.
 
 ## Required Investigation Steps
 
@@ -387,7 +396,7 @@ Definitions for step 0 clustering:
 - comparator run ID: nearest successful run of the same workflow when available, otherwise nearest prior failed run
 Only call additional logs/list APIs when a required field is missing or stale.
 
-**Early exit**: If `failed_run_ids` is empty, or every failure signature is already covered by an open issue in `existing_tracking_issues`, call `noop` immediately with a brief explanation and stop.
+**Early exit**: If `failed_run_ids` is empty, call `noop` immediately with a brief explanation and stop. If every failure signature is already covered by an open issue in `existing_tracking_issues`, skip steps 1-3 (no new classification or analysis needed) and go straight to step 4 to close every covered source failure issue as a duplicate of its existing tracking issue.
 
 ### 1) Classify failures and correlate with existing issues
 
@@ -399,7 +408,7 @@ It returns which clusters are already tracked (matched) and which are new gaps.
 
 Keep the combined cluster + tracking mapping in context for steps 2-4.
 
-**Early exit**: If all untracked clusters from `issue-matcher` are P2 severity (no P0 or P1 gaps), call `noop` with a brief explanation and stop.
+**Early exit**: If all untracked clusters from `issue-matcher` are P2 severity (no P0 or P1 gaps), skip steps 2-3 (no deepened evidence or audit-diff needed) but still continue to step 4: matched clusters still need their represented source failure issues closed as duplicates, and any P2 gaps still need to be reflected in the existing coverage. Only call `noop` at this point if there are also no `matched` clusters with open source failure issues to close.
 
 ### 2) Deepen evidence for untracked clusters
 
@@ -413,7 +422,7 @@ Use `agentic-workflows` MCP `audit-diff` to compare **the single highest-severit
 
 Identify regressions and deltas (metrics/tooling/firewall/MCP behavior) that support fix recommendations.
 
-### 4) Close fixed issues first, then add focused sub-issues
+### 4) Close fixed issues, add focused sub-issues, then close consolidated failures
 
 First, identify currently open `agentic-workflows` issues that are now fixed, stale, or no longer actionable based on fresh evidence, and close them using `update-issue`.
 
@@ -432,6 +441,15 @@ Each new sub-issue must include:
 - probable root cause
 - specific proposed remediation
 - success criteria / verification
+
+For every cluster the `issue-matcher` agent already matched to an existing open `agentic-workflows` issue, and for any consolidated parent report or fix issue selected or filed above, identify every open source failure issue represented by that existing or consolidated issue. Source failure issues are the automated `[aw]` issues for the included workflow failures, such as issues reporting that a workflow failed or produced an incomplete result.
+
+Close **every** represented source failure issue with `close_issue`:
+- set `issue_number` to the source failure issue
+- set `duplicate_of` to the existing or consolidated issue number
+- set `body` to `Consolidated into #<existing or consolidated issue number>.`
+
+The configured close reason marks these issues as duplicates. Use the actual issue number in both `duplicate_of` and the comment. Do not close the existing/consolidated issue itself, its remediation sub-issues, or source failure issues that were not included in it.
 
 ## Tone Variant Instructions
 

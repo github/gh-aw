@@ -178,11 +178,16 @@ func (c *Compiler) getReferencedCustomJobs(content string, customJobs map[string
 // Only jobs with NO explicit needs are returned - jobs that explicitly depend on activation/pre_activation/etc.
 // are excluded because they either already run before activation or cannot run before it.
 func (c *Compiler) getCustomJobsReferencedInPromptWithNoActivationDep(data *WorkflowData) []string {
-	if data == nil || data.Jobs == nil || data.MarkdownContent == "" {
+	if data == nil || data.Jobs == nil {
 		return nil
 	}
 
-	referencedJobs := c.getReferencedCustomJobs(data.MarkdownContent, data.Jobs)
+	promptContent := data.MarkdownContent
+	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForCompilerAnalysis(data); runtimeImportMarkdown != "" {
+		promptContent += "\n" + runtimeImportMarkdown
+	}
+
+	referencedJobs := c.getReferencedCustomJobs(promptContent, data.Jobs)
 	var result []string
 	for _, jobName := range referencedJobs {
 		jobConfig, ok := data.Jobs[jobName].(map[string]any)
@@ -441,6 +446,11 @@ func jobStepsMintOTLPOIDCToken(job *Job) bool {
 // buildPreActivationAndActivationJobs builds the pre-activation and activation jobs if needed.
 // Returns whether each job was created.
 func (c *Compiler) buildPreActivationAndActivationJobs(data *WorkflowData, frontmatter map[string]any, lockFilename string) (preActivationJobCreated bool, activationJobCreated bool, err error) {
+	data.Cooldown, err = extractCooldown(frontmatter)
+	if err != nil {
+		return
+	}
+
 	// Determine if permission checks or stop-time checks are needed
 	needsPermissionCheck := c.needsRoleCheck(data, frontmatter)
 	hasStopTime := data.StopTime != ""
@@ -451,16 +461,17 @@ func (c *Compiler) buildPreActivationAndActivationJobs(data *WorkflowData, front
 	hasSkipAuthorAssociations := len(data.SkipAuthorAssociations) > 0
 	hasCommandTrigger := len(data.Command) > 0
 	hasRateLimit := data.RateLimit != nil
+	hasCooldown := data.Cooldown > 0
 	hasOnSteps := len(data.OnSteps) > 0
 	hasOnNeeds := len(data.OnNeeds) > 0
 	hasLabelNames := len(data.LabelNames) > 0
-	compilerJobsLog.Printf("Job configuration: needsPermissionCheck=%v, hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasSkipRoles=%v, hasSkipBots=%v, hasSkipAuthorAssociations=%v, hasCommand=%v, hasRateLimit=%v, hasOnSteps=%v, hasOnNeeds=%v, hasLabelNames=%v", needsPermissionCheck, hasStopTime, hasSkipIfMatch, hasSkipIfNoMatch, hasSkipRoles, hasSkipBots, hasSkipAuthorAssociations, hasCommandTrigger, hasRateLimit, hasOnSteps, hasOnNeeds, hasLabelNames)
+	compilerJobsLog.Printf("Job configuration: needsPermissionCheck=%v, hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasSkipRoles=%v, hasSkipBots=%v, hasSkipAuthorAssociations=%v, hasCommand=%v, hasRateLimit=%v, hasCooldown=%v, hasOnSteps=%v, hasOnNeeds=%v, hasLabelNames=%v", needsPermissionCheck, hasStopTime, hasSkipIfMatch, hasSkipIfNoMatch, hasSkipRoles, hasSkipBots, hasSkipAuthorAssociations, hasCommandTrigger, hasRateLimit, hasCooldown, hasOnSteps, hasOnNeeds, hasLabelNames)
 
 	// Build pre-activation job if needed. The job combines:
 	//   - membership checks, stop-time validation, skip-if-match/no-match checks
 	//   - skip-roles/bots checks, rate limit check, command position check
 	//   - on.steps injection, label-names filter
-	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasSkipRoles || hasSkipBots || hasSkipAuthorAssociations || hasCommandTrigger || hasRateLimit || hasOnSteps || hasOnNeeds || hasLabelNames {
+	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasSkipRoles || hasSkipBots || hasSkipAuthorAssociations || hasCommandTrigger || hasRateLimit || hasCooldown || hasOnSteps || hasOnNeeds || hasLabelNames {
 		compilerJobsLog.Print("Building pre-activation job")
 		preActivationJob, err := c.buildPreActivationJob(data, needsPermissionCheck)
 		if err != nil {
@@ -766,12 +777,23 @@ func (c *Compiler) extractJobsFromFrontmatter(frontmatter map[string]any) map[st
 // The checkout step is only skipped when:
 //   - Custom steps already contain a checkout action
 //   - checkout: false is set in the workflow frontmatter
+//   - permissions.contents: none is set (target-only checkout: the workflow does
+//     not need its own repository content, but other configured checkout entries
+//     such as a target-repo checkout are still generated)
 //
 // Otherwise, checkout is always added to ensure the agent has access to the repository.
 func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 	// If checkout was explicitly disabled via checkout: false, skip it
 	if data.CheckoutDisabled {
 		workflowLog.Print("Skipping checkout step: checkout disabled via checkout: false")
+		return false
+	}
+
+	// If permissions.contents: none is set, skip only the default (workflow-repository)
+	// checkout step; other configured checkouts (e.g. a target-only sidecar checkout)
+	// are still generated separately.
+	if data.CheckoutSkipDefault {
+		workflowLog.Print("Skipping default checkout step: permissions.contents is none (target-only checkout)")
 		return false
 	}
 

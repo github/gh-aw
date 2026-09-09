@@ -1,5 +1,5 @@
 {
-  "auto_upgrade": { "cron": "0 9 * * 1" },
+  "auto_upgrade": { "cron": "0 9 * * 1", "options": ["--pre-releases"] },
   "maintenance": {
     "action_failure_issue_expires": 12,
     "label_triggers": true

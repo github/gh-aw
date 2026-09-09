@@ -12,7 +12,7 @@ import (
 )
 
 func writeMCPGatewayStepEnvForTest(yaml *strings.Builder, mcpEnvVars map[string]string, safeOutputsInputEnvVars map[string]string, gatewayEnvVars map[string]string) {
-	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, mcpEnvVars, safeOutputsInputEnvVars, gatewayEnvVars, sanitizedGatewayEnvNames(gatewayEnvVars))
+	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, mcpEnvVars, safeOutputsInputEnvVars, gatewayEnvVars, sanitizedGatewayEnvNames(gatewayEnvVars), "")
 }
 
 func appendMCPGatewayCustomAndHTTPEnvFlagsForTest(containerCmd *strings.Builder, workflowData *WorkflowData, gatewayConfig *MCPGatewayRuntimeConfig, mcpEnvVars map[string]string, hasGitHub bool, githubTool map[string]any, tools map[string]any, engine CodingAgentEngine) {
@@ -232,4 +232,26 @@ func TestMCPGatewayFilteredCustomEnvDoesNotSuppressHTTPMCPEnvForwarding(t *testi
 	)
 
 	assert.Equal(t, " -e GH_AW_MCP_GATEWAY_ENV_0", containerCommand.String())
+}
+
+func TestMCPGatewayConfiguredAgentIDPassedViaStepEnv(t *testing.T) {
+	configuredAgentID := `my-agent-id"; touch /tmp/pwned; #`
+
+	var stepEnv strings.Builder
+	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(&stepEnv, nil, nil, nil, nil, configuredAgentID)
+
+	assert.Contains(t, stepEnv.String(), `GH_AW_MCP_GATEWAY_CONFIGURED_AGENT_ID: "my-agent-id\"; touch /tmp/pwned; #"`)
+
+	var runScript strings.Builder
+	writeMCPGatewayExports(&runScript, writeMCPGatewayExportsOptions{
+		engine:        NewCopilotEngine(),
+		workflowData:  &WorkflowData{},
+		gatewayConfig: &MCPGatewayRuntimeConfig{AgentID: configuredAgentID},
+		port:          8080,
+		domain:        "localhost",
+		payloadDir:    "/tmp/payloads",
+	})
+
+	assert.Contains(t, runScript.String(), `export MCP_GATEWAY_AGENT_ID="${GH_AW_MCP_GATEWAY_CONFIGURED_AGENT_ID}"`)
+	assert.NotContains(t, runScript.String(), `export MCP_GATEWAY_AGENT_ID="my-agent-id`)
 }

@@ -99,6 +99,9 @@ allPassed &= assertContains(output, "```yaml wrap", "YAML code block should have
 
 allPassed &= assertNotContains(output, "```yaml\n---\n# Workflow name", "YAML code block should NOT be plain ```yaml without wrap");
 
+allPassed &= assertContains(output, 'toolsets: ["issues","projects"]', "Linear toolset array example should be non-empty");
+allPassed &= assertContains(output, "Array items: A Linear MCP toolset name", "Linear toolset array items should resolve their schema description");
+
 // Test 8: Verify that all $refs in schema can be resolved
 // Defaults is nested within safe-output configuration, not a root schema property.
 const allRefs = ["#/$defs/engine_config", "#/$defs/stdio_mcp_tool", "#/$defs/http_mcp_tool", "#/properties/permissions", "#/properties/concurrency"];

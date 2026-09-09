@@ -6,7 +6,7 @@
 //
 // # Key Functions
 //
-//   - runShellcheckOnLockFiles() - Run shellcheck on run steps in multiple lock files
+//   - runShellcheckOnLockFilesAndResources() - Run shellcheck on lock files and explicit shell resources
 //   - extractRunStepsFromLockFile() - Parse a lock file and extract run step info
 //   - isShellcheckAvailable() - Check whether the shellcheck binary is in PATH
 //   - isShellcheckableShell() - True for bash/sh steps; false for pwsh/python/etc.
@@ -143,6 +143,46 @@ func resolveDefaultShell(defaults map[string]any) string {
 	return shell
 }
 
+// extractRunStepsFromJob returns all run: steps in a single job whose
+// effective shell is lintable by shellcheck. jobDefaultShell is the shell
+// resolved from the job's (or workflow's) defaults.run.shell, used when a
+// step does not set its own "shell" field.
+func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string) []runStepInfo {
+	var steps []runStepInfo
+	rawSteps, ok := job["steps"].([]any)
+	if !ok {
+		return steps
+	}
+	for _, stepData := range rawSteps {
+		step, ok := stepData.(map[string]any)
+		if !ok {
+			continue
+		}
+		runScript, ok := step["run"].(string)
+		if !ok || runScript == "" {
+			continue
+		}
+
+		shell, _ := step["shell"].(string)
+		effectiveShell := shell
+		if effectiveShell == "" {
+			effectiveShell = jobDefaultShell
+		}
+
+		if !isShellcheckableShell(effectiveShell) {
+			continue
+		}
+		name, _ := step["name"].(string)
+		steps = append(steps, runStepInfo{
+			Name:     name,
+			Script:   runScript,
+			Shell:    effectiveShell,
+			LockFile: lockFile,
+		})
+	}
+	return steps
+}
+
 // extractRunStepsFromLockFile parses a compiled lock file and returns all
 // run: steps whose effective shell is lintable by shellcheck.
 //
@@ -191,42 +231,28 @@ func extractRunStepsFromLockFile(lockFile string) ([]runStepInfo, error) {
 			}
 		}
 
-		rawSteps, ok := job["steps"].([]any)
-		if !ok {
-			continue
-		}
-		for _, stepData := range rawSteps {
-			step, ok := stepData.(map[string]any)
-			if !ok {
-				continue
-			}
-			runScript, ok := step["run"].(string)
-			if !ok || runScript == "" {
-				continue
-			}
-
-			// Resolve effective shell: step > job default > workflow default.
-			shell, _ := step["shell"].(string)
-			effectiveShell := shell
-			if effectiveShell == "" {
-				effectiveShell = jobDefaultShell
-			}
-
-			if !isShellcheckableShell(effectiveShell) {
-				continue
-			}
-			name, _ := step["name"].(string)
-			steps = append(steps, runStepInfo{
-				Name:     name,
-				Script:   runScript,
-				Shell:    effectiveShell,
-				LockFile: lockFile,
-			})
-		}
+		steps = append(steps, extractRunStepsFromJob(job, jobDefaultShell, lockFile)...)
 	}
 
 	shellcheckLog.Printf("Found %d shellcheckable run steps in %s", len(steps), lockFile)
 	return steps, nil
+}
+
+func writeTempScriptFile(script string) (string, error) {
+	// Sanitize GitHub Actions ${{ ... }} expressions before writing the script.
+	sanitizedScript := sanitizeGHAExpressions(script)
+
+	tmpFile, err := os.CreateTemp("", "gh-aw-shellcheck-*.sh")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file for shellcheck: %w", err)
+	}
+	if _, err := tmpFile.WriteString(sanitizedScript); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write shellcheck temp file: %w", err)
+	}
+	tmpFile.Close()
+	return tmpFile.Name(), nil
 }
 
 // runShellcheckOnScript writes script to a temporary file and invokes shellcheck.
@@ -237,25 +263,11 @@ func extractRunStepsFromLockFile(lockFile string) ([]runStepInfo, error) {
 func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool) ([]byte, error) {
 	shellcheckLog.Printf("Running shellcheck on step %q (shell=%s)", info.Name, info.Shell)
 
-	var out bytes.Buffer
-
-	// Sanitize GitHub Actions ${{ ... }} expressions before writing the script.
-	// Without this, shellcheck emits parse errors (SC1073, SC1083) because
-	// ${{ is not valid POSIX/bash substitution syntax.
-	sanitizedScript := sanitizeGHAExpressions(info.Script)
-
-	// Write script to a temp file so shellcheck can lint it.
-	tmpFile, err := os.CreateTemp("", "gh-aw-shellcheck-*.sh")
+	tmpPath, err := writeTempScriptFile(info.Script)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file for shellcheck: %w", err)
+		return nil, err
 	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(sanitizedScript); err != nil {
-		tmpFile.Close()
-		return nil, fmt.Errorf("failed to write shellcheck temp file: %w", err)
-	}
-	tmpFile.Close()
+	defer os.Remove(tmpPath)
 
 	args := []string{
 		"--shell=" + shellcheckShell(info.Shell),
@@ -264,7 +276,7 @@ func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool)
 	for _, code := range ignoreCodes {
 		args = append(args, "--exclude="+code)
 	}
-	args = append(args, tmpFile.Name())
+	args = append(args, tmpPath)
 
 	if verbose {
 		shellcheckLog.Printf("Invoking: shellcheck %s", strings.Join(args, " "))
@@ -278,31 +290,30 @@ func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+	cmdErr := cmd.Run()
 
 	// Replace the temp file path with "script" so that reported line numbers
 	// are clearly relative to the run: script snippet rather than the lock
 	// file.  The enclosing header message ("shellcheck findings in <lock>")
 	// already identifies the originating file and step.
-	findings := strings.ReplaceAll(stdout.String(), tmpFile.Name(), "script")
+	findings := strings.ReplaceAll(stdout.String(), tmpPath, "script")
 	if stderr.Len() > 0 {
-		findings += strings.ReplaceAll(stderr.String(), tmpFile.Name(), "script")
+		findings += strings.ReplaceAll(stderr.String(), tmpPath, "script")
 	}
 
+	var out bytes.Buffer
 	if findings != "" {
 		fmt.Fprintf(&out, "%s\n", console.FormatWarningMessage("shellcheck findings in "+stepLabel(info)+":"))
 		fmt.Fprint(&out, findings)
 	}
 
-	if err != nil {
+	if cmdErr != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			if exitErr.ExitCode() == 1 {
-				// Exit code 1 means shellcheck found issues; already printed above.
-				return out.Bytes(), fmt.Errorf("shellcheck found issues in %s", stepLabel(info))
-			}
+		if errors.As(cmdErr, &exitErr) && exitErr.ExitCode() == 1 {
+			// Exit code 1 means shellcheck found issues; already printed above.
+			return out.Bytes(), fmt.Errorf("shellcheck found issues in %s", stepLabel(info))
 		}
-		return out.Bytes(), fmt.Errorf("shellcheck failed: %w", err)
+		return out.Bytes(), fmt.Errorf("shellcheck failed: %w", cmdErr)
 	}
 
 	return out.Bytes(), nil
@@ -395,9 +406,10 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 	return out.Bytes(), nil
 }
 
-// runShellcheckOnLockFiles extracts run: steps from each lock file and runs
-// shellcheck on the shell snippets in parallel. It uses shellcheckDefaultIgnoreCodes
-// to suppress known false positives from GitHub Actions expression syntax.
+// runShellcheckOnLockFilesAndResources extracts run: steps from each lock file,
+// combines them with explicit shell resources, and runs shellcheck on the shell
+// snippets in parallel. It uses shellcheckDefaultIgnoreCodes to suppress known
+// false positives from GitHub Actions expression syntax.
 //
 // When the shellcheck binary is not installed, it falls back to the Docker
 // container (ShellcheckImage) if Docker is available. This allows shellcheck
@@ -414,10 +426,6 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 // When strict is true, any step failure causes a non-nil error to be returned
 // after all steps have been checked (reports-all-then-errors). In non-strict
 // mode, all failures are printed as warnings and nil is returned.
-func runShellcheckOnLockFiles(ctx context.Context, lockFiles []string, verbose bool, strict bool) error {
-	return runShellcheckOnLockFilesAndResources(ctx, lockFiles, nil, verbose, strict)
-}
-
 func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []string, resources []workflow.ShellScriptResource, verbose bool, strict bool) error {
 	if len(lockFiles) == 0 && len(resources) == 0 {
 		return nil
@@ -430,6 +438,7 @@ func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 
 	allSteps := collectShellcheckSteps(lockFiles, resources)
 	if len(allSteps) == 0 {
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps (0 run steps found in lock files)"))
 		return nil
 	}
 	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker)

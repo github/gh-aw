@@ -26,6 +26,11 @@ func TestIsCopilotWorkflowContent(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "default engine",
+			content: "---\non: workflow_dispatch\n---\nbody\n",
+			want:    true,
+		},
+		{
 			name:    "no frontmatter",
 			content: "body\n",
 			want:    false,

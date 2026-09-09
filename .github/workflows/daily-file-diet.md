@@ -39,7 +39,7 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 tracker-id: daily-file-diet
@@ -48,7 +48,7 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 evals:
   - id: large_files_analyzed
     question: Did the agent analyze the largest Go source files in the repository?

@@ -353,6 +353,16 @@ Test workflow.
 						"job %q if: condition should contain %q", job, sub)
 				}
 			}
+
+			if slices.Contains(tt.wantJobs, "detection") {
+				detectionSection := extractJobSection(yaml, "detection")
+				require.Equal(t, 1, strings.Count(detectionSection, "- name: Setup Node.js"),
+					"detection job must contain exactly one Node.js setup step")
+				assert.Less(t,
+					strings.Index(detectionSection, "- name: Setup Node.js"),
+					strings.Index(detectionSection, "- name: Install GitHub Copilot CLI"),
+					"Node.js setup must precede Copilot installation")
+			}
 		})
 	}
 }

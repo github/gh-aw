@@ -206,15 +206,6 @@ func TestCompiledLockFiles_CLIEngineInstallStepNamesIncludeCLISuffix(t *testing.
 			},
 		},
 		{
-			lockFile: "daily-code-metrics.lock.yml",
-			wantNames: []string{
-				"Install Crush CLI in docker-sbx path",
-			},
-			absentNames: []string{
-				"Install Crush in docker-sbx path",
-			},
-		},
-		{
 			lockFile: "smoke-opencode.lock.yml",
 			wantNames: []string{
 				"Install OpenCode CLI",

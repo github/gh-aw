@@ -7,7 +7,7 @@ description: `engine:` frontmatter field detail for GitHub Agentic Workflows.
 See [syntax-agentic.md](syntax-agentic.md) for the full frontmatter field index.
 
 - **`engine:`** - AI processor configuration
-  - String format: `"copilot"` (default, recommended), `"claude"`, `"codex"`, `"gemini"`, or `"pi"`
+  - String format: `"copilot"` (current default), `"claude"`, `"codex"`, `"gemini"`, or `"pi"`. Omit `engine:` when there is no engine preference or engine-specific requirement so the configured default remains in effect. If an explicit model requirement forces engine selection, try Copilot first.
   - The experimental `opencode` engine is available through `imports: [shared/opencode.md]`; see [`smoke-opencode.md`](../workflows/smoke-opencode.md) for an example.
   - The experimental `deepseek-harness` engine is available through `imports: [shared/deepseek-harness.md]`; see [`smoke-deepseek-harness.md`](../workflows/smoke-deepseek-harness.md) for an example. It runs the developer-preview `dsh` headless profile with AWF provider routing and uses `provider/model` syntax.
   - The experimental `cursor` engine is available through `imports: [shared/cursor.md]`; see [`smoke-cursor.md`](../workflows/smoke-cursor.md) for an example. Requires the `CURSOR_API_KEY` secret. Cursor reads project rules from `.cursor/rules/*.mdc` and respects the root-level `.cursorignore` and `AGENTS.md`; both are protected in the manifest. Use `model: cursor/auto` or a specific model such as `cursor/claude-3-7-sonnet`.

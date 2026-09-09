@@ -113,3 +113,27 @@ engine: copilot
 	assert.Contains(t, string(output), "strict mode: write permission 'contents: write' is not allowed",
 		"compile without --strict should enable strict validation by default")
 }
+
+func TestCompileWorkspaceStrictModeOverridesFrontmatter(t *testing.T) {
+	setup := setupIntegrationTest(t)
+	defer setup.cleanup()
+
+	require.NoError(t, os.WriteFile(filepath.Join(setup.workflowsDir, "aw.json"), []byte(`{"strict":true}`), 0644))
+	workflowPath := filepath.Join(setup.workflowsDir, "workspace-strict.md")
+	workflow := `---
+on: push
+strict: false
+permissions:
+  contents: write
+engine: copilot
+---
+
+# Workspace strict
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0644))
+
+	cmd := exec.Command(setup.binaryPath, "compile", workflowPath)
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, "workspace strict mode should reject a workflow opt-out")
+	assert.Contains(t, string(output), "strict mode: write permission 'contents: write' is not allowed")
+}

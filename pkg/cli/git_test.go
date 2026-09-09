@@ -33,6 +33,8 @@ func TestIsSafeGitRevisionArg(t *testing.T) {
 		{"empty", "", false},
 		{"leading dash", "-oops", false},
 		{"leading double dash", "--upload-pack=evil", false},
+		{"newline", "origin/main\n--help", false},
+		{"unicode control character", "origin/main\u202e", false},
 		{"plain branch", "main", true},
 		{"remote branch", "origin/main", true},
 		{"contains dash not leading", "feature-branch", true},
@@ -413,7 +415,34 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 		assert.False(t, status.HasUnpushedCommits, "clean file should not report unpushed commits")
 	})
 
-	// Test 3: Modified file (unstaged changes)
+	// Test 3: Configured upstream with local-only commits affecting the file
+	t.Run("configured_upstream_file_has_unpushed_commits", func(t *testing.T) {
+		remoteDir := filepath.Join(tmpDir, "origin.git")
+		require.NoError(t, exec.Command("git", "init", "--bare", remoteDir).Run(), "create bare remote repo")
+		require.NoError(t, exec.Command("git", "remote", "add", "origin", remoteDir).Run(), "configure upstream remote")
+		require.NoError(t, exec.Command("git", "push", "-u", "origin", "HEAD").Run(), "push initial branch to remote")
+
+		// A commit that doesn't touch the workflow should not trigger an unpushed-commit result.
+		unrelatedFile := "README.md"
+		require.NoError(t, os.WriteFile(unrelatedFile, []byte("notes\n"), 0644), "create unrelated file")
+		require.NoError(t, exec.Command("git", "add", unrelatedFile).Run())
+		require.NoError(t, exec.Command("git", "commit", "-m", "docs: add unrelated notes").Run(), "commit unrelated change")
+
+		status, err := checkWorkflowFileStatus(workflowFile)
+		require.NoError(t, err, "check workflow file status against configured upstream")
+		assert.False(t, status.HasUnpushedCommits, "unrelated commit should not count for workflow file")
+
+		// A commit that does affect the workflow should be reported when ahead of upstream.
+		require.NoError(t, os.WriteFile(workflowFile, []byte("# Updated Workflow\n"), 0644), "modify workflow file")
+		require.NoError(t, exec.Command("git", "add", workflowFile).Run())
+		require.NoError(t, exec.Command("git", "commit", "-m", "chore: update workflow").Run(), "commit workflow change")
+
+		status, err = checkWorkflowFileStatus(workflowFile)
+		require.NoError(t, err, "check workflow file status after local workflow commit")
+		assert.True(t, status.HasUnpushedCommits, "workflow change ahead of upstream should be reported")
+	})
+
+	// Test 4: Modified file (unstaged changes)
 	t.Run("modified_file", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(workflowFile, []byte("# Modified Workflow\n"), 0644), "modify workflow file")
 
@@ -570,6 +599,26 @@ func TestExtractHostFromRemoteURL(t *testing.T) {
 			name:     "GHES with port",
 			url:      "https://ghes.example.com:8443/org/repo.git",
 			expected: "ghes.example.com:8443",
+		},
+		{
+			name:     "malformed URL falls back to manual parsing with userinfo and path",
+			url:      "https://baduser%zz@example.com/path",
+			expected: "example.com",
+		},
+		{
+			name:     "malformed URL falls back to manual parsing with userinfo and no path",
+			url:      "https://baduser%zz@example.com",
+			expected: "example.com",
+		},
+		{
+			name:     "malformed URL falls back to manual parsing with no userinfo and no path",
+			url:      "https://%zz",
+			expected: "%zz",
+		},
+		{
+			name:     "SSH scp-like with slash before colon does not match and defaults to github.com",
+			url:      "some/path:notaport",
+			expected: "github.com",
 		},
 	}
 

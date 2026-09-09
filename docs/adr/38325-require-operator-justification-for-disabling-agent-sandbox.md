@@ -1,7 +1,11 @@
 # ADR-38325: Require Operator-Authored Justification to Disable the Agent Sandbox
 
 **Date**: 2026-06-10
-**Status**: Draft
+**Status**: Superseded
+
+> Superseded by the restored non-strict opt-out policy: `sandbox.agent: false` now
+> requires `features.dangerously-disable-sandbox-agent: true`, while strict mode
+> continues to reject the configuration.
 
 ## Context
 

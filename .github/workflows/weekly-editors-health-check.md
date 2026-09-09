@@ -25,10 +25,10 @@ network:
 
 imports:
   - shared/otlp.md
+  - shared/noop-reminder.md
 tools:
   cli-proxy: true
   playwright:
-    mode: cli
   web-fetch:
   bash:
     - "curl*"
@@ -45,6 +45,7 @@ safe-outputs:
     labels: [documentation, automation]
     reviewers: [copilot]
     expires: 7d
+  noop:
 
 sandbox:
   agent:
@@ -68,10 +69,10 @@ The editors are documented in `docs/src/content/docs/reference/editors.mdx`.
 
 Read the file `docs/src/content/docs/reference/editors.mdx` using the `cat` command to extract the list of editors to inspect. Parse the file sequentially top to bottom:
 
-1. Track the most recent `###` heading encountered — this is the editor name for all `<LinkButton>` elements that follow it until the next heading.
-2. For each `<LinkButton href="...">` element found, record the `href` value as the editor URL.
+1. Track the most recent `###` heading encountered — this is the editor name.
+2. For each editor section (under a `###` heading), extract the editor URL from `<LinkButton href="...">`, markdown links (`[...](...)`), or plain URL bullet items (`- https://...` or `https://...`).
 3. Derive the editor-id by converting the `###` heading to lowercase kebab-case (e.g., "Compiler Playground" → `compiler-playground`).
-4. For any `href` that is not an absolute `https://` URL (e.g., it uses template expressions like `${import.meta.env.BASE_URL}` or starts with `/`), resolve it relative to the documentation base URL `https://github.github.com/gh-aw/`. For example, `${import.meta.env.BASE_URL}editor/` resolves to `https://github.github.com/gh-aw/editor/`.
+4. For any `href`/URL that is not an absolute `https://` URL (e.g., it uses template expressions like `${import.meta.env.BASE_URL}` or starts with `/`), resolve it relative to the documentation base URL `https://github.github.com/gh-aw/`. For example, `${import.meta.env.BASE_URL}editor/` resolves to `https://github.github.com/gh-aw/editor/`.
 5. Build a working list of editors with: name, editor-id, and resolved URL.
 
 Proceed with the full list of editors discovered in this step.
@@ -103,13 +104,13 @@ For each screenshot file saved in Step 2:
 ### Step 4: Update the Documentation
 
 1. Read the current content of `docs/src/content/docs/reference/editors.mdx`.
-2. For each editor section, add or replace an image tag that renders the screenshot as a preview. The image should be placed **below the `<LinkButton>` component** for that editor. Use this format:
+2. For each editor section, add or replace an image tag that renders the screenshot as a preview. The image should be placed below the editor link or `<LinkButton>` component for that editor. Use this format:
 
    ```mdx
    ![Screenshot of <Editor Name>](<asset-url>)
    ```
 
-   - Place the image after the closing `</LinkButton>` tag (or after the `<LinkButton ... />` self-closing tag) for the corresponding editor section.
+   - Place the image after the editor link/button line for the corresponding editor section.
    - If an image tag already exists for a given editor, replace its URL with the newly uploaded asset URL so the preview stays fresh.
    - Only add an image for editors whose URL was reachable in Step 1.
 
@@ -147,8 +148,8 @@ Example body (rows reflect whatever editors were discovered in Step 0):
 
 - If a URL is unreachable (non-200 status or connection error), skip the screenshot step for that editor but still include the editor in the PR body with its error status.
 - If a screenshot cannot be taken (Playwright error), log the error and continue with the remaining editors.
-- If no screenshots were successfully taken and no documentation changes are needed, do **not** open a pull request. Instead, exit successfully after logging the results.
-- Always attempt all editors before deciding whether to create a PR.
+- If no screenshots were successfully taken or no documentation changes are needed (e.g., all screenshots and links are unchanged and already up to date), do **not** open a pull request. Instead, call the `noop` safe output tool explaining what was checked and why no PR was needed.
+- Always attempt all editors before deciding whether to create a PR or call `noop`.
 
 
 ### Output Format

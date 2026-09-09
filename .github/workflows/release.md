@@ -328,6 +328,33 @@ jobs:
           }
           Write-Host "Found $($binaries.Count) Windows binaries to scan."
 
+          # Verify every Windows binary against the release checksum manifest
+          # before asking Defender to inspect it.
+          $checksumPath = Join-Path "dist" "checksums.txt"
+          if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+            Write-Error "Release checksum manifest not found: $checksumPath"
+            exit 1
+          }
+          $expectedHashes = @{}
+          foreach ($line in Get-Content -LiteralPath $checksumPath) {
+            if ($line -match '^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$') {
+              $expectedHashes[[IO.Path]::GetFileName($Matches[2])] = $Matches[1].ToUpperInvariant()
+            }
+          }
+          foreach ($binary in $binaries) {
+            $expectedHash = $expectedHashes[$binary.Name]
+            if (-not $expectedHash) {
+              Write-Error "No checksum entry found for $($binary.Name)"
+              exit 1
+            }
+            $actualHash = (Get-FileHash -LiteralPath $binary.FullName -Algorithm SHA256).Hash.ToUpperInvariant()
+            if ($actualHash -ne $expectedHash) {
+              Write-Error "Release checksum mismatch for $($binary.Name): expected $expectedHash, got $actualHash"
+              exit 1
+            }
+            Write-Host "Verified release checksum for $($binary.Name): $actualHash"
+          }
+
           # Resolve MpCmdRun.exe path with fallback to ProgramFiles(x86).
           $mpCmdRun = Join-Path $env:ProgramFiles "Windows Defender\MpCmdRun.exe"
           if (-not (Test-Path $mpCmdRun)) {
@@ -687,14 +714,14 @@ jobs:
         run: go mod download
 
       - name: Generate SBOM (SPDX format)
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           artifact-name: sbom.spdx.json
           output-file: sbom.spdx.json
           format: spdx-json
 
       - name: Generate SBOM (CycloneDX format)
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           artifact-name: sbom.cdx.json
           output-file: sbom.cdx.json

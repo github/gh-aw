@@ -29,13 +29,14 @@
 const fs = require("fs");
 const { runWithCopilotSDK, extractPromptFromArgs } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
+const { parseCopilotSDKToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 // Re-export the session and permission helpers so that existing callers that
 // require("./copilot_sdk_driver.cjs") (e.g. copilot_harness.cjs) continue to work.
-module.exports = { extractPromptFromArgs, runWithCopilotSDK, parsePermissionConfigFromServerArgs, parseMultiProviderJson };
+module.exports = { extractPromptFromArgs, runWithCopilotSDK, parsePermissionConfigFromServerArgs, parseCopilotSDKToolConfig, parseMultiProviderJson };
 
 // ---------------------------------------------------------------------------
 // Standalone entry point
@@ -111,22 +112,12 @@ async function main() {
     log(`  provider: name=${p.name} type=${p.type} baseUrl=${p.baseUrl}${p.wireApi ? ` wireApi=${p.wireApi}` : ""}`);
   }
 
-  // --- Build permission config from sidecar server args ----------------
-  // GH_AW_COPILOT_SDK_SERVER_ARGS holds the JSON-encoded --allow-tool flags
-  // that the Go engine passed to the sidecar. Mirror those same rules in the
-  // SDK session so the driver's onPermissionRequest handler aligns with the
-  // sidecar's pre-configured allow list (e.g. shell(safeoutputs:*) for
-  // workflows with safe-outputs enabled and a restricted bash allowlist).
-  const permissionConfig = parsePermissionConfigFromServerArgs(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS);
-  if (permissionConfig) {
-    if (permissionConfig.allowAllTools) {
-      log("permission config: allow-all-tools (sidecar launched with --allow-all-tools)");
-    } else {
-      log(`permission config: ${(permissionConfig.allowedTools ?? []).length} allow-tool entries from GH_AW_COPILOT_SDK_SERVER_ARGS`);
-    }
-  } else {
-    log("permission config: none (onPermissionRequest will use unrestricted behavior)");
-  }
+  // --- Read compiler-owned tool and permission configuration ------------
+  // One structured contract controls visibility, registration, and permission
+  // enforcement. Missing or invalid contracts fail before session creation.
+  const toolConfig = parseCopilotSDKToolConfig(process.env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
+  const permissionConfig = toolConfig.permissions;
+  log(`permission config: ${permissionConfig.allowedTools.length} compiler-owned allow-tool entries`);
 
   // --- Run SDK session -------------------------------------------------
 
@@ -139,6 +130,7 @@ async function main() {
     providers,
     models: sdkModels,
     permissionConfig,
+    toolConfig,
   });
 
   process.exit(result.exitCode);

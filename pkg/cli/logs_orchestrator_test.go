@@ -449,3 +449,42 @@ func TestDownloadRunArtifactsConcurrent_PanicRecovery(t *testing.T) {
 		assert.NotEmpty(t, result.LogsPath, "Result should have LogsPath set")
 	}
 }
+
+// TestDownloadRunArtifactsConcurrent_StorageLimitPreservesSubmissionOrder verifies
+// that a configured --max-storage limit no longer forces the download pool down to
+// a single goroutine (a prior regression) while still keeping results indexed by
+// submission (API) order, which continuation cursors rely on. Run this test with
+// `go test -race -tags integration -run TestDownloadRunArtifactsConcurrent_StorageLimit ./pkg/cli`
+// to additionally confirm there is no data race on the shared results slice,
+// completion counter, or storage-limit bookkeeping when downloads run in parallel.
+func TestDownloadRunArtifactsConcurrent_StorageLimitPreservesSubmissionOrder(t *testing.T) {
+	ctx := context.Background()
+
+	runs := make([]WorkflowRun, 20)
+	for i := range runs {
+		runs[i] = WorkflowRun{
+			DatabaseID: int64(9000 + i),
+			Status:     "completed",
+			Conclusion: "success",
+		}
+	}
+
+	tmpDir := testutil.TempDir(t, "test-orchestrator-storage-limit-*")
+	// A large budget that will not be reached; the goal is to observe ordering and
+	// concurrency safety, not the limit-reached code path (covered separately in
+	// logs_storage_limit_test.go).
+	storageLimit := newLogsStorageLimit(tmpDir, 10240, false)
+
+	results := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{
+		outputDir:    tmpDir,
+		maxRuns:      len(runs),
+		storageLimit: storageLimit,
+	})
+
+	require.Len(t, results, len(runs), "expected a result for every submitted run")
+	for i, result := range results {
+		assert.Equal(t, runs[i].DatabaseID, result.Run.DatabaseID,
+			"result at index %d should correspond to the run submitted at that index", i)
+	}
+	assert.False(t, storageLimit.isReached(), "budget is large enough that it should not be reached")
+}

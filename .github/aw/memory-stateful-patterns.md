@@ -4,19 +4,11 @@ description: Worked patterns for stateful agentic workflows — baseline metric 
 
 # Stateful Memory Patterns
 
-Detailed worked examples for the two most common persistent-state patterns. For the tool decision guide and configuration reference, see [memory.md](memory.md).
+Worked examples for the two most common persistent-state patterns. Tool decision guide and configuration reference: [memory.md](memory.md).
 
 ## Baseline Comparison (cache-memory)
 
-Use `cache-memory` to persist a baseline metric between runs and detect regressions. Well-suited for any "compare current vs. previous" scenario — test coverage, build duration, benchmark scores, audit counts — where runs happen at least once every 7 days (the default cache retention).
-
-**When to use this pattern**
-
-- Tracking a numeric metric (coverage %, build time, test count, score) across scheduled or PR runs
-- Alerting when a metric regresses by more than an acceptable threshold
-- Any "tell me when X drops by more than Y" workflow where losing the baseline for a cycle is tolerable (the next run simply re-establishes it)
-
-**When to use `repo-memory` instead**
+Persist a baseline metric with `cache-memory` and alert on regression — test coverage, build duration, benchmark scores, audit counts. Requires runs at least every 7 days (default cache retention) and tolerance for losing a baseline: the next run simply re-establishes it.
 
 If a lost baseline would cause serious side-effects — e.g. a security-finding baseline where "cache miss" floods the repo with duplicate issues — use `repo-memory` (see below).
 
@@ -72,7 +64,7 @@ with the current coverage and a filesystem-safe timestamp `YYYY-MM-DD-HH-MM-SS`
 
 ## Stateful Scanning (repo-memory)
 
-Use `repo-memory` to persist a baseline JSON file between scheduled runs so the workflow only alerts on *new* findings — vulnerability scans, dependency audits, licence checks, or any "track changes over time" scenario. Unlike `cache-memory`, the baseline survives cache expiry, so a missed cycle does not flood the repo with duplicate issues.
+Use `repo-memory` to persist a baseline JSON file between scheduled runs so the workflow only alerts on *new* findings — vulnerability scans, dependency audits, licence checks, or any "track changes over time" scenario.
 
 **Worked example: nightly npm vulnerability scan**
 

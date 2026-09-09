@@ -3161,6 +3161,8 @@ ${diffs}
       const result = await handler({ branch: "should-reject-files-outside-the-allowed-files-allowlist" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("outside the allowed-files list");
       expect(result.error).toContain("src/index.js");
     });
@@ -3195,6 +3197,8 @@ ${diffs}
       const result = await handler({ branch: "should-still-block-a-protected-file-when-it-is-in-the-allowl" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("protected files");
       expect(result.error).toContain("package.json");
     });
@@ -3362,6 +3366,8 @@ ${diffs}
       const result = await handler({ branch: "should-block-a-protected-file-when-no-allowed-files-list-is-" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("protected files");
       expect(result.error).toContain("package.json");
     });
@@ -3374,6 +3380,8 @@ ${diffs}
       const result = await handler({ branch: "should-reject-a-mixed-patch-where-at-least-one-file-is-outsi" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("outside the allowed-files list");
       expect(result.error).toContain("src/index.js");
       expect(result.error).not.toContain(".changeset/my-fix.md");
@@ -3438,6 +3446,8 @@ ${diffs}
       const result = await handler({ branch: "should-still-block-non-ignored-files-that-violate-the-allowe" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
       expect(result.error).toContain("outside the allowed-files list");
       expect(result.error).toContain("other/file.txt");
       expect(result.error).not.toContain("src/index.js");

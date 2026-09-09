@@ -14,7 +14,7 @@ permissions:
   actions: read
   discussions: read
 tracker-id: outcome-collector
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 engine:
   id: codex
 strict: true

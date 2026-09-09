@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" role="img" aria-labelledby="wwf-title wwf-desc" font-family="-apple-system, 'Segoe UI', 'Mona Sans', sans-serif">
+  <title id="wwf-title">Editing a workflow: body versus frontmatter changes</title>
+  <desc id="wwf-desc">A workflow file has a frontmatter section and a Markdown body. Editing the body takes effect on the next run with no recompilation needed. Editing the frontmatter requires running gh aw compile before the change takes effect.</desc>
+
+  <rect width="640" height="220" fill="#ffffff"/>
+
+  <!-- Source file box -->
+  <rect x="20" y="70" width="150" height="80" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+  <text x="95" y="98" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">workflow.md</text>
+  <line x1="35" y1="108" x2="155" y2="108" stroke="#d0d7de" stroke-width="1"/>
+  <text x="95" y="122" text-anchor="middle" font-size="11" fill="#59636e">frontmatter</text>
+  <text x="95" y="138" text-anchor="middle" font-size="11" fill="#59636e">body</text>
+
+  <!-- Arrow to body branch -->
+  <path d="M170 130 L 230 130" stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <!-- Arrow to frontmatter branch -->
+  <path d="M170 100 L 230 60" stroke="#0969da" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)"/>
+
+  <!-- Body change outcome -->
+  <rect x="230" y="105" width="180" height="50" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text x="320" y="126" text-anchor="middle" font-size="12" fill="#1f2328">Body-only change</text>
+  <text x="320" y="144" text-anchor="middle" font-size="11" fill="#59636e">effective on next run</text>
+
+  <!-- Frontmatter change outcome -->
+  <rect x="230" y="35" width="180" height="50" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="320" y="56" text-anchor="middle" font-size="12" fill="#1f2328">Frontmatter change</text>
+  <text x="320" y="74" text-anchor="middle" font-size="11" fill="#59636e">requires recompilation</text>
+
+  <!-- Arrow to compile step -->
+  <path d="M410 60 L 460 60" stroke="#0969da" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)"/>
+
+  <!-- Compile command box -->
+  <rect x="460" y="35" width="160" height="50" fill="#0969da" stroke="#0969da" stroke-width="1"/>
+  <text x="540" y="56" text-anchor="middle" font-size="11" fill="#ffffff" font-family="ui-monospace, monospace">gh aw compile</text>
+  <text x="540" y="72" text-anchor="middle" font-size="10" fill="#ffffff">generates .lock.yml</text>
+
+  <!-- Dashed line down to body outcome for symmetry note -->
+  <path d="M540 85 L 540 130 L 410 130" stroke="#d0d7de" stroke-width="1" fill="none" stroke-dasharray="3,3" marker-end="url(#arrow)"/>
+  <text x="530" y="200" text-anchor="end" font-size="10" fill="#59636e">Commit source and lock file together</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#59636e"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#0969da"/>
+    </marker>
+  </defs>
+</svg>

@@ -97,5 +97,28 @@ const mockCore = {
             expect(mockCore.setOutput).toHaveBeenCalledWith("stop_time_ok", "false"),
             expect(mockCore.setFailed).not.toHaveBeenCalled());
         });
+      }),
+      describe("when stop time is a relative delta (e.g. resolved from a GitHub Actions expression)", () => {
+        it("should allow execution for a future relative delta such as +48h", async () => {
+          ((process.env.GH_AW_STOP_TIME = "+48h"),
+            (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
+            await eval(`(async () => { ${checkStopTimeScript}; await main(); })()`),
+            expect(mockCore.setOutput).toHaveBeenCalledWith("stop_time_ok", "true"),
+            expect(mockCore.setFailed).not.toHaveBeenCalled());
+        });
+        it("should support combined units such as +1d12h", async () => {
+          ((process.env.GH_AW_STOP_TIME = "+1d12h"),
+            (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
+            await eval(`(async () => { ${checkStopTimeScript}; await main(); })()`),
+            expect(mockCore.setOutput).toHaveBeenCalledWith("stop_time_ok", "true"),
+            expect(mockCore.setFailed).not.toHaveBeenCalled());
+        });
+        it("should fail with a descriptive error for an invalid relative delta", async () => {
+          ((process.env.GH_AW_STOP_TIME = "+5x"),
+            (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
+            await eval(`(async () => { ${checkStopTimeScript}; await main(); })()`),
+            expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Invalid stop-time format")),
+            expect(mockCore.setOutput).not.toHaveBeenCalled());
+        });
       }));
   }));

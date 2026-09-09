@@ -2431,3 +2431,130 @@ Run a task.
 	assert.Contains(t, needs, "imported_job", "safe_outputs needs should include deduped dependency from import")
 	assert.Contains(t, needs, "shared_job", "safe_outputs needs should include dependency from import")
 }
+
+// TestSafeOutputsImportLinearTokenFromOnlyImport ensures that a Linear handler and its
+// linear-token supplied purely by an imported shared workflow retain the credential after
+// merge, mirroring the equivalent GitHubToken merge behavior.
+func TestSafeOutputsImportLinearTokenFromOnlyImport(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	sharedWorkflow := `---
+safe-outputs:
+  linear-token: "${{ secrets.IMPORT_LINEAR_TOKEN }}"
+  linear-add-comment:
+    target: "ENG-123"
+---
+
+# Shared Linear Configuration
+`
+
+	sharedFile := filepath.Join(workflowsDir, "shared-linear.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
+
+	mainWorkflow := `---
+on: issues
+permissions:
+  contents: read
+imports:
+  - ./shared-linear.md
+---
+
+# Main Workflow
+
+This workflow uses only the imported Linear safe-outputs configuration.
+`
+
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+
+	require.NotNil(t, workflowData.SafeOutputs.LinearAddComment, "LinearAddComment should be imported")
+	assert.Equal(t, "ENG-123", workflowData.SafeOutputs.LinearAddComment.Target)
+	assert.Equal(t, "${{ secrets.IMPORT_LINEAR_TOKEN }}", workflowData.SafeOutputs.LinearToken, "LinearToken should be merged from the import")
+
+	// The Linear-only configuration must not implicitly enable GitHub issue creation
+	// for incomplete-run reporting.
+	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete)
+	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete.CreateIssue)
+	assert.Equal(t, "false", *workflowData.SafeOutputs.ReportIncomplete.CreateIssue, "ReportIncomplete.CreateIssue should default to false for a Linear-only merged configuration")
+}
+
+// TestSafeOutputsImportLinearOnlyDoesNotEnableGitHubIssueReporting is a regression test for
+// the implicit report-incomplete default being computed before imported Linear handlers are
+// merged in. Previously, a main workflow declaring only meta safe-outputs fields (like
+// linear-token) would get an implicit "create-issue: true" default before the import's Linear
+// handler was merged in, and that implicit true value would then be preserved by the merge
+// because the import did not explicitly set report-incomplete.
+func TestSafeOutputsImportLinearOnlyDoesNotEnableGitHubIssueReporting(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	sharedWorkflow := `---
+safe-outputs:
+  linear-create-issue:
+    team-id: "9cfb482a-81e3-4154-b5b9-2c805e70a02d"
+---
+
+# Shared Linear Configuration
+`
+
+	sharedFile := filepath.Join(workflowsDir, "shared-linear.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
+
+	// Main workflow declares a safe-outputs section (so the implicit default gets
+	// computed before merge) but only sets meta fields, not any GitHub-backed handler.
+	mainWorkflow := `---
+on: issues
+permissions:
+  contents: read
+imports:
+  - ./shared-linear.md
+safe-outputs:
+  linear-token: "${{ secrets.LINEAR_API_KEY }}"
+---
+
+# Main Workflow
+`
+
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+
+	require.NotNil(t, workflowData.SafeOutputs.LinearCreateIssue, "LinearCreateIssue should be imported")
+	require.Nil(t, workflowData.SafeOutputs.CreateIssues, "CreateIssues (GitHub) must not be implicitly enabled")
+	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete)
+	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete.CreateIssue)
+	assert.Equal(t, "false", *workflowData.SafeOutputs.ReportIncomplete.CreateIssue, "ReportIncomplete.CreateIssue should be recomputed to false after merging the imported Linear-only handler")
+	assert.Empty(t, computePermissionsForSafeOutputs(workflowData.SafeOutputs, false).permissions, "Linear-only merged configuration should not request GitHub write permissions")
+}

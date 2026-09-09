@@ -146,16 +146,16 @@ If a model entry omits optional price fields, implementations MUST apply the fol
 
 ### 3.5 Provider-Specific Input Handling
 
-For providers that include cache-read tokens in total input tokens, implementations MUST subtract `cache_read_tokens` from `input_tokens` before applying input price and MUST NOT double-charge cache-read usage.
+When an invocation record provides the optional, forward-compatible `input_tokens_include_cache` field, implementations MUST use it instead of inferring cache semantics from the provider. If it is `true`, cache-read and cache-write tokens are subsets of `input_tokens` and MUST be subtracted before applying the full input price. If it is `false`, the cache fields are additive and MUST NOT be subtracted.
 
-The following providers are known to bundle cache-read tokens in the reported input total and MUST have §3.5 applied:
+Legacy records without `input_tokens_include_cache` retain these provider defaults:
 
 | Provider (normalized) | Notes |
 |-----------------------|-------|
 | `anthropic` | Direct Anthropic API |
 | `openai` | Direct OpenAI API |
 | `azure-openai` / `azure_openai` | Azure-hosted OpenAI |
-| `github-copilot` (and aliases `github`, `copilot`, `github_models`) | GitHub Copilot proxy — proxies both OpenAI and Anthropic models, which bundle cache-read tokens in input |
+| `github-copilot` (and aliases `github`, `copilot`, `github_models`) | Treat cache-read tokens as included to preserve legacy repricing behavior when the optional field is absent. |
 
 ### 3.6 Aggregation
 
@@ -332,6 +332,12 @@ These references SHOULD be treated as the external billing-alignment sources for
 ## 7. Reporting Requirements
 
 A conforming implementation MUST expose AIC in runtime reporting outputs where cost metrics are emitted.
+
+When AWF token-usage records provide finite, non-negative `ai_credits_this_response` values, reporting MUST prefer those per-request values. The chronologically last valid `ai_credits_total` is the reported run total. If later records omit or contain invalid reported values, reporting MUST surface a warning and extend the last valid total with available per-request values or legacy pricing until another valid cumulative total appears. Implementations MUST recompute AIC from token counts and catalog pricing for legacy records that omit these fields.
+
+> [!NOTE]
+> Token-usage files are diagnostic artifacts visible to the agent runtime. Their mirrored AIC fields improve usage summaries, but are not sufficient evidence to classify a provider failure as budget enforcement or to change retry, authentication, or safe-output behavior.
+> This reporting contract does not alter per-run or daily guardrail enforcement inputs; those require a separate first-party accounting contract.
 
 Implementations SHOULD provide:
 

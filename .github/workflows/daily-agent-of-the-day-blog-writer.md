@@ -26,14 +26,14 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   agentic-workflows:
   edit:
   bash: ["*"]
   github:
-    mode: gh-proxy
+    mode: local
     lockdown: false
     allowed-repos:
       - github/gh-aw

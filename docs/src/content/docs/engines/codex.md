@@ -19,12 +19,12 @@ Recompile the workflow with `gh aw compile` and commit the changes to your repos
 
 ## Selecting Codex + GitHub as the AI engine
 
-To select Codex as the AI engine, with inference hosted and billed through a GitHub Copilot subscription, add a `copilot/` model declaration. This configures Codex's BYOK provider to use GitHub Copilot inference. For example:
+To select Codex as the AI engine, with inference hosted and billed through a GitHub Copilot subscription, add a `copilot/` model declaration. This configures Codex's BYOK provider to use GitHub Copilot inference. Select a Codex model because the Codex runtime relies on model capabilities that general-purpose models do not provide. For example:
 
 ```yaml
 engine:
   id: codex
-  model: copilot/auto
+  model: copilot/gpt-5.3-codex
 ```
 To authenticate:
 - For organization-billed usage, grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission).
@@ -64,6 +64,8 @@ Analyze the repository and create a concise daily status report covering:
 ## Capabilities and limitations
 
 Codex supports native web search when `tools.web-search` is enabled and can disable shell execution completely. Codex cannot enforce a nonempty per-command `tools.bash` allowlist and does not support bare mode, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+
+When a workflow does not declare any `plugins`, GitHub Agentic Workflows writes [`features.plugins=false`](https://developers.openai.com/codex/config-reference/#features) to Codex's generated `config.toml`. This prevents Codex from contacting the ChatGPT plugin catalog or synchronizing the curated plugin repository at startup. Codex does not provide a narrower setting that disables only startup synchronization, so workflows that declare Agent Plugins keep the plugin subsystem and its startup checks enabled. Directly configured MCP servers are unaffected.
 
 ## GitHub Agentic Workflows vs. running Codex directly in Actions
 

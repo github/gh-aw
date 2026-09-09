@@ -19,6 +19,7 @@ type IssueReportingConfig struct {
 	ReportAsFailure      *string  `yaml:"report-as-failure,omitempty"` // Whether to surface these signals as agent failures (default: true). Set to false to revert to old behavior. Supports literal bool or GitHub Actions expression.
 	TitlePrefix          string   `yaml:"title-prefix,omitempty"`      // Prefix for issue titles
 	Labels               []string `yaml:"labels,omitempty"`            // Labels to add to created issues
+	Implicit             bool     `yaml:"-"`                           // True when this config was auto-defaulted rather than authored by the user; recomputed after import merges (e.g. for report-incomplete's create-issue default)
 }
 
 // Type aliases so existing code (compiler_types.go, tests, etc.) continues to compile unchanged.

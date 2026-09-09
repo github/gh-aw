@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -150,18 +151,19 @@ func (b *handlerConfigBuilder) AddTemplatableJSONSlice(key string, value []strin
 }
 
 func marshalSafeOutputsConfig(config map[string]any) ([]byte, error) {
-	configJSON, err := json.Marshal(config)
+	configJSON, err := jsonutil.MarshalCompactNoHTMLEscape(config)
 	if err != nil {
 		return nil, err
 	}
+	result := []byte(configJSON)
 	for _, expression := range templatableJSONExpressions(config) {
-		placeholder, err := json.Marshal(expression.placeholder())
+		placeholderJSON, err := jsonutil.MarshalCompactNoHTMLEscape(expression.placeholder())
 		if err != nil {
 			return nil, err
 		}
-		configJSON = bytes.ReplaceAll(configJSON, placeholder, []byte(expression.expr))
+		result = bytes.ReplaceAll(result, []byte(placeholderJSON), []byte(expression.expr))
 	}
-	return configJSON, nil
+	return result, nil
 }
 
 var (

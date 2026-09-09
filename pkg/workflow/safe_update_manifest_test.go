@@ -244,7 +244,6 @@ func TestCollectMCPServersForManifest(t *testing.T) {
 			"github": map[string]any{
 				"allowed": []any{"list_issues", "get_issue"},
 			},
-			"playwright": map[string]any{},
 			"my-api": map[string]any{
 				"type":    "http",
 				"url":     "https://api.example.test/mcp",
@@ -278,29 +277,6 @@ func TestCollectMCPServersForManifest(t *testing.T) {
 		{Name: "github", Tools: []string{"get_issue", "list_issues"}},
 		{Name: "mcpscripts", Tools: []string{"lookup"}},
 		{Name: "my-api", Tools: []string{"fetch_data", "list_items"}},
-		{Name: "playwright", Tools: []string{
-			"browser_click",
-			"browser_close",
-			"browser_console_messages",
-			"browser_drag",
-			"browser_evaluate",
-			"browser_file_upload",
-			"browser_fill_form",
-			"browser_handle_dialog",
-			"browser_hover",
-			"browser_install",
-			"browser_navigate",
-			"browser_navigate_back",
-			"browser_network_requests",
-			"browser_press_key",
-			"browser_resize",
-			"browser_select_option",
-			"browser_snapshot",
-			"browser_tabs",
-			"browser_take_screenshot",
-			"browser_type",
-			"browser_wait_for",
-		}},
 		{Name: "safeoutputs", Tools: []string{"create_issue", "noop", "triage_script"}},
 	}, servers)
 }

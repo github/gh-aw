@@ -34,6 +34,7 @@ async function main() {
 
     // Extract mentions configuration from validation config
     const mentionsConfig = validationConfig?.mentions || null;
+    const maxMentions = parseIntTemplatable(mentionsConfig?.max, 50);
 
     // Resolve allowed mentions for the output collector
     // This determines which @mentions are allowed in the agent output
@@ -43,7 +44,7 @@ async function main() {
     /** @type {number | undefined} */
     let maxBotMentions;
 
-    function validateFieldWithInputSchema(value, fieldName, inputSchema, lineNum) {
+    function validateFieldWithInputSchema(value, fieldName, inputSchema, lineNum, allowedAliasesSeen) {
       if (inputSchema.required && (value === undefined || value === null)) {
         return {
           isValid: false,
@@ -53,7 +54,7 @@ async function main() {
       if (value === undefined || value === null) {
         return {
           isValid: true,
-          normalizedValue: inputSchema.default || undefined,
+          normalizedValue: inputSchema.default ?? undefined,
         };
       }
       const inputType = inputSchema.type || "string";
@@ -66,7 +67,7 @@ async function main() {
               error: `Line ${lineNum}: ${fieldName} must be a string`,
             };
           }
-          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxBotMentions });
+          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
           break;
         case "boolean":
           if (typeof value !== "boolean") {
@@ -97,11 +98,11 @@ async function main() {
               error: `Line ${lineNum}: ${fieldName} must be one of: ${inputSchema.options.join(", ")}`,
             };
           }
-          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxBotMentions });
+          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
           break;
         default:
           if (typeof value === "string") {
-            normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxBotMentions });
+            normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
           }
           break;
       }
@@ -120,9 +121,10 @@ async function main() {
           normalizedItem,
         };
       }
+      const allowedAliasesSeen = new Set();
       for (const [fieldName, inputSchema] of Object.entries(jobConfig.inputs)) {
         const fieldValue = item[fieldName];
-        const validation = validateFieldWithInputSchema(fieldValue, fieldName, inputSchema, lineNum);
+        const validation = validateFieldWithInputSchema(fieldValue, fieldName, inputSchema, lineNum, allowedAliasesSeen);
         if (!validation.isValid && validation.error) {
           errors.push(validation.error);
         } else if (validation.normalizedValue !== undefined) {
@@ -357,6 +359,7 @@ async function main() {
         if (hasValidationConfig(itemType)) {
           const validationResult = validateItem(item, itemType, i + 1, {
             allowedAliases: allowedMentions,
+            maxMentions,
             maxBotMentions,
             normalizeIssueClosingKeywords,
             dataEnabled: typeConfig !== null && typeof typeConfig === "object" && typeConfig.data_enabled === true,

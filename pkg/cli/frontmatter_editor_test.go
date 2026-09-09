@@ -95,6 +95,7 @@ permissions:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := RemoveFieldFromOnTrigger(tt.content, tt.fieldName)
 
 			if tt.expectError && err == nil {
@@ -191,6 +192,7 @@ permissions:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := SetFieldInOnTrigger(tt.content, tt.fieldName, tt.fieldValue)
 
 			if tt.expectError && err == nil {
@@ -332,6 +334,7 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := RemoveTopLevelFieldFromFrontmatter(tt.content, tt.fieldName)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("RemoveTopLevelFieldFromFrontmatter() error = %v, wantErr %v", err, tt.wantErr)

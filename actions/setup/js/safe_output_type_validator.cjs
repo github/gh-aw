@@ -31,6 +31,8 @@ const ISSUE_INTENT_RATIONALE_MAX_LENGTH = 280;
 /**
  * @typedef {{
  *   allowedAliases?: string[],
+ *   maxMentions?: number,
+ *   allowedAliasesSeen?: Set<string>,
  *   maxBotMentions?: number,
  *   normalizeIssueClosingKeywords?: boolean,
  *   dataEnabled?: boolean,
@@ -90,6 +92,8 @@ function normalizeIssueIntentRationale(rationale, options) {
   const sanitizedRationale = sanitizeContent(unfenceMarkdown(rationale), {
     maxLength: ISSUE_INTENT_RATIONALE_MAX_LENGTH,
     allowedAliases: options?.allowedAliases || [],
+    maxMentions: options?.maxMentions,
+    allowedAliasesSeen: options?.allowedAliasesSeen,
     maxBotMentions: options?.maxBotMentions,
   }).trim();
   // sanitizeContent appends "\n[Content truncated due to length]" when it truncates,
@@ -116,6 +120,8 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
       const name = sanitizeContent(label, {
         maxLength: 128,
         allowedAliases: options?.allowedAliases || [],
+        maxMentions: options?.maxMentions,
+        allowedAliasesSeen: options?.allowedAliasesSeen,
         maxBotMentions: options?.maxBotMentions,
       });
       if (!name) {
@@ -149,6 +155,8 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
     const name = sanitizeContent(label.name, {
       maxLength: 128,
       allowedAliases: options?.allowedAliases || [],
+      maxMentions: options?.maxMentions,
+      allowedAliasesSeen: options?.allowedAliasesSeen,
       maxBotMentions: options?.maxBotMentions,
     });
     if (!name) {
@@ -210,6 +218,10 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
  * @property {number} [itemMaxLength] - For arrays, max length per item
  * @property {string} [pattern] - Regex pattern the value must match
  * @property {string} [patternError] - Error message for pattern mismatch
+ * @property {boolean} [rejectIfOversized] - When true, reject the field outright (instead of
+ *   silently truncating via sanitizeContent) if the raw pre-sanitization value exceeds
+ *   maxLength. Used for external-system fields (e.g. Linear) where truncation could turn an
+ *   oversized/placeholder value into a deceptively short but "valid" operation.
  * @property {boolean} [x-strip-on-error] - When true, strip the field on validation failure
  *   instead of rejecting the whole item. Bracket access only (validation["x-strip-on-error"])
  *   because the key contains hyphens. Used for optional enrichment fields like confidence and rationale.
@@ -544,10 +556,21 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
         normalizedResult = sanitizeContent(normalizedResult, {
           maxLength: validation.maxLength,
           allowedAliases: options?.allowedAliases || [],
+          maxMentions: options?.maxMentions,
+          allowedAliasesSeen: options?.allowedAliasesSeen,
           maxBotMentions: options?.maxBotMentions,
         });
       }
       return { isValid: true, normalizedValue: normalizedResult };
+    }
+
+    // Reject outright (instead of silently truncating) when configured, so an oversized
+    // raw value cannot be converted into a deceptively short but "valid" operation.
+    if (validation.rejectIfOversized && validation.maxLength && value.length > validation.maxLength) {
+      return {
+        isValid: false,
+        error: `Line ${lineNum}: ${itemType} '${fieldName}' exceeds maximum length (${validation.maxLength} characters)`,
+      };
     }
 
     // Handle sanitization
@@ -557,6 +580,8 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
       finalValue = sanitizeContent(unfenceMarkdown(value), {
         maxLength: validation.maxLength || MAX_BODY_LENGTH,
         allowedAliases: options?.allowedAliases || [],
+        maxMentions: options?.maxMentions,
+        allowedAliasesSeen: options?.allowedAliasesSeen,
         maxBotMentions: options?.maxBotMentions,
       });
     }
@@ -635,6 +660,8 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
             ? sanitizeContent(item, {
                 maxLength: validation.itemMaxLength || 128,
                 allowedAliases: options?.allowedAliases || [],
+                maxMentions: options?.maxMentions,
+                allowedAliasesSeen: options?.allowedAliasesSeen,
                 maxBotMentions: options?.maxBotMentions,
               })
             : item
@@ -753,10 +780,13 @@ function validateItem(item, itemType, lineNum, options) {
     }
   }
 
+  // Share mention state across every sanitized field in this output item.
+  const validationOptions = { ...options, allowedAliasesSeen: new Set() };
+
   // Validate each configured field
   for (const [fieldName, validation] of Object.entries(typeConfig.fields)) {
     const fieldValue = item[fieldName];
-    const result = validateField(fieldValue, fieldName, validation, itemType, lineNum, options);
+    const result = validateField(fieldValue, fieldName, validation, itemType, lineNum, validationOptions);
 
     if (!result.isValid) {
       // When x-strip-on-error is set, strip the invalid optional field instead of rejecting the item.

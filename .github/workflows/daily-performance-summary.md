@@ -16,8 +16,9 @@ sandbox:
   agent:
     id: awf
 engine:
-  id: codex
-model: copilot/mai-code-1-flash-picker
+  id: pi
+  model-provider: openai
+model: openai/gpt-5.4
 strict: true
 tracker-id: daily-performance-summary
 tools:

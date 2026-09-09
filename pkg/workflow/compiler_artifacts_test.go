@@ -669,6 +669,48 @@ Body.
 	}
 }
 
+func TestAgentArtifactExcludesUserGeneratedDirectory(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-artifact-paths-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+strict: false
+---
+
+# Test Agent Artifact Paths
+
+Body.
+`
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	uploadSection := extractWorkflowStepByName(t, string(lockContent), "Upload agent artifacts")
+
+	for _, expected := range []string{
+		constants.TmpMcpLogsDir,
+		constants.TmpSandboxAgentLogsDir,
+		constants.AgentStdioLogPath,
+		constants.AWFProxyLogsDir.String() + "/",
+		constants.AWFAuditDir.String() + "/",
+	} {
+		assert.Contains(t, uploadSection, expected)
+	}
+	assert.NotContains(t, uploadSection, "\n            "+constants.TmpGhAwAgentDir+"\n")
+}
+
 func TestAgentOutputFallbackArtifact_NoSafeOutputs(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "agent-output-fallback-no-safe-outputs-test")
 

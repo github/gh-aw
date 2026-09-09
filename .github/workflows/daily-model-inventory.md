@@ -345,7 +345,6 @@ sandbox:
 tools:
   cli-proxy: true
   playwright:
-    mode: cli
   bash:
     - "*"
   github:

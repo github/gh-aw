@@ -230,6 +230,7 @@ func TestIntensityChar(t *testing.T) {
 }
 
 func TestRenderScheduleCalendarCell_NoANSIWhenNotTerminal(t *testing.T) {
+	t.Parallel()
 	for _, count := range []int{0, 1, 2, 5, 8} {
 		text := intensityChar(count)
 		got := renderScheduleCalendarCell(count, text, false, []string{"TERM=xterm-256color"})
@@ -238,6 +239,7 @@ func TestRenderScheduleCalendarCell_NoANSIWhenNotTerminal(t *testing.T) {
 }
 
 func TestRenderScheduleCalendarCell_NoANSIWhenNoColor(t *testing.T) {
+	t.Parallel()
 	for _, count := range []int{0, 1, 2, 5, 8} {
 		text := intensityChar(count)
 		got := renderScheduleCalendarCell(count, text, true, []string{"NO_COLOR=1", "TERM=xterm-256color"})

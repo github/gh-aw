@@ -14,7 +14,7 @@ import (
 
 var claudeLog = logger.New("workflow:claude_engine")
 
-const claudeDebugLogFile = constants.TmpGhAwAgentDir + "claude-debug.log"
+const claudeDebugLogFile = constants.TmpGhAwDir + "/claude-debug.log"
 
 // ClaudeEngine represents the Claude Code agentic engine
 type ClaudeEngine struct {
@@ -112,8 +112,8 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 
 	// Skip installation if custom command is specified
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		claudeLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
-		return []GitHubActionStep{}
+		claudeLog.Printf("Skipping Claude CLI installation: custom command specified (%s)", workflowData.EngineConfig.Command)
+		return buildNpmEngineInstallStepsWithAWF(nil, workflowData, false)
 	}
 
 	// Use version from engine config if provided, otherwise default to pinned version
@@ -155,9 +155,9 @@ func (e *ClaudeEngine) GetPluginInstallationSteps(workflowData *WorkflowData) []
 	return generatePluginInstallationSteps(workflowData, pluginInstallSpec{})
 }
 
-// GetDeclaredOutputFiles returns the output files that Claude may produce
+// GetDeclaredOutputFiles returns the diagnostic files that Claude may produce.
 func (e *ClaudeEngine) GetDeclaredOutputFiles() []string {
-	return []string{}
+	return []string{claudeDebugLogFile}
 }
 
 // GetAgentManifestFiles returns Claude-specific instruction files that should be
@@ -416,7 +416,7 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 			WorkflowData:   workflowData,
 			UsesTTY:        true, // Claude Code CLI requires TTY
 			AllowedDomains: allowedDomains,
-			PathSetup:      "mkdir -p " + constants.TmpGhAwAgentDir + " && (umask 177 && touch " + claudeDebugLogFile + ") && touch " + AgentStepSummaryPath, // Runs BEFORE AWF on the host
+			PathSetup:      "mkdir -p " + constants.TmpGhAwDir + " && (umask 177 && touch " + claudeDebugLogFile + ") && touch " + AgentStepSummaryPath, // Runs BEFORE AWF on the host
 			// Exclude every env var whose step-env value is a secret so the agent
 			// cannot read raw token values via bash tools (env / printenv).
 			ExcludeEnvVarNames:   ComputeAWFExcludeEnvVarNames(workflowData, llmProviderSecretNames(e.ResolveLLMProvider(workflowData))),
@@ -436,7 +436,7 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
           mkdir -p %s
           (umask 177 && touch %s)
           # Execute Claude Code CLI with prompt from file
-          %s | tee -a %s`, AgentCLIStartMsPath, AgentStepSummaryPath, logFile, constants.TmpGhAwAgentDir, claudeDebugLogFile, claudeCommand, logFile)
+          %s | tee -a %s`, AgentCLIStartMsPath, AgentStepSummaryPath, logFile, constants.TmpGhAwDir, claudeDebugLogFile, claudeCommand, logFile)
 }
 
 // buildClaudeCommandEnv builds the environment variable map for the Claude execution step.
@@ -471,6 +471,7 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 		maps.Copy(env, getGitIdentityEnvVars())
 	}
 	applyClaudeTimeoutEnvVars(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 	applySafeOutputEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	applyOptionalEngineToolTimeouts(env, workflowData)

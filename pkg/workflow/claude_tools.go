@@ -17,7 +17,7 @@ var claudeToolsLog = logger.New("workflow:claude_tools")
 const defaultClaudeTmpWritePath = "/tmp"
 
 // expandNeutralToolsToClaudeTools converts neutral tool names to Claude-specific tool configurations
-func (e *ClaudeEngine) expandNeutralToolsToClaudeTools(tools map[string]any) map[string]any {
+func (e *ClaudeEngine) expandNeutralToolsToClaudeTools(tools map[string]any) map[string]any { //nolint:largefunc // Existing neutral-tool expansion remains centralized.
 	claudeToolsLog.Printf("Starting neutral tools expansion: input_tools=%d", len(tools))
 	result := make(map[string]any)
 
@@ -80,15 +80,6 @@ func (e *ClaudeEngine) expandNeutralToolsToClaudeTools(tools map[string]any) map
 		// If edit tool has specific configuration, we could handle it here
 		// For now, treating it as enabling all edit capabilities
 		_ = editTool
-	}
-
-	// Handle playwright tool by converting it to an MCP tool configuration
-	if _, hasPlaywright := tools["playwright"]; hasPlaywright {
-		// Create playwright as an MCP tool with the same tools available as copilot agent
-		playwrightMCP := map[string]any{
-			"allowed": GetPlaywrightTools(),
-		}
-		result["playwright"] = playwrightMCP
 	}
 
 	claudeToolsLog.Printf("Expansion complete: result_tools=%d, claude_allowed=%d", len(result), len(claudeAllowed))
@@ -266,7 +257,7 @@ func appendDriveMemoryTools(allowedTools []string, config *DriveMemoryConfig) []
 	}
 	for _, drive := range config.Drives {
 		memoryDir := driveMemoryDirFor(drive.ID)
-		pattern := memoryDir + "/*"
+		pattern := memoryDir + "/*" //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Read(%s)", pattern))
 		if !drive.RestoreOnly {
 			allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Write(%s)", pattern))
@@ -284,7 +275,7 @@ func appendCacheMemoryTools(allowedTools []string, cacheMemoryConfig *CacheMemor
 	}
 	for _, cache := range cacheMemoryConfig.Caches {
 		cacheDir := cacheMemoryDirFor(cache.ID)
-		cacheDirPattern := cacheDir + "/*"
+		cacheDirPattern := cacheDir + "/*" //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Read(%s)", cacheDirPattern))
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Write(%s)", cacheDirPattern))
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Edit(%s)", cacheDirPattern))
@@ -325,7 +316,7 @@ func appendMCPToolPermissions(allowedTools []string, toolName string, toolValue 
 	if toolName == "github" {
 		return appendGitHubMCPTools(allowedTools, toolName, toolValue, mcpConfig)
 	}
-	if toolName == "playwright" || isCustomMCP {
+	if isCustomMCP {
 		return appendGenericMCPTools(allowedTools, toolName, mcpConfig)
 	}
 	return allowedTools
@@ -417,7 +408,7 @@ func normalizeSandboxWritablePattern(writablePath string) (string, bool) {
 	if strings.ContainsAny(path, "*?[]{}") {
 		return path, true
 	}
-	return strings.TrimRight(path, "/") + "/*", true
+	return strings.TrimRight(path, "/") + "/*", true //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
 }
 
 func appendSafeOutputsTools(allowedTools []string, safeOutputs *SafeOutputsConfig) []string {

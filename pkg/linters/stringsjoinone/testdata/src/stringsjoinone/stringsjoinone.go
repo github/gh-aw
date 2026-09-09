@@ -28,6 +28,11 @@ func joinOneSliced(a, b string) string {
 	return strings.Join([]string{a + b}, "")[1:] // want `strings\.Join called with a single-element slice`
 }
 
+// flagged: single-element []string literal with inline comment; fix suppressed to preserve comment.
+func joinOneWithComments(name string) string {
+	return strings.Join([]string{name /* display */}, ",") // want `strings\.Join called with a single-element slice`
+}
+
 // not flagged: two-element slice literal.
 func joinTwo(a, b string) string {
 	return strings.Join([]string{a, b}, ", ")

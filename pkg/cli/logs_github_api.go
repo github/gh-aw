@@ -16,12 +16,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -76,15 +78,15 @@ func buildCreatedFilter(startDate, endDate, beforeDate string) string {
 // call and returns the full detail slice together with the count of failed jobs.
 // It is the single source of truth for the jobs endpoint; fetchJobDetails and
 // fetchJobStatuses are thin wrappers that each return only the value they need.
-func fetchJobDetailsWithCounts(ctx context.Context, runID int64, verbose bool) ([]JobInfoWithDuration, int, error) {
+func fetchJobDetailsWithCounts(ctx context.Context, runID int64, outputDir string, verbose bool) ([]JobInfoWithDuration, int, error) {
 	logsGitHubAPILog.Printf("Fetching job details: runID=%d", runID)
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching job details for run %d", runID)))
 	}
 
 	output, err := workflow.RunGHCombinedContext(ctx, "Fetching job details...", "api",
-		fmt.Sprintf("repos/{owner}/{repo}/actions/runs/%d/jobs", runID),
-		"--jq", ".jobs[] | {name: .name, status: .status, conclusion: (.conclusion // \"\"), started_at: .started_at, completed_at: .completed_at, steps: ((.steps // []) | map({name: .name, status: .status, conclusion: (.conclusion // \"\")}))}")
+		fmt.Sprintf("repos/{owner}/{repo}/actions/runs/%d/jobs?per_page=100", runID),
+		"--paginate", "--slurp")
 	if err != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Failed to fetch job details for run %d: %v", runID, err)))
@@ -92,47 +94,257 @@ func fetchJobDetailsWithCounts(ctx context.Context, runID int64, verbose bool) (
 		return nil, 0, err
 	}
 
-	var jobs []JobInfoWithDuration
-	failedJobs := 0
-	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
-	for line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
+	jobs, failedJobs, err := parseJobsAPIResponses(output, runID, verbose)
+	if err != nil {
+		return nil, 0, err
+	}
 
-		var job JobInfo
-		if err := json.Unmarshal([]byte(line), &job); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Failed to parse job info: "+line))
-			}
-			continue
+	if outputDir != "" {
+		responsePath := filepath.Join(outputDir, jobsAPIResponseFileName)
+		if err := writeSensitiveFile(responsePath, output); err != nil {
+			return jobs, failedJobs, &jobDetailsCacheError{err: fmt.Errorf("failed to cache jobs API response: %w", err)}
 		}
-
-		jobWithDuration := JobInfoWithDuration{JobInfo: job}
-		if !job.StartedAt.IsZero() && !job.CompletedAt.IsZero() {
-			jobWithDuration.Duration = job.CompletedAt.Sub(job.StartedAt)
-		}
-		jobs = append(jobs, jobWithDuration)
-
-		if isFailureConclusion(job.Conclusion) {
-			failedJobs++
-			logsGitHubAPILog.Printf("Found failed job: name=%s, conclusion=%s", job.Name, job.Conclusion)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Found failed job '%s' with conclusion '%s'", job.Name, job.Conclusion)))
-			}
-		}
+		logsGitHubAPILog.Printf("Cached jobs API response: path=%s", responsePath)
 	}
 
 	logsGitHubAPILog.Printf("Job fetch complete: total=%d failed=%d", len(jobs), failedJobs)
 	return jobs, failedJobs, nil
 }
 
+func parseJobsAPIResponses(output []byte, runID int64, verbose bool) ([]JobInfoWithDuration, int, error) {
+	var rawResponses []json.RawMessage
+	if err := json.Unmarshal(output, &rawResponses); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse jobs API response: %w", err)
+	}
+
+	jobs := []JobInfoWithDuration{}
+	failedJobs := 0
+	for _, rawResponse := range rawResponses {
+		var response struct {
+			Jobs []json.RawMessage `json:"jobs"`
+		}
+		if err := json.Unmarshal(rawResponse, &response); err != nil {
+			logsGitHubAPILog.Printf("Skipping malformed jobs API page for run %d: %v", runID, err)
+			continue
+		}
+		for _, rawJob := range response.Jobs {
+			var job JobInfo
+			if err := json.Unmarshal(rawJob, &job); err != nil {
+				logsGitHubAPILog.Printf("Skipping malformed job in run %d: %v", runID, err)
+				continue
+			}
+			jobWithDuration := JobInfoWithDuration{JobInfo: job}
+			if !job.StartedAt.IsZero() && !job.CompletedAt.IsZero() {
+				jobWithDuration.Duration = job.CompletedAt.Sub(job.StartedAt)
+			}
+			jobs = append(jobs, jobWithDuration)
+			if isFailureConclusion(job.Conclusion) {
+				failedJobs++
+				logsGitHubAPILog.Printf("Found failed job: name=%s, conclusion=%s", job.Name, job.Conclusion)
+				if verbose {
+					fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Found failed job '%s' with conclusion '%s'", job.Name, job.Conclusion)))
+				}
+			}
+		}
+	}
+	return jobs, failedJobs, nil
+}
+
+type jobDetailsCacheError struct {
+	err error
+}
+
+func (e *jobDetailsCacheError) Error() string {
+	return e.err.Error()
+}
+
+func (e *jobDetailsCacheError) Unwrap() error {
+	return e.err
+}
+
+func writeSensitiveFile(path string, data []byte) (err error) {
+	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tempPath := file.Name()
+	closed := false
+	defer func() {
+		if !closed {
+			if closeErr := file.Close(); err == nil {
+				err = closeErr
+			}
+		}
+		if removeErr := os.Remove(tempPath); err == nil && removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			err = removeErr
+		}
+	}()
+	if err := file.Chmod(constants.FilePermSensitive); err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	closed = true
+	if err := os.Rename(tempPath, path); err != nil {
+		return err
+	}
+	return nil
+}
+
+type workflowRunAPIResponse struct {
+	ID           int64     `json:"id"`
+	RunNumber    int       `json:"run_number"`
+	RunAttempt   int       `json:"run_attempt"`
+	HTMLURL      string    `json:"html_url"`
+	Status       string    `json:"status"`
+	Conclusion   string    `json:"conclusion"`
+	Name         string    `json:"name"`
+	Path         string    `json:"path"`
+	CreatedAt    time.Time `json:"created_at"`
+	RunStartedAt time.Time `json:"run_started_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Event        string    `json:"event"`
+	HeadBranch   string    `json:"head_branch"`
+	HeadSHA      string    `json:"head_sha"`
+	DisplayTitle string    `json:"display_title"`
+	Actor        struct {
+		Login string `json:"login"`
+	} `json:"actor"`
+	Repository struct {
+		FullName string `json:"full_name"`
+	} `json:"repository"`
+}
+
+func parseWorkflowRunAPIResponse(data []byte) (WorkflowRun, error) {
+	var response workflowRunAPIResponse
+	if err := json.Unmarshal(data, &response); err != nil {
+		return WorkflowRun{}, fmt.Errorf("failed to parse workflow run API response: %w", err)
+	}
+	return WorkflowRun{
+		DatabaseID:   response.ID,
+		Number:       response.RunNumber,
+		URL:          response.HTMLURL,
+		Status:       response.Status,
+		Conclusion:   response.Conclusion,
+		WorkflowName: response.Name,
+		WorkflowPath: response.Path,
+		CreatedAt:    response.CreatedAt,
+		StartedAt:    response.RunStartedAt,
+		UpdatedAt:    response.UpdatedAt,
+		Event:        response.Event,
+		HeadBranch:   response.HeadBranch,
+		HeadSha:      response.HeadSHA,
+		DisplayTitle: response.DisplayTitle,
+		Attempt:      response.RunAttempt,
+		Repository:   response.Repository.FullName,
+		Actor:        response.Actor.Login,
+	}, nil
+}
+
+func applyWorkflowRunMetadata(run *WorkflowRun, metadata WorkflowRun) bool {
+	applied := applyNonZero(&run.DatabaseID, metadata.DatabaseID)
+	applied = applyNonZero(&run.Number, metadata.Number) || applied
+	applied = applyNonZero(&run.URL, metadata.URL) || applied
+	applied = applyNonZero(&run.Status, metadata.Status) || applied
+	applied = applyNonZero(&run.Conclusion, metadata.Conclusion) || applied
+	if !strings.HasPrefix(metadata.WorkflowName, constants.GithubDir) || run.WorkflowName == "" {
+		applied = applyNonZero(&run.WorkflowName, metadata.WorkflowName) || applied
+	}
+	applied = applyNonZero(&run.WorkflowPath, metadata.WorkflowPath) || applied
+	applied = applyNonZero(&run.CreatedAt, metadata.CreatedAt) || applied
+	applied = applyNonZero(&run.StartedAt, metadata.StartedAt) || applied
+	applied = applyNonZero(&run.UpdatedAt, metadata.UpdatedAt) || applied
+	applied = applyNonZero(&run.Event, metadata.Event) || applied
+	applied = applyNonZero(&run.HeadBranch, metadata.HeadBranch) || applied
+	applied = applyNonZero(&run.HeadSha, metadata.HeadSha) || applied
+	applied = applyNonZero(&run.DisplayTitle, metadata.DisplayTitle) || applied
+	applied = applyNonZero(&run.Attempt, metadata.Attempt) || applied
+	applied = applyNonZero(&run.Repository, metadata.Repository) || applied
+	applied = applyNonZero(&run.Actor, metadata.Actor) || applied
+	return applied
+}
+
+func applyNonZero[T comparable](target *T, value T) bool {
+	var zero T
+	if value == zero {
+		return false
+	}
+	changed := *target != value
+	*target = value
+	return changed
+}
+
+func fetchAndCacheWorkflowRunMetadata(ctx context.Context, currentRun WorkflowRun, outputDir, owner, repo, hostname string, verbose bool) (WorkflowRun, error) {
+	responsePath := filepath.Join(outputDir, runAPIResponseFileName)
+	if output, err := os.ReadFile(responsePath); err == nil {
+		if run, parseErr := parseWorkflowRunAPIResponse(output); parseErr == nil && cachedWorkflowRunMetadataIsCurrent(run, currentRun, owner, repo) {
+			return run, nil
+		}
+		logsGitHubAPILog.Printf("Ignoring invalid cached workflow run API response: path=%s", responsePath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return WorkflowRun{}, fmt.Errorf("failed to read cached workflow run API response: %w", err)
+	}
+
+	args := buildWorkflowRunAPIArgs(currentRun.DatabaseID, owner, repo, hostname)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Executing: gh "+strings.Join(args, " ")))
+	}
+	output, err := workflow.RunGHCombinedContext(ctx, "Fetching run metadata...", args...)
+	if err != nil {
+		return WorkflowRun{}, classifyWorkflowRunMetadataError(currentRun.DatabaseID, err, output)
+	}
+	run, err := parseWorkflowRunAPIResponse(output)
+	if err != nil {
+		return WorkflowRun{}, err
+	}
+	if err := writeSensitiveFile(responsePath, output); err != nil {
+		return WorkflowRun{}, fmt.Errorf("failed to cache workflow run API response: %w", err)
+	}
+	return run, nil
+}
+
+func workflowRunMetadataCacheNeedsRefresh(outputDir string, currentRun WorkflowRun, owner, repo string) (bool, error) {
+	output, err := os.ReadFile(filepath.Join(outputDir, runAPIResponseFileName))
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to read cached workflow run API response: %w", err)
+	}
+	cached, err := parseWorkflowRunAPIResponse(output)
+	return err != nil || !cachedWorkflowRunMetadataIsCurrent(cached, currentRun, owner, repo), nil
+}
+
+func cachedWorkflowRunMetadataIsCurrent(cached, current WorkflowRun, owner, repo string) bool {
+	if cached.DatabaseID != current.DatabaseID {
+		return false
+	}
+	if owner != "" && repo != "" && !strings.EqualFold(cached.Repository, filepath.Join(owner, repo)) {
+		return false
+	}
+	if current.Attempt > 0 && cached.Attempt != current.Attempt {
+		return false
+	}
+	if !current.UpdatedAt.IsZero() && cached.UpdatedAt.Before(current.UpdatedAt) {
+		return false
+	}
+	return cached.Status == "completed"
+}
+
 // fetchJobDetails gets detailed job information including durations for a workflow run.
 // Errors from the underlying API call are suppressed so that callers can continue
 // processing even when job data is unavailable (e.g. missing permissions).
-func fetchJobDetails(ctx context.Context, runID int64, verbose bool) ([]JobInfoWithDuration, error) {
-	jobs, _, err := fetchJobDetailsWithCounts(ctx, runID, verbose)
+func fetchJobDetails(ctx context.Context, runID int64, outputDir string, verbose bool) ([]JobInfoWithDuration, error) {
+	jobs, _, err := fetchJobDetailsWithCounts(ctx, runID, outputDir, verbose)
 	if err != nil {
+		var cacheErr *jobDetailsCacheError
+		if errors.As(err, &cacheErr) {
+			return jobs, err
+		}
 		// Don't fail the entire operation if we can't get job info
 		return nil, nil
 	}
@@ -143,7 +355,7 @@ func fetchJobDetails(ctx context.Context, runID int64, verbose bool) ([]JobInfoW
 // Errors from the underlying API call are suppressed so that callers can continue
 // processing even when job data is unavailable (e.g. missing permissions).
 func fetchJobStatuses(ctx context.Context, runID int64, verbose bool) (int, error) {
-	_, failedJobs, err := fetchJobDetailsWithCounts(ctx, runID, verbose)
+	_, failedJobs, err := fetchJobDetailsWithCounts(ctx, runID, "", verbose)
 	if err != nil {
 		// Don't fail the entire operation if we can't get job info
 		return 0, nil
@@ -189,7 +401,7 @@ type ListWorkflowRunsOptions struct {
 // not the total number of matching runs the user wants to find.
 //
 // The processedCount and targetCount parameters are used to display progress in the spinner message.
-func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun, int, error) {
+func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun, int, error) { //nolint:largefunc // Existing run listing keeps pagination, error classification, and filtering together.
 	logsGitHubAPILog.Printf("Listing workflow runs: workflow=%s, limit=%d, startDate=%s, endDate=%s, ref=%s", opts.WorkflowName, opts.Limit, opts.StartDate, opts.EndDate, opts.Ref)
 	args := []string{"run", "list", "--json", "databaseId,number,url,status,conclusion,workflowName,createdAt,startedAt,updatedAt,event,headBranch,headSha,displayTitle"}
 

@@ -284,6 +284,23 @@ describe("sanitize_content.cjs", () => {
       expect(result).toBe("Hello @user1 and @user2 and `@other`");
     });
 
+    it("should apply max only to allowed aliases present in the message", () => {
+      const allowedAliases = Array.from({ length: 10 }, (_, i) => `user${i}`);
+      const result = sanitizeContent("Hello @user7, @user8, and @user9", {
+        allowedAliases,
+        maxMentions: 3,
+      });
+      expect(result).toBe("Hello @user7, @user8, and @user9");
+    });
+
+    it("should neutralize additional distinct allowed aliases after max is reached", () => {
+      const result = sanitizeContent("@user1 @other @user2 @user3 @user1", {
+        allowedAliases: ["user1", "user2", "user3"],
+        maxMentions: 2,
+      });
+      expect(result).toBe("@user1 `@other` @user2 `@user3` @user1");
+    });
+
     it("should work with options object containing both maxLength and allowedAliases", () => {
       const result = sanitizeContent("Hello @author and @other", {
         maxLength: 524288,

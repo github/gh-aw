@@ -179,6 +179,11 @@ func (c *Compiler) IncrementWarningCount() {
 	c.warningCount++
 }
 
+// SetConfiguredModelValidator configures optional validation against an external active model inventory.
+func (c *Compiler) SetConfiguredModelValidator(validator func(data *WorkflowData) []string) {
+	c.configuredModelValidator = validator
+}
+
 // GetWarningCount returns the current warning count
 func (c *Compiler) GetWarningCount() int {
 	return c.warningCount

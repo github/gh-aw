@@ -45,6 +45,10 @@ evals:
     question: Did the agent post a security review comment or finding on the pull request?
   - id: findings_specific
     question: Does the agent output describe specific, concrete security concerns tied to the pull request changes rather than generic advice?
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 ---
 
 # Security Review Agent 🔒

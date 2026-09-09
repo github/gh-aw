@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,6 +19,7 @@ const mcpGatewayCustomEnvNamesVar = "GH_AW_MCP_GATEWAY_CUSTOM_ENV_NAMES"
 const mcpGatewayCustomEnvTransportPrefix = "GH_AW_MCP_GATEWAY_ENV_"
 const mcpGatewayReservedEnvPrefix = "GH_AW_MCP_GATEWAY_"
 const mcpGatewayCustomEnvMarker = "__GH_AW_MCP_GATEWAY_CUSTOM_ENV__"
+const mcpGatewayConfiguredAgentIDVar = "GH_AW_MCP_GATEWAY_CONFIGURED_AGENT_ID"
 
 var optionalPRHeadEnvVars = []string{
 	"GH_AW_PR_HEAD_BASE_BRANCH",
@@ -28,7 +30,7 @@ var optionalPRHeadEnvVars = []string{
 	"GH_AW_PR_HEAD_REPO",
 }
 
-func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpTools []string, engine CodingAgentEngine, workflowData *WorkflowData, hasAgenticWorkflows bool, safeOutputsInputEnvVars map[string]string) error {
+func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpTools []string, engine CodingAgentEngine, workflowData *WorkflowData, hasAgenticWorkflows bool, safeOutputsInputEnvVars map[string]string) error { //nolint:largefunc // Existing setup generation preserves emitted step ordering.
 	// If the engine provides an MCP config-adapter script (e.g. Goose), write it to disk
 	// before starting the gateway so that start_mcp_gateway.cjs can execute it once the
 	// gateway has produced its output configuration.
@@ -45,10 +47,16 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	ensureDefaultMCPGatewayConfig(workflowData)
 	gatewayConfig := workflowData.SandboxConfig.MCP
 	mcpEnvVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
+	if auth, ok := jiraAuthConfig(tools); ok && auth["type"] == jiraAPITokenAuth {
+		mcpEnvVars[jiraBasicAuthEnvVar] = ""
+	}
+	stepEnvVars := maps.Clone(mcpEnvVars)
+	maps.Copy(stepEnvVars, jiraAPIAuthStepEnv(tools))
 	customGatewayEnvNames := sanitizedGatewayEnvNames(gatewayConfig.Env)
-	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, mcpEnvVars, safeOutputsInputEnvVars, gatewayConfig.Env, customGatewayEnvNames)
+	writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml, stepEnvVars, safeOutputsInputEnvVars, gatewayConfig.Env, customGatewayEnvNames, gatewayConfig.AgentID)
 	yaml.WriteString("        run: |\n")
 	yaml.WriteString("          set -eo pipefail\n")
+	writeJiraAPIAuthPreparation(yaml, tools)
 	yaml.WriteString("          mkdir -p \"${RUNNER_TEMP}/gh-aw/mcp-config\"\n")
 	yaml.WriteString("          if [ -n \"${GITHUB_EVENT_PATH:-}\" ] && [ -r \"${GITHUB_EVENT_PATH}\" ]; then\n")
 	yaml.WriteString("            GH_AW_SAFEOUTPUTS_EVENT_PATH=\"${RUNNER_TEMP}/gh-aw/safeoutputs/github_event.json\"\n")
@@ -62,7 +70,7 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	port, domain, payloadDir, payloadPathPrefix, payloadSizeThreshold := resolveMCPGatewayValues(workflowData, gatewayConfig)
 	githubToolRaw, hasGitHub := tools["github"]
 	githubTool, _ := githubToolRaw.(map[string]any)
-	writeMCPGatewayExports(yaml, writeMCPGatewayExportsOptions{
+	if err := writeMCPGatewayExports(yaml, writeMCPGatewayExportsOptions{
 		engine:               engine,
 		workflowData:         workflowData,
 		gatewayConfig:        gatewayConfig,
@@ -74,7 +82,9 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 		payloadDir:           payloadDir,
 		payloadPathPrefix:    payloadPathPrefix,
 		payloadSizeThreshold: payloadSizeThreshold,
-	})
+	}); err != nil {
+		return err
+	}
 	containerCmd := buildMCPGatewayContainerCommand(buildMCPGatewayContainerCommandOptions{
 		engine:                  engine,
 		workflowData:            workflowData,
@@ -101,8 +111,8 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 	return engine.RenderMCPConfig(yaml, tools, mcpTools, workflowData)
 }
 
-func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpEnvVars map[string]string, safeOutputsInputEnvVars map[string]string, gatewayEnvVars map[string]string, customEnvVarNames []string) {
-	if len(mcpEnvVars) == 0 && len(safeOutputsInputEnvVars) == 0 && len(customEnvVarNames) == 0 {
+func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpEnvVars map[string]string, safeOutputsInputEnvVars map[string]string, gatewayEnvVars map[string]string, customEnvVarNames []string, configuredAgentID string) {
+	if len(mcpEnvVars) == 0 && len(safeOutputsInputEnvVars) == 0 && len(customEnvVarNames) == 0 && configuredAgentID == "" {
 		return
 	}
 	yaml.WriteString("        env:\n")
@@ -147,6 +157,9 @@ func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpE
 		for i, envVarName := range customEnvVarNames {
 			yaml.WriteString(formatYAMLEnv("          ", mcpGatewayCustomEnvTransportName(i), gatewayEnvVars[envVarName]))
 		}
+	}
+	if configuredAgentID != "" {
+		yaml.WriteString(formatYAMLEnv("          ", mcpGatewayConfiguredAgentIDVar, configuredAgentID))
 	}
 }
 
@@ -231,7 +244,7 @@ type writeMCPGatewayExportsOptions struct {
 	payloadSizeThreshold int
 }
 
-func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOptions) {
+func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOptions) error { //nolint:largefunc // Existing export generation keeps related runtime variables together.
 	engine := opts.engine
 	workflowData := opts.workflowData
 	gatewayConfig := opts.gatewayConfig
@@ -267,13 +280,13 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 		hostDomain = "localhost"
 	}
 	yaml.WriteString("          export MCP_GATEWAY_HOST_DOMAIN=\"" + hostDomain + "\"\n")
-	if gatewayConfig.APIKey == "" {
-		yaml.WriteString("          MCP_GATEWAY_API_KEY=$(openssl rand -base64 45 | tr -d '/+=')\n")
-		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
-		yaml.WriteString("          export MCP_GATEWAY_API_KEY\n")
+	if gatewayConfig.AgentID == "" {
+		yaml.WriteString("          MCP_GATEWAY_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')\n")
+		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_AGENT_ID}\"\n")
+		yaml.WriteString("          export MCP_GATEWAY_AGENT_ID\n")
 	} else {
-		yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + gatewayConfig.APIKey + "\"\n")
-		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
+		yaml.WriteString("          export MCP_GATEWAY_AGENT_ID=\"${" + mcpGatewayConfiguredAgentIDVar + "}\"\n")
+		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_AGENT_ID}\"\n")
 	}
 	yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_DIR=\"" + payloadDir + "\"\n")
 	yaml.WriteString("          mkdir -p \"${MCP_GATEWAY_PAYLOAD_DIR}\"\n")
@@ -298,18 +311,78 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 		yaml.WriteString("          export AWF_ENCLAVE_MCP_GATEWAY_CONTAINER=\"awmg-mcpg\"\n")
 		yaml.WriteString("          export AWF_ENCLAVE_MCP_GATEWAY_ENDPOINT=\"http://localhost:${MCP_GATEWAY_PORT}/mcp/awf-enclave\"\n")
 		yaml.WriteString("          export AWF_ENCLAVE_MCP_READINESS_TIMEOUT_MS=\"120000\"\n")
+		if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+			yaml.WriteString("          AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY=$(openssl rand -hex 32)\n")
+			yaml.WriteString("          echo \"::add-mask::${AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY}\"\n")
+			yaml.WriteString("          export AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY\n")
+			// mcpg's github-repository-delegation-v1 controller is bootstrapped as one
+			// atomic configuration: envelope, control key, state path, generation, and a
+			// control listener bound separately from the executor-facing data plane.
+			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_CONTROL_KEY=\"${AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY}\"\n")
+			yaml.WriteString("          mkdir -p \"" + enclaveDelegationStateDir + "\"\n")
+			yaml.WriteString("          chmod 700 \"" + enclaveDelegationStateDir + "\"\n")
+			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_STATE_PATH=\"" + enclaveDelegationStateDir + "/state.json\"\n")
+			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_GENERATION=\"" + enclaveDelegationGeneration + "\"\n")
+			// The in-container listener must bind to a bridge-reachable address in
+			// bridge (network-isolation) mode: Docker's -p publish NATs the host port
+			// to the container's bridge IP, which cannot reach a listener bound to the
+			// container's own 127.0.0.1. In --network host mode the container shares
+			// the host's network namespace, so 127.0.0.1 works directly and is kept
+			// tightest-scoped. The host-side publication (see buildMCPGatewayContainerCommand)
+			// stays on 127.0.0.1 either way, so the control port is never reachable from
+			// outside the host regardless of the in-container bind address. Note this
+			// says nothing about container-to-container reachability: in bridge mode a
+			// peer co-attached to a network mcpg joins can dial this 0.0.0.0 listener on
+			// the container IP directly. The capability is what guards the control API;
+			// see the -p comment in buildMCPGatewayContainerCommand and github/gh-aw#59268.
+			controlListenHost := "127.0.0.1"
+			if isAWFNetworkIsolationEnabled(workflowData) {
+				controlListenHost = "0.0.0.0"
+			}
+			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_CONTROL_LISTEN=\"" + controlListenHost + ":" + strconv.Itoa(port+enclaveDelegationControlPortOffset) + "\"\n")
+			if dynamicEnclave := enclaveDynamicRepositoryPolicyConfig(workflowData); dynamicEnclave != nil {
+				expiryScript, err := buildDynamicEnclaveExpiryScript(workflowData, dynamicEnclave)
+				if err != nil {
+					return err
+				}
+				yaml.WriteString(expiryScript)
+				envelopeJSON, err := json.Marshal(buildMCPGatewayDelegationEnvelope(dynamicEnclave))
+				if err != nil {
+					return fmt.Errorf("failed to marshal MCP gateway delegation envelope: %w", err)
+				}
+				yaml.WriteString("          export MCP_GATEWAY_DELEGATION_ENVELOPE=" + shellEscapeArgWithVarsPreserved(string(envelopeJSON), enclaveDelegationExpiresAtEnv, "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT") + "\n")
+			}
+			// AWF-only private handoff: the control endpoint is never published to the
+			// primary-agent network, the enclave executor network, or the general MCP
+			// route, and is kept out of the primary agent's environment via --exclude-env.
+			// The pinned mcpg controller serves control operations under the fixed
+			// enclaveDelegationControlAPIBasePath, not a path keyed by controller name.
+			fmt.Fprintf(yaml, "          export AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_ENDPOINT=\"http://127.0.0.1:%d%s/%s\"\n", port+enclaveDelegationControlPortOffset, enclaveDelegationControlAPIBasePath, enclaveDynamicController)
+		}
+		if enclaveGitHubIssuesEnabled(workflowData) {
+			yaml.WriteString("          AWF_ENCLAVE_GITHUB_MCP_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')\n")
+			yaml.WriteString("          echo \"::add-mask::${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}\"\n")
+			yaml.WriteString("          export AWF_ENCLAVE_GITHUB_MCP_AGENT_ID\n")
+		}
 		yaml.WriteString("          # The eager checker runs inside start_mcp_gateway.cjs in this step.\n")
 		fmt.Fprintf(yaml, "          export %s=%q\n", enclaveMCPDeferredServersEnv, enclaveMCPServerName)
 		// Masked values may be suppressed as GitHub Actions step outputs. Enclave host setup
-		// therefore carries the gateway key through the same GITHUB_ENV channel as its other
+		// therefore carries the gateway agent ID through the same GITHUB_ENV channel as its other
 		// AWF-only handoffs; --exclude-env keeps it out of the primary agent.
 		yaml.WriteString("          {\n")
-		yaml.WriteString("            printf '%s=%s\\n' MCP_GATEWAY_API_KEY \"$MCP_GATEWAY_API_KEY\"\n")
+		yaml.WriteString("            printf '%s=%s\\n' MCP_GATEWAY_AGENT_ID \"$MCP_GATEWAY_AGENT_ID\"\n")
 		yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_MCP_CAPABILITY \"$AWF_ENCLAVE_MCP_CAPABILITY\"\n")
 		yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_MCP_GATEWAY_IDENTITY \"$AWF_ENCLAVE_MCP_GATEWAY_IDENTITY\"\n")
 		yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_MCP_GATEWAY_CONTAINER \"$AWF_ENCLAVE_MCP_GATEWAY_CONTAINER\"\n")
 		yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_MCP_GATEWAY_ENDPOINT \"$AWF_ENCLAVE_MCP_GATEWAY_ENDPOINT\"\n")
 		yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_MCP_READINESS_TIMEOUT_MS \"$AWF_ENCLAVE_MCP_READINESS_TIMEOUT_MS\"\n")
+		if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+			yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY \"$AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_CAPABILITY\"\n")
+			yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_ENDPOINT \"$AWF_ENCLAVE_GITHUB_DELEGATION_CONTROL_ENDPOINT\"\n")
+		}
+		if enclaveGitHubIssuesEnabled(workflowData) {
+			yaml.WriteString("            printf '%s=%s\\n' AWF_ENCLAVE_GITHUB_MCP_AGENT_ID \"$AWF_ENCLAVE_GITHUB_MCP_AGENT_ID\"\n")
+		}
 		yaml.WriteString("          } >> \"$GITHUB_ENV\"\n")
 	}
 	yaml.WriteString("          export DEBUG=\"*\"\n")
@@ -330,6 +403,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 	if hasGitHub && getGitHubType(githubTool) == GitHubMCPModeRemote && engine.GetID() == "copilot" {
 		yaml.WriteString("          export GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_MCP_SERVER_TOKEN\"\n")
 	}
+	return nil
 }
 
 // buildMCPGatewayContainerCommandOptions holds configuration for buildMCPGatewayContainerCommand.
@@ -347,7 +421,7 @@ type buildMCPGatewayContainerCommandOptions struct {
 	customGatewayEnvNames   []string
 }
 
-func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions) string {
+func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions) string { //nolint:largefunc // Existing docker command assembly keeps flag ordering stable.
 	engine := opts.engine
 	workflowData := opts.workflowData
 	gatewayConfig := opts.gatewayConfig
@@ -363,7 +437,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	if gatewayConfig.Version != "" {
 		containerImage += ":" + gatewayConfig.Version
 	} else {
-		containerImage += ":" + string(constants.DefaultMCPGatewayVersion)
+		containerImage += ":" + effectiveMCPGatewayVersion(workflowData)
 	}
 	// Apply container_pins mapping from aw.json so the runtime docker run command
 	// targets the redirected registry (e.g. an internal mirror) rather than the
@@ -385,6 +459,31 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 			// Publish the gateway port to the host so host-side clients (e.g. Gemini CLI)
 			// can reach the gateway at localhost:${MCP_GATEWAY_PORT}.
 			containerCmd.WriteString(" -p 127.0.0.1:${MCP_GATEWAY_PORT}:${MCP_GATEWAY_PORT}")
+		}
+		if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+			// Unlike the data plane above, this -p flag always publishes to the host's
+			// 127.0.0.1, never 0.0.0.0, so the control port is not reachable from
+			// outside the runner and AWF reaches it over host loopback.
+			//
+			// This publication scope is deliberately NOT relied on as a
+			// container-to-container isolation boundary, and must not be described as
+			// one. The in-container bind address (the right-hand side of
+			// MCP_GATEWAY_DELEGATION_CONTROL_LISTEN, set in writeMCPGatewayExports) is
+			// 0.0.0.0 in bridge mode because Docker NATs a published port to the
+			// container's bridge IP and a container-local 127.0.0.1 bind would be
+			// unreachable. A peer co-attached to any network mcpg joins can therefore
+			// address the container IP and this port directly, without traversing the
+			// published host port -- co-attachment, not publication scope, determines
+			// container-to-container reachability.
+			//
+			// The enforced control on this listener is authentication, by design (see
+			// github/gh-aw#59268): every request must present the 256-bit AWF-only
+			// capability minted in writeMCPGatewayExports, which is never placed in any
+			// primary-agent, enclave-executor, or model-sidecar environment or mount.
+			// mcpg verifies it in constant time against a stored SHA-256 digest, before
+			// any control routing, on a handler kept separate from the executor-facing
+			// data plane, so a valid executor bearer cannot reach control operations.
+			containerCmd.WriteString(" -p 127.0.0.1:${MCP_GATEWAY_DELEGATION_CONTROL_LISTEN#*:}:${MCP_GATEWAY_DELEGATION_CONTROL_LISTEN#*:}")
 		}
 	} else {
 		containerCmd.WriteString(" --network host")
@@ -413,6 +512,11 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	if payloadDir != "" {
 		containerCmd.WriteString(" -v " + payloadDir + ":" + payloadDir + ":rw")
 	}
+	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+		// Protected, persistent mount for mcpg delegation controller state so that it
+		// survives an in-run restart; restricted to owner-only permissions on the host.
+		containerCmd.WriteString(" -v " + enclaveDelegationStateDir + ":" + enclaveDelegationStateDir + ":rw")
+	}
 	for _, mount := range gatewayConfig.Mounts {
 		containerCmd.WriteString(" -v " + mount)
 	}
@@ -432,7 +536,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPrefix string) {
 	containerCmd.WriteString(" -e MCP_GATEWAY_PORT")
 	containerCmd.WriteString(" -e MCP_GATEWAY_DOMAIN")
-	containerCmd.WriteString(" -e MCP_GATEWAY_API_KEY")
+	containerCmd.WriteString(" -e MCP_GATEWAY_AGENT_ID")
 	containerCmd.WriteString(" -e MCP_GATEWAY_PAYLOAD_DIR")
 	if payloadPathPrefix != "" {
 		containerCmd.WriteString(" -e MCP_GATEWAY_PAYLOAD_PATH_PREFIX")
@@ -652,6 +756,13 @@ func appendMCPGatewayConditionalEnvFlags(containerCmd *strings.Builder, workflow
 	if enclavesEnabled(workflowData) {
 		containerCmd.WriteString(" -e " + enclaveMCPCapabilityEnv)
 	}
+	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+		containerCmd.WriteString(" -e MCP_GATEWAY_DELEGATION_ENVELOPE")
+		containerCmd.WriteString(" -e MCP_GATEWAY_DELEGATION_CONTROL_KEY")
+		containerCmd.WriteString(" -e MCP_GATEWAY_DELEGATION_STATE_PATH")
+		containerCmd.WriteString(" -e MCP_GATEWAY_DELEGATION_GENERATION")
+		containerCmd.WriteString(" -e MCP_GATEWAY_DELEGATION_CONTROL_LISTEN")
+	}
 	if hasGitHub && getGitHubType(githubTool) == GitHubMCPModeRemote && engine.GetID() == "copilot" {
 		containerCmd.WriteString(" -e GITHUB_PERSONAL_ACCESS_TOKEN")
 	}
@@ -713,7 +824,7 @@ func appendMCPGatewayCustomAndHTTPEnvFlagsWithCustomGatewayEnvNames(containerCmd
 func buildAddedGatewayEnvVarSet(workflowData *WorkflowData, customGatewayEnvNames []string, hasGitHub bool, githubTool map[string]any, tools map[string]any, engine CodingAgentEngine) map[string]struct{} {
 	addedEnvVars := make(map[string]struct{})
 	standardEnvVars := []string{
-		"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_API_KEY", "MCP_GATEWAY_PAYLOAD_DIR", "DEBUG",
+		"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_AGENT_ID", "MCP_GATEWAY_PAYLOAD_DIR", "DEBUG",
 		"MCP_GATEWAY_LOG_DIR", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS",
 		"GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH", compilerenv.PolicyAllowCreatePullRequest,
 		"GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_ASSETS_ALLOWED_EXTS",

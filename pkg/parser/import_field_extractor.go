@@ -39,6 +39,7 @@ type importAccumulator struct {
 	observabilityConfigs       []string          // observability config JSON blobs from all imports (merged into endpoint array)
 	engines                    []string
 	plugins                    []string
+	pluginObjects              []map[string]any
 	safeOutputs                []string
 	gradersBuilder             strings.Builder
 	mcpScripts                 []string
@@ -92,6 +93,8 @@ type importAccumulator struct {
 	mergedMaxTurnCacheMisses string
 	mergedMaxAICredits       string
 	mergedMaxDailyAICredits  string
+	mergedConcurrency        string
+	mergedJobDiscriminator   string
 	// Union of excluded-env lists from all imported files (deduplicated).
 	excludedEnv    []string
 	excludedEnvSet map[string]bool
@@ -127,6 +130,10 @@ func newImportAccumulator() *importAccumulator {
 // skip-roles, skip-bots, pre-steps, pre-agent-steps, post-steps, labels, cache, and features.
 // The work is delegated to focused helper methods, each handling one logical phase.
 func (acc *importAccumulator) extractAllImportFields(content []byte, item importQueueItem, visited map[string]struct{}) error {
+	return acc.extractImportFields(content, item, visited, true)
+}
+
+func (acc *importAccumulator) extractImportFields(content []byte, item importQueueItem, visited map[string]struct{}, includeOrderedSteps bool) error {
 	parserLog.Printf("Extracting all import fields: path=%s, section=%s, inputs=%d, content_size=%d bytes", item.fullPath, item.sectionName, len(item.inputs), len(content))
 
 	// Phase 1: Parse, apply defaults, substitute inputs, extract tools and markdown.
@@ -160,6 +167,10 @@ func (acc *importAccumulator) extractAllImportFields(content []byte, item import
 
 	// Phase 7: Extract feature flags, model aliases, run-install-scripts, and observability.
 	acc.extractFeatureAndObservabilityFields(fm, item.fullPath)
+
+	if includeOrderedSteps {
+		acc.extractOrderedStepFields(fm)
+	}
 
 	return nil
 }
@@ -396,6 +407,8 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-turn-cache-misses", &acc.mergedMaxTurnCacheMisses)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-ai-credits", &acc.mergedMaxAICredits)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-daily-ai-credits", &acc.mergedMaxDailyAICredits)
+	acc.extractConcurrencyInImport(fm, fullPath)
+	acc.extractConcurrencyJobDiscriminator(fm, fullPath)
 	if acc.metadataDocs == "" {
 		if metadata, ok := fm["metadata"].(map[string]any); ok {
 			if docs, ok := metadata["docs"].(string); ok {
@@ -405,11 +418,10 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	}
 
 	acc.appendJSONBuilderField(fm, "mcp-servers", "{}", &acc.mcpServersBuilder)
-	acc.plugins = append(acc.plugins, parseStringSliceField(fm["plugins"], false)...)
+	acc.extractPlugins(fm)
 	acc.appendJSONSliceField(fm, "safe-outputs", "{}", &acc.safeOutputs)
 	acc.appendJSONBuilderField(fm, "graders", "{}", &acc.gradersBuilder)
 	acc.appendJSONSliceField(fm, "mcp-scripts", "{}", &acc.mcpScripts)
-	acc.appendYAMLBuilderField(fm, "steps", &acc.stepsBuilder)
 	acc.appendJSONBuilderField(fm, "runtimes", "{}", &acc.runtimesBuilder)
 	acc.appendYAMLBuilderField(fm, "services", &acc.servicesBuilder)
 	acc.appendJSONBuilderField(fm, "network", "{}", &acc.networkBuilder)
@@ -417,6 +429,65 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.mergeSandboxAgentRuntimeInstall(fm)
 	acc.appendJSONBuilderField(fm, "permissions", "{}", &acc.permissionsBuilder)
 	acc.appendJSONBuilderField(fm, "secret-masking", "{}", &acc.secretMaskingBuilder)
+}
+
+func (acc *importAccumulator) extractConcurrencyInImport(fm map[string]any, fullPath string) {
+	if acc.mergedConcurrency != "" {
+		return
+	}
+	concurrencyValue, ok := fm["concurrency"]
+	if !ok {
+		return
+	}
+	if group, ok := concurrencyValue.(string); ok && strings.TrimSpace(group) != "" {
+		groupJSON := mustMarshalJSON(group)
+		if len(groupJSON) == 0 {
+			parserLog.Printf("Skipping invalid concurrency.group from import: %s", fullPath)
+			return
+		}
+		acc.mergedConcurrency = string(groupJSON)
+		parserLog.Printf("Extracted concurrency.group from import: %s", fullPath)
+		return
+	}
+	concurrencyMap, ok := concurrencyValue.(map[string]any)
+	if !ok {
+		return
+	}
+	groupValue, ok := concurrencyMap["group"].(string)
+	if !ok || strings.TrimSpace(groupValue) == "" {
+		return
+	}
+	groupJSON := mustMarshalJSON(map[string]any{"group": groupValue})
+	if len(groupJSON) == 0 {
+		parserLog.Printf("Skipping invalid concurrency.group from import: %s", fullPath)
+		return
+	}
+	acc.mergedConcurrency = string(groupJSON)
+	parserLog.Printf("Extracted concurrency.group from import: %s", fullPath)
+}
+
+func (acc *importAccumulator) extractConcurrencyJobDiscriminator(fm map[string]any, fullPath string) {
+	if acc.mergedJobDiscriminator != "" {
+		return
+	}
+	concurrency, ok := fm["concurrency"].(map[string]any)
+	if !ok {
+		return
+	}
+	discriminator, ok := concurrency["job-discriminator"].(string)
+	if !ok || discriminator == "" {
+		return
+	}
+	acc.mergedJobDiscriminator = discriminator
+	parserLog.Printf("Extracted concurrency.job-discriminator from import: %s", fullPath)
+}
+
+func mustMarshalJSON(v any) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 
 func (acc *importAccumulator) mergeSandboxAgentMounts(fm map[string]any) {
@@ -560,16 +631,20 @@ func (acc *importAccumulator) extractActivationFields(fm map[string]any, item im
 
 func (acc *importAccumulator) mergeBots(fm map[string]any) {
 	mergeJSONStringListField(fm, "bots", "[]", acc.botsSet, &acc.bots, func(m map[string]any, field string) (string, error) {
-		return extractFieldJSONFromMap(m, field, "[]")
+		return extractOnSectionFieldFromMap(m, field)
 	})
 }
 
 func (acc *importAccumulator) mergeSkipRoles(fm map[string]any) {
-	mergeJSONStringListField(fm, "skip-roles", "[]", acc.skipRolesSet, &acc.skipRoles, extractOnSectionFieldFromMap)
+	mergeJSONStringListField(fm, "skip-roles", "[]", acc.skipRolesSet, &acc.skipRoles, func(m map[string]any, field string) (string, error) {
+		return extractOnSectionFieldFromMap(m, field)
+	})
 }
 
 func (acc *importAccumulator) mergeSkipBots(fm map[string]any) {
-	mergeJSONStringListField(fm, "skip-bots", "[]", acc.skipBotsSet, &acc.skipBots, extractOnSectionFieldFromMap)
+	mergeJSONStringListField(fm, "skip-bots", "[]", acc.skipBotsSet, &acc.skipBots, func(m map[string]any, field string) (string, error) {
+		return extractOnSectionFieldFromMap(m, field)
+	})
 }
 
 func (acc *importAccumulator) mergeAmbientFolders(fm map[string]any) {
@@ -671,16 +746,6 @@ func (acc *importAccumulator) extractStepAndJobFields(fm map[string]any, importP
 		acc.preStepsBuilder.WriteString(preStepsContent + "\n")
 	}
 
-	// Extract pre-agent-steps (prepend in order).
-	if preAgentStepsContent, err := extractYAMLFieldFromMap(fm, "pre-agent-steps"); err == nil && preAgentStepsContent != "" {
-		acc.preAgentStepsBuilder.WriteString(preAgentStepsContent + "\n")
-	}
-
-	// Extract post-steps (append in order).
-	if postStepsContent, err := extractYAMLFieldFromMap(fm, "post-steps"); err == nil && postStepsContent != "" {
-		acc.postStepsBuilder.WriteString(postStepsContent + "\n")
-	}
-
 	// Extract jobs (append in order; merged into custom jobs map).
 	if jobsContent, err := extractFieldJSONFromMap(fm, "jobs", "{}"); err == nil && jobsContent != "" && jobsContent != "{}" {
 		acc.jobsBuilder.WriteString(jobsContent + "\n")
@@ -703,6 +768,16 @@ func (acc *importAccumulator) extractStepAndJobFields(fm map[string]any, importP
 	}
 
 	return nil
+}
+
+func (acc *importAccumulator) extractOrderedStepFields(fm map[string]any) {
+	acc.appendYAMLBuilderField(fm, "steps", &acc.stepsBuilder)
+	if preAgentStepsContent, err := extractYAMLFieldFromMap(fm, "pre-agent-steps"); err == nil && preAgentStepsContent != "" {
+		acc.preAgentStepsBuilder.WriteString(preAgentStepsContent + "\n")
+	}
+	if postStepsContent, err := extractYAMLFieldFromMap(fm, "post-steps"); err == nil && postStepsContent != "" {
+		acc.postStepsBuilder.WriteString(postStepsContent + "\n")
+	}
 }
 
 // extractFeatureAndObservabilityFields extracts labels, cache, feature flags, model
@@ -887,6 +962,7 @@ func parseStringSliceField(value any, keepEmpty bool) []string {
 	if !ok {
 		return nil
 	}
+
 	result := make([]string, 0, len(values))
 	for _, v := range values {
 		if s, ok := v.(string); ok {
@@ -900,6 +976,23 @@ func parseStringSliceField(value any, keepEmpty bool) []string {
 		return nil
 	}
 	return result
+}
+
+func (acc *importAccumulator) extractPlugins(fm map[string]any) {
+	values, ok := fm["plugins"].([]any)
+	if !ok {
+		return
+	}
+	for _, value := range values {
+		switch typed := value.(type) {
+		case string:
+			if typed != "" {
+				acc.plugins = append(acc.plugins, typed)
+			}
+		case map[string]any:
+			acc.pluginObjects = append(acc.pluginObjects, typed)
+		}
+	}
 }
 
 func isModelPolicyKey(key string) bool {
@@ -968,6 +1061,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedMCPServers:                 acc.mcpServersBuilder.String(),
 		MergedEngines:                    acc.engines,
 		MergedPlugins:                    acc.plugins,
+		MergedPluginObjects:              acc.pluginObjects,
 		MergedSafeOutputs:                acc.safeOutputs,
 		MergedGraders:                    acc.gradersBuilder.String(),
 		MergedMCPScripts:                 acc.mcpScripts,
@@ -1029,6 +1123,8 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedMaxTurnCacheMisses = acc.mergedMaxTurnCacheMisses
 	result.MergedMaxAICredits = acc.mergedMaxAICredits
 	result.MergedMaxDailyAICredits = acc.mergedMaxDailyAICredits
+	result.MergedConcurrency = acc.mergedConcurrency
+	result.MergedJobDiscriminator = acc.mergedJobDiscriminator
 	result.MergedExcludedEnv = acc.excludedEnv
 }
 

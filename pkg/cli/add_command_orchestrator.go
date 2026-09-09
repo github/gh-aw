@@ -28,6 +28,7 @@ type AddWorkflowsResult struct {
 // with optional repository installation and PR creation.
 // Returns AddWorkflowsResult containing PR number (if created) and other metadata.
 func AddWorkflows(ctx context.Context, workflows []string, opts AddOptions) (*AddWorkflowsResult, error) {
+	addLog.Printf("Resolving %d workflow reference(s) before add", len(workflows))
 	// Resolve workflows first - fetches content directly from GitHub
 	resolved, err := ResolveWorkflows(ctx, workflows, opts.Verbose)
 	if err != nil {
@@ -187,6 +188,7 @@ func addWorkflowWithTracking(ctx context.Context, resolved *ResolvedWorkflow, tr
 	sourceContent := resolved.Content
 	sourceInfo := resolved.SourceInfo
 
+	addLog.Printf("Processing workflow %q (source_size=%d bytes)", workflowSpec.WorkflowName, len(sourceContent))
 	reportAddWorkflowStart(workflowSpec, sourceContent, opts)
 	if err := validateWorkflowSecurity(resolved, opts); err != nil {
 		return err

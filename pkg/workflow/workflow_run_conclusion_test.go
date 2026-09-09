@@ -97,6 +97,19 @@ func TestExtractWorkflowRunConclusionCondition(t *testing.T) {
 			want: "github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success')",
 		},
 		{
+			name: "startup failure conclusion",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_run": map[string]any{
+						"workflows":  []any{"CI"},
+						"types":      []any{"completed"},
+						"conclusion": "startup_failure",
+					},
+				},
+			},
+			want: "github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'startup_failure')",
+		},
+		{
 			name: "workflow_run value is not a map",
 			frontmatter: map[string]any{
 				"on": map[string]any{

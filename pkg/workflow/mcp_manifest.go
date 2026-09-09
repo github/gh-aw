@@ -36,8 +36,6 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 			continue
 		case "github":
 			add("github", collectGitHubMCPManifestTools(data.Tools["github"]))
-		case "playwright":
-			add("playwright", anySliceToStrings(GetPlaywrightTools()))
 		case "agentic-workflows":
 			add(constants.AgenticWorkflowsMCPServerID.String(), []string{"*"})
 		case "safe-outputs":

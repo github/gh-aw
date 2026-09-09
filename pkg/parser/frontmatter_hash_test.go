@@ -331,3 +331,169 @@ func TestExtractImportsFromText_ObjectFormPathImport(t *testing.T) {
 	assert.Equal(t, []string{"shared/tool.md"}, result,
 		"Object-form path: import path must be extracted")
 }
+
+func TestCollectRuntimeImportTemplateExpressionsTopologies(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowDir := filepath.Join(tempDir, ".github", "workflows")
+	promptsDir := filepath.Join(tempDir, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(filepath.Join(workflowDir, "shared"), 0755))
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+
+	write := func(path, content string) {
+		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+	}
+	write(filepath.Join(promptsDir, "direct.md"), "Direct ${{ needs.select.outputs.issue_numbers }}")
+	write(filepath.Join(promptsDir, "optional.md"), "Optional ${{ inputs.item_number }}")
+	write(filepath.Join(promptsDir, "legacy.md"), "Legacy ${{ vars.LEGACY_PROMPT }}")
+	write(filepath.Join(promptsDir, "outer.md"), "Outer {{#runtime-import prompts/nested.md}}")
+	write(filepath.Join(promptsDir, "nested.md"), "Nested ${{ needs.nested.outputs.value }}")
+	write(filepath.Join(promptsDir, "ranged.md"), strings.Join([]string{
+		"Ignored ${{ needs.outside.outputs.value }}",
+		"Selected ${{ needs.inside.outputs.value }}",
+		"Also selected ${{ env.RANGED }}",
+	}, "\n"))
+	write(filepath.Join(workflowDir, "shared", "imported.md"), `---
+description: Imported prompt
+---
+Imported body ${{ needs.imported.outputs.value }}
+{{#runtime-import prompts/direct.md}}`)
+
+	frontmatterText := `engine: copilot
+imports:
+  - shared/imported.md`
+	markdown := `{{#runtime-import prompts/direct.md}}
+{{#runtime-import? prompts/optional.md}}
+{{#import: prompts/legacy.md}}
+{{#runtime-import prompts/outer.md}}
+{{#runtime-import prompts/ranged.md:2-3}}
+{{#runtime-import https://example.com/ignored.md}}
+{{#runtime-import? prompts/missing.md}}`
+
+	expressions := collectRuntimeImportTemplateExpressions(frontmatterText, markdown, workflowDir, DefaultFileReader)
+
+	assert.Equal(t, []string{
+		"${{ env.RANGED }}",
+		"${{ inputs.item_number }}",
+		"${{ needs.imported.outputs.value }}",
+		"${{ needs.inside.outputs.value }}",
+		"${{ needs.nested.outputs.value }}",
+		"${{ needs.select.outputs.issue_numbers }}",
+		"${{ vars.LEGACY_PROMPT }}",
+	}, expressions)
+}
+
+func TestCollectRuntimeImportTemplateExpressionsSkipsSymlinkEscape(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowDir := filepath.Join(tempDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "outside.md"), []byte("Outside ${{ needs.outside.outputs.value }}"), 0644))
+	require.NoError(t, os.Symlink(filepath.Join(tempDir, "outside.md"), filepath.Join(workflowDir, "outside-link.md")))
+
+	expressions := collectRuntimeImportTemplateExpressions("", "{{#runtime-import outside-link.md}}", workflowDir, DefaultFileReader)
+
+	assert.Empty(t, expressions)
+}
+
+func TestFrontmatterHashIncludesRuntimeImportExpressionSet(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowDir := filepath.Join(tempDir, ".github", "workflows")
+	promptsDir := filepath.Join(tempDir, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(workflowDir, 0755))
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+
+	workflowFile := filepath.Join(workflowDir, "runtime-import-hash.md")
+	workflowContent := `---
+engine: copilot
+on:
+  workflow_dispatch:
+---
+{{#runtime-import prompts/runtime.md}}
+`
+	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+
+	promptFile := filepath.Join(promptsDir, "runtime.md")
+	require.NoError(t, os.WriteFile(promptFile, []byte("Issue: ${{ needs.select.outputs.issue_numbers }}\n"), 0644))
+	hashA, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(promptFile, []byte("Unrelated text change\nIssue: ${{ needs.select.outputs.issue_numbers }}\n"), 0644))
+	hashSameExpression, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+	assert.Equal(t, hashA, hashSameExpression, "runtime-import body text changes should not affect the frontmatter hash when the detected expression set is unchanged")
+
+	require.NoError(t, os.WriteFile(promptFile, []byte("Issue: ${{ needs.select.outputs.marker }}\n"), 0644))
+	hashB, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+	assert.NotEqual(t, hashA, hashB, "runtime-import expression set changes must affect the frontmatter hash")
+
+	jsHash, err := computeHashViaNode(workflowFile)
+	if err != nil {
+		t.Logf("JavaScript not available for runtime-import hash parity: %v", err)
+		return
+	}
+	assert.Equal(t, hashB, jsHash, "Go and JS frontmatter hashes must include the same runtime-import expression set")
+}
+
+func TestFrontmatterHashRuntimeImportLineRangeUsesSelectedLines(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowDir := filepath.Join(tempDir, ".github", "workflows")
+	promptsDir := filepath.Join(tempDir, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(workflowDir, 0755))
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+
+	workflowFile := filepath.Join(workflowDir, "runtime-import-range-hash.md")
+	workflowContent := `---
+engine: copilot
+on:
+  workflow_dispatch:
+---
+{{#runtime-import prompts/ranged.md:2-2}}
+`
+	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+
+	promptFile := filepath.Join(promptsDir, "ranged.md")
+	require.NoError(t, os.WriteFile(promptFile, []byte("Ignored ${{ needs.outside.outputs.value }}\nSelected ${{ needs.inside.outputs.value }}\n"), 0644))
+	hashA, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(promptFile, []byte("Ignored ${{ needs.outside.outputs.changed }}\nSelected ${{ needs.inside.outputs.value }}\n"), 0644))
+	hashOutsideChanged, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+	assert.Equal(t, hashA, hashOutsideChanged, "expressions outside the selected runtime-import line range should not affect the frontmatter hash")
+
+	require.NoError(t, os.WriteFile(promptFile, []byte("Ignored ${{ needs.outside.outputs.changed }}\nSelected ${{ needs.inside.outputs.changed }}\n"), 0644))
+	hashInsideChanged, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+	assert.NotEqual(t, hashA, hashInsideChanged, "expressions inside the selected runtime-import line range must affect the frontmatter hash")
+}
+
+func TestFrontmatterHashRuntimeImportCyclesTerminate(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowDir := filepath.Join(tempDir, ".github", "workflows")
+	sharedDir := filepath.Join(workflowDir, "shared")
+	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+
+	workflowFile := filepath.Join(workflowDir, "runtime-import-cycle-hash.md")
+	workflowContent := `---
+engine: copilot
+imports:
+  - shared/a.md
+on:
+  workflow_dispatch:
+---
+Cycle hash coverage.
+`
+	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "a.md"), []byte("A ${{ needs.a.outputs.value }}\n{{#runtime-import shared/b.md}}\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "b.md"), []byte("B ${{ needs.b.outputs.value }}\n{{#runtime-import shared/a.md}}\n"), 0644))
+
+	hash, err := ComputeFrontmatterHashFromFile(workflowFile, NewImportCache(workflowDir))
+	require.NoError(t, err)
+	assert.Len(t, hash, 64)
+
+	expressions := collectRuntimeImportTemplateExpressions("imports:\n  - shared/a.md", "Cycle hash coverage.", workflowDir, DefaultFileReader)
+	assert.Equal(t, []string{
+		"${{ needs.a.outputs.value }}",
+		"${{ needs.b.outputs.value }}",
+	}, expressions)
+}

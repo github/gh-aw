@@ -4,15 +4,13 @@ description: Language Server Protocol (LSP) configuration reference for gh-aw Co
 
 # LSP Configuration
 
-> ⚠️ **Experimental feature.** The `lsp` frontmatter field is experimental. Using it will emit a compile-time warning. The interface may change in future releases.
+> ⚠️ **Experimental.** `lsp` emits a compile-time warning and may change. **Only supported with `engine: copilot`** — any other engine is a compile-time error.
 
 The `lsp` frontmatter field lets Copilot-engine workflows declare language servers. At compile time, the compiler:
 
-1. Validates the configuration and rejects the workflow if `lsp` is used with a non-Copilot engine.
+1. Validates the configuration and rejects `lsp` with a non-Copilot engine.
 2. Generates `~/.copilot/settings.json` with an `lspServers` block the Copilot CLI reads at startup.
 3. Injects install steps for known server ecosystems into the agent setup job.
-
-> ⚠️ **`lsp` is only supported with `engine: copilot`**. Using it with any other engine causes a compile-time error.
 
 ## Syntax
 
@@ -39,7 +37,7 @@ Each key under `lsp` is a language identifier (lowercase, alphanumeric, hyphens,
 
 ## Built-in Servers
 
-For the languages below, the compiler automatically injects an install step — no manual `steps:` entry is needed. Each server is pinned to a known-good release by default; use the `version` field to override.
+For the languages below, the compiler injects the install step automatically — no manual `steps:` entry needed. Each is pinned to a known-good release; override with `version`.
 
 | Language key | Default version | Install command | Example `command` |
 |---|---|---|---|
@@ -58,31 +56,29 @@ Language keys not in this table still work — the compiler simply skips the aut
 
 ## LSP-enabled Tools (Copilot Engine)
 
-When `lsp` is configured, Copilot gets semantic code-intelligence tools from the configured language servers. These tools are distinct from plain text search and are best for symbol-aware work.
+When `lsp` is configured, Copilot gets semantic code-intelligence tools from the language servers:
 
-| Tool capability | What it's used for | Typical prompt intent |
-|---|---|---|
-| Symbol lookup | Find functions, types, methods, constants, classes by symbol name | "Find the `Compile` method and related types." |
-| Go to definition / declaration | Jump from usage to source of truth | "Open the definition of `NewLSPManager`." |
-| Find references | Discover where a symbol is read/written/called | "List all call sites of `GenerateInstallSteps`." |
-| Document / workspace symbols | Enumerate symbols in a file or project scope | "Summarize top-level symbols in `pkg/workflow/lsp_manager.go`." |
-| Hover / type info | Inspect signatures, inferred types, and doc comments | "Show the signature and docs for `RuntimeRequirements`." |
-| Diagnostics | Surface parse/type errors from the language server | "Check diagnostics in `pkg/workflow` before editing." |
-| Rename / refactor actions (server-dependent) | Apply safe symbol renames and structured edits | "Rename this exported type and update references." |
+| Tool capability | What it's used for |
+|---|---|
+| Symbol lookup | Find functions, types, methods, constants, classes by symbol name |
+| Go to definition / declaration | Jump from usage to source of truth |
+| Find references | Discover where a symbol is read/written/called |
+| Document / workspace symbols | Enumerate symbols in a file or project scope |
+| Hover / type info | Inspect signatures, inferred types, and doc comments |
+| Diagnostics | Surface parse/type errors from the language server |
+| Rename / refactor actions (server-dependent) | Apply safe symbol renames and structured edits |
 
 > [!NOTE]
 > Exact tool names and availability depend on the runtime engine and language server. Prompt for the capability ("find references", "go to definition"), not a hardcoded tool ID.
 
 ## Prompting Guidance for Efficient LSP Use
 
-Use these patterns to help the authoring agent get faster, higher-signal results:
-
-1. **State the semantic goal first.** Ask for symbol-level operations (definition, references, diagnostics) before broad grep scans.
-2. **Constrain scope early.** Include target directories/files and language keys to avoid whole-repo symbol walks.
-3. **Use a two-pass flow.** Ask for quick symbol discovery first, then deeper reference/type analysis only for shortlisted symbols.
-4. **Require evidence in output.** Instruct the agent to include file paths and line numbers for each definition/reference result.
-5. **Set fallback behavior.** If LSP data is unavailable, instruct the agent to fall back to text search and say confidence is lower.
-6. **Avoid over-requesting.** Ask for only the symbols needed for the current task to minimize token and tool overhead.
+1. **State the semantic goal first** — symbol-level operations (definition, references, diagnostics) before broad grep scans.
+2. **Constrain scope early** — name target directories/files and language keys to avoid whole-repo symbol walks.
+3. **Use a two-pass flow** — quick symbol discovery first, deeper reference/type analysis only for shortlisted symbols.
+4. **Require evidence** — file paths and line numbers for each definition/reference result.
+5. **Set fallback behavior** — if LSP data is unavailable, fall back to text search and state lower confidence.
+6. **Avoid over-requesting** — only the symbols needed for the current task.
 
 Example intent phrasing:
 

@@ -78,6 +78,72 @@ function getImmediateEnclosingFunction(node: TSESTree.Node, sourceCode: Readonly
   return null;
 }
 
+// Returns the call that `fn` is passed to as an argument, but only when that
+// call is itself awaited directly (for example `await withRetry(() => ..., ...)`).
+// This excludes fire-and-forget callbacks like `setTimeout(() => ..., 0)`,
+// whose bodies run outside the dynamic scope of any enclosing try/catch.
+function getAwaitedCallbackWrapperCall(fn: FunctionNode): TSESTree.CallExpression | null {
+  const parent = fn.parent;
+  if (!parent || parent.type !== AST_NODE_TYPES.CallExpression || !parent.arguments.some(argument => argument === fn)) return null;
+  return parent.parent?.type === AST_NODE_TYPES.AwaitExpression ? parent : null;
+}
+
+// Checks whether a statement (possibly nested in control-flow constructs)
+// contains a throw, without crossing into nested function bodies.
+function statementRethrows(statement: TSESTree.Statement): boolean {
+  switch (statement.type) {
+    case AST_NODE_TYPES.ThrowStatement:
+      return true;
+    case AST_NODE_TYPES.BlockStatement:
+      return statement.body.some(statementRethrows);
+    case AST_NODE_TYPES.IfStatement:
+      return statementRethrows(statement.consequent) || (statement.alternate !== null && statementRethrows(statement.alternate));
+    case AST_NODE_TYPES.TryStatement:
+      return statementRethrows(statement.block) || (statement.handler !== null && statementRethrows(statement.handler.body)) || (statement.finalizer !== null && statementRethrows(statement.finalizer));
+    case AST_NODE_TYPES.SwitchStatement:
+      return statement.cases.some(switchCase => switchCase.consequent.some(statementRethrows));
+    case AST_NODE_TYPES.ForStatement:
+    case AST_NODE_TYPES.ForInStatement:
+    case AST_NODE_TYPES.ForOfStatement:
+    case AST_NODE_TYPES.WhileStatement:
+    case AST_NODE_TYPES.DoWhileStatement:
+    case AST_NODE_TYPES.LabeledStatement:
+      return statementRethrows(statement.body);
+    default:
+      return false;
+  }
+}
+
+function catchClauseRethrows(handler: TSESTree.CatchClause): boolean {
+  return statementRethrows(handler.body);
+}
+
+function getFunctionsForGitHubApiCall(node: TSESTree.CallExpression, sourceCode: Readonly<TSESLint.SourceCode>): FunctionNode[] {
+  const immediateFunction = getImmediateEnclosingFunction(node, sourceCode);
+  if (!immediateFunction) return [];
+  const functions = [immediateFunction];
+
+  // Only correlate across the callback boundary for the awaited retry-helper
+  // shape; otherwise unrelated deferred callbacks (setTimeout, etc.) would be
+  // incorrectly attributed to whatever function happens to enclose a try.
+  const wrapperCall = getAwaitedCallbackWrapperCall(immediateFunction);
+  if (!wrapperCall) return functions;
+
+  const ancestors = sourceCode.getAncestors(wrapperCall);
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const ancestor = ancestors[i];
+    if (ancestor.type !== AST_NODE_TYPES.TryStatement || !ancestor.handler) continue;
+    if (!(ancestor.block.range[0] <= wrapperCall.range[0] && wrapperCall.range[1] <= ancestor.block.range[1])) continue;
+    // A catch that swallows the error without rethrowing terminates the
+    // failure here, so it must not be attributed to an outer function.
+    if (!catchClauseRethrows(ancestor.handler)) break;
+    const ownerFunction = getImmediateEnclosingFunction(ancestor, sourceCode);
+    if (ownerFunction && ownerFunction !== immediateFunction) functions.push(ownerFunction);
+    break;
+  }
+  return functions;
+}
+
 export const requireErrorCodeForGithubApiThrowRule = createRule({
   name: "require-error-code-for-github-api-throw",
   meta: {
@@ -101,11 +167,11 @@ export const requireErrorCodeForGithubApiThrowRule = createRule({
     return {
       CallExpression(node) {
         if (!isGitHubApiCall(node)) return;
-        const fn = getImmediateEnclosingFunction(node, sourceCode);
-        if (!fn) return;
-        const calls = githubApiCallsByFunction.get(fn);
-        if (calls) calls.push(node.range[0]);
-        else githubApiCallsByFunction.set(fn, [node.range[0]]);
+        for (const fn of getFunctionsForGitHubApiCall(node, sourceCode)) {
+          const calls = githubApiCallsByFunction.get(fn);
+          if (calls) calls.push(node.range[0]);
+          else githubApiCallsByFunction.set(fn, [node.range[0]]);
+        }
       },
       ThrowStatement(node) {
         if (!node.argument || node.argument.type !== AST_NODE_TYPES.NewExpression) return;

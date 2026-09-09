@@ -14,6 +14,7 @@ describe("collect_skill_install_failures", () => {
       info: vi.fn(),
       warning: vi.fn(),
       setOutput: vi.fn(),
+      setFailed: vi.fn(),
     };
   });
 
@@ -26,6 +27,13 @@ describe("collect_skill_install_failures", () => {
     expect(script.readSkillInstallFailures()).toEqual([]);
   });
 
+  it("does not fail when all skills installed", async () => {
+    await script.main();
+
+    expect(global.core.setOutput).toHaveBeenCalledWith("failure_count", "0");
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+  });
+
   it("filters malformed entries and emits sanitized outputs", async () => {
     fs.mkdirSync("/tmp/gh-aw", { recursive: true });
     fs.writeFileSync("/tmp/gh-aw/skill_install_failures.json", JSON.stringify([{ skill: "owner/repo", error: "line1\nline2" }, { skill: "missing-error" }]), "utf8");
@@ -34,6 +42,7 @@ describe("collect_skill_install_failures", () => {
 
     expect(global.core.setOutput).toHaveBeenCalledWith("failure_count", "1");
     expect(global.core.setOutput).toHaveBeenCalledWith("errors", "owner/repo\tline1 line2");
+    expect(global.core.setFailed).toHaveBeenCalledWith("1 skill(s) failed to install — see agent failure issue/comment for details");
   });
 
   it("warns and returns empty array on unreadable failures file", () => {

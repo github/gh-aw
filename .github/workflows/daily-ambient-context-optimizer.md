@@ -23,11 +23,11 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
   agentic-workflows:
   bash: true
 safe-outputs:
@@ -193,7 +193,7 @@ Use the `agentic-workflows` MCP server instead of shelling out to `gh aw`:
 
 - call the `logs` MCP tool with `start_date: "-1d"` and `count: 60`
 - use the JSON artifacts under `/tmp/gh-aw/aw-mcp/logs/` as your source of run metadata
-- keep GitHub reads on `tools.github.mode: gh-proxy`
+- keep GitHub reads on the configured GitHub MCP tools
 - use `tools.cli-proxy: true` only for other proxied `gh` CLI commands when they are truly needed
 - do not run `gh aw logs` or `gh aw audit` through the CLI proxy because the `agentic-workflows` MCP server already provides dedicated `logs` and `audit` tools for those operations
 
@@ -325,12 +325,12 @@ Review `prompt.txt` only as a compiler cross-check artifact:
 - compare its size to the authoritative API proxy request text when both are present
 - if `prompt.txt` contains inline agents or inline linters that do **not** appear in the API proxy request text, classify that as a likely compilation bug instead of ambient-context evidence against the workflow author
 
-Also review proxy/CLI feature readiness for each sampled workflow:
+Also review tool/CLI feature readiness for each sampled workflow:
 
-- GitHub gh-proxy enabled (`tools.github.mode: gh-proxy`)
+- GitHub MCP tools configured with the required toolsets
 - CLI proxy enabled (`tools.cli-proxy: true`)
 
-When one or more are missing, include a recommendation to enable them and rewrite raw `gh aw` shell instructions into explicit `agentic-workflows` MCP-tool usage.
+When one or more are missing, include a recommendation to configure them and rewrite raw `gh aw` shell instructions into explicit `agentic-workflows` MCP-tool usage.
 
 ## Deep-Dive Analysis
 
@@ -370,7 +370,7 @@ Prioritize recommendations that:
 2. reduce broad skill loading or oversized skill fusion
 3. simplify or remove low-value inline agents
 4. move deterministic data gathering out of the main prompt
-5. enable `gh-proxy` and `cli-proxy` when missing, then rewrite raw CLI-oriented problem wording to explicit `agentic-workflows` MCP-tool calls
+5. configure GitHub MCP tools and `cli-proxy` when missing, then rewrite raw CLI-oriented problem wording to explicit `agentic-workflows` MCP-tool calls
 6. move large inline output templates (issue body, discussion body, report formats) into `## skill:` blocks so they are loaded on demand rather than unconditionally inflating the first request
 7. when an audited run shows a high WSRF (context repeatedly rebuilt near the peak invocation size rather than growing incrementally), prioritize recommendations that stop resending large static context on every turn
 

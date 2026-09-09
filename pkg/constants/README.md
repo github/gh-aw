@@ -14,11 +14,14 @@ The package also acts as the authoritative source for the generated workflow con
 
 | Type | Kind | Description |
 |------|------|-------------|
+| `ArtifactName` | alias | Semantic string type for GitHub Actions artifact names (`actions/upload-artifact`/`download-artifact`), distinct from filenames or file paths. |
 | `CommandPrefix` | alias | Semantic string type for user-facing CLI command prefixes. |
 | `DocURL` | alias | Semantic string type for documentation URLs used in validation and help messages. |
 | `EngineName` | alias | Semantic string type for AI engine identifiers such as `copilot` and `claude`. |
 | `EngineOption` | struct | Display and secret metadata for a selectable engine. |
 | `FeatureFlag` | alias | Semantic string type for workflow feature flag identifiers. |
+| `Filename` | alias | Semantic string type for a file's base name (without a directory path), distinct from `FilePath` and `ArtifactName`. |
+| `FilePath` | alias | Semantic string type for a filesystem (or GitHub Actions expression) path to a file or directory, distinct from `Filename`. |
 | `JobName` | alias | Semantic string type for built-in GitHub Actions job names. |
 | `LineLength` | alias | Semantic integer type for formatting thresholds. |
 | `MCPServerID` | alias | Semantic string type for built-in MCP server identifiers. |

@@ -207,7 +207,8 @@ func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {
 	if workflowData != nil && (workflowData.IsDetectionRun || workflowData.IsEvalsRun) {
 		return false
 	}
-	return resolveSandboxRuntimeProfile(agentConfig).NetworkIsolation
+	profile := resolveSandboxRuntimeProfile(agentConfig)
+	return profile.NetworkIsolation && !profile.SupportsHostAccess
 }
 
 // enableFirewallByDefaultForCopilot enables firewall by default for copilot and codex engines

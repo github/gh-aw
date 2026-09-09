@@ -354,16 +354,14 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 		unexpectedContent []string
 	}{
 		{
-			name: "Basic config with GitHub and playwright",
+			name: "Basic config with GitHub and agentic-workflows",
 			tools: map[string]any{
 				"github": map[string]any{
 					"allowed": []string{"get_repo"},
 				},
-				"playwright": map[string]any{
-					"allowed": []string{"navigate"},
-				},
+				"agentic-workflows": nil,
 			},
-			mcpTools: []string{"github", "playwright"},
+			mcpTools: []string{"github", "agentic-workflows"},
 			options: JSONMCPConfigOptions{
 				ConfigPath: "/tmp/test-config.json",
 				Renderers: MCPToolRenderers{
@@ -374,17 +372,16 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 						}
 						yaml.WriteString("\n")
 					},
-					RenderPlaywright: func(yaml *strings.Builder, playwrightTool any, isLast bool) {
-						yaml.WriteString("              \"playwright\": { \"test\": true }")
+					RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {
+						yaml.WriteString("              \"agentic-workflows\": { \"test\": true }")
 						if !isLast {
 							yaml.WriteString(",")
 						}
 						yaml.WriteString("\n")
 					},
-					RenderCacheMemory:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
-					RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {},
-					RenderSafeOutputs:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
-					RenderCustomMCPConfig:  nil,
+					RenderCacheMemory:     func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
+					RenderSafeOutputs:     func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
+					RenderCustomMCPConfig: nil,
 				},
 			},
 			expectedContent: []string{
@@ -392,7 +389,7 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 				"cat << GH_AW_MCP_CONFIG_NORM_EOF | \"$GH_AW_NODE\" \"${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs\"",
 				"\"mcpServers\": {",
 				"\"github\": { \"test\": true },",
-				"\"playwright\": { \"test\": true }",
+				"\"agentic-workflows\": { \"test\": true }",
 				"GH_AW_MCP_CONFIG_NORM_EOF",
 			},
 		},
@@ -413,7 +410,6 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 						}
 						yaml.WriteString("\n")
 					},
-					RenderPlaywright:       func(yaml *strings.Builder, playwrightTool any, isLast bool) {},
 					RenderCacheMemory:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
 					RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {},
 					RenderSafeOutputs:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
@@ -445,7 +441,6 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 					RenderGitHub: func(yaml *strings.Builder, githubTool map[string]any, isLast bool, workflowData *WorkflowData) {
 						yaml.WriteString("              \"github\": {}\n")
 					},
-					RenderPlaywright:       func(yaml *strings.Builder, playwrightTool any, isLast bool) {},
 					RenderCacheMemory:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
 					RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {},
 					RenderSafeOutputs:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
@@ -500,10 +495,10 @@ func TestRenderJSONMCPConfig(t *testing.T) {
 // TestRenderJSONMCPConfig_IsLastHandling tests that isLast is properly set
 func TestRenderJSONMCPConfig_IsLastHandling(t *testing.T) {
 	tools := map[string]any{
-		"github":     map[string]any{},
-		"playwright": map[string]any{},
+		"github":            map[string]any{},
+		"agentic-workflows": nil,
 	}
-	mcpTools := []string{"github", "playwright"}
+	mcpTools := []string{"github", "agentic-workflows"}
 
 	var callOrder []string
 	var isLastValues []bool
@@ -515,14 +510,13 @@ func TestRenderJSONMCPConfig_IsLastHandling(t *testing.T) {
 				callOrder = append(callOrder, "github")
 				isLastValues = append(isLastValues, isLast)
 			},
-			RenderPlaywright: func(yaml *strings.Builder, playwrightTool any, isLast bool) {
-				callOrder = append(callOrder, "playwright")
+			RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {
+				callOrder = append(callOrder, "agentic-workflows")
 				isLastValues = append(isLastValues, isLast)
 			},
-			RenderCacheMemory:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
-			RenderAgenticWorkflows: func(yaml *strings.Builder, isLast bool) {},
-			RenderSafeOutputs:      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
-			RenderCustomMCPConfig:  nil,
+			RenderCacheMemory:     func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
+			RenderSafeOutputs:     func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {},
+			RenderCustomMCPConfig: nil,
 		},
 	}
 
@@ -534,7 +528,7 @@ func TestRenderJSONMCPConfig_IsLastHandling(t *testing.T) {
 	}
 
 	// Verify call order
-	expectedOrder := []string{"github", "playwright"}
+	expectedOrder := []string{"github", "agentic-workflows"}
 	if len(callOrder) != len(expectedOrder) {
 		t.Fatalf("Expected %d calls, got %d", len(expectedOrder), len(callOrder))
 	}

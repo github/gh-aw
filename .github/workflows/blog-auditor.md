@@ -39,7 +39,6 @@ network:
 tools:
   cli-proxy: true
   playwright:
-    mode: cli
   bash:
     - "date *"
     - "echo *"

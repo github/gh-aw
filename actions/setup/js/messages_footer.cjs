@@ -294,6 +294,19 @@ function getFooterMessage(ctx) {
 }
 
 /**
+ * Render a deterministic footer configured for a generated issue or pull request body.
+ * @param {string|undefined} template - Body footer template
+ * @param {{workflowName: string, runUrl: string}} ctx - Template context
+ * @returns {string} Rendered body footer, or an empty string when not configured
+ */
+function getBodyFooterMessage(template, ctx) {
+  if (!template) {
+    return "";
+  }
+  return renderTemplate(template, toSnakeCase(ctx));
+}
+
+/**
  * @param {string|undefined} commandsJSON
  * @returns {string|undefined}
  */
@@ -772,6 +785,7 @@ function generateFooterWithMessages(workflowName, runUrl, workflowSource, workfl
 
 module.exports = {
   getDetectionCautionAlert,
+  getBodyFooterMessage,
   getFooterMessage,
   getFooterInstallMessage,
   getFooterWorkflowRecompileMessage,

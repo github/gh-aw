@@ -31,7 +31,7 @@ permissions:
 
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 
 imports:
   # Note: markitdown.md excluded — docker.io/mcp/markitdown has Critical/High CVEs (see #49515)

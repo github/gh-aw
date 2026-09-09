@@ -4,8 +4,9 @@
  * Shared process runner utilities for agent harnesses.
  *
  * Provides a common runProcess helper used by both the Claude and Copilot
- * harnesses to spawn child processes, forward stdin/stdout/stderr, collect
- * output for retry decisions, track byte counts, and surface spawn errors.
+ * harnesses to spawn child processes, forward stdout/stderr (stdin is closed;
+ * prompts are delivered via file/argument, not stdin), collect output for
+ * retry decisions, track byte counts, and surface spawn errors.
  *
  * Each harness retains its own logging prefix and argument-redaction logic;
  * the caller passes a log function and an optional logArgs array so that
@@ -59,7 +60,8 @@ function sleep(ms) {
 }
 
 /**
- * Run a command with the given arguments, transparently forwarding stdin/stdout/stderr.
+ * Run a command with the given arguments, forwarding stdout/stderr (stdin is closed;
+ * see the spawn call below for why).
  * Also collects combined stdout+stderr output for error pattern detection.
  *
  * The child process is spawned with `cwd` set to `process.env.GH_AW_ENGINE_CWD` when
@@ -121,8 +123,14 @@ function runProcess({ command, args, attempt, log, logArgs, env, postResultWatch
     const argsForLog = logArgs ?? args;
     log(`attempt ${attempt + 1}: spawning: ${command} ${argsForLog.join(" ").substring(0, 200)}`);
 
+    // stdin is closed (not inherited) rather than forwarded: every harness delivers the
+    // prompt via a file or CLI argument, so the child never needs to read from stdin.
+    // Closing it means a CLI that unexpectedly falls back to an interactive
+    // "read from stdin" mode (e.g. due to an unrecognized argument) sees immediate EOF
+    // and exits/errors quickly instead of hanging silently until the step's
+    // timeout-minutes budget is exhausted.
     const child = spawn(command, args, {
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
       env: env ?? process.env,
       cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || undefined,
     });

@@ -27,7 +27,7 @@ func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 func TestValidateMainWorkflowFrontmatter_RejectsUnsupportedTopLevelFields(t *testing.T) {
 	t.Parallel()
 
-	for _, field := range []string{"version", "include"} {
+	for _, field := range []string{"version", "include", "bots"} {
 		t.Run(field, func(t *testing.T) {
 			t.Parallel()
 
@@ -202,6 +202,78 @@ func TestValidateMainWorkflowFrontmatterEnclaves(t *testing.T) {
 		t.Fatalf("expected keyed top-level enclaves to validate: %v", err)
 	}
 
+	toolsShape := map[string]any{
+		"on":     "workflow_dispatch",
+		"engine": "copilot",
+		"enclaves": []any{
+			map[string]any{
+				"agent": map[string]any{
+					"model": "gpt-5",
+					"tools": map[string]any{
+						"github": map[string]any{
+							"allowed":       []any{"list_issues", "issue_read"},
+							"allowed-repos": []any{"octo-org/private-service"},
+							"min-integrity": "none",
+						},
+					},
+				},
+				"repos": []any{
+					map[string]any{"repo": "octo-org/private-service", "sensitivity": "confidential"},
+				},
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(toolsShape, "workflow.md"); err != nil {
+		t.Fatalf("expected enclave agent.tools.github shape to validate: %v", err)
+	}
+
+	dynamicShape := map[string]any{
+		"on":     "workflow_dispatch",
+		"engine": "copilot",
+		"enclaves": []any{
+			map[string]any{
+				"agent": map[string]any{
+					"model":              "gpt-5",
+					"max-task-bytes":     4096,
+					"max-model-requests": 8,
+					"max-model-tokens":   1024,
+				},
+				"dynamic": map[string]any{
+					"allowed-repositories": []any{"octo-org/private-service"},
+					"sensitivity":          "confidential",
+					"github-policy":        "github-repository-read-v1",
+					"max-repositories":     4,
+					"quotas": map[string]any{
+						"max-invocations":       8,
+						"max-output-bytes":      32768,
+						"max-execution-seconds": 900,
+					},
+					"audit-labels": []any{"dynamic-enclave"},
+					"expires-at":   "2999-01-01T00:00:00Z",
+				},
+				"timeout":          120,
+				"memory-limit":     "512m",
+				"cpu-limit":        "1",
+				"pids-limit":       128,
+				"tmpfs-limit":      "64m",
+				"max-output-bytes": 8192,
+				"max-invocations":  8,
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(dynamicShape, "workflow.md"); err != nil {
+		t.Fatalf("expected dynamic enclave agent policy shape to validate: %v", err)
+	}
+
+	valid["enclaves"].([]any)[0].(map[string]any)["repos"].([]any)[0].(map[string]any)["sensitivity"] = "trusted"
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(valid, "workflow.md"); err != nil {
+		t.Fatalf("expected trusted enclave sensitivity to validate: %v", err)
+	}
+	valid["enclaves"].([]any)[0].(map[string]any)["repos"].([]any)[0].(map[string]any)["sensitivity"] = "unsupported"
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(valid, "workflow.md"); err == nil {
+		t.Fatal("expected unsupported enclave sensitivity to be rejected")
+	}
+
 	legacy := map[string]any{
 		"on":     "workflow_dispatch",
 		"engine": "copilot",
@@ -239,6 +311,56 @@ func TestValidateMainWorkflowFrontmatterEnclaves(t *testing.T) {
 	invalidMode["enclaves"].([]any)[1].(map[string]any)["agent"].(map[string]any)["github"] = map[string]any{"cli": "read-only"}
 	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(invalidMode, "workflow.md"); err == nil {
 		t.Fatal("expected generic enclave GitHub CLI mode to be rejected")
+	}
+
+	invalidTool := toolsShape
+	invalidTool["enclaves"].([]any)[0].(map[string]any)["agent"].(map[string]any)["tools"].(map[string]any)["github"] = map[string]any{
+		"allowed": []any{"search_issues"},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(invalidTool, "workflow.md"); err == nil {
+		t.Fatal("expected unsupported enclave GitHub tool to be rejected")
+	}
+
+	invalidRepoScope := toolsShape
+	invalidRepoScope["enclaves"].([]any)[0].(map[string]any)["agent"].(map[string]any)["tools"].(map[string]any)["github"] = map[string]any{
+		"allowed":       []any{"list_issues"},
+		"allowed-repos": "all",
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(invalidRepoScope, "workflow.md"); err == nil {
+		t.Fatal("expected scalar enclave GitHub repository scope to be rejected")
+	}
+
+	dynamicScript := map[string]any{
+		"on":     "workflow_dispatch",
+		"engine": "copilot",
+		"enclaves": []any{
+			map[string]any{
+				"script":  nil,
+				"dynamic": dynamicShape["enclaves"].([]any)[0].(map[string]any)["dynamic"],
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(dynamicScript, "workflow.md"); err == nil {
+		t.Fatal("expected dynamic script enclave to be rejected")
+	}
+
+	staticAndDynamic := dynamicShape
+	staticAndDynamic["enclaves"].([]any)[0].(map[string]any)["repos"] = []any{
+		map[string]any{"repo": "octo-org/private-service", "sensitivity": "confidential"},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(staticAndDynamic, "workflow.md"); err == nil {
+		t.Fatal("expected static and dynamic enclave declaration to be rejected")
+	}
+
+	unknownDynamicPolicy := map[string]any{
+		"on":       "workflow_dispatch",
+		"engine":   "copilot",
+		"enclaves": dynamicShape["enclaves"],
+	}
+	delete(staticAndDynamic["enclaves"].([]any)[0].(map[string]any), "repos")
+	unknownDynamicPolicy["enclaves"].([]any)[0].(map[string]any)["dynamic"].(map[string]any)["github-policy"] = "github-repository-write-v1"
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(unknownDynamicPolicy, "workflow.md"); err == nil {
+		t.Fatal("expected unknown dynamic GitHub policy to be rejected")
 	}
 
 	scriptGitHub := map[string]any{
@@ -1208,6 +1330,62 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_SandboxAgentPlatfo
 	})
 }
 
+func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_WorkflowRunConclusion(t *testing.T) {
+	t.Parallel()
+
+	workflowRunFrontmatter := func(conclusion any) map[string]any {
+		return map[string]any{
+			"on": map[string]any{
+				"workflow_run": map[string]any{
+					"workflows":  []any{"CI"},
+					"types":      []any{"completed"},
+					"conclusion": conclusion,
+				},
+			},
+		}
+	}
+
+	t.Run("conclusion as string is accepted", func(t *testing.T) {
+		t.Parallel()
+
+		frontmatter := workflowRunFrontmatter("startup_failure")
+
+		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/workflow-run-conclusion-string-test.md"); err != nil {
+			t.Fatalf("expected on.workflow_run.conclusion=startup_failure to pass schema validation, got: %v", err)
+		}
+	})
+
+	t.Run("conclusion as array is accepted", func(t *testing.T) {
+		t.Parallel()
+
+		frontmatter := workflowRunFrontmatter([]any{"failure", "cancelled"})
+
+		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/workflow-run-conclusion-array-test.md"); err != nil {
+			t.Fatalf("expected on.workflow_run.conclusion (array) to pass schema validation, got: %v", err)
+		}
+	})
+
+	t.Run("unknown conclusion value is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		frontmatter := workflowRunFrontmatter([]any{"bogus"})
+
+		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/workflow-run-conclusion-invalid-test.md"); err == nil {
+			t.Fatal("expected on.workflow_run.conclusion with unknown value to fail schema validation")
+		}
+	})
+
+	t.Run("empty conclusion array is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		frontmatter := workflowRunFrontmatter([]any{})
+
+		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/workflow-run-conclusion-empty-test.md"); err == nil {
+			t.Fatal("expected an empty on.workflow_run.conclusion array to fail schema validation")
+		}
+	})
+}
+
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_OperationalValueGrader(t *testing.T) {
 	t.Parallel()
 
@@ -1628,6 +1806,26 @@ func TestMainWorkflowSchema_CreateDiscussionRequiredCategoryAllowed(t *testing.T
 
 	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
 		t.Fatalf("expected create-discussion.required-category to pass schema validation, got: %v", err)
+	}
+}
+
+func TestMainWorkflowSchema_CreateBodyFootersAllowed(t *testing.T) {
+	t.Parallel()
+
+	frontmatter := map[string]any{
+		"on": "daily",
+		"safe-outputs": map[string]any{
+			"create-issue": map[string]any{
+				"body-footer": "Issue footer from {workflow_name}",
+			},
+			"create-pull-request": map[string]any{
+				"body-footer": "Pull request footer from {workflow_name}",
+			},
+		},
+	}
+
+	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
+		t.Fatalf("expected create body footers to pass schema validation, got: %v", err)
 	}
 }
 

@@ -2,9 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"maps"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -192,30 +192,6 @@ type MetricEvalResults struct {
 	LatestRunID  string `json:"latest_run_id,omitempty"`
 }
 
-// computeExperimentAnalysis computes the statistical analysis for a single named experiment.
-// cfg may be nil when no workflow frontmatter is available, in which case defaults are used.
-// evals provides the eval definitions for resolving eval-backed metric references; may be nil.
-func computeExperimentAnalysis(
-	exp ExperimentVariantStats,
-	cfg *workflow.ExperimentConfig,
-	evals *workflow.EvalsConfig,
-	metricEvalResults map[string]MetricEvalResults,
-) ExperimentAnalysis {
-	return computeExperimentAnalysisWithObservations(exp, cfg, evals, metricEvalResults, nil)
-}
-
-func computeExperimentAnalysisWithObservations(
-	exp ExperimentVariantStats,
-	cfg *workflow.ExperimentConfig,
-	evals *workflow.EvalsConfig,
-	metricEvalResults map[string]MetricEvalResults,
-	graderObservations *graderMetricObservationSet,
-) ExperimentAnalysis {
-	return computeExperimentAnalysisWithObservationBundle(
-		exp, cfg, evals, metricEvalResults, graderObservations, nil,
-	)
-}
-
 func computeExperimentAnalysisWithObservationBundle(
 	exp ExperimentVariantStats,
 	cfg *workflow.ExperimentConfig,
@@ -238,14 +214,21 @@ func computeExperimentAnalysisWithObservationBundle(
 	variantCounts := experimentVariantCounts(exp, cfg, graderObservations != nil)
 	variantNames := sliceutil.SortedKeys(variantCounts)
 	expectedPcts := expectedProportions(variantNames, cfg)
-	a.Variants = buildVariantAnalyses(exp.Total, variantCounts, variantNames, expectedPcts, a.MinSamples, graderObservations)
+	// When cfg declares a variant list, variantCounts has already been reconciled
+	// against it (stale variant keys dropped); recompute the total from the
+	// reconciled counts so it stays consistent with the chi-square inputs below.
+	total := exp.Total
+	if cfg != nil && len(cfg.Variants) > 0 {
+		total = sumVariantCounts(variantCounts)
+	}
+	a.Variants = buildVariantAnalyses(total, variantCounts, variantNames, expectedPcts, a.MinSamples, graderObservations)
 	if graderObservations != nil {
 		a.UsesMetricObservations = true
 		a.MetricType = graderObservationMetricType(cfg, graderObservations)
 		a.MetricDirection = normalizeMetricDirection(graderObservations.Direction)
 		a.Comparisons = computeGraderMetricComparisons(cfg, graderObservations, variantNames, a.MetricType)
 	}
-	applyExperimentBalance(&a, exp.Name, exp.Total, cfg, variantCounts, variantNames, expectedPcts)
+	applyExperimentBalance(&a, exp.Name, total, cfg, variantCounts, variantNames, expectedPcts)
 	applyExperimentReadiness(&a, graderObservations != nil)
 	applyExperimentGuardrails(&a, guardrailObservations)
 	a.ExperimentDecisionResult = DecideExperiment(a)
@@ -425,18 +408,73 @@ func findEvalQuestion(evals *workflow.EvalsConfig, evalID string) string {
 	return ""
 }
 
+// experimentVariantCounts returns the observed run counts for a named experiment,
+// reconciled against the workflow's currently-declared variants: list. Persisted
+// state.Counts entries are keyed by whatever variant label a run recorded, and never
+// reconciled against the workflow's current variant list; when a workflow renames or
+// removes variants, stale labels from earlier runs stay in the branch's state forever
+// and would otherwise skew balance/selection statistics. When cfg declares a variant
+// list, counts for variants no longer present in it are dropped. When includeDeclared
+// is true, declared variants with no observed runs are included with a zero count.
+// When cfg is nil or declares no variants (e.g. the workflow's frontmatter could not be
+// loaded), the raw, unreconciled counts are returned as-is. Note: reconcileExperimentDetailsWithConfigs
+// (pkg/cli/experiments_command.go) applies the same stale-key filtering upstream in
+// RunExperimentsAnalyze, so by the time exp.Variants reaches here it is typically already
+// reconciled; this function re-applies the filter defensively for callers that build
+// ExperimentVariantStats directly (e.g. tests, or future call sites).
 func experimentVariantCounts(exp ExperimentVariantStats, cfg *workflow.ExperimentConfig, includeDeclared bool) map[string]int {
-	if !includeDeclared || cfg == nil {
+	if cfg == nil || len(cfg.Variants) == 0 {
 		return exp.Variants
 	}
-	counts := make(map[string]int, typeutil.SafeAllocationCapacity(len(exp.Variants), len(cfg.Variants)))
-	maps.Copy(counts, exp.Variants)
-	for _, name := range cfg.Variants {
-		if _, ok := counts[name]; !ok {
-			counts[name] = 0
+	counts := filterDeclaredVariantCounts(exp.Variants, cfg.Variants)
+	if includeDeclared {
+		for _, name := range cfg.Variants {
+			if _, ok := counts[name]; !ok {
+				counts[name] = 0
+			}
 		}
 	}
 	return counts
+}
+
+// filterDeclaredVariantCounts returns a copy of counts containing only the keys present in
+// declaredVariants, dropping any stale variant labels left over from a renamed or removed
+// variant. Shared by experimentVariantCounts and reconcileExperimentDetailsWithConfigs so
+// the two callers apply identical reconciliation semantics.
+func filterDeclaredVariantCounts(counts map[string]int, declaredVariants []string) map[string]int {
+	declared := make(map[string]bool, len(declaredVariants))
+	for _, name := range declaredVariants {
+		declared[name] = true
+	}
+	filtered := make(map[string]int, typeutil.SafeAllocationCapacity(len(counts), len(declaredVariants)))
+	for name, count := range counts {
+		if declared[name] {
+			filtered[name] = count
+		}
+	}
+	return filtered
+}
+
+// staleVariantNames returns the sorted names present in original but absent from filtered,
+// used to log which stale variant labels a reconciliation step dropped.
+func staleVariantNames(original, filtered map[string]int) []string {
+	var stale []string
+	for name := range original {
+		if _, ok := filtered[name]; !ok {
+			stale = append(stale, name)
+		}
+	}
+	slices.Sort(stale)
+	return stale
+}
+
+// sumVariantCounts returns the sum of all values in a variant→count map.
+func sumVariantCounts(counts map[string]int) int {
+	total := 0
+	for _, c := range counts {
+		total += c
+	}
+	return total
 }
 
 func buildVariantAnalyses(

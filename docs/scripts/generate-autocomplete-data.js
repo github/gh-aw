@@ -9,50 +9,77 @@
  * Output: docs/public/editor/autocomplete-data.json
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SCHEMA_PATH = path.resolve(__dirname, '../../pkg/parser/schemas/main_workflow_schema.json');
-const OUTPUT_PATH = path.resolve(__dirname, '../public/editor/autocomplete-data.json');
+const SCHEMA_PATH = path.resolve(__dirname, "../../pkg/parser/schemas/main_workflow_schema.json");
+const OUTPUT_PATH = path.resolve(__dirname, "../public/editor/autocomplete-data.json");
 
 const MAX_DEPTH = 3;
 
 // Sections where we limit child recursion to just 1 level (key + desc/type only)
-const SHALLOW_SECTIONS = new Set([
-  'safe-outputs', 'on',
-]);
+const SHALLOW_SECTIONS = new Set(["safe-outputs", "on"]);
 
-const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf-8'));
+const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf-8"));
 const defs = schema.$defs || {};
 
 // Priority ordering for root-level keys in suggestions
 const ROOT_SORT_ORDER = [
-  'name', 'description', 'on', 'engine', 'permissions', 'tools',
-  'safe-outputs', 'mcp-servers', 'env', 'imports', 'command', 'cache',
-  'labels', 'metadata', 'tracker-id', 'source', 'run-name', 'runs-on',
-  'timeout-minutes', 'concurrency', 'environment', 'container', 'services',
-  'network', 'sandbox', 'plugins', 'if', 'steps', 'post-steps',
-  'features', 'secrets',
-  'secret-masking', 'bots', 'user-rate-limit', 'strict', 'safe-inputs',
-  'runtimes', 'jobs',
+  "name",
+  "description",
+  "intent",
+  "on",
+  "engine",
+  "permissions",
+  "tools",
+  "safe-outputs",
+  "mcp-servers",
+  "env",
+  "imports",
+  "command",
+  "cache",
+  "labels",
+  "metadata",
+  "tracker-id",
+  "source",
+  "run-name",
+  "runs-on",
+  "timeout-minutes",
+  "concurrency",
+  "environment",
+  "container",
+  "services",
+  "network",
+  "sandbox",
+  "plugins",
+  "if",
+  "steps",
+  "post-steps",
+  "features",
+  "secrets",
+  "secret-masking",
+  "bots",
+  "user-rate-limit",
+  "strict",
+  "safe-inputs",
+  "runtimes",
+  "jobs",
 ];
 
 /**
  * Resolve $ref pointers to their definitions.
  */
 function resolveRef(node) {
-  if (!node || typeof node !== 'object') return node;
+  if (!node || typeof node !== "object") return node;
   if (node.$ref) {
-    const refPath = node.$ref.replace('#/$defs/', '');
+    const refPath = node.$ref.replace("#/$defs/", "");
     const resolved = defs[refPath];
     if (!resolved) return node;
-    return node.description
-      ? { ...resolved, description: node.description }
-      : resolved;
+    return node.description ? { ...resolved, description: node.description } : resolved;
   }
   return node;
 }
@@ -61,18 +88,18 @@ function resolveRef(node) {
  * Extract a compact type string from a schema node.
  */
 function getType(node) {
-  if (!node) return 'unknown';
+  if (!node) return "unknown";
   if (node.type) {
-    if (Array.isArray(node.type)) return node.type.join('|');
+    if (Array.isArray(node.type)) return node.type.join("|");
     return node.type;
   }
   if (node.oneOf) {
     const types = node.oneOf.map(o => resolveRef(o).type).filter(Boolean);
     const unique = [...new Set(types.flat())];
-    return unique.join('|') || 'unknown';
+    return unique.join("|") || "unknown";
   }
-  if (node.enum) return 'string';
-  return 'unknown';
+  if (node.enum) return "string";
+  return "unknown";
 }
 
 /**
@@ -95,8 +122,8 @@ function getEnum(node) {
 function truncDesc(desc) {
   if (!desc) return undefined;
   const firstSentence = desc.split(/\.\s/)[0];
-  if (firstSentence.length <= 120) return firstSentence + (desc.length > firstSentence.length ? '.' : '');
-  return desc.substring(0, 117) + '...';
+  if (firstSentence.length <= 120) return firstSentence + (desc.length > firstSentence.length ? "." : "");
+  return desc.substring(0, 117) + "...";
 }
 
 /**
@@ -109,7 +136,7 @@ function getObjectProperties(node) {
   if (resolved.oneOf) {
     for (const variant of resolved.oneOf) {
       const r = resolveRef(variant);
-      if (r.type === 'object' && r.properties) return r.properties;
+      if (r.type === "object" && r.properties) return r.properties;
     }
   }
   return null;
@@ -121,12 +148,12 @@ function getObjectProperties(node) {
 function canBeLeaf(node) {
   const resolved = resolveRef(node);
   const type = resolved.type;
-  if (type === 'string' || type === 'integer' || type === 'number' || type === 'boolean') return true;
-  if (Array.isArray(type) && type.some(t => t === 'string' || t === 'integer' || t === 'number' || t === 'boolean')) return true;
+  if (type === "string" || type === "integer" || type === "number" || type === "boolean") return true;
+  if (Array.isArray(type) && type.some(t => t === "string" || t === "integer" || t === "number" || t === "boolean")) return true;
   if (resolved.oneOf) {
     return resolved.oneOf.some(v => {
       const r = resolveRef(v);
-      return r.type === 'string' || r.type === 'integer' || r.type === 'number' || r.type === 'boolean' || r.type === 'null';
+      return r.type === "string" || r.type === "integer" || r.type === "number" || r.type === "boolean" || r.type === "null";
     });
   }
   return false;
@@ -137,9 +164,9 @@ function canBeLeaf(node) {
  */
 function canBeArray(node) {
   const resolved = resolveRef(node);
-  if (resolved.type === 'array') return true;
+  if (resolved.type === "array") return true;
   if (resolved.oneOf) {
-    return resolved.oneOf.some(v => resolveRef(v).type === 'array');
+    return resolved.oneOf.some(v => resolveRef(v).type === "array");
   }
   return false;
 }
@@ -152,7 +179,7 @@ function buildEntry(propSchema, depth) {
   const entry = {};
 
   const type = getType(resolved);
-  if (type !== 'unknown') entry.type = type;
+  if (type !== "unknown") entry.type = type;
 
   const desc = truncDesc(resolved.description);
   if (desc) entry.desc = desc;
@@ -163,7 +190,7 @@ function buildEntry(propSchema, depth) {
     if (filtered.length > 0) entry.enum = filtered;
   }
 
-  if (type === 'boolean' && !entry.enum) {
+  if (type === "boolean" && !entry.enum) {
     entry.enum = [true, false];
   }
 
@@ -171,8 +198,8 @@ function buildEntry(propSchema, depth) {
     entry.deprecated = true;
   }
 
-  if (typeof resolved['x-deprecation-message'] === 'string' && resolved['x-deprecation-message']) {
-    entry['x-deprecation-message'] = resolved['x-deprecation-message'];
+  if (typeof resolved["x-deprecation-message"] === "string" && resolved["x-deprecation-message"]) {
+    entry["x-deprecation-message"] = resolved["x-deprecation-message"];
   }
 
   if (depth < MAX_DEPTH) {

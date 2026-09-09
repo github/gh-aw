@@ -35,17 +35,17 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 | 8 | `recurrence-trapping-time` | Canonical states | Implemented |
 | 9 | `recurrence-rate` | Canonical states | Implemented |
 | 10 | `event-entropy-rate` | Event sequence only | Implemented |
-| 11 | `lempel-ziv-trajectory-complexity` | Event sequence only | Not started |
+| 11 | `lempel-ziv-trajectory-complexity` | Event sequence only | Implemented |
 
 ## Tier 2 — needs explicit constraints/states/provenance/objectives
 
 | Rank | Grader ID | Runtime requirement | Status |
 |---|---|---|---|
-| 1 | `policy-near-miss` | Policy/guard predicates | Not started |
-| 2 | `skill-constraint-coverage` | Precompiled constraints | Not started |
-| 3 | `exploration-error` | State/task model | Not started |
-| 4 | `exploitation-error` | State/task model | Not started |
-| 12 | `tool-output-consumption-rate` | Provenance/reference IDs | Not started |
+| 1 | `policy-near-miss` | Policy/guard predicates | Implemented |
+| 2 | `skill-constraint-coverage` | Precompiled constraints | Implemented |
+| 3 | `exploration-error` | State/task model | Implemented |
+| 4 | `exploitation-error` | State/task model | Implemented |
+| 12 | `tool-output-consumption-rate` | Provenance/reference IDs | Implemented |
 | 13 | `end-to-end-lineage-completeness` | Provenance graph | Not started |
 | 14 | `action-provenance-coverage` | Provenance graph | Not started |
 | 15 | `premature-termination-gap` | Completion predicates | Not started |

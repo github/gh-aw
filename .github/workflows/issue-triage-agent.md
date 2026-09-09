@@ -1,6 +1,10 @@
 ---
 emoji: "🔧"
 timeout-minutes: 5
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 strict: true
 on:
   schedule: "daily around 14:00 on weekdays"  # ~2 PM UTC, weekdays only
@@ -9,6 +13,7 @@ permissions:
   issues: read
 
 
+  copilot-requests: write
 tools:
   cli-proxy: true
   github:

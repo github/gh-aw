@@ -288,6 +288,36 @@ func TestValidateStepShellScripts(t *testing.T) {
 			expectError: true,
 			errorMsg:    "strict mode:",
 		},
+		{
+			name: "runner.tool_cache directly interpolated in run is an error",
+			frontmatter: map[string]any{
+				"steps": []any{
+					map[string]any{
+						"name": "Set runtime paths",
+						"run":  `echo "RUNNER_TOOL_CACHE=${{ runner.tool_cache }}" >> "$GITHUB_ENV"`,
+					},
+				},
+			},
+			strictMode:  true,
+			expectError: true,
+			errorMsg:    "Pass it through the step's env:",
+		},
+		{
+			name: "runner.tool_cache in env is allowed",
+			frontmatter: map[string]any{
+				"steps": []any{
+					map[string]any{
+						"name": "Set runtime paths",
+						"env": map[string]any{
+							"GH_AW_RUNNER_TOOL_CACHE": "${{ runner.tool_cache }}",
+						},
+						"run": `echo "RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}" >> "$GITHUB_ENV"`,
+					},
+				},
+			},
+			strictMode:  true,
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -394,6 +424,17 @@ func TestCheckStepGHToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckStepRunnerToolCache(t *testing.T) {
+	assert.NotEmpty(t, checkStepRunnerToolCache(map[string]any{
+		"name": "Set runtime paths",
+		"run":  `echo "${{ runner.tool_cache }}"`,
+	}))
+	assert.Empty(t, checkStepRunnerToolCache(map[string]any{
+		"env": map[string]any{"GH_AW_RUNNER_TOOL_CACHE": "${{ runner.tool_cache }}"},
+		"run": `echo "$GH_AW_RUNNER_TOOL_CACHE"`,
+	}))
 }
 
 func TestWorkflowEnvHasGHToken(t *testing.T) {

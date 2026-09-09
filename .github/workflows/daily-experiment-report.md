@@ -22,14 +22,15 @@ network:
   allowed:
     - defaults
     - go
+    - github
 max-tool-denials: 3
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
+    mode: gh-proxy
     toolsets: [default, actions]
 
 imports:

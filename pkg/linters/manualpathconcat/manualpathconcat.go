@@ -53,7 +53,7 @@ func analyzeBinaryExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	if !ok || reported[bin] {
 		return
 	}
-	left, ok := matchSlashSeparator(bin)
+	left, rightOverride, ok := matchSlashSeparator(bin)
 	if !ok {
 		return
 	}
@@ -73,6 +73,9 @@ func analyzeBinaryExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 
 	leftText := astutil.NodeText(pass.Fset, left)
 	rightText := astutil.NodeText(pass.Fset, bin.Y)
+	if rightOverride != "" {
+		rightText = rightOverride
+	}
 	message := `manual "/" path concatenation; use filepath.Join (or path.Join) instead`
 	if isShortOperandText(leftText) && isShortOperandText(rightText) && !containsSlashConcat(left) {
 		message = fmt.Sprintf(`manual "/" path concatenation; use filepath.Join(%s, %s) (or path.Join) instead`, leftText, rightText)
@@ -84,15 +87,28 @@ func analyzeBinaryExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	})
 }
 
-// analyzeAssignStmt reports compound assignments of the shape X += "/" + Y.
+// analyzeAssignStmt reports compound assignments of the shape X += "/" + Y,
+// as well as the two-operand X += "/subpath" form.
 func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	assign, ok := n.(*ast.AssignStmt)
 	if !ok || assign.Tok != token.ADD_ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 		return
 	}
-	bin, ok := assign.Rhs[0].(*ast.BinaryExpr)
-	if !ok || bin.Op != token.ADD || !isSlashLiteral(bin.X) {
-		return
+	var rightExpr ast.Expr
+	var rightOverride string
+	switch rhs := assign.Rhs[0].(type) {
+	case *ast.BinaryExpr:
+		if rhs.Op != token.ADD || !isSlashLiteral(rhs.X) {
+			return
+		}
+		rightExpr = rhs.Y
+	default:
+		trimmed, isEmbedded := embeddedSlashLiteral(assign.Rhs[0])
+		if !isEmbedded {
+			return
+		}
+		rightExpr = assign.Rhs[0]
+		rightOverride = trimmed
 	}
 	pos := pass.Fset.PositionFor(assign.Pos(), false)
 	if filecheck.ShouldSkipFilename(pos.Filename, generatedFiles) {
@@ -103,7 +119,10 @@ func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	}
 
 	leftText := astutil.NodeText(pass.Fset, assign.Lhs[0])
-	rightText := astutil.NodeText(pass.Fset, bin.Y)
+	rightText := astutil.NodeText(pass.Fset, rightExpr)
+	if rightOverride != "" {
+		rightText = rightOverride
+	}
 	message := `manual "/" path concatenation; use filepath.Join (or path.Join) instead`
 	if isShortOperandText(leftText) && isShortOperandText(rightText) && !containsSlashConcat(assign.Lhs[0]) {
 		message = fmt.Sprintf(`manual "/" path concatenation; use filepath.Join(%s, %s) (or path.Join) instead`, leftText, rightText)
@@ -116,24 +135,36 @@ func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 }
 
 // matchSlashSeparator reports whether bin has the shape X + "/" + Y, which Go
-// parses as ((X + "/") + Y), and returns the X operand.
-func matchSlashSeparator(bin *ast.BinaryExpr) (left ast.Expr, ok bool) {
+// parses as ((X + "/") + Y), or the two-operand shape X + "/subpath", where
+// the leading slash is embedded in a longer literal. It returns the X operand
+// (left) and, for the two-operand shape, a quoted rightOverride text (the
+// literal with its leading slash stripped) suitable for the diagnostic
+// message; rightOverride is empty for the three-operand shape, where the
+// caller uses bin.Y's own source text instead.
+func matchSlashSeparator(bin *ast.BinaryExpr) (left ast.Expr, rightOverride string, ok bool) {
 	if bin.Op != token.ADD {
-		return nil, false
+		return nil, "", false
 	}
-	inner, isBinary := bin.X.(*ast.BinaryExpr)
-	if !isBinary || inner.Op != token.ADD {
-		return nil, false
+	if inner, isBinary := bin.X.(*ast.BinaryExpr); isBinary && inner.Op == token.ADD && isSlashLiteral(inner.Y) {
+		// A left operand that is itself the separator (e.g. `"/" + "/" + name`)
+		// carries no path segment to join, so it is not a manual join.
+		if isSlashLiteral(inner.X) {
+			return nil, "", false
+		}
+		return inner.X, "", true
 	}
-	if !isSlashLiteral(inner.Y) {
-		return nil, false
+	if trimmed, isEmbedded := embeddedSlashLiteral(bin.Y); isEmbedded {
+		// A left operand that is itself a string literal makes the whole
+		// expression a compile-time constant, where filepath.Join is not a
+		// valid substitute (and the caller's constant check would exclude it
+		// anyway); skip it here so matchSlashSeparator's result is correct on
+		// its own.
+		if _, leftIsLit := bin.X.(*ast.BasicLit); leftIsLit {
+			return nil, "", false
+		}
+		return bin.X, trimmed, true
 	}
-	// A left operand that is itself the separator (e.g. `"/" + "/" + name`)
-	// carries no path segment to join, so it is not a manual join.
-	if isSlashLiteral(inner.X) {
-		return nil, false
-	}
-	return inner.X, true
+	return nil, "", false
 }
 
 // isSlashLiteral reports whether expr is the string literal "/".
@@ -144,6 +175,23 @@ func isSlashLiteral(expr ast.Expr) bool {
 	}
 	val, err := strconv.Unquote(lit.Value)
 	return err == nil && val == "/"
+}
+
+// embeddedSlashLiteral reports whether expr is a string literal that begins
+// with "/" and carries additional path text after it (e.g. "/config.yml"),
+// as opposed to the bare separator "/" alone. On success it returns the
+// literal's text quoted without the leading slash (e.g. `"config.yml"`),
+// suitable for a filepath.Join diagnostic argument.
+func embeddedSlashLiteral(expr ast.Expr) (trimmedQuoted string, ok bool) {
+	lit, isLit := expr.(*ast.BasicLit)
+	if !isLit || lit.Kind != token.STRING {
+		return "", false
+	}
+	val, err := strconv.Unquote(lit.Value)
+	if err != nil || !strings.HasPrefix(val, "/") || val == "/" {
+		return "", false
+	}
+	return strconv.Quote(strings.TrimPrefix(val, "/")), true
 }
 
 // maxOperandTextLen bounds the operand source text embedded in a diagnostic

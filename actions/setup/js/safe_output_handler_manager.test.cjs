@@ -1,6 +1,7 @@
 // @ts-check
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import path from "path";
 import fs from "fs";
 import { createRequire } from "module";
 import {
@@ -21,6 +22,7 @@ import {
   partitionFailureResults,
   computeSafeOutputsStatus,
   setSafeOutputsStatusOutputs,
+  processSyntheticUpdates,
 } from "./safe_output_handler_manager.cjs";
 
 const require = createRequire(import.meta.url);
@@ -152,6 +154,88 @@ describe("Safe Output Handler Manager", () => {
         const unrelated = { type: "create_issue", temporary_id: "aw_other", title: "Unrelated" };
 
         expect(sortMessageIndicesByTemporaryIdDependencies([dependent, producer, unrelated])).toEqual([1, 0, 2]);
+      });
+
+      it("tracks a comment emitted before its temporary-ID producer", async () => {
+        const callOrder = [];
+        const handlers = new Map([
+          [
+            "add_comment",
+            vi.fn(async (_message, resolvedTemporaryIds) => {
+              callOrder.push("add_comment");
+              expect(resolvedTemporaryIds).toEqual({});
+              return {
+                success: true,
+                commentId: 123,
+                itemNumber: 42,
+                repo: "owner/repo",
+                isDiscussion: false,
+                body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+              };
+            }),
+          ],
+          [
+            "create_issue",
+            vi.fn(async () => {
+              callOrder.push("create_issue");
+              return { success: true, temporaryId: "aw_track1", repo: "owner/tracker", number: 99 };
+            }),
+          ],
+        ]);
+        const messages = [
+          { type: "add_comment", item_number: 42, body: "Tracking issue: #aw_track1" },
+          { type: "create_issue", temporary_id: "aw_track1", title: "Tracking issue" },
+        ];
+
+        const result = await processMessages(handlers, messages);
+
+        expect(callOrder).toEqual(["add_comment", "create_issue"]);
+        expect(result.temporaryIdMap.aw_track1).toEqual({ repo: "owner/tracker", number: 99 });
+        expect(result.outputsWithUnresolvedIds).toEqual([
+          {
+            type: "add_comment",
+            message: { type: "add_comment", item_number: 42, body: "Tracking issue: #aw_track1" },
+            result: {
+              success: true,
+              commentId: 123,
+              itemNumber: 42,
+              repo: "owner/repo",
+              isDiscussion: false,
+              body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+            },
+            originalTempIdMapSize: 0,
+          },
+        ]);
+      });
+
+      it("updates the posted comment body while retaining handler metadata", async () => {
+        const updateComment = vi.fn().mockResolvedValue({});
+        const github = { rest: { issues: { updateComment } } };
+        const trackedOutputs = [
+          {
+            type: "add_comment",
+            message: { type: "add_comment", body: "Tracking issue: #aw_track1" },
+            result: {
+              success: true,
+              commentId: 123,
+              itemNumber: 42,
+              repo: "owner/repo",
+              isDiscussion: false,
+              body: "Tracking issue: #aw_track1\n\nHandler footer marker",
+            },
+            originalTempIdMapSize: 0,
+          },
+        ];
+
+        const updateCount = await processSyntheticUpdates(github, {}, trackedOutputs, new Map([["aw_track1", { repo: "owner/tracker", number: 99 }]]), new Map());
+
+        expect(updateCount).toBe(1);
+        expect(updateComment).toHaveBeenCalledWith({
+          owner: "owner",
+          repo: "repo",
+          comment_id: 123,
+          body: "Tracking issue: owner/tracker#99\n\nHandler footer marker",
+        });
       });
     });
 
@@ -758,6 +842,7 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[0].error).toContain("No handler loaded for type 'my_script'");
       expect(result.results[0].error).toContain("Cannot find module");
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("The handler was configured but failed to load"));
+      expect(core.warning).not.toHaveBeenCalledWith(expect.stringContaining("safe output type is not configured"));
     });
   });
 
@@ -844,23 +929,26 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[1].success).toBe(true);
     });
 
-    it.each(["set_issue_type", "set_issue_field", "dispatch_repository", "call_workflow", "upload_artifact"])("should abort %s in detection warning mode", async messageType => {
-      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
-      const handler = vi.fn().mockResolvedValue({ success: true });
-      const handlers = new Map([[messageType, handler]]);
-      const messages = [{ type: messageType }];
+    it.each(["set_issue_type", "set_issue_field", "jira_add_label", "add_labels", "remove_labels", "replace_label", "dispatch_repository", "call_workflow", "upload_artifact"])(
+      "should abort %s in detection warning mode",
+      async messageType => {
+        process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+        const handler = vi.fn().mockResolvedValue({ success: true });
+        const handlers = new Map([[messageType, handler]]);
+        const messages = [{ type: messageType }];
 
-      const result = await processMessages(handlers, messages);
+        const result = await processMessages(handlers, messages);
 
-      expect(handler).not.toHaveBeenCalled();
-      expect(result.results[0]).toMatchObject({
-        type: messageType,
-        success: false,
-        cancelled: true,
-        threatDetected: true,
-        errorCode: "threat_detected_abort_policy",
-      });
-    });
+        expect(handler).not.toHaveBeenCalled();
+        expect(result.results[0]).toMatchObject({
+          type: messageType,
+          success: false,
+          cancelled: true,
+          threatDetected: true,
+          errorCode: "threat_detected_abort_policy",
+        });
+      }
+    );
 
     it("should log conversion requirement for push_to_pull_request_branch in detection warning mode", async () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";
@@ -2287,6 +2375,7 @@ describe("Safe Output Handler Manager", () => {
 
       const handlerFiles = [...handlerMapBlock[1].matchAll(/["'](\.\/[^"']+\.cjs)["']/g)].map(match => match[1].slice(2));
       expect(handlerFiles).toContain("approve_workflow_run.cjs");
+      expect(handlerFiles).toContain("replace_label.cjs");
 
       const builtinModules = new Set(require("module").builtinModules);
       const visited = new Set();
@@ -2343,6 +2432,66 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results).toHaveLength(1);
       expect(result.results[0].success).toBe(false);
       expect(result.results[0].error).toContain("No handler loaded for type 'call_workflow'");
+    });
+  });
+
+  describe("replace_label handler registration", () => {
+    // Regression test for the replace-label portion of
+    // https://github.com/github/gh-aw/issues/54811: replace_label had a
+    // dedicated handler module (replace_label.cjs) but was missing from
+    // HANDLER_MAP, so the collect job never loaded it and label
+    // transitions silently did nothing even though the sample/agent output
+    // was recorded successfully.
+    it("maps key 'replace_label' directly to './replace_label.cjs' in HANDLER_MAP", () => {
+      const managerPath = path.join(typeof __dirname !== "undefined" ? __dirname : path.dirname(new URL(import.meta.url).pathname), "safe_output_handler_manager.cjs");
+      const managerSource = fs.readFileSync(managerPath, "utf8");
+      const handlerMapBlock = managerSource.match(/const HANDLER_MAP = \{([\s\S]*?)\n\};/);
+      expect(handlerMapBlock).not.toBeNull();
+
+      const pairs = Object.fromEntries([...handlerMapBlock[1].matchAll(/(\w+):\s*["'](\.\/[^"']+\.cjs)["']/g)].map(m => [m[1], m[2]]));
+      expect(pairs["replace_label"]).toBe("./replace_label.cjs");
+    });
+
+    it("loads replace_label handler from HANDLER_MAP via loadHandlers when enabled in config", async () => {
+      global.github = {};
+      try {
+        const handlers = await loadHandlers({ replace_label: {} });
+        expect(handlers.has("replace_label")).toBe(true);
+        expect(typeof handlers.get("replace_label")).toBe("function");
+      } finally {
+        delete global.github;
+      }
+    });
+
+    it("processes replace_label messages without no-handler warnings when handler is registered", async () => {
+      const messages = [{ type: "replace_label", item_number: 1, label_to_remove: "old", label_to_add: "new" }];
+      const mockHandler = vi.fn().mockResolvedValue({
+        success: true,
+        item_number: 1,
+        label_to_remove: "old",
+        label_to_add: "new",
+      });
+      const handlers = new Map([["replace_label", mockHandler]]);
+
+      const result = await processMessages(handlers, messages);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].type).toBe("replace_label");
+      // Handler was invoked, so no "no handler loaded" error
+      expect(result.results[0].error).toBeUndefined();
+      expect(mockHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it("records no-handler error for replace_label when handler map is missing entry", async () => {
+      const messages = [{ type: "replace_label", item_number: 1, label_to_remove: "old", label_to_add: "new" }];
+      // Empty handler map - simulates the bug where replace_label was not in HANDLER_MAP
+      const handlers = new Map();
+
+      const result = await processMessages(handlers, messages);
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].success).toBe(false);
+      expect(result.results[0].error).toContain("No handler loaded for type 'replace_label'");
     });
   });
 

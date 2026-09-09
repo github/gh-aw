@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -177,13 +178,18 @@ func (e *BehaviorDefinedEngine) GetSecretValidationStep(workflowData *WorkflowDa
 	})
 }
 
+//nolint:largefunc // Existing installation steps assembly is kept in generated order.
 func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
 	behavior := e.behavior()
 	if behavior == nil {
 		return nil
 	}
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		return nil
+		var steps []GitHubActionStep
+		if behavior.HarnessScript != "" {
+			steps = append(steps, GenerateNodeJsSetupStep())
+		}
+		return buildNpmEngineInstallStepsWithAWF(steps, workflowData, false)
 	}
 
 	// Behavior-defined engines that execute via a harness script (e.g. Goose) run the
@@ -542,7 +548,7 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedEngineCommand(exec *EngineEx
 		if len(exec.Args) > 0 {
 			harnessArgs = append(harnessArgs, shellJoinArgs(exec.Args))
 		}
-		harnessPath := SetupActionDestinationShell + "/" + e.harnessScriptFilename()
+		harnessPath := path.Join(SetupActionDestinationShell, e.harnessScriptFilename())
 		return fmt.Sprintf("%s %s %s", nodeRuntimeResolutionCommand, harnessPath, strings.Join(harnessArgs, " "))
 	}
 
@@ -601,6 +607,7 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 		env["AWF_REFLECT_ENABLED"] = "1"
 	}
 	applySafeOutputEnvToMap(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	applyOptionalEngineToolTimeouts(env, workflowData)
 	applyEngineMaxTurnsEnv(env, workflowData)
@@ -635,7 +642,7 @@ func (e *BehaviorDefinedEngine) applyBehaviorDefinedModelEnv(exec *EngineExecuti
 	modelVal := workflowData.Model
 	if exec.ModelEnvProviderPrefix != "" {
 		if parts := strings.SplitN(modelVal, "/", 2); len(parts) == 2 {
-			modelVal = exec.ModelEnvProviderPrefix + "/" + parts[1]
+			modelVal = path.Join(exec.ModelEnvProviderPrefix, parts[1])
 		}
 	}
 	env[exec.ModelEnvVarName] = modelVal
@@ -771,7 +778,7 @@ func isEngineDefinitionForm(def *EngineDefinition) bool {
 	// Treat richer metadata-only objects as shared engine definitions. Plain engine
 	// config objects ("id", "model", "env", etc.) should continue down the normal
 	// EngineConfig path instead of being registered as catalog entries.
-	if def.DisplayName != "" || def.RuntimeID != "" || def.Experimental || def.GHSkillAgentName != "" || def.Behaviors != nil || len(def.Auth) > 0 {
+	if def.DisplayName != "" || def.RuntimeID != "" || def.Experimental || def.GHSkillAgentName != "" || def.Behaviors != nil || def.DetectionEngine != "" || len(def.Auth) > 0 {
 		return true
 	}
 	if def.Provider.Name != "" || def.Provider.Auth != nil || def.Provider.Request != nil {
@@ -947,6 +954,8 @@ func deepCopyEngineDefinition(src EngineDefinition) EngineDefinition {
 }
 
 // deepCopyEngineBehaviorDefinition returns a fully independent copy of src.
+//
+//nolint:largefunc // Deep copy initializes all fields explicitly.
 func deepCopyEngineBehaviorDefinition(src EngineBehaviorDefinition) EngineBehaviorDefinition {
 	dst := src // value copy covers all scalar fields
 

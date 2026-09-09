@@ -45,7 +45,7 @@ name: Daily Documentation Healer
 strict: true
 experiments:
   model_size:
-    variants: [claude-sonnet-4.6, claude-haiku-4.5]
+    variants: [claude-sonnet-5, claude-haiku-4.5]
     description: "Tests whether Claude Haiku detects and corrects documentation gaps with equivalent quality at lower token cost versus Claude Sonnet."
     hypothesis: "H0: no change in issue/PR creation rate or run success rate. H1: Claude Haiku reduces AI credit usage >=30% with equivalent run success rate (>=0.90)."
     metric: ai_credits_total
@@ -73,7 +73,7 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 tracker-id: daily-doc-healer
@@ -82,7 +82,7 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 evals:
   - id: gaps-confirmed
     question: Did the workflow identify at least one confirmed documentation gap to fix, or correctly conclude that no actionable gap remained?

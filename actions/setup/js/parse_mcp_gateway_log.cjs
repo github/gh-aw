@@ -68,13 +68,58 @@ function formatDurationMs(ms) {
 }
 
 /**
+ * AWF-reported AIC fields are numeric JSON fields. Invalid or missing values
+ * are identified so the caller can report that legacy pricing was used.
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function parseNonNegativeFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/**
+ * Preserve AWF's reported six-decimal precision while retaining the
+ * historical three-decimal export for recomputed legacy records.
+ *
+ * @param {number} value
+ * @param {"awf_reported"|"recomputed"} source
+ * @returns {string}
+ */
+function formatAICForOutput(value, source) {
+  if (!Number.isFinite(value) || value < 0) return "";
+  if (source !== "awf_reported") return value.toFixed(3);
+  const rounded = Number(value.toFixed(6));
+  return String(rounded);
+}
+
+/**
+ * Keep the human-readable table compact for large totals while preserving
+ * exact AWF precision for the normal per-run range.
+ *
+ * @param {number} value
+ * @param {"awf_reported"|"recomputed"} source
+ * @returns {string}
+ */
+function formatAICForTable(value, source) {
+  return source === "awf_reported" && value < 1000 ? formatAICForOutput(value, source) : formatAIC(value);
+}
+
+/**
  * Parses token-usage.jsonl content and returns an aggregated summary.
+ *
+ * token-usage.jsonl is agent-visible runtime telemetry. This parser uses its
+ * AWF-computed AIC fields only for diagnostics and public reporting; budget
+ * aborts, retries, authentication, and safe outputs use separate paths.
+ *
  * @param {string} jsonlContent - The token-usage.jsonl file content
- * @returns {{totalInputTokens: number, totalOutputTokens: number, totalCacheReadTokens: number, totalCacheWriteTokens: number, totalRequests: number, totalDurationMs: number, totalAIC: number, ambientContextTokens: number|undefined, byModel: Object, entries: Array} | null}
+ * @returns {{totalInputTokens: number, totalOutputTokens: number, totalCacheReadTokens: number, totalCacheWriteTokens: number, totalRequests: number, totalDurationMs: number, totalAIC: number, aiCreditsSource: "awf_reported"|"recomputed", aiCreditsWarnings: string[], ambientContextTokens: number|undefined, byModel: Record<string, any>, entries: Array} | null}
  * ambientContextTokens records first-request context size as:
  * input_tokens + ((cache_read_tokens + cache_write_tokens) / 10).
  */
 function parseTokenUsageJsonl(jsonlContent) {
+  const seenRequestIds = new Set();
+  let duplicateRecordCount = 0;
   const summary = {
     totalInputTokens: 0,
     totalOutputTokens: 0,
@@ -83,9 +128,15 @@ function parseTokenUsageJsonl(jsonlContent) {
     totalRequests: 0,
     totalDurationMs: 0,
     totalAIC: 0,
+    /** @type {"awf_reported"|"recomputed"} */
+    aiCreditsSource: "recomputed",
+    /** @type {string[]} */
+    aiCreditsWarnings: [],
+    /** @type {number | undefined} */
     ambientContextTokens: undefined,
-    byModel: {},
-    /** @type {{ model: string, provider: string, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, reasoningTokens: number, durationMs: number, deltaAIC: number }[]} */
+    /** @type {Record<string, any>} */
+    byModel: Object.create(null),
+    /** @type {{ model: string, provider: string, inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number, reasoningTokens: number, durationMs: number, timestampMs: number|null, originalIndex: number, inputTokensIncludeCache: boolean|undefined, hasInputTokensIncludeCacheField: boolean, reportedDeltaAIC: number|null, reportedTotalAIC: number|null, hasReportedDeltaField: boolean, hasReportedTotalField: boolean, deltaAIC: number, runningAIC: number }[]} */
     entries: [],
   };
 
@@ -96,6 +147,14 @@ function parseTokenUsageJsonl(jsonlContent) {
     try {
       const entry = JSON.parse(trimmed);
       if (!entry || typeof entry !== "object") continue;
+      const requestId = typeof entry.request_id === "string" ? entry.request_id.trim() : "";
+      const eventName = typeof entry.event === "string" && entry.event ? entry.event : "token_usage";
+      const dedupeKey = requestId ? `${eventName}:${requestId}` : "";
+      if (dedupeKey && seenRequestIds.has(dedupeKey)) {
+        duplicateRecordCount++;
+        continue;
+      }
+      if (dedupeKey) seenRequestIds.add(dedupeKey);
 
       const inputTokens = entry.input_tokens || 0;
       const outputTokens = entry.output_tokens || 0;
@@ -103,6 +162,13 @@ function parseTokenUsageJsonl(jsonlContent) {
       const cacheWriteTokens = entry.cache_write_tokens || 0;
       const reasoningTokens = entry.reasoning_tokens || 0;
       const durationMs = entry.duration_ms || 0;
+      const parsedTimestamp = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
+      const hasInputTokensIncludeCacheField = Object.prototype.hasOwnProperty.call(entry, "input_tokens_include_cache") && entry.input_tokens_include_cache !== null;
+      const inputTokensIncludeCache = typeof entry.input_tokens_include_cache === "boolean" ? entry.input_tokens_include_cache : undefined;
+      const hasReportedDelta = Object.prototype.hasOwnProperty.call(entry, "ai_credits_this_response");
+      const hasReportedTotal = Object.prototype.hasOwnProperty.call(entry, "ai_credits_total");
+      const reportedDeltaAIC = parseNonNegativeFiniteNumber(entry.ai_credits_this_response);
+      const reportedTotalAIC = parseNonNegativeFiniteNumber(entry.ai_credits_total);
 
       summary.totalInputTokens += inputTokens;
       summary.totalOutputTokens += outputTokens;
@@ -136,41 +202,130 @@ function parseTokenUsageJsonl(jsonlContent) {
       m.requests++;
       m.durationMs += durationMs;
 
-      summary.entries.push({ model, provider: m.provider, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens, durationMs, deltaAIC: 0 });
+      summary.entries.push({
+        model,
+        provider: m.provider,
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+        reasoningTokens,
+        durationMs,
+        timestampMs: Number.isFinite(parsedTimestamp) ? parsedTimestamp : null,
+        originalIndex: summary.entries.length,
+        inputTokensIncludeCache,
+        hasInputTokensIncludeCacheField,
+        reportedDeltaAIC,
+        reportedTotalAIC,
+        hasReportedDeltaField: hasReportedDelta,
+        hasReportedTotalField: hasReportedTotal,
+        deltaAIC: 0,
+        runningAIC: 0,
+      });
     } catch {
       // Malformed line — ignored.
     }
   }
 
   if (summary.totalRequests === 0) return null;
-
-  let totalAIC = 0;
-  for (const [model, usage] of Object.entries(summary.byModel)) {
-    const aic = computeInferenceAIC({
-      provider: usage.provider || "",
-      model,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadTokens: usage.cacheReadTokens,
-      cacheWriteTokens: usage.cacheWriteTokens,
-      reasoningTokens: usage.reasoningTokens || 0,
-    });
-    usage.aic = aic;
-    totalAIC += aic;
+  if (duplicateRecordCount > 0) {
+    summary.aiCreditsWarnings.push(`${duplicateRecordCount} duplicate token usage record(s) were ignored by event and request_id.`);
   }
-  summary.totalAIC = totalAIC;
 
-  // Compute per-request AI credits.
-  for (const entry of summary.entries) {
-    entry.deltaAIC = computeInferenceAIC({
-      provider: entry.provider || "",
-      model: entry.model,
-      inputTokens: entry.inputTokens,
-      outputTokens: entry.outputTokens,
-      cacheReadTokens: entry.cacheReadTokens,
-      cacheWriteTokens: entry.cacheWriteTokens,
-      reasoningTokens: entry.reasoningTokens || 0,
+  const hasReportedAIC = summary.entries.some(entry => entry.reportedDeltaAIC !== null || entry.reportedTotalAIC !== null);
+  const hasAnyReportedAICFields = summary.entries.some(entry => entry.hasReportedDeltaField || entry.hasReportedTotalField);
+  const hasExplicitCacheSemantics = summary.entries.some(entry => typeof entry.inputTokensIncludeCache === "boolean");
+  let invalidCacheSemanticsCount = 0;
+
+  if (!hasAnyReportedAICFields && !hasExplicitCacheSemantics) {
+    invalidCacheSemanticsCount = summary.entries.filter(entry => entry.hasInputTokensIncludeCacheField && typeof entry.inputTokensIncludeCache !== "boolean").length;
+    // Preserve the legacy aggregation contract exactly for records emitted before
+    // AWF added reported AIC and explicit cache-semantics fields.
+    let totalAIC = 0;
+    for (const [model, usage] of Object.entries(summary.byModel)) {
+      const aic = computeInferenceAIC({
+        provider: usage.provider || "",
+        model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+        reasoningTokens: usage.reasoningTokens || 0,
+      });
+      usage.aic = aic;
+      totalAIC += aic;
+    }
+    summary.totalAIC = totalAIC;
+
+    for (const entry of summary.entries) {
+      entry.deltaAIC = computeInferenceAIC({
+        provider: entry.provider || "",
+        model: entry.model,
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheWriteTokens: entry.cacheWriteTokens,
+        reasoningTokens: entry.reasoningTokens || 0,
+      });
+    }
+  } else {
+    summary.entries.sort((left, right) => {
+      if (left.timestampMs !== null && right.timestampMs !== null) {
+        return left.timestampMs - right.timestampMs || left.originalIndex - right.originalIndex;
+      }
+      if (left.timestampMs !== null) return -1;
+      if (right.timestampMs !== null) return 1;
+      return left.originalIndex - right.originalIndex;
     });
+    const firstEntry = summary.entries[0];
+    if (firstEntry) {
+      summary.ambientContextTokens = firstEntry.inputTokens + (firstEntry.cacheReadTokens + firstEntry.cacheWriteTokens) / 10;
+    }
+    let runningAIC = 0;
+    let fallbackRecordCount = 0;
+    for (const usage of Object.values(summary.byModel)) {
+      usage.aic = 0;
+    }
+
+    for (let index = 0; index < summary.entries.length; index++) {
+      const entry = summary.entries[index];
+      const reportedFieldsMissingOrInvalid = hasAnyReportedAICFields && (!entry.hasReportedDeltaField || entry.reportedDeltaAIC === null || !entry.hasReportedTotalField || entry.reportedTotalAIC === null);
+      if (reportedFieldsMissingOrInvalid) fallbackRecordCount++;
+
+      if (entry.reportedDeltaAIC !== null) {
+        entry.deltaAIC = entry.reportedDeltaAIC;
+      } else {
+        if (entry.hasInputTokensIncludeCacheField && typeof entry.inputTokensIncludeCache !== "boolean") {
+          invalidCacheSemanticsCount++;
+        }
+        entry.deltaAIC = computeInferenceAIC({
+          provider: entry.provider || "",
+          model: entry.model,
+          inputTokens: entry.inputTokens,
+          outputTokens: entry.outputTokens,
+          cacheReadTokens: entry.cacheReadTokens,
+          cacheWriteTokens: entry.cacheWriteTokens,
+          reasoningTokens: entry.reasoningTokens || 0,
+          inputTokensIncludeCache: entry.inputTokensIncludeCache,
+        });
+      }
+      summary.byModel[entry.model].aic += entry.deltaAIC;
+      runningAIC = entry.reportedTotalAIC ?? runningAIC + entry.deltaAIC;
+      entry.runningAIC = runningAIC;
+    }
+
+    summary.totalAIC = runningAIC;
+    summary.aiCreditsSource = hasReportedAIC ? "awf_reported" : "recomputed";
+    if (fallbackRecordCount > 0) {
+      summary.aiCreditsWarnings.push(`${fallbackRecordCount} token usage record(s) had missing or invalid AWF-reported AI Credits fields; fallback accounting was used for the missing values.`);
+    }
+    const summedDeltaAIC = Object.values(summary.byModel).reduce((total, usage) => total + (usage.aic || 0), 0);
+    if (summary.aiCreditsSource === "awf_reported" && Math.abs(summedDeltaAIC - summary.totalAIC) > 1e-6 * Math.max(1, Math.abs(summary.totalAIC))) {
+      summary.aiCreditsWarnings.push("The AWF-reported cumulative AI Credits total differs from the sum of per-request credits; the cumulative total was preserved for reporting.");
+    }
+  }
+  if (invalidCacheSemanticsCount > 0) {
+    summary.aiCreditsWarnings.push(`${invalidCacheSemanticsCount} token usage record(s) had invalid input_tokens_include_cache values; legacy provider cache semantics were used.`);
   }
 
   return summary;
@@ -180,7 +335,7 @@ function parseTokenUsageJsonl(jsonlContent) {
  * Generates a markdown summary section for token usage data.
  * Renders one row per request in chronological order with per-request AI credits,
  * a running AI credits total, followed by an aggregate totals row and legend.
- * @param {{totalInputTokens: number, totalOutputTokens: number, totalCacheReadTokens: number, totalCacheWriteTokens: number, totalRequests: number, totalDurationMs: number, totalAIC: number, byModel: Object, entries: Array} | null} summary
+ * @param {ReturnType<typeof parseTokenUsageJsonl>} summary
  * @returns {string} Markdown section, or empty string if no data
  */
 function generateTokenUsageSummary(summary) {
@@ -192,22 +347,33 @@ function generateTokenUsageSummary(summary) {
 
   const entries = summary.entries || [];
   let compoundedAIC = 0;
+  const formatSummaryAIC = value => formatAICForTable(value, summary.aiCreditsSource);
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const deltaAIC = entry.deltaAIC || 0;
     compoundedAIC += deltaAIC;
+    const runningAIC = summary.aiCreditsSource === "awf_reported" ? entry.runningAIC : compoundedAIC;
     lines.push(
-      `| ${i + 1} | ${formatModelEmojiAlias(entry.model) || entry.model} | ${entry.inputTokens.toLocaleString()} | ${entry.outputTokens.toLocaleString()} | ${entry.cacheReadTokens.toLocaleString()} | ${entry.cacheWriteTokens.toLocaleString()} | ${formatAIC(deltaAIC)} | ${formatAIC(compoundedAIC)} | ${formatDurationMs(entry.durationMs)} |`
+      `| ${i + 1} | ${formatModelEmojiAlias(entry.model) || entry.model} | ${entry.inputTokens.toLocaleString()} | ${entry.outputTokens.toLocaleString()} | ${entry.cacheReadTokens.toLocaleString()} | ${entry.cacheWriteTokens.toLocaleString()} | ${formatSummaryAIC(deltaAIC)} | ${formatSummaryAIC(runningAIC)} | ${formatDurationMs(entry.durationMs)} |`
     );
   }
 
-  const totalAIC = formatAIC(summary.totalAIC || 0);
+  const totalAIC = formatSummaryAIC(summary.totalAIC || 0);
   lines.push(
     `| **Total** | | **${summary.totalInputTokens.toLocaleString()}** | **${summary.totalOutputTokens.toLocaleString()}** | **${summary.totalCacheReadTokens.toLocaleString()}** | **${summary.totalCacheWriteTokens.toLocaleString()}** | | **${totalAIC}** | **${formatDurationMs(summary.totalDurationMs)}** |`
   );
 
   lines.push("");
-  lines.push("Legend: `Alias` shows the model shorthand used in the table. `ΔAI Credits` is the per-request cost, and `AI Credits` is the running total computed with the current AI credits pricing model.");
+  const accountingDescription =
+    summary.aiCreditsSource === "awf_reported"
+      ? summary.aiCreditsWarnings.length > 0
+        ? "mirrored from AWF fields where available, with warned fallback accounting"
+        : "mirrored from AWF fields for reporting"
+      : "recomputed with the current AI credits pricing model for legacy records";
+  lines.push(`Legend: \`Alias\` shows the model shorthand used in the table. \`ΔAI Credits\` is the per-request cost, and \`AI Credits\` is the running total ${accountingDescription}.`);
+  for (const warning of summary.aiCreditsWarnings) {
+    lines.push(`Warning: ${warning}`);
+  }
   lines.push("");
 
   return lines.join("\n") + "\n";
@@ -233,11 +399,14 @@ async function writeStepSummaryWithTokenUsage(coreObj) {
     if (content?.trim()) {
       coreObj.info(`Found token-usage.jsonl (${content.length} bytes)`);
       const parsedSummary = parseTokenUsageJsonl(content);
-      if (parsedSummary && parsedSummary.totalAIC > 0) {
-        const roundedAIC = parsedSummary.totalAIC.toFixed(3);
-        coreObj.exportVariable("GH_AW_AIC", roundedAIC);
-        coreObj.setOutput("aic", roundedAIC);
-        coreObj.info(`AI Credits: ${roundedAIC}`);
+      for (const warning of parsedSummary?.aiCreditsWarnings || []) {
+        coreObj.warning?.(`[ai-credits] ${warning}`);
+      }
+      if (parsedSummary && (parsedSummary.aiCreditsSource === "awf_reported" || parsedSummary.totalAIC > 0)) {
+        const aic = formatAICForOutput(parsedSummary.totalAIC, parsedSummary.aiCreditsSource);
+        coreObj.exportVariable("GH_AW_AIC", aic);
+        coreObj.setOutput("aic", aic);
+        coreObj.info(`AI Credits: ${aic}`);
       }
       if (parsedSummary && typeof parsedSummary.ambientContextTokens === "number" && parsedSummary.ambientContextTokens > 0) {
         const roundedAmbientContext = String(Math.round(parsedSummary.ambientContextTokens));
@@ -1158,6 +1327,8 @@ if (typeof module !== "undefined" && module.exports) {
     parseTokenUsageJsonl,
     generateTokenUsageSummary,
     formatDurationMs,
+    formatAICForOutput,
+    writeStepSummaryWithTokenUsage,
     hasAICreditsRateLimitError,
     hasUnknownModelAICreditsError,
     setUnknownModelAICreditsOutput,

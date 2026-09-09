@@ -129,7 +129,7 @@ For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, 
 
 For `checks`, normalized states are `success`, `failed`, `pending`, `no_checks`, and `policy_blocked`. Use `required_state` as the authoritative CI verdict when optional third-party deployments are present.
 
-Available `fix` codemods: `timeout-minutes-migration`, `network-firewall-migration`, `sandbox-agent-false-removal`, `mcp-scripts-mode-removal`, `steps-run-secrets-to-env`.
+Available `fix` codemods include `timeout-minutes-migration`, `network-firewall-migration`, `mcp-scripts-mode-removal`, and `steps-run-secrets-to-env`.
 
 ## Using GH-AW as an MCP from an Agentic Workflow
 

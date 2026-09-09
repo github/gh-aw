@@ -7,9 +7,7 @@
 // of lexical filename ordering.
 //
 // Tie-break rule (documented contract): when multiple nodes are ready at the same
-// time (in-degree 0 in Kahn's algorithm), they are ordered alphabetically by their
-// relative filename. Tests that verify this rule use fixtures where the tie-break
-// outcome differs from the declaration order.
+// time (in-degree 0 in Kahn's algorithm), they retain declaration order.
 //
 // Cross-path contract: each fixture is verified via
 //
@@ -250,13 +248,9 @@ tools:
 				"z-leaf-a.md": {},
 				"y-leaf-b.md": {},
 			},
-			// Kahn's algorithm: queue is sorted globally after each emit.
-			// y-leaf-b.md is emitted first (y < z alphabetically). That immediately
-			// makes b-parent.md ready; after sorting, the queue becomes
-			// [b-parent.md, z-leaf-a.md] (b < z), so b-parent.md is emitted next.
-			// Then z-leaf-a.md is emitted, making a-parent.md ready.
+			// The branch rooted at the first declared parent is emitted first.
 			// Key invariant: every leaf precedes its own parent (topological guarantee).
-			wantOrder: []string{"y-leaf-b.md", "b-parent.md", "z-leaf-a.md", "a-parent.md"},
+			wantOrder: []string{"z-leaf-a.md", "a-parent.md", "y-leaf-b.md", "b-parent.md"},
 		},
 		{
 			// Diamond: two parents share the same leaf. Lexical sort would not
@@ -286,7 +280,7 @@ tools:
 				"y-right.md": {"a-base.md"},
 				"a-base.md":  {},
 			},
-			wantOrder: []string{"a-base.md", "y-right.md", "z-left.md"},
+			wantOrder: []string{"a-base.md", "z-left.md", "y-right.md"},
 		},
 	}
 
@@ -309,25 +303,23 @@ tools:
 }
 
 // ---------------------------------------------------------------------------
-// TestImportTopologicalContractTieBreakIsAlphabetical
+// TestImportTopologicalContractTieBreakIsDeclarationOrder
 // ---------------------------------------------------------------------------
 
-// TestImportTopologicalContractTieBreakIsAlphabetical explicitly documents and
+// TestImportTopologicalContractTieBreakIsDeclarationOrder explicitly documents and
 // verifies the tie-break rule: when multiple nodes are simultaneously ready
-// (in-degree 0 in Kahn's algorithm), they are sorted alphabetically by their
-// relative filename.
+// (in-degree 0 in Kahn's algorithm), they retain declaration order.
 //
 // This test uses fixtures where all nodes are roots (no dependencies), so the
 // only ordering constraint is the tie-break rule itself.
-func TestImportTopologicalContractTieBreakIsAlphabetical(t *testing.T) {
-	t.Run("all-roots ordered alphabetically regardless of declaration order", func(t *testing.T) {
+func TestImportTopologicalContractTieBreakIsDeclarationOrder(t *testing.T) {
+	t.Run("all roots retain declaration order", func(t *testing.T) {
 		files := map[string]string{
 			"omega.md": "---\ntools:\n  t: {}\n---",
 			"alpha.md": "---\ntools:\n  t: {}\n---",
 			"gamma.md": "---\ntools:\n  t: {}\n---",
 			"beta.md":  "---\ntools:\n  t: {}\n---",
 		}
-		// Declaration order is deliberately not alphabetical.
 		topImports := []string{"omega.md", "alpha.md", "gamma.md", "beta.md"}
 
 		dir := testutil.TempDir(t, "contract-tiebreak-*")
@@ -336,15 +328,11 @@ func TestImportTopologicalContractTieBreakIsAlphabetical(t *testing.T) {
 		got := runImportProcessor(t, dir, topImports)
 
 		require.Len(t, got, 4, "all four files must appear in the result")
-		// Tie-break rule: alphabetical by filename.
-		assert.Equal(t, []string{"alpha.md", "beta.md", "gamma.md", "omega.md"}, got,
-			"independent nodes must be sorted alphabetically (documented tie-break rule)")
+		assert.Equal(t, topImports, got,
+			"independent nodes must retain declaration order")
 	})
 
-	t.Run("ready nodes at each wave are alphabetically sorted", func(t *testing.T) {
-		// Build a two-wave structure: first wave (leaves) has {z-leaf, a-leaf},
-		// second wave (parents) has {c-parent, b-parent}.
-		// Within each wave, alphabetical order must apply.
+	t.Run("independent branches retain declaration order", func(t *testing.T) {
 		files := map[string]string{
 			"c-parent.md": `---
 imports:
@@ -369,14 +357,8 @@ tools:
 		got := runImportProcessor(t, dir, topImports)
 
 		require.Len(t, got, 4)
-		// Wave 1 (leaves): a-leaf < z-leaf alphabetically.
-		// Wave 2 (parents become ready after their respective leaf): b-parent
-		// and c-parent become ready at different points because each parent
-		// depends only on its own leaf.
-		// After a-leaf is emitted, b-parent (in-degree drops to 0) is queued.
-		// After z-leaf is emitted, c-parent (in-degree drops to 0) is queued.
-		assert.Equal(t, []string{"a-leaf.md", "b-parent.md", "z-leaf.md", "c-parent.md"}, got,
-			"within each Kahn wave, nodes must be sorted alphabetically")
+		assert.Equal(t, []string{"z-leaf.md", "c-parent.md", "a-leaf.md", "b-parent.md"}, got,
+			"independent branches must retain declaration order")
 
 		// Property check: no dependency constraint violated.
 		verifyTopologicalConstraints(t, got, map[string][]string{

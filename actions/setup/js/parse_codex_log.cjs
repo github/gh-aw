@@ -409,14 +409,32 @@ function parseCodexJsonl(logContent) {
         });
         break;
       }
+      case "error": {
+        const rawMessage = typeof item.message === "string" ? item.message : JSON.stringify(item);
+        const message = rawMessage.trim();
+        if (message) {
+          parsedData.push({ type: "error", content: message });
+        }
+        break;
+      }
       default:
         break;
     }
   }
 
+  const errorMessages = parsedData.filter(item => item.type === "error").map(item => item.content);
+
   // Build markdown so the parser returns a truthy result and core.info has a
   // readable fallback. The step summary itself is rendered from logEntries.
-  let markdown = "<details>\n<summary>Reasoning</summary>\n\n";
+  let markdown = "";
+  if (errorMessages.length > 0) {
+    markdown += "<details>\n<summary>Errors</summary>\n\n";
+    for (const message of errorMessages) {
+      markdown += `> ${message}\n\n`;
+    }
+    markdown += "</details>\n\n";
+  }
+  markdown += "<details>\n<summary>Reasoning</summary>\n\n";
   for (const item of parsedData) {
     if (item.type === "text") {
       markdown += `${item.content}\n\n`;
@@ -456,17 +474,21 @@ function parseCodexJsonl(logContent) {
     model: model || undefined,
   });
 
-  // Surface token usage and turn count via a result entry so Statistics and the
-  // OTEL telemetry enrichment (agent-stdio.log result line) are populated.
-  if (usage) {
+  // Surface token usage, turn count, and error messages via a result entry so
+  // Statistics, the Information section's Errors list, and the OTEL telemetry
+  // enrichment (agent-stdio.log result line) are populated.
+  if (usage || errorMessages.length > 0) {
     logEntries.push({
       type: "result",
       num_turns: turnCount > 0 ? turnCount : undefined,
-      usage: {
-        input_tokens: typeof usage.input_tokens === "number" ? usage.input_tokens : undefined,
-        output_tokens: typeof usage.output_tokens === "number" ? usage.output_tokens : undefined,
-        cache_read_input_tokens: typeof usage.cached_input_tokens === "number" ? usage.cached_input_tokens : undefined,
-      },
+      usage: usage
+        ? {
+            input_tokens: typeof usage.input_tokens === "number" ? usage.input_tokens : undefined,
+            output_tokens: typeof usage.output_tokens === "number" ? usage.output_tokens : undefined,
+            cache_read_input_tokens: typeof usage.cached_input_tokens === "number" ? usage.cached_input_tokens : undefined,
+          }
+        : undefined,
+      errors: errorMessages.length > 0 ? errorMessages : undefined,
     });
   }
 

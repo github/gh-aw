@@ -158,6 +158,7 @@ func TestRunMonteCarloNonFiniteLambda(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			rng := deterministicRNG()
 			result := runMonteCarlo(obs, len(obs), tt.lambda, rng)
 			assert.Nil(t, result, "non-finite λ=%v should return nil (zero-projection fallback)", tt.lambda)
@@ -210,6 +211,7 @@ func TestRunMonteCarloZeroLambdaFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			rng := deterministicRNG()
 			result := runMonteCarlo(tt.etObs, tt.successCount, tt.observedRunsPerPeriod, rng)
 			if tt.wantNil {
@@ -559,6 +561,7 @@ func TestResolveForecastWorkflowsFromRemote_RateLimitFallsBackToPartialResults(t
 func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	t.Parallel()
 	t.Run("minimal fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_minimal.json")
 		run, ok := fixture["run"].(map[string]any)
 		require.True(t, ok)
@@ -566,6 +569,7 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	})
 
 	t.Run("zero ET fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_zero_et.json")
 		usage, ok := fixture["token_usage_summary"].(map[string]any)
 		require.True(t, ok)
@@ -575,6 +579,7 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	})
 
 	t.Run("failed run fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_failed.json")
 		run, ok := fixture["run"].(map[string]any)
 		require.True(t, ok)
@@ -582,6 +587,7 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	})
 
 	t.Run("high ET fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_high_et.json")
 		usage, ok := fixture["token_usage_summary"].(map[string]any)
 		require.True(t, ok)
@@ -591,6 +597,7 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	})
 
 	t.Run("cancelled run fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_cancelled.json")
 		run, ok := fixture["run"].(map[string]any)
 		require.True(t, ok)
@@ -598,6 +605,7 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 	})
 
 	t.Run("partial ET fixture", func(t *testing.T) {
+		t.Parallel()
 		fixture := loadFixture(t, "run_summary_partial_et.json")
 		run, ok := fixture["run"].(map[string]any)
 		require.True(t, ok)

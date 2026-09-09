@@ -90,6 +90,7 @@ func TestNoRunsMessage(t *testing.T) {
 		name           string
 		startDate      string
 		timeoutReached bool
+		storageReached bool
 		wantContains   string
 	}{
 		{
@@ -97,6 +98,11 @@ func TestNoRunsMessage(t *testing.T) {
 			startDate:      "",
 			timeoutReached: true,
 			wantContains:   "Timeout reached",
+		},
+		{
+			name:           "storage limit reached",
+			storageReached: true,
+			wantContains:   "Storage limit reached",
 		},
 		{
 			name:           "future date (YYYY-MM-DD)",
@@ -144,7 +150,7 @@ func TestNoRunsMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := noRunsMessage(tt.startDate, tt.timeoutReached)
+			got := noRunsMessage(tt.startDate, tt.timeoutReached, tt.storageReached)
 			assert.Contains(t, got, tt.wantContains,
 				"noRunsMessage(%q, %v) = %q, want to contain %q", tt.startDate, tt.timeoutReached, got, tt.wantContains)
 		})
@@ -188,21 +194,25 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	}
 
 	t.Run("count limit reached emits cursor with correct message and BeforeRunID", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, false, true, continuationOptions{
-			workflowName:   "my-workflow",
-			startDate:      "2026-06-01",
-			endDate:        "2026-06-30",
-			engine:         "claude",
-			branch:         "main",
-			afterRunID:     0,
-			count:          100,
-			timeoutMinutes: 3,
+		c := buildContinuationIfNeeded(runs, false, true, false, continuationOptions{
+			workflowName:          "my-workflow",
+			startDate:             "2026-06-01",
+			endDate:               "2026-06-30",
+			engine:                "claude",
+			branch:                "main",
+			afterRunID:            0,
+			count:                 100,
+			timeoutMinutes:        3,
+			maxGitHubAPIRateLimit: -2000,
+			maxStorageMB:          10240,
 		})
 		require.NotNil(t, c, "expected continuation when countLimitReached=true")
 		assert.Equal(t, int64(2999), c.BeforeRunID, "BeforeRunID should be oldest processed run")
 		assert.Equal(t, "2026-06-01", c.StartDate)
 		assert.Equal(t, "2026-06-30", c.EndDate)
 		assert.Equal(t, 100, c.Count)
+		assert.Equal(t, -2000, c.MaxGitHubAPIRateLimit)
+		assert.Equal(t, 10240, c.MaxStorageMB)
 		assert.Contains(t, c.Message, "Count limit reached")
 	})
 
@@ -212,7 +222,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 		// actually reached. The continuation must bound its end_date at the real
 		// pagination cursor, not the original request's end_date, or a resumed
 		// request restarts from the top of the original window (see github/gh-aw#54110).
-		c := buildContinuationIfNeeded(runs, false, true, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, true, false, continuationOptions{
 			workflowName:          "my-workflow",
 			startDate:             "2026-01-01",
 			endDate:               "2026-06-30",
@@ -226,7 +236,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("timeout reached emits cursor with timeout message", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, true, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, true, false, false, continuationOptions{
 			workflowName:   "my-workflow",
 			startDate:      "2026-06-01",
 			endDate:        "",
@@ -241,8 +251,22 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 		assert.Contains(t, c.Message, "Timeout reached")
 	})
 
+	t.Run("storage limit reached emits resumable cursor", func(t *testing.T) {
+		c := buildContinuationIfNeeded(runs, false, false, true, continuationOptions{
+			workflowName:   "my-workflow",
+			count:          50,
+			maxStorageMB:   2048,
+			pruneOlderRuns: true,
+		})
+		require.NotNil(t, c)
+		assert.Equal(t, int64(2999), c.BeforeRunID)
+		assert.Equal(t, 2048, c.MaxStorageMB)
+		assert.True(t, c.PruneOlderRuns)
+		assert.Contains(t, c.Message, "Storage limit reached")
+	})
+
 	t.Run("neither flag set returns nil", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, false, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, false, false, continuationOptions{
 			workflowName:   "my-workflow",
 			startDate:      "2026-06-01",
 			endDate:        "",
@@ -256,7 +280,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("empty processedRuns returns nil even when count limit reached", func(t *testing.T) {
-		c := buildContinuationIfNeeded(nil, false, true, continuationOptions{
+		c := buildContinuationIfNeeded(nil, false, true, false, continuationOptions{
 			workflowName:   "my-workflow",
 			startDate:      "2026-06-01",
 			endDate:        "",
@@ -267,6 +291,18 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 			timeoutMinutes: 3,
 		})
 		assert.Nil(t, c, "expected nil when no runs were processed")
+	})
+
+	t.Run("empty processedRuns returns current cursor when storage blocks progress", func(t *testing.T) {
+		c := buildContinuationIfNeeded(nil, false, false, true, continuationOptions{
+			workflowName: "my-workflow",
+			count:        100,
+			maxStorageMB: 2048,
+		})
+		require.NotNil(t, c)
+		assert.Zero(t, c.BeforeRunID)
+		assert.Equal(t, 2048, c.MaxStorageMB)
+		assert.Contains(t, c.Message, "Storage limit reached")
 	})
 }
 
@@ -373,14 +409,14 @@ func TestCollectProcessedWorkflowRunsAccumulatesBatches(t *testing.T) {
 		// totalFetched == batchSize keeps pagination going after the first batch.
 		return workflowRunBatch{runs: runs, totalFetched: len(runs), batchSize: 2}, nil
 	}
-	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool) {
+	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
 		for _, run := range batch.runs {
 			processedRuns = append(processedRuns, ProcessedRun{Run: run})
 		}
-		return processedRuns, len(batch.runs), true, false
+		return processedRuns, len(batch.runs), true, false, false
 	}
 
-	runs, timeoutReached, countLimitReached, _, err := collectProcessedWorkflowRuns(
+	runs, timeoutReached, countLimitReached, _, _, err := collectProcessedWorkflowRuns(
 		logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
 		LogsDownloadOptions{Count: 100, StartDate: "-1d"},
 	)
@@ -390,6 +426,43 @@ func TestCollectProcessedWorkflowRunsAccumulatesBatches(t *testing.T) {
 	require.Len(t, runs, 3, "runs from every batch should accumulate across iterations")
 	assert.Equal(t, int64(1), runs[0].Run.DatabaseID)
 	assert.Equal(t, int64(3), runs[2].Run.DatabaseID)
+}
+
+// TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached verifies that
+// continuation does not skip unprocessed runs from the interrupted batch.
+func TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached(t *testing.T) {
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	storageLimit := newLogsStorageLimit(t.TempDir(), 1, false)
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		return workflowRunBatch{
+			runs:                   []WorkflowRun{{DatabaseID: 10}, {DatabaseID: 9}},
+			totalFetched:           2,
+			batchSize:              2,
+			oldestFetchedCreatedAt: time.Now().Add(-time.Hour),
+		}, nil
+	}
+	logsProcessWorkflowRunBatch = func(_ context.Context, _ workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+		storageLimit.reached.Store(true)
+		return append(processedRuns, ProcessedRun{Run: WorkflowRun{DatabaseID: 10}}), 1, true, false, true
+	}
+
+	state := logsCollectionState{beforeDate: "previous-cursor"}
+	stop, err := fetchAndProcessLogsBatch(
+		&state,
+		logsDownloadRuntime{activeCtx: context.Background(), storageLimit: storageLimit},
+		LogsDownloadOptions{Count: 10},
+	)
+
+	require.NoError(t, err)
+	assert.True(t, stop)
+	assert.True(t, state.storageLimitReached)
+	assert.Equal(t, "previous-cursor", state.beforeDate)
 }
 
 // TestStaleLogsWarning verifies that a warning is only emitted when no explicit
@@ -442,7 +515,7 @@ func TestStaleLogsWarning(t *testing.T) {
 // results for a complete scan of the range (see github/gh-aw#53995).
 func TestCollectProcessedWorkflowRunsIterationLimitSurfacesContinuation(t *testing.T) {
 	oldFetchRateLimitFunc := fetchRateLimitFunc
-	fetchRateLimitFunc = func() (rateLimitResource, error) {
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
 		return rateLimitResource{Limit: 5000, Remaining: 5000, Reset: time.Now().Add(time.Hour).Unix()}, nil
 	}
 	t.Cleanup(func() { fetchRateLimitFunc = oldFetchRateLimitFunc })
@@ -467,14 +540,14 @@ func TestCollectProcessedWorkflowRunsIterationLimitSurfacesContinuation(t *testi
 			oldestFetchedCreatedAt: time.Now().Add(-time.Duration(nextID) * time.Hour),
 		}, nil
 	}
-	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool) {
+	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
 		for _, run := range batch.runs {
 			processedRuns = append(processedRuns, ProcessedRun{Run: run})
 		}
-		return processedRuns, len(batch.runs), true, false
+		return processedRuns, len(batch.runs), true, false, false
 	}
 
-	runs, timeoutReached, countLimitReached, _, err := collectProcessedWorkflowRuns(
+	runs, timeoutReached, countLimitReached, _, _, err := collectProcessedWorkflowRuns(
 		logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
 		LogsDownloadOptions{Count: 1000, StartDate: "-90d"},
 	)
@@ -485,7 +558,7 @@ func TestCollectProcessedWorkflowRunsIterationLimitSurfacesContinuation(t *testi
 
 	t.Run("last batch is included when cap is hit", func(t *testing.T) {
 		nextID = 0
-		runs, _, countLimitReached, _, err := collectProcessedWorkflowRuns(
+		runs, _, countLimitReached, _, _, err := collectProcessedWorkflowRuns(
 			logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
 			LogsDownloadOptions{Count: MaxIterations, StartDate: "-90d"},
 		)

@@ -12,8 +12,7 @@ permissions:
   pull-requests: read
   actions: read
   issues: read
-
-
+  copilot-requests: write
 tools:
   github:
     mode: gh-proxy
@@ -33,6 +32,10 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: true
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 ---
 
 ### Daily Windows Terminal Integration Builder

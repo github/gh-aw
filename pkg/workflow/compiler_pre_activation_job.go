@@ -96,8 +96,8 @@ func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupAction
 	if needsContentsRead {
 		perms = NewPermissionsContentsRead()
 	}
-	// Add actions: read permission if rate limiting is configured (needed to query workflow runs).
-	if data.RateLimit != nil {
+	// Add actions: read permission if run history checks are configured.
+	if data.RateLimit != nil || data.Cooldown > 0 {
 		if perms == nil {
 			perms = NewPermissions()
 		}
@@ -139,6 +139,9 @@ func (c *Compiler) buildPreActivationCheckSteps(data *WorkflowData, steps []stri
 	}
 	if data.RateLimit != nil {
 		steps = c.generateRateLimitCheck(data, steps)
+	}
+	if data.Cooldown > 0 {
+		steps = c.generateCooldownCheck(data, steps)
 	}
 	if data.StopTime == "" {
 		return steps
@@ -414,7 +417,8 @@ func buildPreActivationActivatedConditions(data *WorkflowData, needsPermissionCh
 func buildPreActivationMembershipAndTimeConditions(data *WorkflowData, needsPermissionCheck bool) []ConditionNode {
 	conditions := appendPreActivationCondition(nil, needsPermissionCheck, constants.CheckMembershipStepID, constants.IsTeamMemberOutput)
 	conditions = appendPreActivationCondition(conditions, data.StopTime != "", constants.CheckStopTimeStepID, constants.StopTimeOkOutput)
-	return appendPreActivationCondition(conditions, data.RateLimit != nil, constants.CheckRateLimitStepID, constants.RateLimitOkOutput)
+	conditions = appendPreActivationCondition(conditions, data.RateLimit != nil, constants.CheckRateLimitStepID, constants.RateLimitOkOutput)
+	return appendPreActivationCondition(conditions, data.Cooldown > 0, constants.CheckCooldownStepID, constants.CooldownOkOutput)
 }
 
 func buildPreActivationSkipAndCommandConditions(data *WorkflowData) []ConditionNode {
@@ -459,7 +463,7 @@ func buildPreActivationActivatedNode(data *WorkflowData, conditions []ConditionN
 			)
 			return BuildStringLiteral("true"), nil
 		}
-		return nil, errors.New("developer error: pre-activation job created without permission check or stop-time configuration")
+		return nil, errors.New("developer error: pre-activation job created without activation checks or custom steps")
 	}
 	if len(conditions) == 1 {
 		return conditions[0], nil

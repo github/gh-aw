@@ -31,9 +31,10 @@ permissions:
   pull-requests: read
   issues: read
 max-turns: 30
-model: copilot/gpt-5.4
+model: openai/gpt-5.4
 engine:
   id: pi
+  model-provider: openai
 safe-outputs:
   add-comment:
     max: 2

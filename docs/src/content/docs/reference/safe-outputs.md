@@ -66,6 +66,15 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 | [Set Issue Type](#set-issue-type-set-issue-type) | `set-issue-type` | Set or clear the type of GitHub issues (max: 5) |
 | [Set Issue Field](#set-issue-field-set-issue-field) | `set-issue-field` | Set one issue field value by name/value (max: 5) |
 
+### External Integrations
+
+| Output | Key | Description |
+|--------|-----|-------------|
+| [Jira Create Issue](#jira-safe-outputs) | `jira-create-issue` | Create a Jira issue (max: 1) |
+| [Jira Update Issue](#jira-safe-outputs) | `jira-update-issue` | Update a Jira issue summary or description (max: 1) |
+| [Jira Add Comment](#jira-safe-outputs) | `jira-add-comment` | Add a comment to a Jira issue (max: 1) |
+| [Jira Add Label](#jira-safe-outputs) | `jira-add-label` | Add one label to a Jira issue (max: 1) |
+
 ### Projects, Releases & Assets
 
 | Output | Key | Description |
@@ -76,6 +85,17 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 | [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions (max: 1) |
 | [Upload Artifact](#artifact-uploads-upload-artifact) | `upload-artifact` | Upload files as run-scoped GitHub Actions artifacts (max: 1 by default) |
 | [Upload Assets](#asset-uploads-upload-asset) | `upload-asset` | Upload files to orphaned git branch (max: 10, same-repo only). **Prefer `upload-artifact` with `skip-archive` instead.** |
+
+### Azure DevOps Work Items
+
+| Output | Key | Description |
+|--------|-----|-------------|
+| [Create Work Item](#azure-devops-work-items) | `ado-create-work-item` | Create an Azure DevOps work item (max: 1, experimental) |
+| [Update Work Item](#azure-devops-work-items) | `ado-update-work-item` | Update explicitly enabled fields on a scoped work item (max: 1, experimental) |
+| [Comment on Work Item](#azure-devops-work-items) | `ado-comment-on-work-item` | Add a comment to a scoped work item (max: 1, experimental) |
+| [Assign Work Item](#azure-devops-work-items) | `ado-assign-work-item` | Assign an allowed identity to a scoped work item (max: 1, experimental) |
+| [Link Work Items](#azure-devops-work-items) | `ado-link-work-items` | Link two scoped work items (max: 5, experimental) |
+| [Upload Work Item Attachment](#azure-devops-work-items) | `ado-upload-workitem-attachment` | Attach a staged workspace file to a work item (max: 1, experimental) |
 
 ### Security & Agent Tasks
 
@@ -88,6 +108,39 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 | [Autofix Code Scanning Alerts](#autofix-code-scanning-alerts-autofix-code-scanning-alert) | `autofix-code-scanning-alert` | Create automated fixes for code scanning alerts (max: 10, same-repo only) |
 | [Create Check Run](#check-run-creation-create-check-run) | `create-check-run` | Create GitHub Check Runs to surface analysis results in the PR checks UI (default max: 1, same-repo only) |
 | [Create Agent Session](/gh-aw/reference/copilot-cloud-agent/#create-agent-session) | `create-agent-session` | Create Copilot coding agent sessions (max: 1) |
+
+### Linear
+
+| Output | Key | Description |
+|--------|-----|-------------|
+| [Create Linear Issue](#linear-safe-outputs) | `linear-create-issue` | Create an issue in a configured Linear team (max: 1, experimental) |
+| [Add Linear Comment](#linear-safe-outputs) | `linear-add-comment` | Comment on a configured Linear issue (max: 1, experimental) |
+| [Update Linear Issue](#linear-safe-outputs) | `linear-update-issue` | Update enabled fields on a configured Linear issue (max: 1, experimental) |
+
+#### Linear Safe Outputs
+
+:::caution[Experimental]
+Linear Safe Outputs are experimental. Compiling a workflow that enables any Linear Safe Output emits `Using experimental feature: Linear safe outputs`.
+:::
+
+Linear Safe Outputs use Linear's public GraphQL API from the isolated `safe_outputs` job. Configure a personal Linear API key through a secret expression. The credential is not available to the agent.
+
+```yaml wrap
+safe-outputs:
+  linear-token: ${{ secrets.LINEAR_API_KEY }}
+  linear-create-issue:
+    team-id: ${{ vars.LINEAR_TEAM_ID }}
+    project-id: "810f57a7e383"
+    max: 1
+  linear-add-comment:
+    target: "ENG-123"
+  linear-update-issue:
+    target: "ENG-123"
+    title: true
+    body: true
+```
+
+`team-id` accepts a Linear team model UUID, available through Linear's model UUID tooling or API, or a GitHub Actions expression such as `${{ vars.LINEAR_TEAM_ID }}`. Optional `project-id` fixes new issues to a trusted project and accepts either the 12-character identifier from a Linear project URL or its model UUID. When omitted, the compiler loads `LINEAR_TEAM_ID` and `LINEAR_PROJECT_ID` from same-named repository or organization variables. Values in `safe-outputs.env` can override those defaults; explicit `team-id` and `project-id` values take precedence over environment fallbacks. Comment and update targets are fixed trusted configuration and accept either a Linear issue model UUID or shorthand identifier such as `ENG-123`. Updates replace only the enabled `title` and `body` fields. All agent-provided titles, descriptions, and comments use standard Safe Outputs sanitization.
 
 ### System Types (Auto-Enabled)
 
@@ -105,6 +158,52 @@ Create custom post-processing jobs registered as Model Context Protocol (MCP) to
 ### GitHub Action Wrappers (`actions:`)
 
 Mount any public GitHub Action as a once-callable MCP tool. The compiler pins the action reference to a SHA at compile time and derives the tool's input schema from the action's `action.yml`. See [GitHub Action Wrappers](/gh-aw/reference/custom-safe-outputs/#github-action-wrappers-safe-outputsactions).
+
+## Jira Safe Outputs
+
+Jira safe outputs call Jira Cloud REST API v3 from the privileged safe-output job. Jira credentials are not exposed to the agent or included in `agent_output`.
+
+```aw wrap
+---
+on:
+  workflow_dispatch:
+safe-outputs:
+  env:
+    JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+    JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+    JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+  jira-create-issue:
+    max: 1
+  jira-update-issue:
+    max: 1
+  jira-add-comment:
+    max: 1
+  jira-add-label:
+    max: 3
+---
+
+# Jira maintenance
+
+Use Jira safe outputs for Jira mutations.
+```
+
+`JIRA_BASE_URL` is the Jira API base without `/rest/api/3`. For unscoped API tokens, use the site URL, such as `https://example.atlassian.net`. For scoped API tokens, use the Atlassian gateway URL, such as `https://api.atlassian.com/ex/jira/<cloudId>`. The initial authentication mechanism uses an Atlassian account email and API token with HTTP Basic authentication.
+
+Each output accepts `max` and `staged`. In staged mode, the handler writes a Jira-specific preview without requiring credentials or sending an HTTP request.
+
+| Frontmatter key | Agent tool | Inputs |
+|---|---|---|
+| `jira-create-issue` | `jira_create_issue` | Required: `project_key`, `issue_type`, `summary`; optional: `description` |
+| `jira-update-issue` | `jira_update_issue` | Required: `issue_key`; at least one of `summary` or `description` |
+| `jira-add-comment` | `jira_add_comment` | Required: `issue_key`, `body` |
+| `jira-add-label` | `jira_add_label` | Required: `issue_key`, `label` |
+
+Descriptions and comment bodies remain plain strings at the agent boundary. The runtime converts them deterministically to Atlassian Document Format version 1, preserving paragraphs and line breaks. `jira_add_label` uses Jira's additive field-update operation and does not replace existing labels.
+
+> [!IMPORTANT]
+> Unprefixed tools such as `create_issue`, `update_issue`, `add_comment`, and `add_labels` operate on GitHub. Jira operations always use the `jira_` prefix.
+
+This initial integration does not support transitions, assignment, custom fields, priorities, components, attachments, issue links, subtasks, label removal, JQL, bulk operations, arbitrary Jira REST calls, or OAuth installation flows. Update, comment, and label operations require a known Jira issue key; they cannot reference a Jira issue created earlier in the same run.
 
 ## Steering Issues (`steer:`)
 
@@ -1107,6 +1206,48 @@ git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-emp
 **Security**: File path validation (workspace/`/tmp` only), extension allowlist, size limits, SHA-256 verification, orphaned branch isolation, minimal permissions.
 
 **Outputs**: `published_count`, `branch_name`. **Limits**: Same-repo only, max 50MB/file, 100 assets/run.
+
+### Azure DevOps Work Items
+
+Azure DevOps work-item safe outputs use the same public tool names as [`ado-aw`](https://githubnext.github.io/ado-aw/reference/safe-outputs/). The agent remains read-only; the safe-output job performs trusted Azure DevOps REST requests.
+
+Provide the organization, project, and credential only to the safe-output job:
+
+> These safe outputs are experimental. Compiling a workflow emits an experimental feature warning for each configured Azure DevOps work-item output.
+
+```yaml wrap
+safe-outputs:
+  env:
+    AZURE_DEVOPS_ORG_URL: ${{ vars.AZURE_DEVOPS_ORG_URL }}
+    SYSTEM_TEAMPROJECT: ${{ vars.AZURE_DEVOPS_PROJECT }}
+    AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
+  ado-create-work-item:
+    work-item-type: Task
+    area-path: MyProject\Platform
+    allowed-tags: [agent-*]
+  ado-update-work-item:
+    target: MyProject\Platform
+    title: true
+    status: true
+  ado-comment-on-work-item:
+    target: MyProject\Platform
+  ado-assign-work-item:
+    target: "*"
+    allowed: [owner@example.com]
+  ado-link-work-items:
+    target: MyProject\Platform
+    allowed-link-types: [parent, child, related]
+  ado-upload-workitem-attachment:
+    target: MyProject\Platform
+    allowed-extensions: [.txt, .log, .pdf]
+    max-file-size: 5242880
+```
+
+Authentication uses `SYSTEM_ACCESSTOKEN` when present, otherwise `AZURE_DEVOPS_EXT_PAT`. `AZURE_DEVOPS_ORG_URL` must use `https://dev.azure.com/{organization}` or `https://{organization}.visualstudio.com`; redirects and embedded credentials are rejected.
+
+`ado_create_work_item` returns a run-scoped `#aw_...` temporary ID. The other work-item tools accept that ID, and same-run IDs bypass their consuming `target` policy because creation was already scoped by trusted configuration. Numeric IDs are checked against `target`, which accepts `"*"`, a single ID, a list of IDs, or an area-path prefix.
+
+For `ado-update-work-item`, each mutable field must be explicitly enabled. Assignment always rejects the reserved `Agency` and `GitHub Copilot` identities. Attachments must be regular workspace files and are checked for traversal, symbolic links, size, extension, and Azure Pipelines command sequences before upload.
 
 ### No-Op Logging (`noop:`)
 

@@ -148,7 +148,7 @@ The unified `agent` artifact contains agent job outputs:
 - Agent execution logs
 - Safe output data (`agent_output.json`)
 - GitHub API rate limit logs (`github_rate_limits.jsonl`)
-- Token usage summary (`agent_usage.json`) — aggregated totals only; per-request data is in `firewall-audit-logs`
+- Token usage summary (`agent_usage.json`) — aggregated totals only; per-request data is in `firewall-audit-logs`. When AWF records include valid `ai_credits_this_response` and `ai_credits_total` values, the summary preserves those reported values instead of repricing the tokens.
 - `otel.jsonl` — OTLP span mirror written by gh-aw's JavaScript span exporters when `observability.otlp` is configured
 
 For OTLP configuration, runtime environment variables, and span semantics, see the [OpenTelemetry guide](/gh-aw/reference/open-telemetry/).
@@ -204,6 +204,60 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
 
 ```json
 {
+  "schema": "usage-activity-summary/v1",
+  "firewall": {
+    "total_requests": 12,
+    "allowed_requests": 10,
+    "blocked_requests": 2
+  },
+  "gateway": {
+    "total_calls": 5,
+    "failed_calls": 1,
+    "total_input_size": 1000,
+    "total_output_size": 5000,
+    "max_input_size": 400,
+    "max_output_size": 3000,
+    "tool_calls": [
+      {
+        "tool_call_id": "call-1",
+        "timestamp": "2026-09-09T00:00:00Z",
+        "server_name": "github",
+        "tool_name": "issue_read",
+        "request_size": 200,
+        "response_size": 800,
+        "duration_ms": 100,
+        "outcome": "success"
+      }
+    ],
+    "servers": [
+      {
+        "server_name": "github",
+        "request_count": 5,
+        "tool_call_count": 5,
+        "failed_calls": 1
+      }
+    ],
+    "tools": [
+      {
+        "server_name": "github",
+        "tool_name": "issue_read",
+        "call_count": 5,
+        "failed_calls": 1,
+        "total_input_size": 1000,
+        "total_output_size": 5000,
+        "max_input_size": 400,
+        "max_output_size": 3000,
+        "avg_duration_ms": 120,
+        "max_duration_ms": 250
+      }
+    ]
+  },
+  "integrity": {
+    "total_filtered": 2,
+    "filtered_server_counts": { "github": 2 },
+    "filtered_tool_counts": { "issue_read": 2 },
+    "filtered_reason_counts": { "integrity": 2 }
+  },
   "working_set": {
     "measurement_state": "measured",
     "rebuild_factor": 3.9017857142857144,
@@ -215,11 +269,19 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
 }
 ```
 
+MCP `tool_calls` contain quantitative metadata only. Tool-call IDs are replaced with
+run-local opaque identifiers, and request and response content is never copied into
+the usage artifact. `outcome` is `success`, `failure`, or `incomplete`.
+
+The conclusion job derives `gateway` and `integrity` from MCP gateway logs, falling back to `rpc-messages.jsonl` when `gateway.jsonl` is unavailable. These compact aggregates let `gh aw logs --artifacts usage` report MCP call, payload-size, duration, failure, and integrity-filter metrics without downloading raw logs. Cross-run reports include `runs_with_filtered_events`; the existing logs report summary remains the source for the total number of runs.
+
 `rebuild_factor` is `cumulative_input_tokens / peak_input_tokens`, where each invocation contributes the canonical `input_tokens` value from the agent `token_usage.jsonl` record. Cache-read and cache-write fields are not added because provider normalization has already produced that logical input count. The factor is omitted when `measurement_state` is `unavailable`; `partial` means usable records were measured but malformed or unsupported records were ignored.
 
 Working-Set Rebuild Factor measures cumulative context reconstruction relative to peak invocation context. It is an efficiency/trajectory metric, not a measurement of semantic coherence debt and not a predictor of task success. It cannot identify missing task facts or classify outcome quality. The metric is conceptually inspired by [“The Working Set of a Coding Agent: Coherence Debt in Repository-Scale Tasks”](https://arxiv.org/abs/2608.16630), while deliberately limiting the implementation to observable token traffic.
 
 ### Accessing usage data
+
+Token-usage files are diagnostic data produced in the agent runtime. Their mirrored AIC fields support usage reporting and analysis, but are not sufficient evidence to classify a provider failure as a trusted budget-enforcement event.
 
 ```bash
 # Download only the usage artifact

@@ -6,9 +6,11 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/timeutil"
 )
 
 var logsUsageActivityLog = logger.New("cli:logs_usage_activity")
@@ -20,6 +22,7 @@ type usageActivitySummary struct {
 	Firewall    *usageActivityFirewall    `json:"firewall,omitempty"`
 	Session     *usageActivitySession     `json:"session,omitempty"`
 	Gateway     *usageActivityGateway     `json:"gateway,omitempty"`
+	Integrity   *IntegrityFilterSummary   `json:"integrity,omitempty"`
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
@@ -68,15 +71,49 @@ type usageActivitySession struct {
 }
 
 type usageActivityGateway struct {
-	TotalCalls  int                          `json:"total_calls"`
-	FailedCalls int                          `json:"failed_calls"`
-	Servers     []usageActivityGatewayServer `json:"servers,omitempty"`
+	TotalCalls      int                          `json:"total_calls"`
+	FailedCalls     int                          `json:"failed_calls"`
+	TotalInputSize  int                          `json:"total_input_size"`
+	TotalOutputSize int                          `json:"total_output_size"`
+	MaxInputSize    int                          `json:"max_input_size"`
+	MaxOutputSize   int                          `json:"max_output_size"`
+	Servers         []usageActivityGatewayServer `json:"servers,omitempty"`
+	Tools           []usageActivityGatewayTool   `json:"tools,omitempty"`
+	ToolCalls       []usageActivityGatewayCall   `json:"tool_calls,omitempty"`
+}
+
+type usageActivityGatewayCall struct {
+	ToolCallID   string  `json:"tool_call_id"`
+	Timestamp    string  `json:"timestamp"`
+	ServerName   string  `json:"server_name"`
+	ToolName     string  `json:"tool_name"`
+	RequestSize  int     `json:"request_size"`
+	ResponseSize int     `json:"response_size"`
+	DurationMS   float64 `json:"duration_ms"`
+	Outcome      string  `json:"outcome"`
 }
 
 type usageActivityGatewayServer struct {
-	ServerName    string `json:"server_name"`
-	ToolCallCount int    `json:"tool_call_count"`
-	FailedCalls   int    `json:"failed_calls"`
+	ServerName      string  `json:"server_name"`
+	RequestCount    int     `json:"request_count"`
+	ToolCallCount   int     `json:"tool_call_count"`
+	FailedCalls     int     `json:"failed_calls"`
+	TotalInputSize  int     `json:"total_input_size"`
+	TotalOutputSize int     `json:"total_output_size"`
+	AvgDurationMS   float64 `json:"avg_duration_ms"`
+}
+
+type usageActivityGatewayTool struct {
+	ServerName      string  `json:"server_name"`
+	ToolName        string  `json:"tool_name"`
+	CallCount       int     `json:"call_count"`
+	FailedCalls     int     `json:"failed_calls"`
+	TotalInputSize  int     `json:"total_input_size"`
+	TotalOutputSize int     `json:"total_output_size"`
+	MaxInputSize    int     `json:"max_input_size"`
+	MaxOutputSize   int     `json:"max_output_size"`
+	AvgDurationMS   float64 `json:"avg_duration_ms"`
+	MaxDurationMS   float64 `json:"max_duration_ms"`
 }
 
 type usageActivitySafeOutputs struct {
@@ -136,68 +173,8 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 		result.Run.Turns = summary.Session.Turns
 	}
 
-	if summary.Firewall != nil && result.FirewallAnalysis == nil {
-		logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling firewall analysis (total=%d allowed=%d blocked=%d)", summary.Firewall.TotalRequests, summary.Firewall.AllowedRequests, summary.Firewall.BlockedRequests)
-		requestsByDomain := maps.Clone(summary.Firewall.RequestsByDomain)
-		if requestsByDomain == nil {
-			requestsByDomain = map[string]DomainRequestStats{}
-		}
-		allowedSet := map[string]struct{}{}
-		blockedSet := map[string]struct{}{}
-		for _, domain := range summary.Firewall.AllowedDomains {
-			allowedSet[domain] = struct{}{}
-		}
-		for _, domain := range summary.Firewall.BlockedDomains {
-			blockedSet[domain] = struct{}{}
-		}
-		for domain, stats := range requestsByDomain {
-			if stats.Allowed > 0 {
-				allowedSet[domain] = struct{}{}
-			}
-			if stats.Blocked > 0 {
-				blockedSet[domain] = struct{}{}
-			}
-		}
-		allowedDomains := sliceutil.SortedKeys(allowedSet)
-		blockedDomains := sliceutil.SortedKeys(blockedSet)
-
-		result.FirewallAnalysis = &FirewallAnalysis{
-			AnalysisBase: AnalysisBase{
-				DomainBuckets: DomainBuckets{
-					AllowedDomains: allowedDomains,
-					BlockedDomains: blockedDomains,
-				},
-				TotalRequests:   summary.Firewall.TotalRequests,
-				AllowedRequests: summary.Firewall.AllowedRequests,
-				BlockedRequests: summary.Firewall.BlockedRequests,
-			},
-			RequestsByDomain: requestsByDomain,
-		}
-	}
-
-	if summary.Gateway != nil && result.MCPToolUsage == nil {
-		logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling MCP tool usage from %d gateway server(s)", len(summary.Gateway.Servers))
-		servers := make([]MCPServerStats, 0, len(summary.Gateway.Servers))
-		for _, server := range summary.Gateway.Servers {
-			servers = append(servers, MCPServerStats{
-				MCPServerStatsBase: MCPServerStatsBase{
-					ServerName:    server.ServerName,
-					ToolCallCount: server.ToolCallCount,
-					ErrorCount:    server.FailedCalls,
-				},
-				// Keep both RequestCount and ToolCallCount aligned because MCPServerStats
-				// distinguishes overall request volume (RequestCount) from tool-invocation
-				// volume (ToolCallCount). In usage-aggregate mode we only have per-server
-				// tool-call counts, so both fields are populated from that single source.
-				RequestCount: server.ToolCallCount,
-			})
-		}
-		result.MCPToolUsage = &MCPToolUsageData{
-			Summary:   []MCPToolSummary{},
-			ToolCalls: []MCPToolCall{},
-			Servers:   servers,
-		}
-	}
+	applyUsageActivityFirewallSummary(summary.Firewall, result)
+	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
 
 	// Backfill safe output item count from usage summary when the safe-outputs-items
 	// artifact was not downloaded separately. The count is 0-safe: only backfill when
@@ -206,4 +183,221 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 		logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling safe output item count from usage summary (total=%d)", summary.SafeOutputs.TotalItems)
 		result.Run.SafeItemsCount = summary.SafeOutputs.TotalItems
 	}
+}
+
+func applyUsageActivityFirewallSummary(firewall *usageActivityFirewall, result *DownloadResult) {
+	if firewall == nil || result.FirewallAnalysis != nil {
+		return
+	}
+	logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling firewall analysis (total=%d allowed=%d blocked=%d)", firewall.TotalRequests, firewall.AllowedRequests, firewall.BlockedRequests)
+	requestsByDomain := maps.Clone(firewall.RequestsByDomain)
+	if requestsByDomain == nil {
+		requestsByDomain = map[string]DomainRequestStats{}
+	}
+	allowedSet := map[string]struct{}{}
+	blockedSet := map[string]struct{}{}
+	for _, domain := range firewall.AllowedDomains {
+		allowedSet[domain] = struct{}{}
+	}
+	for _, domain := range firewall.BlockedDomains {
+		blockedSet[domain] = struct{}{}
+	}
+	for domain, stats := range requestsByDomain {
+		if stats.Allowed > 0 {
+			allowedSet[domain] = struct{}{}
+		}
+		if stats.Blocked > 0 {
+			blockedSet[domain] = struct{}{}
+		}
+	}
+	result.FirewallAnalysis = &FirewallAnalysis{
+		AnalysisBase: AnalysisBase{
+			DomainBuckets: DomainBuckets{
+				AllowedDomains: sliceutil.SortedKeys(allowedSet),
+				BlockedDomains: sliceutil.SortedKeys(blockedSet),
+			},
+			TotalRequests:   firewall.TotalRequests,
+			AllowedRequests: firewall.AllowedRequests,
+			BlockedRequests: firewall.BlockedRequests,
+		},
+		RequestsByDomain: requestsByDomain,
+	}
+}
+
+func applyUsageActivityMCPSummary(gateway *usageActivityGateway, integritySummary *IntegrityFilterSummary, result *DownloadResult) {
+	if gateway == nil && integritySummary == nil {
+		return
+	}
+	if result.MCPToolUsage != nil {
+		backfillUsageActivityMCPMetrics(gateway, integritySummary, result.MCPToolUsage)
+		return
+	}
+	serverCount := 0
+	if gateway != nil {
+		serverCount = len(gateway.Servers)
+	}
+	logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling MCP tool usage from %d gateway server(s)", serverCount)
+
+	var tools []MCPToolSummary
+	var servers []MCPServerStats
+	if gateway != nil {
+		tools = buildUsageActivityTools(gateway.Tools)
+		servers = buildUsageActivityServers(gateway.Servers)
+	}
+
+	var integrity *IntegrityFilterSummary
+	if integritySummary != nil {
+		integrity = cloneIntegrityFilterSummary(integritySummary)
+	}
+	result.MCPToolUsage = &MCPToolUsageData{
+		Summary:   tools,
+		ToolCalls: buildUsageActivityToolCalls(gateway),
+		Servers:   servers,
+		Integrity: integrity,
+	}
+}
+
+func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySummary *IntegrityFilterSummary, usage *MCPToolUsageData) {
+	if gateway != nil {
+		if len(usage.ToolCalls) == 0 {
+			usage.ToolCalls = buildUsageActivityToolCalls(gateway)
+		}
+		activityTools := make(map[string]usageActivityGatewayTool, len(gateway.Tools))
+		for _, tool := range gateway.Tools {
+			activityTools[tool.ServerName+":"+tool.ToolName] = tool
+		}
+		for index := range usage.Summary {
+			tool := &usage.Summary[index]
+			tool.syncFieldsFromBase()
+			if activity, ok := activityTools[tool.ServerName+":"+tool.ToolName]; ok {
+				backfillUsageActivityToolMetrics(tool, activity)
+			}
+		}
+
+		activityServers := make(map[string]usageActivityGatewayServer, len(gateway.Servers))
+		for _, server := range gateway.Servers {
+			activityServers[server.ServerName] = server
+		}
+		for index := range usage.Servers {
+			server := &usage.Servers[index]
+			if activity, ok := activityServers[server.ServerName]; ok {
+				if server.TotalInputSize == 0 {
+					server.TotalInputSize = activity.TotalInputSize
+				}
+				if server.TotalOutputSize == 0 {
+					server.TotalOutputSize = activity.TotalOutputSize
+				}
+				if server.AvgDuration == "" {
+					server.AvgDuration = formatActivityDuration(activity.AvgDurationMS)
+				}
+			}
+		}
+	}
+	if usage.Integrity == nil && len(usage.FilteredEvents) == 0 && integritySummary != nil {
+		usage.Integrity = cloneIntegrityFilterSummary(integritySummary)
+	}
+}
+
+func buildUsageActivityToolCalls(gateway *usageActivityGateway) []MCPToolCall {
+	if gateway == nil {
+		return nil
+	}
+	calls := make([]MCPToolCall, 0, len(gateway.ToolCalls))
+	for _, call := range gateway.ToolCalls {
+		calls = append(calls, MCPToolCall{
+			ToolCallID: call.ToolCallID,
+			Timestamp:  call.Timestamp,
+			ServerName: call.ServerName,
+			ToolName:   call.ToolName,
+			InputSize:  call.RequestSize,
+			OutputSize: call.ResponseSize,
+			Duration:   formatActivityDuration(call.DurationMS),
+			Status:     call.Outcome,
+		})
+	}
+	return calls
+}
+
+func backfillUsageActivityToolMetrics(tool *MCPToolSummary, activity usageActivityGatewayTool) {
+	if tool.TotalInputSize == 0 {
+		tool.TotalInputSize = activity.TotalInputSize
+	}
+	if tool.TotalOutputSize == 0 {
+		tool.TotalOutputSize = activity.TotalOutputSize
+	}
+	if tool.MaxInputSize == 0 {
+		tool.MaxInputSize = activity.MaxInputSize
+	}
+	if tool.MaxOutputSize == 0 {
+		tool.MaxOutputSize = activity.MaxOutputSize
+	}
+	if tool.AvgDuration == "" {
+		tool.AvgDuration = formatActivityDuration(activity.AvgDurationMS)
+	}
+	if tool.MaxDuration == "" {
+		tool.MaxDuration = formatActivityDuration(activity.MaxDurationMS)
+	}
+	tool.syncBaseFromFields()
+}
+
+func cloneIntegrityFilterSummary(summary *IntegrityFilterSummary) *IntegrityFilterSummary {
+	if summary == nil {
+		return nil
+	}
+	return &IntegrityFilterSummary{
+		TotalFiltered:        summary.TotalFiltered,
+		FilteredServerCounts: maps.Clone(summary.FilteredServerCounts),
+		FilteredToolCounts:   maps.Clone(summary.FilteredToolCounts),
+		FilteredReasonCounts: maps.Clone(summary.FilteredReasonCounts),
+	}
+}
+
+func buildUsageActivityTools(activityTools []usageActivityGatewayTool) []MCPToolSummary {
+	tools := make([]MCPToolSummary, 0, len(activityTools))
+	for _, tool := range activityTools {
+		toolSummary := MCPToolSummary{
+			ServerName:      tool.ServerName,
+			ToolName:        tool.ToolName,
+			CallCount:       tool.CallCount,
+			TotalInputSize:  tool.TotalInputSize,
+			TotalOutputSize: tool.TotalOutputSize,
+			MaxInputSize:    tool.MaxInputSize,
+			MaxOutputSize:   tool.MaxOutputSize,
+			AvgDuration:     formatActivityDuration(tool.AvgDurationMS),
+			MaxDuration:     formatActivityDuration(tool.MaxDurationMS),
+			ErrorCount:      tool.FailedCalls,
+		}
+		toolSummary.syncBaseFromFields()
+		tools = append(tools, toolSummary)
+	}
+	return tools
+}
+
+func buildUsageActivityServers(activityServers []usageActivityGatewayServer) []MCPServerStats {
+	servers := make([]MCPServerStats, 0, len(activityServers))
+	for _, server := range activityServers {
+		requestCount := server.RequestCount
+		if requestCount == 0 {
+			requestCount = server.ToolCallCount
+		}
+		servers = append(servers, MCPServerStats{
+			MCPServerStatsBase: MCPServerStatsBase{
+				ServerName:    server.ServerName,
+				ToolCallCount: server.ToolCallCount,
+				ErrorCount:    server.FailedCalls,
+			},
+			RequestCount:    requestCount,
+			TotalInputSize:  server.TotalInputSize,
+			TotalOutputSize: server.TotalOutputSize,
+			AvgDuration:     formatActivityDuration(server.AvgDurationMS),
+		})
+	}
+	return servers
+}
+
+func formatActivityDuration(milliseconds float64) string {
+	if milliseconds <= 0 {
+		return ""
+	}
+	return timeutil.FormatDuration(time.Duration(milliseconds * float64(time.Millisecond)))
 }

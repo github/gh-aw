@@ -1,7 +1,7 @@
 // @ts-check
 
 const { formatJSONFiles, runCustomMemoryValidation, writeValidationMarker, clearValidationMarker } = require("./memory_custom_validation.cjs");
-const { validateMemoryFiles } = require("./validate_memory_files.cjs");
+const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
 
 /**
  * @param {{ error: (message: string) => void, info: (message: string) => void, setFailed: (message: string) => void }} core
@@ -22,12 +22,12 @@ function validateMemoryStep(core, options) {
     clearValidationMarker(options.kind, memoryId);
   }
 
+  // Allowed-extensions (and file-glob, when present) are persistence filters, not hard
+  // failures: ineligible files are logged and removed here so that custom validation,
+  // artifact upload/save, and any downstream push all see the same effective file set.
+  // This mirrors the filtering applied for repo-memory before this step runs.
   if (allowedExtensions.length > 0) {
-    const result = validateMemoryFiles(memoryDir, options.kind, allowedExtensions, core);
-    if (!result.valid) {
-      core.setFailed(`Storage file type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only ${allowedExtensions.join(", ")} are allowed.`);
-      failed = true;
-    }
+    filterIneligibleMemoryFiles(memoryDir, allowedExtensions, process.env.FILE_GLOB_FILTER || "", core);
   }
 
   if (options.formatJSON) {

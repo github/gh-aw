@@ -14,6 +14,7 @@ Update existing workflow files in `.github/workflows/`.
 - [workflow-constraints.md](workflow-constraints.md)
 - [safe-outputs.md](safe-outputs.md)
 - [syntax.md](syntax.md)
+- [intent.md](intent.md) for preserving the outcome and re-deriving evals or operational value when it changes
 
 Load these additional files only when relevant:
 
@@ -33,7 +34,7 @@ This prompt is for **updating existing workflows only**. For new workflows, use 
 
 1. Ask which workflow to update.
 2. Ask what change is needed.
-3. Then inspect the existing file before proposing edits.
+3. Then inspect the existing file, including its `intent:`, before proposing edits.
 
 ## First Decision: Frontmatter or Prompt Body?
 
@@ -44,6 +45,9 @@ Use [workflow-editing.md](workflow-editing.md) as the source of truth for when r
 - make the smallest possible change
 - preserve existing style and structure unless reorganization is required
 - do not rewrite unrelated frontmatter sections
+- preserve the existing `intent:` for implementation-only changes, including trigger or output-channel redesigns
+- when the requested outcome materially expands, contracts, or changes, update `intent:` and re-derive its applicability, required effects, no-op conditions, architecture, and evals using [intent.md](intent.md)
+- when an implementation-only change selects a different architecture, revalidate activation conditions, evidence window, deduplication or previous-result strategy, no-op behavior, and evals so event-specific rules do not survive an incompatible redesign
 - when targeting the Copilot coding agent, recommend `permissions: { copilot-requests: write }` for Copilot authentication
 - prefer `toolsets:` for GitHub tools
 - when the user asks for specific skills or agent plugins, add them to the top-level `skills:` / `plugins:` frontmatter fields; never add on-the-fly install steps or prompt instructions to install them at run time (see [skills.md](skills.md))
@@ -108,6 +112,7 @@ plugins:
 ## Validation Flow
 
 - always inspect the workflow before editing
+- explicitly determine whether the existing intent is preserved or changed
 - always compile after any change to keep `.lock.yml` in sync
 - keep the workflow valid at every step
 - summarize what changed and whether recompilation was needed

@@ -191,7 +191,6 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   const allowContext = mentionsConfig?.allowContext !== false; // default: true
   const allowedList = mentionsConfig?.allowed || [];
   const allowedTeams = mentionsConfig?.allowedTeams || [];
-  const maxMentions = mentionsConfig?.max || 50;
 
   try {
     const { owner, repo } = context.repo;
@@ -234,23 +233,14 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
     // If collaborator mentions are disabled, only use known authors (context + allowed list)
     if (!allowCollaboratorMentions) {
       core.info(`[MENTIONS] Collaborator mentions disabled - only allowing context (${deduplicatedKnownAuthors.length} users)`);
-      if (deduplicatedKnownAuthors.length > maxMentions) {
-        core.warning(`[MENTIONS] Mention limit exceeded: ${deduplicatedKnownAuthors.length} mentions, limiting to ${maxMentions}`);
-      }
-      return deduplicatedKnownAuthors.slice(0, maxMentions);
+      return deduplicatedKnownAuthors;
     }
 
     // Build allowed mentions list from known authors and collaborators
     // We pass the known authors as fake mentions in text so they get processed
     const fakeText = deduplicatedKnownAuthors.map(author => `@${author}`).join(" ");
     const mentionResult = await resolveMentionsLazily(fakeText, deduplicatedKnownAuthors, owner, repo, github, core);
-    let allowedMentions = mentionResult.allowedMentions;
-
-    // Apply max limit
-    if (allowedMentions.length > maxMentions) {
-      core.warning(`[MENTIONS] Mention limit exceeded: ${allowedMentions.length} mentions, limiting to ${maxMentions}`);
-      allowedMentions = allowedMentions.slice(0, maxMentions);
-    }
+    const allowedMentions = mentionResult.allowedMentions;
 
     if (allowedMentions.length > 0) {
       core.info(`[OUTPUT COLLECTOR] Allowed mentions: ${allowedMentions.join(", ")}`);

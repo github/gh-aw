@@ -16,25 +16,23 @@ func findCyclePath(cycleNodes map[string]struct {
 }, dependencies map[string][]string) []string {
 	importLog.Printf("Finding cycle path among %d cycle nodes", len(cycleNodes))
 
-	// Pick any node in the cycle as a starting point (use sorted order for determinism)
-	var startNode string
+	// Try nodes in sorted order for determinism. Kahn's unprocessed set can also
+	// contain files that depend on a cycle without participating in it.
 	sortedNodes := sliceutil.SortedKeys(cycleNodes)
-	if len(sortedNodes) > 0 {
-		startNode = sortedNodes[0]
-	} else {
+	if len(sortedNodes) == 0 {
 		importLog.Print("No cycle nodes found, cannot determine cycle path")
 		return nil
 	}
 
-	importLog.Printf("Starting DFS cycle detection from node: %s", startNode)
-
-	// Use DFS to find a path from startNode back to itself
-	visited := make(map[string]struct {
-	})
-	path := []string{}
-	if dfsForCycle(startNode, startNode, cycleNodes, dependencies, visited, &path, true) {
-		importLog.Printf("Cycle path found: %v", path)
-		return path
+	for _, startNode := range sortedNodes {
+		importLog.Printf("Starting DFS cycle detection from node: %s", startNode)
+		visited := make(map[string]struct {
+		})
+		path := []string{}
+		if dfsForCycle(startNode, startNode, cycleNodes, dependencies, visited, &path, true) {
+			importLog.Printf("Cycle path found: %v", path)
+			return path
+		}
 	}
 
 	importLog.Print("DFS completed but no cycle path could be constructed")
@@ -63,8 +61,10 @@ func dfsForCycle(current, target string, cycleNodes map[string]struct {
 
 	// Explore each dependency
 	for _, dep := range sortedDeps {
-		// Found the cycle - we've reached the target again
-		if !isFirst && dep == target {
+		// Found the cycle - we've reached the target again. A direct self-edge
+		// (dep == current) always counts as a cycle, even on the first call,
+		// so that self-imports (e.g. a.md importing a.md) are detected.
+		if dep == target && (!isFirst || dep == current) {
 			importLog.Printf("Cycle back-edge found: %s -> %s", current, dep)
 			*path = append(*path, dep) // Add the back-edge
 			return true

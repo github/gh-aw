@@ -207,6 +207,64 @@ describe("model_costs.cjs", () => {
     expect(aic).toBeCloseTo(0.336, 6);
   });
 
+  it("uses explicit inclusive cache semantics when present", async () => {
+    writeModelsFixture({
+      "github-copilot": {
+        models: {
+          "gpt-4o-mini": {
+            cost: {
+              input: "0.00000015",
+              output: "0.0000006",
+              cache_read: "0.000000075",
+            },
+          },
+        },
+      },
+    });
+
+    const { computeInferenceAIC } = await import("./model_costs.cjs");
+    const aic = computeInferenceAIC({
+      provider: "copilot",
+      model: "gpt-4o-mini",
+      inputTokens: 1000,
+      outputTokens: 100,
+      cacheReadTokens: 400,
+      cacheWriteTokens: 100,
+      inputTokensIncludeCache: true,
+    });
+
+    expect(aic).toBeCloseTo(0.018, 6);
+  });
+
+  it("uses explicit additive cache semantics when present", async () => {
+    writeModelsFixture({
+      "github-copilot": {
+        models: {
+          "gpt-4o-mini": {
+            cost: {
+              input: "0.00000015",
+              output: "0.0000006",
+              cache_read: "0.000000075",
+            },
+          },
+        },
+      },
+    });
+
+    const { computeInferenceAIC } = await import("./model_costs.cjs");
+    const aic = computeInferenceAIC({
+      provider: "copilot",
+      model: "gpt-4o-mini",
+      inputTokens: 1000,
+      outputTokens: 100,
+      cacheReadTokens: 400,
+      cacheWriteTokens: 100,
+      inputTokensIncludeCache: false,
+    });
+
+    expect(aic).toBeCloseTo(0.0255, 6);
+  });
+
   it("falls back to bundled models.json when GH_AW_MODELS_JSON_PATH points to a non-existent file", async () => {
     // Simulate the detection/evals job scenario: GH_AW_MODELS_JSON_PATH is set to
     // /tmp/gh-aw/models.json but that file was never downloaded from the activation artifact.

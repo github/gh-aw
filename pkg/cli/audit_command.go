@@ -12,9 +12,12 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/spf13/cobra"
 )
+
+var auditCommandLog = logger.New("cli:audit_command")
 
 var auditCommandLong = `Audit one or more workflow runs by downloading artifacts and logs, detecting errors,
 analyzing MCP tool usage, and generating a concise report suitable for AI agents.
@@ -105,6 +108,7 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 	if err != nil || handled {
 		return err
 	}
+	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
 	if len(args) == 1 {
 		return runAuditSingle(cmd.Context(), args[0], opts)
 	}
@@ -167,6 +171,7 @@ func resolveAuditCommandArgs(args []string, stdin bool) ([]string, bool, error) 
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
 			return nil, true, nil
 		}
+		auditCommandLog.Printf("Read %d run ID(s)/URL(s) from stdin", len(stdinURLs))
 		args = stdinURLs
 	}
 	if len(args) == 0 {
@@ -189,6 +194,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	if err := applyAuditRepoFlag(opts.repoFlag, components); err != nil {
 		return err
 	}
+	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
 	return AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
 		Repo:             components.Repo,
@@ -257,6 +263,7 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 		compareRunIDs = append(compareRunIDs, c.Number)
 	}
 
+	auditCommandLog.Printf("Running multi-run diff audit: base=%d, compare_count=%d, format=%s", baseComponents.Number, len(compareRunIDs), format)
 	return RunAuditDiff(ctx, baseComponents.Number, compareRunIDs, AuditOptions{
 		Owner:        owner,
 		Repo:         repo,

@@ -50,7 +50,7 @@ type UploadArtifactConfig struct {
 }
 
 // parseUploadArtifactConfig parses the upload-artifact key from the safe-outputs map.
-func (c *Compiler) parseUploadArtifactConfig(outputMap map[string]any) *UploadArtifactConfig {
+func (c *Compiler) parseUploadArtifactConfig(outputMap map[string]any) *UploadArtifactConfig { //nolint:largefunc // Existing upload-artifact parsing remains centralized; Azure attachment staging only reuses its artifact channel.
 	configData, exists := outputMap["upload-artifact"]
 	if !exists {
 		return nil
@@ -170,7 +170,7 @@ func (c *Compiler) parseUploadArtifactConfig(outputMap map[string]any) *UploadAr
 // This step only appears when upload-artifact is configured in safe-outputs.
 // pinAction resolves the upload-artifact action reference; pass c.getActionPin from Compiler methods.
 func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *WorkflowData, pinAction func(string) string) {
-	if data.SafeOutputs == nil || data.SafeOutputs.UploadArtifact == nil {
+	if data.SafeOutputs == nil || !usesSafeOutputsArtifactStaging(data.SafeOutputs) {
 		return
 	}
 
@@ -187,4 +187,8 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	fmt.Fprintf(builder, "          path: %s\n", artifactStagingDirExpr)
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")
+}
+
+func usesSafeOutputsArtifactStaging(config *SafeOutputsConfig) bool {
+	return config != nil && (config.UploadArtifact != nil || config.UploadWorkItemAttachments != nil)
 }

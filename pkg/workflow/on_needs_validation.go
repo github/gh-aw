@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -12,7 +13,10 @@ import (
 
 var onNeedsValidationLog = logger.New("workflow:on_needs_validation")
 
-var onNeedsOutputExpressionPattern = regexp.MustCompile(`^\$\{\{\s*needs\.([A-Za-z_][A-Za-z0-9_-]*)\.outputs\.[A-Za-z_][A-Za-z0-9_-]*\s*\}\}$`)
+var (
+	onNeedsOutputExpressionPattern = regexp.MustCompile(`^\$\{\{\s*needs\.([A-Za-z_][A-Za-z0-9_-]*)\.outputs\.[A-Za-z_][A-Za-z0-9_-]*\s*\}\}$`)
+	needsJobReferencePattern       = regexp.MustCompile(`\bneeds\.([A-Za-z_][A-Za-z0-9_-]*)\.`)
+)
 
 func (c *Compiler) validateOnNeeds(data *WorkflowData) error {
 	if data == nil {
@@ -25,6 +29,10 @@ func (c *Compiler) validateOnNeeds(data *WorkflowData) error {
 		return err
 	}
 
+	if err := c.validatePromptNeedsAvailableBeforeActivation(data); err != nil {
+		return err
+	}
+
 	if err := c.validateOnNeedsDependencyChains(data); err != nil {
 		return err
 	}
@@ -34,6 +42,58 @@ func (c *Compiler) validateOnNeeds(data *WorkflowData) error {
 	}
 
 	return nil
+}
+
+func (c *Compiler) validatePromptNeedsAvailableBeforeActivation(data *WorkflowData) error {
+	if data == nil || len(data.Jobs) == 0 {
+		return nil
+	}
+
+	allowed := c.activationDependencySetForPromptNeeds(data)
+	for _, jobName := range extractNeedsJobReferencesFromPrompt(c.collectRuntimeImportMarkdownForCompilerAnalysis(data)) {
+		if _, isCustomJob := data.Jobs[jobName]; !isCustomJob || setutil.Contains(allowed, jobName) {
+			continue
+		}
+		return fmt.Errorf(
+			"prompt references needs.%s.* but custom job %q is not available before activation. Add it to on.needs, remove its explicit needs so gh-aw can add it automatically, or avoid evaluating it during activation",
+			jobName,
+			jobName,
+		)
+	}
+	return nil
+}
+
+func (c *Compiler) activationDependencySetForPromptNeeds(data *WorkflowData) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	for _, jobName := range data.OnNeeds {
+		allowed[jobName] = struct{}{}
+	}
+	for _, jobName := range c.getCustomJobsDependingOnPreActivation(data.Jobs) {
+		allowed[jobName] = struct{}{}
+	}
+	for _, jobName := range c.getCustomJobsReferencedInPromptWithNoActivationDep(data) {
+		allowed[jobName] = struct{}{}
+	}
+	return allowed
+}
+
+func extractNeedsJobReferencesFromPrompt(promptContent string) []string {
+	matches := needsJobReferencePattern.FindAllStringSubmatch(promptContent, -1)
+	seen := make(map[string]struct{})
+	var jobNames []string
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		jobName := match[1]
+		if setutil.Contains(seen, jobName) {
+			continue
+		}
+		seen[jobName] = struct{}{}
+		jobNames = append(jobNames, jobName)
+	}
+	sort.Strings(jobNames)
+	return jobNames
 }
 
 func validateOnNeedsTargets(data *WorkflowData) error {

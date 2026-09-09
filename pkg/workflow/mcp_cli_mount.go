@@ -64,7 +64,7 @@ func appendCustomMCPServerIfEligible(servers []string, toolName string, toolValu
 //
 // Returns nil when no servers are eligible for mounting.
 // The GitHub MCP server is excluded (handled differently).
-func getMCPCLIServerNames(data *WorkflowData) []string {
+func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // Existing CLI proxy selection handles all supported tool sources.
 	if data == nil {
 		return nil
 	}
@@ -206,7 +206,7 @@ func getMountedCLIServerNamesIfBashRestricted(workflowData *WorkflowData, tools 
 	return getMCPCLIServerNames(buildCLIWorkflowDataForMounts(workflowData, tools, safeOutputs, mcpScripts))
 }
 
-func withMountedCLIShellCommandsInRestrictedBash(workflowData *WorkflowData) map[string]any {
+func withMountedCLIShellCommandsInRestrictedBash(workflowData *WorkflowData) map[string]any { //nolint:largefunc // Existing shell wrapper logic preserves command rewriting order.
 	if workflowData == nil {
 		return nil
 	}
@@ -310,7 +310,7 @@ func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *Workflow
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        env:\n")
 	if !enclavesEnabled(data) {
-		yaml.WriteString("          MCP_GATEWAY_API_KEY: ${{ steps.start-mcp-gateway.outputs.gateway-api-key }}\n")
+		yaml.WriteString("          MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}\n")
 	}
 	yaml.WriteString("          MCP_GATEWAY_DOMAIN: ${{ steps.start-mcp-gateway.outputs.gateway-domain }}\n")
 	yaml.WriteString("          MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}\n")

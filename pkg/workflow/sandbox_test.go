@@ -64,10 +64,10 @@ func TestValidateSandboxConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "sandbox.agent false with valid justification",
+			name: "sandbox.agent false with feature enabled",
 			data: &WorkflowData{
 				Features: map[string]any{
-					"dangerously-disable-sandbox-agent": "controlled environment with no internet access",
+					"dangerously-disable-sandbox-agent": true,
 				},
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -77,7 +77,7 @@ func TestValidateSandboxConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "sandbox.agent false without justification",
+			name: "sandbox.agent false without feature",
 			data: &WorkflowData{
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -89,10 +89,10 @@ func TestValidateSandboxConfig(t *testing.T) {
 			errorMsg:    "dangerously-disable-sandbox-agent",
 		},
 		{
-			name: "sandbox.agent false with short justification",
+			name: "sandbox.agent false with feature disabled",
 			data: &WorkflowData{
 				Features: map[string]any{
-					"dangerously-disable-sandbox-agent": "too short",
+					"dangerously-disable-sandbox-agent": false,
 				},
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -101,13 +101,13 @@ func TestValidateSandboxConfig(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "at least 20 characters",
+			errorMsg:    "dangerously-disable-sandbox-agent",
 		},
 		{
-			name: "sandbox.agent false with expression justification",
+			name: "sandbox.agent false with legacy feature",
 			data: &WorkflowData{
 				Features: map[string]any{
-					"dangerously-disable-sandbox-agent": "${{ inputs.reason }}",
+					"dangerously-disable-sandbox": true,
 				},
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -116,7 +116,22 @@ func TestValidateSandboxConfig(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "expressions",
+			errorMsg:    "dangerously-disable-sandbox-agent",
+		},
+		{
+			name: "sandbox.agent false with non-boolean feature",
+			data: &WorkflowData{
+				Features: map[string]any{
+					"dangerously-disable-sandbox-agent": "true",
+				},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Disabled: true,
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "dangerously-disable-sandbox-agent",
 		},
 	}
 
@@ -376,6 +391,51 @@ func TestEnsureCacheMemoryWritePaths(t *testing.T) {
 		"/tmp/gh-aw/cache-memory",
 		"/tmp/gh-aw/cache-memory-session",
 	}, sandboxConfig.Agent.Config.Filesystem.AllowWrite)
+}
+
+func TestEnsureRepoMemoryWritePaths(t *testing.T) {
+	sandboxConfig := applySandboxDefaults(&SandboxConfig{
+		Agent: &AgentSandboxConfig{
+			Type:    SandboxTypeAWF,
+			Runtime: AgentRuntimeCloudHypervisor,
+		},
+	}, &EngineConfig{ID: "claude"})
+	repoMemoryConfig := &RepoMemoryConfig{
+		Memories: []RepoMemoryEntry{
+			{ID: "default"},
+			{ID: "notes"},
+		},
+	}
+
+	ensureRepoMemoryWritePaths(sandboxConfig, repoMemoryConfig)
+	ensureRepoMemoryWritePaths(sandboxConfig, repoMemoryConfig)
+
+	require.NotNil(t, sandboxConfig.Agent.Config)
+	require.NotNil(t, sandboxConfig.Agent.Config.Filesystem)
+	assert.Equal(t, []string{
+		defaultAgentWorkspaceWritePath,
+		cloudHypervisorWorkspaceWritePath,
+		cloudHypervisorAwfHomeWritePath,
+		"/tmp/gh-aw/repo-memory/default",
+		"/tmp/gh-aw/repo-memory/notes",
+	}, sandboxConfig.Agent.Config.Filesystem.AllowWrite)
+}
+
+func TestEnsureRepoMemoryWritePathsSkipsNonCloudHypervisorRuntime(t *testing.T) {
+	sandboxConfig := applySandboxDefaults(&SandboxConfig{
+		Agent: &AgentSandboxConfig{
+			Type: SandboxTypeAWF,
+		},
+	}, &EngineConfig{ID: "claude"})
+	repoMemoryConfig := &RepoMemoryConfig{
+		Memories: []RepoMemoryEntry{{ID: "default"}},
+	}
+
+	ensureRepoMemoryWritePaths(sandboxConfig, repoMemoryConfig)
+
+	if sandboxConfig.Agent.Config != nil && sandboxConfig.Agent.Config.Filesystem != nil {
+		assert.NotContains(t, sandboxConfig.Agent.Config.Filesystem.AllowWrite, "/tmp/gh-aw/repo-memory/default")
+	}
 }
 
 func TestMergeImportedSandboxAgentMounts(t *testing.T) {

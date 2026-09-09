@@ -1,7 +1,8 @@
+//go:build !integration
+
 package workflow
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,197 +11,253 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
-func enclaveGitHubIssuesWorkflowData() *WorkflowData {
-	data := enclaveWorkflowData(false, true, 0, 120)
-	data.Enclaves[0].Agent.GitHub = &AgentEnclaveGitHubConfig{CLI: enclaveGitHubIssuesProfile}
-	data.SandboxConfig.MCP = &MCPGatewayRuntimeConfig{
-		Container: constants.DefaultMCPGatewayContainer,
-		Version:   string(constants.MCPGEnclaveGitHubIssuesMinVersion),
+func TestEnclaveGitHubMCPAgentPolicy(t *testing.T) {
+	tests := []struct {
+		name             string
+		data             *WorkflowData
+		wantTools        []string
+		wantRepos        []string
+		wantMinIntegrity string
+	}{
+		{
+			name: "legacy profile defaults",
+			data: func() *WorkflowData {
+				data := enclaveGitHubIssuesWorkflowData()
+				data.Enclaves[0].Repos = []*EnclaveRepository{
+					{Repo: "octo-org/trusted-service", Sensitivity: "trusted"},
+					{Repo: "octo-org/public-docs", Sensitivity: "public"},
+				}
+				return data
+			}(),
+			wantTools:        []string{"list_issues", "issue_read"},
+			wantRepos:        []string{"octo-org/trusted-service", "octo-org/public-docs"},
+			wantMinIntegrity: "approved",
+		},
+		{
+			name: "agent tools config overrides defaults",
+			data: func() *WorkflowData {
+				data := enclaveGitHubToolsWorkflowData()
+				data.Enclaves[0].Repos = []*EnclaveRepository{
+					{Repo: "octo-org/private-service", Sensitivity: "confidential"},
+					{Repo: "octo-org/public-docs", Sensitivity: "public"},
+				}
+				data.Enclaves[0].Agent.Tools.GitHub.AllowedRepos = GitHubReposScope{"octo-org/public-docs"}
+				return data
+			}(),
+			wantTools:        []string{"list_issues", "issue_read"},
+			wantRepos:        []string{"octo-org/public-docs"},
+			wantMinIntegrity: "none",
+		},
 	}
-	return data
-}
 
-func TestBuildEnclaveGitHubProxyPolicyJSON(t *testing.T) {
-	data := enclaveGitHubIssuesWorkflowData()
-	data.Enclaves[0].Repos = append(data.Enclaves[0].Repos, &EnclaveRepository{
-		Repo: "octo-org/public-docs", Sensitivity: "public",
-	})
-
-	policyJSON, err := buildEnclaveGitHubProxyPolicyJSON(data, "123456")
-	require.NoError(t, err)
-	assert.Contains(t, policyJSON, `"version":1`)
-	assert.Contains(t, policyJSON, `"audience":"gh-aw-enclave-github"`)
-	assert.Contains(t, policyJSON, `"repositories":[`)
-	assert.Contains(t, policyJSON, `"max_capability_ttl_seconds":600`)
-	assert.NotContains(t, policyJSON, "assigned_repositories")
-	assert.NotContains(t, policyJSON, "max_ttl_seconds")
-
-	var policy enclaveGitHubProxyPolicy
-	require.NoError(t, json.Unmarshal([]byte(policyJSON), &policy))
-	assert.Equal(t, 1, policy.Version)
-	assert.Equal(t, "123456", policy.WorkflowRunID)
-	assert.Equal(t, enclaveGitHubIssuesProfile, policy.Profile)
-	assert.Equal(t, enclaveGitHubProxyAudience, policy.Audience)
-	assert.Equal(t, "approved", policy.PublicMinimumIntegrity)
-	assert.Equal(t, []string{"issues.comments.list", "issues.get", "issues.list"}, policy.AllowedOperations)
-	assert.Equal(t, enclaveGitHubProxyMaxTTL, policy.MaxCapabilityTTL)
-	assert.Equal(t, []enclaveGitHubPolicyRepository{
-		{Repo: "octo-org/private-service", Sensitivity: "confidential"},
-		{Repo: "octo-org/public-docs", Sensitivity: "public"},
-	}, policy.Repositories)
-}
-
-func TestEnclaveGitHubProxyPolicyInheritsPrimaryIntegrity(t *testing.T) {
-	data := enclaveGitHubIssuesWorkflowData()
-	data.Tools["github"] = map[string]any{"min-integrity": "merged"}
-
-	policyJSON, err := buildEnclaveGitHubProxyPolicyJSON(data, "123456")
-	require.NoError(t, err)
-	assert.Contains(t, policyJSON, `"public_min_integrity":"merged"`)
-
-	data.Tools = map[string]any{}
-	data.ParsedTools = &ToolsConfig{
-		GitHub: &GitHubToolConfig{MinIntegrity: GitHubIntegrityUnapproved},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := enclaveGitHubMCPAgentPolicy(tt.data)
+			assert.Equal(t, []string{"github"}, policy.Servers)
+			assert.Equal(t, map[string][]string{"github": tt.wantTools}, policy.Tools)
+			assert.Equal(t, map[string]any{
+				"repos":         tt.wantRepos,
+				"min-integrity": tt.wantMinIntegrity,
+			}, policy.AllowOnly)
+		})
 	}
-	policyJSON, err = buildEnclaveGitHubProxyPolicyJSON(data, "123456")
-	require.NoError(t, err)
-	assert.Contains(t, policyJSON, `"public_min_integrity":"unapproved"`)
-
-	data.Tools["github"] = map[string]any{"min-integrity": "merged"}
-	policyJSON, err = buildEnclaveGitHubProxyPolicyJSON(data, "123456")
-	require.NoError(t, err)
-	assert.Contains(t, policyJSON, `"public_min_integrity":"unapproved"`)
 }
 
-func TestGenerateEnclaveGitHubProxySetup(t *testing.T) {
+func TestEnclaveGitHubMCPGatewayConfiguration(t *testing.T) {
 	data := enclaveGitHubIssuesWorkflowData()
-	var yaml strings.Builder
-	require.NoError(t, (&Compiler{}).generateStartEnclaveGitHubProxyStep(&yaml, data))
-	generated := yaml.String()
+	data.Tools["github"] = map[string]any{}
+	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	config := buildMCPGatewayConfig(data)
 
-	assert.Contains(t, generated, "- name: Start Enclave GitHub Proxy")
-	assert.Contains(t, generated, "GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN }}")
-	assert.Contains(t, generated, enclaveGitHubProxyAliasEnv+": "+enclaveGitHubProxyNetworkAlias)
-	assert.Contains(t, generated, "ENCLAVE_GITHUB_PROXY_POLICY_TEMPLATE:")
-	assert.Contains(t, generated, `"allowed_operations":["issues.comments.list","issues.get","issues.list"]`)
-	assert.Contains(t, generated, "start_enclave_github_proxy.sh")
-	assert.NotContains(t, generated, enclaveGitHubProxyRootKeyEnv+":")
-	assert.NotContains(t, generated, enclaveGitHubProxyContainerEnv+":")
+	assert.Empty(t, config.AgentID)
+	assert.Equal(t, []string{"${MCP_GATEWAY_AGENT_ID}", "${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"}, config.AgentIDs)
+	assert.Equal(t, []string{enclaveMCPServerName, "github", constants.SafeOutputsMCPServerID.String()}, config.AgentPolicies["${MCP_GATEWAY_AGENT_ID}"].Servers)
+	assert.Equal(t, []string{"github"}, config.AgentPolicies["${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"].Servers)
+
+	generatedServers := make(map[string]struct{})
+	for _, server := range collectMCPServersForManifest(data) {
+		generatedServers[server.Name] = struct{}{}
+	}
+	for agentID, policy := range config.AgentPolicies {
+		for _, server := range policy.Servers {
+			assert.Contains(t, generatedServers, server, "policy for %s references an unknown MCP server", agentID)
+		}
+	}
 }
 
-func TestGenerateEnclaveGitHubProxyStopAlwaysRuns(t *testing.T) {
+func TestToolsWithEnclaveGitHubIssuesUnionsTypedToolsets(t *testing.T) {
 	data := enclaveGitHubIssuesWorkflowData()
+	tools := map[string]any{
+		"github": map[string]any{"toolsets": []string{"context"}},
+	}
+
+	updated := toolsWithEnclaveGitHubIssues(tools, data)
+
+	assert.Equal(t, []string{"context", "issues"}, updated["github"].(map[string]any)["toolsets"])
+	assert.Equal(t, []string{"context"}, tools["github"].(map[string]any)["toolsets"], "original tools must remain unchanged")
+}
+
+func TestDynamicEnclaveRegistersGitHubBackend(t *testing.T) {
+	data := dynamicEnclaveWorkflowData()
+	config := buildMCPGatewayConfig(data)
+
+	// The GitHub backend stays registered so mcpg's delegation controller can
+	// issue delegated identities for it, but the primary agent identity must
+	// not gain GitHub MCP access merely because a dynamic enclave is enabled.
+	assert.Contains(t, collectMCPTools(data), "github")
+	assert.NotContains(t, config.AgentPolicies["${MCP_GATEWAY_AGENT_ID}"].Servers, "github")
+}
+
+func TestDynamicEnclaveWithPrimaryGitHubRetainsPrimaryAccess(t *testing.T) {
+	data := dynamicEnclaveWorkflowData()
+	data.Tools["github"] = map[string]any{}
+	config := buildMCPGatewayConfig(data)
+
+	assert.Contains(t, config.AgentPolicies["${MCP_GATEWAY_AGENT_ID}"].Servers, "github")
+	assert.NotEmpty(t, config.AgentPolicies["${MCP_GATEWAY_AGENT_ID}"].Tools["github"])
+}
+
+func TestGenerateMCPSetupDynamicEnclaveGitHubBackendWithoutPrimaryGitHub(t *testing.T) {
+	workflowData := dynamicEnclaveWorkflowData()
+	workflowData.Tools["github"] = false
+	workflowData.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	workflowData.SandboxConfig.MCP.Version = ""
+	workflowData.TimeoutMinutes = "timeout-minutes: 20"
+	workflowData.Enclaves[0].Dynamic.Sensitivity = "internal"
+	workflowData.Enclaves[0].Dynamic.AllowedOwners = []string{"github"}
+	workflowData.Enclaves[0].Dynamic.AllowedRepositories = nil
+
+	ensureDefaultMCPGatewayConfig(workflowData)
+
+	compiler := &Compiler{}
+	engine := NewCopilotEngine()
 	var yaml strings.Builder
-	(&Compiler{}).generateStopEnclaveGitHubProxyStep(&yaml, data)
-	generated := yaml.String()
+	require.NoError(t, compiler.generateMCPSetup(&yaml, workflowData.Tools, engine, workflowData))
 
-	assert.Contains(t, generated, "- name: Stop Enclave GitHub Proxy")
-	assert.Contains(t, generated, "if: always()")
-	assert.Contains(t, generated, "continue-on-error: true")
-	assert.Contains(t, generated, "stop_enclave_github_proxy.sh")
+	setup := yaml.String()
+	assert.Contains(t, setup, `ghcr.io/github/gh-aw-mcpg:`+string(constants.DefaultMCPGatewayVersion))
+	assert.Contains(t, setup, `"min-integrity": "approved"`)
+	assert.Contains(t, setup, `"github/*"`)
+	assert.Contains(t, setup, `"accept": [`)
+	assert.Contains(t, setup, `"private:github"`)
+	assert.Contains(t, setup, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
+	assert.Contains(t, setup, `"required": false`)
+	assert.Contains(t, setup, `GH_AW_TIMEOUT_MINUTES: 20`)
+	assert.NotContains(t, setup, `$GITHUB_MCP_GUARD_MIN_INTEGRITY`)
+	assert.NotContains(t, setup, `$GITHUB_MCP_GUARD_REPOS`)
 }
 
-func TestEnclaveGitHubProxyScriptsEnforceDedicatedBridgeContract(t *testing.T) {
-	startScript, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "sh", "start_enclave_github_proxy.sh"))
+func TestDynamicEnclaveWriteSinkPolicyUsesWorkflowDestinationVisibility(t *testing.T) {
+	for _, sensitivity := range []string{"internal", "confidential"} {
+		t.Run(sensitivity, func(t *testing.T) {
+			workflowData := dynamicEnclaveWorkflowData()
+			workflowData.Tools["github"] = false
+			workflowData.Enclaves[0].Dynamic.Sensitivity = sensitivity
+			workflowData.Enclaves[0].Dynamic.AllowedOwners = []string{"github"}
+			workflowData.Enclaves[0].Dynamic.AllowedRepositories = nil
+
+			assert.Equal(t, map[string]any{
+				"write-sink": map[string]any{
+					"accept":          []string{"private:github"},
+					"sink-visibility": sinkVisibilityRuntimeExpr,
+				},
+			}, dynamicEnclaveWriteSinkGuardPolicy(workflowData))
+		})
+	}
+}
+
+// TestCompileDynamicGitHubEnclaveDisabledPrimaryGitHub compiles a workflow matching the
+// gh-aw#59523 fixture: tools.github: false with a dynamic GitHub repository enclave. It
+// asserts the compiler generates a usable lock file without manual edits (guard policy,
+// write-sink policy, delegated-only backend readiness, envelope lifetime, mcpg version)
+// and that the generated lock file itself is valid YAML end-to-end, guarding against
+// regressions like a bare unindented "," corrupting an enclosing "run: |" block scalar.
+func TestCompileDynamicGitHubEnclaveDisabledPrimaryGitHub(t *testing.T) {
+	tmp := t.TempDir()
+	workflowPath := filepath.Join(tmp, "dynamic-enclave.md")
+	content := `---
+on: workflow_dispatch
+strict: false
+engine: copilot
+tools:
+  github: false
+enclaves:
+  - agent:
+      model: gpt-5
+      max-task-bytes: 4096
+      max-model-requests: 10
+      max-model-tokens: 32768
+    dynamic:
+      allowed-owners: [github]
+      sensitivity: internal
+      github-policy: github-repository-read-v1
+      max-repositories: 1
+      quotas:
+        max-invocations: 1
+        max-output-bytes: 1024
+        max-execution-seconds: 180
+      audit-labels: ["dynamic-enclave"]
+      expires-at: "2027-01-01T00:00:00Z"
+    timeout: 180
+    memory-limit: "512m"
+    cpu-limit: "1"
+    pids-limit: 128
+    tmpfs-limit: "64m"
+    max-output-bytes: 1024
+    max-invocations: 1
+safe-outputs:
+  threat-detection:
+    enabled: false
+timeout-minutes: 20
+---
+
+# Dynamic Enclave Test
+
+Test dynamic enclave delegation.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o600))
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+	lockBytes, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
 	require.NoError(t, err)
-	start := string(startScript)
+	lock := string(lockBytes)
 
-	keyGeneration := strings.Index(start, "openssl rand -hex 32")
-	keyMask := strings.Index(start, "::add-mask::${MCP_GATEWAY_ENCLAVE_CAPABILITY_KEY}")
-	containerStart := strings.Index(start, "docker run -d")
-	require.GreaterOrEqual(t, keyGeneration, 0)
-	require.Greater(t, keyMask, keyGeneration)
-	require.Greater(t, containerStart, keyMask)
+	// The generated lock file must be valid YAML end-to-end (it embeds JSON as literal
+	// text inside "run: |" block scalars; any unindented line dedents out of the block).
+	var doc any
+	require.NoError(t, yaml.Unmarshal(lockBytes, &doc), "generated lock file must be valid YAML")
 
-	assert.Contains(t, start, `^[0-9a-f]{64}$`)
-	assert.Contains(t, start, "--network bridge")
-	assert.NotContains(t, start, "\n  -p ")
-	assert.Contains(t, start, `com.github.gh-aw.enclave-github.run`)
-	assert.Contains(t, start, `openssl dgst -sha256 -r`)
-	assert.Contains(t, start, `PROXY_IDENTITY="gh-aw-egh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${JOB_HASH}"`)
-	assert.Contains(t, start, `^[a-z0-9][a-z0-9-]{0,63}$`)
-	assert.NotContains(t, start, `-${GITHUB_JOB}"`)
-	assert.Contains(t, start, `--arg workflow_run_id "$PROXY_IDENTITY"`)
-	assert.NotContains(t, start, `--arg workflow_run_id "$GITHUB_RUN_ID"`)
-	assert.NotContains(t, start, "--enclave-profile")
-	assert.Contains(t, start, `PORT="18443"`)
-	assert.Contains(t, start, `MCP_LOG_DIR="${RUNNER_TEMP:-/tmp}/gh-aw/enclave-github-proxy-logs"`)
-	assert.Contains(t, start, `-e MCP_GATEWAY_ENCLAVE_POLICY_JSON`)
-	assert.Contains(t, start, `-e MCP_GATEWAY_ENCLAVE_CAPABILITY_KEY`)
-	assert.Contains(t, start, `rm -rf "${MCP_LOG_DIR}/proxy-tls"`)
-	assert.NotContains(t, start, "--policy")
-	assert.NotContains(t, start, "--tls-dir")
-	assert.Contains(t, start, `PROXY_ALIAS="${ENCLAVE_GITHUB_PROXY_ALIAS:-}"`)
-	assert.Contains(t, start, `--tls-dns-name "$PROXY_ALIAS"`)
-	assert.Equal(t, "awf-enclave-github-proxy", enclaveGitHubProxyNetworkAlias)
-	assert.Contains(t, start, `proxy-tls/ca.crt`)
-	assert.Contains(t, start, `AWF_ENCLAVE_GITHUB_PROXY_CONTAINER`)
-	assert.Contains(t, start, `AWF_ENCLAVE_GITHUB_PROXY_IDENTITY`)
-	assert.Contains(t, start, `AWF_ENCLAVE_GITHUB_PROXY_CA_CERT`)
-	assert.Contains(t, start, `MCP_GATEWAY_ENCLAVE_CAPABILITY_KEY`)
-	assert.Contains(t, start, `::add-mask::${POLICY_TEMPLATE}`)
-	assert.Contains(t, start, `::add-mask::${MCP_GATEWAY_ENCLAVE_POLICY_JSON}`)
-	assert.Contains(t, start, `--resolve "${PROXY_ALIAS}:${PORT}:${PROXY_IP}"`)
-	assert.Contains(t, start, `--cacert "$CA_CERT"`)
-	assert.NotContains(t, start, `curl -skf`)
+	// 1. GitHub source guard is generated even though tools.github is false.
+	assert.Contains(t, lock, `"min-integrity": "approved"`)
+	assert.Contains(t, lock, `"github/*"`)
+	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_MIN_INTEGRITY")
+	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_REPOS")
 
-	stopScript, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "sh", "stop_enclave_github_proxy.sh"))
-	require.NoError(t, err)
-	assert.Contains(t, string(stopScript), "docker rm -f awmg-enclave-github-proxy")
-	assert.Contains(t, string(stopScript), `MCP_LOG_DIR="${RUNNER_TEMP:-/tmp}/gh-aw/enclave-github-proxy-logs"`)
-	assert.NotContains(t, string(stopScript), "/tmp/gh-aw/enclave-github-proxy-logs")
-	assert.Contains(t, string(stopScript), "MCP_GATEWAY_ENCLAVE_CAPABILITY_KEY=\\n")
+	// 2. Safe Outputs gets the destination visibility from the runtime detection
+	// step, while its accepted source secrecy stays scoped to the dynamic enclave.
+	assert.Contains(t, lock, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
+	assert.Contains(t, lock, `"private:github"`)
+	assert.Contains(t, lock, "Determine automatic lockdown mode")
+
+	// 3. The delegated-only GitHub backend does not block gateway readiness.
+	assert.Contains(t, lock, `"required": false`)
+
+	// 4. The delegation envelope lifetime is bounded by the job timeout, while the
+	// per-identity TTL stays bounded by max-execution-seconds (180s).
+	assert.Contains(t, lock, `GH_AW_ENCLAVE_DYNAMIC_JOB_EXPIRES_EPOCH=$(( $(date -u +%s) + (${GH_AW_TIMEOUT_MINUTES:-20} * 60) ))`)
+	assert.Contains(t, lock, `\"max_identity_ttl\":180`)
+
+	// 5. mcpg uses the default version, which must meet the dynamic delegation minimum,
+	// and is consistent across manifest, download, and runtime.
+	defaultVersion := string(constants.DefaultMCPGatewayVersion)
+	assert.True(t, versionAtLeast(defaultVersion, "v0.0.0", string(constants.MCPGDynamicRepositoryDelegationMinVersion)))
+	assert.Equal(t, strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"+defaultVersion), strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"))
 }
 
-func TestEnclaveGitHubProxyVersionGates(t *testing.T) {
-	t.Run("minimum versions accepted", func(t *testing.T) {
-		data := enclaveGitHubIssuesWorkflowData()
-		data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)
-		require.NoError(t, validateEnclavesConfig(data))
-	})
-
-	t.Run("old AWF rejected", func(t *testing.T) {
-		data := enclaveGitHubIssuesWorkflowData()
-		data.NetworkPermissions.Firewall.Version = "v0.28.5"
-		err := validateEnclavesConfig(data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), string(constants.AWFEnclaveGitHubIssuesMinVersion))
-	})
-
-	t.Run("old MCPG rejected", func(t *testing.T) {
-		data := enclaveGitHubIssuesWorkflowData()
-		data.SandboxConfig.MCP.Version = "v0.4.10"
-		err := validateEnclavesConfig(data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), string(constants.MCPGEnclaveGitHubIssuesMinVersion))
-	})
-
-	t.Run("nil MCP config uses supporting default", func(t *testing.T) {
-		data := enclaveGitHubIssuesWorkflowData()
-		data.SandboxConfig.MCP = nil
-		require.NoError(t, validateEnclavesConfig(data))
-	})
-
-	t.Run("omitted profile keeps compatibility", func(t *testing.T) {
-		data := enclaveWorkflowData(false, true, 0, 120)
-		data.NetworkPermissions.Firewall.Version = "v0.25.3"
-		data.SandboxConfig.MCP = &MCPGatewayRuntimeConfig{Version: "v0.1.0"}
-		require.NoError(t, validateEnclavesConfig(data))
-	})
-}
-
-func TestEnclaveGitHubProxyEnvironmentExclusions(t *testing.T) {
-	excluded := ComputeAWFExcludeEnvVarNames(enclaveGitHubIssuesWorkflowData(), nil)
-	assert.Contains(t, excluded, enclaveGitHubProxyContainerEnv)
-	assert.Contains(t, excluded, enclaveGitHubProxyIdentityEnv)
-	assert.Contains(t, excluded, enclaveGitHubProxyCACertEnv)
-	assert.Contains(t, excluded, enclaveGitHubProxyRootKeyEnv)
-	assert.NotContains(t, excluded, enclaveGitHubProxyPolicyEnv)
-}
-
-func TestCompileEnclaveGitHubProxyLifecycle(t *testing.T) {
+func TestCompileEnclaveGitHubSharedGateway(t *testing.T) {
 	tmp := t.TempDir()
 	workflowPath := filepath.Join(tmp, "enclave-github.md")
 	content := `---
@@ -208,11 +265,16 @@ on: workflow_dispatch
 strict: false
 network: defaults
 engine: copilot
+tools:
+  github:
+    toolsets: [context]
+safe-outputs:
+  add-comment:
 sandbox:
   agent:
     id: awf
   mcp:
-    version: v0.4.13
+    version: v0.4.15
 enclaves:
   - agent:
       model: gpt-5
@@ -221,7 +283,6 @@ enclaves:
     repos:
       - repo: octo-org/private-service
         sensitivity: confidential
-    timeout: 120
 ---
 
 Read the assigned repository's issues through the enclave.
@@ -234,45 +295,64 @@ Read the assigned repository's issues through the enclave.
 	require.NoError(t, err)
 	lock := string(lockBytes)
 
-	imageTag := strings.TrimPrefix(string(constants.DefaultFirewallVersion), "v")
-	for _, imageName := range []string{"enclave-agent", "enclave-mcp-server"} {
-		image := constants.DefaultFirewallRegistry + "/" + imageName + ":" + imageTag
-		pin, ok := getEmbeddedContainerPin(image)
-		require.True(t, ok, "expected embedded pin for %s", image)
-		pinnedImage := pin.Image + "@" + pin.Digest
-		assert.Contains(t, lock, `"image":"`+pin.Image+`","digest":"`+pin.Digest+`","pinned_image":"`+pinnedImage+`"`)
-		assert.Contains(t, lock, "#   - "+pinnedImage)
-		assert.NotContains(t, lock, `"repo":"`+constants.DefaultFirewallRegistry+`/`+imageName+`","ref":"`+imageTag+`","error_type":"container_pin_not_found"`)
-	}
+	assert.Equal(t, 1, strings.Count(lock, "--name awmg-mcpg"))
+	assert.Contains(t, lock, `"agentIds": ["${MCP_GATEWAY_AGENT_ID}","${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"]`)
+	assert.Contains(t, lock, `"safeoutputs": {`)
+	assert.Contains(t, lock, `"awf-enclave": {`)
+	assert.NotContains(t, lock, `"required": false`)
+	assert.Contains(t, lock, `"GITHUB_TOOLSETS": "context,issues"`)
+	assert.Contains(t, lock, `"${MCP_GATEWAY_AGENT_ID}":{"servers":["awf-enclave","github","safeoutputs"],"tools":{"github":["get_me"]}}`)
+	assert.NotContains(t, lock, `"servers":["awf-enclave","github","safe-outputs"]`)
+	assert.Contains(t, lock, `"agentPolicies": {"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}":{"servers":["github"],"tools":{"github":["list_issues","issue_read"]},"allow-only":{"min-integrity":"approved","repos":["octo-org/private-service"]}}`)
+	assert.Contains(t, lock, `AWF_ENCLAVE_GITHUB_MCP_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')`)
+	assert.Contains(t, lock, `printf '%s=%s\n' AWF_ENCLAVE_GITHUB_MCP_AGENT_ID "$AWF_ENCLAVE_GITHUB_MCP_AGENT_ID"`)
+	assert.Contains(t, lock, `MCP_GATEWAY_API_KEY: ${{ steps.start-mcp-gateway.outputs.gateway-api-key }}`)
+	assert.Contains(t, lock, `--exclude-env MCP_GATEWAY_API_KEY`)
+	assert.Contains(t, lock, "--exclude-env AWF_ENCLAVE_GITHUB_MCP_AGENT_ID")
+	assert.NotContains(t, lock, "Enclave GitHub Proxy")
+	assert.NotContains(t, lock, "start_enclave_github_proxy")
+	assert.NotContains(t, lock, "stop_enclave_github_proxy")
+}
 
-	proxyStart := strings.Index(lock, "- name: Start Enclave GitHub Proxy")
-	gatewayStart := strings.Index(lock, "- name: Start MCP Gateway")
-	gatewayKeyHandoff := strings.Index(lock, `printf '%s=%s\n' MCP_GATEWAY_API_KEY "$MCP_GATEWAY_API_KEY"`)
-	awf := strings.Index(lock, "awf --config")
-	proxyStop := strings.Index(lock, "- name: Stop Enclave GitHub Proxy")
-	require.GreaterOrEqual(t, proxyStart, 0)
-	require.Greater(t, gatewayStart, proxyStart)
-	require.Greater(t, gatewayKeyHandoff, gatewayStart)
-	require.Greater(t, awf, gatewayStart)
-	require.Less(t, gatewayKeyHandoff, awf)
-	require.Greater(t, proxyStop, awf)
+func TestEnclaveGitHubMCPVersionGates(t *testing.T) {
+	data := enclaveGitHubIssuesWorkflowData()
+	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)
+	require.NoError(t, validateEnclavesConfig(data))
 
-	assert.Contains(t, lock, `\"github\":{\"cli\":\"issues-read-v1\"}`)
-	assert.Contains(t, lock, "ENCLAVE_GITHUB_PROXY_POLICY_TEMPLATE:")
-	assert.NotContains(t, lock, enclaveGitHubProxyPolicyEnv+":")
-	assert.Contains(t, lock, "--exclude-env "+enclaveGitHubProxyContainerEnv)
-	assert.Contains(t, lock, "--exclude-env "+enclaveGitHubProxyIdentityEnv)
-	assert.Contains(t, lock, "--exclude-env "+enclaveGitHubProxyCACertEnv)
-	assert.Contains(t, lock, "--exclude-env "+enclaveGitHubProxyRootKeyEnv)
-	assert.Contains(t, lock, "--exclude-env MCP_GATEWAY_API_KEY")
-	mountStart := strings.Index(lock, "- name: Mount MCP servers as CLIs")
-	require.GreaterOrEqual(t, mountStart, 0)
-	mountEnd := strings.Index(lock[mountStart:], "\n      - name:")
-	require.Positive(t, mountEnd)
-	assert.NotContains(t, lock[mountStart:mountStart+mountEnd], "steps.start-mcp-gateway.outputs.gateway-api-key")
-	stopStart := strings.Index(lock, "- name: Stop MCP Gateway")
-	require.GreaterOrEqual(t, stopStart, 0)
-	stopEnd := strings.Index(lock[stopStart:], "\n      - name:")
-	require.Positive(t, stopEnd)
-	assert.NotContains(t, lock[stopStart:stopStart+stopEnd], "steps.start-mcp-gateway.outputs.gateway-api-key")
+	data.SandboxConfig.MCP.Version = "v0.4.14"
+	err := validateEnclavesConfig(data)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), string(constants.MCPGEnclaveGitHubIssuesMinVersion))
+}
+
+func TestDynamicEnclaveMCPVersionGatesAndDefaults(t *testing.T) {
+	data := dynamicEnclaveWorkflowData()
+	data.SandboxConfig.MCP.Version = ""
+	require.NoError(t, validateEnclavesConfig(data))
+	ensureDefaultMCPGatewayConfig(data)
+	assert.Equal(t, string(constants.DefaultMCPGatewayVersion), data.SandboxConfig.MCP.Version)
+
+	data = dynamicEnclaveWorkflowData()
+	data.SandboxConfig.MCP.Version = "v0.4.18"
+	err := validateEnclavesConfig(data)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), string(constants.MCPGDynamicRepositoryDelegationMinVersion))
+	assert.Contains(t, err.Error(), "set sandbox.mcp.version to "+string(constants.MCPGDynamicRepositoryDelegationMinVersion)+" or newer")
+}
+
+func TestEnclaveGitHubToolsVersionGates(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)
+	require.NoError(t, validateEnclavesConfig(data))
+
+	data.NetworkPermissions.Firewall.Version = "v0.28.8"
+	err := validateEnclavesConfig(data)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), string(constants.AWFEnclaveGitHubIssuesMinVersion))
+
+	data = enclaveGitHubToolsWorkflowData()
+	data.SandboxConfig.MCP.Version = "v0.4.14"
+	err = validateEnclavesConfig(data)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), string(constants.MCPGEnclaveAgentToolsMinVersion))
 }

@@ -59,6 +59,44 @@ func TestParseAndDisplayZizmorOutput(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "current zizmor output uses verbatim path",
+			stdout: `[
+  {
+    "ident": "undocumented-permissions",
+    "desc": "permissions without explanatory comments",
+    "url": "https://docs.zizmor.sh/audits/#undocumented-permissions",
+    "determinations": {
+      "severity": "Low"
+    },
+    "locations": [
+      {
+        "symbolic": {
+          "key": {
+            "Local": {
+              "verbatim_path": "./.github/workflows/test.lock.yml"
+            }
+          },
+          "annotation": "needs an explanatory comment"
+        },
+        "concrete": {
+          "location": {
+            "start_point": {
+              "row": 6,
+              "column": 4
+            }
+          }
+        }
+      }
+    ]
+  }
+]`,
+			stderr: " INFO audit: zizmor: 🌈 completed ./.github/workflows/test.lock.yml\n",
+			expectedOutput: []string{
+				"./.github/workflows/test.lock.yml:7:5: info: [Low] undocumented-permissions: permissions without explanatory comments (https://docs.zizmor.sh/audits/#undocumented-permissions)",
+			},
+			expectError: false,
+		},
+		{
 			name: "multiple findings in same file",
 			stdout: `[
   {

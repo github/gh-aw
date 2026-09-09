@@ -179,6 +179,42 @@ engine: copilot
 	require.NoError(t, err)
 }
 
+func TestCompileWorkflows_ResolvesImportedManifestRootRelativeWorkflow(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "aw-manifest-import-root-relative-*")
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	require.NoError(t, os.Chdir(tmpDir))
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	require.NoError(t, cmd.Run())
+
+	writePackageTestFile(t, tmpDir, "README.md", "# Repo Assist\n")
+	writePackageTestFile(t, tmpDir, "aw.yml", `name: Repo Assist
+includes:
+  - ambient-context/aw.yml
+`)
+	writePackageTestFile(t, tmpDir, "ambient-context/aw.yml", `name: Ambient Context
+includes:
+  - .github/workflows/ambient-context.md
+`)
+	writePackageTestFile(t, tmpDir, ".github/workflows/ambient-context.md", `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+---
+
+# Ambient Context
+`)
+
+	_, err = CompileWorkflows(context.Background(), CompileConfig{})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(tmpDir, ".github", "workflows", "ambient-context.lock.yml"))
+	assert.NoFileExists(t, filepath.Join(tmpDir, "ambient-context", ".github", "workflows", "ambient-context.md"))
+}
+
 func TestCompileWorkflows_RequiresPackageReadme(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "aw-manifest-readme-*")
 	originalWd, err := os.Getwd()

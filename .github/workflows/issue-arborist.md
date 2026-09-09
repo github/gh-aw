@@ -11,8 +11,10 @@ permissions:
   issues: read
 
 
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: true
 network:
   allowed:
@@ -26,7 +28,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     min-integrity: approved
     toolsets:
       - issues
@@ -102,7 +104,7 @@ evals:
     question: Were related issues linked as sub-issues, or was noop used when no linkable relationships were found?
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 {{#if experiments.prompt_style == 'detailed'}}

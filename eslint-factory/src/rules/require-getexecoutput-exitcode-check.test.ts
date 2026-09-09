@@ -33,8 +33,20 @@ describe("require-getexecoutput-exitcode-check", () => {
         `async function f() { const { stdout } = await exec.getExecOutput("git", ["status"], { ...opts }); }`,
         // trailing spread may override ignoreReturnCode with an unresolvable value — out of scope
         `async function f() { const { stdout } = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true, ...opts }); }`,
-        // options passed as an identifier can't be statically inspected
-        `async function f() { const { stdout } = await exec.getExecOutput("git", ["status"], options); }`,
+        // options passed as an identifier that isn't a resolvable object literal (e.g. a
+        // function parameter) can't be statically inspected
+        `async function f(options) { const { stdout } = await exec.getExecOutput("git", ["status"], options); }`,
+        // options passed as an identifier initialized from another identifier can't be
+        // statically inspected
+        `async function f(other) { const options = other; const { stdout } = await exec.getExecOutput("git", ["status"], options); }`,
+        // options passed as a reassigned identifier can't be trusted to still hold the
+        // initializer's shape at the call site
+        `async function f() { let opts = { ignoreReturnCode: true }; opts = {}; const { stdout } = await exec.getExecOutput("git", ["status"], opts); }`,
+        // options passed as an identifier resolving to a local object literal, but exitCode
+        // is read — no violation
+        `async function f() { const opts = { ignoreReturnCode: true }; const { exitCode } = await exec.getExecOutput("git", ["status"], opts); }`,
+        // ternary of two non-literal option values can't be statically inspected
+        `async function f(a, b) { const opts = Boolean(a) ? a : b; const { stdout } = await exec.getExecOutput("git", ["status"], opts); }`,
         // explicit ignoreReturnCode: true after a spread is resolvable; exitCode is directly accessed
         `async function f() { const r = (await exec.getExecOutput("git", ["status"], { ...opts, ignoreReturnCode: true })).exitCode; }`,
         // direct member access on the awaited result
@@ -49,6 +61,22 @@ describe("require-getexecoutput-exitcode-check", () => {
         `async function f() { const run = async () => { const result = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true }); return result; }; const out = await run(); if (out.exitCode !== 0) throw new Error("failed"); }`,
         // returned via implicit arrow callback passed to a helper; caller checks exitCode
         `async function withToken(cb) { return await cb(); } async function f() { const out = await withToken(async () => exec.getExecOutput("git", ["status"], { ignoreReturnCode: true })); if (out.exitCode !== 0) throw new Error("failed"); }`,
+        // destructuring-assignment (not a declaration) includes exitCode
+        `let stdout, exitCode; async function f() { ({ stdout, exitCode } = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true })); }`,
+        // destructuring-assignment with only exitCode
+        `let exitCode; async function f() { ({ exitCode } = await execApi.getExecOutput("git", ["status"], { ignoreReturnCode: true })); }`,
+        // destructuring-assignment with a rest element that could capture exitCode
+        `let rest; async function f() { ({ ...rest } = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true })); console.log(rest.exitCode); }`,
+        // exec() variant: no ignoreReturnCode option — default throw-on-failure applies
+        `async function f() { await exec.exec("git", ["status"]); }`,
+        // exec() variant: captured and compared against 0 (mirrors run_validate_workflows.cjs)
+        `async function f() { const exitCode = await exec.exec("git", ["status"], { ignoreReturnCode: true }); if (exitCode !== 0) throw new Error("failed"); }`,
+        // exec() variant: reassigned identifier, checked later
+        `async function f() { let exitCode; exitCode = await exec.exec("git", ["status"], { ignoreReturnCode: true }); if (exitCode !== 0) throw new Error("failed"); }`,
+        // exec() variant: value consumed directly in a comparison
+        `async function f() { if ((await exec.exec("git", ["status"], { ignoreReturnCode: true })) !== 0) throw new Error("failed"); }`,
+        // exec() variant: returned directly from the function
+        `async function f() { return await exec.exec("git", ["status"], { ignoreReturnCode: true }); }`,
       ],
       invalid: [],
     });
@@ -86,6 +114,42 @@ describe("require-getexecoutput-exitcode-check", () => {
         {
           code: `async function f() { let result; result = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true }); return result.stdout.trim(); }`,
           errors: [{ messageId: "missingExitCodeCheck" }],
+        },
+        {
+          // destructuring-assignment with exitCode omitted
+          code: `let stdout; async function f() { ({ stdout } = await exec.getExecOutput("git", ["status"], { ignoreReturnCode: true })); }`,
+          errors: [{ messageId: "missingExitCodeCheck" }],
+        },
+        {
+          // options passed as an identifier resolving to a local object literal with
+          // ignoreReturnCode: true
+          code: `async function f() { const opts = { ignoreReturnCode: true }; const { stdout } = await exec.getExecOutput("git", ["status"], opts); }`,
+          errors: [{ messageId: "missingExitCodeCheck" }],
+        },
+        {
+          // same, but the object literal builds on a spread with an explicit override after it
+          code: `async function f() { const opts = { ...base, ignoreReturnCode: true }; const { stdout } = await exec.getExecOutput("git", ["status"], opts); }`,
+          errors: [{ messageId: "missingExitCodeCheck" }],
+        },
+        {
+          // mirrors actions/setup/js/git_helpers.cjs: both ternary branches agree on true
+          code: `async function f(gitOpts) { const shallowOpts = gitOpts !== undefined ? { ...gitOpts, ignoreReturnCode: true } : { ignoreReturnCode: true }; const { stdout } = await execApi.getExecOutput("git", ["rev-parse", "--is-shallow-repository"], shallowOpts); }`,
+          errors: [{ messageId: "missingExitCodeCheck" }],
+        },
+        {
+          // mirrors actions/setup/js/check_workflow_recompile_needed.cjs: bare await, return value discarded
+          code: `async function f() { let diffOutput = ""; await exec.exec("git", ["diff", "--exit-code", "."], { ignoreReturnCode: true, listeners: { stdout: d => { diffOutput += d.toString(); } } }); return diffOutput.trim().length > 0; }`,
+          errors: [{ messageId: "missingExecExitCodeCheck" }],
+        },
+        {
+          // exec() variant: captured but never read
+          code: `async function f() { const exitCode = await exec.exec("git", ["status"], { ignoreReturnCode: true }); }`,
+          errors: [{ messageId: "missingExecExitCodeCheck" }],
+        },
+        {
+          // exec() variant: reassigned identifier, never read afterward
+          code: `async function f() { let exitCode; exitCode = await exec.exec("git", ["status"], { ignoreReturnCode: true }); }`,
+          errors: [{ messageId: "missingExecExitCodeCheck" }],
         },
       ],
     });

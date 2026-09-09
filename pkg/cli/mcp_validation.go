@@ -139,6 +139,15 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 			missingSecrets = append(missingSecrets, secret)
 		}
 	}
+	for _, secret := range availableSecrets {
+		if secret.Value == "" {
+			continue
+		}
+		for key, value := range config.Headers {
+			expression := "${{ secrets." + secret.Name + " }}"
+			config.Headers[key] = strings.ReplaceAll(value, expression, secret.Value)
+		}
+	}
 
 	// Display information about secrets
 	if verbose {

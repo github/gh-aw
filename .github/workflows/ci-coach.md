@@ -24,7 +24,7 @@ max-tool-denials: 3
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [issues, pull_requests]
   edit:
 safe-outputs:
@@ -63,7 +63,7 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 evals:
   - id: repair-or-optimization-path
     question: Did the workflow check validation-status first and then follow the correct repair or optimization path for this run?

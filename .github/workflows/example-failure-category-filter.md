@@ -22,6 +22,10 @@ imports:
 sandbox:
   agent:
     runtime: cloud-hypervisor
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 ---
 
 # Example: Failure Category Filtering

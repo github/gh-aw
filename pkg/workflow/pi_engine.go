@@ -193,42 +193,43 @@ func (e *PiEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHubAct
 func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
 	piLog.Printf("Generating installation steps for Pi engine: workflow=%s", workflowData.Name)
 
+	var steps []GitHubActionStep
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		piLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
-		return []GitHubActionStep{}
-	}
+		piLog.Printf("Skipping Pi CLI installation: custom command specified (%s)", workflowData.EngineConfig.Command)
+		steps = buildNpmEngineInstallStepsWithAWF(nil, workflowData, false)
+	} else {
+		version := string(constants.DefaultPiVersion)
+		if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
+			version = workflowData.EngineConfig.Version
+		}
 
-	version := string(constants.DefaultPiVersion)
-	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
-		version = workflowData.EngineConfig.Version
-	}
-
-	npmSteps := GenerateNpmInstallSteps(
-		"@earendil-works/pi-coding-agent",
-		version,
-		"Install Pi CLI",
-		"pi",
-		NPMInstallOptions{
-			IncludeNodeSetup:  true,
-			RunInstallScripts: false,
-			CooldownEnabled:   false,
-		},
-	)
-
-	// microVM runtimes (docker-sbx/cloud-hypervisor) cannot see the globally installed
-	// CLI in the hosted tool cache, so stage a second copy under RUNNER_TEMP.
-	if isDockerSbxRuntime(workflowData) || isCloudHypervisorRuntime(workflowData) {
-		npmSteps = append(npmSteps, GenerateDockerSbxNpmCLIInstallStep(
+		npmSteps := GenerateNpmInstallSteps(
 			"@earendil-works/pi-coding-agent",
 			version,
-			"Install Pi CLI in docker-sbx path",
+			"Install Pi CLI",
 			"pi",
-			false,
-			false,
-		))
-	}
+			NPMInstallOptions{
+				IncludeNodeSetup:  true,
+				RunInstallScripts: false,
+				CooldownEnabled:   false,
+			},
+		)
 
-	steps := BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
+		// microVM runtimes (docker-sbx/cloud-hypervisor) cannot see the globally installed
+		// CLI in the hosted tool cache, so stage a second copy under RUNNER_TEMP.
+		if isDockerSbxRuntime(workflowData) || isCloudHypervisorRuntime(workflowData) {
+			npmSteps = append(npmSteps, GenerateDockerSbxNpmCLIInstallStep(
+				"@earendil-works/pi-coding-agent",
+				version,
+				"Install Pi CLI in docker-sbx path",
+				"pi",
+				false,
+				false,
+			))
+		}
+
+		steps = BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
+	}
 
 	// Install extensions declared in engine.extensions: [...]
 	// Each extension is installed via `pi install <extension>` before the agent runs.
@@ -430,6 +431,7 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 		"PI_OFFLINE":            "1",
 		"RUNNER_TEMP":           "${{ runner.temp }}",
 	}
+	applyPlaywrightBrowserEnv(env, workflowData)
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	if modelConfigured {
 		env["GH_AW_PI_MODEL"] = workflowData.Model
@@ -453,6 +455,7 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 		env["AWF_REFLECT_ENABLED"] = "1"
 	}
 	applySafeOutputEnvToMap(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.MaxTurns != "" {
 		env["GH_AW_MAX_TURNS"] = workflowData.EngineConfig.MaxTurns

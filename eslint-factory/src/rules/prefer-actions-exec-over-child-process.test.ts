@@ -110,6 +110,40 @@ describe("prefer-actions-exec-over-child-process", () => {
     });
   });
 
+  it("flags a distinct message variant when migration requires converting a sync function (and its callers) to async", () => {
+    cjsRuleTester.run("prefer-actions-exec-over-child-process", preferActionsExecOverChildProcessRule, {
+      valid: [],
+      invalid: [
+        // Bare statement for side effects only — no return-value dependency, so plain message unchanged
+        {
+          code: ghScript(`const { execSync } = require("child_process"); function f() { execSync("git status"); }`),
+          errors: [{ messageId: "preferActionsExec", data: { method: "execSync" } }],
+        },
+        // Already-async enclosing function — even though the result is returned, the enclosing
+        // function is already async, so no caller-chain conversion is needed; message unchanged
+        {
+          code: ghScript(`const { execSync } = require("child_process"); async function f() { return execSync("git status"); }`),
+          errors: [{ messageId: "preferActionsExec", data: { method: "execSync" } }],
+        },
+        // Non-async function whose return value is directly the call's result
+        {
+          code: ghScript(`const { execSync } = require("child_process"); function f() { return execSync("git status"); }`),
+          errors: [{ messageId: "preferActionsExecSyncContext", data: { method: "execSync" } }],
+        },
+        // Non-async function where the call's result is assigned and then consumed
+        {
+          code: ghScript(`const { execSync } = require("child_process"); function f() { const out = execSync("git status"); return out.trim(); }`),
+          errors: [{ messageId: "preferActionsExecSyncContext", data: { method: "execSync" } }],
+        },
+        // Also applies to arrow functions
+        {
+          code: ghScript(`const { execSync } = require("child_process"); const f = () => execSync("git status");`),
+          errors: [{ messageId: "preferActionsExecSyncContext", data: { method: "execSync" } }],
+        },
+      ],
+    });
+  });
+
   it("flags child_process output-capturing calls (ES module)", () => {
     esmRuleTester.run("prefer-actions-exec-over-child-process", preferActionsExecOverChildProcessRule, {
       valid: [

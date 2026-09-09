@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 /** Environment variables managed by tests */
-const TEST_ENV_VARS = ["GH_AW_OPERATION", "GH_AW_CMD_PREFIX", "GH_TOKEN", "GITHUB_TOKEN"];
+const TEST_ENV_VARS = ["GH_AW_OPERATION", "GH_AW_CMD_PREFIX", "GH_AW_UPGRADE_OPTIONS", "GH_TOKEN", "GITHUB_TOKEN"];
 
 describe("run_operation_update_upgrade", () => {
   let mockCore;
@@ -471,6 +471,17 @@ describe("run_operation_update_upgrade", () => {
         })
       );
       expect(mockCore.notice).toHaveBeenCalledWith(expect.stringContaining("https://github.com/testowner/testrepo/issues/42"));
+    });
+
+    it("passes configured upgrade options", async () => {
+      process.env.GH_AW_UPGRADE_OPTIONS = '["--pre-releases"]';
+      mockExec.exec = vi.fn().mockResolvedValue(0);
+      mockExec.getExecOutput = vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 });
+
+      const { mainNotifyIssue } = await import("./run_operation_update_upgrade.cjs");
+      await mainNotifyIssue();
+
+      expect(mockExec.exec).toHaveBeenCalledWith("gh", ["aw", "upgrade", "--pre-releases"]);
     });
 
     it("closes existing issues before creating a new one", async () => {

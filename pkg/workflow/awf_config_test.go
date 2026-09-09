@@ -129,6 +129,23 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		assert.NotContains(t, jsonStr, `"platform":`, "platform should be absent when sandbox agent is disabled")
 	})
 
+	t.Run("enables sbx egress verification for docker-sbx", func(t *testing.T) {
+		config := AWFCommandConfig{
+			EngineName: "copilot",
+			WorkflowData: &WorkflowData{
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true},
+				},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{Runtime: AgentRuntimeDockerSbx},
+				},
+			},
+		}
+		jsonStr, err := BuildAWFConfigJSON(config)
+		require.NoError(t, err)
+		assert.Contains(t, jsonStr, `"verifySbxEgress":true`)
+	})
+
 	t.Run("blocked domains are included in the network section", func(t *testing.T) {
 		config := AWFCommandConfig{
 			EngineName:     "copilot",
@@ -369,6 +386,105 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		assert.Contains(t, jsonStr, `"targets"`, "should include targets in apiProxy")
 		assert.Contains(t, jsonStr, `"openai"`, "should include openai target")
 		assert.Contains(t, jsonStr, "my-proxy.internal.example.com", "should include the openai host")
+	})
+
+	t.Run("HTTP API target schemes follow the effective AWF version", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			engine       string
+			envVar       string
+			baseURL      string
+			version      string
+			provider     string
+			expectedHost string
+		}{
+			{
+				name:         "openai preserves HTTP with the default AWF version",
+				engine:       "codex",
+				envVar:       "OPENAI_BASE_URL",
+				baseURL:      "http://openai-gateway.example.com/v1",
+				provider:     "openai",
+				expectedHost: "http://openai-gateway.example.com",
+			},
+			{
+				name:         "anthropic preserves HTTP at the minimum AWF version",
+				engine:       "claude",
+				envVar:       "ANTHROPIC_BASE_URL",
+				baseURL:      "http://anthropic-gateway.example.com/v1",
+				version:      string(constants.AWFHTTPAPITargetMinVersion),
+				provider:     "anthropic",
+				expectedHost: "http://anthropic-gateway.example.com",
+			},
+			{
+				name:         "preserves an explicit HTTP port",
+				engine:       "codex",
+				envVar:       "OPENAI_BASE_URL",
+				baseURL:      "http://openai-gateway.example.com:8080/v1",
+				provider:     "openai",
+				expectedHost: "http://openai-gateway.example.com:8080",
+			},
+			{
+				name:         "gemini preserves HTTP with a newer AWF version",
+				engine:       "gemini",
+				envVar:       "GEMINI_API_BASE_URL",
+				baseURL:      "http://gemini-gateway.example.com/v1",
+				version:      "v0.28.14",
+				provider:     "gemini",
+				expectedHost: "http://gemini-gateway.example.com",
+			},
+			{
+				name:         "older AWF versions keep HTTP targets bare",
+				engine:       "codex",
+				envVar:       "OPENAI_BASE_URL",
+				baseURL:      "http://legacy-gateway.example.com/v1",
+				version:      "v0.28.12",
+				provider:     "openai",
+				expectedHost: "legacy-gateway.example.com",
+			},
+			{
+				name:         "HTTPS targets remain bare",
+				engine:       "claude",
+				envVar:       "ANTHROPIC_BASE_URL",
+				baseURL:      "https://secure-gateway.example.com/v1",
+				provider:     "anthropic",
+				expectedHost: "secure-gateway.example.com",
+			},
+			{
+				name:         "bare targets remain bare",
+				engine:       "gemini",
+				envVar:       "GEMINI_API_BASE_URL",
+				baseURL:      "bare-gateway.example.com/v1",
+				provider:     "gemini",
+				expectedHost: "bare-gateway.example.com",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				config := AWFCommandConfig{
+					EngineName:     tt.engine,
+					AllowedDomains: "github.com",
+					WorkflowData: &WorkflowData{
+						EngineConfig: &EngineConfig{
+							ID:  tt.engine,
+							Env: map[string]string{tt.envVar: tt.baseURL},
+						},
+						NetworkPermissions: &NetworkPermissions{
+							Firewall: &FirewallConfig{Enabled: true, Version: tt.version},
+						},
+					},
+				}
+
+				jsonStr, err := BuildAWFConfigJSON(config)
+				require.NoError(t, err)
+
+				var parsed AWFConfigFile
+				require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+				require.NotNil(t, parsed.APIProxy)
+				require.Contains(t, parsed.APIProxy.Targets, tt.provider)
+				assert.Equal(t, tt.expectedHost, parsed.APIProxy.Targets[tt.provider].Host)
+			})
+		}
 	})
 
 	t.Run("default max-ai-credits is enabled when frontmatter is unset", func(t *testing.T) {
@@ -1490,6 +1606,80 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 	})
 }
 
+// TestBuildAWFConfigJSON_APIProxyCACert verifies that sandbox.agent.ca-cert is
+// mapped to apiProxy.caCert and gated to AWF versions that support the field.
+func TestBuildAWFConfigJSON_APIProxyCACert(t *testing.T) {
+	t.Run("apiProxy.caCert is emitted when configured and AWF supports it", func(t *testing.T) {
+		config := AWFCommandConfig{
+			EngineName:     "claude",
+			AllowedDomains: "github.com",
+			WorkflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "claude"},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						CACert: "/etc/ssl/certs/internal-ca.pem",
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true, Version: string(constants.AWFAPIProxyCACertMinVersion)},
+				},
+			},
+		}
+
+		jsonStr, err := BuildAWFConfigJSON(config)
+		require.NoError(t, err)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+		apiProxy, ok := parsed["apiProxy"].(map[string]any)
+		require.True(t, ok, "expected apiProxy object")
+		assert.Equal(t, "/etc/ssl/certs/internal-ca.pem", apiProxy["caCert"], "apiProxy.caCert should be emitted from sandbox.agent.ca-cert")
+	})
+
+	t.Run("apiProxy.caCert is not emitted when AWF version does not support it", func(t *testing.T) {
+		config := AWFCommandConfig{
+			EngineName:     "claude",
+			AllowedDomains: "github.com",
+			WorkflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "claude"},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						CACert: "/etc/ssl/certs/internal-ca.pem",
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true, Version: "v0.28.9"},
+				},
+			},
+		}
+
+		jsonStr, err := BuildAWFConfigJSON(config)
+		require.NoError(t, err)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+		apiProxy, ok := parsed["apiProxy"].(map[string]any)
+		require.True(t, ok, "expected apiProxy object")
+		_, hasCACert := apiProxy["caCert"]
+		assert.False(t, hasCACert, "apiProxy should omit caCert when AWF version does not support it")
+	})
+
+	t.Run("apiProxy.caCert is omitted when not configured", func(t *testing.T) {
+		config := AWFCommandConfig{
+			EngineName:     "claude",
+			AllowedDomains: "github.com",
+			WorkflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "claude"},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true},
+				},
+			},
+		}
+
+		jsonStr, err := BuildAWFConfigJSON(config)
+		require.NoError(t, err)
+		assert.NotContains(t, jsonStr, `"caCert"`, "apiProxy should omit caCert when not configured")
+	})
+}
+
 func TestExtractModelCostProviders(t *testing.T) {
 	t.Run("returns a cloned providers map", func(t *testing.T) {
 		workflowData := &WorkflowData{
@@ -2058,8 +2248,12 @@ func TestBuildAWFCommand_ResolvesMaxAICreditsFromEnv(t *testing.T) {
 
 			command := BuildAWFCommand(config)
 			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-%d}"`, tt.defaultBudget))
+			assert.Contains(t, command, `if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then`)
+			assert.Contains(t, command, fmt.Sprintf(`GH_AW_MAX_AI_CREDITS="%d"`, tt.defaultBudget))
+			assert.Contains(t, command, `\"maxAiCredits\":${GH_AW_MAX_AI_CREDITS}`)
 			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_MAX_AI_CREDITS")
 			assert.NotContains(t, command, "vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS")
+			assert.NotContains(t, command, "${{")
 		})
 	}
 }

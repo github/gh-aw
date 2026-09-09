@@ -19,11 +19,11 @@ max-tool-denials: 3
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [issues, pull_requests, repos]
 safe-outputs:
   assign-to-user:

@@ -195,31 +195,6 @@ func TestRenderCustomToolWithoutGuardPoliciesJSON(t *testing.T) {
 	assert.NotContains(t, result, "guard-policies", "guard-policies should not be rendered")
 }
 
-// TestPlaywrightMCPWithGuardPoliciesJSON tests that playwright gets write-sink guard policies in JSON format
-func TestPlaywrightMCPWithGuardPoliciesJSON(t *testing.T) {
-	guardPolicies := map[string]any{
-		"write-sink": map[string]any{
-			"accept": []string{"*"},
-		},
-	}
-
-	var output strings.Builder
-	renderPlaywrightMCPConfigWithOptions(&output, nil, true, false, false, guardPolicies, nil)
-
-	result := output.String()
-	assert.Contains(t, result, "\"guard-policies\"", "playwright should have guard-policies in JSON")
-	assert.Contains(t, result, "\"write-sink\"", "playwright should have write-sink in JSON")
-}
-
-// TestPlaywrightMCPWithoutGuardPoliciesJSON tests that playwright without guard policies is unchanged
-func TestPlaywrightMCPWithoutGuardPoliciesJSON(t *testing.T) {
-	var output strings.Builder
-	renderPlaywrightMCPConfigWithOptions(&output, nil, true, false, false, nil, nil)
-
-	result := output.String()
-	assert.NotContains(t, result, "guard-policies", "playwright without guard policies should not have guard-policies")
-}
-
 // TestMCPScriptsMCPWithGuardPoliciesJSON tests that mcp-scripts gets write-sink guard policies in JSON format
 func TestMCPScriptsMCPWithGuardPoliciesJSON(t *testing.T) {
 	guardPolicies := map[string]any{
@@ -263,27 +238,6 @@ func TestAllNonGitHubMCPServersGetGuardPoliciesViaRenderer(t *testing.T) {
 		},
 	}
 
-	t.Run("playwright JSON", func(t *testing.T) {
-		renderer := NewMCPConfigRenderer(MCPRendererOptions{
-			Format:                 "json",
-			IsLast:                 true,
-			WriteSinkGuardPolicies: guardPolicies,
-		})
-		var output strings.Builder
-		renderer.RenderPlaywrightMCP(&output, nil)
-		assert.Contains(t, output.String(), "guard-policies", "playwright JSON should have guard-policies")
-	})
-
-	t.Run("playwright TOML", func(t *testing.T) {
-		renderer := NewMCPConfigRenderer(MCPRendererOptions{
-			Format:                 "toml",
-			WriteSinkGuardPolicies: guardPolicies,
-		})
-		var output strings.Builder
-		renderer.RenderPlaywrightMCP(&output, nil)
-		assert.Contains(t, output.String(), "[mcp_servers.playwright.\"guard-policies\"]", "playwright TOML should have guard-policies section")
-	})
-
 	t.Run("agentic-workflows JSON", func(t *testing.T) {
 		renderer := NewMCPConfigRenderer(MCPRendererOptions{
 			Format:                 "json",
@@ -317,7 +271,6 @@ func TestNonGitHubMCPServersGetGuardPoliciesFromAutoLockdown(t *testing.T) {
 			"github": map[string]any{
 				"toolsets": []string{"default"},
 			},
-			"playwright": nil,
 		},
 	}
 
@@ -332,21 +285,12 @@ func TestNonGitHubMCPServersGetGuardPoliciesFromAutoLockdown(t *testing.T) {
 	}
 	assert.Equal(t, expectedPolicies, policies, "auto-lockdown should produce write-sink with accept=*")
 
-	// Verify playwright JSON rendering has guard-policies
-	var output strings.Builder
-	renderer := NewMCPConfigRenderer(MCPRendererOptions{
-		Format:                 "json",
-		IsLast:                 true,
-		WriteSinkGuardPolicies: policies,
-	})
-	renderer.RenderPlaywrightMCP(&output, nil)
-	assert.Contains(t, output.String(), "guard-policies", "playwright should have guard-policies when auto-lockdown is active")
 }
 
-// TestNonGitHubMCPServersNoGuardPoliciesWithGitHubApp verifies that non-GitHub MCP servers
-// do NOT get write-sink guard policies when a GitHub App is configured.
-// GitHub App tokens are already repo-scoped, so auto-lockdown detection is skipped.
-func TestNonGitHubMCPServersNoGuardPoliciesWithGitHubApp(t *testing.T) {
+// TestNonGitHubMCPServersGetGuardPoliciesWithGitHubApp verifies that non-GitHub MCP servers
+// still get write-sink guard policies when a GitHub App is configured. GitHub App token scope
+// is authentication, not a substitute for DIFC sink policy labels.
+func TestNonGitHubMCPServersGetGuardPoliciesWithGitHubApp(t *testing.T) {
 	workflowData := &WorkflowData{
 		Tools: map[string]any{
 			"github": map[string]any{
@@ -360,7 +304,13 @@ func TestNonGitHubMCPServersNoGuardPoliciesWithGitHubApp(t *testing.T) {
 	}
 
 	policies := deriveWriteSinkGuardPolicyFromWorkflow(workflowData)
-	assert.Nil(t, policies, "no guard policies when GitHub App is configured (auto-lockdown is skipped)")
+	expectedPolicies := map[string]any{
+		"write-sink": map[string]any{
+			"accept":          []string{"*"},
+			"sink-visibility": sinkVisibilityExpr,
+		},
+	}
+	assert.Equal(t, expectedPolicies, policies, "GitHub App authentication should not suppress write-sink policy generation")
 }
 
 // TestAllNonGitHubMCPServersGetWriteSinkWhenGitHubHasAllowOnly verifies that when the GitHub
@@ -417,7 +367,6 @@ func TestAllNonGitHubMCPServersGetWriteSinkWhenGitHubHasAllowOnly(t *testing.T) 
 			workflowData := &WorkflowData{
 				Tools: map[string]any{
 					"github":            tt.githubConfig,
-					"playwright":        nil,
 					"agentic-workflows": nil,
 				},
 			}
@@ -436,12 +385,6 @@ func TestAllNonGitHubMCPServersGetWriteSinkWhenGitHubHasAllowOnly(t *testing.T) 
 				serverName string
 				render     func(*strings.Builder, *MCPConfigRendererUnified)
 			}{
-				{
-					serverName: "playwright",
-					render: func(out *strings.Builder, r *MCPConfigRendererUnified) {
-						r.RenderPlaywrightMCP(out, nil)
-					},
-				},
 				{
 					serverName: "agentic-workflows",
 					render: func(out *strings.Builder, r *MCPConfigRendererUnified) {
@@ -501,7 +444,6 @@ func TestNonGitHubMCPServersGetGuardPoliciesWhenGitHubConfigured(t *testing.T) {
 				"repos":         "all",
 				"min-integrity": "none",
 			},
-			"playwright": nil,
 		},
 	}
 
@@ -516,17 +458,4 @@ func TestNonGitHubMCPServersGetGuardPoliciesWhenGitHubConfigured(t *testing.T) {
 	}
 	assert.Equal(t, expectedPolicies, policies, "policies should match expected write-sink with accept=*")
 
-	// Verify playwright JSON rendering has guard-policies
-	var output strings.Builder
-	renderer := NewMCPConfigRenderer(MCPRendererOptions{
-		Format:                 "json",
-		IsLast:                 true,
-		WriteSinkGuardPolicies: policies,
-	})
-	renderer.RenderPlaywrightMCP(&output, nil)
-	result := output.String()
-	assert.Contains(t, result, "\"guard-policies\"", "playwright should have guard-policies when GitHub has guard policy")
-	assert.Contains(t, result, "\"write-sink\"", "playwright should have write-sink policy")
-	assert.Contains(t, result, "\"accept\"", "playwright should have accept field")
-	assert.Contains(t, result, "\"*\"", "playwright should accept all patterns")
 }

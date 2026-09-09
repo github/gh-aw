@@ -25,7 +25,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [pull_requests, repos, issues, labels]
   repo-memory:
     branch-name: memory/pr-triage
@@ -66,7 +66,7 @@ evals:
     question: Does the agent output include a triage report summarizing the PRs processed?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # PR Triage Agent

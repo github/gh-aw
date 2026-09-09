@@ -237,6 +237,10 @@ func (c *Compiler) validateMainWorkflowSchemaAndEventFilters(cleanPath string, f
 		orchestratorFrontmatterLog.Printf("Skills frontmatter validation failed: %v", err)
 		return err
 	}
+	if err := validateFrontmatterPlugins(frontmatterForValidation); err != nil {
+		orchestratorFrontmatterLog.Printf("Plugins frontmatter validation failed: %v", err)
+		return err
+	}
 
 	// Validate event filter mutual exclusivity (branches/branches-ignore, paths/paths-ignore)
 	if err := ValidateEventFilters(frontmatterForValidation); err != nil {

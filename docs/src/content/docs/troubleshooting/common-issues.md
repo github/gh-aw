@@ -104,7 +104,7 @@ mcp-servers:
 
 ### OpenCode MCP Tools Not Being Called
 
-OpenCode-compatible engines do not auto-discover MCP servers, so use an explicit `opencode.jsonc` config. Keep the local AWF API proxy at `http://host.docker.internal:10004` when using `--enable-api-proxy`; `MCP_GATEWAY_PORT` and `MCP_GATEWAY_API_KEY` are expanded from workflow env at runtime, so substitute concrete values outside a workflow:
+OpenCode-compatible engines do not auto-discover MCP servers, so use an explicit `opencode.jsonc` config. Keep the local AWF API proxy at `http://host.docker.internal:10004` when using `--enable-api-proxy`; `MCP_GATEWAY_PORT` and `MCP_GATEWAY_AGENT_ID` are expanded from workflow env at runtime, so substitute concrete values outside a workflow:
 
 ```json
 {
@@ -125,7 +125,7 @@ OpenCode-compatible engines do not auto-discover MCP servers, so use an explicit
     "safeoutputs": {
       "type": "http",
       "url": "http://host.docker.internal:${MCP_GATEWAY_PORT}/mcp/safeoutputs",
-      "headers": { "Authorization": "${MCP_GATEWAY_API_KEY}" },
+      "headers": { "Authorization": "${MCP_GATEWAY_AGENT_ID}" },
       "disabled": false,
       "timeout": 30000
     }
@@ -169,20 +169,14 @@ network:
 
 ### Cannot Find Module 'playwright'
 
-`Error: Cannot find module 'playwright'` — Playwright is provided as MCP tools, not as an npm package. Use the MCP tools instead of `require('playwright')`:
+`Error: Cannot find module 'playwright'` — the built-in tool installs `@playwright/cli`, not the Playwright JavaScript library. Use `playwright-cli` commands instead of `require('playwright')`:
 
-```javascript
-// ❌ Don't: const playwright = require('playwright')
-// ✅ Do: use MCP tools
-await mcp__playwright__browser_navigate({ url: "https://example.com" });
-await mcp__playwright__browser_snapshot();
+```bash
+playwright-cli goto "https://example.com"
+playwright-cli snapshot
 ```
 
-See [Playwright Tool documentation](/gh-aw/reference/tools/#playwright-tool-playwright) for all available tools.
-
-### Playwright MCP Initialization Failure (EOF Error)
-
-`Failed to register tools error="initialize: EOF" name=playwright` — Chromium crashes before tool registration completes due to missing Docker security flags. Upgrade to 0.41.0+ with `gh extension upgrade gh-aw`.
+See the [Playwright reference](/gh-aw/reference/playwright/) for CLI commands and MCP migration guidance.
 
 ## Permission Issues
 

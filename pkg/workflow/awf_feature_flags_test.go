@@ -451,3 +451,62 @@ func TestAWFSupportsCloudHypervisorFilesystemAllowWrite(t *testing.T) {
 		})
 	}
 }
+
+// TestAWFSupportsAPIProxyCACert tests the awfSupportsAPIProxyCACert version gate.
+func TestAWFSupportsAPIProxyCACert(t *testing.T) {
+	tests := []struct {
+		name           string
+		firewallConfig *FirewallConfig
+		want           bool
+	}{
+		{
+			name:           "nil firewall config returns true (default version v0.28.10 meets minimum)",
+			firewallConfig: nil,
+			want:           true,
+		},
+		{
+			name:           "empty version returns true (default version v0.28.10 meets minimum)",
+			firewallConfig: &FirewallConfig{},
+			want:           true,
+		},
+		{
+			name:           "latest returns true",
+			firewallConfig: &FirewallConfig{Version: "latest"},
+			want:           true,
+		},
+		{
+			name:           "v0.28.10 supports apiProxy.caCert (exact minimum version)",
+			firewallConfig: &FirewallConfig{Version: "v0.28.10"},
+			want:           true,
+		},
+		{
+			name:           "v0.28.9 does not support apiProxy.caCert (schema not present)",
+			firewallConfig: &FirewallConfig{Version: "v0.28.9"},
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := awfSupportsAPIProxyCACert(tt.firewallConfig)
+			assert.Equal(t, tt.want, got, "awfSupportsAPIProxyCACert result")
+		})
+	}
+}
+
+func TestAWFSupportsVerifySbxEgress(t *testing.T) {
+	tests := []struct {
+		name           string
+		firewallConfig *FirewallConfig
+		want           bool
+	}{
+		{name: "default version supports verify-sbx-egress", want: true},
+		{name: "exact minimum version supports verify-sbx-egress", firewallConfig: &FirewallConfig{Version: "v0.28.13"}, want: true},
+		{name: "older version does not support verify-sbx-egress", firewallConfig: &FirewallConfig{Version: "v0.28.12"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, awfSupportsVerifySbxEgress(tt.firewallConfig))
+		})
+	}
+}

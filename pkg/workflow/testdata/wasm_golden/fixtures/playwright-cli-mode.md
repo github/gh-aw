@@ -6,6 +6,8 @@ engine: copilot
 tools:
   playwright:
     mode: cli
+  bash:
+    - "curl *"
 network:
   allowed:
     - defaults
@@ -22,6 +24,6 @@ for coding agents.
 
 Please perform the following tasks:
 
-1. Run `playwright-cli open https://example.com` to navigate to the page
+1. Run `playwright-cli open http://127.0.0.1:4321` to navigate to a local page
 2. Run `playwright-cli screenshot` to capture the current page
 3. Create an issue confirming that Playwright CLI mode is working correctly

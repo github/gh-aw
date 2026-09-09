@@ -7,12 +7,22 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
+type resolvedRepositoryPackageAssets struct {
+	installationSources []resolvedPackageInstallable
+	resourceFiles       []resolvedPackageResource
+	extensionFiles      *repositoryPackageExtensionFiles
+	warnings            []string
+}
+
 func resolveRepositoryPackage(ctx context.Context, repoSpec *RepoSpec, host string) (*resolvedRepositoryPackage, error) {
+	addPackageManifestLog.Printf("Resolving repository package %q (packagePath=%q, host=%q)", repoSpec.RepoSlug, repoSpec.PackagePath, host)
 	owner, repo, err := splitRepositoryPackageSlug(repoSpec.RepoSlug)
 	if err != nil {
 		return nil, err
@@ -29,13 +39,27 @@ func resolveRepositoryPackage(ctx context.Context, repoSpec *RepoSpec, host stri
 	if err != nil {
 		return nil, err
 	}
-
-	installationSources, includeSkillDirs, includeAgentFiles, err := resolveRepositoryPackageInstallablePaths(ctx, owner, repo, packagePath, ref, host, manifest, manifestPath)
+	manifestNodes, importWarnings, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, func(importPath string) ([]byte, error) {
+		return downloadPackageFileFromGitHubForHost(ctx, owner, repo, importPath, ref, host)
+	})
 	if err != nil {
 		return nil, err
 	}
-	resourceFiles, err := resolveRepositoryPackageResourceFiles(ctx, owner, repo, packagePath, ref, host, manifest, installationSources)
+	warnings = append(warnings, importWarnings...)
+
+	assets, err := resolveRepositoryPackageManifestNodes(ctx, owner, repo, ref, host, repoSpec.RepoSlug, manifestNodes)
 	if err != nil {
+		return nil, err
+	}
+	warnings = append(warnings, assets.warnings...)
+	projectFile, err := resolveRepositoryPackageProjectFile(ctx, owner, repo, packagePath, ref, host)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateUniqueResolvedPackageFiles(assets.installationSources, assets.resourceFiles, assets.extensionFiles.skillFiles, assets.extensionFiles.agentFiles, manifestPath); err != nil {
+		return nil, err
+	}
+	if err := validateUniqueManifestWorkflowFilenames(assets.installationSources, manifestPath); err != nil {
 		return nil, err
 	}
 
@@ -43,36 +67,80 @@ func resolveRepositoryPackage(ctx context.Context, repoSpec *RepoSpec, host stri
 	if err != nil {
 		return nil, err
 	}
-
-	extensionFiles, err := resolveRepositoryPackageExtensionFiles(ctx, repositoryPackageExtensionFilesOptions{
-		owner:             owner,
-		repo:              repo,
-		packagePath:       packagePath,
-		ref:               ref,
-		host:              host,
-		manifest:          manifest,
-		includeSkillDirs:  includeSkillDirs,
-		includeAgentFiles: includeAgentFiles,
-	})
-	if err != nil {
-		return nil, err
+	if len(assets.installationSources) == 0 && len(assets.resourceFiles) == 0 && len(assets.extensionFiles.skillFiles) == 0 && len(assets.extensionFiles.agentFiles) == 0 && projectFile == nil {
+		return nil, fmt.Errorf("repository %q does not contain any installable workflows, resources, skills, agents, or aw.json project settings (either explicitly declared or auto-discovered). Add workflows under 'workflows/', resources in aw.yml, skills under 'skills/', agents under 'agents/', or an aw.json file", repositoryPackageIdentifier(repoSpec.RepoSlug, packagePath))
 	}
-	warnings = append(warnings, extensionFiles.warnings...)
-
-	if len(installationSources) == 0 && len(resourceFiles) == 0 && len(extensionFiles.skillFiles) == 0 && len(extensionFiles.agentFiles) == 0 {
-		return nil, fmt.Errorf("repository %q does not contain any installable workflows, resources, skills, or agents (either explicitly declared or auto-discovered). Add workflows under 'workflows/', resources in aw.yml, skills under 'skills/', or agents under 'agents/', or declare them explicitly in aw.yml", repositoryPackageIdentifier(repoSpec.RepoSlug, packagePath))
-	}
-
-	return newResolvedRepositoryPackage(manifestPath, ref, docsPath, manifest, installationSources, resourceFiles, extensionFiles, warnings), nil
+	pkg := newResolvedRepositoryPackage(manifestPath, ref, docsPath, manifest, assets.installationSources, assets.resourceFiles, assets.extensionFiles, warnings)
+	pkg.ProjectFile = projectFile
+	return pkg, nil
 }
 
-func resolveRepositoryPackageResourceFiles(ctx context.Context, owner, repo, packagePath, ref, host string, manifest *repositoryPackageManifest, installationSources []resolvedPackageInstallable) ([]resolvedPackageResource, error) {
-	resourceFiles := normalizePackageResourcePaths(manifest.Resources, packagePath)
-	return appendPackageGraderEvaluatorResources(ctx, owner, repo, ref, host, packagePath, resourceFiles, installationSources)
+func resolveRepositoryPackageProjectFile(ctx context.Context, owner, repo, packagePath, ref, host string) (*resolvedPackageResource, error) {
+	sourcePath := joinRepositoryPackagePath(packagePath, workflow.RepoConfigFileName)
+	if _, err := downloadPackageFileFromGitHubForHost(ctx, owner, repo, sourcePath, ref, host); err != nil {
+		if isRepositoryFileNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read package project file %q: %w", sourcePath, err)
+	}
+	return &resolvedPackageResource{
+		SourcePath:      sourcePath,
+		DestinationPath: workflow.RepoConfigFileName,
+	}, nil
 }
 
-func appendPackageGraderEvaluatorResources(ctx context.Context, owner, repo, ref, host, packagePath string, resourceFiles []resolvedPackageResource, installationSources []resolvedPackageInstallable) ([]resolvedPackageResource, error) {
-	seen := make(map[string]string, len(resourceFiles))
+func resolveRepositoryPackageManifestNodes(ctx context.Context, owner, repo, ref, host, repoSlug string, nodes []repositoryPackageManifestNode) (*resolvedRepositoryPackageAssets, error) {
+	assets := &resolvedRepositoryPackageAssets{extensionFiles: &repositoryPackageExtensionFiles{}}
+	// Shared across every manifest node so that multiple imported manifests referencing the
+	// same repository-root grader evaluator are deduplicated instead of being reported as
+	// conflicting duplicate install destinations by validateUniqueResolvedPackageFiles.
+	seenGraderEvaluators := make(map[string]string)
+	for _, node := range nodes {
+		visibilityWarnings, err := validateRepositoryPackageVisibility(node.Manifest, repositoryPackageIdentifier(repoSlug, node.PackagePath))
+		if err != nil {
+			return nil, err
+		}
+		assets.warnings = append(assets.warnings, visibilityWarnings...)
+
+		nodeInstallables, includeSkillDirs, includeAgentFiles, err := resolveRepositoryPackageInstallablePaths(ctx, owner, repo, node.PackagePath, ref, host, node.Manifest, node.Path)
+		if err != nil {
+			return nil, err
+		}
+		assets.installationSources = append(assets.installationSources, nodeInstallables...)
+		nodeResources := normalizePackageResourcePaths(node.Manifest.Resources, node.PackagePath)
+		nodeResources, err = appendPackageGraderEvaluatorResources(ctx, owner, repo, ref, host, nodeResources, nodeInstallables, seenGraderEvaluators)
+		if err != nil {
+			return nil, err
+		}
+		assets.resourceFiles = append(assets.resourceFiles, nodeResources...)
+
+		nodeExtensionFiles, err := resolveRepositoryPackageExtensionFiles(ctx, repositoryPackageExtensionFilesOptions{
+			owner:             owner,
+			repo:              repo,
+			packagePath:       node.PackagePath,
+			ref:               ref,
+			host:              host,
+			manifest:          node.Manifest,
+			includeSkillDirs:  includeSkillDirs,
+			includeAgentFiles: includeAgentFiles,
+		})
+		if err != nil {
+			return nil, err
+		}
+		assets.extensionFiles.skillFiles = append(assets.extensionFiles.skillFiles, nodeExtensionFiles.skillFiles...)
+		assets.extensionFiles.agentFiles = append(assets.extensionFiles.agentFiles, nodeExtensionFiles.agentFiles...)
+		assets.warnings = append(assets.warnings, nodeExtensionFiles.warnings...)
+	}
+	return assets, nil
+}
+
+// appendPackageGraderEvaluatorResources discovers grader evaluator resources referenced by the
+// given installable package workflows and appends them to resourceFiles. seen tracks previously
+// resolved evaluator destinations across the entire manifest graph (i.e. across every call for
+// every node), so that multiple manifest nodes referencing the identical repository-root
+// evaluator are deduplicated instead of tripping the later duplicate-destination validation,
+// while still rejecting genuinely conflicting sources for the same destination.
+func appendPackageGraderEvaluatorResources(ctx context.Context, owner, repo, ref, host string, resourceFiles []resolvedPackageResource, installationSources []resolvedPackageInstallable, seen map[string]string) ([]resolvedPackageResource, error) {
 	for _, resource := range resourceFiles {
 		seen[packageResourceDestinationKey(resource.DestinationPath)] = resource.SourcePath
 	}
@@ -97,7 +165,7 @@ func appendPackageGraderEvaluatorResources(ctx context.Context, owner, repo, ref
 			if !entry.isGraderEvaluator {
 				continue
 			}
-			resource := packageGraderEvaluatorResource(installable, entry.path, packagePath)
+			resource := packageGraderEvaluatorResource(installable, entry.path)
 			key := packageResourceDestinationKey(resource.DestinationPath)
 			if previousSource, exists := seen[key]; exists {
 				if previousSource != resource.SourcePath {
@@ -112,19 +180,15 @@ func appendPackageGraderEvaluatorResources(ctx context.Context, owner, repo, ref
 	return resourceFiles, nil
 }
 
-func packageGraderEvaluatorResource(installable resolvedPackageInstallable, runPath, packagePath string) resolvedPackageResource {
+func packageGraderEvaluatorResource(installable resolvedPackageInstallable, runPath string) resolvedPackageResource {
 	if localPath, ok := strings.CutPrefix(runPath, "./"); ok {
 		return resolvedPackageResource{
 			SourcePath:      path.Join(path.Dir(installable.SourcePath), localPath),
 			DestinationPath: path.Join(path.Dir(installable.DestinationPath), localPath),
 		}
 	}
-	sourcePath := joinRepositoryPackagePath(packagePath, runPath)
-	if localWorkflowsPath, ok := strings.CutPrefix(runPath, constants.WorkflowsDirSlash); ok {
-		sourcePath = path.Join(path.Dir(installable.SourcePath), localWorkflowsPath)
-	}
 	return resolvedPackageResource{
-		SourcePath:      sourcePath,
+		SourcePath:      runPath,
 		DestinationPath: runPath,
 	}
 }
@@ -160,17 +224,35 @@ func resolveRepositoryPackageRef(ctx context.Context, repoSpec *RepoSpec, host s
 }
 
 func resolveRepositoryPackageInstallablePaths(ctx context.Context, owner, repo, packagePath, ref, host string, manifest *repositoryPackageManifest, manifestPath string) ([]resolvedPackageInstallable, []string, []string, error) {
-	includeInstallablePaths, includeSkillDirs, includeAgentFiles := splitManifestIncludePaths(manifest.Includes)
+	expandedIncludes, err := expandRepositoryPackageWildcardIncludes(ctx, owner, repo, packagePath, ref, host, manifest.Includes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	includeInstallablePaths, includeSkillDirs, includeAgentFiles := splitManifestIncludePaths(expandedIncludes)
 	includeInstallablePaths = append(includeInstallablePaths, manifestIncludesFromPaths(manifest.Files)...)
+	hasExplicitWorkflowSelector := len(manifest.Files) > 0
+	for _, include := range manifest.Includes {
+		if include.isMapping() || isSupportedPackageInstallablePath(include.Source) {
+			hasExplicitWorkflowSelector = true
+			break
+		}
+		if parent, wildcard := manifestIncludeWildcardParent(include.Source); wildcard &&
+			(parent == "workflows" || parent == "agentic-workflows" || parent == constants.WorkflowsDir) {
+			hasExplicitWorkflowSelector = true
+			break
+		}
+	}
 
 	installationSources := normalizePackageInstallablePaths(includeInstallablePaths, packagePath)
-	if len(installationSources) == 0 {
+	if len(installationSources) == 0 && !hasExplicitWorkflowSelector && len(manifest.Imports) == 0 {
+		addPackageManifestLog.Print("No explicit installable paths in manifest, scanning repository for installables")
 		scanned, err := scanRepositoryPackageInstallablePaths(ctx, owner, repo, packagePath, ref, host)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		installationSources = packageInstallablesFromSourcePaths(scanned)
 	}
+	addPackageManifestLog.Printf("Resolved %d installable source(s) for package", len(installationSources))
 	if err := validateUniqueManifestWorkflowFilenames(installationSources, manifestPath); err != nil {
 		return nil, nil, nil, err
 	}
@@ -178,6 +260,58 @@ func resolveRepositoryPackageInstallablePaths(ctx context.Context, owner, repo, 
 		return nil, nil, nil, err
 	}
 	return installationSources, includeSkillDirs, includeAgentFiles, nil
+}
+
+func expandRepositoryPackageWildcardIncludes(ctx context.Context, owner, repo, packagePath, ref, host string, includes []repositoryPackageInclude) ([]repositoryPackageInclude, error) {
+	expanded := make([]repositoryPackageInclude, 0, len(includes))
+	for _, include := range includes {
+		parent, wildcard := manifestIncludeWildcardParent(include.Source)
+		if !wildcard {
+			expanded = append(expanded, include)
+			continue
+		}
+
+		remoteParent := parent
+		rootRelative := !include.isMapping() && strings.HasPrefix(parent, constants.GithubDir)
+		if packagePath != "" && !rootRelative {
+			remoteParent = joinRepositoryPackagePath(packagePath, parent)
+		}
+		files, err := listPackageDirFilesForHost(ctx, owner, repo, ref, remoteParent, host)
+		if err != nil && !isRepositoryFileNotFound(err) {
+			return nil, fmt.Errorf("failed to expand includes wildcard %q in %s/%s@%s: %w", include.Source, owner, repo, ref, err)
+		}
+		var dirs []string
+		if !include.isMapping() {
+			dirs, err = listPackageDirSubdirsForHost(ctx, owner, repo, ref, remoteParent, host)
+			if err != nil && !isRepositoryFileNotFound(err) {
+				return nil, fmt.Errorf("failed to expand includes wildcard %q in %s/%s@%s: %w", include.Source, owner, repo, ref, err)
+			}
+		}
+
+		fileCandidates := make([]string, 0, len(files))
+		for _, candidate := range files {
+			candidate = filepath.ToSlash(candidate)
+			if packagePath != "" && !rootRelative {
+				candidate = strings.TrimPrefix(candidate, strings.TrimSuffix(packagePath, "/")+"/")
+			}
+			fileCandidates = append(fileCandidates, candidate)
+		}
+		if !include.isMapping() {
+			for i, candidate := range dirs {
+				candidate = filepath.ToSlash(candidate)
+				if packagePath != "" && !rootRelative {
+					candidate = strings.TrimPrefix(candidate, strings.TrimSuffix(packagePath, "/")+"/")
+				}
+				dirs[i] = candidate
+			}
+		}
+		matches, err := expandManifestWildcardCandidates(include, parent, fileCandidates, dirs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to expand includes wildcard %q in %s/%s@%s: %w", include.Source, owner, repo, ref, err)
+		}
+		expanded = append(expanded, matches...)
+	}
+	return deduplicateManifestIncludes(expanded), nil
 }
 
 type repositoryPackageExtensionFiles struct {
@@ -228,8 +362,11 @@ func newResolvedRepositoryPackage(manifestPath, ref, docsPath string, manifest *
 		ResolvedRef:        ref,
 		Name:               manifest.Name,
 		Emoji:              manifest.Emoji,
+		Icon:               manifest.Icon,
 		Description:        manifest.Description,
 		License:            manifest.License,
+		Private:            manifest.Private,
+		Experimental:       manifest.Experimental,
 		DocsPath:           docsPath,
 		InstallationSource: installationSources,
 		ResourceFiles:      resourceFiles,

@@ -186,61 +186,6 @@ func runGitIn(t *testing.T, dir string, args ...string) {
 	require.NoError(t, err, "git %s failed: %s", strings.Join(args, " "), string(out))
 }
 
-func TestInspectAddWorkingTree(t *testing.T) {
-	tests := []struct {
-		name            string
-		prepare         func(t *testing.T, repoDir string)
-		plannedPaths    []string
-		wantStaged      []string
-		wantOverlapping []string
-	}{
-		{
-			name: "allows unrelated unstaged and untracked files",
-			prepare: func(t *testing.T, repoDir string) {
-				require.NoError(t, os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("changed\n"), 0644))
-				require.NoError(t, os.WriteFile(filepath.Join(repoDir, "notes.txt"), []byte("notes\n"), 0644))
-			},
-			plannedPaths: []string{".github/workflows/new-workflow.md"},
-		},
-		{
-			name: "blocks staged changes",
-			prepare: func(t *testing.T, repoDir string) {
-				require.NoError(t, os.WriteFile(filepath.Join(repoDir, "notes.txt"), []byte("notes\n"), 0644))
-				runGit(t, repoDir, "add", "notes.txt")
-			},
-			plannedPaths: []string{".github/workflows/new-workflow.md"},
-			wantStaged:   []string{"notes.txt"},
-		},
-		{
-			name: "blocks unstaged changes to a planned path",
-			prepare: func(t *testing.T, repoDir string) {
-				workflowDir := filepath.Join(repoDir, ".github", "workflows")
-				require.NoError(t, os.MkdirAll(workflowDir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(workflowDir, "new-workflow.md"), []byte("local draft\n"), 0644))
-			},
-			plannedPaths:    []string{".github/workflows/new-workflow.md"},
-			wantOverlapping: []string{".github/workflows/new-workflow.md"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repoDir := t.TempDir()
-			runGit(t, repoDir, "init", "--initial-branch=main")
-			require.NoError(t, os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("initial\n"), 0644))
-			runGit(t, repoDir, "add", "README.md")
-			runGit(t, repoDir, "commit", "-m", "initial")
-			t.Chdir(repoDir)
-			tt.prepare(t, repoDir)
-
-			blockers, err := inspectAddWorkingTree(tt.plannedPaths)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantStaged, blockers.staged)
-			assert.Equal(t, tt.wantOverlapping, blockers.overlapping)
-		})
-	}
-}
-
 func TestBuildWorkingTreeResolutionOptions(t *testing.T) {
 	t.Run("offers overwrite first for overlapping unstaged files", func(t *testing.T) {
 		options := buildWorkingTreeResolutionOptions(true)

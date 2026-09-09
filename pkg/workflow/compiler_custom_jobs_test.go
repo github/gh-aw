@@ -873,6 +873,37 @@ func TestApplyBuiltinJobNeedsAugmentations_StatusFuncAlwaysAddsSuccessGuards(t *
 	assert.Contains(t, agentJob.If, "always()")
 }
 
+func TestApplyBuiltinJobNeedsAugmentations_StatusFuncKeepsCustomJobUnguarded(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	// probe is a custom job auto-wired as an agent prerequisite by the compiler.
+	agentJob := &Job{
+		Name:  string(constants.AgentJobName),
+		Needs: []string{string(constants.ActivationJobName), "probe"},
+	}
+	require.NoError(t, compiler.jobManager.AddJob(agentJob))
+	activationJob := &Job{Name: string(constants.ActivationJobName)}
+	require.NoError(t, compiler.jobManager.AddJob(activationJob))
+	probeJob := &Job{Name: "probe"}
+	require.NoError(t, compiler.jobManager.AddJob(probeJob))
+
+	data := &WorkflowData{
+		Jobs: map[string]any{
+			"probe": map[string]any{"runs-on": "ubuntu-latest"},
+			string(constants.AgentJobName): map[string]any{
+				"if": "always()",
+			},
+		},
+	}
+
+	err := compiler.applyBuiltinJobAugmentations(data)
+	require.NoError(t, err)
+	// activation is compiler-owned and stays guarded.
+	assert.Contains(t, agentJob.If, "needs.activation.result == 'success'")
+	// probe is author-owned, so always() keeps the agent running after a failing probe.
+	assert.NotContains(t, agentJob.If, "needs.probe.result == 'success'")
+}
+
 // ========================================
 // normalizeBuiltinJobAlias Tests
 // ========================================

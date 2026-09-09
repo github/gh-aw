@@ -4,9 +4,31 @@ package cli
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
+	cmdArgs, _, _ := buildLogsCommandArgs(context.Background(), logsArgs{
+		Count:                 1,
+		Timeout:               1,
+		MaxGitHubAPIRateLimit: -2000,
+		MaxStorageMB:          10240,
+		PruneOlderRuns:        true,
+	})
+	command := strings.Join(cmdArgs, " ")
+
+	if !strings.Contains(command, "--max-github-api-rate-limit -2000") {
+		t.Fatalf("command args do not include GitHub API rate-limit budget: %s", command)
+	}
+	if !strings.Contains(command, "--max-storage 10240") {
+		t.Fatalf("command args do not include storage budget: %s", command)
+	}
+	if !strings.Contains(command, "--prune-older-runs") {
+		t.Fatalf("command args do not include older-run pruning mode: %s", command)
+	}
+}
 
 // TestTimeoutFlagParsing tests that the timeout flag is properly parsed
 func TestTimeoutFlagParsing(t *testing.T) {

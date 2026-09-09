@@ -47,7 +47,7 @@ These colors communicate the status or severity of information.
 
 #### Visual Examples
 
-```
+```text
 Error:   [Light: darker red]  [Dark: bright red]
          "Error: File not found"
 
@@ -72,7 +72,7 @@ These colors draw attention to specific elements like commands, file paths, and 
 
 #### Visual Examples
 
-```
+```text
 Purple:  [Light: darker purple] [Dark: bright purple]
          "Command: gh aw compile"
          "File: /path/to/workflow.md"
@@ -94,7 +94,7 @@ These colors provide structure and visual hierarchy in terminal output.
 
 #### Visual Examples
 
-```
+```text
 Comment:    [Light: gray-blue]     [Dark: muted purple-gray]
             "  12 │ func main() {"
 

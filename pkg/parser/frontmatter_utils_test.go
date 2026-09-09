@@ -29,7 +29,7 @@ func TestIsUnderWorkflowsDirectory(t *testing.T) {
 		{
 			name:     "file under .github/workflows subdirectory",
 			filePath: "/some/path/.github/workflows/shared/helper.md",
-			expected: false, // Files in subdirectories are not top-level workflow files
+			expected: true,
 		},
 		{
 			name:     "file outside .github/workflows",

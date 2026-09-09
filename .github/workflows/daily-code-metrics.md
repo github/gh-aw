@@ -12,17 +12,16 @@ permissions:
   pull-requests: read
   copilot-requests: write
 tracker-id: daily-code-metrics
-engine:
-  id: crush
-model: copilot/claude-sonnet-4.5
+engine: copilot
+model: claude-sonnet-4.5
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
   repo-memory:
     branch-prefix: daily
     description: "Historical code quality and health metrics"
@@ -37,7 +36,6 @@ safe-outputs:
 timeout-minutes: 30
 strict: true
 imports:
-  - shared/crush.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[daily-code-metrics] "

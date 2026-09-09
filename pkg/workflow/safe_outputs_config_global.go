@@ -10,6 +10,8 @@ import (
 
 // extractGlobalConfigFields parses safe-outputs fields that apply across handlers,
 // keeping extractSafeOutputsConfig focused on routing handler-specific configuration.
+//
+//nolint:largefunc // Legacy global configuration extraction is intentionally centralized.
 func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *SafeOutputsConfig) {
 	// Handle steering issue mode.
 	if steer, exists := outputMap["steer"]; exists {
@@ -87,6 +89,12 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 	if githubToken, exists := outputMap["github-token"]; exists {
 		if githubTokenStr, ok := githubToken.(string); ok {
 			config.GitHubToken = githubTokenStr
+		}
+	}
+
+	if linearToken, exists := outputMap["linear-token"]; exists {
+		if linearTokenStr, ok := linearToken.(string); ok {
+			config.LinearToken = linearTokenStr
 		}
 	}
 

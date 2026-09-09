@@ -156,6 +156,22 @@ func TestPiEngine_GetInstallationSteps_WithCustomCommand(t *testing.T) {
 	assert.Empty(t, steps, "Installation steps should be skipped when custom command is set")
 }
 
+func TestPiEngine_GetInstallationSteps_CustomCommandWithExtensions(t *testing.T) {
+	engine := NewPiEngine()
+	steps := engine.GetInstallationSteps(&WorkflowData{
+		Name: "test-workflow",
+		EngineConfig: &EngineConfig{
+			ID:         "pi",
+			Command:    "/custom/pi",
+			Extensions: []string{"@pi/web-search"},
+		},
+	})
+	stepContent := strings.Join(flattenSteps(steps), "\n")
+
+	assert.Contains(t, stepContent, "/custom/pi install @pi/web-search")
+	assert.NotContains(t, stepContent, "@earendil-works/pi-coding-agent")
+}
+
 func TestPiEngine_GetInstallationSteps_WithExtensions(t *testing.T) {
 	engine := NewPiEngine()
 	workflowData := &WorkflowData{

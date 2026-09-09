@@ -115,6 +115,7 @@ var validWorkflowRunConclusions = []string{
 	"timed_out",
 	"action_required",
 	"stale",
+	"startup_failure",
 }
 
 // isValidWorkflowRunConclusion reports whether v is a recognised conclusion value.

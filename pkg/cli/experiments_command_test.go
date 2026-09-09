@@ -8,9 +8,55 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReconcileExperimentDetailsWithConfigs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("drops stale variant labels not in the declared variants list", func(t *testing.T) {
+		details := &ExperimentDetails{
+			Experiments: []ExperimentVariantStats{
+				{
+					Name:     "model_size",
+					Variants: map[string]int{"gpt-5.4": 28, "gpt-5.4-mini": 18, "small-agent": 1, "agent": 1},
+					Total:    48,
+				},
+			},
+		}
+		configs := map[string]*workflow.ExperimentConfig{
+			"model_size": {Variants: []string{"gpt-5.4", "gpt-5.4-mini"}},
+		}
+
+		reconcileExperimentDetailsWithConfigs(details, configs)
+
+		require.Len(t, details.Experiments, 1)
+		assert.Equal(t, map[string]int{"gpt-5.4": 28, "gpt-5.4-mini": 18}, details.Experiments[0].Variants)
+		assert.Equal(t, 46, details.Experiments[0].Total, "total should be recomputed from the reconciled counts")
+	})
+
+	t.Run("leaves counts untouched when there is no matching config", func(t *testing.T) {
+		details := &ExperimentDetails{
+			Experiments: []ExperimentVariantStats{
+				{Name: "unrelated", Variants: map[string]int{"a": 1, "b": 2}, Total: 3},
+			},
+		}
+
+		reconcileExperimentDetailsWithConfigs(details, map[string]*workflow.ExperimentConfig{})
+		reconcileExperimentDetailsWithConfigs(details, map[string]*workflow.ExperimentConfig{"unrelated": {}})
+
+		assert.Equal(t, map[string]int{"a": 1, "b": 2}, details.Experiments[0].Variants)
+		assert.Equal(t, 3, details.Experiments[0].Total)
+	})
+
+	t.Run("handles nil details safely", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			reconcileExperimentDetailsWithConfigs(nil, map[string]*workflow.ExperimentConfig{"x": {Variants: []string{"a"}}})
+		})
+	})
+}
 
 func TestFetchRemoteExperimentDetailsClassifiesTitleCaseNotFound(t *testing.T) {
 	fakeBinDir := t.TempDir()

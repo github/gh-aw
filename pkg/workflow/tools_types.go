@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"strings"
@@ -182,7 +183,7 @@ func mcpServerConfigToMap(config MCPServerConfig) map[string]any {
 
 // ToMap converts the ToolsConfig back to a map[string]any for backward compatibility.
 // This is useful when interfacing with legacy code that expects map[string]any.
-func (t *ToolsConfig) ToMap() map[string]any {
+func (t *ToolsConfig) ToMap() map[string]any { //nolint:largefunc // Existing conversion preserves backwards-compatible map shape.
 	if t == nil {
 		toolsTypesLog.Print("Converting nil ToolsConfig to empty map")
 		return make(map[string]any)
@@ -344,6 +345,20 @@ func (s *GitHubReposScope) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// UnmarshalJSON normalizes scalar and array repository scopes to a string slice.
+func (s *GitHubReposScope) UnmarshalJSON(data []byte) error {
+	var value any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	scope, err := parseGitHubReposScope(value)
+	if err != nil {
+		return err
+	}
+	*s = scope
+	return nil
+}
+
 // GitHubToolConfig represents the configuration for the GitHub tool
 // Can be nil (enabled with defaults), string, or an object with specific settings
 type GitHubToolConfig struct {
@@ -421,16 +436,16 @@ type GitHubToolConfig struct {
 
 // PlaywrightToolConfig represents the configuration for the Playwright tool
 type PlaywrightToolConfig struct {
-	Version string   `yaml:"version,omitempty"`
-	Args    []string `yaml:"args,omitempty"`
-	// Mode selects the integration approach: "mcp" (default) runs a Docker-based MCP
-	// server; "cli" installs @playwright/cli via npm for token-efficient CLI invocations.
-	Mode string `yaml:"mode,omitempty"`
+	Version string `yaml:"version,omitempty"`
+	// Mode accepts "cli" for backward compatibility with explicit configurations.
+	// CLI mode is also used when this field is omitted.
+	Mode     string   `yaml:"mode,omitempty"`
+	Browsers []string `yaml:"browsers,omitempty"`
 }
 
-// IsCLIMode returns true when the playwright tool is configured in CLI mode (mode: cli).
+// IsCLIMode returns true when the Playwright tool uses the supported CLI mode.
 func (p *PlaywrightToolConfig) IsCLIMode() bool {
-	return p != nil && strings.EqualFold(p.Mode, "cli")
+	return p != nil && (p.Mode == "" || strings.EqualFold(p.Mode, "cli"))
 }
 
 // BashToolConfig represents the configuration for the Bash tool
@@ -506,26 +521,28 @@ type MCPServerConfig struct {
 // Per MCP Gateway Specification v1.0.0: All stdio-based MCP servers MUST be containerized.
 // Direct command execution is not supported.
 type MCPGatewayRuntimeConfig struct {
-	Container            string            `yaml:"container,omitempty"`              // Container image for the gateway (required)
-	Version              string            `yaml:"version,omitempty"`                // Optional version/tag for the container
-	Entrypoint           string            `yaml:"entrypoint,omitempty"`             // Optional entrypoint override for the container
-	Args                 []string          `yaml:"args,omitempty"`                   // Arguments for docker run
-	EntrypointArgs       []string          `yaml:"entrypointArgs,omitempty"`         // Arguments passed to container entrypoint
-	Env                  map[string]string `yaml:"env,omitempty"`                    // Environment variables for the gateway
-	Port                 int               `yaml:"port,omitempty"`                   // Port for the gateway HTTP server (default: 8080)
-	APIKey               string            `yaml:"api-key,omitempty"`                // API key for gateway authentication
-	Domain               string            `yaml:"domain,omitempty"`                 // Domain for gateway URL (localhost or host.docker.internal)
-	Mounts               []string          `yaml:"mounts,omitempty"`                 // Volume mounts for the gateway container (format: "source:dest:mode")
-	PayloadDir           string            `yaml:"payload-dir,omitempty"`            // Directory path for storing large payload JSON files (must be absolute path)
-	PayloadPathPrefix    string            `yaml:"payload-path-prefix,omitempty"`    // Path prefix to remap payload paths for agent containers (e.g., /workspace/payloads)
-	PayloadSizeThreshold int               `yaml:"payload-size-threshold,omitempty"` // Size threshold in bytes for storing payloads to disk (default: 524288 = 512KB)
-	TrustedBots          []string          `yaml:"trusted-bots,omitempty"`           // Additional bot identity strings to pass to the gateway, merged with its built-in list
-	KeepaliveInterval    int               `yaml:"keepalive-interval,omitempty"`     // Keepalive ping interval in seconds for HTTP MCP backends (0=default 1500s, -1=disabled, >0=custom)
-	SessionTimeout       string            `yaml:"session-timeout,omitempty"`        // Session timeout for MCP gateway sessions as a Go duration string (e.g. "4h", "30m"); empty = gateway default (precedence: stdin config > MCP_GATEWAY_SESSION_TIMEOUT env var > built-in default 6h)
-	ToolTimeout          string            `yaml:"tool-timeout,omitempty"`           // Timeout for individual MCP tool calls as a Go duration string (e.g. "2m", "30s"); empty = gateway built-in default (60s)
-	StartupTimeout       int               `yaml:"-"`                                // Startup timeout in seconds for all MCP backends; always emitted to override gateway's built-in 30s default (gh-aw default: 120s, from tools.startup-timeout)
-	OTLPEndpoint         string            `yaml:"-"`                                // OTLP collector endpoint (derived from observability.otlp, not user-settable)
-	OTLPHeaders          string            `yaml:"-"`                                // Raw OTLP HTTP headers string (derived from observability.otlp, not user-settable)
+	Container            string                           `yaml:"container,omitempty"`              // Container image for the gateway (required)
+	Version              string                           `yaml:"version,omitempty"`                // Optional version/tag for the container
+	Entrypoint           string                           `yaml:"entrypoint,omitempty"`             // Optional entrypoint override for the container
+	Args                 []string                         `yaml:"args,omitempty"`                   // Arguments for docker run
+	EntrypointArgs       []string                         `yaml:"entrypointArgs,omitempty"`         // Arguments passed to container entrypoint
+	Env                  map[string]string                `yaml:"env,omitempty"`                    // Environment variables for the gateway
+	Port                 int                              `yaml:"port,omitempty"`                   // Port for the gateway HTTP server (default: 8080)
+	AgentID              string                           `yaml:"agent-id,omitempty"`               // Agent/session identifier for gateway authentication
+	AgentIDs             []string                         `yaml:"-"`                                // Multiple isolated gateway agent identities
+	AgentPolicies        map[string]MCPGatewayAgentPolicy `yaml:"-"`                                // Per-agent gateway access policies
+	Domain               string                           `yaml:"domain,omitempty"`                 // Domain for gateway URL (localhost or host.docker.internal)
+	Mounts               []string                         `yaml:"mounts,omitempty"`                 // Volume mounts for the gateway container (format: "source:dest:mode")
+	PayloadDir           string                           `yaml:"payload-dir,omitempty"`            // Directory path for storing large payload JSON files (must be absolute path)
+	PayloadPathPrefix    string                           `yaml:"payload-path-prefix,omitempty"`    // Path prefix to remap payload paths for agent containers (e.g., /workspace/payloads)
+	PayloadSizeThreshold int                              `yaml:"payload-size-threshold,omitempty"` // Size threshold in bytes for storing payloads to disk (default: 524288 = 512KB)
+	TrustedBots          []string                         `yaml:"trusted-bots,omitempty"`           // Additional bot identity strings to pass to the gateway, merged with its built-in list
+	KeepaliveInterval    int                              `yaml:"keepalive-interval,omitempty"`     // Keepalive ping interval in seconds for HTTP MCP backends (0=default 1500s, -1=disabled, >0=custom)
+	SessionTimeout       string                           `yaml:"session-timeout,omitempty"`        // Session timeout for MCP gateway sessions as a Go duration string (e.g. "4h", "30m"); empty = gateway default (precedence: stdin config > MCP_GATEWAY_SESSION_TIMEOUT env var > built-in default 6h)
+	ToolTimeout          string                           `yaml:"tool-timeout,omitempty"`           // Timeout for individual MCP tool calls as a Go duration string (e.g. "2m", "30s"); empty = gateway built-in default (60s)
+	StartupTimeout       int                              `yaml:"-"`                                // Startup timeout in seconds for all MCP backends; always emitted to override gateway's built-in 30s default (gh-aw default: 120s, from tools.startup-timeout)
+	OTLPEndpoint         string                           `yaml:"-"`                                // OTLP collector endpoint (derived from observability.otlp, not user-settable)
+	OTLPHeaders          string                           `yaml:"-"`                                // Raw OTLP HTTP headers string (derived from observability.otlp, not user-settable)
 	// ForcePublicRepos controls the gateway's runtime public-repo override.
 	// When set to a pointer to false, the compiler emits "forcePublicRepos": false in the gateway
 	// JSON config, disabling the runtime check that restricts repos to "public" when the
@@ -535,6 +552,12 @@ type MCPGatewayRuntimeConfig struct {
 	// sink-visibility="public" enforcement. Emitted as gateway.sinkVisibilityExemptServers.
 	// Set from tools.github.private-to-public-flows: [server-ids...].
 	SinkVisibilityExemptServers []string `yaml:"-"`
+}
+
+type MCPGatewayAgentPolicy struct {
+	Servers   []string            `json:"servers"`
+	Tools     map[string][]string `json:"tools,omitempty"`
+	AllowOnly map[string]any      `json:"allow-only,omitempty"`
 }
 
 // HasTool checks if a tool is present in the configuration

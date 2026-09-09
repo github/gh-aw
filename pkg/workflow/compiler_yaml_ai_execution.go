@@ -155,7 +155,7 @@ func isOTLPEnabled(data *WorkflowData) bool {
 }
 
 // generateStopMCPGateway generates a step that stops the MCP gateway process using its PID from step output
-// It passes the gateway port and API key to enable graceful shutdown via /close endpoint
+// It passes the gateway port and agent ID to enable graceful shutdown via /close endpoint
 func (c *Compiler) generateStopMCPGateway(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Print("Generating MCP gateway stop step")
 
@@ -165,12 +165,12 @@ func (c *Compiler) generateStopMCPGateway(yaml *strings.Builder, data *WorkflowD
 
 	// Add environment variables for graceful shutdown via /close endpoint
 	// These values normally come from Start MCP Gateway step outputs. Enclave workflows
-	// inherit the masked API key from the compiler-owned GITHUB_ENV handoff instead.
+	// inherit the masked agent ID from the compiler-owned GITHUB_ENV handoff instead.
 	// Security: Pass all step outputs through environment variables to prevent template injection
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}\n")
 	if !enclavesEnabled(data) {
-		yaml.WriteString("          MCP_GATEWAY_API_KEY: ${{ steps.start-mcp-gateway.outputs.gateway-api-key }}\n")
+		yaml.WriteString("          MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}\n")
 	}
 	yaml.WriteString("          GATEWAY_PID: ${{ steps.start-mcp-gateway.outputs.gateway-pid }}\n")
 
@@ -294,7 +294,7 @@ func (c *Compiler) generateDetectAgentErrorsStep(yaml *strings.Builder, data *Wo
 // generateActivationArtifactAndCommentMemorySteps) so that user steps: can access prior
 // comment-memory state.
 // It returns the resolved CodingAgentEngine for use in subsequent phases.
-func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, data *WorkflowData, needsGitConfig bool) (CodingAgentEngine, error) {
+func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, data *WorkflowData, needsGitConfig bool) (CodingAgentEngine, error) { //nolint:largefunc // Existing workflow step orchestration preserves generated step order.
 	// Configure git credentials for agentic workflows.
 	// Git credential configuration requires a .git directory in the workspace, which is only
 	// present when the repository was checked out. Skip these steps when checkout is disabled
@@ -341,6 +341,15 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	}
 
 	if pluginInstaller, ok := engine.(PluginInstallationProvider); ok {
+		pluginAuthSteps := c.generatePluginAuthTokenSteps(data)
+		compilerYamlLog.Printf("Adding %d plugin auth token steps for %s", len(pluginAuthSteps), engine.GetID())
+		for _, step := range pluginAuthSteps {
+			for _, line := range step {
+				yaml.WriteString(line)
+				yaml.WriteByte('\n')
+			}
+		}
+
 		pluginInstallSteps := pluginInstaller.GetPluginInstallationSteps(data)
 		compilerYamlLog.Printf("Adding %d plugin installation steps for %s", len(pluginInstallSteps), engine.GetID())
 		for _, step := range pluginInstallSteps {
@@ -438,7 +447,7 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 // MCP gateway stop, secret redaction, agent step summary append, and output collection.
 // It returns the initial set of artifact paths (to be extended by the caller) and the
 // agent stdio log path constant.
-func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, needsGitConfig bool) ([]string, string, error) {
+func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, needsGitConfig bool) ([]string, string, error) { //nolint:largefunc // Existing workflow step orchestration preserves generated step order.
 	// Collect artifact paths for unified upload at the end
 	var artifactPaths []string
 	artifactPaths = append(artifactPaths, constants.AwPromptsFile)
@@ -495,7 +504,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Stop CLI proxy after AWF execution (always runs to ensure cleanup)
 	c.generateStopCliProxyStep(yaml, data)
-	c.generateStopEnclaveGitHubProxyStep(yaml, data)
 
 	// Detect agent errors on the host runner immediately after the AWF container exits.
 	// GITHUB_OUTPUT is not accessible inside the AWF sandbox, so this step must run here

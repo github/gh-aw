@@ -311,6 +311,29 @@ Test content
 	require.NoError(t, err, "Lock file should be created")
 }
 
+func TestCompileWorkflowData_RejectsDisabledSandboxInStrictMode(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "compiler-data-strict-sandbox-test")
+	markdownPath := filepath.Join(tmpDir, "test.md")
+
+	compiler := NewCompiler(WithNoEmit(true))
+	workflowData := &WorkflowData{
+		RawFrontmatter: map[string]any{
+			"strict": true,
+		},
+		Features: map[string]any{
+			"dangerously-disable-sandbox-agent": true,
+		},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{Disabled: true},
+		},
+	}
+
+	err := compiler.CompileWorkflowData(workflowData, markdownPath)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "strict mode")
+	require.ErrorContains(t, err, "sandbox.agent: false")
+}
+
 func TestCompileWorkflow_CachesResolvedManifestBaseline(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "compiler-manifest-cache")
 	testFile := filepath.Join(tmpDir, "test-workflow.md")

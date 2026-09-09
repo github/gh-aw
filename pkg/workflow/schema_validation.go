@@ -167,7 +167,7 @@ func getFieldExample(fieldPath string, err error) string {
 		"concurrency":     "Example: concurrency: production or concurrency:\\n  group: ${{ github.workflow }}\\n  cancel-in-progress: true",
 		"env":             "Example: env:\\n  NODE_ENV: production",
 		"tools":           "Example: tools:\\n  github:\\n    allowed: [list_issues]",
-		"steps":           "Example: steps:\\n  - name: Checkout\\n    uses: actions/checkout@v6",
+		"steps":           "Example: steps:\\n  - name: Checkout\\n    uses: actions/checkout@v7",
 		"jobs":            "Example: jobs:\\n  build:\\n    runs-on: ubuntu-latest\\n    steps:\\n      - run: echo 'hello'",
 		"strategy":        "Example: strategy:\\n  matrix:\\n    os: [ubuntu-latest, windows-latest]",
 		"container":       "Example: container: node:20 or container:\\n  image: node:20\\n  options: --user root",

@@ -39,11 +39,11 @@ fi
 
 # Try graceful shutdown via /close endpoint if gateway variables are available
 # Per MCP Gateway Specification v1.1.0, the /close endpoint:
-# - Requires authentication with API key
+# - Requires authentication with agent ID
 # - Returns 200 OK on success
 # - Returns 410 Gone if already closed (idempotent)
 # - Gracefully terminates containers and cleans up resources
-if [ -n "$MCP_GATEWAY_PORT" ] && [ -n "$MCP_GATEWAY_API_KEY" ]; then
+if [ -n "$MCP_GATEWAY_PORT" ] && [ -n "$MCP_GATEWAY_AGENT_ID" ]; then
   echo "Attempting graceful shutdown via /close endpoint..."
   
   # Use localhost for health check since:
@@ -52,8 +52,8 @@ if [ -n "$MCP_GATEWAY_PORT" ] && [ -n "$MCP_GATEWAY_API_KEY" ]; then
   CLOSE_URL="http://localhost:${MCP_GATEWAY_PORT}/close"
   
   # Try to invoke the /close endpoint (with timeout)
-  # Per spec, the endpoint requires Authorization header with the API key
-  CLOSE_RESPONSE=$(curl -f -s -m 10 -X POST -H "Authorization: ${MCP_GATEWAY_API_KEY}" "$CLOSE_URL" 2>&1) && {
+  # Per spec, the endpoint requires Authorization header with the agent ID
+  CLOSE_RESPONSE=$(curl -f -s -m 10 -X POST -H "Authorization: ${MCP_GATEWAY_AGENT_ID}" "$CLOSE_URL" 2>&1) && {
     echo "Gateway accepted close request"
     echo "Response: $CLOSE_RESPONSE"
     
@@ -74,7 +74,7 @@ if [ -n "$MCP_GATEWAY_PORT" ] && [ -n "$MCP_GATEWAY_API_KEY" ]; then
     echo "Falling back to kill signal..."
   }
 else
-  echo "Gateway environment variables not available (MCP_GATEWAY_PORT or MCP_GATEWAY_API_KEY missing)"
+  echo "Gateway environment variables not available (MCP_GATEWAY_PORT or MCP_GATEWAY_AGENT_ID missing)"
   echo "Falling back to kill signal..."
 fi
 

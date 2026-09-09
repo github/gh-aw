@@ -99,6 +99,11 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 		workflow.WithEngineOverride(config.EngineOverride),
 		workflow.WithFailFast(config.FailFast),
 	)
+	if config.activeModels != nil {
+		compiler.SetConfiguredModelValidator(func(data *workflow.WorkflowData) []string {
+			return unknownConfiguredModelMessages(data, config.activeModels)
+		})
+	}
 	compileCompilerSetupLog.Print("Created compiler instance")
 
 	// Configure compiler flags
@@ -153,6 +158,10 @@ func configureCompilerFlags(compiler *workflow.Compiler, config CompileConfig) {
 		compiler.SetUseSamples(true)
 	}
 
+	configureCompilerMaintenanceFlags(compiler, config)
+}
+
+func configureCompilerMaintenanceFlags(compiler *workflow.Compiler, config CompileConfig) {
 	// Set refresh stop time flag
 	compiler.SetRefreshStopTime(config.RefreshStopTime)
 	if config.RefreshStopTime {

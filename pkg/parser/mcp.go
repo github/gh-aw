@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -16,6 +17,13 @@ import (
 )
 
 var mcpLog = logger.New("parser:mcp")
+var simpleSecretExpressionPattern = regexp.MustCompile(`^\$\{\{\s*secrets\.[A-Z_][A-Z0-9_]*\s*\}\}$`)
+
+// IsSimpleSecretExpression reports whether value is a direct GitHub Actions
+// secrets reference without additional expression operators.
+func IsSimpleSecretExpression(value string) bool {
+	return simpleSecretExpressionPattern.MatchString(value)
+}
 
 // ValidMCPTypes defines all supported MCP server types.
 // "local" is an alias for "stdio" and gets normalized during parsing.
@@ -80,7 +88,7 @@ func ExtractMCPConfigurations(frontmatter map[string]any, serverFilter string) (
 	mcpServersSection, hasMCPServers := frontmatter["mcp-servers"]
 	if !hasMCPServers {
 		mcpLog.Print("No mcp-servers section found, checking for built-in tools")
-		// Process built-in MCP tools from tools section (github, playwright)
+		// Process built-in MCP tools from tools section.
 		if err := extractBuiltinMCPTools(frontmatter, serverFilter, &configs); err != nil {
 			return nil, err
 		}
@@ -93,7 +101,7 @@ func ExtractMCPConfigurations(frontmatter map[string]any, serverFilter string) (
 		return nil, fmt.Errorf("mcp-servers section must be a map, got %T. Example:\nmcp-servers:\n  my-server:\n    command: \"npx @my/tool\"\n    args: [\"--port\", \"3000\"]", mcpServersSection)
 	}
 
-	// Process built-in MCP tools from tools section (github, playwright)
+	// Process built-in MCP tools from tools section.
 	if err := extractBuiltinMCPTools(frontmatter, serverFilter, &configs); err != nil {
 		return nil, err
 	}
@@ -237,7 +245,7 @@ func parseCustomMCPServerConfigs(mcpServers map[string]any, serverFilter string)
 	return configs, nil
 }
 
-// extractBuiltinMCPTools reads the tools section and appends github/playwright configs to configs.
+// extractBuiltinMCPTools reads the tools section and appends GitHub configs to configs.
 // It returns an error if a removed tool (serena) is present.
 func extractBuiltinMCPTools(frontmatter map[string]any, serverFilter string, configs *[]RegistryMCPServerConfig) error {
 	toolsSection, hasTools := frontmatter["tools"]
@@ -252,7 +260,7 @@ func extractBuiltinMCPTools(frontmatter map[string]any, serverFilter string, con
 		if toolName == "serena" {
 			return errors.New("tools.serena is removed")
 		}
-		if toolName == "github" || toolName == "playwright" {
+		if toolName == "github" || toolName == "linear" {
 			config, err := processBuiltinMCPTool(toolName, toolValue, serverFilter)
 			if err != nil {
 				return err
@@ -266,7 +274,7 @@ func extractBuiltinMCPTools(frontmatter map[string]any, serverFilter string, con
 	return nil
 }
 
-// processBuiltinMCPTool handles built-in MCP tools (github and playwright)
+// processBuiltinMCPTool handles built-in MCP tools.
 func processBuiltinMCPTool(toolName string, toolValue any, serverFilter string) (*RegistryMCPServerConfig, error) {
 	if serverFilter != "" && !strings.Contains(strings.ToLower(toolName), strings.ToLower(serverFilter)) {
 		return nil, nil
@@ -276,12 +284,144 @@ func processBuiltinMCPTool(toolName string, toolValue any, serverFilter string) 
 		config := buildGitHubBuiltinConfig(toolValue)
 		return &config, nil
 	}
-	if toolName == "playwright" {
-		config := buildPlaywrightBuiltinConfig(toolValue)
-		return &config, nil
+	if toolName == "linear" {
+		return buildLinearBuiltinConfig(toolValue)
+	}
+	return nil, nil
+}
+
+func buildLinearBuiltinConfig(toolValue any) (*RegistryMCPServerConfig, error) {
+	if toolValue == nil {
+		toolValue = map[string]any{}
+	}
+	toolConfig, ok := toolValue.(map[string]any)
+	if !ok {
+		return nil, errors.New("tools.linear must be an object")
+	}
+	if _, expanded := toolConfig["type"]; expanded {
+		return buildExpandedLinearBuiltinConfig(toolConfig)
+	}
+	for field := range toolConfig {
+		switch field {
+		case "token", "toolsets", "allowed", "required":
+		default:
+			return nil, fmt.Errorf("unknown tools.linear property %q", field)
+		}
+
 	}
 
-	return nil, nil
+	token := constants.LinearMCPDefaultTokenExpr
+	if value, exists := toolConfig["token"]; exists {
+		var ok bool
+		token, ok = value.(string)
+		if !ok || strings.TrimSpace(token) == "" {
+			return nil, errors.New("tools.linear.token must be a GitHub Actions secret reference")
+		}
+	}
+	if !IsSimpleSecretExpression(token) {
+		return nil, errors.New("tools.linear.token must be a GitHub Actions secret reference")
+	}
+
+	config := &RegistryMCPServerConfig{
+		BaseMCPServerConfig: types.BaseMCPServerConfig{
+			Type: "http",
+			URL:  constants.LinearMCPReadOnlyURL,
+			Headers: map[string]string{
+				"Authorization": "Bearer " + token,
+			},
+		},
+		Name: "linear",
+	}
+	allowed, err := buildLinearAllowedTools(toolConfig)
+	if err != nil {
+		return nil, err
+	}
+	config.Allowed = allowed
+	if requiredValue, exists := toolConfig["required"]; exists {
+		required, ok := requiredValue.(bool)
+		if !ok {
+			return nil, errors.New("tools.linear.required must be a boolean")
+		}
+		config.Required = &required
+	}
+	return config, nil
+}
+
+func buildExpandedLinearBuiltinConfig(toolConfig map[string]any) (*RegistryMCPServerConfig, error) {
+	for field := range toolConfig {
+		switch field {
+		case "type", "url", "headers", "allowed", "required":
+		default:
+			return nil, fmt.Errorf("unknown expanded tools.linear property %q", field)
+		}
+	}
+	typeName, ok := toolConfig["type"].(string)
+	if !ok || typeName != "http" {
+		return nil, errors.New("expanded tools.linear type must be http")
+	}
+	url, ok := toolConfig["url"].(string)
+	if !ok || url == "" {
+		return nil, errors.New("expanded tools.linear url must be a non-empty string")
+	}
+	config := &RegistryMCPServerConfig{
+		BaseMCPServerConfig: types.BaseMCPServerConfig{Type: typeName, URL: url, Headers: map[string]string{}},
+		Name:                "linear",
+	}
+	if headers, ok := toolConfig["headers"].(map[string]any); ok {
+		for key, value := range headers {
+			header, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("expanded tools.linear header %q must be a string", key)
+			}
+			config.Headers[key] = header
+		}
+	}
+	allowed, err := buildLinearAllowedTools(toolConfig)
+	if err != nil {
+		return nil, err
+	}
+	config.Allowed = allowed
+	if requiredValue, exists := toolConfig["required"]; exists {
+		required, ok := requiredValue.(bool)
+		if !ok {
+			return nil, errors.New("tools.linear.required must be a boolean")
+		}
+		config.Required = &required
+	}
+	return config, nil
+}
+
+func buildLinearAllowedTools(toolConfig map[string]any) ([]string, error) {
+	var toolsetTools []string
+	if toolsetsValue, exists := toolConfig["toolsets"]; exists {
+		var err error
+		toolsetTools, err = ParseLinearToolsets(toolsetsValue)
+		if err != nil {
+			return nil, err
+		}
+	}
+	allowedValue, exists := toolConfig["allowed"]
+	if !exists {
+		return toolsetTools, nil
+	}
+	allowed, ok := allowedValue.([]any)
+	if !ok || len(allowed) == 0 {
+		return nil, errors.New("tools.linear.allowed must be a non-empty array of tool names")
+	}
+	result := make([]string, 0, len(allowed))
+	for _, item := range allowed {
+		tool, ok := item.(string)
+		if !ok || strings.TrimSpace(tool) == "" {
+			return nil, errors.New("tools.linear.allowed must contain only non-empty tool names")
+		}
+		result = append(result, tool)
+	}
+	if len(toolsetTools) > 0 {
+		if err := ValidateLinearAllowedForToolsets(result, toolsetTools); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func buildGitHubBuiltinConfig(toolValue any) RegistryMCPServerConfig {
@@ -346,33 +486,6 @@ func githubBuiltinMode(toolValue any) (bool, string, map[string]any) {
 		}
 	}
 	return useRemote, customToken, toolConfig
-}
-
-func buildPlaywrightBuiltinConfig(toolValue any) RegistryMCPServerConfig {
-	config := RegistryMCPServerConfig{
-		BaseMCPServerConfig: types.BaseMCPServerConfig{
-			Type:    "docker",
-			Command: "docker",
-			Args: []string{
-				"run", "-i", "--rm", "--shm-size=2gb", "--cap-add=SYS_ADMIN",
-				"-v", constants.TmpMcpLogsMount,
-				"mcr.microsoft.com/playwright:" + string(constants.DefaultPlaywrightBrowserVersion),
-			},
-			Env: make(map[string]string),
-		},
-		Name: "playwright",
-	}
-	toolConfig, ok := toolValue.(map[string]any)
-	if !ok {
-		return config
-	}
-	if version, exists := toolConfig["version"]; exists {
-		if versionStr := stringutil.ParseVersionValue(version); versionStr != "" {
-			replaceBuiltinImage(&config, "mcr.microsoft.com/playwright:", "mcr.microsoft.com/playwright:"+versionStr)
-		}
-	}
-	appendBuiltinArgs(&config, toolConfig["args"])
-	return config
 }
 
 func appendBuiltinAllowedTools(config *RegistryMCPServerConfig, toolConfig map[string]any) {

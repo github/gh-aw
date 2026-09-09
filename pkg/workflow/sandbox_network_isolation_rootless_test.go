@@ -11,7 +11,7 @@ import (
 
 // TestNetworkIsolationRootless verifies that the default docker runtime profile
 // compiles to a lock.yml with no "sudo" for the AWF binary install or the AWF
-// invocation (rootless mode), while docker-sudo-iptables still uses "sudo -E awf".
+// invocation (rootless mode), while docker-sudo-iptables still uses sudo.
 func TestNetworkIsolationRootless(t *testing.T) {
 	t.Run("default runtime omits sudo from awf invocation and install", func(t *testing.T) {
 		workflowsDir := t.TempDir()
@@ -52,8 +52,8 @@ This workflow verifies that sudo is omitted for the default docker runtime profi
 		lockStr := string(lockContent)
 
 		// AWF invocation must not use sudo
-		if strings.Contains(lockStr, "sudo -E awf") {
-			t.Error("Expected no 'sudo -E awf' in lock file for the default docker runtime profile")
+		if strings.Contains(lockStr, "sudo -E ") {
+			t.Error("Expected no sudo in lock file for the default docker runtime profile")
 		}
 
 		// AWF must still be invoked (just without sudo).
@@ -75,7 +75,7 @@ This workflow verifies that sudo is omitted for the default docker runtime profi
 		}
 	})
 
-	t.Run("workflow with sudo omitted defaults to network isolation (no sudo -E awf)", func(t *testing.T) {
+	t.Run("workflow with sudo omitted defaults to network isolation", func(t *testing.T) {
 		workflowsDir := t.TempDir()
 
 		markdown := `---
@@ -113,9 +113,9 @@ This workflow verifies that sudo is omitted by default when sudo is not set (net
 		}
 		lockStr := string(lockContent)
 
-		// Default (sudo not set) must use network isolation mode (no sudo -E awf)
-		if strings.Contains(lockStr, "sudo -E awf") {
-			t.Error("Expected no 'sudo -E awf' in lock file when sudo is not set (network isolation is the default)")
+		// Default (sudo not set) must use network isolation mode.
+		if strings.Contains(lockStr, "sudo -E ") {
+			t.Error("Expected no sudo in lock file when sudo is not set (network isolation is the default)")
 		}
 
 		// AWF must still be invoked (without sudo).
@@ -140,7 +140,7 @@ This workflow verifies that sudo is omitted by default when sudo is not set (net
 
 // TestLegacySecurityInstallNonRootless verifies that runtime: docker-sudo-iptables
 // compiles to a lock.yml that installs awf without --rootless (to /usr/local/bin, which is
-// on sudo's secure_path) and invokes it with "sudo -E awf".
+// on sudo's secure_path) and invokes it with sudo.
 func TestLegacySecurityInstallNonRootless(t *testing.T) {
 	workflowsDir := t.TempDir()
 
@@ -181,7 +181,7 @@ This workflow verifies that docker-sudo-iptables installs awf without --rootless
 	lockStr := string(lockContent)
 
 	// Install step must NOT pass --rootless: awf must land in /usr/local/bin so that
-	// the subsequent "sudo -E awf" invocation can find it on sudo's secure_path.
+	// the subsequent privileged invocation can find it on sudo's secure_path.
 	if strings.Contains(lockStr, "--rootless") {
 		t.Error("Expected no '--rootless' flag in install step for runtime: docker-sudo-iptables")
 	}
@@ -191,8 +191,8 @@ This workflow verifies that docker-sudo-iptables installs awf without --rootless
 		t.Error("Expected install_awf_binary.sh in lock file for runtime: docker-sudo-iptables")
 	}
 
-	// AWF invocation must use sudo -E awf.
-	if !strings.Contains(lockStr, "sudo -E awf") {
-		t.Error("Expected 'sudo -E awf' invocation in lock file for runtime: docker-sudo-iptables")
+	// AWF invocation must restore the runner PATH after sudo applies secure_path.
+	if !strings.Contains(lockStr, `sudo -E /usr/bin/env PATH="$PATH" /usr/local/bin/awf`) {
+		t.Error("Expected PATH-preserving sudo invocation in lock file for runtime: docker-sudo-iptables")
 	}
 }

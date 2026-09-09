@@ -25,6 +25,10 @@ func badIndex(starts []time.Time, i int) time.Duration {
 	return time.Since(starts[i]) // want `time\.Now\(\)\.Sub\(starts\[i\]\) can be simplified to time\.Since\(starts\[i\]\)`
 }
 
+func badWithComments(start time.Time) time.Duration {
+	return time.Now().Sub(start /* measured from init */) // want `time\.Now\(\)\.Sub\(start\) can be simplified to time\.Since\(start\)`
+}
+
 func good(t time.Time) {
 	_ = time.Since(t)
 }

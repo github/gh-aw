@@ -7,7 +7,7 @@ sidebar:
 
 # MCP Gateway Specification
 
-**Version**: 1.16.0
+**Version**: 1.17.0
 **Status**: Draft Specification  
 **Latest Version**: [mcp-gateway](/gh-aw/reference/mcp-gateway/)  
 **JSON Schema**: [mcp-gateway-config.schema.json](/gh-aw/schemas/mcp-gateway-config.schema.json)  
@@ -202,7 +202,7 @@ The gateway MUST accept configuration via stdin in JSON format conforming to the
   },
   "gateway": {
     "port": 8080,
-    "apiKey": "string",
+    "agentId": "string",
     "domain": "string",
     "startupTimeout": 30,
     "toolTimeout": 60
@@ -244,7 +244,8 @@ The `gateway` section is required and configures gateway-specific behavior:
 |-------|------|----------|-------------|
 | `port` | integer | Yes | HTTP server port |
 | `domain` | string | Yes | Gateway domain (localhost or host.docker.internal) |
-| `apiKey` | string | Yes | API key for authentication |
+| `agentId` | string | Conditional* | Single agent/session identifier used for authentication. Mutually exclusive with `agentIds`. See Section 4.1.3.9. |
+| `agentIds` | array[string] | Conditional* | List of agent/session identifiers (at least one, each non-empty), used for authentication. Mutually exclusive with `agentId`. See Section 4.1.3.9. |
 | `startupTimeout` | integer | No | Server startup timeout in seconds (default: 30) |
 | `toolTimeout` | integer | No | Tool invocation timeout in seconds (default: 60) |
 | `payloadDir` | string | No | Directory path for storing large payload JSON files for authenticated clients |
@@ -256,6 +257,8 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `opentelemetry` | object | No | OpenTelemetry configuration for emitting distributed tracing events for MCP calls. See Section 4.1.3.7 for details. |
 | `forcePublicRepos` | boolean | No | When `true` (default), forces the allow-only policy to `repos="public"` at runtime if the gateway detects it is running in a public repository. When `false`, disables this override — set by the compiler when `private-to-public-flows: allow` is declared in workflow frontmatter. See Section 4.1.3.8 for details. |
 | `sinkVisibilityExemptServers` | array[string] | No | List of server IDs exempt from the default `sink-visibility="public"` enforcement. Use `["*"]` to exempt all servers. Set by the compiler when `private-to-public-flows` lists specific server IDs in workflow frontmatter. See Section 10.9 for details. |
+
+*Exactly one of `agentId` or `agentIds` MUST be specified; the two fields are mutually exclusive. See Section 4.1.3.9.
 
 #### 4.1.3.1 Payload Directory Path Validation
 
@@ -330,7 +333,7 @@ payload_dir = "/tmp/jq-payloads"
 payload_path_prefix = "/workspace/payloads"
 port = 8080
 domain = "localhost"
-apiKey = "secret"
+agent_id = "secret"
 ```
 
 **Use Cases**:
@@ -388,7 +391,7 @@ The optional `trustedBots` field in the gateway configuration passes an addition
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "trustedBots": [
       "github-actions[bot]",
       "copilot-swe-agent[bot]"
@@ -432,7 +435,7 @@ The optional `keepaliveInterval` field in the gateway configuration controls how
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "keepaliveInterval": 300
   }
 }
@@ -471,7 +474,7 @@ The optional `sessionTimeout` field in the gateway configuration controls how lo
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "sessionTimeout": "4h"
   }
 }
@@ -516,7 +519,7 @@ The optional `opentelemetry` object in the gateway configuration enables the gat
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "opentelemetry": {
       "endpoint": "https://collector.example.com:4318/v1/traces",
       "serviceName": "my-mcp-gateway"
@@ -586,13 +589,64 @@ When `forcePublicRepos` is `true` (the default), the gateway overrides the compi
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "forcePublicRepos": false
   }
 }
 ```
 
 **Compliance Test**: T-WS-004 (Section 11.1.12)
+
+#### 4.1.3.9 Agent Identifier Configuration (`agentId` / `agentIds`)
+
+The gateway configuration MUST select exactly one of the following mutually exclusive forms to configure the agent/session identifier(s) used for authentication and DIFC session-state keying:
+
+- `agentId` (string): a single agent/session identifier.
+- `agentIds` (array of strings): one or more agent/session identifiers, enabling a primary agent and enclave sessions to share one gateway instance while retaining independent DIFC state and policies.
+
+**Requirements**:
+
+- A gateway configuration MUST specify exactly one of `agentId` or `agentIds`. Specifying both, or neither, MUST be rejected as invalid configuration.
+- `agentId`, when present, MUST be a non-empty string.
+- `agentIds`, when present, MUST be an array containing at least one item, and every item MUST be a non-empty string.
+- `agentIds` enables associating multiple agent/session identifiers with one gateway instance in configuration. Runtime authentication and per-identifier DIFC session-state keying are out of scope for this section and are tracked as follow-up work (see Section 7.2).
+
+**Configuration Example (singular)**:
+
+```json
+{
+  "gateway": {
+    "port": 8080,
+    "domain": "localhost",
+    "agentId": "primary-agent"
+  }
+}
+```
+
+**Configuration Example (plural)**:
+
+```json
+{
+  "gateway": {
+    "port": 8080,
+    "domain": "localhost",
+    "agentIds": ["primary-agent", "enclave-agent"]
+  }
+}
+```
+
+**mcpg TOML spelling**:
+
+```toml
+[gateway]
+port = 8080
+domain = "localhost"
+agent_id = "primary-agent"
+# OR
+agent_ids = ["primary-agent", "enclave-agent"]
+```
+
+**Compatibility**: Implementations MAY continue to accept the legacy `api_key`/`apiKey` spelling internally for backward compatibility with existing deployments, but `apiKey` MUST NOT appear in generated or published configuration; `agentId` or `agentIds` MUST be used instead. Runtime mapping from individual identifiers to allow-only policies is out of scope for this section and is tracked as follow-up work.
 
 #### 4.1.3a Top-Level Configuration Fields
 
@@ -620,7 +674,7 @@ Custom server types MUST be registered in the `customSchemas` field at the top l
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "secret"
+    "agentId": "secret"
   },
   "customSchemas": {
     "safeinputs": "https://docs.github.com/gh-aw/schemas/mcp-scripts-config.schema.json"
@@ -657,7 +711,7 @@ When a server configuration includes a `type` field with a value not in `["stdio
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "secret"
+    "agentId": "secret"
   },
   "customSchemas": {
     "safeinputs": "https://docs.github.com/gh-aw/schemas/mcp-scripts-config.schema.json"
@@ -848,7 +902,7 @@ POST /close
 ```http
 POST /mcp/{server-name} HTTP/1.1
 Content-Type: application/json
-Authorization: <apiKey>
+Authorization: <agentId>
 
 {
   "jsonrpc": "2.0",
@@ -898,7 +952,7 @@ The gateway MUST provide a `/close` endpoint for graceful shutdown and resource 
 
 ```http
 POST /close HTTP/1.1
-Authorization: <apiKey>
+Authorization: <agentId>
 ```
 
 **Note**: The format of the `Authorization` header is implementation-dependent. Consult your gateway implementation's documentation for the expected format.
@@ -954,7 +1008,7 @@ The `/close` endpoint MUST be idempotent:
 
 **Authentication**:
 
-The `/close` endpoint MUST require authentication when `gateway.apiKey` is configured. Requests without valid authentication MUST be rejected with HTTP 401 Unauthorized.
+The `/close` endpoint MUST require authentication when `gateway.agentId` or `gateway.agentIds` is configured. Requests without valid authentication MUST be rejected with HTTP 401 Unauthorized.
 
 #### 5.1.4 Request Routing
 
@@ -1050,7 +1104,7 @@ After successful initialization, the gateway MUST:
          "type": "http",
          "url": "http://{domain}:{port}/mcp/server-name",
          "headers": {
-           "Authorization": "{apiKey}"
+           "Authorization": "{agentId}"
          },
          "tools": ["*"]
        }
@@ -1126,46 +1180,46 @@ The gateway MUST NOT:
 
 ### 7.1 Authorization Header Format
 
-The MCP Gateway uses a simple API key authentication scheme. When `gateway.apiKey` is configured:
+The MCP Gateway uses a simple agent identifier authentication scheme. When `gateway.agentId` or `gateway.agentIds` is configured:
 
-- The `Authorization` header contains the API key value
-- Implementations MAY use different formats (e.g., direct value or Bearer scheme)
+- The `Authorization` header contains an agent/session identifier value (the configured `agentId`, or one of the configured `agentIds` entries)
+- Implementations MAY use different formats (e.g., direct value or a scheme-prefixed value)
 - The specific format is implementation-dependent
 
 > [!WARNING]
-> The gateway API key should not be treated as a secure lock against code already running inside the agent container. A sufficiently capable agent may extract it from in-memory process state or other runtime channels. Treat this key as leaked by design and rely on container isolation, network controls, and staged permission boundaries for defense in depth.
+> The gateway agent identifier should not be treated as a secure lock against code already running inside the agent container. A sufficiently capable agent may extract it from in-memory process state or other runtime channels. Treat this identifier as leaked by design and rely on container isolation, network controls, and staged permission boundaries for defense in depth.
 
 **Example formats**:
 
 ```http
-Authorization: my-secret-api-key-12345
+Authorization: my-secret-agent-id-12345
 ```
 
 or
 
 ```http
-Authorization: Bearer my-secret-api-key-12345
+Authorization: Token my-other-agent-id-67890
 ```
 
 This authentication scheme provides flexibility for different implementation requirements.
 
-### 7.2 API Key Authentication
+### 7.2 Agent Identifier Authentication
 
-When `gateway.apiKey` is configured, the gateway MUST:
+When `gateway.agentId` or `gateway.agentIds` is configured, the gateway MUST:
 
 1. Require `Authorization` header on all RPC requests to `/mcp/{server-name}` and `/close` endpoints
    - The specific format of the Authorization header is implementation-dependent
    - Implementations SHOULD document their expected format
 2. Reject requests with missing or invalid tokens (HTTP 401)
 3. Reject requests with malformed Authorization headers (HTTP 400)
-4. NOT log API keys in plaintext
+4. NOT log agent identifiers in plaintext
 
-### 7.3 Optimal Temporary API Key
+> [!NOTE]
+> This section covers configuration parsing only. Runtime authentication and routing of individual `agentIds` entries to independent DIFC session state is out of scope for this specification and is tracked as follow-up implementation work.
 
-The gateway SHOULD support temporary API keys:
+### 7.3 Temporary Agent Identifiers
 
-1. Generate a random API key on startup if not provided
-2. Include key in stdout configuration output
+A gateway configuration MUST always specify exactly one of `agentId` or `agentIds` (see Section 4.1.3.9); the gateway MUST NOT silently generate an identifier when neither is provided. Callers that need a short-lived identity (for example, an ephemeral session) SHOULD generate their own temporary identifier and supply it as `agentId` before starting the gateway.
 
 ### 7.4 Authentication Exemptions
 
@@ -1927,7 +1981,7 @@ Implementations SHOULD provide:
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "agentId": "gateway-secret-token"
   }
 }
 ```
@@ -1951,7 +2005,7 @@ Implementations SHOULD provide:
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "agentId": "gateway-secret-token"
   }
 }
 ```
@@ -2035,7 +2089,7 @@ The `registry` field documents the MCP server's installation location in an MCP 
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "agentId": "gateway-secret-token"
   }
 }
 ```
@@ -2063,7 +2117,7 @@ The following example configures the gateway to export traces to an OTLP collect
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "opentelemetry": {
       "endpoint": "https://collector.example.com:4318/v1/traces",
       "serviceName": "my-workflow-gateway"
@@ -2091,7 +2145,7 @@ The following example propagates an existing distributed trace into the gateway,
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "${MCP_GATEWAY_API_KEY}",
+    "agentId": "${MCP_GATEWAY_AGENT_ID}",
     "opentelemetry": {
       "endpoint": "https://collector.example.com:4318/v1/traces",
       "traceId": "${PARENT_TRACE_ID}",
@@ -2103,6 +2157,28 @@ The following example propagates an existing distributed trace into the gateway,
 ```
 
 `PARENT_TRACE_ID` and `PARENT_SPAN_ID` are 32-character and 16-character lowercase hex strings respectively, typically injected as environment variables by the orchestrating system.
+
+#### A.8 Gateway with Multiple Agent Identifiers (`agentIds`)
+
+The following example configures a gateway shared by a primary agent and an enclave agent, each with its own identifier and independently keyed DIFC session state:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "container": "ghcr.io/github/github-mcp-server:latest",
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  },
+  "gateway": {
+    "port": 8080,
+    "domain": "localhost",
+    "agentIds": ["primary-agent", "enclave-agent"]
+  }
+}
+```
 
 ### Appendix B: Gateway Lifecycle Examples
 
@@ -2181,7 +2257,7 @@ Content-Type: application/json
 
 #### D.1 Credential Handling
 
-- API keys MUST NOT be logged
+- Agent identifiers (`agentId`/`agentIds`) MUST NOT be logged
 - Environment variables MUST be isolated per server
 - Secrets SHOULD be cleared from memory after use
 
@@ -2230,6 +2306,18 @@ Content-Type: application/json
 ---
 
 ## Change Log
+
+### Version 1.17.0 (Draft)
+
+- **BREAKING**: Removed `gateway.apiKey` from the specification and published schemas (Sections 4.1.1, 4.1.3, 7.1, 7.2)
+  - The field's terminology was misleading: it represented agent/session identity, not a separately modeled API credential
+  - Replaced by `gateway.agentId` (singular) and `gateway.agentIds` (plural), which are mutually exclusive
+- **Added**: `gateway.agentId` — a single agent/session identifier, equivalent in behavior to the former `apiKey` field (Section 4.1.3.9)
+- **Added**: `gateway.agentIds` — an array of agent/session identifiers (at least one, each a non-empty string), enabling a primary agent and enclave sessions to share one gateway instance while retaining independent DIFC state and policies (Section 4.1.3.9)
+- **Added**: Section 4.1.3.9 — Agent Identifier Configuration (`agentId` / `agentIds`), documenting the mutually exclusive singular/plural forms and the corresponding mcpg TOML spelling `agent_id` / `agent_ids`
+- **Changed**: A gateway configuration MUST select exactly one of `agentId` or `agentIds` (Sections 4.1.3, 4.1.3.9)
+- **Updated**: JSON Schema — `gatewayConfig` definition now requires `port`, `domain`, and exactly one of `agentId`/`agentIds`; `apiKey` removed from both canonical schema copies
+- **Note**: Implementations MAY continue to accept the legacy `api_key`/`apiKey` spelling internally for backward compatibility, but it is no longer part of the normative or published configuration contract
 
 ### Version 1.16.0 (Draft)
 

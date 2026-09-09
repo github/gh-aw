@@ -239,10 +239,36 @@ func loadExperimentAnalysisInputs(
 		return frontmatter, nil, nil, err
 	}
 	experimentsLog.Printf("Loaded %d experiment config(s) for %s", len(frontmatter.ExperimentConfigs), config.ExperimentName)
+	reconcileExperimentDetailsWithConfigs(details, frontmatter.ExperimentConfigs)
 	if config.RepoOverride != "" {
 		return frontmatter, details, loadRemoteMetricEvalResults(config.RepoOverride, details.WorkflowID), nil
 	}
 	return frontmatter, details, loadLocalMetricEvalResults(details.WorkflowID), nil
+}
+
+// reconcileExperimentDetailsWithConfigs filters each experiment's persisted variant counts
+// down to the variant labels currently declared in the workflow's frontmatter (variants:
+// list). Variant keys are never removed from state.Counts once written, so a workflow that
+// renames or removes variants otherwise leaves stale labels (e.g. from an earlier model
+// name) mixed in with current ones forever; those stale counts would skew the chi-square
+// balance test and the max-count "last selected variant" heuristic. When an experiment has
+// no matching config (or the config declares no variants), its counts are left untouched.
+func reconcileExperimentDetailsWithConfigs(details *ExperimentDetails, configs map[string]*workflow.ExperimentConfig) {
+	if details == nil || len(configs) == 0 {
+		return
+	}
+	for i, exp := range details.Experiments {
+		cfg := configs[exp.Name]
+		if cfg == nil || len(cfg.Variants) == 0 {
+			continue
+		}
+		filtered := filterDeclaredVariantCounts(exp.Variants, cfg.Variants)
+		if stale := staleVariantNames(exp.Variants, filtered); len(stale) > 0 {
+			experimentsLog.Printf("Experiment %q: dropping %d stale variant(s) %v (not in declared variants %v)", exp.Name, len(stale), stale, cfg.Variants)
+		}
+		details.Experiments[i].Variants = filtered
+		details.Experiments[i].Total = sumVariantCounts(filtered)
+	}
 }
 
 // loadMetricObservationSetsForAnalysis resolves grader-backed and eval-backed experiment
@@ -340,18 +366,6 @@ func loadEvalObservationSetsForAnalysis(
 	sets := buildEvalMetricObservationSets(details.Experiments, details.Runs, refs, evalRecords)
 	guardrailSets := buildEvalGuardrailObservationSets(details, guardrailRefs, evalRecords)
 	return sets, guardrailSets, nil
-}
-
-// computeExperimentAnalyses computes statistical analyses for all named experiments.
-// configs maps experiment names to their configuration; values may be nil.
-// evals provides the eval definitions for resolving eval-backed metric references; may be nil.
-func computeExperimentAnalyses(
-	experiments []ExperimentVariantStats,
-	configs map[string]*workflow.ExperimentConfig,
-	evals *workflow.EvalsConfig,
-	metricEvalResults map[string]MetricEvalResults,
-) []ExperimentAnalysis {
-	return computeExperimentAnalysesWithObservations(experiments, configs, evals, metricEvalResults, nil)
 }
 
 func computeExperimentAnalysesWithObservations(

@@ -226,7 +226,7 @@ gh pr checkout 123  // ✅ SUCCESS - gh CLI fetches from fork-owner/repo
 
 ## Logging Enhancements
 
-The enhanced script now logs:
+The updated script now logs:
 
 ### 1. PR Context Details
 ```
@@ -377,7 +377,7 @@ The test suite now covers:
 3. **Fork PR detection**: Logging and warnings
 4. **Context logging**: Detailed PR information
 5. **Strategy logging**: Why each strategy is chosen
-6. **Error logging**: Enhanced diagnostics on failure
+6. **Error logging**: Detailed diagnostics on failure
 7. **Missing repo handling**: Graceful handling of deleted forks
 8. **Closed PR handling**: Checkout failures on closed PRs treated as warnings, not errors
    - Tests verify that closed PRs don't fail the workflow

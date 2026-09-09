@@ -22,7 +22,7 @@ function getRepoCacheKey(owner, repo) {
  * @property {string[]} allowedMentions - List of allowed mention usernames
  * @property {number} totalMentions - Total number of mentions found
  * @property {number} resolvedCount - Number of mentions resolved via API
- * @property {boolean} limitExceeded - Whether the 50 mention limit was exceeded
+ * @property {boolean} limitExceeded - Whether the 50 unknown-mention resolution limit was exceeded
  */
 
 /**
@@ -172,12 +172,22 @@ async function resolveMentionsLazily(text, knownAuthors, owner, repo, github, co
 
   core.info(`Found ${totalMentions} unique mentions in text`);
 
-  // Limit to 50 mentions - filter out excess without API lookup
-  const limitExceeded = totalMentions > 50;
-  const mentionsToProcess = limitExceeded ? mentions.slice(0, 50) : mentions;
+  // Build set of known allowed authors (case-insensitive)
+  const knownAuthorsLowercase = new Set(knownAuthors.filter(a => a).map(a => a.toLowerCase()));
+
+  // Limit unknown candidates to 50 while always preserving pre-authorized mentions.
+  let unknownMentionCount = 0;
+  const mentionsToProcess = mentions.filter(mention => {
+    if (knownAuthorsLowercase.has(mention.toLowerCase())) {
+      return true;
+    }
+    unknownMentionCount++;
+    return unknownMentionCount <= 50;
+  });
+  const limitExceeded = unknownMentionCount > 50;
 
   if (limitExceeded) {
-    core.warning(`Mention limit exceeded: ${totalMentions} mentions found, processing only first 50`);
+    core.warning(`Mention limit exceeded: ${unknownMentionCount} unknown mentions found, processing only first 50`);
   }
 
   if (mentionsToProcess.length === 0) {
@@ -189,9 +199,6 @@ async function resolveMentionsLazily(text, knownAuthors, owner, repo, github, co
       limitExceeded,
     };
   }
-
-  // Build set of known allowed authors (case-insensitive)
-  const knownAuthorsLowercase = new Set(knownAuthors.filter(a => a).map(a => a.toLowerCase()));
 
   // Optimistically fetch recent collaborators (first page only)
   const collaboratorCache = await getRecentCollaborators(owner, repo, github, core);

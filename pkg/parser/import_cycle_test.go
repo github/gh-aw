@@ -62,6 +62,34 @@ imports:
 	}
 }
 
+// TestImportCycleDetection_SelfImport tests that a file importing itself is detected
+// as a cycle and reported with an actionable chain (e.g. ["a.md", "a.md"]).
+func TestImportCycleDetection_SelfImport(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-self-import-*")
+
+	fileA := filepath.Join(tempDir, "a.md")
+	fileAContent := `---
+imports:
+  - a.md
+---
+# File A
+`
+	require.NoError(t, os.WriteFile(fileA, []byte(fileAContent), 0644), "Failed to write file A")
+
+	frontmatter := map[string]any{
+		"imports": []string{"a.md"},
+	}
+
+	_, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, tempDir, nil, fileA, fileAContent)
+	require.Error(t, err, "Should detect self-import cycle")
+
+	var cycleErr *parser.ImportCycleError
+	require.ErrorAs(t, err, &cycleErr, "Error should be ImportCycleError")
+	require.NotNil(t, cycleErr)
+	assert.Equal(t, []string{"a.md", "a.md"}, cycleErr.Chain)
+	assert.Contains(t, err.Error(), "remove the import of \"a.md\" from \"a.md\"")
+}
+
 // TestImportCycleDetection_FourFiles tests that a 4-file cycle (A→B→C→D→B) is detected
 // This is the exact scenario from the issue requirements
 func TestImportCycleDetection_FourFiles(t *testing.T) {
@@ -138,11 +166,12 @@ imports:
 	require.Error(t, formattedErr, "Formatted error should not be nil")
 
 	errMsg := formattedErr.Error()
-	assert.Contains(t, errMsg, "Import cycle detected", "Error should mention import cycle")
+	assert.Contains(t, errMsg, "circular import detected", "Error should mention import cycle")
 	assert.Contains(t, errMsg, "b.md", "Error should mention b.md")
 	assert.Contains(t, errMsg, "c.md", "Error should mention c.md")
 	assert.Contains(t, errMsg, "d.md", "Error should mention d.md")
-	assert.Contains(t, errMsg, "cycles back", "Error should mention the back-edge")
+	assert.Contains(t, errMsg, "Imports must form a directed acyclic graph", "Error should state the expected structure")
+	assert.Contains(t, errMsg, "Example:", "Error should include an actionable example")
 }
 
 // TestImportCycleDetection_Deterministic verifies that cycle detection is deterministic
@@ -199,6 +228,55 @@ imports:
 	}
 }
 
+func TestImportCycleDetection_InSubdirectories(t *testing.T) {
+	tests := []struct {
+		name          string
+		files         map[string]string
+		mainImport    string
+		expectedCycle []string
+	}{
+		{
+			name: "two file cycle reached through entry",
+			files: map[string]string{
+				"entry.md":        "---\nimports:\n  - shared/sub-a.md\n---",
+				"shared/sub-a.md": "---\nimports:\n  - sub-b.md\n---",
+				"shared/sub-b.md": "---\nimports:\n  - sub-a.md\n---",
+			},
+			mainImport:    "entry.md",
+			expectedCycle: []string{"shared/sub-a.md", "shared/sub-b.md", "shared/sub-a.md"},
+		},
+		{
+			name: "three file cycle spanning two directories",
+			files: map[string]string{
+				"entry.md": "---\nimports:\n  - one/a.md\n---",
+				"one/a.md": "---\nimports:\n  - two/b.md\n---",
+				"two/b.md": "---\nimports:\n  - two/c.md\n---",
+				"two/c.md": "---\nimports:\n  - one/a.md\n---",
+			},
+			mainImport:    "entry.md",
+			expectedCycle: []string{"one/a.md", "two/b.md", "two/c.md", "one/a.md"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := testutil.TempDir(t, "import-subdirectory-cycle-*")
+			for name, content := range tt.files {
+				fullPath := filepath.Join(tempDir, name)
+				require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755))
+				require.NoError(t, os.WriteFile(fullPath, []byte(content), 0600))
+			}
+
+			_, err := parser.ProcessImportsFromFrontmatterWithSource(
+				map[string]any{"imports": []string{tt.mainImport}}, tempDir, nil, "", "")
+			require.Error(t, err)
+			var cycleErr *parser.ImportCycleError
+			require.ErrorAs(t, err, &cycleErr)
+			assert.Equal(t, tt.expectedCycle, cycleErr.Chain)
+		})
+	}
+}
+
 // TestImportCycleError_FormattedOutput tests the formatted error message
 func TestImportCycleError_FormattedOutput(t *testing.T) {
 	tests := []struct {
@@ -210,22 +288,18 @@ func TestImportCycleError_FormattedOutput(t *testing.T) {
 			name:  "simple 2-file cycle",
 			chain: []string{"a.md", "b.md", "a.md"},
 			expectedParts: []string{
-				"Import cycle detected",
-				"a.md (starting point)",
-				"imports b.md",
-				"cycles back to a.md",
-				"To fix this issue:",
+				"circular import detected: a.md → b.md → a.md",
+				"Imports must form a directed acyclic graph",
+				"remove the import of \"a.md\" from \"b.md\"",
 			},
 		},
 		{
 			name:  "4-file cycle as per issue",
 			chain: []string{"b.md", "c.md", "d.md", "b.md"},
 			expectedParts: []string{
-				"Import cycle detected",
-				"b.md (starting point)",
-				"imports c.md",
-				"imports d.md",
-				"cycles back to b.md",
+				"circular import detected: b.md → c.md → d.md → b.md",
+				"Imports must form a directed acyclic graph",
+				"remove the import of \"b.md\" from \"d.md\"",
 			},
 		},
 	}
@@ -245,13 +319,22 @@ func TestImportCycleError_FormattedOutput(t *testing.T) {
 				assert.Contains(t, errMsg, part, "Error message should contain: %s", part)
 			}
 
-			// Verify multiline format
-			assert.Contains(t, errMsg, "\n", "Error should be multiline")
-
-			// Verify indentation is present (agent-friendly formatting)
-			assert.Contains(t, errMsg, "  ↳", "Error should use indented arrows")
+			assert.NotContains(t, errMsg, "\n", "Error should follow the concise validation message style")
 		})
 	}
+}
+
+func TestImportCycleError_QuoteBearingPaths(t *testing.T) {
+	cycleErr := &parser.ImportCycleError{
+		Chain: []string{"entry.md", `importer's "path".md`, `imported's "path".md`},
+	}
+
+	formatted := parser.FormatImportCycleError(cycleErr)
+
+	assert.Equal(t,
+		`circular import detected: entry.md → importer's "path".md → imported's "path".md. Imports must form a directed acyclic graph. Example: remove the import of "imported's \"path\".md" from "importer's \"path\".md"`,
+		formatted.Error(),
+	)
 }
 
 // TestImportCycleError_InvalidChain tests handling of invalid cycle chains

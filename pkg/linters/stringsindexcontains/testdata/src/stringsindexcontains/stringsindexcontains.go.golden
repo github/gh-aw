@@ -72,3 +72,7 @@ func badParenContains(s, sub string) bool {
 func badParenYodaNotContains(s, sub string) bool {
 	return !strings.Contains(s, sub) // want `use !strings\.Contains\(s, sub\) instead of strings\.Index comparison`
 }
+
+func badIndexWithComments(s, sub string) bool {
+	return strings.Index(s, sub /* substr */) != -1 // want `use strings\.Contains\(s, sub\) instead of strings\.Index comparison`
+}

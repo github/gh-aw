@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -17,7 +18,8 @@ var compileOrchestratorLog = logger.New("cli:compile_orchestrator")
 var compileUpdateContainerPins = updateContainerPins
 
 // CompileWorkflows compiles workflows based on the provided configuration
-func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.WorkflowData, error) {
+func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.WorkflowData, error) { //nolint:largefunc // Existing compilation lifecycle remains centralized.
+	config = applyWorkspaceStrictMode(config)
 	compileOrchestratorLog.Printf("Starting workflow compilation: files=%d, validate=%v, watch=%v, noEmit=%v",
 		len(config.MarkdownFiles), config.Validate, config.Watch, config.NoEmit)
 
@@ -153,6 +155,18 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 
 	// Compile all workflow files in directory
 	return compileAllFilesInDirectory(ctx, compiler, config, workflowDir, stats, &validationResults)
+}
+
+func applyWorkspaceStrictMode(config CompileConfig) CompileConfig {
+	gitRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		gitRoot = ""
+	}
+	repoConfig, err := workflow.LoadRepoConfig(gitRoot)
+	if err == nil && repoConfig.Strict {
+		config.Strict = true
+	}
+	return config
 }
 
 func maybeForceRefreshContainerPins(ctx context.Context, config CompileConfig, workflowDir string) error {

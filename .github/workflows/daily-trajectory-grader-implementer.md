@@ -3,13 +3,13 @@ private: true
 emoji: "🧮"
 name: Daily Trajectory Grader Implementer
 description: >
-  Implements exactly one grader per run from the ranked graders
-  catalog (shared/graders/README.md) as a new, self-contained
-  shared agentic workflow component, and opens a draft PR with the addition.
+  Feature grower (all-you-can-eat) workflow that implements exactly one grader
+  per run from the ranked graders catalog (shared/graders/README.md) as a new,
+  self-contained shared agentic workflow component, and opens a draft PR with the addition.
 on:
-  schedule: daily
+  schedule: every 30 minutes
   workflow_dispatch:
-  skip-if-match: 'is:open is:pr in:title "[trajectory-grader]"'
+  skip-if-match: 'is:open in:title "[trajectory-grader]"'
 
 imports:
   - shared/graders/state-revisit-probability-rep.md

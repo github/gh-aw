@@ -98,6 +98,10 @@ evals:
   - id: trend_report_created
     question: Was a trend report created with per-workflow AIC data for the requested period?
 
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 ---
 
 # On-Demand Agentic Workflow AIC Trend Audit

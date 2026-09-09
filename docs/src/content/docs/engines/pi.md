@@ -46,6 +46,12 @@ engine:
 
 To authenticate, provide a [`CODEX_API_KEY`](/gh-aw/reference/auth/#openai_api_key) or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) as a GitHub Actions repository secret.
 
+Pi routes `openai/` and `codex/` models through OpenAI's [Responses API](https://developers.openai.com/api/docs/guides/responses-vs-chat-completions) rather than Chat Completions, since OpenAI rejects function tool calls on Chat Completions whenever reasoning is enabled. This matches Pi's own OpenAI model catalog and requires no additional configuration. The Copilot and Anthropic backends are unaffected and keep using their existing wire protocols.
+
+## Authenticating threat detection
+
+By default, threat detection for Pi workflows runs on the GitHub Copilot CLI, regardless of Pi's model provider. Grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) or provide a [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) secret for detection. This credential is separate from the OpenAI or Anthropic key used by the Pi agent.
+
 For any provider, recompile the workflow with `gh aw compile` and commit the changes to the repository.
 
 ## Example: scheduled repository report
@@ -88,7 +94,7 @@ Analyze the repository and create a concise daily status report covering:
 
 ## Capabilities and limitations
 
-Pi supports top-level `max-turns`, provider-prefixed models, and `engine.extensions`. Pi already runs in bare mode, so `engine.bare: true` is accepted but has no effect. Pi does not provide native MCP server integration, native `tools.web-search`, per-command bash allowlisting, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. MCP-backed tools must be exposed through the required CLI proxy.
+Pi supports top-level `max-turns`, provider-prefixed models, and `engine.extensions`. Pi already runs in bare mode, so `engine.bare: true` is accepted but has no effect. The built-in `tools.playwright` integration works through `playwright-cli`; omit its `mode` field because CLI is the only built-in mode. Pi does not provide native MCP server integration, native `tools.web-search`, per-command bash allowlisting, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. MCP-backed tools must be exposed through the required CLI proxy.
 
 See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison) and [Pi extensions reference](/gh-aw/reference/engines/#pi-extensions-extensions).
 

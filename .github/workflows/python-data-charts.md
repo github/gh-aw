@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 tools:
   cli-proxy: true
   agentic-workflows:

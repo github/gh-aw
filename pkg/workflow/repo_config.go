@@ -11,7 +11,7 @@
 //		  "help_command": false,      // disables builtin centralized /help comment handler
 //		  "utc": "-08:00", // project home UTC offset for rendered local times
 //		  "auto_upgrade": true, // set to true to generate agentic-auto-upgrade.yml with weekly schedule
-//		  "auto_upgrade": { "cron": "0 9 * * 1" }, // or object form: enable with custom cron (Monday 09:00 UTC)
+//		  "auto_upgrade": { "cron": "0 9 * * 1", "options": ["--pre-releases"] }, // or object form: configure schedule and upgrade options
 //		  "action_pins": {            // redirect action references to internal mirrors
 //		    "actions/checkout@v4": "acme-corp/checkout@v4"
 //		  },
@@ -143,6 +143,10 @@ func (m *MaintenanceConfig) IsJobDisabled(jobName string) bool {
 
 // RepoConfig is the parsed representation of aw.json.
 type RepoConfig struct {
+	// Strict enforces strict mode for every workflow compiled in the repository.
+	// The schema only permits true when this field is present.
+	Strict bool
+
 	// GHES enables GitHub Enterprise Server compatibility mode.
 	// When true, the compiler uses artifact action versions supported by GHES.
 	GHES bool
@@ -166,6 +170,10 @@ type RepoConfig struct {
 	// agentic-auto-upgrade workflow schedule. When non-empty, it overrides
 	// the default fuzzy weekly schedule. Requires AutoUpgrade to be true.
 	AutoUpgradeCron string
+
+	// AutoUpgradeOptions contains supported command-line options passed to
+	// gh aw upgrade by the agentic-auto-upgrade workflow.
+	AutoUpgradeOptions []string
 
 	// MaintenanceDisabled is true when maintenance has been explicitly set to false
 	// in aw.json, disabling agentic-maintenance generation and any features that
@@ -217,10 +225,11 @@ func (r *RepoConfig) IsAutoUpgradeEnabled() bool {
 // and auto_upgrade fields. maintenance can be either the boolean false (disable)
 // or a configuration object; auto_upgrade can be a boolean or an object with an
 // optional cron field.
-func (r *RepoConfig) UnmarshalJSON(data []byte) error {
+func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Polymorphic repository fields are decoded together.
 	// Use an intermediate struct with json.RawMessage to defer maintenance and
 	// auto_upgrade parsing.
 	var raw struct {
+		Strict        bool                          `json:"strict,omitempty"`
 		GHES          bool                          `json:"ghes,omitempty"`
 		HelpCommand   *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
 		UTC           string                        `json:"utc,omitempty"`
@@ -233,6 +242,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	r.Strict = raw.Strict
 	r.GHES = raw.GHES
 	r.HelpCommand = raw.HelpCommand
 	r.UTC = strings.TrimSpace(raw.UTC)
@@ -245,16 +255,18 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(raw.AutoUpgrade, &b); err == nil {
 			r.AutoUpgrade = &b
 		} else {
-			// Object form: { "cron": "..." } — implies enabled.
+			// Object form: { "cron": "...", "options": [...] } — implies enabled.
 			var autoUpgradeObj struct {
-				Cron string `json:"cron,omitempty"`
+				Cron    string   `json:"cron,omitempty"`
+				Options []string `json:"options,omitempty"`
 			}
 			if err := json.Unmarshal(raw.AutoUpgrade, &autoUpgradeObj); err != nil {
-				return fmt.Errorf("auto_upgrade configuration is not recognized: %w. Expected a boolean or an object with a 'cron' field, for example: {\"cron\": \"0 9 * * 1\"}", err)
+				return fmt.Errorf("auto_upgrade configuration is not recognized: %w. Expected a boolean or an object with 'cron' and 'options' fields, for example: {\"cron\": \"0 9 * * 1\", \"options\": [\"--pre-releases\"]}", err)
 			}
 			enabled := true
 			r.AutoUpgrade = &enabled
 			r.AutoUpgradeCron = strings.TrimSpace(autoUpgradeObj.Cron)
+			r.AutoUpgradeOptions = autoUpgradeObj.Options
 		}
 	}
 

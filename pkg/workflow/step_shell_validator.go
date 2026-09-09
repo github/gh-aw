@@ -7,6 +7,8 @@
 // Current rules:
 //   - gh-cli-missing-token: if a step's run: script uses the gh CLI,
 //     its env: section must define GH_TOKEN.
+//   - runner-tool-cache-in-run: runner.tool_cache must be passed through an
+//     env: entry instead of interpolated directly into a run: script.
 
 package workflow
 
@@ -38,6 +40,8 @@ var stepShellValidatorLog = logger.New("workflow:step_shell_validator")
 // by this pattern, which is acceptable for this crude validator.
 var ghCLIPattern = regexp.MustCompile(`(?m)(?:^|&&|\|\||;|\|)\s*gh(?:\s|$)`)
 
+var runnerToolCacheInRunPattern = regexp.MustCompile(`\$\{\{\s*runner\.tool_cache\s*\}\}`)
+
 // validateStepShellScripts checks the "pre-steps", "steps", "pre-agent-steps",
 // and "post-steps" frontmatter sections for common shell script mistakes.
 //
@@ -45,6 +49,8 @@ var ghCLIPattern = regexp.MustCompile(`(?m)(?:^|&&|\|\||;|\|)\s*gh(?:\s|$)`)
 //   - gh-cli-missing-token: any step whose run: script invokes the gh CLI
 //     must define GH_TOKEN in its env: section to avoid authentication
 //     failures at runtime.
+//   - runner-tool-cache-in-run: runner.tool_cache must be passed through an
+//     env: entry instead of interpolated directly into a run: script.
 //
 // Detection uses a line-oriented heuristic: "gh" is matched as a command
 // token at the start of a line or after shell operators (&&, ||, ;, |).
@@ -85,6 +91,9 @@ func (c *Compiler) validateStepShellScriptsSection(frontmatter map[string]any, s
 		if v := checkStepGHToken(step, workflowHasGHToken); v != "" {
 			violations = append(violations, v)
 		}
+		if v := checkStepRunnerToolCache(step); v != "" {
+			violations = append(violations, v)
+		}
 	}
 
 	if len(violations) == 0 {
@@ -94,12 +103,7 @@ func (c *Compiler) validateStepShellScriptsSection(frontmatter map[string]any, s
 
 	stepShellValidatorLog.Printf("Found %d shell script violation(s) in %s section", len(violations), sectionName)
 
-	message := fmt.Sprintf(
-		"step in '%s' uses the gh CLI but is missing GH_TOKEN in its env: section. "+
-			"Add `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` to the step's env: to avoid authentication failures at runtime. "+
-			"Affected step(s): %s",
-		sectionName, strings.Join(violations, ", "),
-	)
+	message := fmt.Sprintf("shell script validation failed in '%s'. Affected step(s): %s", sectionName, strings.Join(violations, ", "))
 
 	if c.strictMode {
 		return fmt.Errorf("strict mode: %s", message)
@@ -108,6 +112,38 @@ func (c *Compiler) validateStepShellScriptsSection(frontmatter map[string]any, s
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Warning: "+message))
 	c.IncrementWarningCount()
 	return nil
+}
+
+// checkStepRunnerToolCache returns a non-empty description string if a step's
+// run: script directly interpolates runner.tool_cache. The expression must be
+// passed through env: so it is treated as data rather than shell code.
+func checkStepRunnerToolCache(step any) string {
+	stepMap, ok := step.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	runVal, hasRun := stepMap["run"]
+	if !hasRun {
+		return ""
+	}
+	runStr, ok := runVal.(string)
+	if !ok || !runnerToolCacheInRunPattern.MatchString(runStr) {
+		return ""
+	}
+
+	stepName := "(unnamed step)"
+	if nameVal, ok := stepMap["name"]; ok {
+		if nameStr, ok := nameVal.(string); ok && nameStr != "" {
+			stepName = fmt.Sprintf("%q", nameStr)
+		}
+	}
+	return fmt.Sprintf(
+		"%s directly interpolates runner.tool_cache in its run: script. "+
+			"Pass it through the step's env: (for example, `GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}`) "+
+			"and reference `$GH_AW_RUNNER_TOOL_CACHE` in the shell script",
+		stepName,
+	)
 }
 
 // checkStepGHToken returns a non-empty description string if the step uses the

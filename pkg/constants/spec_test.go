@@ -385,6 +385,8 @@ func TestSpec_VersionConstraints_MinVersionValues(t *testing.T) {
 		{name: "AWFExcludeEnvMinVersion", constant: constants.AWFExcludeEnvMinVersion, expected: "v0.25.3"},
 		// From spec: AWFCliProxyMinVersion // "v0.25.17"
 		{name: "AWFCliProxyMinVersion", constant: constants.AWFCliProxyMinVersion, expected: "v0.25.17"},
+		// From spec: AWFCliProxyGHListMinVersion // "v0.28.13"
+		{name: "AWFCliProxyGHListMinVersion", constant: constants.AWFCliProxyGHListMinVersion, expected: "v0.28.13"},
 		// From spec: AWFTokenSteeringMinVersion // "v0.25.44"
 		{name: "AWFTokenSteeringMinVersion", constant: constants.AWFTokenSteeringMinVersion, expected: "v0.25.44"},
 		// From spec: CopilotNoAskUserMinVersion // "1.0.19"

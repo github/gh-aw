@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolveEngineID(t *testing.T) {
@@ -224,6 +225,86 @@ func TestGetNpmBinPathSetup_GorootOrdering(t *testing.T) {
 	if !strings.Contains(result, "go1.25.0") {
 		t.Errorf("Expected go1.25.0 to take precedence, but got: %s", result)
 	}
+}
+
+func TestGetNpmBinPathSetup_PreservesSelectedRuby(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping shell-based test on non-Linux platform")
+	}
+
+	cacheRoot := filepath.Join(t.TempDir(), "toolcache")
+	selectedRubyBin := filepath.Join(t.TempDir(), "selected-ruby", "bin")
+	cachedRubyBin := filepath.Join(cacheRoot, "Ruby", "3.2.11", "x64", "bin")
+	require.NoError(t, os.MkdirAll(selectedRubyBin, 0o755))
+	require.NoError(t, os.MkdirAll(cachedRubyBin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(selectedRubyBin, "ruby"), []byte("#!/bin/sh\necho 'ruby 3.4.8'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(cachedRubyBin, "ruby"), []byte("#!/bin/sh\necho 'ruby 3.2.11'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(cachedRubyBin, "npm-agent"), []byte("#!/bin/sh\necho 'npm agent found'\n"), 0o755))
+
+	shellCmd := fmt.Sprintf(
+		`unset GOROOT ERLANG_HOME; export RUNNER_TOOL_CACHE=%q; export PATH=%q:/usr/bin:/bin; %s; ruby --version; npm-agent`,
+		cacheRoot,
+		selectedRubyBin,
+		GetNpmBinPathSetup(),
+	)
+
+	output, err := exec.Command("bash", "-c", shellCmd).Output()
+	if err != nil {
+		t.Fatalf("Failed to execute shell command: %v", err)
+	}
+	assert.Equal(t, "ruby 3.4.8\nnpm agent found\n", string(output))
+}
+
+func TestDockerSudoIptablesPreservesSelectedRubyPath(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping shell-based test on non-Linux platform")
+	}
+
+	root := t.TempDir()
+	cacheRoot := filepath.Join(root, "toolcache")
+	selectedRubyBin := filepath.Join(root, "selected-ruby", "bin")
+	cachedRubyBin := filepath.Join(cacheRoot, "Ruby", "3.2.11", "x64", "bin")
+	secureBin := filepath.Join(root, "secure-bin")
+	commandBin := filepath.Join(root, "command-bin")
+	for _, dir := range []string{selectedRubyBin, cachedRubyBin, secureBin, commandBin} {
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+	}
+
+	require.NoError(t, os.WriteFile(filepath.Join(selectedRubyBin, "ruby"), []byte("#!/bin/sh\necho 'ruby 3.4.8'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(cachedRubyBin, "ruby"), []byte("#!/bin/sh\necho 'ruby 3.2.11'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(cachedRubyBin, "npm-agent"), []byte("#!/bin/sh\necho 'npm agent found'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(secureBin, "ruby"), []byte("#!/bin/sh\necho 'ruby 3.2.3'\n"), 0o755))
+
+	fakeAWF := filepath.Join(secureBin, "awf")
+	awfScript := fmt.Sprintf("#!/bin/bash\nset -e\nunset GOROOT ERLANG_HOME\n%s\nruby --version\nnpm-agent\n", GetNpmBinPathSetup())
+	require.NoError(t, os.WriteFile(fakeAWF, []byte(awfScript), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(commandBin, "sudo"), []byte(`#!/bin/sh
+if [ "$1" = "-E" ]; then
+  shift
+fi
+export PATH="$GH_AW_TEST_SECURE_PATH"
+exec "$@"
+`), 0o755))
+
+	workflowData := &WorkflowData{
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{Runtime: AgentRuntimeDockerSudoIptables},
+		},
+	}
+	awfCommand := strings.Replace(GetAWFCommandPrefix(workflowData), "/usr/local/bin/awf", fakeAWF, 1)
+	hostPath := strings.Join([]string{selectedRubyBin, commandBin, "/usr/bin", "/bin"}, ":")
+	securePath := strings.Join([]string{secureBin, "/usr/bin", "/bin"}, ":")
+	shellCmd := fmt.Sprintf(
+		`export PATH=%q GH_AW_TEST_SECURE_PATH=%q RUNNER_TOOL_CACHE=%q; %s`,
+		hostPath,
+		securePath,
+		cacheRoot,
+		awfCommand,
+	)
+
+	output, err := exec.Command("/bin/bash", "-c", shellCmd).CombinedOutput()
+	require.NoError(t, err, "privileged AWF command failed: %s", output)
+	assert.Equal(t, "ruby 3.4.8\nnpm agent found\n", string(output))
 }
 
 // TestGetNpmBinPathSetup_NoGorootDoesNotBreakChain verifies that when GOROOT is

@@ -11,7 +11,7 @@ import (
 // It starts from the initial paths already accumulated by generateAgentRunSteps and appends
 // engine-declared output paths, log directories, observability files, safe-outputs files,
 // patch/bundle paths, and firewall audit paths.
-func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEngine, logFileFull string, initialPaths []string) []string {
+func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEngine, logFileFull string, initialPaths []string) []string { //nolint:largefunc // Existing artifact policy remains explicit and ordered.
 	paths := initialPaths
 
 	// Merge engine-declared output files into the unified artifact instead of creating a
@@ -42,11 +42,6 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Include the pre-agent audit file (file listing of agent-related directories captured
 	// before agent execution) so it is available in the agent artifact for post-run inspection.
 	paths = append(paths, constants.PreAgentAuditFilePath.String())
-
-	// Collect agent-generated files path for unified upload
-	// This directory is used by workflows that instruct the agent to write files
-	// (e.g., smoke-claude status summaries)
-	paths = append(paths, constants.TmpGhAwAgentDir)
 
 	// Collect GitHub API rate-limit log for observability.
 	// Written by github_rate_limit_logger.cjs during REST API calls.
@@ -179,7 +174,7 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 // step-summary generation via generateSummarySteps, safe-outputs/memory/staging artifact uploads,
 // post-steps, the unified artifact upload, token invalidation, dev-mode actions restore,
 // and step-order validation.
-func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, artifactPaths []string, logFileFull string, checkoutMgr *CheckoutManager) error {
+func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, artifactPaths []string, logFileFull string, checkoutMgr *CheckoutManager) error { //nolint:largefunc // Existing post-agent orchestration preserves generated step order.
 	compilerYamlLog.Print("Generating post-agent collection and upload steps")
 	// Generate engine output cleanup step so workspace files are removed after collection.
 	// The engine-declared output paths are gathered by collectArtifactPaths below.

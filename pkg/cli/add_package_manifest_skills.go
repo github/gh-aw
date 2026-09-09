@@ -6,6 +6,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -48,7 +49,11 @@ func resolvePackageSkillFiles(ctx context.Context, owner, repo, packagePath, ref
 func normalizeManifestSkillDirs(explicitSkillDirs []string, packagePath string) []string {
 	var manifestSkillDirs []string
 	for _, dir := range explicitSkillDirs {
-		manifestSkillDirs = append(manifestSkillDirs, joinRepositoryPackagePath(packagePath, dir))
+		if strings.HasPrefix(filepath.ToSlash(dir), constants.GithubDir) {
+			manifestSkillDirs = append(manifestSkillDirs, filepath.ToSlash(dir))
+		} else {
+			manifestSkillDirs = append(manifestSkillDirs, joinRepositoryPackagePath(packagePath, dir))
+		}
 	}
 	return manifestSkillDirs
 }
@@ -123,7 +128,11 @@ func resolvePackageAgentFiles(ctx context.Context, owner, repo, packagePath, ref
 	if len(explicitAgentFiles) > 0 {
 		var agentFiles []string
 		for _, f := range explicitAgentFiles {
-			agentFiles = append(agentFiles, joinRepositoryPackagePath(packagePath, f))
+			if strings.HasPrefix(filepath.ToSlash(f), constants.GithubDir) {
+				agentFiles = append(agentFiles, filepath.ToSlash(f))
+			} else {
+				agentFiles = append(agentFiles, joinRepositoryPackagePath(packagePath, f))
+			}
 		}
 		return agentFiles, nil, nil
 	}
@@ -210,7 +219,7 @@ func scanRepositoryPackageInstallablePaths(ctx context.Context, owner, repo, pac
 
 func resolveRepositoryPackageDocsPath(ctx context.Context, owner, repo, packagePath, ref, host string) (string, error) {
 	readmePath := joinRepositoryPackagePath(packagePath, "README.md")
-	repoSlug := owner + "/" + repo
+	repoSlug := path.Join(owner, repo)
 	packageID := repositoryPackageIdentifier(repoSlug, packagePath)
 	if _, err := downloadPackageFileFromGitHubForHost(ctx, owner, repo, readmePath, ref, host); err == nil {
 		return readmePath, nil
@@ -225,5 +234,5 @@ func repositoryPackageIdentifier(repoSlug, packagePath string) string {
 	if packagePath == "" {
 		return repoSlug
 	}
-	return repoSlug + "/" + packagePath
+	return path.Join(repoSlug, packagePath)
 }

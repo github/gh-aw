@@ -16,7 +16,7 @@ on:
     events: [pull_request_comment, pull_request_review_comment]
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 permissions:
   contents: read
   pull-requests: read

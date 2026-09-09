@@ -31,6 +31,10 @@ safe-outputs:
     create-issue: true
     labels: [cookie]
 timeout-minutes: 45
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: true
 imports:
   - shared/mcp-pagination.md

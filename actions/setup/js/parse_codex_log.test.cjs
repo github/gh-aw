@@ -9,6 +9,7 @@ describe("parse_codex_log.cjs", () => {
   let estimateTokens;
   let formatDuration;
   let extractMCPInitialization;
+  let generateCopilotCliStyleSummary;
 
   beforeEach(async () => {
     // Mock core actions methods
@@ -38,6 +39,7 @@ describe("parse_codex_log.cjs", () => {
     truncateString = sharedModule.truncateString;
     estimateTokens = sharedModule.estimateTokens;
     formatDuration = sharedModule.formatDuration;
+    generateCopilotCliStyleSummary = sharedModule.generateCopilotCliStyleSummary;
   });
 
   describe("parseCodexLog function", () => {
@@ -832,6 +834,19 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
       const result = parseCodexLog(jsonlLog);
       expect(result.markdown).toContain("Reviewed the issue");
       expect(result.markdown).toContain("Total Tokens Used:");
+    });
+
+    it("surfaces item errors in the result and rendered step summary without usage", () => {
+      const errorMessage = "Model metadata unavailable; using fallback metadata.";
+      const errorOnlyLog = ['{"type":"thread.started","thread_id":"019ef8cb"}', `{"type":"item.completed","item":{"id":"item_0","type":"error","message":"${errorMessage}"}}`, '{"type":"turn.completed"}'].join("\n");
+
+      const result = parseCodexLog(errorOnlyLog);
+      const resultEntry = result.logEntries.find(e => e.type === "session.result");
+
+      expect(resultEntry?.data?.errors).toEqual([errorMessage]);
+      expect(generateCopilotCliStyleSummary(result.logEntries)).toContain(errorMessage);
+      expect(result.markdown).toContain("<summary>Errors</summary>");
+      expect(result.markdown).toContain(errorMessage);
     });
   });
 });

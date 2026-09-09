@@ -38,6 +38,24 @@ func badAddAssign(absPath, relPath string) string {
 	return absPath
 }
 
+// bad2OpEmbeddedSlash uses the two-operand shape where the leading slash is
+// embedded in a longer literal rather than being its own operand.
+func bad2OpEmbeddedSlash(dir string) string {
+	return dir + "/config.yml" // want `manual "/" path concatenation; use filepath\.Join\(dir, "config\.yml"\) \(or path\.Join\) instead`
+}
+
+// bad2OpEmbeddedSlashNested has a longer path after the leading slash.
+func bad2OpEmbeddedSlashNested(home string) string {
+	return home + "/.config/foo" // want `manual "/" path concatenation; use filepath\.Join\(home, "\.config/foo"\) \(or path\.Join\) instead`
+}
+
+// bad2OpEmbeddedSlashAddAssign builds a path with an embedded-slash literal
+// via +=.
+func bad2OpEmbeddedSlashAddAssign(home string) string {
+	home += "/.config/foo" // want `manual "/" path concatenation; use filepath\.Join\(home, "\.config/foo"\) \(or path\.Join\) instead`
+	return home
+}
+
 // badLongOperand has an operand too long to quote, so the diagnostic falls back
 // to the generic message.
 func badLongOperand(name string) string {
@@ -67,6 +85,19 @@ func goodSuffixOnly(dir string) string {
 // goodPrefixOnly prepends a leading separator — not flagged.
 func goodPrefixOnly(name string) string {
 	return "/" + name
+}
+
+// goodBareSeparatorLeftOfEmbedded is a compile-time constant (both operands
+// are literals), where filepath.Join is not valid — not flagged, matching
+// goodConstant below.
+func goodBareSeparatorLeftOfEmbedded() string {
+	return "/" + "/config.yml"
+}
+
+// goodLiteralLeftOfEmbedded is also a compile-time constant (both operands
+// are literals) — not flagged, matching goodConstant below.
+func goodLiteralLeftOfEmbedded() string {
+	return "prefix" + "/config.yml"
 }
 
 // badSuffixAfterJoinShape confirms the nested join shape is still reported.

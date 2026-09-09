@@ -142,7 +142,11 @@ func buildMentionsHandlerConfig(m *MentionsConfig) map[string]any {
 		cfg["allowedTeams"] = m.AllowedTeams
 	}
 	if m.Max != nil {
-		cfg["max"] = *m.Max
+		if n := templatableIntValue(m.Max); n > 0 {
+			cfg["max"] = n
+		} else {
+			cfg["max"] = *m.Max
+		}
 	}
 	return cfg
 }

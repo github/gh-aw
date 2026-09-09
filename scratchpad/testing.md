@@ -447,7 +447,7 @@ The tests are designed to work with the current implementation state:
 
 ### Future Expansion
 As the Go implementation develops:
-1. **Stub tests** will be enhanced with full behavioral validation
+1. **Stub tests** will be expanded to include full behavioral validation
 3. **Edge case tests** will be expanded based on real usage patterns
 
 ## Test Coverage Areas

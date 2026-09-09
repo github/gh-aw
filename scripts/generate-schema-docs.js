@@ -258,9 +258,11 @@ function generateVariants(prop, propName, indent = 0, required = []) {
           lines.push(`${indentStr}  {}`);
         }
       } else if (variant.type === "array") {
-        lines.push(`${indentStr}${propName}: []`);
+        const example = variant.examples?.find(Array.isArray) || [];
+        lines.push(`${indentStr}${propName}: ${JSON.stringify(example)}`);
         if (variant.items) {
-          lines.push(formatComment(`Array items: ${variant.items.description || variant.items.type}`, indent + 2));
+          const items = resolvePropertyRef(variant.items);
+          lines.push(formatComment(`Array items: ${items.description || items.type}`, indent + 2));
         }
       } else if (variant.type === "boolean") {
         const boolExample = getExampleValue(variant, propName);

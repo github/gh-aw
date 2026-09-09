@@ -13,6 +13,8 @@ import (
 
 var compilerYamlGradersLog = logger.New("workflow:compiler_yaml_graders")
 
+const graderPayloadChunkSize = 12 * 1024
+
 // generateGradersStep emits an always() post-agent step that runs deterministic
 // graders. The step executes after secret redaction / summary steps and before
 // the unified artifact upload so results are included in the agent artifact.
@@ -52,7 +54,14 @@ func (c *Compiler) generateGradersStep(yaml *strings.Builder, data *WorkflowData
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('" + SetupActionDestination + "/trace_graders.cjs');\n")
-	fmt.Fprintf(yaml, "            await main('%s', '%s');\n", manifestB64, execB64)
+	invocation := fmt.Sprintf("            await main('%s', '%s');\n", manifestB64, execB64)
+	if len(invocation) <= MaxExpressionSize {
+		yaml.WriteString(invocation)
+	} else {
+		writeChunkedGraderPayload(yaml, "graderManifestB64", manifestB64)
+		writeChunkedGraderPayload(yaml, "graderExecB64", execB64)
+		yaml.WriteString("            await main(graderManifestB64, graderExecB64);\n")
+	}
 	if operationalValueGrader, ok := data.Graders.Graders["operational-value"]; ok && (operationalValueGrader.Enabled == nil || *operationalValueGrader.Enabled) {
 		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
@@ -60,6 +69,16 @@ func (c *Compiler) generateGradersStep(yaml *strings.Builder, data *WorkflowData
 	}
 
 	compilerYamlGradersLog.Print("Generated graders step")
+}
+
+func writeChunkedGraderPayload(yaml *strings.Builder, variable, payload string) {
+	fmt.Fprintf(yaml, "            const %s = [\n", variable)
+	for payload != "" {
+		chunkSize := min(len(payload), graderPayloadChunkSize)
+		fmt.Fprintf(yaml, "              '%s',\n", payload[:chunkSize])
+		payload = payload[chunkSize:]
+	}
+	yaml.WriteString("            ].join('');\n")
 }
 
 // graderManifestEntry represents a single grader in the serialized manifest.
@@ -94,7 +113,7 @@ type graderExecEntry struct {
 }
 
 // buildGraderManifest constructs the manifest for the JS runtime.
-func buildGraderManifest(cfg *GradersConfig) *graderManifest {
+func buildGraderManifest(cfg *GradersConfig) *graderManifest { //nolint:largefunc // Manifest entry assembly is intentionally kept in serialization order.
 	if cfg == nil {
 		return &graderManifest{Version: 1}
 	}
@@ -191,9 +210,6 @@ func (c *Compiler) generateGraderRedactionStep(yaml *strings.Builder, yamlConten
 	if data.Graders == nil || !data.Graders.HasGraders() {
 		return
 	}
-	if !data.Graders.HasCustomScripts() {
-		return
-	}
 
 	secretReferences := CollectSecretReferences(yamlContent)
 	c.stepOrderTracker.RecordSecretRedaction("Redact grader outputs")
@@ -227,6 +243,7 @@ func (c *Compiler) generateGraderRedactionStep(yaml *strings.Builder, yamlConten
 func collectGraderArtifactPaths(graders *GradersConfig) []string {
 	paths := []string{
 		constants.GradersDirSlash + constants.GraderManifestFilename.String(),
+		constants.GradersDirSlash + constants.GraderPayloadFilename.String(),
 		constants.GradersDirSlash + constants.GraderResultsFilename.String(),
 	}
 	if graders != nil {

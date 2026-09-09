@@ -7,7 +7,7 @@ import (
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
-// commentOutProcessedFieldsInOnSection comments out draft, max-stack, fork, forks, names, labels, manual-approval, stop-after, skip-if-match, skip-if-no-match, skip-roles, reaction, lock-for-agent, steps, permissions, needs, restore-memory, and stale-check fields in the on section
+// commentOutProcessedFieldsInOnSection comments out draft, max-stack, fork, forks, names, labels, manual-approval, cooldown, stop-after, skip-if-match, skip-if-no-match, skip-roles, reaction, lock-for-agent, steps, permissions, needs, restore-memory, and stale-check fields in the on section
 // These fields are processed separately and should be commented for documentation
 // Exception: names fields in sections with __gh_aw_native_label_filter__ marker in frontmatter are NOT commented out
 func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmatter map[string]any) string {
@@ -397,6 +397,8 @@ func (s *onSectionCleanupState) commentSimpleTopLevelField(info onSectionLine) (
 	switch {
 	case strings.HasPrefix(info.trimmed, "manual-approval:"):
 		return true, " # Manual approval processed as environment field in activation job"
+	case strings.HasPrefix(info.trimmed, "cooldown:"):
+		return true, " # Cooldown processed as run history check in pre-activation job"
 	case strings.HasPrefix(info.trimmed, "stop-after:"):
 		return true, " # Stop-after processed as stop-time check in pre-activation job"
 	case strings.HasPrefix(info.trimmed, "restore-memory:"):

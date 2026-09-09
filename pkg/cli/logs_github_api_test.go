@@ -42,6 +42,65 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 	assert.Empty(t, runs[0].WorkflowPath, "WorkflowPath should be empty when 'path' field is absent")
 }
 
+func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	outputDir := t.TempDir()
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGHScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
+		"cat <<'EOF'\n" +
+		`{"id":42,"run_number":7,"run_attempt":3,"html_url":"https://github.com/octo/repo/actions/runs/42","status":"completed","conclusion":"success","name":"Daily report","path":".github/workflows/daily-report.lock.yml","created_at":"2026-09-01T10:00:00Z","run_started_at":"2026-09-01T10:00:01Z","updated_at":"2026-09-01T10:02:00Z","event":"schedule","head_branch":"main","head_sha":"abc123","display_title":"Daily report","actor":{"login":"octocat"},"repository":{"full_name":"octo/repo"}}` + "\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	currentRun := WorkflowRun{DatabaseID: 42, Attempt: 3, Status: "completed"}
+	run, err := fetchAndCacheWorkflowRunMetadata(context.Background(), currentRun, outputDir, "octo", "repo", "", false)
+	require.NoError(t, err)
+	assert.Equal(t, int64(42), run.DatabaseID)
+	assert.Equal(t, 3, run.Attempt)
+	assert.Equal(t, ".github/workflows/daily-report.lock.yml", run.WorkflowPath)
+	assert.Equal(t, "octo/repo", run.Repository)
+	assert.Equal(t, "octocat", run.Actor)
+
+	cachePath := filepath.Join(outputDir, runAPIResponseFileName)
+	cached, err := os.ReadFile(cachePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(cached), `"run_attempt":3`)
+
+	require.NoError(t, os.Remove(fakeGH))
+	cachedRun, err := fetchAndCacheWorkflowRunMetadata(context.Background(), currentRun, outputDir, "octo", "repo", "", false)
+	require.NoError(t, err, "the second read should use the cache without invoking gh")
+	assert.Equal(t, run, cachedRun)
+
+	argsLog, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Equal(t, "api repos/octo/repo/actions/runs/42\n", string(argsLog))
+
+	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "other-repo")
+	require.NoError(t, err)
+	assert.True(t, needsRefresh, "a cache entry from another repository must be refreshed")
+
+	needsRefresh, err = workflowRunMetadataCacheNeedsRefresh(outputDir, WorkflowRun{
+		DatabaseID: 42,
+		Attempt:    4,
+		Status:     "completed",
+	}, "octo", "repo")
+	require.NoError(t, err)
+	assert.True(t, needsRefresh, "a cache entry from another attempt must be refreshed")
+
+	require.NoError(t, os.WriteFile(cachePath, []byte(strings.Replace(string(cached), `"status":"completed"`, `"status":"in_progress"`, 1)), 0o600))
+	needsRefresh, err = workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "repo")
+	require.NoError(t, err)
+	assert.True(t, needsRefresh, "a mutable cache entry must be refreshed")
+
+	metadataApplied := applyWorkflowRunMetadata(&WorkflowRun{WorkflowName: "Daily report"}, WorkflowRun{
+		WorkflowName: ".github/workflows/daily-report.lock.yml",
+	})
+	assert.False(t, metadataApplied, "a path-like API name must not replace a resolved display name")
+}
+
 // TestBuildCreatedFilter verifies that buildCreatedFilter always produces a single
 // --created expression that enforces all supplied date bounds. The key invariant is that
 // StartDate is never silently dropped, which was the root cause of the bug where runs
@@ -229,30 +288,108 @@ func TestListWorkflowRunsErrorHandling(t *testing.T) {
 
 func TestFetchJobDetailsWithCountsIncludesSteps(t *testing.T) {
 	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	outputDir := t.TempDir()
 	fakeGH := filepath.Join(fakeBinDir, "gh")
 	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
 	fakeGHScript := "#!/bin/sh\n" +
 		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
 		"cat <<'EOF'\n" +
-		"{\"name\":\"agent\",\"status\":\"completed\",\"conclusion\":\"failure\",\"started_at\":\"2026-06-28T01:31:00Z\",\"completed_at\":\"2026-06-28T01:33:00Z\",\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\"},{\"name\":\"Run agent\",\"status\":\"completed\",\"conclusion\":\"failure\"}]}\n" +
+		"[{\"total_count\":1,\"jobs\":[{\"id\":42,\"run_id\":28307653871,\"run_attempt\":2,\"html_url\":\"https://github.com/github/gh-aw/actions/runs/28307653871/job/42\",\"status\":\"completed\",\"conclusion\":\"failure\",\"created_at\":\"2026-06-28T01:30:00Z\",\"started_at\":\"2026-06-28T01:31:00Z\",\"completed_at\":\"2026-06-28T01:33:00Z\",\"name\":\"agent\",\"runner_name\":\"GitHub Actions 1\",\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":1,\"started_at\":\"2026-06-28T01:31:00Z\",\"completed_at\":\"2026-06-28T01:31:10Z\"},{\"name\":\"Run agent\",\"status\":\"completed\",\"conclusion\":\"failure\",\"number\":2,\"started_at\":\"2026-06-28T01:31:10Z\",\"completed_at\":\"2026-06-28T01:33:00Z\"}]}]}]\n" +
 		"EOF\n"
 	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
 
 	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, false)
+	cachePath := filepath.Join(outputDir, jobsAPIResponseFileName)
+	require.NoError(t, os.WriteFile(cachePath, []byte("old cache"), 0o644))
+
+	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, outputDir, false)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	assert.Equal(t, 1, failedJobs, "failed job count should include failed jobs")
 	assert.Equal(t, 2*time.Minute, jobs[0].Duration, "job duration should still be derived from timestamps")
+	assert.Equal(t, int64(42), jobs[0].ID, "high-level GitHub job metadata should be preserved")
+	assert.Equal(t, 2, jobs[0].RunAttempt)
+	assert.Equal(t, "GitHub Actions 1", jobs[0].RunnerName)
 	require.Len(t, jobs[0].Steps, 2)
 	assert.Equal(t, "Run agent", jobs[0].Steps[1].Name, "step names should be parsed from gh api output")
 	assert.Equal(t, "failure", jobs[0].Steps[1].Conclusion, "step conclusions should be parsed from gh api output")
+	assert.Equal(t, 2, jobs[0].Steps[1].Number)
 
 	argsLog, err := os.ReadFile(argsLogPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(argsLog), "repos/{owner}/{repo}/actions/runs/28307653871/jobs", "should query the run jobs API")
-	assert.Contains(t, string(argsLog), "steps:", "gh jq projection should request step data")
+	assert.Contains(t, string(argsLog), "repos/{owner}/{repo}/actions/runs/28307653871/jobs?per_page=100", "should query the run jobs API")
+	assert.Contains(t, string(argsLog), "--paginate --slurp", "should cache all pages of the jobs API response")
+	assert.NotContains(t, string(argsLog), "--jq", "should cache the complete API response without a projection")
+
+	cachedResponse, err := os.ReadFile(cachePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(cachedResponse), `"total_count":1`)
+	assert.Contains(t, string(cachedResponse), `"runner_name":"GitHub Actions 1"`)
+	cachedInfo, err := os.Stat(cachePath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), cachedInfo.Mode().Perm())
+}
+
+func TestFetchJobDetailsWithCountsReturnsJobsWhenCacheWriteFails(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"cat <<'EOF'\n" +
+		"[{\"total_count\":1,\"jobs\":[{\"name\":\"agent\",\"status\":\"completed\",\"conclusion\":\"failure\"}]}]\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	missingOutputDir := filepath.Join(t.TempDir(), "missing", "run")
+	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, missingOutputDir, false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to cache jobs API response")
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "agent", jobs[0].Name)
+	assert.Equal(t, 1, failedJobs)
+}
+
+func TestFetchJobDetailsWithCountsSkipsMalformedJobs(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"cat <<'EOF'\n" +
+		"[{\"total_count\":3,\"jobs\":[{\"name\":\"failed\",\"status\":\"completed\",\"conclusion\":\"failure\"},{\"name\":42,\"status\":\"completed\",\"conclusion\":\"failure\"},{\"name\":\"passed\",\"status\":\"completed\",\"conclusion\":\"success\"}]}]\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, "", false)
+
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, "failed", jobs[0].Name)
+	assert.Equal(t, "passed", jobs[1].Name)
+	assert.Equal(t, 1, failedJobs)
+}
+
+func TestFetchJobDetailsWithCountsSkipsMalformedPages(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"cat <<'EOF'\n" +
+		"[{\"total_count\":1,\"jobs\":[{\"name\":\"first\",\"status\":\"completed\",\"conclusion\":\"success\"}]},{\"total_count\":1,\"jobs\":\"malformed\"},{\"total_count\":1,\"jobs\":[{\"name\":\"last\",\"status\":\"completed\",\"conclusion\":\"failure\"}]}]\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, "", false)
+
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, "first", jobs[0].Name)
+	assert.Equal(t, "last", jobs[1].Name)
+	assert.Equal(t, 1, failedJobs)
 }
 
 // TestFetchJobDetailsWithCountsNullConclusion verifies that jobs and steps with null conclusions
@@ -265,13 +402,13 @@ func TestFetchJobDetailsWithCountsNullConclusion(t *testing.T) {
 	// A job still in progress has conclusion="" for itself and for any pending steps.
 	fakeGHScript := "#!/bin/sh\n" +
 		"cat <<'EOF'\n" +
-		"{\"name\":\"agent\",\"status\":\"in_progress\",\"conclusion\":\"\",\"started_at\":\"2026-06-28T01:31:00Z\",\"completed_at\":\"0001-01-01T00:00:00Z\",\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\"},{\"name\":\"Run agent\",\"status\":\"in_progress\",\"conclusion\":\"\"}]}\n" +
+		"[{\"total_count\":1,\"jobs\":[{\"name\":\"agent\",\"status\":\"in_progress\",\"conclusion\":null,\"started_at\":\"2026-06-28T01:31:00Z\",\"completed_at\":null,\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\"},{\"name\":\"Run agent\",\"status\":\"in_progress\",\"conclusion\":null}]}]}]\n" +
 		"EOF\n"
 	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
 
 	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, false)
+	jobs, failedJobs, err := fetchJobDetailsWithCounts(context.Background(), 28307653871, "", false)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1, "in-progress jobs with null conclusion should not be dropped")
 	assert.Equal(t, 0, failedJobs, "in-progress job should not count as failed")

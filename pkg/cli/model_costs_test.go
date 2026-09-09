@@ -153,3 +153,15 @@ func TestComputeModelInferenceAICGitHubCopilotNoCacheRead(t *testing.T) {
 	assert.InDelta(t, aicViaAnthropic, aicViaGitHubCopilot, 1e-9,
 		"zero cache reads must not alter the charged input token count")
 }
+
+func TestComputeModelInferenceAICExplicitCacheSemantics(t *testing.T) {
+	t.Parallel()
+
+	inclusive := true
+	additive := false
+	inclusiveAIC := computeModelInferenceAICWithCacheSemantics("copilot", "claude-sonnet-4.6", 1000, 100, 400, 100, 0, &inclusive)
+	additiveAIC := computeModelInferenceAICWithCacheSemantics("copilot", "claude-sonnet-4.6", 1000, 100, 400, 100, 0, &additive)
+
+	assert.InDelta(t, 0.3495, inclusiveAIC, 1e-9)
+	assert.InDelta(t, 0.4995, additiveAIC, 1e-9)
+}

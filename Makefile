@@ -489,6 +489,8 @@ test-scripts: build
 	@echo "Running Bash script tests..."
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
+	bash scripts/check-skill-file-paths_test.sh
+	bash scripts/check-safe-outputs-conformance_test.sh
 	bash scripts/resolve-base-commit_test.sh
 	bash scripts/check-workflow-drift_test.sh ./$(BINARY_NAME)
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
@@ -662,7 +664,7 @@ tools: ## Install build-time tools declared in go.mod tool directives
 .PHONY: install-golangci-lint
 install-golangci-lint:
 	@echo "Installing golangci-lint binary..."
-	@GOLANGCI_LINT_VERSION="v2.12.2"; \
+	@GOLANGCI_LINT_VERSION="v2.13.2"; \
 	GOPATH=$$(go env GOPATH); \
 	GOOS=$$(go env GOOS); \
 	GOARCH=$$(go env GOARCH); \
@@ -925,6 +927,11 @@ check-stale-lock-files:
 		bash scripts/check-stale-lock-files.sh; \
 	fi
 
+# Fast guard: fails when a skill references a backticked repo path that no longer exists.
+.PHONY: check-skill-file-paths
+check-skill-file-paths:
+	@bash scripts/check-skill-file-paths.sh
+
 # Check for drift between workflow markdown sources and generated lock files.
 # Compiles all .github/workflows/*.md files and fails if any .lock.yml would
 # change, reminding contributors to run 'make recompile' before committing.
@@ -1137,7 +1144,7 @@ shellcheck-setup-sh:
 
 # Validate all project files
 .PHONY: lint
-lint: check-stale-lock-files fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary
+lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary
 	@echo "✓ All validations passed"
 
 # Install the binary locally
@@ -1436,6 +1443,7 @@ help:
 	@echo "  validate-workflows - Validate compiled workflow lock files (depends on build)"
 	@echo "  check-workflow-drift - Check for drift between .md sources and .lock.yml files (builds binary if missing)"
 	@echo "  check-stale-lock-files - Fast guard: detect modified .md files without regenerated .lock.yml (no binary needed)"
+	@echo "  check-skill-file-paths - Guard: reject invalid backticked repo paths in .github/skills/**/SKILL.md"
 	@echo "  check-stale-schema-binary - Guard: detect modified schema files under pkg/parser/schemas/ without a binary rebuild"
 	@echo "  install          - Install binary locally"
 	@echo "  sync-action-pins - Sync actions-lock.json from .github/aw to pkg/actionpins/data and pkg/workflow/data (runs automatically during build)"

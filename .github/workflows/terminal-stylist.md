@@ -7,10 +7,11 @@ on:
   schedule: daily
 
 permissions:
+  copilot-requests: write
   contents: read
 
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine: pi
+model: copilot/auto
 
 timeout-minutes: 10
 

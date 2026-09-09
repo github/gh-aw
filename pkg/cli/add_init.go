@@ -45,6 +45,7 @@ type addInitializedFile struct {
 }
 
 func confirmAddRepositoryInitialization(ctx context.Context, engineOverride string, noGitattributes bool) (addRepositoryInitializationPlan, error) {
+	addLog.Printf("Checking repository initialization state: engineOverride=%s, noGitattributes=%v", engineOverride, noGitattributes)
 	gitRoot, err := addFindGitRoot()
 	if err != nil {
 		if errors.Is(err, gitutil.ErrNotGitRepository) {
@@ -70,8 +71,10 @@ func confirmAddRepositoryInitialization(ctx context.Context, engineOverride stri
 	if len(missingMarkers) == 0 {
 		return addRepositoryInitializationPlan{}, nil
 	}
+	addLog.Printf("Found %d missing repository init marker(s): %v", len(missingMarkers), missingMarkers)
 
 	confirmed, err := addConfirmAuthoringSupport(ctx)
+	addLog.Printf("Coding agent prompts and skills confirmation: confirmed=%t", confirmed)
 	if err != nil || !confirmed {
 		if err == nil {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Coding agent prompts and skills: skipped"))
@@ -87,14 +90,6 @@ func applyAddRepositoryInitialization(plan addRepositoryInitializationPlan, engi
 		return nil, nil
 	}
 	return ensureAddRepositoryInitializedFromPlan(plan.files, engineOverride, verbose, noGitattributes)
-}
-
-func confirmAndInitializeAddRepository(ctx context.Context, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
-	plan, err := confirmAddRepositoryInitialization(ctx, engineOverride, noGitattributes)
-	if err != nil {
-		return nil, err
-	}
-	return applyAddRepositoryInitialization(plan, engineOverride, verbose, noGitattributes)
 }
 
 func ensureAddRepositoryInitializedFromPlan(markers []string, engineOverride string, verbose bool, noGitattributes bool) ([]addInitializedFile, error) {
@@ -129,6 +124,7 @@ func ensureAddRepositoryInitialized(engineOverride string, verbose bool, noGitat
 }
 
 func ensureAddRepositoryInitializedWithDetails(engineOverride string, verbose bool, noGitattributes bool) ([]string, error) {
+	addLog.Printf("Ensuring repository initialization with details: engineOverride=%s", engineOverride)
 	gitRoot, err := addFindGitRoot()
 	if err != nil {
 		if errors.Is(err, gitutil.ErrNotGitRepository) {
@@ -187,5 +183,6 @@ func initializeAddRepositoryFiles(markers []string, engineOverride string, verbo
 		}
 		initializedFiles = append(initializedFiles, absPath)
 	}
+	addLog.Printf("Repository initialization complete: %d of %d marker file(s) initialized", len(initializedFiles), len(markers))
 	return initializedFiles, nil
 }

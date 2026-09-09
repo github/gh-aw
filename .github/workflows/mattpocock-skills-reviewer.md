@@ -11,6 +11,10 @@ engine:
   max-continuations: 6
 features:
   gh-aw-detection: true
+
+network:
+  allowed: [defaults, go]
+
 imports:
 - uses: shared/pr-review-base.md
   with:
@@ -18,7 +22,7 @@ imports:
 - shared/otlp.md
 - shared/pr-diff-data-fetch.md
 max-daily-ai-credits: 10000
-model: claude-sonnet-4.6
+model: claude-sonnet-5
 "on":
   pull_request:
     paths-ignore:

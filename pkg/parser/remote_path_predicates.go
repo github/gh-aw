@@ -7,17 +7,12 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-// isUnderWorkflowsDirectory checks if a file path is a top-level workflow file (not in shared subdirectory)
+// isUnderWorkflowsDirectory checks whether a file path lives under the workflow
+// directory. Shared workflows in .github/workflows/shared/... are still workflow
+// files and must undergo the same validation rules as top-level workflows.
 func isUnderWorkflowsDirectory(filePath string) bool {
 	normalizedPath := filepath.ToSlash(filePath)
-	if !strings.Contains(normalizedPath, constants.WorkflowsDirSlash) {
-		return false
-	}
-	parts := strings.Split(normalizedPath, constants.WorkflowsDirSlash)
-	if len(parts) < 2 {
-		return false
-	}
-	return !strings.Contains(parts[1], "/")
+	return strings.Contains(normalizedPath, constants.WorkflowsDirSlash)
 }
 
 // isCustomAgentFile checks if a file path is a custom agent file under .github/agents/

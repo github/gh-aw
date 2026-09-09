@@ -68,6 +68,97 @@ function makeTrace(overrides = {}) {
   };
 }
 
+const policyNearMissScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/policy-near-miss.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+if (!policyNearMissScriptMatch?.[1]) {
+  throw new Error("unable to extract policy-near-miss grader script");
+}
+const policyNearMissScript = policyNearMissScriptMatch[1]
+  .split("\n")
+  .map(line => line.slice(6))
+  .join("\n");
+
+function runPolicyNearMiss(trace) {
+  return runCustomGrader("policy-near-miss", policyNearMissScript, makeTrace(trace), {
+    name: "Policy Near-Miss Rate",
+    unit: "ratio",
+    direction: "lower_is_better",
+    source: "inline",
+  });
+}
+
+const explorationErrorScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/exploration-error.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+if (!explorationErrorScriptMatch?.[1]) {
+  throw new Error("unable to extract exploration-error grader script");
+}
+const explorationErrorScript = explorationErrorScriptMatch[1]
+  .split("\n")
+  .map(line => line.slice(6))
+  .join("\n");
+
+function runExplorationError(trace) {
+  return runCustomGrader("exploration-error", explorationErrorScript, makeTrace(trace), {
+    name: "Exploration Error",
+    unit: "ratio",
+    direction: "lower_is_better",
+    source: "inline",
+  });
+}
+
+const exploitationErrorScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/exploitation-error.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+if (!exploitationErrorScriptMatch?.[1]) {
+  throw new Error("unable to extract exploitation-error grader script");
+}
+const exploitationErrorScript = exploitationErrorScriptMatch[1]
+  .split("\n")
+  .map(line => line.slice(6))
+  .join("\n");
+
+function runExploitationError(trace) {
+  return runCustomGrader("exploitation-error", exploitationErrorScript, makeTrace(trace), {
+    name: "Exploitation Error",
+    unit: "ratio",
+    direction: "lower_is_better",
+    source: "inline",
+  });
+}
+
+const skillConstraintCoverageScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/skill-constraint-coverage.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+if (!skillConstraintCoverageScriptMatch?.[1]) {
+  throw new Error("unable to extract skill-constraint-coverage grader script");
+}
+const skillConstraintCoverageScript = skillConstraintCoverageScriptMatch[1]
+  .split("\n")
+  .map(line => line.slice(6))
+  .join("\n");
+
+function runSkillConstraintCoverage(trace, config) {
+  return runCustomGrader("skill-constraint-coverage", skillConstraintCoverageScript, makeTrace(trace), {
+    name: "Skill Constraint Coverage",
+    unit: "ratio",
+    direction: "higher_is_better",
+    source: "inline",
+    config,
+  });
+}
+
+const toolOutputConsumptionRateScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/tool-output-consumption-rate.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+if (!toolOutputConsumptionRateScriptMatch?.[1]) {
+  throw new Error("unable to extract tool-output-consumption-rate grader script");
+}
+const toolOutputConsumptionRateScript = toolOutputConsumptionRateScriptMatch[1]
+  .split("\n")
+  .map(line => line.slice(6))
+  .join("\n");
+
+function runToolOutputConsumptionRate(trace) {
+  return runCustomGrader("tool-output-consumption-rate", toolOutputConsumptionRateScript, makeTrace(trace), {
+    name: "Tool Output Consumption Rate",
+    unit: "ratio",
+    direction: "higher_is_better",
+    source: "inline",
+  });
+}
+
 describe("trace_graders", () => {
   describe("buildGradersSummaryBody", () => {
     it("renders all computed grader values without emojis", () => {
@@ -397,12 +488,17 @@ describe("trace_graders", () => {
       expect(r.status).toBe("fail");
     });
 
-    it("handles object results from custom scripts", () => {
+    it("uses manifest metadata for object results from custom scripts", () => {
       const r = normalizeResult("test", { value: 42, unit: "ms", severity: "warning", details: "too slow" }, { ...meta, source: "inline" });
       expect(r.value).toBe(42);
-      expect(r.unit).toBe("ms");
+      expect(r.unit).toBe("count");
       expect(r.severity).toBe("warning");
       expect(r.details).toBe("too slow");
+    });
+
+    it("omits an unrecognized custom severity", () => {
+      const r = normalizeResult("test", { value: 42, severity: "sensitive trace content" }, { ...meta, source: "inline" });
+      expect(r.severity).toBeUndefined();
     });
 
     it("handles null result as unavailable", () => {
@@ -554,7 +650,7 @@ describe("trace_graders", () => {
         }
       `;
       const trace = makeTrace({ toolCalls: [{ name: "a" }, { name: "b" }] });
-      const result = runCustomGrader("test", script, trace, meta);
+      const result = runCustomGrader("test", script, trace, { ...meta, unit: "count" });
       expect(result.value).toBe(2);
       expect(result.unit).toBe("count");
     });
@@ -563,6 +659,462 @@ describe("trace_graders", () => {
       const result = runCustomGrader("test", "while(true){} return 1", makeTrace(), meta);
       expect(result.status).toBe("error");
       expect(result.error).toContain("runtime error");
+    });
+  });
+
+  describe("policy-near-miss custom grader", () => {
+    it("discovers objectives after an events-only candidate", () => {
+      const result = runPolicyNearMiss({
+        trajectoryIR: { events: [{ kind: "safe_output" }] },
+        ir: { objectives: [{ id: "guard", description: "Verify approval", satisfiedAtEventIndex: null }] },
+      });
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("guardObjectives=1 unmet=1");
+    });
+
+    it("identifies guard objectives and treats event index zero as satisfied", () => {
+      const result = runPolicyNearMiss({
+        trajectoryIR: {
+          events: [{ kind: "safe_output" }],
+          objectives: [
+            { id: "met", description: "Check authorization", satisfiedAtEventIndex: 0 },
+            { id: "unmet", description: "Verification required", satisfiedAtEventIndex: null },
+            { id: "not-a-guard", description: "Complete checkbox", satisfiedAtEventIndex: null },
+          ],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("guardObjectives=2 unmet=1");
+    });
+
+    it.each([
+      ["no objectives", { trajectoryIR: { events: [{ kind: "safe_output" }], objectives: [] } }],
+      ["no outcome", { trajectoryIR: { events: [], objectives: [{ description: "Check approval" }] } }],
+      ["no guard objective", { trajectoryIR: { events: [{ kind: "safe_output" }], objectives: [{ description: "Write report" }] } }],
+    ])("normalizes %s as unavailable", (_name, trace) => {
+      const result = runPolicyNearMiss(trace);
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.status).toBe("unavailable");
+    });
+  });
+
+  describe("exploration-error custom grader", () => {
+    it("reports unavailable when no objectives are declared", () => {
+      const result = runExplorationError({ trajectoryIR: { events: [{ kind: "state_change", ref: "a" }] } });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("no declared objectives");
+    });
+
+    it("returns zero when all objectives are already satisfied", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Read all files", satisfiedAtEventIndex: 0 }],
+        },
+      });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("all objectives satisfied");
+    });
+
+    it("prefers the objective-bearing IR candidate over unrelated agentOutput observations", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          events: [{ kind: "state_change", ref: "repo-root" }],
+        },
+        agentOutput: {
+          observations: [{ id: "obs-1" }],
+        },
+      });
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("observations=0");
+    });
+
+    it("counts distinct state refs from state_change events", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          events: [
+            { kind: "state_change", ref: "repo-root" },
+            { kind: "state_change", ref: "repo-readme" },
+            { kind: "state_change", ref: "repo-root" },
+          ],
+          observations: [{ id: "obs-1" }],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("distinctStatesVisited=2");
+    });
+
+    it("falls back to declared states[] when no state_change events exist", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          states: [{ id: "a" }, { id: "b" }],
+          observations: [{ id: "obs-1" }],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("from declared states[]");
+    });
+
+    it("clamps the ratio at zero when observations exceed the visited-state count", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          states: [{ id: "a" }],
+          observations: [{ id: "obs-1" }, { id: "obs-2" }, { id: "obs-3" }],
+        },
+      });
+
+      expect(result.value).toBe(0);
+    });
+
+    it("is unavailable without state_change events or declared states", () => {
+      const result = runExplorationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          observations: [{ id: "obs-1" }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("no state_change events or declared states");
+    });
+  });
+
+  describe("exploitation-error custom grader", () => {
+    it("reports unavailable when no objectives are declared", () => {
+      const result = runExploitationError({ trajectoryIR: { observations: [{ id: "obs-1" }] } });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("no declared objectives");
+    });
+
+    it("returns zero when all objectives are already satisfied", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Read all files", satisfiedAtEventIndex: 0 }],
+        },
+      });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("all objectives satisfied");
+    });
+
+    it("is unavailable without state_change events or declared states", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          observations: [{ id: "obs-1" }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("no state_change events or declared states");
+    });
+
+    it("is unavailable when the trace records no observations", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          states: [{ id: "a" }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("no observations");
+    });
+
+    it("defers to exploration-error when exploration was insufficient", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          events: [
+            { kind: "state_change", ref: "repo-root" },
+            { kind: "state_change", ref: "repo-readme" },
+          ],
+          observations: [{ id: "obs-1", consumedByActionIds: ["act-1"] }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.message).toContain("exploration was insufficient");
+      expect(result.message).toContain("exploration-error");
+    });
+
+    it("scores the unused fraction of observations when exploration was sufficient", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          events: [
+            { kind: "state_change", ref: "repo-root" },
+            { kind: "state_change", ref: "repo-root" },
+          ],
+          observations: [
+            { id: "obs-1", consumedByActionIds: ["act-1"] },
+            { id: "obs-2", consumedByActionIds: [] },
+          ],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("observations=2 unused=1");
+      expect(result.details).toContain("distinctStatesVisited=1");
+      expect(result.details).toContain("unmet objectives: goal");
+    });
+
+    it("falls back to declared states[] when no state_change events exist", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          states: [{ id: "a" }, { id: "b" }],
+          observations: [{ id: "obs-1" }, { id: "obs-2" }],
+        },
+      });
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("from declared states[]");
+    });
+
+    it("prefers the objective-bearing IR candidate over unrelated agentOutput observations", () => {
+      const result = runExploitationError({
+        trajectoryIR: {
+          objectives: [{ id: "goal", description: "Inspect repo", satisfiedAtEventIndex: null }],
+          states: [{ id: "a" }],
+          observations: [{ id: "obs-1", consumedByActionIds: ["act-1"] }],
+        },
+        agentOutput: {
+          observations: [{ id: "obs-x" }],
+        },
+      });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("observations=1 unused=0");
+    });
+  });
+
+  describe("skill-constraint-coverage custom grader", () => {
+    it("reports full coverage when every constraint is exercised and succeeds", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          trajectoryIR: {
+            toolCalls: [
+              { name: "read_file", arguments: { path: "a.md" }, success: true },
+              { name: "run_lint", arguments: {}, success: true },
+            ],
+          },
+        },
+        {
+          constraints: [
+            { id: "reads-before-write", pattern: "read_file", description: "must read before writing" },
+            { id: "lints", pattern: "run_lint", description: "must lint" },
+          ],
+        }
+      );
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("constraints=2 exercised=2 covered=2");
+    });
+
+    it("counts an exercised-but-failing constraint as uncovered", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          trajectoryIR: {
+            toolCalls: [{ name: "run_lint", arguments: {}, success: false }],
+          },
+        },
+        {
+          constraints: [{ id: "lints", pattern: "run_lint" }],
+        }
+      );
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("exercised=1 covered=0");
+      expect(result.details).toContain("unmet: lints");
+    });
+
+    it("ignores success when requireSuccess is false", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          trajectoryIR: {
+            actions: [{ type: "comment", target: "issue-1", validAtIssueTime: false }],
+          },
+        },
+        {
+          constraints: [{ id: "comments", pattern: "comment", requireSuccess: false }],
+        }
+      );
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("covered=1");
+    });
+
+    it("uses the preprocessed trace as a fallback candidate when trajectoryIR is absent", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          toolCalls: [{ name: "read_file", arguments: { path: "a.md" }, success: true }],
+        },
+        {
+          constraints: [{ id: "reads-before-write", pattern: "read_file" }],
+        }
+      );
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("constraints=1 exercised=1 covered=1");
+    });
+
+    it("counts non-object constraint entries against the denominator instead of dropping them", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          trajectoryIR: {
+            toolCalls: [{ name: "run_lint", arguments: {}, success: true }],
+          },
+        },
+        {
+          constraints: [null, { id: "lints", pattern: "run_lint" }],
+        }
+      );
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("constraints=2 exercised=1 covered=1 invalidPattern=1");
+    });
+
+    it("counts a constraint with an invalid pattern against the denominator instead of dropping it", () => {
+      const result = runSkillConstraintCoverage(
+        {
+          trajectoryIR: {
+            toolCalls: [{ name: "run_lint", arguments: {}, success: true }],
+          },
+        },
+        {
+          constraints: [
+            { id: "lints", pattern: "run_lint" },
+            { id: "broken", pattern: "(" },
+          ],
+        }
+      );
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("constraints=2 exercised=1 covered=1 invalidPattern=1");
+    });
+
+    it.each([
+      ["no constraints configured", { trajectoryIR: { toolCalls: [{ name: "x", success: true }] } }, {}],
+      ["no constraints with a valid pattern", { trajectoryIR: { toolCalls: [{ name: "x", success: true }] } }, { constraints: [{ id: "c", pattern: "" }] }],
+      ["no toolCalls/actions in trace", { trajectoryIR: {} }, { constraints: [{ id: "c", pattern: "x" }] }],
+    ])("normalizes %s as unavailable", (_name, trace, config) => {
+      const result = runSkillConstraintCoverage(trace, config);
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.status).toBe("unavailable");
+    });
+  });
+
+  describe("tool-output-consumption-rate custom grader", () => {
+    it("scores the fraction of matching tool observations that were consumed", () => {
+      const result = runToolOutputConsumptionRate({
+        trajectoryIR: {
+          toolCalls: [{ id: "tc-1" }, { id: "tc-2" }],
+          observations: [
+            { id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: ["act-1"] },
+            { id: "obs-2", sourceToolCallId: "tc-2", consumedByActionIds: [] },
+            { id: "obs-3", sourceToolCallId: null, consumedByActionIds: ["act-2"] },
+            { id: "obs-4", sourceToolCallId: "unknown", consumedByActionIds: ["act-3"] },
+          ],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("toolObservations=2 consumed=1");
+      expect(result.details).toContain("unconsumed: obs-2");
+    });
+
+    it("treats malformed consumption metadata as unconsumed", () => {
+      const result = runToolOutputConsumptionRate({
+        trajectoryIR: {
+          toolCalls: [{ id: "tc-1" }],
+          observations: [{ id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: "act-1" }],
+        },
+      });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("toolObservations=1 consumed=0");
+    });
+
+    it("treats consumedByActionIds arrays containing only non-string/empty entries as unconsumed", () => {
+      const result = runToolOutputConsumptionRate({
+        trajectoryIR: {
+          toolCalls: [{ id: "tc-1" }, { id: "tc-2" }],
+          observations: [
+            { id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: [null] },
+            { id: "obs-2", sourceToolCallId: "tc-2", consumedByActionIds: [42, ""] },
+          ],
+        },
+      });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("toolObservations=2 consumed=0");
+      expect(result.details).toContain("unconsumed: obs-1, obs-2");
+    });
+
+    it("reads observations/toolCalls from the root trace object", () => {
+      const result = runToolOutputConsumptionRate({
+        toolCalls: [{ id: "tc-1" }],
+        observations: [{ id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: ["act-1"] }],
+      });
+
+      expect(result.value).toBe(1);
+    });
+
+    it("reads a complete IR nested in agentOutput", () => {
+      const result = runToolOutputConsumptionRate({
+        agentOutput: {
+          trajectoryIR: {
+            toolCalls: [{ id: "tc-1" }],
+            observations: [{ id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: ["act-1"] }],
+          },
+        },
+      });
+
+      expect(result.value).toBe(1);
+    });
+
+    it.each([
+      ["no observations", { trajectoryIR: { toolCalls: [{ id: "tc-1" }] } }, "no observations"],
+      ["no tool calls", { trajectoryIR: { observations: [{ id: "obs-1", sourceToolCallId: "tc-1", consumedByActionIds: ["act-1"] }] } }, "no tool-originated observations"],
+      [
+        "no matching tool call",
+        {
+          trajectoryIR: {
+            toolCalls: [{ id: "tc-1" }],
+            observations: [{ id: "obs-1", sourceToolCallId: "unknown", consumedByActionIds: ["act-1"] }],
+          },
+        },
+        "no tool-originated observations",
+      ],
+    ])("normalizes %s as unavailable", (_name, trace, message) => {
+      const result = runToolOutputConsumptionRate(trace);
+
+      expect(result.value).toBeNull();
+      expect(result.passed).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain(message);
     });
   });
 

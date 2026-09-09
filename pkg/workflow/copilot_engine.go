@@ -74,7 +74,7 @@ func (e *CopilotEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvid
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Copilot engine.
-// This includes COPILOT_GITHUB_TOKEN and optionally MCP_GATEWAY_API_KEY.
+// This includes COPILOT_GITHUB_TOKEN and optionally MCP_GATEWAY_AGENT_ID.
 // It also includes COPILOT_PROVIDER_* env var keys that may carry secrets when BYOK mode
 // is configured — allowing them to pass through strict-mode validation and the secret filter.
 func (e *CopilotEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
@@ -89,10 +89,10 @@ func (e *CopilotEngine) GetRequiredSecretNames(workflowData *WorkflowData) []str
 		constants.CopilotProviderBearerToken,
 	)
 
-	// Add MCP gateway API key if MCP servers are present (gateway is always started with MCP servers)
+	// Add MCP gateway agent ID if MCP servers are present (gateway is always started with MCP servers)
 	if HasMCPServers(workflowData) {
-		copilotLog.Print("Adding MCP_GATEWAY_API_KEY secret")
-		secrets = append(secrets, "MCP_GATEWAY_API_KEY")
+		copilotLog.Print("Adding MCP_GATEWAY_AGENT_ID secret")
+		secrets = append(secrets, "MCP_GATEWAY_AGENT_ID")
 	}
 
 	// Add GitHub token for GitHub MCP server if present

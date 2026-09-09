@@ -40,11 +40,11 @@ network:
 
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default]
   bash: ["*"]
 

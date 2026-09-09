@@ -5,7 +5,8 @@
  *
  * Wraps the Copilot CLI command (or @github/copilot-sdk session in SDK mode) with retry logic
  * for failures that occur after the session has been partially executed.  Passes all arguments
- * to the copilot subprocess, transparently forwarding stdin/stdout/stderr.
+ * to the copilot subprocess, forwarding stdout/stderr; stdin is closed since the prompt is
+ * delivered via CLI argument, not stdin.
  *
  * Retry policy (shared by CLI and SDK modes):
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the

@@ -24,7 +24,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [pull_requests, repos]
   bash:
     - "jq *"
@@ -48,7 +48,7 @@ evals:
     question: Were the expected labels, comments, and closures applied to stale draft pull requests when appropriate?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Draft PR Cleanup Agent 🧹

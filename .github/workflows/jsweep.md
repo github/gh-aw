@@ -22,7 +22,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [repos]
   edit:
   bash: ["*"]
@@ -58,7 +58,7 @@ strict: true
 
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # jsweep - JavaScript Unbloater

@@ -43,21 +43,22 @@ func (c *AddInteractiveConfig) createWorkflowChangesAndConfigureSecret(ctx conte
 	// Pass Quiet=true to suppress detailed output (already shown earlier in interactive mode)
 	// This returns the result including PR number and HasWorkflowDispatch
 	opts := AddOptions{
-		Verbose:                      c.Verbose,
-		Quiet:                        true,
-		EngineOverride:               c.EngineOverride,
-		Name:                         "",
-		Force:                        c.forceOverwrite,
-		AppendText:                   c.AppendText,
-		CreatePR:                     createPR,
-		NoGitattributes:              c.NoGitattributes,
-		WorkflowDir:                  c.WorkflowDir,
-		NoStopAfter:                  c.NoStopAfter,
-		StopAfter:                    c.StopAfter,
-		DisableSecurityScanner:       c.DisableSecurityScanner,
-		RepoSlug:                     c.RepoOverride,
-		AddCopilotRequestsPermission: c.UseCopilotRequests,
-		GhAwRef:                      c.GhAwRef,
+		Verbose:                          c.Verbose,
+		Quiet:                            true,
+		EngineOverride:                   c.EngineOverride,
+		Name:                             "",
+		Force:                            c.forceOverwrite,
+		AppendText:                       c.AppendText,
+		CreatePR:                         createPR,
+		NoGitattributes:                  c.NoGitattributes,
+		WorkflowDir:                      c.WorkflowDir,
+		NoStopAfter:                      c.NoStopAfter,
+		StopAfter:                        c.StopAfter,
+		DisableSecurityScanner:           c.DisableSecurityScanner,
+		RepoSlug:                         c.RepoOverride,
+		AddCopilotRequestsPermission:     c.UseCopilotRequests,
+		AddCopilotRequestsNonePermission: c.UseCopilotPAT,
+		GhAwRef:                          c.GhAwRef,
 		addWizard: &addWizardOptions{
 			initializedFiles:                    initFiles,
 			workingTreePrevalidated:             createPR,
@@ -86,6 +87,7 @@ func (c *AddInteractiveConfig) createWorkflowChangesAndConfigureSecret(ctx conte
 }
 
 func (c *AddInteractiveConfig) ensurePullRequestMerged(prNumber int, prURL string) error {
+	addInteractiveLog.Printf("Ensuring PR merged: prNumber=%d", prNumber)
 	if prNumber == 0 {
 		if prURL == "" {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Requested workflow files already exist locally; no pull request was created."))
@@ -246,14 +248,12 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 // the merged workflow files, which are required when offering to run the workflow.
 func (c *AddInteractiveConfig) updateLocalBranch() error {
 	addInteractiveLog.Print("Updating local branch with merged changes")
-
 	// Get the default branch name using gh
 	output, err := workflow.RunGHCombined("Getting default branch...", "repo", "view", "--repo", c.RepoOverride, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
 	defaultBranch := ""
 	if err == nil {
 		defaultBranch = strings.TrimSpace(string(output))
 	}
-
 	// Fallback: query the local origin remote directly (works even when gh repo
 	// view fails, e.g. forks without a default remote set).
 	if defaultBranch == "" {
@@ -264,7 +264,6 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 			defaultBranch = parseDefaultBranchFromLsRemote(string(lsOutput))
 		}
 	}
-
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
@@ -396,14 +395,6 @@ func (c *AddInteractiveConfig) plannedAddPathsAtRoot(gitRoot string, workflowFil
 	return planned, nil
 }
 
-func inspectAddWorkingTree(plannedPaths []string) (addWorkingTreeBlockers, error) {
-	gitRoot, err := addFindGitRoot()
-	if err != nil {
-		return addWorkingTreeBlockers{}, fmt.Errorf("failed to determine repository root for PR preflight: %w", err)
-	}
-	return inspectAddWorkingTreeAtRoot(gitRoot, plannedPaths)
-}
-
 func inspectAddWorkingTreeAtRoot(gitRoot string, plannedPaths []string) (addWorkingTreeBlockers, error) {
 	cmd := exec.Command("git", "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	cmd.Dir = gitRoot
@@ -501,6 +492,7 @@ func (c *AddInteractiveConfig) mergePullRequest(prNumber int) error {
 	// GraphQL API and is surfaced verbatim in the gh CLI output.
 	combinedText := strings.ToLower(string(squashOutput) + squashErr.Error())
 	if strings.Contains(combinedText, squashMergeNotAllowedErr) {
+		addInteractiveLog.Printf("Squash merge rejected for PR #%d, retrying with merge commit", prNumber)
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Squash merges are not allowed on this repository, retrying with merge commit"))
 		mergeOutput, mergeErr := workflow.RunGHCombined("Merging pull request...", "pr", "merge", prArg, "--repo", c.RepoOverride, "--merge")
 		if mergeErr != nil {

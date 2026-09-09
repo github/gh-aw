@@ -169,7 +169,7 @@ type fixArgs struct {
 }
 
 // registerFixTool registers the fix tool with the MCP server.
-func registerFixTool(server *mcp.Server, execCmd execCmdFunc) {
+func registerFixTool(server *mcp.Server, execCmd execCmdFunc) { //nolint:largefunc // Existing MCP tool registration remains centralized.
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "fix",
 		Annotations: &mcp.ToolAnnotations{
@@ -185,7 +185,6 @@ and migrate to new syntax. Codemods preserve formatting and comments as much as 
 Available codemods:
 • timeout-minutes-migration: Replaces 'timeout_minutes' with 'timeout-minutes'
 • network-firewall-migration: Removes deprecated 'network.firewall' field
-• sandbox-agent-false-removal: Removes 'sandbox.agent: false' (firewall now mandatory)
 • mcp-scripts-mode-removal: Removes deprecated 'mcp-scripts.mode' field
 
 If no workflows are specified, all Markdown files in .github/workflows will be processed.

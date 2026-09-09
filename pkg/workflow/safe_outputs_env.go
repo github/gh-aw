@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 var safeOutputsEnvLog = logger.New("workflow:safe_outputs_env")
@@ -216,10 +217,38 @@ func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model string) []stri
 // addCustomSafeOutputEnvVars adds custom environment variables to safe output job steps
 func (c *Compiler) addCustomSafeOutputEnvVars(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs != nil && len(data.SafeOutputs.Env) > 0 {
-		for key, value := range data.SafeOutputs.Env {
-			*steps = append(*steps, fmt.Sprintf("          %s: %s\n", key, value))
+		for _, key := range sliceutil.SortedKeys(data.SafeOutputs.Env) {
+			if hasAnyJiraSafeOutputEnabled(data.SafeOutputs) && jiraSafeOutputDefaultEnv[key] != "" {
+				continue
+			}
+			if data.SafeOutputs.LinearCreateIssue != nil && (key == "LINEAR_TEAM_ID" || key == "LINEAR_PROJECT_ID") {
+				continue
+			}
+			*steps = append(*steps, fmt.Sprintf("          %s: %s\n", key, data.SafeOutputs.Env[key]))
 		}
 	}
+}
+
+func injectProcessorStepEnv(steps []string, env map[string]string) []string {
+	if len(env) == 0 {
+		return steps
+	}
+	processStepFound := false
+	for index, step := range steps {
+		if step == "      - name: Process Safe Outputs\n" {
+			processStepFound = true
+			continue
+		}
+		if processStepFound && step == "        env:\n" {
+			var inserted []string
+			for _, name := range sliceutil.SortedKeys(env) {
+				inserted = append(inserted, fmt.Sprintf("          %s: %s\n", name, env[name]))
+			}
+			tail := append([]string(nil), steps[index+1:]...)
+			return append(append(steps[:index+1], inserted...), tail...)
+		}
+	}
+	return steps
 }
 
 func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, data *WorkflowData, configToken string, resolver func(string) string, allowGitHubApp bool) {

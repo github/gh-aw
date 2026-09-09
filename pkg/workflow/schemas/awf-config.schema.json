@@ -44,6 +44,10 @@
           "type": "boolean",
           "description": "Experimental: enforce egress via Docker network topology (an internal network with no internet route plus a dual-homed Squid proxy) instead of host iptables. Requires no sudo/NET_ADMIN, so it works inside ARC/Kubernetes DinD runners. Not yet supported together with dnsOverHttps or enableHostAccess. Maps to the --network-isolation CLI flag."
         },
+        "verifySbxEgress": {
+          "type": "boolean",
+          "description": "Fail before agent startup unless Docker sbx blocks a direct request made with all proxy environment variables removed. Intended for orchestrators that start the sbx daemon with DOCKER_SANDBOXES_PROXY chained to AWF Squid. Maps to --verify-sbx-egress."
+        },
         "topologyAttach": {
           "type": "array",
           "items": {
@@ -101,6 +105,10 @@
           "type": "boolean",
           "deprecated": true,
           "description": "[DEPRECATED] The API proxy sidecar is always enabled; this field is ignored. Source credentials (OPENAI_API_KEY, ANTHROPIC_API_KEY, COPILOT_GITHUB_TOKEN, COPILOT_PROVIDER_API_KEY, GEMINI_API_KEY) are always held exclusively in the sidecar and excluded from the agent environment. The negated CLI form --no-enable-api-proxy is rejected at runtime. See docs/awf-config-spec.md §9.3 for details."
+        },
+        "caCert": {
+          "type": "string",
+          "description": "Host path to an additional CA certificate for api-proxy upstream TLS verification. The file is bind-mounted read-only into the sidecar and exposed via NODE_EXTRA_CA_CERTS."
         },
         "enableTokenSteering": {
           "type": "boolean",
@@ -635,6 +643,103 @@
         }
       }
     },
+    "cloudHypervisor": {
+      "type": "object",
+      "description": "Cloud Hypervisor v53.0 microVM preview configuration. Requires container.containerRuntime: \"cloud-hypervisor\" and previewEnabled to execute workloads; supported only on GitHub-hosted Ubuntu x86_64 KVM runners.",
+      "additionalProperties": false,
+      "properties": {
+        "previewEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the Cloud Hypervisor v53.0 workload-execution preview. Requires container.containerRuntime: \"cloud-hypervisor\" and a GitHub-hosted Ubuntu x86_64 KVM runner."
+        },
+        "mountPolicy": {
+          "type": "string",
+          "enum": ["workspace-only", "workspace-and-tool-cache"],
+          "default": "workspace-only",
+          "description": "Host directory exposure policy. \"workspace-only\" is the secure default and exports the workspace plus only narrow gh-aw runtime directories when present. \"workspace-and-tool-cache\" additionally requires and mounts RUNNER_TOOL_CACHE or AGENT_TOOLSDIRECTORY read-only with host-enforced staging."
+        },
+        "cloudHypervisorBinary": {
+          "type": "string",
+          "description": "Absolute path to the Cloud Hypervisor v53.0 binary. Defaults to /usr/local/bin/cloud-hypervisor."
+        },
+        "kernelPath": {
+          "type": "string",
+          "description": "Absolute path to the trusted PCI-capable guest Linux kernel image."
+        },
+        "rootfsPath": {
+          "type": "string",
+          "description": "Absolute path to the trusted guest root filesystem image."
+        },
+        "supervisorPath": {
+          "type": "string",
+          "description": "Absolute path to the built AWF guest supervisor."
+        },
+        "artifactManifestPath": {
+          "type": "string",
+          "description": "Absolute path to the release-pinned Cloud Hypervisor artifact manifest."
+        },
+        "artifactManifestBundlePath": {
+          "type": "string",
+          "description": "Absolute path to the manifest GitHub artifact-attestation Sigstore bundle used for offline verification."
+        },
+        "artifactReleaseTag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+          "description": "Expected AWF release tag recorded in the attested artifact manifest."
+        },
+        "developmentAllowUnattestedArtifacts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Development-only legacy bypass. Also requires AWF_CLOUD_HYPERVISOR_DEVELOPMENT_ALLOW_UNATTESTED_ARTIFACTS=1 and complete sha256 pins."
+        },
+        "vcpuCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Number of guest virtual CPUs."
+        },
+        "memoryMib": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 512,
+          "description": "Guest memory in MiB."
+        },
+        "apiTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5000,
+          "description": "Bounded timeout in milliseconds for Cloud Hypervisor API socket readiness and requests."
+        },
+        "sha256": {
+          "type": "object",
+          "description": "Development-only legacy SHA-256 pins. Release use derives all hashes from the verified artifact manifest.",
+          "additionalProperties": false,
+          "properties": {
+            "cloudHypervisor": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{64}$"
+            },
+            "virtiofsd": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{64}$"
+            },
+            "kernel": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{64}$"
+            },
+            "rootfs": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{64}$"
+            },
+            "supervisor": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{64}$"
+            }
+          }
+        }
+      }
+    },
     "chroot": {
       "type": "object",
       "description": "Chroot execution overrides for split-filesystem ARC/DinD runners.",
@@ -848,7 +953,7 @@
                     },
                     "sensitivity": {
                       "type": "string",
-                      "enum": ["public", "internal", "confidential", "sealed"]
+                      "enum": ["public", "trusted", "internal", "confidential", "sealed"]
                     }
                   }
                 }
@@ -907,7 +1012,11 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["agent", "repos"],
+            "required": ["agent"],
+            "oneOf": [
+              { "required": ["repos"], "not": { "required": ["dynamic"] } },
+              { "required": ["dynamic"], "not": { "required": ["repos"] } }
+            ],
             "properties": {
               "agent": {
                 "type": "object",
@@ -976,8 +1085,101 @@
                     },
                     "sensitivity": {
                       "type": "string",
-                      "enum": ["public", "internal", "confidential", "sealed"]
+                      "enum": ["public", "trusted", "internal", "confidential", "sealed"]
                     }
+                  }
+                }
+              },
+              "dynamic": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["allowedOwners", "allowedRepositories", "sensitivity", "executor", "githubPolicy", "maxRepositories", "limits", "quotas", "auditLabels", "expiresAt"],
+                "properties": {
+                  "allowedOwners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38})$"
+                    }
+                  },
+                  "allowedRepositories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38})/[a-z0-9._-]{1,100}$"
+                    }
+                  },
+                  "sensitivity": {
+                    "type": "string",
+                    "enum": ["public", "trusted", "internal", "confidential", "sealed"]
+                  },
+                  "executor": {
+                    "type": "string",
+                    "enum": ["agent"]
+                  },
+                  "githubPolicy": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["version", "tools"],
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "enum": ["github-repository-read-v1"]
+                      },
+                      "tools": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "string",
+                          "enum": ["list_issues", "issue_read"]
+                        }
+                      }
+                    }
+                  },
+                  "maxRepositories": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["timeoutSeconds", "memoryLimit", "cpuLimit", "pidsLimit", "tmpfsLimit", "maxOutputBytes", "maxTaskBytes", "maxModelRequests", "maxModelTokens"],
+                    "properties": {
+                      "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 4740 },
+                      "memoryLimit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$" },
+                      "cpuLimit": { "type": "string", "pattern": "^(?:[1-9][0-9]?(?:\\.[0-9]{1,3})?|0\\.[0-9]{1,3})$" },
+                      "pidsLimit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+                      "tmpfsLimit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$" },
+                      "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 8192 },
+                      "maxTaskBytes": { "type": "integer", "minimum": 1, "maximum": 65536 },
+                      "maxModelRequests": { "type": "integer", "minimum": 1, "maximum": 64 },
+                      "maxModelTokens": { "type": "integer", "minimum": 1, "maximum": 32768 }
+                    }
+                  },
+                  "quotas": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["maxInvocations", "maxOutputBytes", "maxExecutionSeconds"],
+                    "properties": {
+                      "maxInvocations": { "type": "integer", "minimum": 1, "maximum": 10000 },
+                      "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+                      "maxExecutionSeconds": { "type": "integer", "minimum": 1, "maximum": 86400 }
+                    }
+                  },
+                  "auditLabels": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                    }
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
                   }
                 }
               },
@@ -1047,7 +1249,7 @@
         },
         "privateRepos": {
           "type": "array",
-          "description": "Private repositories a bounded agent may reason about, each with a trusted confidentiality category that fixes its per-run information budget (`public` unmetered, `internal` 64 bits/run, `confidential` 8 bits/run, `sealed` 0 bits/run — never launches an enclave). Each `repo` must be a bare `owner/repo` slug — no scheme, host, credentials, path traversal, query string, fragment, or wildcard. Repository names must be unique case-insensitively. Bounded agents keep a ledger separate from bounded queries.",
+          "description": "Repositories a bounded agent may reason about, each with a trusted confidentiality category that fixes its per-run information budget (`public` and `trusted` unmetered, `internal` 64 bits/run, `confidential` 8 bits/run, `sealed` 0 bits/run — never launches an enclave). Trusted enclave responses may contain free-form strings only inside strict structured schemas. Each `repo` must be a bare `owner/repo` slug — no scheme, host, credentials, path traversal, query string, fragment, or wildcard. Repository names must be unique case-insensitively. Bounded agents keep a ledger separate from bounded queries.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1060,7 +1262,7 @@
               },
               "sensitivity": {
                 "type": "string",
-                "enum": ["public", "internal", "confidential", "sealed"],
+                "enum": ["public", "trusted", "internal", "confidential", "sealed"],
                 "description": "Confidentiality category, which fixes this repository's immutable per-run information budget. Cannot be increased by configuration."
               }
             }

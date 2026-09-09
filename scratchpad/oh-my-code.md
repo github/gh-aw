@@ -222,7 +222,7 @@ Use GitHub MCP to access PR files and repository context.
 4. **Hook-Based Communication**: Agents communicate via lifecycle hooks
    - `PreToolUse`: Inject context before tool execution
    - `PostToolUse`: Process results after tool execution
-   - `UserPromptSubmit`: Enhance prompts with shared knowledge
+   - `UserPromptSubmit`: Add shared knowledge to prompts
 
 **Todo Continuation Enforcer**: Critical feature that prevents agents from quitting halfway
 - Monitors agent progress

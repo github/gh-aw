@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestProcessOrderedPromptImports tests the processOrderedPromptImports function.
@@ -661,6 +663,137 @@ func TestResolveWorkspaceRoot(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisTopologies(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(filepath.Join(workflowsDir, "shared"), 0755))
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+
+	write := func(path, content string) {
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+	}
+	write(filepath.Join(promptsDir, "direct.md"), "Direct ${{ needs.direct.outputs.value }}")
+	write(filepath.Join(promptsDir, "optional.md"), "Optional ${{ needs.optional.outputs.value }}")
+	write(filepath.Join(promptsDir, "legacy.md"), "Legacy ${{ needs.legacy.outputs.value }}")
+	write(filepath.Join(promptsDir, "nested.md"), "Nested ${{ needs.nested.outputs.value }}")
+	write(filepath.Join(promptsDir, "outer.md"), "Outer {{#runtime-import prompts/nested.md}}")
+	write(filepath.Join(promptsDir, "range.md"), strings.Join([]string{
+		"Outside ${{ needs.outside.outputs.value }}",
+		"Inside ${{ needs.inside.outputs.value }}",
+	}, "\n"))
+	write(filepath.Join(workflowsDir, "shared", "frontmatter-import.md"), "Frontmatter import ${{ needs.frontmatter.outputs.value }}")
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "topologies.md")
+	data := &WorkflowData{
+		MarkdownContent: `{{#runtime-import prompts/direct.md}}
+{{#runtime-import? prompts/optional.md}}
+{{#import: prompts/legacy.md}}
+{{#runtime-import prompts/outer.md}}
+{{#runtime-import prompts/range.md:2-2}}`,
+		ImportPaths: []string{filepath.Join(".github", "workflows", "shared", "frontmatter-import.md")},
+	}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	for _, want := range []string{
+		"needs.direct.outputs.value",
+		"needs.optional.outputs.value",
+		"needs.legacy.outputs.value",
+		"needs.nested.outputs.value",
+		"needs.inside.outputs.value",
+		"needs.frontmatter.outputs.value",
+	} {
+		assert.Contains(t, runtimeImportMarkdown, want)
+	}
+	assert.NotContains(t, runtimeImportMarkdown, "needs.outside.outputs.value")
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisLegacyImportOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(promptsDir, "legacy.md"), []byte("Legacy ${{ needs.legacy.outputs.value }}"), 0600))
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "legacy-only.md")
+	data := &WorkflowData{MarkdownContent: "{{#import: prompts/legacy.md}}"}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	assert.Contains(t, runtimeImportMarkdown, "needs.legacy.outputs.value")
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisRejectsTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "outside.md"), []byte("Outside ${{ secrets.OUTSIDE_TOKEN }}"), 0600))
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "traversal.md")
+	data := &WorkflowData{MarkdownContent: "{{#runtime-import ../outside.md}}"}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	assert.Empty(t, runtimeImportMarkdown)
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisSkipsUnsafeExpressions(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	sharedDir := filepath.Join(tmpDir, ".github", "shared")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "unsafe.md"), []byte("Secret ${{ secrets.PRIVATE_TOKEN }}"), 0600))
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "unsafe.md")
+	data := &WorkflowData{MarkdownContent: "{{#runtime-import shared/unsafe.md}}"}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	assert.Empty(t, runtimeImportMarkdown)
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisStopsOnUnsafeCandidate(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+	workflowPromptsDir := filepath.Join(workflowsDir, "prompts")
+	require.NoError(t, os.MkdirAll(promptsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowPromptsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(promptsDir, "ambiguous.md"), []byte("Secret ${{ secrets.PRIVATE_TOKEN }}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(workflowPromptsDir, "ambiguous.md"), []byte("Safe ${{ needs.safe.outputs.value }}"), 0600))
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "ambiguous.md")
+	data := &WorkflowData{MarkdownContent: "{{#runtime-import prompts/ambiguous.md}}"}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	assert.Empty(t, runtimeImportMarkdown)
+}
+
+func TestCollectRuntimeImportMarkdownForCompilerAnalysisRejectsSymlinkEscape(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "outside.md"), []byte("Outside ${{ needs.outside.outputs.value }}"), 0600))
+	require.NoError(t, os.Symlink(filepath.Join(tmpDir, "outside.md"), filepath.Join(workflowsDir, "outside-link.md")))
+
+	compiler := NewCompiler()
+	compiler.markdownPath = filepath.Join(workflowsDir, "symlink.md")
+	data := &WorkflowData{MarkdownContent: "{{#runtime-import outside-link.md}}"}
+
+	runtimeImportMarkdown := compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data)
+
+	assert.Empty(t, runtimeImportMarkdown)
 }
 
 // TestExtractPromptChunksFromMarkdown tests the extractPromptChunksFromMarkdown function.

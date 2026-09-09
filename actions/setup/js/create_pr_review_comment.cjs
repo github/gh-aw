@@ -12,6 +12,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { isTemplatableTrue, isStagedMode, logStagedPreviewInfo, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
+const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 
@@ -58,6 +59,7 @@ async function main(config = {}) {
   if (requiredLabels.length > 0) core.info(`Required labels (all): ${requiredLabels.join(", ")}`);
   if (requiredTitlePrefix) core.info(`Required title prefix: ${requiredTitlePrefix}`);
 
+  const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
   let allowedMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
     allowedMentionAliases = config.allowedMentionAliases;
@@ -376,7 +378,7 @@ async function main(config = {}) {
     const bufferedComment = {
       path: commentItem.path,
       line: line,
-      body: sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases }),
+      body: sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions }),
       side: side,
     };
 

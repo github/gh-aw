@@ -162,15 +162,15 @@ engine: copilot
 	assert.Equal(t, content, result)
 }
 
-func TestBotsToOnBotsCodemod_NoChange_OnBotsExists(t *testing.T) {
+func TestBotsToOnBotsCodemod_MergesWhenOnBotsExists(t *testing.T) {
 	t.Parallel()
 	codemod := getBotsToOnBotsCodemod()
 
 	content := `---
 on:
-  issues:
-    types: [opened]
-  bots: [dependabot, renovate]
+    issues:
+        types: [opened]
+    bots: [dependabot, renovate]
 bots: [dependabot, renovate, github-actions]
 ---
 
@@ -189,6 +189,78 @@ bots: [dependabot, renovate, github-actions]
 	result, applied, err := codemod.Apply(content, frontmatter)
 
 	require.NoError(t, err)
-	assert.False(t, applied)
-	assert.Equal(t, content, result)
+	assert.True(t, applied)
+	assert.Contains(t, result, `    bots: ["dependabot","renovate","github-actions"]`)
+	assert.NotContains(t, result, "\nbots:")
+}
+
+func TestBotsToOnBotsCodemod_IgnoresNestedBotsKey(t *testing.T) {
+	t.Parallel()
+	codemod := getBotsToOnBotsCodemod()
+
+	content := `---
+on:
+ workflow_call:
+   inputs:
+     bots:
+       type: string
+ bots: [dependabot]
+bots: [github-actions]
+---
+
+# Test workflow`
+
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_call": map[string]any{
+				"inputs": map[string]any{
+					"bots": map[string]any{"type": "string"},
+				},
+			},
+			"bots": []any{"dependabot"},
+		},
+		"bots": []any{"github-actions"},
+	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Contains(t, result, "workflow_call:")
+	assert.Contains(t, result, "type: string")
+	assert.Contains(t, result, "bots: [\"dependabot\",\"github-actions\"]")
+}
+
+func TestBotsToOnBotsCodemod_PreservesCommentsAndBlankLines(t *testing.T) {
+	t.Parallel()
+	codemod := getBotsToOnBotsCodemod()
+
+	content := `---
+on:
+ bots:
+   - dependabot # keep existing bot comment
+
+   # keep block comment
+   - renovate
+bots:
+ - github-actions # legacy comment
+---
+
+# Test workflow`
+
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"bots": []any{"dependabot", "renovate"},
+		},
+		"bots": []any{"github-actions", "dependabot", "renovate"},
+	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Contains(t, result, "# keep block comment")
+	assert.Contains(t, result, "# legacy comment")
+	assert.Contains(t, result, "dependabot # keep existing bot comment")
+	assert.Contains(t, result, "bots:")
 }

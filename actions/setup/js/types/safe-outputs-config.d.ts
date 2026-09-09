@@ -13,6 +13,7 @@ interface SafeOutputConfig {
  */
 interface CreateIssueConfig extends SafeOutputConfig {
   "title-prefix"?: string;
+  "body-footer"?: string;
   "deduplicate-by-title"?: boolean | number;
   labels?: string[];
   "target-repo"?: string;
@@ -94,6 +95,7 @@ interface AddCommentConfig extends SafeOutputConfig {
  */
 interface CreatePullRequestConfig extends SafeOutputConfig {
   "title-prefix"?: string;
+  "body-footer"?: string;
   labels?: string[];
   reviewers?: string | string[];
   "team-reviewers"?: string | string[];

@@ -44,9 +44,7 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 	images := collectContainerImagesFromLockFiles(lockFiles)
 	if len(images) == 0 {
 		syftLog.Print("No container images found in lock files")
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("No container images found in lock files to scan with syft"))
-		}
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running syft SBOM scanner (0 container images found in lock files)"))
 		return nil
 	}
 

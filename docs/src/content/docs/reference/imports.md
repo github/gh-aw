@@ -59,6 +59,8 @@ An imported workflow can only be imported once per workflow.
 
 In markdown, use `{{#runtime-import filepath}}` to inject the content of another file directly into the body at that position. This is useful for sharing reusable prompt snippets, tone instructions, or reference material across workflows.
 
+Imported markdown can include safe GitHub Actions expressions such as `${{ needs.pre_activation.outputs.activated }}` or `${{ needs.build.outputs.version }}`. gh-aw validates those expressions across the full nested runtime-import tree at compile time, so shared prompt files can reuse job outputs without weakening expression-safety checks.
+
 ```aw wrap
 ---
 on: schedule
@@ -310,7 +312,7 @@ Shared workflow files (without `on:` field) can define the fields below. Other f
 
 ### Field-Specific Merge Semantics
 
-Imports are processed using breadth-first traversal: direct imports first, then nested. Earlier imports in the list take precedence; circular imports fail at compile time.
+Imported step fields use dependency order: a file's steps are processed after the steps from everything it imports and before the steps from anything that imports it. Ties retain declaration order, and circular imports fail at compile time. Other fields keep discovery order (direct imports first, then nested), so first-wins scalar precedence remains backward compatible.
 
 | Field | Merge strategy |
 |-------|---------------|
@@ -325,9 +327,9 @@ Imports are processed using breadth-first traversal: direct imports first, then 
 | `github-app:` | Main workflow's `github-app` takes precedence; first imported value fills in if main does not define one. |
 | `checkout:` | Imported checkout entries are appended after the main workflow's entries. For duplicate (repository, path) pairs, the main workflow's entry takes precedence: first-seen wins for `ref`, and auth is mutually exclusive — once `github-token` or `github-app` is set by the main workflow, an imported duplicate cannot add the other auth method. `checkout: false` in the main workflow disables all checkout including imported entries. |
 | `engine.mcp` | First-wins across imports. Shared files may define `engine:` with only `mcp.tool-timeout` and/or `mcp.session-timeout` (no engine identifier). The importing workflow's own engine setting always takes precedence; the first imported value fills in if the main workflow does not set a value. |
-| `steps:` | Imported steps prepended to main; concatenated in import order. |
-| `pre-agent-steps:` | Imported pre-agent-steps prepended to main; concatenated in import order. |
-| `post-steps:` | Imported post-steps appended after main; concatenated in import order. |
+| `steps:` | Imported steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
+| `pre-agent-steps:` | Imported pre-agent steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
+| `post-steps:` | Imported post-steps are appended after main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
 | `jobs:` | Not merged — define only in the main workflow. Use `safe-outputs.jobs` for importable jobs. |
 | `safe-outputs.jobs` | Names must be unique; duplicates fail. Order determined by `needs:` dependencies. |
 | `env:` | Main workflow env vars take precedence over imports. Duplicate keys across different imports fail compilation — move to the main workflow to override imported values. |
@@ -378,7 +380,7 @@ steps:
 Process the issue using the rotated token from the imported step.
 ```
 
-Steps from imports run **before** steps defined in the main workflow, in import declaration order.
+Steps from imports run **before** steps defined in the main workflow. Imported prerequisites run before the files that depend on them, while unrelated sibling imports retain declaration order.
 
 ### Importing MCP Servers
 
@@ -453,7 +455,7 @@ jobs:
     outputs:
       artifact_name: ${{ steps.build.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build
         id: build
         run: |

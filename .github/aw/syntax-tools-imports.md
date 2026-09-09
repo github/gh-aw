@@ -89,7 +89,8 @@ The `tools:` field configures which tools the coding agent may use.
 - `toolsets:` - Enable specific GitHub toolset groups (single name string or array; a string is shorthand for a one-element array)
   - **Default toolsets** (when unspecified): `context`, `repos`, `issues`, `pull_requests` (excludes `users` as GitHub Actions tokens don't support user operations)
   - **Group aliases**: `default` (recommended action-friendly set), `action-friendly` (action-safe toolsets, excludes `users`), `all` (everything)
-  - **Individual toolsets**: `context`, `repos`, `issues`, `pull_requests`, `actions`, `code_security`, `dependabot`, `discussions`, `experiments`, `gists`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`, `search`
+  - **Individual toolsets**: `context`, `repos`, `issues`, `pull_requests`, `actions`, `code_quality`, `code_security`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `dependabot`, `discussions`, `gists`, `git`, `github_support_docs_search`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`
+    Search tools are distributed across `repos`, `orgs`, `users`, and `issues`; there is no standalone `search` toolset.
   - Examples: `toolsets: [default]`, `toolsets: [default, discussions]`, `toolsets: [repos, issues]`
   - **Recommended**: Prefer `toolsets:` over `allowed:` for better organization and reduced configuration verbosity
 
@@ -119,12 +120,11 @@ The `tools:` field configures which tools the coding agent may use.
   tools:
     bash: ["*"]
   ```
-- `playwright:` - Browser automation for visual regression, accessibility, and end-to-end testing. Use `mode: cli` (recommended) — no Docker, runs `playwright-cli <command>` in bash, `localhost` reaches local servers directly. `mode: mcp` is deprecated (Docker-based). Pin a version with `version:` and restrict network to `local` + `playwright`.
+- `playwright:` - Browser automation for visual regression, accessibility, and end-to-end testing. The built-in integration uses `playwright-cli <command>` in bash, and `localhost` reaches local servers directly. `mode: mcp` is removed; use a custom `mcp-servers` entry if MCP is required. Pin the CLI with `version:` and restrict network to `local` + `playwright`.
 
   ```yaml
   tools:
     playwright:
-      mode: cli          # recommended: token-efficient CLI mode
       version: "0.1.11"  # optional: @playwright/cli npm package version
   ```
 - `timeout:` - Per-operation timeout in seconds for all tool and MCP calls (integer or expression, default: 60 s for all engines).
@@ -318,7 +318,7 @@ In the compiled workflow, the order is: copilot-setup-steps → imported steps f
 
 ## Permission Patterns
 
-**IMPORTANT**: Agentic workflows MUST NOT include write permissions (`issues: write`, `pull-requests: write`, `contents: write`). Safe-outputs provide these via separate secured jobs. Granting writes to the main AI job causes a compilation error.
+**IMPORTANT**: Agentic workflows should not include write permissions (`contents: write`, `issues: write`, `pull-requests: write`) on the main agent job. Safe-outputs provide these via separate secured jobs. In `strict: true` mode, granting any of these three write scopes to the main job is a compilation error; outside strict mode it compiles but is against the recommended security posture (see [workflow-constraints.md](workflow-constraints.md)).
 
 ### Read-Only Pattern
 

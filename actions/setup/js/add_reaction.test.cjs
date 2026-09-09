@@ -544,6 +544,17 @@ describe("add_reaction", () => {
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to add reaction"));
     });
 
+    it("should warn and continue for rate limit 403 errors", async () => {
+      const rateLimitError = new Error("API rate limit exceeded for installation");
+      /** @type {any} */ rateLimitError.status = 403;
+      mockGithub.request.mockRejectedValueOnce(rateLimitError);
+
+      await runScript();
+
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("GitHub API rate limiting"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
     it("should fail for other non-403 errors", async () => {
       const serverError = new Error("Internal server error");
       serverError.status = 500;

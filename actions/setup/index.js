@@ -17,7 +17,7 @@ const inputParentSpanId = getActionInput("PARENT_SPAN_ID");
 const inputJobName = getActionInput("JOB_NAME");
 const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
 
-const result = spawnSync(path.join(__dirname, "setup.sh"), [], {
+const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
   stdio: "inherit",
   env: Object.assign({}, process.env, {
     INPUT_SAFE_OUTPUT_CUSTOM_TOKENS: safeOutputCustomTokens,

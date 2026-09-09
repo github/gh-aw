@@ -191,6 +191,34 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name: "valid max-runs positive integer",
+			frontmatter: map[string]any{
+				"on":       "push",
+				"max-runs": 1,
+			},
+			filePath: "/test/workflow.md",
+			wantErr:  false,
+		},
+		{
+			name: "valid max-runs expression",
+			frontmatter: map[string]any{
+				"on":       "push",
+				"max-runs": "${{ inputs.max-runs }}",
+			},
+			filePath: "/test/workflow.md",
+			wantErr:  false,
+		},
+		{
+			name: "invalid max-runs zero",
+			frontmatter: map[string]any{
+				"on":       "push",
+				"max-runs": 0,
+			},
+			filePath:    "/test/workflow.md",
+			wantErr:     true,
+			errContains: "minimum",
+		},
+		{
 			name: "invalid workflow frontmatter with location",
 			frontmatter: map[string]any{
 				"on":      "push",
@@ -331,6 +359,16 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AdditionalProperti
 			filePath:    "/test/workflow.md",
 			wantErr:     true,
 			errContains: "requird",
+		},
+		{
+			name: "top-level roles field is rejected pointing to on.roles",
+			frontmatter: map[string]any{
+				"on":    "push",
+				"roles": []string{"admin", "maintainer", "write"},
+			},
+			filePath:    "/test/workflow.md",
+			wantErr:     true,
+			errContains: "'roles' belongs under 'on'",
 		},
 		{
 			name: "dispatch-repository key is accepted by schema",
@@ -691,6 +729,31 @@ func TestValidateIncludedFileFrontmatterWithSchemaAndLocation_DeclarativeEngineW
 	if err != nil {
 		t.Fatalf("expected declarative engine with version and pre-agent-steps to pass validation, got: %v", err)
 	}
+}
+
+func TestValidateIncludedFileFrontmatterWithSchemaAndLocation_ConcurrencyJobDiscriminator(t *testing.T) {
+	t.Run("allows job discriminator", func(t *testing.T) {
+		err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+			"concurrency": map[string]any{
+				"job-discriminator": "${{ github.run_id }}",
+			},
+		}, "/repo/.github/workflows/shared/concurrency.md")
+		if err != nil {
+			t.Fatalf("expected concurrency.job-discriminator to be allowed, got: %v", err)
+		}
+	})
+
+	t.Run("rejects unsupported workflow concurrency fields", func(t *testing.T) {
+		err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+			"concurrency": map[string]any{
+				"group":              "shared-group",
+				"cancel-in-progress": true,
+			},
+		}, "/repo/.github/workflows/shared/concurrency.md")
+		if err == nil || !strings.Contains(err.Error(), "unsupported key: cancel-in-progress") {
+			t.Fatalf("expected unsupported concurrency field error, got: %v", err)
+		}
+	})
 }
 
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_MaxStack(t *testing.T) {

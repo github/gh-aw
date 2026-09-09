@@ -32,15 +32,6 @@ func getEffectiveGitHubToken(customToken string) string {
 	return "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
 }
 
-// getEffectiveEnclaveGitHubToken returns the GitHub token for enclave GitHub
-// proxy operations. It intentionally excludes GITHUB_TOKEN because repository-
-// scoped enclave access may target private repositories outside the workflow
-// repository, which the default token cannot read.
-func getEffectiveEnclaveGitHubToken() string {
-	tokenLog.Print("Using enclave GitHub token chain (GH_AW_GITHUB_MCP_SERVER_TOKEN || GH_AW_GITHUB_TOKEN)")
-	return "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN }}"
-}
-
 // getEffectiveSafeOutputGitHubToken returns the GitHub token to use for safe output operations, with precedence:
 // 1. Custom token passed as parameter (e.g., from per-output config)
 // 2. Default fallback: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

@@ -94,6 +94,16 @@ These attributes appear on built-in workflow setup, agent, and conclusion spans 
     <tr><td><code>gh-aw.max_ai_credits_exceeded</code></td><td>Whether the run exceeded the max AI credits budget.</td></tr>
     <tr><td><code>gh-aw.ai_credits_rate_limit_error</code></td><td>Whether an AI-credits rate-limit or budget-exhaustion signal was detected.</td></tr>
     <tr><td><code>gh-aw.turns</code></td><td>Total agent turns recorded for the run.</td></tr>
+    <tr><td><code>gh-aw.integrity.filtered_events</code></td><td>Integrity or secrecy filtering events recorded for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.firewall.requests</code></td><td>Total firewall requests recorded for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.firewall.allowed_requests</code></td><td>Firewall requests allowed for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.firewall.blocked_requests</code></td><td>Firewall requests blocked for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.tool_calls</code></td><td>MCP tool calls recorded for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.failed_tool_calls</code></td><td>Failed MCP tool calls recorded for the run. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.input_bytes</code></td><td>Total serialized MCP tool input bytes. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.max_input_bytes</code></td><td>Largest serialized MCP tool input payload in bytes. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.output_bytes</code></td><td>Total serialized MCP tool output bytes. Emitted on the conclusion span.</td></tr>
+    <tr><td><code>gh-aw.mcp.max_output_bytes</code></td><td>Largest serialized MCP tool output payload in bytes. Emitted on the conclusion span.</td></tr>
     <tr><td><code>gh-aw.working_set.measurement_state</code></td><td>Working-set measurement availability: <code>measured</code>, <code>partial</code>, or <code>unavailable</code>.</td></tr>
     <tr><td><code>gh-aw.working_set.rebuild_factor</code></td><td>Cumulative canonical input tokens divided by peak invocation input tokens. Omitted when unavailable.</td></tr>
     <tr><td><code>gh-aw.working_set.cumulative_input_tokens</code></td><td>Sum of canonical logical input tokens across measured agent invocations.</td></tr>

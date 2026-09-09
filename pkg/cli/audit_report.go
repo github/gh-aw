@@ -27,6 +27,7 @@ var auditReportLog = logger.New("cli:audit_report")
 
 // AuditData represents the complete structured audit data for a workflow run
 type AuditData struct {
+	CacheSource             auditCacheSource         `json:"cache_source,omitempty"`
 	Overview                OverviewData             `json:"overview"`
 	Comparison              *AuditComparisonData     `json:"comparison,omitempty"`
 	TaskDomain              *TaskDomainInfo          `json:"task_domain,omitempty"`
@@ -165,13 +166,23 @@ type ToolUsageInfo struct {
 	OutputSample  string `json:"output_sample,omitempty" console:"header:Response Preview,omitempty"`
 }
 
+// IntegrityFilterSummary contains aggregate DIFC integrity-filter activity.
+type IntegrityFilterSummary struct {
+	TotalFiltered          int            `json:"total_filtered"`
+	RunsWithFilteredEvents int            `json:"runs_with_filtered_events,omitempty"`
+	FilteredServerCounts   map[string]int `json:"filtered_server_counts,omitempty"`
+	FilteredToolCounts     map[string]int `json:"filtered_tool_counts,omitempty"`
+	FilteredReasonCounts   map[string]int `json:"filtered_reason_counts,omitempty"`
+}
+
 // MCPToolUsageData contains detailed MCP tool usage statistics and individual call records
 type MCPToolUsageData struct {
-	Summary            []MCPToolSummary    `json:"summary"`                        // Aggregated statistics per tool
-	ToolCalls          []MCPToolCall       `json:"tool_calls"`                     // Individual tool call records
-	Servers            []MCPServerStats    `json:"servers,omitempty"`              // Server-level statistics
-	FilteredEvents     []DifcFilteredEvent `json:"filtered_events,omitempty"`      // DIFC filtered events
-	GuardPolicySummary *GuardPolicySummary `json:"guard_policy_summary,omitempty"` // Guard policy enforcement summary
+	Summary            []MCPToolSummary        `json:"summary"`                        // Aggregated statistics per tool
+	ToolCalls          []MCPToolCall           `json:"tool_calls"`                     // Individual tool call records
+	Servers            []MCPServerStats        `json:"servers,omitempty"`              // Server-level statistics
+	FilteredEvents     []DifcFilteredEvent     `json:"filtered_events,omitempty"`      // DIFC filtered events
+	Integrity          *IntegrityFilterSummary `json:"integrity,omitempty"`            // Aggregate DIFC integrity-filter activity
+	GuardPolicySummary *GuardPolicySummary     `json:"guard_policy_summary,omitempty"` // Guard policy enforcement summary
 }
 
 // MCPToolSummary contains aggregated statistics for a single MCP tool
@@ -199,6 +210,7 @@ func (s *MCPToolSummary) syncBaseFromFields() {
 
 // MCPToolCall represents a single MCP tool call with full details
 type MCPToolCall struct {
+	ToolCallID          string `json:"tool_call_id,omitempty"`
 	Timestamp           string `json:"timestamp"`
 	ServerName          string `json:"server_name"`
 	ToolName            string `json:"tool_name"`
@@ -262,6 +274,14 @@ type OverviewDisplay struct {
 
 // buildAuditData creates structured audit data from workflow run information
 func buildAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData) AuditData {
+	auditData, createdItems := buildLocalAuditData(processedRun, metrics, mcpToolUsage)
+	addAuditOutcomeSummary(ctx, &auditData, createdItems)
+	return auditData
+}
+
+// buildLocalAuditData creates an audit exclusively from downloaded run data.
+// Callers such as logs --audit use this path to avoid additional GitHub API calls.
+func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData) (AuditData, []CreatedItemReport) {
 	run := processedRun.Run
 	auditReportLog.Printf("Building audit data for run ID %d", run.DatabaseID)
 	expData := extractExperimentData(run.LogsPath)
@@ -294,8 +314,7 @@ func buildAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogM
 		recommendations:       recommendations,
 		observabilityInsights: observabilityInsights,
 	})
-	addAuditOutcomeSummary(ctx, &auditData, createdItems)
-	return auditData
+	return auditData, createdItems
 }
 
 func buildAuditOverview(run WorkflowRun, expData *ExperimentData) OverviewData {

@@ -28,9 +28,8 @@ experiments:
     start_date: "2026-07-03"
     issue: 43177
 engine:
-  id: claude
-  mcp:
-    tool-timeout: 10m
+  id: codex
+  model-provider: openai
 tools:
   cli-proxy: true
   agentic-workflows:
@@ -68,6 +67,7 @@ evals:
   - id: issues_identified_or_noop
     question: Were issues, missing tools, errors, and improvement opportunities identified, or was noop used when no problems were found?
 
+model: openai/gpt-5.3-codex
 ---
 
 # Agentic Workflow Audit Agent
@@ -81,6 +81,12 @@ Daily audit all agentic workflow runs from the last 24 hours to identify issues,
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
+
+## Report Formatting
+
+- Begin the final discussion with a concise `### Summary` of the key takeaway and recommendations.
+- Use `###` headings for report sections and `####` headings for subsections. Do not use `#` or `##` headings in the report body.
+- Keep critical findings and key metrics visible, and wrap long audit findings, evidence, or logs in `<details><summary><b>View full findings</b></summary>` blocks.
 
 ## 📊 Trend Charts
 

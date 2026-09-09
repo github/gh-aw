@@ -18,7 +18,7 @@ require("./shim.cjs");
  *
  * Required environment variables:
  * - MCP_GATEWAY_DOCKER_COMMAND: Container image to run (required)
- * - MCP_GATEWAY_API_KEY: API key for gateway authentication (required for converter scripts)
+ * - MCP_GATEWAY_AGENT_ID: agent ID for gateway authentication (required for converter scripts)
  * - MCP_GATEWAY_PORT: Port for MCP gateway
  * - MCP_GATEWAY_DOMAIN: Domain for MCP server URLs (e.g., host.docker.internal)
  * - RUNNER_TEMP: GitHub Actions runner temp directory
@@ -249,7 +249,7 @@ function writeGatewayStartupMarker(markerPath) {
  */
 const gatewayCredentialRedactions = [
   { pattern: /(Bearer\s+)\S+/gi, replacement: "$1[REDACTED]" },
-  { pattern: /((?:api[_-]?key|token|secret|password|authorization)"?\s*[:=]\s*"?)[^\s,}"]+/gi, replacement: "$1[REDACTED]" },
+  { pattern: /((?:agent[_-]?id|api[_-]?key|token|secret|password|authorization)"?\s*[:=]\s*"?)[^\s,}"]+/gi, replacement: "$1[REDACTED]" },
 ];
 
 /**
@@ -650,6 +650,27 @@ function detectEngineType(configDir, env = process.env, existsSync = fs.existsSy
   return "unknown";
 }
 
+/**
+ * Validates the mutually exclusive gateway agent identifier forms.
+ *
+ * @param {Record<string, unknown>} gateway
+ * @returns {string | null}
+ */
+function validateGatewayAgentIdentifiers(gateway) {
+  const hasAgentId = Object.prototype.hasOwnProperty.call(gateway, "agentId");
+  const hasAgentIds = Object.prototype.hasOwnProperty.call(gateway, "agentIds");
+
+  if (hasAgentId === hasAgentIds) {
+    return "ERROR: Gateway configuration must specify exactly one of 'agentId' or 'agentIds'";
+  }
+  if (hasAgentId) {
+    return typeof gateway.agentId === "string" && gateway.agentId.length > 0 ? null : "ERROR: Gateway 'agentId' must be a non-empty string";
+  }
+  return Array.isArray(gateway.agentIds) && gateway.agentIds.length > 0 && gateway.agentIds.every(agentId => typeof agentId === "string" && agentId.length > 0)
+    ? null
+    : "ERROR: Gateway 'agentIds' must be a non-empty array of non-empty strings";
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -660,7 +681,7 @@ async function main() {
   process.umask(0o077);
 
   const dockerCommand = process.env.MCP_GATEWAY_DOCKER_COMMAND;
-  const apiKey = process.env.MCP_GATEWAY_API_KEY;
+  const agentId = process.env.MCP_GATEWAY_AGENT_ID;
   const gatewayPort = process.env.MCP_GATEWAY_PORT;
   const gatewayDomain = process.env.MCP_GATEWAY_DOMAIN;
   const runnerTemp = process.env.RUNNER_TEMP;
@@ -821,8 +842,9 @@ async function main() {
     core.setFailed("ERROR: Gateway configuration is missing required 'domain' field");
     return;
   }
-  if (!("apiKey" in gw) || gw.apiKey == null) {
-    core.setFailed("ERROR: Gateway configuration is missing required 'apiKey' field");
+  const agentIdentifierError = validateGatewayAgentIdentifiers(gw);
+  if (agentIdentifierError) {
+    core.setFailed(agentIdentifierError);
     return;
   }
 
@@ -1137,11 +1159,11 @@ async function main() {
   const configConvertStart = nowMs();
   process.env.MCP_GATEWAY_OUTPUT = outputPath;
 
-  // Validate MCP_GATEWAY_API_KEY
-  if (!apiKey) {
+  // Validate MCP_GATEWAY_AGENT_ID
+  if (!agentId) {
     stopGatewayProcess(gatewayPid);
     core.error("This variable should be set in the workflow before calling start_mcp_gateway.cjs");
-    core.setFailed("ERROR: MCP_GATEWAY_API_KEY environment variable must be set for converter scripts");
+    core.setFailed("ERROR: MCP_GATEWAY_AGENT_ID environment variable must be set for converter scripts");
     return;
   }
 
@@ -1239,11 +1261,11 @@ async function main() {
 
   if (fs.existsSync(checkScript)) {
     core.info("Running MCP server checks...");
-    // Pass apiKey via MCP_GATEWAY_API_KEY env var (already set) rather than
+    // Pass agentId via MCP_GATEWAY_AGENT_ID env var (already set) rather than
     // as a shell argument to avoid shell metacharacter injection risks.
     const safePort = String(gatewayPort).replace(/[^0-9]/g, "");
     try {
-      execFileSync("bash", [checkScript, outputPath, `http://localhost:${safePort}`, process.env.MCP_GATEWAY_API_KEY || ""], {
+      execFileSync("bash", [checkScript, outputPath, `http://localhost:${safePort}`, process.env.MCP_GATEWAY_AGENT_ID || ""], {
         stdio: "inherit",
         env: { ...process.env, GH_AW_MCP_OPTIONAL_SERVERS: optionalServerNames.join(",") },
         timeout: MCP_SERVER_CHECK_TIMEOUT_MS,
@@ -1334,7 +1356,9 @@ async function main() {
   // Write GitHub Actions step outputs
   // -----------------------------------------------------------------------
   if (githubOutput) {
-    const outputs = [`gateway-pid=${gatewayPid}`, `gateway-port=${gatewayPort}`, `gateway-api-key=${apiKey}`, `gateway-domain=${gatewayDomain}`].join("\n");
+    // The gateway authenticates with its agent ID; expose the same value under the
+    // API-key output name expected by the AWF host handoff.
+    const outputs = [`gateway-pid=${gatewayPid}`, `gateway-port=${gatewayPort}`, `gateway-agent-id=${agentId}`, `gateway-api-key=${agentId}`, `gateway-domain=${gatewayDomain}`].join("\n");
     try {
       fs.appendFileSync(githubOutput, outputs + "\n");
     } catch {
@@ -1379,5 +1403,6 @@ module.exports = {
   normalizeSinkVisibilityEncoding,
   redactGatewayDiagnostics,
   resolveCopilotConfigPaths,
+  validateGatewayAgentIdentifiers,
   writeGatewayStartupMarker,
 };

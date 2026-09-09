@@ -930,6 +930,218 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			checkJSON:    true,
 			expectedKeys: []string{"add_comment", "mentions"},
 		},
+		{
+			name: "ado create work item config",
+			safeOutputs: &SafeOutputsConfig{
+				CreateWorkItems: &CreateWorkItemConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					WorkItemType: "Task",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_create_work_item"},
+		},
+		{
+			name: "ado update work item config",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateWorkItems: &UpdateWorkItemConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Target: "*",
+					Title:  true,
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_update_work_item"},
+		},
+		{
+			name: "ado comment on work item config",
+			safeOutputs: &SafeOutputsConfig{
+				CommentOnWorkItems: &CommentOnWorkItemConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Target: "*",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_comment_on_work_item"},
+		},
+		{
+			name: "ado assign work item config",
+			safeOutputs: &SafeOutputsConfig{
+				AssignWorkItems: &AssignWorkItemConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Target:  "*",
+					Allowed: []string{"owner@example.com"},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_assign_work_item"},
+		},
+		{
+			name: "ado link work items config",
+			safeOutputs: &SafeOutputsConfig{
+				LinkWorkItems: &LinkWorkItemsConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("5"),
+					},
+					Target:           "*",
+					AllowedLinkTypes: []string{"parent", "child", "related"},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_link_work_items"},
+		},
+		{
+			name: "ado upload workitem attachment config",
+			safeOutputs: &SafeOutputsConfig{
+				UploadWorkItemAttachments: &UploadWorkItemAttachmentConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Target:            "*",
+					AllowedExtensions: []string{".txt", ".log"},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"ado_upload_workitem_attachment"},
+		},
+		{
+			name: "linear create issue config",
+			safeOutputs: &SafeOutputsConfig{
+				LinearCreateIssue: &LinearCreateIssueConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					TeamID: "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"linear_create_issue"},
+		},
+		{
+			name: "linear add comment config",
+			safeOutputs: &SafeOutputsConfig{
+				LinearAddComment: &LinearTargetConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+					Target: "ENG-123",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"linear_add_comment"},
+		},
+		{
+			name: "linear update issue config",
+			safeOutputs: &SafeOutputsConfig{
+				LinearUpdateIssue: &LinearUpdateIssueConfig{
+					LinearTargetConfig: LinearTargetConfig{
+						BaseSafeOutputConfig: BaseSafeOutputConfig{
+							Max: strPtr("1"),
+						},
+						Target: "ENG-123",
+					},
+					Title: boolPtr(true),
+					Body:  boolPtr(true),
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"linear_update_issue"},
+		},
+		{
+			name: "jira create issue config",
+			safeOutputs: &SafeOutputsConfig{
+				JiraCreateIssue: &JiraSafeOutputConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"jira_create_issue"},
+		},
+		{
+			name: "jira update issue config",
+			safeOutputs: &SafeOutputsConfig{
+				JiraUpdateIssue: &JiraSafeOutputConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"jira_update_issue"},
+		},
+		{
+			name: "jira add comment config",
+			safeOutputs: &SafeOutputsConfig{
+				JiraAddComment: &JiraSafeOutputConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"jira_add_comment"},
+		},
+		{
+			name: "jira add label config",
+			safeOutputs: &SafeOutputsConfig{
+				JiraAddLabel: &JiraSafeOutputConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("3"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"jira_add_label"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -67,6 +67,23 @@ flowchart LR
 
 Use `max` to control fan-out breadth, and `title-prefix` plus labels to make the automated PRs easy to filter. See [Feature Synchronization](/gh-aw/gallery/multi-repo/feature-sync/) for a complete example.
 
+## Target-Only Checkout
+
+Side repositories that only need to check out a target repository — not their own hosting repository — can set `permissions.contents: none`. This skips the automatic workflow-repository checkout while keeping any explicitly configured `checkout:` entries (like a target repo) intact:
+
+```yaml
+permissions:
+  contents: none
+checkout:
+  - repository: octo-org/target-repository
+    path: target
+    github-app:
+      client-id: ${{ vars.TARGET_APP_CLIENT_ID }}
+      private-key: ${{ secrets.TARGET_APP_PRIVATE_KEY }}
+```
+
+See [Target-Only Checkout](/gh-aw/reference/checkout/#target-only-checkout-permissionscontents-none) in the checkout reference for details.
+
 ## Cross-Repository Safe Outputs
 
 Most safe output types support `target-repo` to write to external repositories, and `allowed-repos` for dynamic multi-target workflows. See [Cross-Repository Safe Outputs](/gh-aw/reference/cross-repository/#cross-repository-safe-outputs) for the complete list and configuration options, including `target-repo: "*"` for runtime-determined targets and the [GitHub Tools reference](/gh-aw/reference/cross-repository/#cross-repository-reading) for reading from private repositories.
@@ -83,6 +100,7 @@ Use GitHub Apps over PATs for automatic token revocation; scope tokens minimally
 
 - [CentralRepoOps](/gh-aw/patterns/central-repo-ops/) — Central control plane and tracker repo patterns
 - [Cross-Repository Operations](/gh-aw/reference/cross-repository/) — Checkout and `target-repo` configuration
+- [GitHub Repository Checkout](/gh-aw/reference/checkout/) — Full checkout configuration, including target-only checkout
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) — Complete safe output configuration
 - [GitHub Tools](/gh-aw/reference/github-tools/) — GitHub API toolsets
 - [Authentication](/gh-aw/reference/auth/) — PAT and GitHub App setup

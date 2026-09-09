@@ -25,6 +25,8 @@ imports:
   - shared/otlp.md
 tools:
   cli-proxy: true
+  bash:
+    - "/tmp/gh-aw/python/venv/bin/python3 *"
   github:
     mode: gh-proxy
     min-integrity: approved

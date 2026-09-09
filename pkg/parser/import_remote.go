@@ -31,6 +31,9 @@ type importQueueItem struct {
 	baseDir      string              // Base directory for resolving nested imports
 	inputs       map[string]any      // Optional input values from parent import
 	remoteOrigin *remoteImportOrigin // Remote origin context (non-nil when imported from a remote repo)
+	content      []byte              // Cached file content for dependency-ordered field merging
+	frontmatter  map[string]any      // Parsed frontmatter after input substitution
+	priority     int                 // Declaration-order priority of the top-level sibling branch that discovered this import
 }
 
 // parseRemoteOrigin extracts the remote origin (owner, repo, ref, basePath) from a workflowspec path.

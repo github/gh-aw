@@ -18,7 +18,7 @@ strict: true
 tracker-id: daily-action-setup-security-audit
 tools:
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [issues]
   cache-memory: true
   bash: ["*"]
@@ -33,7 +33,7 @@ timeout-minutes: 30
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 imports:
   - shared/otlp.md
 evals:

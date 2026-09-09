@@ -1,8 +1,12 @@
 # ADR-29483: Automate Removal of Deprecated Sandbox Keys via Codemods
 
 **Date**: 2026-05-01
-**Status**: Draft
+**Status**: Superseded
 **Deciders**: Unknown
+
+> Superseded by the restored non-strict opt-out policy: `sandbox.agent: false` is
+> supported when `features.dangerously-disable-sandbox-agent: true` is set, and
+> the removal codemod is no longer registered.
 
 ---
 

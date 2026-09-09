@@ -340,4 +340,14 @@ function checkFileProtectionPostApply(actualFiles, config) {
   return { action: "deny", source: "protected", files: allProtected };
 }
 
-module.exports = { extractFilenamesFromPatch, extractPathsFromPatch, checkForManifestFiles, checkForProtectedPaths, checkForTopLevelDotFolders, checkAllowedFiles, checkExcludedFiles, checkFileProtection, checkFileProtectionPostApply };
+module.exports = {
+  extractFilenamesFromPatch,
+  extractPathsFromPatch,
+  checkForManifestFiles,
+  checkForProtectedPaths,
+  checkForTopLevelDotFolders,
+  checkAllowedFiles,
+  checkExcludedFiles,
+  checkFileProtection,
+  checkFileProtectionPostApply,
+};

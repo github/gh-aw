@@ -5,7 +5,8 @@
 // usage-activity-summary/v1 structure:
 //   firewall: total/allowed/blocked request counters
 //   session: aggregate Copilot session event counters
-//   gateway: total/failed tool-call counters with per-server breakdown
+//   gateway: tool-call counts, sizes, durations, and per-server/tool breakdowns
+//   integrity: aggregate DIFC filtering counts from gateway/RPC logs
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
@@ -27,6 +28,7 @@ const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
+const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 
 function findFiles(rootDir, shouldIncludeFile, maxDepth = Number.POSITIVE_INFINITY, currentDepth = 0) {
   if (!fs.existsSync(rootDir)) {
@@ -334,103 +336,371 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
 }
 
 /**
- * Parse MCP gateway logs and aggregate tool call counts
+ * @param {unknown} value
+ * @returns {number}
  */
-function parseGatewayLogs() {
-  const gateway = { total_calls: 0, failed_calls: 0, servers: {} };
-  const gatewayPaths = [];
+function nonNegativeNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
 
-  const pathPairs = [
-    ["/tmp/gh-aw/sandbox/agent/logs/mcp-logs/gateway.jsonl", "/tmp/gh-aw/sandbox/agent/logs/gateway.jsonl"],
-    ["/tmp/gh-aw/threat-detection/sandbox/agent/logs/mcp-logs/gateway.jsonl", "/tmp/gh-aw/threat-detection/sandbox/agent/logs/gateway.jsonl"],
-  ];
-
-  for (const [modernPath, legacyPath] of pathPairs) {
-    if (fs.existsSync(modernPath)) {
-      gatewayPaths.push(modernPath);
-    } else if (fs.existsSync(legacyPath)) {
-      gatewayPaths.push(legacyPath);
-    }
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function jsonByteLength(value) {
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? 0 : Buffer.byteLength(serialized, "utf8");
+  } catch {
+    return 0;
   }
+}
 
-  for (const gatewayPath of gatewayPaths) {
-    if (!fs.existsSync(gatewayPath)) {
-      continue;
-    }
+/**
+ * @param {Map<string, number>} counts
+ * @returns {Record<string, number>}
+ */
+function sortedCounts(counts) {
+  return Object.fromEntries(Array.from(counts.entries()).sort(([left], [right]) => left.localeCompare(right)));
+}
 
-    try {
-      const content = fs.readFileSync(gatewayPath, "utf-8");
-      const lines = content.split("\n");
-
-      for (const raw of lines) {
-        const line = raw.trim();
-        if (!line || !line.startsWith("{")) {
-          continue;
-        }
-
-        let entry;
-        try {
-          entry = JSON.parse(line);
-        } catch {
-          continue;
-        }
-
-        const event = String(entry.event || "")
-          .trim()
-          .toLowerCase();
-        if (!["tool_call", "rpc_call", "request"].includes(event)) {
-          continue;
-        }
-
-        gateway.total_calls += 1;
-
-        const status = String(entry.status || "")
-          .trim()
-          .toLowerCase();
-        const level = String(entry.level || "")
-          .trim()
-          .toLowerCase();
-        const errorText = String(entry.error || "").trim();
-        const failed = status === "error" || errorText !== "" || level === "error";
-
-        if (failed) {
-          gateway.failed_calls += 1;
-        }
-
-        // gateway.jsonl has server_name for modern logs and server_id in
-        // some compatibility/transition paths; keep fallback ordering explicit.
-        const serverName = String(entry.server_name || entry.server_id || "unknown");
-
-        if (!gateway.servers[serverName]) {
-          gateway.servers[serverName] = { tool_call_count: 0, failed_calls: 0 };
-        }
-
-        gateway.servers[serverName].tool_call_count += 1;
-        if (failed) {
-          gateway.servers[serverName].failed_calls += 1;
-        }
-      }
-    } catch (err) {
-      // Skip files that can't be read
-      continue;
-    }
-  }
-
-  if (gateway.total_calls > 0) {
-    return {
-      total_calls: gateway.total_calls,
-      failed_calls: gateway.failed_calls,
-      servers: Object.entries(gateway.servers)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([serverName, bucket]) => ({
-          server_name: serverName,
-          tool_call_count: bucket.tool_call_count,
-          failed_calls: bucket.failed_calls,
-        })),
+/**
+ * @param {any} gateway
+ * @param {string} serverName
+ */
+function getGatewayServer(gateway, serverName) {
+  let server = gateway.servers.get(serverName);
+  if (!server) {
+    server = {
+      server_name: serverName,
+      request_count: 0,
+      tool_call_count: 0,
+      failed_calls: 0,
+      total_input_size: 0,
+      total_output_size: 0,
+      total_duration_ms: 0,
     };
+    gateway.servers.set(serverName, server);
+  }
+  return server;
+}
+
+/**
+ * @param {any} gateway
+ * @param {string} serverName
+ * @param {string} toolName
+ */
+function getGatewayTool(gateway, serverName, toolName) {
+  const key = JSON.stringify([serverName, toolName]);
+  let tool = gateway.tools.get(key);
+  if (!tool) {
+    tool = {
+      server_name: serverName,
+      tool_name: toolName,
+      call_count: 0,
+      failed_calls: 0,
+      total_input_size: 0,
+      total_output_size: 0,
+      max_input_size: 0,
+      max_output_size: 0,
+      total_duration_ms: 0,
+      max_duration_ms: 0,
+    };
+    gateway.tools.set(key, tool);
+  }
+  return tool;
+}
+
+/**
+ * @param {any} gateway
+ * @param {string} serverName
+ * @param {string} toolName
+ * @param {number} inputSize
+ * @param {string} timestamp
+ */
+function recordGatewayToolCall(gateway, serverName, toolName, inputSize, timestamp) {
+  const server = getGatewayServer(gateway, serverName);
+  const tool = getGatewayTool(gateway, serverName, toolName);
+  const call = {
+    tool_call_id: `call-${gateway.tool_calls.length + 1}`,
+    timestamp,
+    server_name: serverName,
+    tool_name: toolName,
+    request_size: inputSize,
+    response_size: 0,
+    duration_ms: 0,
+    outcome: "incomplete",
+  };
+  gateway.tool_calls.push(call);
+  gateway.total_calls += 1;
+  gateway.total_input_size += inputSize;
+  gateway.max_input_size = Math.max(gateway.max_input_size, inputSize);
+  server.request_count += 1;
+  server.tool_call_count += 1;
+  server.total_input_size += inputSize;
+  tool.call_count += 1;
+  tool.total_input_size += inputSize;
+  tool.max_input_size = Math.max(tool.max_input_size, inputSize);
+  return call;
+}
+
+/**
+ * @param {any} gateway
+ * @param {string} serverName
+ * @param {string} toolName
+ * @param {{failed: boolean, outputSize: number, durationMs: number}} result
+ * @param {{response_size: number, duration_ms: number, outcome: string}} call
+ */
+function recordGatewayToolResult(gateway, serverName, toolName, result, call) {
+  const server = getGatewayServer(gateway, serverName);
+  const tool = getGatewayTool(gateway, serverName, toolName);
+  if (result.failed) {
+    gateway.failed_calls += 1;
+    server.failed_calls += 1;
+    tool.failed_calls += 1;
+  }
+  gateway.total_output_size += result.outputSize;
+  gateway.max_output_size = Math.max(gateway.max_output_size, result.outputSize);
+  gateway.total_duration_ms += result.durationMs;
+  gateway.max_duration_ms = Math.max(gateway.max_duration_ms, result.durationMs);
+  server.total_output_size += result.outputSize;
+  server.total_duration_ms += result.durationMs;
+  tool.total_output_size += result.outputSize;
+  tool.max_output_size = Math.max(tool.max_output_size, result.outputSize);
+  tool.total_duration_ms += result.durationMs;
+  tool.max_duration_ms = Math.max(tool.max_duration_ms, result.durationMs);
+  call.response_size = result.outputSize;
+  call.duration_ms = result.durationMs;
+  call.outcome = result.failed ? "failure" : "success";
+}
+
+/**
+ * @param {any} integrity
+ * @param {Record<string, any>} entry
+ */
+function recordIntegrityFilteredEvent(integrity, entry) {
+  const serverName = String(entry.server_id || entry.server_name || "unknown").trim() || "unknown";
+  const toolName = String(entry.tool_name || "unknown").trim() || "unknown";
+  const reason = String(entry.reason || "unknown").trim() || "unknown";
+  integrity.total_filtered += 1;
+  integrity.filtered_server_counts.set(serverName, (integrity.filtered_server_counts.get(serverName) || 0) + 1);
+  integrity.filtered_tool_counts.set(toolName, (integrity.filtered_tool_counts.get(toolName) || 0) + 1);
+  integrity.filtered_reason_counts.set(reason, (integrity.filtered_reason_counts.get(reason) || 0) + 1);
+}
+
+/**
+ * @param {Record<string, any>} entry
+ * @returns {string}
+ */
+function getRpcMessageType(entry) {
+  if (typeof entry.type === "string" && entry.type) {
+    return entry.type.toUpperCase();
+  }
+  const event = typeof entry.event === "string" ? entry.event.toLowerCase() : "";
+  return RPC_EVENT_TO_TYPE[event] || event.toUpperCase();
+}
+
+/**
+ * @param {any} activity
+ * @param {string} content
+ */
+function parseGatewayJSONL(activity, content) {
+  for (const raw of content.split("\n")) {
+    const line = raw.trim();
+    if (!line || !line.startsWith("{")) {
+      continue;
+    }
+    try {
+      const entry = JSON.parse(line);
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      if (getRpcMessageType(entry) === "DIFC_FILTERED") {
+        recordIntegrityFilteredEvent(activity.integrity, entry);
+        continue;
+      }
+      const event = String(entry.event || "")
+        .trim()
+        .toLowerCase();
+      const method = String(entry.method || "")
+        .trim()
+        .toLowerCase();
+      if (event !== "tool_call" && method !== "tools/call") {
+        continue;
+      }
+      const serverName = String(entry.server_name || entry.server_id || "").trim();
+      const toolName = String(entry.tool_name || entry.method || "").trim();
+      if (!serverName || !toolName) {
+        continue;
+      }
+      const inputSize = nonNegativeNumber(entry.input_size);
+      const outputSize = nonNegativeNumber(entry.output_size);
+      const durationMs = nonNegativeNumber(entry.duration);
+      const status = String(entry.status || "")
+        .trim()
+        .toLowerCase();
+      const level = String(entry.level || "")
+        .trim()
+        .toLowerCase();
+      const failed = status === "error" || String(entry.error || "").trim() !== "" || level === "error";
+      const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize, String(entry.timestamp || ""));
+      recordGatewayToolResult(activity.gateway, serverName, toolName, { failed, outputSize, durationMs }, call);
+    } catch {
+      continue;
+    }
+  }
+}
+
+/**
+ * @param {any} activity
+ * @param {string} content
+ */
+function parseRPCMessagesJSONL(activity, content) {
+  const pending = new Map();
+  for (const raw of content.split("\n")) {
+    const line = raw.trim();
+    if (!line || !line.startsWith("{")) {
+      continue;
+    }
+    try {
+      const entry = JSON.parse(line);
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const messageType = getRpcMessageType(entry);
+      if (messageType === "DIFC_FILTERED") {
+        recordIntegrityFilteredEvent(activity.integrity, entry);
+        continue;
+      }
+      const serverName = String(entry.server_id || entry.server_name || "").trim();
+      const payload = entry.payload && typeof entry.payload === "object" ? entry.payload : null;
+      if (!serverName || !payload) {
+        continue;
+      }
+      if (String(entry.direction || "").toUpperCase() === "OUT" && messageType === "REQUEST" && payload.method === "tools/call") {
+        const toolName = String(payload.params?.name || "").trim();
+        if (!toolName) {
+          continue;
+        }
+        const inputSize = jsonByteLength(payload.params?.arguments ?? payload.params);
+        const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize, String(entry.timestamp || ""));
+        if (payload.id !== null && payload.id !== undefined) {
+          const key = JSON.stringify([serverName, payload.id]);
+          pending.set(key, {
+            serverName,
+            toolName,
+            timestampMs: Date.parse(entry.timestamp),
+            call,
+          });
+        }
+        continue;
+      }
+      if (String(entry.direction || "").toUpperCase() !== "IN" || messageType !== "RESPONSE" || payload.id === null || payload.id === undefined) {
+        continue;
+      }
+      const key = JSON.stringify([serverName, payload.id]);
+      const request = pending.get(key);
+      if (!request) {
+        continue;
+      }
+      pending.delete(key);
+      const responseTimestampMs = Date.parse(entry.timestamp);
+      const durationMs = Number.isFinite(request.timestampMs) && Number.isFinite(responseTimestampMs) ? Math.max(0, responseTimestampMs - request.timestampMs) : 0;
+      const hasRPCError = payload.error !== null && payload.error !== undefined;
+      const failed = hasRPCError || payload.result?.isError === true;
+      const outputSize = jsonByteLength(hasRPCError ? payload.error : payload.result);
+      recordGatewayToolResult(activity.gateway, request.serverName, request.toolName, { failed, outputSize, durationMs }, request.call);
+    } catch {
+      continue;
+    }
+  }
+}
+
+/**
+ * Parse MCP gateway/RPC logs and aggregate tool-call and integrity-filter metrics.
+ */
+function parseGatewayActivity(logRoots = ["/tmp/gh-aw", "/tmp/gh-aw/threat-detection", "/tmp/gh-aw/sandbox/agent/logs", "/tmp/gh-aw/threat-detection/sandbox/agent/logs"]) {
+  const activity = {
+    gateway: {
+      total_calls: 0,
+      failed_calls: 0,
+      total_input_size: 0,
+      total_output_size: 0,
+      max_input_size: 0,
+      max_output_size: 0,
+      total_duration_ms: 0,
+      max_duration_ms: 0,
+      servers: new Map(),
+      tools: new Map(),
+      tool_calls: [],
+    },
+    integrity: {
+      total_filtered: 0,
+      filtered_server_counts: new Map(),
+      filtered_tool_counts: new Map(),
+      filtered_reason_counts: new Map(),
+    },
+  };
+
+  for (const root of logRoots) {
+    const gatewayPath = [path.join(root, "mcp-logs/gateway.jsonl"), path.join(root, "gateway.jsonl")].find(candidate => fs.existsSync(candidate));
+    const rpcPath = [path.join(root, "mcp-logs/rpc-messages.jsonl"), path.join(root, "rpc-messages.jsonl")].find(candidate => fs.existsSync(candidate));
+    const selectedPath = gatewayPath || rpcPath;
+    if (!selectedPath) {
+      continue;
+    }
+    try {
+      const content = fs.readFileSync(selectedPath, "utf-8");
+      if (gatewayPath) {
+        parseGatewayJSONL(activity, content);
+      } else {
+        parseRPCMessagesJSONL(activity, content);
+      }
+    } catch {
+      continue;
+    }
   }
 
-  return null;
+  const gateway =
+    activity.gateway.total_calls > 0
+      ? {
+          total_calls: activity.gateway.total_calls,
+          failed_calls: activity.gateway.failed_calls,
+          total_input_size: activity.gateway.total_input_size,
+          total_output_size: activity.gateway.total_output_size,
+          max_input_size: activity.gateway.max_input_size,
+          max_output_size: activity.gateway.max_output_size,
+          total_duration_ms: activity.gateway.total_duration_ms,
+          max_duration_ms: activity.gateway.max_duration_ms,
+          tool_calls: activity.gateway.tool_calls,
+          servers: Array.from(activity.gateway.servers.values())
+            .sort((left, right) => left.server_name.localeCompare(right.server_name))
+            .map(server => ({
+              ...server,
+              avg_duration_ms: server.tool_call_count > 0 ? server.total_duration_ms / server.tool_call_count : 0,
+            })),
+          tools: Array.from(activity.gateway.tools.values())
+            .sort((left, right) => left.server_name.localeCompare(right.server_name) || left.tool_name.localeCompare(right.tool_name))
+            .map(tool => ({
+              ...tool,
+              avg_duration_ms: tool.call_count > 0 ? tool.total_duration_ms / tool.call_count : 0,
+            })),
+        }
+      : null;
+  const integrity =
+    activity.integrity.total_filtered > 0
+      ? {
+          total_filtered: activity.integrity.total_filtered,
+          filtered_server_counts: sortedCounts(activity.integrity.filtered_server_counts),
+          filtered_tool_counts: sortedCounts(activity.integrity.filtered_tool_counts),
+          filtered_reason_counts: sortedCounts(activity.integrity.filtered_reason_counts),
+        }
+      : null;
+  return { gateway, integrity };
+}
+
+function parseGatewayLogs() {
+  return parseGatewayActivity().gateway;
 }
 
 /**
@@ -527,10 +797,13 @@ function main() {
     summary.session = session;
   }
 
-  // Parse gateway logs
-  const gateway = parseGatewayLogs();
-  if (gateway) {
-    summary.gateway = gateway;
+  // Parse gateway/RPC logs once for both MCP and integrity-filter aggregates.
+  const gatewayActivity = parseGatewayActivity();
+  if (gatewayActivity.gateway) {
+    summary.gateway = gatewayActivity.gateway;
+  }
+  if (gatewayActivity.integrity) {
+    summary.integrity = gatewayActivity.integrity;
   }
 
   // Parse safe outputs manifest.
@@ -595,6 +868,7 @@ module.exports = {
   parseFirewallLogs,
   parseSessionLogs,
   parseGatewayLogs,
+  parseGatewayActivity,
   parseSafeOutputsManifest,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,

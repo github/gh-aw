@@ -73,27 +73,7 @@ func generateKnownNeedsExpressions(data *WorkflowData, preActivationJobCreated b
 	if data.Jobs != nil {
 		customJobNames := getCustomJobsBeforeActivation(data)
 		for _, jobName := range customJobNames {
-			// If the job has explicit outputs declared in the frontmatter, skip the generic "output"
-			// env var unless "output" is explicitly among those declared outputs.
-			// This prevents actionlint errors when the job declares specific outputs but not "output".
-			if jobConfig, ok := data.Jobs[jobName].(map[string]any); ok {
-				if outputsField, hasOutputs := jobConfig["outputs"]; hasOutputs && outputsField != nil {
-					if outputsMap, ok := outputsField.(map[string]any); ok {
-						if _, hasOutputKey := outputsMap["output"]; !hasOutputKey {
-							// Job has explicit outputs but "output" is not among them - skip
-							knownNeedsLog.Printf("Skipping generic 'output' env var for job '%s': has explicit outputs without 'output'", jobName)
-							continue
-						}
-					}
-				}
-			}
-
-			// For custom jobs without explicit outputs (or with "output" declared),
-			// add the most commonly used output name: "output"
-			commonCustomOutputs := []string{
-				"output",
-			}
-			for _, output := range commonCustomOutputs {
+			for _, output := range knownNeedsOutputNames(data.Jobs[jobName]) {
 				expr := fmt.Sprintf("needs.%s.outputs.%s", jobName, output)
 				envVar := fmt.Sprintf("GH_AW_NEEDS_%s_OUTPUTS_%s",
 					normalizeJobNameForEnvVar(jobName),
@@ -109,6 +89,28 @@ func generateKnownNeedsExpressions(data *WorkflowData, preActivationJobCreated b
 
 	knownNeedsLog.Printf("Generated %d known needs.* expression mappings", len(mappings))
 	return mappings
+}
+
+func knownNeedsOutputNames(jobConfig any) []string {
+	defaultOutputs := []string{"output"}
+	jobMap, ok := jobConfig.(map[string]any)
+	if !ok {
+		return defaultOutputs
+	}
+	outputsField, hasOutputs := jobMap["outputs"]
+	if !hasOutputs || outputsField == nil {
+		return defaultOutputs
+	}
+	outputsMap, ok := outputsField.(map[string]any)
+	if !ok {
+		return defaultOutputs
+	}
+	outputs := make([]string, 0, len(outputsMap))
+	for output := range outputsMap {
+		outputs = append(outputs, output)
+	}
+	sort.Strings(outputs)
+	return outputs
 }
 
 // filterExpressionsForActivation filters expression mappings to remove any that reference

@@ -27,6 +27,8 @@ engine:
   copilot-sdk: true
 max-tool-denials: 3
 tools:
+  github:
+    mode: local
   bash:
     - "gh agent-task create *"
 safe-outputs:
@@ -55,7 +57,7 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Dev Hawk - Development Workflow Monitor

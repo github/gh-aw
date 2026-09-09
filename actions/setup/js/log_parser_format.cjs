@@ -585,6 +585,12 @@ function createLogParserFormatters(deps) {
     if (lastEntry?.total_cost_usd) {
       lines.push(`  Cost: $${lastEntry.total_cost_usd.toFixed(4)}`);
     }
+    if (lastEntry?.errors && Array.isArray(lastEntry.errors) && lastEntry.errors.length > 0) {
+      lines.push("  Errors:");
+      for (const error of lastEntry.errors) {
+        lines.push(`    ${error}`);
+      }
+    }
   }
 
   function generateSummaryLines(logEntries) {

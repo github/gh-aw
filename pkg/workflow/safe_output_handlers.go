@@ -22,6 +22,60 @@ type safeOutputHandlerDescriptor struct {
 
 var safeOutputHandlers = []safeOutputHandlerDescriptor{
 	{
+		Key:         "ado-create-work-item",
+		StructField: "CreateWorkItems",
+		ToolName:    "ado_create_work_item",
+		NewConfig:   func() any { return &CreateWorkItemConfig{} },
+	},
+	{
+		Key:         "ado-update-work-item",
+		StructField: "UpdateWorkItems",
+		ToolName:    "ado_update_work_item",
+		NewConfig:   func() any { return &UpdateWorkItemConfig{} },
+	},
+	{
+		Key:         "ado-comment-on-work-item",
+		StructField: "CommentOnWorkItems",
+		ToolName:    "ado_comment_on_work_item",
+		NewConfig:   func() any { return &CommentOnWorkItemConfig{} },
+	},
+	{
+		Key:         "ado-assign-work-item",
+		StructField: "AssignWorkItems",
+		ToolName:    "ado_assign_work_item",
+		NewConfig:   func() any { return &AssignWorkItemConfig{} },
+	},
+	{
+		Key:         "ado-link-work-items",
+		StructField: "LinkWorkItems",
+		ToolName:    "ado_link_work_items",
+		NewConfig:   func() any { return &LinkWorkItemsConfig{} },
+	},
+	{
+		Key:         "ado-upload-workitem-attachment",
+		StructField: "UploadWorkItemAttachments",
+		ToolName:    "ado_upload_workitem_attachment",
+		NewConfig:   func() any { return &UploadWorkItemAttachmentConfig{} },
+	},
+	{
+		Key:         "linear-create-issue",
+		StructField: "LinearCreateIssue",
+		ToolName:    "linear_create_issue",
+		NewConfig:   func() any { return &LinearCreateIssueConfig{} },
+	},
+	{
+		Key:         "linear-add-comment",
+		StructField: "LinearAddComment",
+		ToolName:    "linear_add_comment",
+		NewConfig:   func() any { return &LinearTargetConfig{} },
+	},
+	{
+		Key:         "linear-update-issue",
+		StructField: "LinearUpdateIssue",
+		ToolName:    "linear_update_issue",
+		NewConfig:   func() any { return &LinearUpdateIssueConfig{} },
+	},
+	{
 		Key:         "create-issue",
 		StructField: "CreateIssues",
 		ToolName:    "create_issue",
@@ -32,6 +86,30 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 			}
 			return NewPermissionsIssuesWrite()
 		},
+	},
+	{
+		Key:         "jira-create-issue",
+		StructField: "JiraCreateIssue",
+		ToolName:    "jira_create_issue",
+		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
+	},
+	{
+		Key:         "jira-update-issue",
+		StructField: "JiraUpdateIssue",
+		ToolName:    "jira_update_issue",
+		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
+	},
+	{
+		Key:         "jira-add-comment",
+		StructField: "JiraAddComment",
+		ToolName:    "jira_add_comment",
+		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
+	},
+	{
+		Key:         "jira-add-label",
+		StructField: "JiraAddLabel",
+		ToolName:    "jira_add_label",
+		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
 	},
 	{
 		Key:         "create-agent-session",

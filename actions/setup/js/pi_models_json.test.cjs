@@ -94,7 +94,7 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("buildModelsJSON", () => {
-    it("builds the aw-gateway provider payload", () => {
+    it("builds the aw-gateway provider payload with the default api", () => {
       const json = piModelsJson.buildModelsJSON({
         baseUrl: "http://api-proxy:10000",
         apiKeyEnvVar: "CODEX_API_KEY",
@@ -112,22 +112,51 @@ describe("pi_models_json.cjs", () => {
         },
       });
     });
+
+    it("builds the aw-gateway provider payload with an explicit api", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10000",
+        apiKeyEnvVar: "CODEX_API_KEY",
+        modelId: "gpt-5.4",
+        api: "openai-responses",
+      });
+      const parsed = JSON.parse(json);
+      expect(parsed.providers["aw-gateway"].api).toBe("openai-responses");
+    });
+  });
+
+  describe("resolvePiApiForProvider", () => {
+    it("routes the openai provider through openai-responses", () => {
+      expect(piModelsJson.resolvePiApiForProvider("openai")).toBe("openai-responses");
+    });
+
+    it("routes the codex provider through openai-responses", () => {
+      expect(piModelsJson.resolvePiApiForProvider("codex")).toBe("openai-responses");
+    });
+
+    it("keeps the github provider on openai-completions", () => {
+      expect(piModelsJson.resolvePiApiForProvider("github")).toBe("openai-completions");
+    });
+
+    it("routes the anthropic provider through its native Messages API", () => {
+      expect(piModelsJson.resolvePiApiForProvider("anthropic")).toBe("anthropic-messages");
+    });
   });
 
   describe("main", () => {
-    it("writes models.json using the live /reflect baseUrl when available", async () => {
+    it.each(["openai", "codex"])("writes models.json using the live /reflect baseUrl and responses api for the %s provider", async provider => {
       process.env.GH_AW_PI_MODEL_ID = "gpt-4.1";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";
       // Deliberately pass the wrong fallback port (10001 is anthropic's port, not openai's)
       // to prove that the live /reflect data overrides the compile-time fallback value.
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10001";
-      process.env.GH_AW_LLM_PROVIDER = "openai";
+      process.env.GH_AW_LLM_PROVIDER = provider;
       process.env.AWF_REFLECT_ENABLED = "1";
       process.env.PI_CODING_AGENT_DIR = tmpDir;
       delete process.env.GH_AW_PI_MODELS_JSON_PATH;
 
       const reflectPayload = {
-        endpoints: [{ provider: "openai", configured: true, port: 10000, base_url: "http://api-proxy:10000", models: [] }],
+        endpoints: [{ provider, configured: true, port: 10000, base_url: "http://api-proxy:10000", models: [] }],
       };
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => reflectPayload }));
 
@@ -137,6 +166,7 @@ describe("pi_models_json.cjs", () => {
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10000");
       expect(written.providers["aw-gateway"].apiKey).toBe("CODEX_API_KEY");
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "gpt-4.1" }]);
+      expect(written.providers["aw-gateway"].api).toBe("openai-responses");
       expect(fetch).toHaveBeenCalled();
     });
 
@@ -156,6 +186,7 @@ describe("pi_models_json.cjs", () => {
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10001");
+      expect(written.providers["aw-gateway"].api).toBe("anthropic-messages");
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 

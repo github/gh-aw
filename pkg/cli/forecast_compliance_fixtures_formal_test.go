@@ -201,6 +201,7 @@ func TestFormal_P6_ZeroLambdaNilResult(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			rng := rand.New(rand.NewSource(42)) //nolint:gosec
 			result := runMonteCarlo(obs, len(obs), tc.lambda, rng)
 			assert.Nil(t, result, "P6: λ=%v must yield nil (zero-projection fallback)", tc.lambda)
@@ -608,6 +609,7 @@ func TestFormal_FC_P9_TimestampOrdering(t *testing.T) {
 
 	for _, name := range fixtures {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			data, err := os.ReadFile(filepath.Join(fixtureDir(t), name))
 			require.NoError(t, err, "FC-P9: fixture file %q must be readable", name)
 
@@ -652,6 +654,7 @@ func TestFormal_FC_P10_MonteCarloInputCompleteness(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fixturePath := filepath.Join(fixtureDir(t), tc.name)
 			if _, err := os.Stat(fixturePath); os.IsNotExist(err) {
 				t.Skipf("FC-P10: fixture %s not present on disk — skipping", tc.name)

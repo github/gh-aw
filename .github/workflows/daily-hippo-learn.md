@@ -17,10 +17,10 @@ permissions:
 
   copilot-requests: write
 tracker-id: daily-hippo-learn
-model: copilot/gpt-5.4
+model: openai/gpt-5.4
 engine:
   id: pi
-  bare: true
+  model-provider: openai
 
 timeout-minutes: 30
 

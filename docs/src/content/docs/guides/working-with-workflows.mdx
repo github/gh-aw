@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import CopyEntireFileButton from '../../../components/CopyEntireFileButton.astro';
+import { Image } from 'astro:assets';
+import editingWorkflowsFlow from '../../../assets/diagrams/working-with-workflows-2026-08-28.svg';
 
 Use coding agents to create GitHub Agentic Workflows or remix from existing workflows. Once a workflow is in the repository, edit its Markdown source, compile configuration changes, debug failed runs, and keep it current with the `gh aw` CLI.
 
@@ -95,6 +97,8 @@ Commit and push the added workflow and its generated files. See the [CLI command
 An agentic workflow has YAML frontmatter and a Markdown body. The body is loaded at runtime, so changes to instructions, output templates, context, conditions, and examples take effect on the next run without recompilation.
 
 Changes between the frontmatter `---` markers require recompilation. This includes triggers, permissions, tools, network settings, safe outputs, MCP scripts, runtimes, imports, custom jobs, engine selection, timeouts, and roles.
+
+<Image src={editingWorkflowsFlow} alt="Diagram showing that a body-only change to workflow.md takes effect on the next run, while a frontmatter change requires running gh aw compile to generate the lock file before the change takes effect" />
 
 After a frontmatter change, run:
 

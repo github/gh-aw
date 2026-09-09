@@ -36,6 +36,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
+const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 
@@ -106,20 +107,42 @@ function extractPromptFromArgs(args) {
  *     allowAllTools?: boolean,
  *     allowedTools?: string[],
  *   },
+ *   toolConfig?: import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig,
+ *   webFetchOptions?: {fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number},
  *   coreLogger?: import("./copilot_sdk_permissions.cjs").CopilotSDKCoreLogger,
  *   sdkModule?: {
  *     CopilotClient: typeof import("@github/copilot-sdk").CopilotClient,
  *     RuntimeConnection: typeof import("@github/copilot-sdk").RuntimeConnection,
- *     approveAll: typeof import("@github/copilot-sdk").approveAll
+ *     approveAll: typeof import("@github/copilot-sdk").approveAll,
+ *     ToolSet?: typeof import("@github/copilot-sdk").ToolSet,
+ *     BuiltInTools?: typeof import("@github/copilot-sdk").BuiltInTools,
+ *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
  * }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
-async function runWithCopilotSDK({ sdkUri, prompt, logger, attempt = 0, model, connectionToken, providers, models: providerModels, maxToolDenials, permissionConfig, coreLogger, sdkModule, sessionStateBaseDir }) {
+async function runWithCopilotSDK({
+  sdkUri,
+  prompt,
+  logger,
+  attempt = 0,
+  model,
+  connectionToken,
+  providers,
+  models: providerModels,
+  maxToolDenials,
+  permissionConfig,
+  toolConfig,
+  webFetchOptions,
+  coreLogger,
+  sdkModule,
+  sessionStateBaseDir,
+}) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
-  const { CopilotClient, RuntimeConnection, approveAll } = sdkModule ?? require("@github/copilot-sdk");
+  const sdk = sdkModule ?? require("@github/copilot-sdk");
+  const { CopilotClient, RuntimeConnection, approveAll } = sdk;
 
   const startTime = Date.now();
   let output = "";
@@ -260,6 +283,7 @@ async function runWithCopilotSDK({ sdkUri, prompt, logger, attempt = 0, model, c
       providers,
       models: providerModels,
       onPermissionRequest,
+      ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = await client.createSession(sessionConfig);

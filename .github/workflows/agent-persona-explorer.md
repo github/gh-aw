@@ -4,9 +4,10 @@ emoji: "🎭"
 description: Explores agentic-workflows custom agent behavior by generating software personas and analyzing responses to common automation tasks
 on: daily
 max-daily-ai-credits: 10000
-model: copilot/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
-  id: pi
+  id: codex
+  model-provider: openai
 permissions:
   contents: read
   actions: read
@@ -37,11 +38,11 @@ experiments:
 # Note: max-turns not available for default Copilot engine (Claude only)
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
   agentic-workflows:
   cache-memory: true
 safe-outputs:

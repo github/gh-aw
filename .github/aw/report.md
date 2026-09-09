@@ -19,8 +19,8 @@ Default to `create-issue`. Use `create-discussion` only when the requester expli
 ## Automatic Cleanup
 
 - **`expires`** — auto-close after a window (e.g. `7`, `2w`, `1m`).
-- **`close-older-issues: true`** — close previous issues from the same workflow. Requires `title-prefix` or `labels`.
-- **`close-older-discussions: true`** — close older matching discussions as "OUTDATED". Requires `title-prefix` or `labels`.
+- **`close-older-issues: true`** — close previous open issues from the same workflow, matched via an embedded workflow-id marker (no `title-prefix` or `labels` needed). Use `close-older-key` for an explicit dedup key instead of the default workflow-id match.
+- **`close-older-discussions: true`** — close older matching discussions as "OUTDATED", matched the same way as issues.
 - **`hide-older-comments: true`** — minimize previous comments. Useful for rolling status updates.
 
 **Recommended for recurring reports**: `create-issue` with `close-older-issues: true` and a stable `title-prefix`.

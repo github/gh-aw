@@ -20,10 +20,11 @@ import (
 var gitLog = logger.New("cli:git")
 
 // isSafeGitRevisionArg reports whether ref cannot be misinterpreted as a git
-// CLI flag by rejecting empty strings and values starting with "-". It does
-// not validate that ref is a well-formed git revision.
+// CLI flag or terminal input by rejecting empty strings, values starting with
+// "-", and control characters. It does not validate that ref is a well-formed
+// git revision.
 func isSafeGitRevisionArg(ref string) bool {
-	return ref != "" && !strings.HasPrefix(ref, "-")
+	return ref != "" && !strings.HasPrefix(ref, "-") && !containsControlCharacters(ref)
 }
 
 // validateRelPathForGit rejects relative paths that could be misinterpreted as
@@ -383,18 +384,43 @@ func ensureGitAttributes() (bool, error) {
 	}
 
 	gitAttributesPath := filepath.Join(gitRoot, ".gitattributes")
-	lockYmlEntry := constants.WorkflowsLockYmlGitAttributesEntry
-	requiredEntries := []string{lockYmlEntry}
-
-	// Read existing .gitattributes file if it exists
-	var lines []string
-	if content, err := os.ReadFile(gitAttributesPath); err == nil {
-		lines = strings.Split(string(content), "\n")
-		gitLog.Printf("Read existing .gitattributes with %d lines", len(lines))
-	} else {
-		gitLog.Print("No existing .gitattributes file found")
+	lines, err := readGitAttributesFile(gitAttributesPath)
+	if err != nil {
+		return false, err
 	}
 
+	lines, modified := ensureRequiredGitAttributesEntry(lines)
+	if !modified {
+		gitLog.Print(".gitattributes already contains required entries")
+		return false, nil
+	}
+
+	content := strings.Join(lines, "\n")
+	if err := os.WriteFile(gitAttributesPath, []byte(content), constants.FilePermSensitive); err != nil {
+		gitLog.Printf("Failed to write .gitattributes: %v", err)
+		return false, fmt.Errorf("failed to write .gitattributes: %w", err)
+	}
+
+	gitLog.Print("Successfully updated .gitattributes")
+	return true, nil
+}
+
+func readGitAttributesFile(path string) ([]string, error) {
+	if content, err := os.ReadFile(path); err == nil {
+		lines := strings.Split(string(content), "\n")
+		gitLog.Printf("Read existing .gitattributes with %d lines", len(lines))
+		return lines, nil
+	}
+	gitLog.Print("No existing .gitattributes file found")
+	return []string{}, nil
+}
+
+func ensureRequiredGitAttributesEntry(lines []string) ([]string, bool) {
+	if lines == nil {
+		lines = []string{}
+	}
+	lockYmlEntry := constants.WorkflowsLockYmlGitAttributesEntry
+	requiredEntries := []string{lockYmlEntry}
 	modified := false
 	for _, required := range requiredEntries {
 		found := false
@@ -404,9 +430,6 @@ func ensureGitAttributes() (bool, error) {
 				found = true
 				break
 			}
-			// Only clean up the exact legacy gh-aw entry (with the ineffective
-			// "merge=ours" attribute); never rewrite other repository-owned lines
-			// that happen to start with the lock-yml glob.
 			if trimmedLine == constants.WorkflowsLockYmlGitAttributesEntryLegacy && required == lockYmlEntry {
 				gitLog.Print("Updating legacy .gitattributes entry format")
 				lines[i] = lockYmlEntry
@@ -415,7 +438,6 @@ func ensureGitAttributes() (bool, error) {
 				break
 			}
 		}
-
 		if !found {
 			gitLog.Printf("Adding new .gitattributes entry: %s", required)
 			if len(lines) > 0 && lines[len(lines)-1] != "" {
@@ -425,21 +447,7 @@ func ensureGitAttributes() (bool, error) {
 			modified = true
 		}
 	}
-
-	if !modified {
-		gitLog.Print(".gitattributes already contains required entries")
-		return false, nil
-	}
-
-	// Write back to file with owner-only read/write permissions (0600) for security best practices
-	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(gitAttributesPath, []byte(content), constants.FilePermSensitive); err != nil {
-		gitLog.Printf("Failed to write .gitattributes: %v", err)
-		return false, fmt.Errorf("failed to write .gitattributes: %w", err)
-	}
-
-	gitLog.Print("Successfully updated .gitattributes")
-	return true, nil
+	return lines, modified
 }
 
 // stageGitAttributesIfChanged stages .gitattributes if it was modified
@@ -639,114 +647,105 @@ type WorkflowFileStatus struct {
 	HasUnpushedCommits bool // File has unpushed commits affecting it
 }
 
-// checkWorkflowFileStatus checks if a workflow file has local modifications, staged changes, or unpushed commits
+// checkWorkflowFileStatus checks if a workflow file has local modifications, staged changes, or unpushed commits.
 func checkWorkflowFileStatus(workflowPath string) (*WorkflowFileStatus, error) {
 	gitLog.Printf("Checking status for workflow file: %s", workflowPath)
 
 	status := &WorkflowFileStatus{}
-
-	// Check if we're in a git repository
 	if !isGitRepo() {
 		gitLog.Print("Not in a git repository")
 		return status, nil
 	}
 
-	// Get the absolute path relative to git root
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		gitLog.Printf("Failed to find git root: %v", err)
-		return status, nil // Not in a git repository, return empty status
+		return status, nil
 	}
 
-	// Make path relative to git root if it's absolute
-	var relPath string
-	if filepath.IsAbs(workflowPath) {
-		var err error
-		relPath, err = filepath.Rel(gitRoot, workflowPath)
-		if err != nil {
-			gitLog.Printf("Failed to make path relative: %v", err)
-			relPath = workflowPath
-		}
-	} else {
-		relPath = workflowPath
-	}
-
-	// Reject paths that escape the repository root (path traversal) or that
-	// could be misinterpreted as a git CLI flag (option/argument injection).
+	relPath := relativeWorkflowPath(gitRoot, workflowPath)
 	if err := validateRelPathForGit(relPath); err != nil {
 		gitLog.Printf("Rejecting unsafe relative path %q: %v", relPath, err)
 		return status, fmt.Errorf("invalid workflow path %q: %w", workflowPath, err)
 	}
 
 	gitLog.Printf("Checking git status for: %s", relPath)
+	if err := populateLocalWorkflowStatus(gitRoot, relPath, status); err != nil {
+		return status, nil
+	}
 
-	// Check for modified or staged changes using git status --porcelain
-	// #nosec G204 -- relPath is validated above by validateRelPathForGit to reject
-	// leading '-' (option injection) and '..' path traversal outside gitRoot.
+	return populateUnpushedWorkflowStatus(gitRoot, relPath, status)
+}
+
+func relativeWorkflowPath(gitRoot, workflowPath string) string {
+	if filepath.IsAbs(workflowPath) {
+		relPath, err := filepath.Rel(gitRoot, workflowPath)
+		if err != nil {
+			gitLog.Printf("Failed to make path relative: %v", err)
+			return workflowPath
+		}
+		return relPath
+	}
+	return workflowPath
+}
+
+func populateLocalWorkflowStatus(gitRoot, relPath string, status *WorkflowFileStatus) error {
 	cmd := exec.Command("git", "-C", gitRoot, "status", "--porcelain", relPath)
 	output, err := cmd.Output()
 	if err != nil {
 		gitLog.Printf("Failed to check git status: %v", err)
-		return status, nil // Ignore error, return empty status
+		return err
 	}
 
-	statusOutput := string(output) // Don't trim - the leading space is significant!
-	if statusOutput != "" {
-		gitLog.Printf("Git status output: %q", statusOutput)
-		// Parse the status line (format: XY filename)
-		// X = index (staged) status, Y = working tree (unstaged) status
-		// The format is exactly 2 characters followed by a space and then the filename
-		if len(statusOutput) >= 2 {
-			stagedStatus := statusOutput[0]
-			unstagedStatus := statusOutput[1]
+	statusOutput := string(output)
+	if statusOutput == "" {
+		return nil
+	}
 
-			// Check if file is staged (first character is not space or ?)
-			if stagedStatus != ' ' && stagedStatus != '?' {
-				status.IsStaged = true
-				gitLog.Print("File has staged changes")
-			}
-
-			// Check if file is modified in working tree (second character is M or other modification indicators)
-			if unstagedStatus == 'M' || unstagedStatus == 'D' || unstagedStatus == 'A' {
-				status.IsModified = true
-				gitLog.Print("File has unstaged modifications")
-			}
+	gitLog.Printf("Git status output: %q", statusOutput)
+	if len(statusOutput) >= 2 {
+		stagedStatus := statusOutput[0]
+		unstagedStatus := statusOutput[1]
+		if stagedStatus != ' ' && stagedStatus != '?' {
+			status.IsStaged = true
+			gitLog.Print("File has staged changes")
+		}
+		if unstagedStatus == 'M' || unstagedStatus == 'D' || unstagedStatus == 'A' {
+			status.IsModified = true
+			gitLog.Print("File has unstaged modifications")
 		}
 	}
+	return nil
+}
 
-	// Check for unpushed commits that affect this file
-	// First, check if there's a remote tracking branch
-	cmd = exec.Command("git", "-C", gitRoot, "rev-parse", "--abbrev-ref", "@{u}")
-	output, err = cmd.Output()
+func populateUnpushedWorkflowStatus(gitRoot, relPath string, status *WorkflowFileStatus) (*WorkflowFileStatus, error) {
+	cmd := exec.Command("git", "-C", gitRoot, "rev-parse", "--abbrev-ref", "@{u}")
+	output, err := cmd.Output()
 	if err != nil {
-		// No upstream branch configured, skip unpushed commits check
 		gitLog.Print("No upstream branch configured")
 		return status, nil
 	}
 
 	upstream := strings.TrimSpace(string(output))
 	gitLog.Printf("Upstream branch: %s", upstream)
-
 	if !isSafeGitRevisionArg(upstream) {
 		gitLog.Printf("Rejecting unsafe upstream ref: %q", upstream)
 		return status, fmt.Errorf("unexpected upstream ref %q", upstream)
 	}
 
-	// Check if there are commits in the current branch that affect this file and aren't in upstream
 	// #nosec G204 -- upstream is validated above by isSafeGitRevisionArg and relPath was
 	// validated by validateRelPathForGit; "--" separates revision args from the path.
-	cmd = exec.Command("git", "-C", gitRoot, "log", upstream+"..HEAD", "--oneline", "--", relPath)
+	cmd = exec.Command("git", "-C", gitRoot, "log", "--oneline", "HEAD", "--not", upstream, "--", relPath)
 	output, err = cmd.Output()
 	if err != nil {
 		gitLog.Printf("Failed to check unpushed commits: %v", err)
-		return status, nil // Ignore error, return current status
+		return status, nil
 	}
 
 	if strings.TrimSpace(string(output)) != "" {
 		status.HasUnpushedCommits = true
 		gitLog.Print("File has unpushed commits")
 	}
-
 	return status, nil
 }
 

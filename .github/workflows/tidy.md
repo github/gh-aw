@@ -33,7 +33,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default]
   edit:
   bash: ["make:*", "git restore:*", "git status"]
@@ -71,7 +71,7 @@ evals:
 
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Code Tidying Agent

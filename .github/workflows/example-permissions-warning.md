@@ -17,6 +17,10 @@ tools:
   cli-proxy: true
   github:
     toolsets: [repos, issues, pull_requests]
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: false
 
 sandbox:

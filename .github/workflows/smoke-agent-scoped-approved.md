@@ -24,6 +24,7 @@ imports:
   - shared/github-guard-policy.md
   - shared/otlp.md
   - shared/reporting.md
+  - shared/playwright-title-test.md
 tools:
   github:
     mode: local

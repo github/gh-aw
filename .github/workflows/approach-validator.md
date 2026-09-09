@@ -29,11 +29,11 @@ imports:
   - shared/graders.md
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, pull_requests, issues]
   bash:
     - "cat:*"

@@ -40,7 +40,7 @@ async function main() {
   core.setOutput("errors", failures.map(f => `${f.skill}\t${f.error.replace(/\r?\n/g, " ").replace(/\t/g, " ")}`).join("\n"));
 
   if (failureCount > 0) {
-    core.warning(`${failureCount} skill(s) failed to install — see agent failure issue/comment for details`);
+    core.setFailed(`${failureCount} skill(s) failed to install — see agent failure issue/comment for details`);
   }
 }
 

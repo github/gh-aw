@@ -7,6 +7,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,10 +22,13 @@ import (
 // DownloadWorkflowLogsFromStdin fetches and processes workflow run logs for runs
 // provided as IDs or URLs, bypassing the GitHub API run-discovery step.
 // This is used when the --stdin flag is passed to the logs command.
-func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) error {
+func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) error { //nolint:largefunc // Existing stdin orchestration remains centralized.
 	logsOrchestratorLog.Printf("Starting stdin log download: runs=%d, outputDir=%s", len(opts.RunURLs), opts.OutputDir)
 
 	if err := ValidateArtifactSets(opts.ArtifactSets); err != nil {
+		return err
+	}
+	if err := validateMaxStorageMB(opts.MaxStorageMB); err != nil {
 		return err
 	}
 	artifactFilter := ResolveArtifactFilter(opts.ArtifactSets)
@@ -53,7 +57,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
 		return nil
 	}
-
 	// Parse owner/repo (and optional GHES host) from --repo override if provided.
 	// Accepted formats: "owner/repo" or "HOST/owner/repo".
 	var hostOverride, ownerOverride, repoNameOverride string
@@ -74,6 +77,28 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 			return fmt.Errorf("invalid repository format '%s': expected '[HOST/]owner/repo'", opts.RepoOverride)
 		}
 	}
+	rateLimitHosts := make([]string, 0, len(opts.RunURLs))
+	seenRateLimitHosts := make(map[string]struct{}, len(opts.RunURLs))
+	for _, rawURL := range opts.RunURLs {
+		components, err := parser.ParseRunURLExtended(rawURL)
+		if err != nil {
+			continue
+		}
+		host := components.Host
+		if host == "" {
+			host = hostOverride
+		}
+		host = normalizedGitHubAPIHost(host)
+		if _, ok := seenRateLimitHosts[host]; ok {
+			continue
+		}
+		seenRateLimitHosts[host] = struct{}{}
+		rateLimitHosts = append(rateLimitHosts, host)
+	}
+	if len(rateLimitHosts) == 0 {
+		rateLimitHosts = append(rateLimitHosts, normalizedGitHubAPIHost(hostOverride))
+	}
+	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, rateLimitHosts)
 
 	// Start timeout timer if specified.
 	var startTime time.Time
@@ -135,8 +160,12 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	}
 
 	if len(runs) == 0 {
+		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
+			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
+			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 			logsData.Message = "No runs found. No valid runs could be loaded from the provided input."
 			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 				return fmt.Errorf("failed to render JSON output: %w", err)
@@ -147,7 +176,8 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	}
 
 	// Download artifacts for all runs concurrently.
-	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets})
+	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
+	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit})
 
 	filters := runFilterOpts{
 		engine:            opts.Engine,
@@ -162,20 +192,27 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 
 	// Process download results applying the same filters as DownloadWorkflowLogs.
 	var processedRuns []ProcessedRun
+	var storageLimitReached bool
 	for _, result := range downloadResults {
+		if errors.Is(result.Error, errLogsStorageLimitReached) {
+			storageLimitReached = true
+		}
 		if result.Skipped {
 			if opts.Verbose && result.Error != nil {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: %v", result.Run.DatabaseID, result.Error)))
 			}
+			finalizeLogsRunDownload(storageLimit, result)
 			continue
 		}
 
 		if result.Error != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download artifacts for run %d: %v", result.Run.DatabaseID, result.Error)))
+			finalizeLogsRunDownload(storageLimit, result)
 			continue
 		}
 
 		if applyRunFilters(ctx, result, filters, opts.Verbose) {
+			finalizeLogsRunDownload(storageLimit, result)
 			continue
 		}
 
@@ -203,20 +240,36 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		}
 
 		processedRuns = append(processedRuns, processedRun)
+		finalizeLogsRunDownload(storageLimit, result)
 	}
 
 	if len(processedRuns) == 0 {
+		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
-			logsData.Message = "No runs found matching the specified criteria."
+			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
+			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
+			logsData.Message = noRunsMessage("", false, storageLimitReached)
 			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 				return fmt.Errorf("failed to render JSON output: %w", err)
 			}
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No workflow runs with artifacts found matching the specified criteria"))
+		if storageLimitReached {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Storage limit reached before any new runs could be processed"))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No workflow runs with artifacts found matching the specified criteria"))
+		}
 		return nil
 	}
 
+	message := ""
+	if storageLimitReached {
+		message = "Storage limit reached. Results are partial because some input runs were not downloaded."
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+	}
+	finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 	return renderLogsOutput(processedRuns, renderLogsOutputOptions{
 		outputDir:      opts.OutputDir,
 		summaryFile:    opts.SummaryFile,
@@ -225,7 +278,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		jsonOutput:     opts.JSONOutput,
 		toolGraph:      opts.ToolGraph,
 		train:          opts.Train,
+		audit:          opts.Audit,
+		message:        message,
 		verbose:        opts.Verbose,
 		artifactFilter: artifactFilter,
+		apiRateLimit:   apiRateLimit,
+		apiRateLimits:  apiRateLimits,
 	})
 }

@@ -47,7 +47,7 @@ func (e *GeminiEngine) GetModelEnvVarName() string {
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Gemini engine
-// This includes GEMINI_API_KEY and optionally MCP_GATEWAY_API_KEY, GITHUB_MCP_SERVER_TOKEN,
+// This includes GEMINI_API_KEY and optionally MCP_GATEWAY_AGENT_ID, GITHUB_MCP_SERVER_TOKEN,
 // HTTP MCP header secrets, and mcp-scripts secrets.
 // When Google/Vertex WIF (github-oidc + provider=google) is configured, no static API key
 // is needed and only common MCP secrets are returned.
@@ -59,7 +59,7 @@ func (e *GeminiEngine) GetRequiredSecretNames(workflowData *WorkflowData) []stri
 		secrets = append(secrets, "GEMINI_API_KEY")
 	}
 
-	// Add common MCP secrets (MCP_GATEWAY_API_KEY if MCP servers present, mcp-scripts secrets)
+	// Add common MCP secrets (MCP_GATEWAY_AGENT_ID if MCP servers present, mcp-scripts secrets)
 	secrets = append(secrets, collectCommonMCPSecrets(workflowData)...)
 
 	// Add GitHub token for GitHub MCP server if present
@@ -118,8 +118,8 @@ func (e *GeminiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 
 	// Skip installation if custom command is specified
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		geminiLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
-		return []GitHubActionStep{}
+		geminiLog.Printf("Skipping Gemini CLI installation: custom command specified (%s)", workflowData.EngineConfig.Command)
+		return buildNpmEngineInstallStepsWithAWF(nil, workflowData, false)
 	}
 
 	// Normalize engine config version when not explicitly set, so downstream consumers
@@ -183,7 +183,7 @@ func (e *GeminiEngine) GetPreBundleSteps(workflowData *WorkflowData) []GitHubAct
 }
 
 // GetExecutionSteps returns the GitHub Actions steps for executing Gemini
-func (e *GeminiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string) []GitHubActionStep {
+func (e *GeminiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string) []GitHubActionStep { //nolint:largefunc // Existing Gemini step assembly is kept in generated order.
 	geminiLog.Printf("Generating execution steps for Gemini engine: workflow=%s, firewall=%v", workflowData.Name, isFirewallEnabled(workflowData))
 
 	var steps []GitHubActionStep
@@ -310,6 +310,7 @@ touch %s
 		// approval mode when the workspace is untrusted, which causes exit code 55.
 		"GEMINI_CLI_TRUST_WORKSPACE": "true",
 	}
+	applyPlaywrightBrowserEnv(env, workflowData)
 	if !vertexWIF {
 		// Set static API key when WIF is not configured.
 		// When WIF is active, authentication is handled by the AWF api-proxy sidecar
@@ -345,6 +346,7 @@ touch %s
 
 	// Add safe outputs env
 	applySafeOutputEnvToMap(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 
 	// Propagate W3C trace context so engine spans nest under the gh-aw.agent.setup span.
 	applyTraceContextEnvToMap(env)

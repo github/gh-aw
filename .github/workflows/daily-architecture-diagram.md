@@ -15,7 +15,7 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 
 experiments:
   detail_level:

@@ -256,6 +256,22 @@ func TestConclusionJob(t *testing.T) {
 	}
 }
 
+func TestConclusionJobRunsForSkillInstallFailures(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI:          "copilot",
+		Skills:      []string{"owner/repo/skills/example@deadbeef"},
+		SafeOutputs: &SafeOutputsConfig{},
+	}
+
+	condition := RenderCondition(compiler.buildConclusionJobCondition(data, string(constants.AgentJobName), nil))
+
+	if !strings.Contains(condition, "needs.activation.outputs.skill_install_failure_count != ''") ||
+		!strings.Contains(condition, "needs.activation.outputs.skill_install_failure_count != '0'") {
+		t.Errorf("Expected conclusion condition to include skill installation failures, got: %q", condition)
+	}
+}
+
 func TestConclusionJobIntegration(t *testing.T) {
 	// Test that the job is properly integrated with activation job outputs
 	compiler := NewCompiler()
@@ -647,6 +663,30 @@ func TestConclusionJobActionFailureIssueExpiration_DefaultFromRepoConfig(t *test
 	jobYAML := strings.Join(job.Steps, "")
 	if !strings.Contains(jobYAML, `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "168"`) {
 		t.Error("Expected default action failure issue expiration env var (168 hours) in conclusion job")
+	}
+}
+
+func TestConclusionJobActionFailureIssueExpiration_DisabledWhenFailureReportingIsOff(t *testing.T) {
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{
+		Name: "Test Workflow",
+		SafeOutputs: &SafeOutputsConfig{
+			NoOp:                 &NoOpConfig{},
+			ReportFailureAsIssue: templatableBoolPtr("false"),
+		},
+	}
+
+	job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
+	if err != nil {
+		t.Fatalf("Failed to build conclusion job: %v", err)
+	}
+	if job == nil {
+		t.Fatal("Expected conclusion job to be created")
+	}
+
+	jobYAML := strings.Join(job.Steps, "")
+	if !strings.Contains(jobYAML, `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`) {
+		t.Error("Expected disabled action failure issue expiration env var when failure reporting is disabled")
 	}
 }
 

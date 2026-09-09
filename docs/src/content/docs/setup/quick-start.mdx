@@ -25,7 +25,7 @@ head:
           {
             "@type": "HowToStep",
             "name": "Add a sample workflow and select an AI engine",
-            "text": "Run: gh aw add-wizard githubnext/agentics/daily-repo-status — then follow the interactive prompts to choose GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi and configure authentication.",
+            "text": "Run: gh aw add-wizard githubnext/agentics/repo-status — then follow the interactive prompts to choose GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi and configure authentication.",
             "position": 2
           },
           {
@@ -37,7 +37,7 @@ head:
           {
             "@type": "HowToStep",
             "name": "Customize your workflow (optional)",
-            "text": "Open .github/workflows/daily-repo-status.md and edit the instructions. If you change YAML frontmatter, run gh aw compile to regenerate the lock file, then commit both files.",
+            "text": "Open .github/workflows/repo-status.md and edit the instructions. If you change YAML frontmatter, run gh aw compile to regenerate the lock file, then commit both files.",
             "position": 4
           }
         ]
@@ -47,13 +47,15 @@ head:
 import Video from '../../../components/Video.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter (the configuration block between the `---` markers at the top of the file) and run AI agents through GitHub Actions. By the end of this guide, you will have a recurring agentic workflow running in your repository with GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi. The stable-engine path takes about 10 minutes and requires only the GitHub CLI.
-
 ## Adding an Automated Daily Status Workflow to Your Repo
+
+### YAML frontmatter
+
+GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter (the configuration block between the `---` markers at the top of the file) and run AI agents through GitHub Actions. By the end of this guide, you will have a recurring agentic workflow running in your repository with GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi. The stable-engine path takes about 10 minutes and requires only the GitHub CLI.
 
 **⏱️ Estimated time: 10 minutes**
 
-In this guide you will add an existing workflow to a GitHub repository where you are a maintainer: the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md?plain=1), running in GitHub Actions.
+In this guide you will add an existing workflow to a GitHub repository where you are a maintainer: the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/repo-status.md?plain=1), running in GitHub Actions.
 
 <Video
   src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
@@ -101,10 +103,10 @@ gh extension install github/gh-aw
 From your repository root, run one of this command:
 
 ```text wrap
-gh aw add-wizard githubnext/agentics/daily-repo-status
+gh aw add-wizard githubnext/agentics/repo-status
 ```
 
-`add-wizard` accepts workflow references in `<owner>/<repo>/<workflow-name>` format. In this guide, `githubnext/agentics` is the public [githubnext/agentics](https://github.com/githubnext/agentics) examples repository, and `daily-repo-status` is one of the sample workflows it publishes.
+`add-wizard` accepts workflow references in `<owner>/<repo>/<workflow-name>` format. In this guide, `githubnext/agentics` is the public [githubnext/agentics](https://github.com/githubnext/agentics) examples repository, and `repo-status` is one of the sample workflows it publishes.
 
 This will take you through an interactive process to:
 
@@ -186,11 +188,11 @@ With GitHub Agentic Workflows, you are in control! Your repository automation is
 
 To customize it now:
 
-1. Open the workflow markdown file located at `.github/workflows/daily-repo-status.md` in your repository.
+1. Open the workflow markdown file located at `.github/workflows/repo-status.md` in your repository.
 
 2. Edit the section "What to include" to list things you are having trouble with regularly in your repository: your issue backlog, your CI setup, your testing, the performance of your software, your roadmap. Any or all of these, or anything else you want to improve. You can also customize the style and process sections to guide the coding agent's behavior.
 
-3. If you changed the [frontmatter](/gh-aw/reference/frontmatter/) (the YAML configuration block between the `---` markers at the top of the file), regenerate the compiled workflow by running:
+3. If you changed the [frontmatter](#yaml-frontmatter) (the YAML configuration block between the `---` markers at the top of the file), regenerate the compiled workflow by running:
 
    ```text
    gh aw compile
@@ -201,7 +203,7 @@ To customize it now:
 5. Optionally trigger another run by running:
 
    ```text
-   gh aw run daily-repo-status
+   gh aw run repo-status
    ```
 
 After waiting for the workflow to complete, check the new issue created with your updated report!

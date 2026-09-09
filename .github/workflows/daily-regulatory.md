@@ -13,6 +13,10 @@ permissions:
   discussions: read
 
 
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: true
 tracker-id: daily-regulatory
 max-ai-credits: 1000

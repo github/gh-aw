@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildLogsData tests the structured data creation for logs
@@ -994,6 +996,52 @@ func TestBuildLogsDataOrganizationEmptyWhenNoRepository(t *testing.T) {
 	}
 }
 
+func TestBuildLogsDataUsesGitHubRunMetadataWithoutAwInfo(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	logsData := buildLogsData([]ProcessedRun{{
+		Run: WorkflowRun{
+			DatabaseID:   9003,
+			WorkflowName: "daily-report",
+			WorkflowPath: ".github/workflows/daily-report.lock.yml",
+			Status:       "completed",
+			Conclusion:   "failure",
+			Repository:   "myorg/myrepo",
+			Actor:        "octocat",
+			Attempt:      2,
+			HeadSha:      "abc123",
+			Event:        "schedule",
+			LogsPath:     runDir,
+		},
+	}}, runDir, nil)
+
+	require.Len(t, logsData.Runs, 1)
+	run := logsData.Runs[0]
+	assert.Equal(t, "myorg/myrepo", run.Repository)
+	assert.Equal(t, "myorg", run.Organization)
+	assert.Equal(t, "octocat", run.Actor)
+	assert.Equal(t, "2", run.RunAttempt)
+	assert.Equal(t, "abc123", run.SHA)
+	assert.Equal(t, "schedule", run.EventName)
+}
+
+func TestApplyGitHubMetadataToRunDataPreservesExistingValues(t *testing.T) {
+	t.Parallel()
+	runData := RunData{
+		Repository: "myorg/myrepo",
+		SHA:        "abc123",
+		Actor:      "octocat",
+		EventName:  "schedule",
+	}
+
+	applyGitHubMetadataToRunData(&runData, WorkflowRun{})
+
+	assert.Equal(t, "myorg/myrepo", runData.Repository)
+	assert.Equal(t, "abc123", runData.SHA)
+	assert.Equal(t, "octocat", runData.Actor)
+	assert.Equal(t, "schedule", runData.EventName)
+}
+
 // TestInferWorkflowPathFromDisplayName verifies that display names are correctly
 // slugified into conventional lock-file paths.
 func TestInferWorkflowPathFromDisplayName(t *testing.T) {
@@ -1181,4 +1229,32 @@ func TestCompactLogsDataEpisodesEmptySliceNotNull(t *testing.T) {
 	if !strings.Contains(jsonStr, `"edges":[]`) {
 		t.Errorf("expected JSON to contain \"edges\":[], got: %s", jsonStr)
 	}
+}
+
+func TestRenderLogsJSONIncludesMCPToolCalls(t *testing.T) {
+	t.Parallel()
+
+	logsData := buildLogsData([]ProcessedRun{{
+		Run: WorkflowRun{DatabaseID: 12345, WorkflowName: "Test Workflow"},
+		MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{
+			ToolCallID: "call-1",
+			Timestamp:  "2026-09-09T00:00:00Z",
+			ServerName: "github",
+			ToolName:   "issue_read",
+			InputSize:  100,
+			OutputSize: 200,
+			Duration:   "25ms",
+			Status:     "success",
+		}}},
+	}}, t.TempDir(), nil)
+
+	var output bytes.Buffer
+	require.NoError(t, renderLogsJSONToWriter(&output, logsData, false))
+
+	var rendered LogsData
+	require.NoError(t, json.Unmarshal(output.Bytes(), &rendered))
+	require.NotNil(t, rendered.MCPToolUsage)
+	require.Len(t, rendered.MCPToolUsage.ToolCalls, 1)
+	assert.Equal(t, "github", rendered.MCPToolUsage.ToolCalls[0].ServerName)
+	assert.Equal(t, "issue_read", rendered.MCPToolUsage.ToolCalls[0].ToolName)
 }

@@ -399,12 +399,29 @@ func TestBuildMCPToolUsageSummaryFilteredEvents(t *testing.T) {
 			Run: WorkflowRun{DatabaseID: 1},
 			MCPToolUsage: &MCPToolUsageData{
 				FilteredEvents: []DifcFilteredEvent{event1},
+				Integrity: &IntegrityFilterSummary{
+					TotalFiltered:        2,
+					FilteredServerCounts: map[string]int{"github": 2},
+					FilteredToolCounts:   map[string]int{"pull_request_read": 2},
+					FilteredReasonCounts: map[string]int{"integrity check failed": 2},
+				},
 			},
 		},
 		{
 			Run: WorkflowRun{DatabaseID: 2},
 			MCPToolUsage: &MCPToolUsageData{
 				FilteredEvents: []DifcFilteredEvent{event2},
+			},
+		},
+		{
+			Run: WorkflowRun{DatabaseID: 3},
+			MCPToolUsage: &MCPToolUsageData{
+				Integrity: &IntegrityFilterSummary{
+					TotalFiltered:        2,
+					FilteredServerCounts: map[string]int{"github": 1, "playwright": 1},
+					FilteredToolCounts:   map[string]int{"issue_read": 1, "navigate": 1},
+					FilteredReasonCounts: map[string]int{"integrity": 2},
+				},
 			},
 		},
 	}
@@ -416,4 +433,10 @@ func TestBuildMCPToolUsageSummaryFilteredEvents(t *testing.T) {
 	require.Len(t, summary.FilteredEvents, 2, "should aggregate filtered events from all runs")
 	assert.Equal(t, event1, summary.FilteredEvents[0])
 	assert.Equal(t, event2, summary.FilteredEvents[1])
+	require.NotNil(t, summary.Integrity, "integrity aggregates should be included")
+	assert.Equal(t, 4, summary.Integrity.TotalFiltered, "raw and compact integrity counts should be aggregated without duplicating a run")
+	assert.Equal(t, 3, summary.Integrity.RunsWithFilteredEvents, "runs with filtered events should be counted")
+	assert.Equal(t, map[string]int{"github": 3, "playwright": 1}, summary.Integrity.FilteredServerCounts)
+	assert.Equal(t, map[string]int{"issue_read": 2, "navigate": 1, "pull_request_read": 1}, summary.Integrity.FilteredToolCounts)
+	assert.Equal(t, map[string]int{"integrity": 2, "integrity check failed": 1, "secrecy violation": 1}, summary.Integrity.FilteredReasonCounts)
 }

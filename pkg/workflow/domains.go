@@ -543,7 +543,7 @@ func extractHTTPMCPDomains(tools map[string]any) []string {
 
 // extractPlaywrightDomains returns Playwright domains when Playwright tool is configured
 // Returns a slice of domain names required for Playwright browser downloads
-// These domains are needed when Playwright MCP server initializes in the Docker container
+// These domains are needed when Playwright CLI installs browser binaries.
 func extractPlaywrightDomains(tools map[string]any) []string {
 	if tools == nil {
 		return []string{}

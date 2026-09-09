@@ -54,7 +54,7 @@ tools:
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 features:
@@ -65,7 +65,7 @@ evals:
 
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Typist - Go Type Consistency Analysis

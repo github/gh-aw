@@ -60,6 +60,18 @@ func validateSharedWorkflowFields(frontmatter map[string]any) error {
 			}
 			continue
 		}
+		if key == "concurrency" {
+			if err := validateSharedWorkflowConcurrencyField(frontmatter["concurrency"]); err != nil {
+				return err
+			}
+			continue
+		}
+		if key == "features" {
+			if err := validateSharedWorkflowFeaturesField(frontmatter["features"]); err != nil {
+				return err
+			}
+			continue
+		}
 		if setutil.Contains(sharedWorkflowForbiddenFields, key) {
 			forbiddenFound = append(forbiddenFound, key)
 		}
@@ -71,6 +83,50 @@ func validateSharedWorkflowFields(frontmatter map[string]any) error {
 			return fmt.Errorf("field '%s' cannot be used in shared workflows (only allowed in main workflows with 'on' trigger)", forbiddenFound[0])
 		}
 		return fmt.Errorf("fields %v cannot be used in shared workflows (only allowed in main workflows with 'on' trigger)", forbiddenFound)
+	}
+
+	return nil
+}
+
+func validateSharedWorkflowConcurrencyField(concurrencyValue any) error {
+	switch value := concurrencyValue.(type) {
+	case string:
+		if strings.TrimSpace(value) == "" {
+			return errors.New("field 'concurrency' cannot be used in shared workflows (only concurrency.group and concurrency.job-discriminator are import-safe)")
+		}
+		return nil
+	case map[string]any:
+		for key := range value {
+			if key != "group" && key != "job-discriminator" {
+				return fmt.Errorf("field 'concurrency' in shared workflows can only include import-safe fields group and job-discriminator; found unsupported key: %s", key)
+			}
+		}
+		return nil
+	default:
+		return errors.New("field 'concurrency' cannot be used in shared workflows (only concurrency.group and concurrency.job-discriminator are import-safe)")
+	}
+}
+
+// sharedWorkflowAllowedFeaturesFields lists the features.* sub-fields that are safe to
+// import from shared workflows. Other feature keys are configuration/experimental
+// settings intended only for main workflows and are rejected.
+var sharedWorkflowAllowedFeaturesFields = map[string]struct{}{
+	"samples":             {},
+	"intentional-failure": {},
+}
+
+// validateSharedWorkflowFeaturesField validates features: usage in shared workflows.
+// Shared workflows may use features: only for import-safe feature flags.
+func validateSharedWorkflowFeaturesField(featuresValue any) error {
+	featuresMap, ok := featuresValue.(map[string]any)
+	if !ok {
+		return errors.New("field 'features' cannot be used in shared workflows (only features.samples and features.intentional-failure are import-safe)")
+	}
+
+	for key := range featuresMap {
+		if _, ok := sharedWorkflowAllowedFeaturesFields[key]; !ok {
+			return fmt.Errorf("field 'features' in shared workflows can only include import-safe fields samples and intentional-failure; found unsupported key: %s", key)
+		}
 	}
 
 	return nil

@@ -315,13 +315,13 @@ func downloadLegacyEvalsArtifactIfNeeded(ctx context.Context, cfg auditRunConfig
 }
 
 func cacheRecoveryError(message string, runID int64, runOutputDir string, err error) error {
-	return fmt.Errorf(message+"\n\n"+
+	return fmt.Errorf("%s\n\n"+
 		"To download artifacts, use the GitHub MCP server:\n\n"+
 		"1. Use the github-mcp-server tool 'download_workflow_run_artifacts' with:\n"+
 		"   - run_id: %d\n"+
 		"   - output_directory: %s\n\n"+
 		"2. After downloading, run this audit command again to analyze the cached artifacts.\n\n"+
-		"Original error: %v", runID, runOutputDir, err)
+		"Original error: %w", message, runID, runOutputDir, err)
 }
 
 func prepareRunForAnalysis(run WorkflowRun, cfg auditRunConfig, useLocalCache bool) WorkflowRun {

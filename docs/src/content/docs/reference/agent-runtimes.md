@@ -5,7 +5,7 @@ sidebar:
   order: 1340
 ---
 
-Agentic workflows use AWF (Agent Workflow Firewall) to run the agent in an isolated environment. The environment can use the runner's standard Docker runtime, gVisor, Docker sbx, or preview Cloud Hypervisor mode. ARC DinD is a runner topology that changes how the standard Docker environment is reached; it is not another value of `sandbox.agent.runtime`.
+Agentic workflows use AWF (Agent Workflow Firewall) to run the agent in an isolated environment. The environment can use the runner's standard Docker runtime, gVisor, Docker sbx, or preview Cloud Hypervisor mode. ARC DinD is a runner topology that changes how the standard Docker environment is reached; it is not another value of `sandbox.agent.runtime`. The `gvisor` and `docker-sbx` runtimes are deprecated and will be removed in a future release; use `docker` instead.
 
 Use this page when selecting a runtime, writing workflow frontmatter, provisioning a runner, or diagnosing a runtime setup failure.
 
@@ -15,7 +15,7 @@ These similarly named fields control different layers:
 
 | Field | Purpose | Values covered here |
 | --- | --- | --- |
-| `sandbox.agent.runtime` | Selects the isolation backend for the main agent | `docker`, `docker-sudo-iptables`, `gvisor`, `docker-sbx`, `cloud-hypervisor`, or omitted for Docker |
+| `sandbox.agent.runtime` | Selects the isolation backend for the main agent | `docker`, `docker-sudo-iptables`, `gvisor` (deprecated), `docker-sbx` (deprecated), `cloud-hypervisor`, or omitted for Docker |
 | `sandbox.agent.runtime-install` | Controls whether gh-aw installs and prepares gVisor or Docker sbx | `true` by default; `false` for a pre-provisioned runner |
 | `runner.topology` | Describes how the runner reaches Docker | `arc-dind`, or omitted for a local Docker daemon |
 | `runtimes` | Installs language toolchains such as Node.js, Python, and Go | Unrelated to agent isolation |
@@ -283,13 +283,13 @@ Preview scope is intentionally narrow:
 
 - GitHub-hosted runners only (`RUNNER_ENVIRONMENT=github-hosted`).
 - Ubuntu Linux x86_64 only (`RUNNER_OS=Linux`, `RUNNER_ARCH=X64`, `ImageOS=ubuntu*`).
-- `/dev/kvm` must be present.
+- `/dev/kvm` must be present, and the host must have `gh`, `rsync`, and Docker (with a running Docker Engine), a usable cgroup v2 hierarchy, and a kernel that reports Landlock LSM support.
 - `runner.topology: arc-dind` is not supported.
 - `tools.github.mode: gh-proxy` and the `integrity-reactions` feature are not supported: the CLI proxy sidecar is not attached to the isolated topology.
 - `sandbox.agent.allow-host-ports` and GitHub Actions `services:` with published ports are not supported: host access requires `sandbox.agent.runtime: docker-sudo-iptables`.
 - `enclaves` configuration is not supported.
 
-The compiler grants only the runner user read/write access to `/dev/kvm`, then emits host preflight and release-asset provisioning steps before AWF runs. Provisioning downloads the Cloud Hypervisor bundle, `SHA256SUMS`, and `manifest.json` from the pinned `gh-aw-firewall` release, verifies checksums, and feeds AWF digest-pinned flags for the Cloud Hypervisor binary, `virtiofsd`, kernel, rootfs, and supervisor.
+The compiler grants only the runner user read/write access to `/dev/kvm`, then emits host preflight and release-asset provisioning steps before AWF runs. Host preflight fails closed unless `/dev/kvm`, `gh`, `rsync`, Docker, a usable cgroup v2 hierarchy, and Landlock LSM support are all present. Provisioning downloads the Cloud Hypervisor guest archive together with its attested `manifest.json` and Sigstore `manifest.sigstore.jsonl` bundle from the pinned `gh-aw-firewall` release, validates the release identity, artifact names, and bundle structure, and feeds AWF the manifest path, bundle path, and exact release tag so AWF can perform the authoritative offline Sigstore/provenance verification for the Cloud Hypervisor binary, `virtiofsd`, kernel, rootfs, and supervisor.
 
 AWF launches with host privileges required to create the VM, but the runtime remains in strict network-isolation mode. The guest defaults to 2 vCPUs and 4096 MiB of memory. Its trusted topology attachment is limited to the MCP gateway on TCP 8080; the CLI proxy is not attached.
 

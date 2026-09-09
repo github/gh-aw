@@ -1366,7 +1366,7 @@ jobs:
       # Downloads pre-built binary from GitHub releases instead of using go install
     - name: Install golangci-lint
       run: |
-        GOLANGCI_LINT_VERSION="v2.12.2"
+        GOLANGCI_LINT_VERSION="v2.13.2"
         GOOS=$(go env GOOS)
         GOARCH=$(go env GOARCH)
         GOPATH=$(go env GOPATH)

@@ -564,10 +564,13 @@ func TestCommentAuthorAssociationImportedExpressionBot(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "comment-auth-import-test")
 	compiler := NewCompiler()
 
-	// Shared agentic workflow: no on: field, but defines a bot with a GHA expression.
+	// Shared agentic workflow: defines a bot with a GHA expression using the supported
+	// on.bots path. This should disable the static author_association guard because the
+	// bot identity is only known at runtime.
 	sharedContent := `---
-bots:
-  - "${{ vars.TRUSTED_BOT }}"
+on:
+ bots:
+   - "${{ vars.TRUSTED_BOT }}"
 ---
 `
 	sharedPath := filepath.Join(tmpDir, "shared-bots.md")

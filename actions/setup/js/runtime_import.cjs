@@ -14,6 +14,7 @@ const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agent
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 /**
  * Makes any "## skill:"/"## agent:" block in a runtime-imported chunk of
@@ -401,6 +402,15 @@ function isSafeExpression(expr) {
 }
 
 /**
+ * Generates the compiler's hash-based environment variable name for a GitHub expression.
+ * @param {string} expr - The GitHub expression content without ${{ }}.
+ * @returns {string}
+ */
+function generateHashedExpressionEnvVarName(expr) {
+  return "GH_AW_EXPR_" + crypto.createHash("sha256").update(expr).digest("hex").slice(0, 8).toUpperCase();
+}
+
+/**
  * Evaluates a safe GitHub Actions expression at runtime
  * @param {string} expr - The expression to evaluate (without ${{ }})
  * @returns {string} - The evaluated value or original expression if cannot evaluate
@@ -454,6 +464,12 @@ function evaluateExpression(expr) {
     const envValue = process.env[envVarName];
     if (envValue !== undefined && envValue !== null) {
       return envValue;
+    }
+
+    const hashedEnvVarName = generateHashedExpressionEnvVarName(trimmed);
+    const hashedEnvValue = process.env[hashedEnvVarName];
+    if (hashedEnvValue !== undefined && hashedEnvValue !== null) {
+      return hashedEnvValue;
     }
     // If not found in environment, continue to try other evaluation methods below
   }
@@ -972,7 +988,7 @@ function generatePlaceholderName(expr) {
  * Resolves a runtime-import file path to its normalized absolute path.
  * @param {string} filepathOrUrl - File path (not URL)
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
- * @returns {{filepath: string, normalizedPath: string}}
+ * @returns {{filepath: string, normalizedPath: string, normalizedBaseFolder: string}}
  */
 function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
   if (/^https?:\/\//i.test(filepathOrUrl)) {
@@ -1031,11 +1047,11 @@ function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
     baseFolder = workspaceDir;
     absolutePath = path.resolve(workspaceDir, filepath);
     normalizedPath = path.normalize(absolutePath);
-    normalizedBaseFolder = path.normalize(baseFolder);
+    normalizedBaseFolder = path.normalize(path.join(workspaceDir, ".agents"));
 
     // Security check: ensure the resolved path is within the workspace
-    const relativePath = path.relative(normalizedBaseFolder, normalizedPath);
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    const relativePath = path.relative(path.normalize(baseFolder), normalizedPath);
+    if (relativePath === ".." || relativePath.startsWith(".." + path.sep) || path.isAbsolute(relativePath)) {
       throw new Error(`${ERR_CONFIG}: Security: Path ${filepathOrUrl} must be within workspace (resolves to: ${relativePath})`);
     }
     // Additional check: ensure path stays within .agents folder
@@ -1057,7 +1073,29 @@ function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
     }
   }
 
-  return { filepath, normalizedPath };
+  return { filepath, normalizedPath, normalizedBaseFolder };
+}
+
+/**
+ * Verifies the resolved runtime-import target remains inside the allowed base
+ * after following symlinks.
+ * @param {string} normalizedPath
+ * @param {string} normalizedBaseFolder
+ * @param {string} filepathOrUrl
+ */
+function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filepathOrUrl) {
+  let realPath;
+  let realBase;
+  try {
+    realPath = fs.realpathSync(normalizedPath);
+    realBase = fs.realpathSync(normalizedBaseFolder);
+  } catch (err) {
+    throw new Error(`${ERR_SYSTEM}: Failed to resolve runtime import path ${filepathOrUrl}: ${getErrorMessage(err)}`, { cause: err });
+  }
+  const relativePath = path.relative(realBase, realPath);
+  if (relativePath === ".." || relativePath.startsWith(".." + path.sep) || path.isAbsolute(relativePath)) {
+    throw new Error(`${ERR_VALIDATION}: Security: Path ${filepathOrUrl} must remain within its allowed folder after resolving symlinks`);
+  }
 }
 
 /**
@@ -1077,7 +1115,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   }
 
   // Otherwise, process as a file
-  const { filepath, normalizedPath } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
+  const { filepath, normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   // Check if file exists
   if (!fs.existsSync(normalizedPath)) {
@@ -1087,6 +1125,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     }
     throw new Error(`${ERR_SYSTEM}: Runtime import file not found: ${normalizedPath}`);
   }
+  assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFolder, filepathOrUrl);
 
   // Read the file
   let content;

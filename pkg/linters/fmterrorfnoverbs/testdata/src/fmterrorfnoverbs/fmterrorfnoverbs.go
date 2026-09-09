@@ -63,3 +63,21 @@ func realVerbWithEscapePercent(n int) error {
 func multipleEscapePercents() error {
 	return fmtalias.Errorf("between 50%% and 90%% utilised") // want `fmt\.Errorf called with no format verbs; use errors\.New`
 }
+
+// concatNoVerbs builds its format string via string concatenation of literals;
+// the literal portion has no format verbs.
+func concatNoVerbs() error {
+	return fmtalias.Errorf("operation failed: " + "occurred with no additional context") // want `fmt\.Errorf called with no format verbs; use errors\.New`
+}
+
+// opaqueConcatNoVerbs builds format string with an opaque prefix;
+// must NOT be flagged because prefix may contain verbs at runtime.
+func opaqueConcatNoVerbs(prefix string) error {
+	return fmtalias.Errorf(prefix + " occurred with no additional context")
+}
+
+// concatWithVerb builds its format string via string concatenation of literals and
+// contains a real verb; must NOT be flagged.
+func concatWithVerb(n int) error {
+	return fmtalias.Errorf("operation failed: "+"occurred %d times", n)
+}

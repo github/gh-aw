@@ -166,6 +166,37 @@ jobs:
 
     - name: Run shellcheck on actions/setup/sh
       run: make shellcheck-setup-sh
+  sh-playwright-browsers:
+    name: "Playwright Browsers sh Integration Test: ${{ matrix.browser }}"
+    if: ${{ needs.changes.outputs.has_changes == 'true' }}
+    needs:
+    - changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    concurrency:
+      group: ci-${{ github.ref }}-sh-playwright-browsers-${{ matrix.browser }}
+      cancel-in-progress: true
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      with:
+        persist-credentials: false
+
+    - name: Set up Node.js
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f   # v6
+      with:
+        node-version: "24"
+
+    - name: Run install_playwright_browsers.sh integration tests
+      env:
+        PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers
+      run: bash actions/setup/sh/install_playwright_browsers_integration_test.sh "${{ matrix.browser }}"
   integration:
     name: "Integration: ${{ matrix.test-group.name }}"
     if: ${{ needs.changes.outputs.has_changes == 'true' }}

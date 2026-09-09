@@ -33,6 +33,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	}}
 
 	t.Run("normalizes canonical and dotted forms", func(t *testing.T) {
+		t.Parallel()
 		refs, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"canonical": {Metric: "grader:score"},
 			"dotted":    {Metric: "graders.score.value"},
@@ -42,6 +43,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	})
 
 	t.Run("rejects missing grader", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"test": {Metric: "grader:missing"},
 		}, graders)
@@ -49,6 +51,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	})
 
 	t.Run("rejects disabled grader", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"test": {Metric: "grader:disabled"},
 		}, graders)
@@ -56,6 +59,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	})
 
 	t.Run("rejects malformed reference", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"test": {Metric: "grader:"},
 		}, graders)
@@ -63,6 +67,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	})
 
 	t.Run("rejects unsupported dotted suffix", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"test": {Metric: "graders.score.passed"},
 		}, graders)
@@ -70,6 +75,7 @@ func TestResolveGraderMetricReferences(t *testing.T) {
 	})
 
 	t.Run("rejects misspelled value suffix", func(t *testing.T) {
+		t.Parallel()
 		_, err := resolveGraderMetricReferences(map[string]*workflow.ExperimentConfig{
 			"test": {Metric: "graders.score.vaule"},
 		}, graders)
@@ -139,6 +145,7 @@ func TestExtractGraderObservation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			observation, reason := extractGraderObservation(tt.artifact, "42", "candidate", "score")
 			assert.Equal(t, tt.wantReason, reason)
 			if reason == "" {
@@ -155,6 +162,7 @@ func TestExtractGraderObservation(t *testing.T) {
 func TestReadGraderResultsArtifact(t *testing.T) {
 	t.Parallel()
 	t.Run("loads unified agent grader results", func(t *testing.T) {
+		t.Parallel()
 		runDir := t.TempDir()
 		resultsDir := filepath.Join(runDir, "agent", "graders")
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
@@ -170,6 +178,7 @@ func TestReadGraderResultsArtifact(t *testing.T) {
 	})
 
 	t.Run("loads fallback artifact grader results", func(t *testing.T) {
+		t.Parallel()
 		runDir := t.TempDir()
 		resultsDir := filepath.Join(runDir, "agent-output-fallback", "agent", "graders")
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
@@ -186,11 +195,13 @@ func TestReadGraderResultsArtifact(t *testing.T) {
 	})
 
 	t.Run("missing artifact is excluded", func(t *testing.T) {
+		t.Parallel()
 		data := readGraderResultsArtifact(t.TempDir())
 		assert.Equal(t, exclusionArtifactUnavailable, data.ExclusionReason)
 	})
 
 	t.Run("malformed artifact is excluded", func(t *testing.T) {
+		t.Parallel()
 		runDir := t.TempDir()
 		resultsDir := filepath.Join(runDir, "graders")
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
@@ -205,6 +216,7 @@ func TestReadGraderResultsArtifact(t *testing.T) {
 	})
 
 	t.Run("oversized artifact is excluded as too large", func(t *testing.T) {
+		t.Parallel()
 		runDir := t.TempDir()
 		resultsDir := filepath.Join(runDir, "graders")
 		require.NoError(t, os.MkdirAll(resultsDir, 0o755))
@@ -287,7 +299,7 @@ func TestComputeGraderBackedExperimentAnalysis(t *testing.T) {
 		Total:    6,
 	}
 
-	analysis := computeExperimentAnalysisWithObservations(exp, cfg, nil, nil, set)
+	analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, nil)
 	assert.Equal(t, "trajectory-efficiency", analysis.MetricGraderID)
 	assert.Equal(t, "continuous", analysis.MetricType)
 	assert.Equal(t, "READY_FOR_ANALYSIS", analysis.Recommendation)
@@ -352,7 +364,7 @@ func TestComputeGraderBackedExperimentDecision(t *testing.T) {
 		Total:    6,
 	}
 
-	analysis := computeExperimentAnalysisWithObservations(exp, cfg, nil, nil, set)
+	analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, nil)
 
 	assert.Equal(t, ExperimentReadinessReady, analysis.Readiness)
 	assert.Equal(t, ExperimentDecisionPromote, analysis.Decision)
@@ -403,7 +415,7 @@ func TestGraderReadinessUsesValidObservations(t *testing.T) {
 		Total:    20,
 	}
 
-	analysis := computeExperimentAnalysisWithObservations(exp, cfg, nil, nil, set)
+	analysis := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, set, nil)
 	assert.Equal(t, "EXTEND", analysis.Recommendation)
 	variants := variantsByName(analysis.Variants)
 	assert.True(t, variants["control"].BelowMinSamples)
@@ -445,24 +457,28 @@ func TestLoadGraderRunDataDeduplicatesRunIDs(t *testing.T) {
 func TestGraderStatisticalMethods(t *testing.T) {
 	t.Parallel()
 	t.Run("welch t test", func(t *testing.T) {
+		t.Parallel()
 		pValue, err := welchTTest([]float64{0.6, 0.7, 0.8}, []float64{0.8, 0.9, 1.0})
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, pValue, 0.0)
 		assert.LessOrEqual(t, pValue, 1.0)
 	})
 	t.Run("proportion test", func(t *testing.T) {
+		t.Parallel()
 		pValue, err := twoProportionTest([]float64{0, 0, 1, 0}, []float64{1, 1, 1, 0})
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, pValue, 0.0)
 		assert.LessOrEqual(t, pValue, 1.0)
 	})
 	t.Run("bayesian ab", func(t *testing.T) {
+		t.Parallel()
 		probability, err := betaBinomialProbability([]float64{0, 0, 1}, []float64{1, 1, 1})
 		require.NoError(t, err)
 		assert.Greater(t, probability, 0.5)
 		assert.LessOrEqual(t, probability, 1.0)
 	})
 	t.Run("proportion rejects continuous values", func(t *testing.T) {
+		t.Parallel()
 		_, err := twoProportionTest([]float64{0.2}, []float64{0.8})
 		require.ErrorContains(t, err, "0/1")
 	})

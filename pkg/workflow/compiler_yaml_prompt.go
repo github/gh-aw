@@ -98,6 +98,14 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 			expressionMappings = append(expressionMappings, mainExprMappings...)
 		}
 	}
+	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForCompilerAnalysis(data); runtimeImportMarkdown != "" {
+		runtimeImportExtractor := NewExpressionExtractor()
+		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(runtimeImportMarkdown)
+		if err == nil && len(runtimeImportExprMappings) > 0 {
+			compilerYamlPromptLog.Printf("Extracted %d expressions from runtime-import markdown", len(runtimeImportExprMappings))
+			expressionMappings = append(expressionMappings, runtimeImportExprMappings...)
+		}
+	}
 	expressionMappings = filterExpressionsForActivation(expressionMappings, data.Jobs, beforeActivationJobs)
 	if len(data.Experiments) > 0 {
 		experimentMappings := ExperimentExpressionMappings(data.Experiments)
@@ -331,4 +339,161 @@ func resolveWorkspaceRoot(markdownPath string) string {
 	}
 	// Fallback: use the directory containing the workflow file.
 	return filepath.Dir(markdownPath)
+}
+
+func (c *Compiler) collectRuntimeImportMarkdownForCompilerAnalysis(data *WorkflowData) string {
+	if data == nil || c.markdownPath == "" {
+		return ""
+	}
+	workspaceRoot := resolveWorkspaceRoot(c.markdownPath)
+	var seed strings.Builder
+	seed.WriteString(data.MarkdownContent)
+	if data.MainWorkflowMarkdown != "" {
+		seed.WriteByte('\n')
+		seed.WriteString(data.MainWorkflowMarkdown)
+	}
+	for _, importPath := range data.ImportPaths {
+		seed.WriteString("\n{{#runtime-import ")
+		seed.WriteString(filepath.ToSlash(importPath))
+		seed.WriteString("}}")
+	}
+	for _, entry := range data.PromptImports {
+		if entry.ImportPath != "" {
+			seed.WriteString("\n{{#runtime-import ")
+			seed.WriteString(filepath.ToSlash(entry.ImportPath))
+			seed.WriteString("}}")
+		}
+	}
+	seedContent := seed.String()
+	if !strings.Contains(seedContent, "{{#runtime-import") && !strings.Contains(seedContent, "{{#import") {
+		return ""
+	}
+	return collectRuntimeImportMarkdownContent(seedContent, workspaceRoot, map[string]struct{}{})
+}
+
+func collectRuntimeImportMarkdownContent(markdownContent, workspaceRoot string, seen map[string]struct{}) string {
+	refs := extractRuntimeImportReferences(markdownContent)
+	if len(refs) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+	for _, ref := range refs {
+		content, ok, stop := readRuntimeImportMarkdownForAnalysis(ref, workspaceRoot, seen)
+		if stop {
+			return builder.String()
+		}
+		if !ok {
+			continue
+		}
+		builder.WriteByte('\n')
+		builder.WriteString(content)
+		if nested := collectRuntimeImportMarkdownContent(content, workspaceRoot, seen); nested != "" {
+			builder.WriteByte('\n')
+			builder.WriteString(nested)
+		}
+	}
+	return builder.String()
+}
+
+func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceRoot string, seen map[string]struct{}) (string, bool, bool) {
+	for _, candidate := range runtimeImportAnalysisCandidatePaths(ref.importPath, workspaceRoot) {
+		seenKey := fmt.Sprintf("%s:%d-%d", candidate, ref.startLine, ref.endLine)
+		if _, alreadySeen := seen[seenKey]; alreadySeen {
+			return "", false, false
+		}
+		if !runtimeImportAnalysisRealPathAllowed(candidate, workspaceRoot) {
+			continue
+		}
+		rawContent, err := os.ReadFile(candidate)
+		if err != nil {
+			continue
+		}
+		seen[seenKey] = struct{}{}
+		content := string(rawContent)
+		if ref.startLine > 0 || ref.endLine > 0 {
+			content = applyRuntimeImportLineRangeForAnalysis(content, ref.startLine, ref.endLine)
+		}
+		importedBody, extractErr := parser.ExtractMarkdownContent(content)
+		if extractErr != nil {
+			importedBody = content
+		}
+		if err := validateExpressionSafety(importedBody); err != nil {
+			return "", false, true
+		}
+		return importedBody, true, false
+	}
+	return "", false, false
+}
+
+func applyRuntimeImportLineRangeForAnalysis(content string, startLine, endLine int) string {
+	lines := strings.Split(content, "\n")
+	start := startLine
+	if start <= 0 {
+		start = 1
+	}
+	end := endLine
+	if end <= 0 || end > len(lines) {
+		end = len(lines)
+	}
+	if start > end || start > len(lines) {
+		return ""
+	}
+	return strings.Join(lines[start-1:end], "\n")
+}
+
+func runtimeImportAnalysisRealPathAllowed(candidate, workspaceRoot string) bool {
+	for _, base := range []string{
+		filepath.Join(workspaceRoot, strings.TrimSuffix(constants.GithubDir, "/")),
+		filepath.Join(workspaceRoot, ".agents"),
+	} {
+		if realPathWithinBase(candidate, base) {
+			return true
+		}
+	}
+	return false
+}
+
+func realPathWithinBase(pathToCheck, baseDir string) bool {
+	realBase, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return false
+	}
+	realPath, err := filepath.EvalSymlinks(pathToCheck)
+	if err != nil {
+		return false
+	}
+	relativePath, err := filepath.Rel(realBase, realPath)
+	return err == nil && relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) && !filepath.IsAbs(relativePath)
+}
+
+func runtimeImportAnalysisCandidatePaths(importPath, workspaceRoot string) []string {
+	normalized := filepath.ToSlash(strings.TrimSpace(importPath))
+	if before, _, ok := strings.Cut(normalized, ":"); ok {
+		normalized = before
+	}
+	if strings.HasPrefix(normalized, "/") {
+		normalized = strings.TrimLeft(normalized, "/")
+		if !strings.HasPrefix(normalized, constants.GithubDir) && !strings.HasPrefix(normalized, ".agents/") {
+			return nil
+		}
+	}
+	normalized = strings.TrimPrefix(normalized, "./")
+	if normalized == "" || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") {
+		return nil
+	}
+
+	githubDir := strings.TrimSuffix(constants.GithubDir, "/")
+	if strings.HasPrefix(normalized, githubDir+"/") {
+		return []string{filepath.Join(workspaceRoot, filepath.FromSlash(normalized))}
+	}
+
+	candidates := []string{
+		filepath.Join(workspaceRoot, githubDir, filepath.FromSlash(normalized)),
+		filepath.Join(workspaceRoot, githubDir, "workflows", filepath.FromSlash(normalized)),
+	}
+	if candidates[0] == candidates[1] {
+		return candidates[:1]
+	}
+	return candidates
 }

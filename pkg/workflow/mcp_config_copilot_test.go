@@ -363,6 +363,36 @@ func TestRenderCustomMCPEnvVars_NonCopilotSecretsEscaped(t *testing.T) {
 	}
 }
 
+func TestRenderCustomMCPEnvVars_TOMLEnvFallbackUsesShellVariable(t *testing.T) {
+	result := renderCustomMCPEnvVars(map[string]string{
+		"SENTRY_HOST": "${{ env.SENTRY_HOST || 'sentry.io' }}",
+	}, true)
+
+	if got := result["SENTRY_HOST"]; got != "${SENTRY_HOST}" {
+		t.Errorf("expected SENTRY_HOST to be rendered as ${SENTRY_HOST}, got %q", got)
+	}
+}
+
+func TestRenderCustomMCPEnvVars_TOMLEnvNoFallbackUsesShellVariable(t *testing.T) {
+	result := renderCustomMCPEnvVars(map[string]string{
+		"DD_SITE": "${{ env.DD_SITE }}",
+	}, true)
+
+	if got := result["DD_SITE"]; got != "${DD_SITE}" {
+		t.Errorf("expected DD_SITE to be rendered as ${DD_SITE}, got %q", got)
+	}
+}
+
+func TestRenderCustomMCPEnvVars_TOMLRepeatedEnvVariableUsesShellVariable(t *testing.T) {
+	result := renderCustomMCPEnvVars(map[string]string{
+		"HOST_URL": "${{ env.HOST || 'localhost' }}/${{ env.HOST }}",
+	}, true)
+
+	if got := result["HOST_URL"]; got != "${HOST}/${HOST}" {
+		t.Errorf("expected HOST_URL to be rendered as ${HOST}/${HOST}, got %q", got)
+	}
+}
+
 func TestRenderSharedMCPConfig_TypeConversion(t *testing.T) {
 	tests := []struct {
 		name           string

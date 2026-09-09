@@ -158,6 +158,18 @@ func TestMCPGatewayVersionFromFrontmatter(t *testing.T) {
 			description:     "should use default version when version is empty string",
 		},
 		{
+			name: "dynamic enclave without explicit version uses default when it satisfies delegation minimum",
+			sandboxConfig: &SandboxConfig{
+				MCP: &MCPGatewayRuntimeConfig{
+					Container: constants.DefaultMCPGatewayContainer,
+					Version:   "",
+					Port:      8080,
+				},
+			},
+			expectedVersion: string(constants.DefaultMCPGatewayVersion),
+			description:     "should use the default version when it satisfies the dynamic delegation minimum",
+		},
+		{
 			name: "version 'latest' preserved",
 			sandboxConfig: &SandboxConfig{
 				MCP: &MCPGatewayRuntimeConfig{
@@ -188,6 +200,10 @@ func TestMCPGatewayVersionFromFrontmatter(t *testing.T) {
 			workflowData := &WorkflowData{
 				SandboxConfig: tt.sandboxConfig,
 				Tools:         map[string]any{"github": map[string]any{}},
+			}
+			if tt.name == "dynamic enclave without explicit version uses default when it satisfies delegation minimum" {
+				workflowData = dynamicEnclaveWorkflowData()
+				workflowData.SandboxConfig.MCP.Version = ""
 			}
 
 			// Ensure MCP gateway config is applied (includes normalization of "latest")
@@ -654,6 +670,48 @@ tools:
 		"MCP gateway domain should use the internal container name in network isolation mode")
 	require.Contains(t, yamlStr, `export MCP_GATEWAY_HOST_DOMAIN="localhost"`,
 		"MCP gateway host domain should be localhost in network isolation mode so host-side clients can connect")
+}
+
+func TestMCPGatewayDockerCommandUsesHostNetworkInHostAccessMode(t *testing.T) {
+	frontmatter := `---
+on: workflow_dispatch
+engine: copilot
+sandbox:
+  agent:
+    runtime: docker-sudo-iptables
+tools:
+  github:
+    mode: remote
+    toolsets: [repos]
+---
+
+# Test Host Access MCP Gateway
+`
+
+	compiler := NewCompiler()
+
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "test.md")
+
+	err := os.WriteFile(inputFile, []byte(frontmatter), 0644)
+	require.NoError(t, err, "Failed to write test input file")
+
+	err = compiler.CompileWorkflow(inputFile)
+	require.NoError(t, err, "Compilation should succeed")
+
+	outputFile := stringutil.MarkdownToLockFile(inputFile)
+	content, err := os.ReadFile(outputFile)
+	require.NoError(t, err, "Failed to read output file")
+	yamlStr := string(content)
+
+	require.Contains(t, yamlStr, `docker run -i --rm --network host`,
+		"Docker command should use host networking in host-access mode")
+	require.NotContains(t, yamlStr, `-p 127.0.0.1:`,
+		"Docker command should not publish the gateway port in host-access mode")
+	require.Contains(t, yamlStr, `export MCP_GATEWAY_DOMAIN="host.docker.internal"`,
+		"MCP gateway domain should use host.docker.internal in host-access mode")
+	require.Contains(t, yamlStr, `--enable-host-access`,
+		"Agent sandbox should enable host access")
 }
 
 // TestMCPGatewayDockerCommandGeminiNetworkIsolationUsesTopologyHostname verifies that

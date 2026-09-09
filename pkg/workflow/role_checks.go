@@ -419,7 +419,7 @@ func hasOnlySafeOnMapEvents(onMap map[string]any, roles []string) bool {
 
 func isRoleCheckConfigKey(key string) bool {
 	switch key {
-	case "allow-bot-authored-trigger-comment", "bots", "command", "labels", "reaction", "roles", "stop-after":
+	case "allow-bot-authored-trigger-comment", "bots", "command", "cooldown", "labels", "reaction", "roles", "stop-after":
 		return true
 	default:
 		return false

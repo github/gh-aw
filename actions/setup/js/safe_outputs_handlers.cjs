@@ -20,7 +20,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { getOrGenerateTemporaryId } = require("./temporary_id.cjs");
+const { generateTemporaryId, getOrGenerateTemporaryId } = require("./temporary_id.cjs");
 const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs");
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
@@ -32,6 +32,7 @@ const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
+const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
 
 /** PR event names used for target:triggering context validation across all safe-output handlers. */
 const PR_EVENT_NAMES = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
@@ -101,7 +102,7 @@ function readJSONFile(filePath) {
 
 const safeOutputsTools = readJSONFile(path.join(__dirname, "safe_outputs_tools.json"));
 
-const safeOutputsToolMap = new Map(safeOutputsTools.map(tool => [tool.name, tool]));
+const safeOutputsToolMap = new Map(safeOutputsTools.map(tool => [tool.name.replace(/-/g, "_"), tool]));
 
 /**
  * @param {string} error
@@ -1786,6 +1787,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const maxFileSize = memoryConf.max_file_size || 10240;
     const maxPatchSize = memoryConf.max_patch_size || 10240;
     const maxFileCount = memoryConf.max_file_count || 100;
+    const allowedExtensions = Array.isArray(memoryConf.allowed_extensions) ? memoryConf.allowed_extensions : [];
+    const fileGlobFilter = typeof memoryConf.file_glob === "string" ? memoryConf.file_glob : "";
     const validationConfig = memoryConf.validation || null;
     const validationScript = validationConfig && typeof validationConfig.script === "string" ? validationConfig.script : "";
     const validationTimeoutSeconds = validationConfig && Number.isFinite(validationConfig.timeout) ? validationConfig.timeout : undefined;
@@ -1802,6 +1805,17 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           },
         ],
       };
+    }
+
+    // Allowed-extensions and file-glob are persistence filters: ineligible files must be
+    // removed here too, before formatting/scanning/staging/custom-validation, so this
+    // preflight sees the same effective file set as the later filter/upload/push steps
+    // and never hard-fails on a file that would have been silently dropped downstream.
+    if (allowedExtensions.length > 0 || fileGlobFilter) {
+      const { removed } = filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilter, core);
+      if (removed.length > 0) {
+        core.info(`push_repo_memory: ignored ${removed.length} ineligible file(s) before validation`);
+      }
     }
 
     clearValidationMarker("repo", memoryId);
@@ -2121,6 +2135,90 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           text: JSON.stringify({ result: "success" }),
         },
       ],
+    };
+  };
+
+  const createWorkItemHandler = args => {
+    const temporaryId = `#${generateTemporaryId()}`;
+    const entry = { ...(args || {}), type: "ado_create_work_item", temporary_id: temporaryId };
+    appendSafeOutputCounted(entry);
+    const output = { result: "success", temporary_id: temporaryId };
+    return {
+      content: [{ type: "text", text: JSON.stringify(output) }],
+      structuredContent: output,
+    };
+  };
+
+  const createAzureDevOpsWorkItemHandler = type => args => {
+    const entry = { ...(args || {}), type };
+    appendSafeOutputCounted(entry);
+    return {
+      content: [{ type: "text", text: JSON.stringify({ result: "success" }) }],
+    };
+  };
+
+  const uploadWorkItemAttachmentHandler = args => {
+    const entry = { ...(args || {}), type: "ado_upload_workitem_attachment" };
+    const rawPath = typeof entry.file_path === "string" ? entry.file_path.trim() : "";
+    if (!rawPath || path.isAbsolute(rawPath) || rawPath.includes(":")) {
+      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must be a workspace-relative path without ':'");
+    }
+
+    const segments = rawPath.split(/[\\/]+/);
+    if (segments.some(segment => !segment || segment === "." || segment === "..")) {
+      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must not contain empty, '.' or '..' path segments");
+    }
+
+    const workspace = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd());
+    const sourcePath = path.resolve(workspace, ...segments);
+    if (sourcePath !== workspace && !sourcePath.startsWith(workspace + path.sep)) {
+      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path resolves outside the workspace");
+    }
+
+    let current = workspace;
+    let sourceStat;
+    try {
+      for (const segment of segments) {
+        current = path.join(current, segment);
+        sourceStat = lstatGuard(current);
+        if (!sourceStat) {
+          return buildIntentErrorResponse("ado_upload_workitem_attachment does not accept symbolic links");
+        }
+      }
+    } catch (error) {
+      return buildIntentErrorResponse(`ado_upload_workitem_attachment could not read file_path: ${getErrorMessage(error)}`);
+    }
+    if (!sourceStat?.isFile()) {
+      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must identify one regular file");
+    }
+
+    const attachmentConfig = getSafeOutputsToolConfig(config, "ado_upload_workitem_attachment");
+    const maxFileSize = Number(attachmentConfig.max_file_size || 5 * 1024 * 1024);
+    if (!Number.isSafeInteger(maxFileSize) || maxFileSize < 1 || sourceStat.size > maxFileSize) {
+      return buildIntentErrorResponse(`ado_upload_workitem_attachment file exceeds the configured max-file-size of ${maxFileSize} bytes`);
+    }
+    const allowedExtensions = Array.isArray(attachmentConfig.allowed_extensions) ? attachmentConfig.allowed_extensions : [];
+    if (allowedExtensions.length > 0 && !allowedExtensions.some(extension => rawPath.toLowerCase().endsWith(String(extension).toLowerCase()))) {
+      return buildIntentErrorResponse("ado_upload_workitem_attachment file extension is not allowed by the workflow configuration");
+    }
+
+    try {
+      const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+      const stagingDirectory = path.join(stagingRoot, "azure-devops-work-items");
+      fs.mkdirSync(stagingDirectory, { recursive: true, mode: 0o700 });
+      const stagedName = `${crypto.randomUUID()}-${segments[segments.length - 1]}`;
+      const stagedPath = path.join(stagingDirectory, stagedName);
+      fs.copyFileSync(sourcePath, stagedPath, fs.constants.COPYFILE_EXCL);
+      fs.chmodSync(stagedPath, 0o600);
+      entry.staged_file = path.posix.join("azure-devops-work-items", stagedName);
+    } catch (error) {
+      throw new Error(`${ERR_SYSTEM}: Failed to stage Azure DevOps work-item attachment: ${getErrorMessage(error)}`, { cause: error });
+    }
+
+    entry.file_path = rawPath;
+    appendSafeOutputCounted(entry);
+    return {
+      content: [{ type: "text", text: JSON.stringify({ result: "success", file_path: rawPath }) }],
     };
   };
 
@@ -2813,6 +2911,18 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     return defaultHandler("update_issue")(args || {});
   };
 
+  const jiraCreateIssueHandler = defaultHandler("jira_create_issue");
+  const jiraAddCommentHandler = defaultHandler("jira_add_comment");
+  const jiraAddLabelHandler = defaultHandler("jira_add_label");
+  const jiraUpdateIssueHandler = args => {
+    const summary = typeof args?.summary === "string" ? args.summary.trim() : "";
+    const description = typeof args?.description === "string" ? args.description.trim() : "";
+    if (!summary && !description) {
+      return buildIntentErrorResponse("jira_update_issue requires at least one non-empty field: summary or description");
+    }
+    return defaultHandler("jira_update_issue")(args || {});
+  };
+
   /**
    * Handler for update_pull_request tool
    * Spec cross-reference: Safe Output Outcome Evaluation §update_pull_request.
@@ -3117,6 +3227,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     pushToPullRequestBranchHandler,
     pushRepoMemoryHandler,
     createIssueHandler,
+    createWorkItemHandler,
+    updateWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_update_work_item"),
+    commentOnWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_comment_on_work_item"),
+    assignWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_assign_work_item"),
+    linkWorkItemsHandler: createAzureDevOpsWorkItemHandler("ado_link_work_items"),
+    uploadWorkItemAttachmentHandler,
+    jiraCreateIssueHandler,
+    jiraUpdateIssueHandler,
+    jiraAddCommentHandler,
+    jiraAddLabelHandler,
     createProjectHandler,
     addCommentHandler,
     createPullRequestReviewCommentHandler,

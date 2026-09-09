@@ -399,6 +399,8 @@ describe("approve_workflow_run", () => {
     const result = await handler({ run_id: 123 }, {});
 
     expect(result.success).toBe(false);
+    expect(result.skipped).toBe(true);
+    expect(result.reasonCode).toBe("POLICY_FILE_PROTECTION_DENIED");
     expect(result.error).toContain("modifies protected files");
     expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
   });

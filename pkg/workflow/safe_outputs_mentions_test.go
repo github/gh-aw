@@ -68,7 +68,7 @@ func TestParseMentionsConfig_Object(t *testing.T) {
 				AllowedCollaborators: boolPtr(true),
 				AllowContext:         boolPtr(false),
 				Allowed:              []string{"bot1", "bot2"},
-				Max:                  new(10),
+				Max:                  strPtr("10"),
 			},
 		},
 		{
@@ -79,7 +79,7 @@ func TestParseMentionsConfig_Object(t *testing.T) {
 			},
 			expected: &MentionsConfig{
 				Allowed: []string{"bot1"},
-				Max:     new(5),
+				Max:     strPtr("5"),
 			},
 		},
 		{
@@ -152,7 +152,7 @@ func TestParseMentionsConfig_Object(t *testing.T) {
 				AllowContext:         boolPtr(false),
 				Allowed:              []string{"bot1"},
 				AllowedTeams:         []string{"myorg/eng"},
-				Max:                  new(10),
+				Max:                  strPtr("10"),
 			},
 		},
 		{
@@ -161,7 +161,16 @@ func TestParseMentionsConfig_Object(t *testing.T) {
 				"max": 10.5,
 			},
 			expected: &MentionsConfig{
-				Max: new(10), // should be truncated
+				Max: strPtr("10"), // should be truncated
+			},
+		},
+		{
+			name: "max as expression",
+			input: map[string]any{
+				"max": "${{ inputs.max-mentions }}",
+			},
+			expected: &MentionsConfig{
+				Max: strPtr("${{ inputs.max-mentions }}"),
 			},
 		},
 		{
@@ -267,7 +276,7 @@ func TestGenerateSafeOutputsConfig_WithMentions(t *testing.T) {
 				AllowedCollaborators: boolPtr(false),
 				AllowContext:         boolPtr(true),
 				Allowed:              []string{"bot1", "bot2"},
-				Max:                  new(20),
+				Max:                  strPtr("20"),
 			},
 			expected: map[string]any{
 				"allowedCollaborators": false,
@@ -291,7 +300,7 @@ func TestGenerateSafeOutputsConfig_WithMentions(t *testing.T) {
 				AllowedCollaborators: boolPtr(false),
 				AllowedTeams:         []string{"myorg/eng"},
 				Allowed:              []string{"bot1"},
-				Max:                  new(30),
+				Max:                  strPtr("30"),
 			},
 			expected: map[string]any{
 				"allowedCollaborators": false,
@@ -406,7 +415,7 @@ func TestExtractSafeOutputsConfig_WithMentions(t *testing.T) {
 				AllowedCollaborators: boolPtr(false),
 				AllowContext:         boolPtr(true),
 				Allowed:              []string{"bot1"},
-				Max:                  new(15),
+				Max:                  strPtr("15"),
 			},
 		},
 		{

@@ -51,6 +51,10 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 - **Load when:** The user needs manual trigger flows (`workflow_dispatch`) with custom inputs for testing or controlled runs.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/dispatch-ops.md
 
+### Feature Grower
+- **Load when:** The user wants a scheduled agent to advance long-lived features one implementation-ready sub-issue at a time.
+- **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/feature-grower.md
+
 ### IssueOps
 - **Load when:** The user needs fully automated issue triage, categorization, and responses on issue events.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/issue-ops.md

@@ -74,19 +74,22 @@ func analyzeAppendOneElement(pass *analysis.Pass, n ast.Node, generatedFiles fil
 		return
 	}
 
-	pass.Report(analysis.Diagnostic{
+	diag := analysis.Diagnostic{
 		Pos:     call.Pos(),
 		End:     call.End(),
 		Message: fmt.Sprintf("append(s, %s...) can be simplified to append(s, %s)", litText, elemText),
-		SuggestedFixes: []analysis.SuggestedFix{{
+	}
+	if !astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		diag.SuggestedFixes = []analysis.SuggestedFix{{
 			Message: fmt.Sprintf("Replace %s... with %s", litText, elemText),
 			TextEdits: []analysis.TextEdit{{
 				Pos:     call.Pos(),
 				End:     call.End(),
 				NewText: fmt.Appendf(nil, "append(%s, %s)", sliceText, elemText),
 			}},
-		}},
-	})
+		}}
+	}
+	pass.Report(diag)
 }
 
 // matchSingleElementSpread validates that call.Args[1] is a single-element slice

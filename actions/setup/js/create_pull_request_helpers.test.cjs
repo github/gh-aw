@@ -551,12 +551,12 @@ describe("generatePatchPreview", () => {
   });
 
   it("truncates and indicates truncation when over 500 lines", () => {
-    const patch = Array.from({ length: 600 }, (_, i) => `line${i}`).join("\n");
+    const patch = Array.from({ length: 600 }, (_, i) => (i === 500 ? "omitted-line" : "x")).join("\n");
     const result = generatePatchPreview(patch);
     expect(result).toContain("Show patch preview (500 of 600 lines)");
     expect(result).toContain("... (truncated)");
     // Content from line 500+ must not appear
-    expect(result).not.toContain("line500");
+    expect(result).not.toContain("omitted-line");
   });
 
   it("truncates and indicates truncation when over 2000 characters", () => {
@@ -564,6 +564,7 @@ describe("generatePatchPreview", () => {
     const longLine = "x".repeat(1000);
     const patch = `${longLine}\n${longLine}\n${longLine}`;
     const result = generatePatchPreview(patch);
+    expect(result).toContain("Show patch preview (2 of 3 lines)");
     expect(result).toContain("... (truncated)");
   });
 

@@ -10,6 +10,11 @@ permissions:
   contents: read
   issues: read
   actions: read
+  copilot-requests: write
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:

@@ -11,11 +11,11 @@ permissions:
   issues: read
   pull-requests: read
   discussions: read
+  copilot-requests: write
 tracker-id: api-consumption-report-daily
 engine:
-  id: claude
-  mcp:
-    tool-timeout: 10m
+  id: codex
+  model-provider: github
 sandbox:
   agent:
     runtime: cloud-hypervisor
@@ -51,6 +51,7 @@ evals:
   - id: report_with_charts_created
     question: Was a report or discussion created with trending charts and quota analysis?
 
+model: copilot/gpt-5.3-codex
 ---
 
 # GitHub API Consumption Report Agent

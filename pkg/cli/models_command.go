@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const defaultModelsRefreshCount = 20
+
 // NewModelsCommand creates the models command.
 func NewModelsCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -46,7 +48,7 @@ so recent awf-reflect data can be discovered before reporting.`,
 	addJSONFlag(cmd)
 	cmd.Flags().String("logs-dir", defaultLogsOutputDir, "Directory containing downloaded logs/artifacts")
 	cmd.Flags().Bool("refresh-observed", true, "Attempt to refresh local observed-model artifacts before reporting")
-	cmd.Flags().Int("refresh-count", 20, "Maximum number of recent runs to inspect when refreshing observed models")
+	cmd.Flags().Int("refresh-count", defaultModelsRefreshCount, "Maximum number of recent runs to inspect when refreshing observed models")
 	addRepoFlag(cmd)
 	return cmd
 }
@@ -82,6 +84,13 @@ type modelsReport struct {
 	Warnings []string           `json:"warnings,omitempty"`
 }
 
+type modelsReportOptions struct {
+	logsDir         string
+	refreshObserved bool
+	refreshCount    int
+	repoOverride    string
+}
+
 const maxAliasHints = 6
 
 func runModelsCommand(cmd *cobra.Command) error {
@@ -91,24 +100,12 @@ func runModelsCommand(cmd *cobra.Command) error {
 	refreshCount, _ := cmd.Flags().GetInt("refresh-count")
 	repoOverride, _ := cmd.Flags().GetString("repo")
 
-	warnings := make([]string, 0)
-	if refreshObserved {
-		if err := refreshObservedArtifacts(cmd.Context(), logsDir, refreshCount, repoOverride); err != nil {
-			warnings = append(warnings, "observed-model refresh failed: "+err.Error())
-		}
-	}
-
-	catalogRows := buildModelCatalogRows()
-	aliasRows, aliasMap := buildModelAliasRows()
-	observedRows, observedWarnings := collectObservedModelRows(logsDir, aliasMap)
-	warnings = append(warnings, observedWarnings...)
-
-	report := modelsReport{
-		Catalog:  catalogRows,
-		Aliases:  aliasRows,
-		Observed: observedRows,
-		Warnings: warnings,
-	}
+	report := buildModelsReport(cmd.Context(), modelsReportOptions{
+		logsDir:         logsDir,
+		refreshObserved: refreshObserved,
+		refreshCount:    refreshCount,
+		repoOverride:    repoOverride,
+	})
 
 	if jsonOutput {
 		jsonBytes, err := marshalIndentJSONOrWrap(report, "models report")
@@ -120,26 +117,47 @@ func runModelsCommand(cmd *cobra.Command) error {
 	}
 
 	fmt.Fprintln(os.Stdout, "Catalog Models")
-	fmt.Fprint(os.Stdout, console.RenderStruct(catalogRows))
+	fmt.Fprint(os.Stdout, console.RenderStruct(report.Catalog))
 	fmt.Fprintln(os.Stdout)
 	fmt.Fprintln(os.Stdout, "Model Aliases")
-	fmt.Fprint(os.Stdout, console.RenderStruct(aliasRows))
+	fmt.Fprint(os.Stdout, console.RenderStruct(report.Aliases))
 	fmt.Fprintln(os.Stdout)
 	fmt.Fprintln(os.Stdout, "Observed Models")
-	if len(observedRows) == 0 {
+	if len(report.Observed) == 0 {
 		fmt.Fprintln(os.Stdout, "No observed models found in local logs/artifacts.")
 	} else {
-		fmt.Fprint(os.Stdout, console.RenderStruct(observedRows))
+		fmt.Fprint(os.Stdout, console.RenderStruct(report.Observed))
 	}
-	for _, warning := range warnings {
+	for _, warning := range report.Warnings {
 		fmt.Fprintln(os.Stderr, warning)
 	}
 	return nil
 }
 
+func buildModelsReport(ctx context.Context, opts modelsReportOptions) modelsReport {
+	warnings := make([]string, 0)
+	if opts.refreshObserved {
+		if err := refreshObservedArtifacts(ctx, opts.logsDir, opts.refreshCount, opts.repoOverride); err != nil {
+			warnings = append(warnings, "observed-model refresh failed: "+err.Error())
+		}
+	}
+
+	catalogRows := buildModelCatalogRows()
+	aliasRows, aliasMap := buildModelAliasRows()
+	observedRows, observedWarnings := collectObservedModelRows(opts.logsDir, aliasMap)
+	warnings = append(warnings, observedWarnings...)
+
+	return modelsReport{
+		Catalog:  catalogRows,
+		Aliases:  aliasRows,
+		Observed: observedRows,
+		Warnings: warnings,
+	}
+}
+
 func refreshObservedArtifacts(ctx context.Context, logsDir string, refreshCount int, repoOverride string) error {
 	if refreshCount <= 0 {
-		refreshCount = 20
+		refreshCount = defaultModelsRefreshCount
 	}
 	return DownloadWorkflowLogs(ctx, LogsDownloadOptions{
 		Count:          refreshCount,

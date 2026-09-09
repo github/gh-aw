@@ -23,7 +23,7 @@ max-daily-ai-credits: 10000
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, actions, issues]
 timeout-minutes: 30
 strict: true
@@ -55,7 +55,7 @@ evals:
     question: Did the agent check every schedule-triggered workflow's most recent run against its expected cadence and report any blind spots?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 
 ---
 

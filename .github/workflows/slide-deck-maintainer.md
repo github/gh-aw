@@ -41,7 +41,6 @@ tools:
   cli-proxy: true
   cache-memory: true
   playwright:
-    mode: cli
   edit:
   bash:
     - "npm *"

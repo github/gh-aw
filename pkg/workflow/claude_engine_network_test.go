@@ -69,7 +69,7 @@ func TestClaudeEngineNetworkPermissions(t *testing.T) {
 		stepYAML := strings.Join(steps[0], "\n")
 
 		// Verify AWF is not used without network permissions
-		if strings.Contains(stepYAML, "sudo -E awf") {
+		if strings.Contains(stepYAML, "sudo -E ") {
 			t.Error("AWF should not be used without network permissions")
 		}
 
@@ -110,11 +110,11 @@ func TestClaudeEngineNetworkPermissions(t *testing.T) {
 			t.Error("--tty flag should be present for Claude with AWF")
 		}
 
-		if !strings.Contains(stepYAML, "--debug-file /tmp/gh-aw/agent/claude-debug.log") {
+		if !strings.Contains(stepYAML, "--debug-file /tmp/gh-aw/claude-debug.log") {
 			t.Error("Claude debug output should use a file separate from the stream-json transcript")
 		}
 
-		if !strings.Contains(stepYAML, "(umask 177 && touch /tmp/gh-aw/agent/claude-debug.log)") {
+		if !strings.Contains(stepYAML, "(umask 177 && touch /tmp/gh-aw/claude-debug.log)") {
 			t.Error("Claude debug log should be created with restrictive permissions before AWF starts")
 		}
 

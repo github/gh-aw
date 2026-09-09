@@ -71,6 +71,20 @@ func extractAPITargetHost(workflowData *WorkflowData, envVar string) string {
 	return host
 }
 
+// extractAPIProxyTargetHost returns the target host format expected by the
+// effective AWF version, preserving an explicit http:// scheme when supported.
+func extractAPIProxyTargetHost(workflowData *WorkflowData, envVar string, firewallConfig *FirewallConfig) string {
+	host := extractAPITargetHost(workflowData, envVar)
+	if host == "" || !awfSupportsHTTPAPITargets(firewallConfig) {
+		return host
+	}
+
+	if strings.HasPrefix(workflowData.EngineConfig.Env[envVar], "http://") {
+		return "http://" + host
+	}
+	return host
+}
+
 // extractAPIBasePath extracts the path component from a custom API base URL in engine.env.
 // Returns the path prefix (e.g., "/serving-endpoints") or empty string if no path is present.
 // Root-only paths ("/") and empty paths return empty string.
@@ -302,6 +316,14 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 	case *ClaudeEngine:
 		return []string{"api.anthropic.com"}
 	case *CodexEngine:
+		if resolveEngineLLMProvider(data, LLMProviderOpenAI) == LLMProviderGitHub {
+			return []string{
+				"api.enterprise.githubcopilot.com",
+				"api.githubcopilot.com",
+				"api.business.githubcopilot.com",
+				"api.individual.githubcopilot.com",
+			}
+		}
 		return []string{"api.openai.com"}
 	case *GeminiEngine:
 		return []string{DefaultGeminiAPITarget}

@@ -8,8 +8,6 @@ Use this skill to run a structured interview with users who know their goal but 
 
 ## When to Use This Skill
 
-Use this before `.github/aw/create-agentic-workflow.md` when requirements are unclear or incomplete.
-
 - Use `.github/aw/designer.md` to discover and confirm requirements.
 - Use `.github/aw/create-agentic-workflow.md` once requirements are clear and ready for implementation.
 - Use `.github/aw/agentic-chat.md` when the user wants a specification/pseudo-code instead of a runnable workflow file.
@@ -28,9 +26,13 @@ Capture:
 - Brief description
 - Optional emoji
 
-### Phase 1b: Repository Survey for Maintenance Workflows
+### Phase 1a: Intent
 
-Before asking the user to choose maintenance tasks, run the survey in [maintainer.md#survey-the-repository-before-choosing-a-strategy](maintainer.md#survey-the-repository-before-choosing-a-strategy) and separate observed signals from inferred strategy. Based on the survey, recommend two or three low-risk task families, a conservative cadence, per-run limits, state/deduplication needs, and pressure valves. Ask the user only about policy choices that cannot be inferred, such as acceptable maintainer attention, protected areas, or whether contributor-facing comments are allowed.
+Before selecting a trigger or implementation, load [intent.md](intent.md) and derive the concise canonical outcome and transient IntentSpec. Use it to derive PromptPex eval and inverse-eval scenarios and, when needed, operational value. Confirm the outcome when it is ambiguous and persist it later as `intent:`. For explicit, narrow requests, keep this step lightweight.
+
+### Phase 1b: Repository Survey and Intent Mining
+
+For maintenance or broad automation requests, run the bounded survey in [maintainer.md#survey-the-repository-before-choosing-a-strategy](maintainer.md#survey-the-repository-before-choosing-a-strategy). Record examined sources, observed signals, and confidence; if evidence is insufficient, stop and ask the user rather than inventing a portfolio. Separate observed signals from inferred strategy, derive evidence-backed candidate intents, and present competing candidates when none clearly dominates before selecting and augmenting one. Ask only about policy choices that cannot be inferred.
 
 ### Phase 2: Trigger
 
@@ -41,7 +43,7 @@ Follow up only if needed:
 - Any filters (labels, branches, commands)?
 - Scheduled cadence (daily/weekly/hourly)?
 
-Map to the `on:` block.
+Compare candidate architectures against the IntentSpec, then map the selected one to the `on:` block.
 
 ### Phase 3: Scope (Read/Write)
 
@@ -97,12 +99,12 @@ Map to:
 
 ### Phase 7: Engine (optional)
 
-Ask only if ambiguous: **"Any AI engine preference?"**
+Ask **"Any AI engine preference?"** only when the request contains ambiguous
+engine-specific hints.
 
-If no preference, suggest default:
-- "I'd suggest Copilot since you haven't mentioned a preference. Sound good?"
-
-Map to `engine:` only when not default.
+Omit `engine:` and let the configured default apply unless there's an explicit
+preference or a requirement the default can't satisfy — then map to `engine:`,
+trying Copilot first.
 
 ### Phase 7b: Skills, Plugins, LSP & Evals (optional)
 
@@ -149,7 +151,7 @@ Use this exact structure:
 📋 Proposed workflow:
 - Name: <workflow-id>
 - Trigger: <event + key options>
-- Engine: <engine or default>
+- Engine: <explicit engine or default (omitted)>
 - Tools: <tool summary>
 - Safe outputs: <list or none>
 - Network: <allowed summary>
@@ -168,6 +170,7 @@ After confirmation, generate one workflow file using the same skeleton style as 
 ---
 emoji: <emoji>
 description: <brief description>
+intent: <concise outcome, not an implementation>
 on:
   <trigger config>
 permissions:
@@ -207,7 +210,9 @@ evals:
 
 ## Task
 
-<clear instructions tied to trigger context>
+Objective: <canonical intent>
+
+Determine applicability from the activation conditions and required context. Produce the required effects only when the evidence threshold is met. If a no-op condition applies, including insufficient evidence or a duplicate, call `noop` with a short reason and take no visible write action.
 If `steps:` includes pre-fetch commands, read the resulting `/tmp/gh-aw/data/*.json` files instead of broad live re-fetches.
 
 ## Safe Outputs
@@ -224,7 +229,9 @@ Before final output, run this internal self-check:
 - [ ] `safe-outputs:` covers every write action mentioned in prompt/instructions
 - [ ] Network access is scoped; avoid blanket wildcard entries
 - [ ] Trigger matches the user's intended activation event
+- [ ] `intent:` is a concise outcome, and the selected architecture follows the augmented IntentSpec
 - [ ] Prompt instructs agent to call `noop` when no action is needed
+- [ ] Prompt states applicability, required effects, and inverse/no-op conditions
 - [ ] Unnecessary defaults are omitted (for example `engine: copilot`)
 - [ ] If reading GitHub data, `steps:` pre-fetches compact JSON (DataOps)
 - [ ] `tools.github.mode` is `gh-proxy` unless broader MCP toolsets are explicitly needed
@@ -237,13 +244,13 @@ Before final output, run this internal self-check:
 - [ ] Skills and plugins are declared in frontmatter — no on-the-fly install steps or prompt-driven installation
 - [ ] `lsp:` is only used with `engine: copilot` (experimental; omit otherwise)
 - [ ] `evals:` questions are binary YES/NO and `safe-outputs:` is declared so `agent_output.json` exists
+- [ ] Evals, when used, cover both an intent-required effect and a counter-case through separate scenario fixtures or scenario-aware questions; do not require mutually exclusive outcomes from one run
 - [ ] For each third-party service/MCP integration, required secrets/env vars are listed
 - [ ] Auth guidance includes least-privilege token scope recommendations
 - [ ] For GHEC/GHES deployments, `engine.api-target` and GHES compatibility guidance are included when needed
 
 ## References (load only when needed)
 
-In-repo references:
 - `.github/aw/designer-mappings.md` (trigger, safe-output, network, tool, pattern, integration-auth, and data-strategy mapping tables)
 - `.github/aw/syntax.md` (index → `.github/aw/syntax-core.md`, `.github/aw/syntax-agentic.md`, `.github/aw/syntax-tools-imports.md`)
 - `.github/aw/safe-outputs.md` (index → `.github/aw/safe-outputs-content.md`, `.github/aw/safe-outputs-management.md`, `.github/aw/safe-outputs-automation.md`, `.github/aw/safe-outputs-runtime.md`)
@@ -256,17 +263,6 @@ In-repo references:
 - `.github/aw/skills.md`
 - `.github/aw/lsp.md`
 - `.github/aw/evals.md`
+- `.github/aw/intent.md`
 
-Portable HTTPS references:
-- `https://github.com/github/gh-aw/blob/main/.github/aw/designer-mappings.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/syntax.md` (index → `.../syntax-core.md`, `.../syntax-agentic.md`, `.../syntax-tools-imports.md`)
-- `https://github.com/github/gh-aw/blob/main/.github/aw/safe-outputs.md` (index → `.../safe-outputs-content.md`, `.../safe-outputs-management.md`, `.../safe-outputs-automation.md`, `.../safe-outputs-runtime.md`)
-- `https://github.com/github/gh-aw/blob/main/.github/aw/network.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/patterns.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/subagents.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/token-optimization.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/triggers.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/create-agentic-workflow.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/skills.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/lsp.md`
-- `https://github.com/github/gh-aw/blob/main/.github/aw/evals.md`
+Outside the repo, use `https://github.com/github/gh-aw/blob/main/<path>` for any of the above.

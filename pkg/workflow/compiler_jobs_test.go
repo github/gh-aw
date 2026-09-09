@@ -3,7 +3,10 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -402,6 +405,74 @@ func TestBuildCustomJobsDoesNotAutoAddActivationToOutputReferencedJobs(t *testin
 		if need == string(constants.ActivationJobName) {
 			t.Errorf("precompute job should NOT have needs: activation when its output is referenced in markdown (it must run before activation)")
 		}
+	}
+}
+
+func TestRuntimeImportReferencedJobOutputRunsBeforeActivation(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	promptsDir := filepath.Join(tmpDir, ".github", "prompts")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(promptsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	workflowPath := filepath.Join(workflowsDir, "runtime-import-output.md")
+	if err := os.WriteFile(workflowPath, []byte(`---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: copilot
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      issue_numbers: ${{ steps.values.outputs.issue_numbers }}
+      marker: ${{ steps.values.outputs.marker }}
+    steps:
+      - id: values
+        shell: bash
+        run: |
+          echo 'issue_numbers=[]' >> "$GITHUB_OUTPUT"
+          echo 'marker=ordinary-string' >> "$GITHUB_OUTPUT"
+---
+
+{{#runtime-import .github/prompts/runtime-import-output.md}}
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(promptsDir, "runtime-import-output.md"), []byte(`# Runtime import interpolation reproducer
+
+Issue numbers: ${{ needs.select.outputs.issue_numbers }}
+Marker: ${{ needs.select.outputs.marker }}
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler(WithVersion("test"))
+	if err := compiler.CompileWorkflow(workflowPath); err != nil {
+		t.Fatalf("CompileWorkflow() returned error: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(filepath.Join(workflowsDir, "runtime-import-output.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := string(lockContent)
+	if !strings.Contains(lock, "  activation:\n    needs: select") {
+		t.Fatalf("activation should depend on runtime-import referenced job; lock excerpt:\n%s", lock)
+	}
+	if !strings.Contains(lock, "GH_AW_NEEDS_SELECT_OUTPUTS_ISSUE_NUMBERS: ${{ needs.select.outputs.issue_numbers }}") {
+		t.Errorf("lock file missing issue_numbers env mapping")
+	}
+	if !strings.Contains(lock, "GH_AW_NEEDS_SELECT_OUTPUTS_MARKER: ${{ needs.select.outputs.marker }}") {
+		t.Errorf("lock file missing marker env mapping")
+	}
+	if strings.Contains(lock, "  select:\n    needs: activation") {
+		t.Errorf("runtime-import referenced select job should not depend on activation")
 	}
 }
 

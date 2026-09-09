@@ -271,6 +271,43 @@ func TestJobManager_WriteJobsYAML(t *testing.T) {
 	}
 }
 
+func TestRenderStepForRunner(t *testing.T) {
+	windowsStep := "      - name: Run script\n        run: \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n"
+	got := renderStepForRunner(windowsStep, "runs-on: windows-latest")
+	if !strings.Contains(got, "        run: bash \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n") {
+		t.Fatalf("Windows step did not invoke the shell script with Bash:\n%s", got)
+	}
+	if !strings.Contains(got, "        shell: bash\n") {
+		t.Fatalf("Windows step did not explicitly select Bash:\n%s", got)
+	}
+
+	quotedPath := "      - name: Run script\n        run: './my script.sh' --verbose\n"
+	got = renderStepForRunner(quotedPath, "windows-latest")
+	if !strings.Contains(got, "        run: bash './my script.sh' --verbose\n") {
+		t.Fatalf("Windows step did not invoke a quoted shell script with Bash:\n%s", got)
+	}
+
+	multiline := "      - name: Run script\n        run: |\n          SCRIPT=helper.sh\n          ./helper.sh\n          cat <<'EOF'\n          helper.sh\n          EOF\n"
+	got = renderStepForRunner(multiline, "windows-latest")
+	if strings.Contains(got, "bash SCRIPT=helper.sh") || strings.Contains(got, "bash helper.sh\n          EOF") {
+		t.Fatalf("Windows step rewrote an assignment or heredoc:\n%s", got)
+	}
+	if !strings.Contains(got, "          bash ./helper.sh\n") {
+		t.Fatalf("Windows step did not invoke the actual shell script with Bash:\n%s", got)
+	}
+
+	withShell := "      - name: Run script\n        run: ./script.sh\n        shell: pwsh\n"
+	got = renderStepForRunner(withShell, "runs-on: windows-latest")
+	if !strings.Contains(got, "        shell: pwsh\n") {
+		t.Fatalf("Windows step changed its explicit shell:\n%s", got)
+	}
+
+	ubuntuStep := "      - name: Run script\n        run: ./script.sh\n"
+	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest"); got != ubuntuStep {
+		t.Fatalf("Non-Windows step changed:\n%s", got)
+	}
+}
+
 func TestJobManager_GetJob(t *testing.T) {
 	jm := NewJobManager()
 

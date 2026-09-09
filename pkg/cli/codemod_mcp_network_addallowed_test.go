@@ -104,6 +104,7 @@ func TestAddAllowedToNetwork(t *testing.T) {
 	})
 
 	t.Run("comment line inside network block is skipped, then top-level sibling ends the block", func(t *testing.T) {
+		t.Parallel()
 		lines := []string{
 			"network:",
 			"  # a comment",

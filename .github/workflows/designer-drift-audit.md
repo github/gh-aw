@@ -120,6 +120,10 @@ safe-outputs:
 network:
   allowed:
     - defaults
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 ---
 
 # Designer Drift Audit

@@ -162,6 +162,49 @@ describe("action_setup_otlp.cjs", () => {
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining(`trace-id=${VALID_TRACE_ID}`));
     });
+
+    it("disables OTLP for later steps when the Authorization secret is empty", async () => {
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com", headers: "Authorization=" }]);
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://traces.example.com";
+      process.env.OTEL_EXPORTER_OTLP_HEADERS = "Authorization=";
+
+      await run();
+
+      expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("");
+      expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("");
+      expect(readFileSync(envFile, "utf8")).toContain("OTEL_EXPORTER_OTLP_ENDPOINT=\n");
+      expect(readFileSync(envFile, "utf8")).toContain("OTEL_EXPORTER_OTLP_HEADERS=\n");
+      expect(mockCore.info).toHaveBeenCalledWith("[otlp] no OTLP endpoints have usable credentials, skipping setup span");
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("[otlp] setup span sent"));
+    });
+
+    it("promotes the next configured endpoint when the first Authorization secret is empty", async () => {
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([
+        { url: "https://sentry.example.com", headers: "x-sentry-auth=" },
+        { url: "https://grafana.example.com", headers: "Authorization=******" },
+      ]);
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://sentry.example.com";
+      process.env.OTEL_EXPORTER_OTLP_HEADERS = "x-sentry-auth=";
+
+      await run();
+
+      expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://grafana.example.com");
+      expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=******");
+    });
+
+    it("preserves explicit exporter overrides when the primary endpoint is unavailable", async () => {
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([
+        { url: "https://sentry.example.com", headers: "x-sentry-auth=" },
+        { url: "https://grafana.example.com", headers: "Authorization=******" },
+      ]);
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://custom.example.com";
+      process.env.OTEL_EXPORTER_OTLP_HEADERS = "Authorization=custom";
+
+      await run();
+
+      expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://custom.example.com");
+      expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=custom");
+    });
   });
 
   describe("OTLP OIDC token header injection", () => {

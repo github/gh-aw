@@ -32,6 +32,15 @@ Provides a human-readable description of the workflow rendered as a comment in t
 description: "Workflow that analyzes pull requests and provides feedback"
 ```
 
+### Intent (`intent:`)
+
+Describes the durable outcome the workflow exists to achieve, rendered as a comment in the generated lock file. While `description` explains *what* the workflow does, `intent` explains *why* it exists and should stay implementation-independent, so it remains valid when the implementation changes.
+
+```yaml wrap
+intent: "Reduce maintainer attention spent identifying recurring CI regressions."
+description: "Analyzes failed CI runs and opens incidents for novel regressions."
+```
+
 ### Emoji (`emoji:`)
 
 An optional emoji to represent the workflow visually, for example in listings and UI surfaces.
@@ -337,7 +346,36 @@ The agent job checks out each pinned plugin immediately after installing the eng
 
 Shared agentic workflows may also declare plugins. When the same plugin path is declared more than once, identical refs are deduplicated and compatible semantic versions are merged to the highest version. Incompatible major versions or conflicting non-semver refs fail compilation.
 
-Plugin repositories must be public. The checkout step always uses the workflow's default `github.token`, which cannot read private repositories; unlike `skills:`, `plugins:` does not currently support per-entry `github-token`/`github-app` credentials.
+Supported entry formats:
+
+- String form (shared authentication):
+  - `owner/repo@<ref>`
+  - `owner/repo/plugins/path@<ref>`
+- Object form (per-plugin authentication):
+  - `plugin` (required)
+  - `github-token` (optional)
+  - `github-app` (optional)
+
+`github-token` and `github-app` are mutually exclusive for each object entry. By default (string form, or object form without either field), the checkout step uses the workflow's default `github.token`, which cannot read private repositories. Set a per-plugin `github-token` or `github-app` to install a plugin from a private repository:
+
+```yaml wrap
+engine: copilot
+plugins:
+  # Public plugin, shared auth via the workflow's default token
+  - octo-org/agent-plugin@v1
+
+  # Per-plugin PAT for a private plugin repository
+  - plugin: octo-org/private-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+    github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
+
+  # Per-plugin GitHub App credentials
+  - plugin: octo-org/private-marketplace/plugins/example@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+    github-app:
+      client-id: ${{ vars.PLUGIN_APP_CLIENT_ID }}
+      private-key: ${{ secrets.PLUGIN_APP_PRIVATE_KEY }}
+```
+
+Because plugin support is implemented per agentic engine, per-plugin credentials only take effect for the checkout step; whether an engine can install a plugin at all still depends on that engine's own Agent Plugins support.
 
 ### MCP Scripts (`mcp-scripts:`)
 
@@ -618,7 +656,7 @@ Each runtime takes a required `version` string, plus optional `action-repo` and 
 
 | Runtime | Default Version | Default Setup Action |
 |---------|----------------|---------------------|
-| `node` | 24 | `actions/setup-node@v6` |
+| `node` | 24 | `actions/setup-node@v7` |
 | `python` | 3.12 | `actions/setup-python@v5` |
 | `go` | 1.25 | `actions/setup-go@v5` |
 | `uv` | latest | `astral-sh/setup-uv@v5` |
@@ -732,6 +770,8 @@ strict: false  # Disable enhanced security validation for development/testing
 ```
 
 Workflows compiled with `strict: false` cannot run on public repositories. The workflow fails at runtime with an error message prompting recompilation with strict mode.
+
+To prevent workflows from opting out, set `"strict": true` at the top level of `.github/workflows/aw.json`. This enforces strict mode for every `gh aw compile` invocation in the repository. The repository setting only accepts `true`; `"strict": false` is invalid.
 
 See [Network Permissions - Strict Mode Validation](/gh-aw/reference/network/#strict-mode-validation) for details on network validation and [CLI Commands](/gh-aw/setup/cli/#compile) for compilation options.
 

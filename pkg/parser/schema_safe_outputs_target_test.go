@@ -60,6 +60,25 @@ func TestMainWorkflowSchema_UpdatePullRequestSupportsReplaceIsland(t *testing.T)
 	}
 }
 
+func TestMainWorkflowSchema_AzureDevOpsUpdateWorkItemSupportsStatus(t *testing.T) {
+	t.Parallel()
+
+	frontmatter := map[string]any{
+		"on":     "push",
+		"engine": "copilot",
+		"safe-outputs": map[string]any{
+			"ado-update-work-item": map[string]any{
+				"target": 42,
+				"status": true,
+			},
+		},
+	}
+
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/ado-update-work-item-status-test.md"); err != nil {
+		t.Fatalf("expected ado-update-work-item status to pass schema validation, got: %v", err)
+	}
+}
+
 func TestMainWorkflowSchema_SafeOutputsRejectsCommentMemory(t *testing.T) {
 	t.Parallel()
 

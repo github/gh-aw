@@ -45,6 +45,8 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 				line += " (optional)"
 			}
 			fmt.Fprintln(w, line)
+		case "repo-label":
+			fmt.Fprintf(w, "  ☐ Create or update repository label: %s (%s)\n", action.Name, action.Color)
 		case "github-app":
 			appLabel := action.AppName
 			if appLabel == "" {

@@ -57,6 +57,7 @@ func sampleGraderManifest() map[string]any {
 }
 
 func TestExtractGradersDataFromUsageArtifact(t *testing.T) {
+	t.Parallel()
 	runDir := t.TempDir()
 	writeGraderFiles(t,
 		filepath.Join(runDir, constants.UsageArtifactName.String(), constants.GradersDirName.String()),
@@ -109,6 +110,7 @@ func TestExtractGradersDataFromUsageArtifact(t *testing.T) {
 }
 
 func TestExtractGradersDataFromAgentArtifact(t *testing.T) {
+	t.Parallel()
 	runDir := t.TempDir()
 	writeGraderFiles(t, filepath.Join(runDir, "agent", constants.GradersDirName.String()), sampleGraderResults(), nil)
 
@@ -125,6 +127,7 @@ func TestExtractGradersDataFromAgentArtifact(t *testing.T) {
 }
 
 func TestExtractGradersDataMissingAndMalformed(t *testing.T) {
+	t.Parallel()
 	empty := t.TempDir()
 	if extractGradersData(empty) != nil {
 		t.Error("expected nil graders data when no results are present")
@@ -150,6 +153,7 @@ func TestExtractGradersDataMissingAndMalformed(t *testing.T) {
 }
 
 func TestExtractGradersDataSkipsOversizedManifest(t *testing.T) {
+	t.Parallel()
 	runDir := t.TempDir()
 	gradersDir := filepath.Join(runDir, constants.UsageArtifactName.String(), constants.GradersDirName.String())
 	writeGraderFiles(t, gradersDir, sampleGraderResults(), nil)
@@ -171,6 +175,7 @@ func TestExtractGradersDataSkipsOversizedManifest(t *testing.T) {
 }
 
 func TestGradersArtifactSetResolvesToUsageAgentAndFallback(t *testing.T) {
+	t.Parallel()
 	filter := artifactSetArtifacts[ArtifactSetGraders]
 	if len(filter) != 3 {
 		t.Fatalf("expected graders set to resolve to 3 artifacts, got %v", filter)

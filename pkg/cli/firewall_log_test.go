@@ -171,6 +171,7 @@ func TestParseFirewallLogLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := parseFirewallLogLine(tt.line)
 
 			if tt.expected == nil {
@@ -296,6 +297,7 @@ func TestIsRequestAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := isRequestAllowed(tt.decision, tt.status)
 			if result != tt.expected {
 				t.Errorf("isRequestAllowed(%q, %q) = %v, want %v", tt.decision, tt.status, result, tt.expected)
@@ -693,6 +695,7 @@ func TestSanitizeWorkflowName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := workflow.SanitizeWorkflowName(tt.input)
 			if result != tt.expected {
 				t.Errorf("SanitizeWorkflowName(%q) = %q, want %q", tt.input, result, tt.expected)
@@ -930,6 +933,7 @@ add --allow-domains chatgpt.com to your command`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tempDir := testutil.TempDir(t, "agent-log-*")
 			logPath := filepath.Join(tempDir, "agent-stdio.log")
 			if err := os.WriteFile(logPath, []byte(tt.logContent), 0644); err != nil {

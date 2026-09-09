@@ -236,6 +236,7 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 		return nil
 	}
 	actionlintLog.Printf("Running actionlint on %d file(s): %v (verbose=%t, strict=%t)", len(lockFiles), lockFiles, verbose, strict)
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running actionlint on %d file(s)", len(lockFiles))))
 	maybePrintActionlintVersion(ctx)
 
 	gitRoot, relPaths, err := resolveActionlintPaths(lockFiles)

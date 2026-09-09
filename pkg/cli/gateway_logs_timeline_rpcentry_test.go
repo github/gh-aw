@@ -13,6 +13,7 @@ import (
 func TestRpcEntryToTimelineEvent(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid timestamp returns zero value and false", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "not-a-timestamp",
 			Type:      "DIFC_FILTERED",
@@ -23,6 +24,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("empty timestamp returns zero value and false", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{Type: "REQUEST", Direction: "OUT"}
 		evt, ok := rpcEntryToTimelineEvent(entry)
 		assert.False(t, ok)
@@ -30,6 +32,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("DIFC_FILTERED entry converts with tool name, reason and author", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp:   "2024-01-01T12:00:00Z",
 			Type:        "DIFC_FILTERED",
@@ -49,6 +52,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST with Direction IN is rejected", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "2024-01-01T12:00:00Z",
 			Type:      "REQUEST",
@@ -60,6 +64,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST OUT with tools/call payload extracts method and tool name", func(t *testing.T) {
+		t.Parallel()
 		params, err := json.Marshal(rpcToolCallParams{Name: "bash"})
 		require.NoError(t, err)
 		payload, err := json.Marshal(rpcRequestPayload{
@@ -86,6 +91,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST OUT with non tools/call method sets method only", func(t *testing.T) {
+		t.Parallel()
 		payload, err := json.Marshal(rpcRequestPayload{Method: "initialize"})
 		require.NoError(t, err)
 
@@ -102,6 +108,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST OUT with nil payload and no method/tool name is rejected", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "2024-01-01T12:00:00Z",
 			Type:      "REQUEST",
@@ -114,6 +121,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST OUT with invalid JSON payload is rejected", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "2024-01-01T12:00:00Z",
 			Type:      "REQUEST",
@@ -126,6 +134,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("REQUEST OUT tools/call with invalid params JSON still uses method", func(t *testing.T) {
+		t.Parallel()
 		payload := json.RawMessage(`{"method":"tools/call","id":1,"params":"not-an-object"}`)
 
 		entry := RPCMessageEntry{
@@ -141,6 +150,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("unrecognized entry type is rejected", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "2024-01-01T12:00:00Z",
 			Type:      "RESPONSE",
@@ -151,6 +161,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("schema rpc-message/v2 REQUEST OUT with event field (no top-level type) converts", func(t *testing.T) {
+		t.Parallel()
 		payload := json.RawMessage(`{"method":"tools/call","params":{"name":"list_issues"}}`)
 
 		entry := RPCMessageEntry{
@@ -168,6 +179,7 @@ func TestRpcEntryToTimelineEvent(t *testing.T) {
 	})
 
 	t.Run("schema rpc-message/v2 DIFC_FILTERED entry with event field converts", func(t *testing.T) {
+		t.Parallel()
 		entry := RPCMessageEntry{
 			Timestamp: "2024-01-01T12:00:00Z",
 			Event:     "difc_filtered",

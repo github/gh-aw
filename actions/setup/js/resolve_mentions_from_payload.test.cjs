@@ -321,7 +321,7 @@ describe("resolveAllowedMentionsFromPayload", () => {
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("extra known author"));
   });
 
-  it("applies max limit when allowTeamMembers is false", async () => {
+  it("does not truncate known authors to max when allowTeamMembers is false", async () => {
     const context = {
       eventName: "issues",
       payload: {
@@ -336,25 +336,22 @@ describe("resolveAllowedMentionsFromPayload", () => {
       allowTeamMembers: false,
       max: 3,
     });
-    expect(result.length).toBeLessThanOrEqual(3);
+    expect(result).toEqual(["alice", "user0", "user1", "user2", "user3", "user4"]);
   });
 
-  it("warns when mention limit is exceeded with team members disabled", async () => {
+  it("does not truncate resolved aliases to max", async () => {
     const context = {
-      eventName: "issues",
-      payload: {
-        issue: {
-          user: null,
-          assignees: Array.from({ length: 5 }, (_, i) => ({ login: `user${i}`, type: "User" })),
-        },
-      },
+      eventName: "workflow_dispatch",
+      payload: {},
       repo: { owner: "o", repo: "r" },
     };
-    await resolveAllowedMentionsFromPayload(context, mockGithub, mockCore, {
-      allowTeamMembers: false,
-      max: 2,
+    const allowed = Array.from({ length: 60 }, (_, i) => `user${i}`);
+    const result = await resolveAllowedMentionsFromPayload(context, mockGithub, mockCore, {
+      allowContext: false,
+      allowed,
+      max: 3,
     });
-    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Mention limit exceeded"));
+    expect(result).toEqual(allowed);
   });
 
   it("returns empty array and logs warning on error", async () => {

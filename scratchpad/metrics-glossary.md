@@ -280,7 +280,7 @@ When implementing or updating daily report workflows:
 **Scope**: Varies by report - document specific time range
 
 **Used By**:
-- Daily Firewall Report (last 7 days)
+- Daily Firewall Report (last 24 hours)
 - Daily Observability Report (last 7 days)
 
 **Python Variable**: `workflow_runs_analyzed`

@@ -47,7 +47,7 @@ function initRepo(dir, defaultBranch) {
   git(["commit", "-q", "-m", "seed"], dir);
 }
 
-describe.sequential("apply_samples.cjs", () => {
+describe("apply_samples.cjs", () => {
   let tempDir;
   let configPath;
   let outputsPath;

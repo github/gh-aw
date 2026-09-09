@@ -55,6 +55,26 @@ func (c *Compiler) extractDescription(frontmatter map[string]any) string {
 	return ""
 }
 
+// extractIntent extracts the intent field from frontmatter.
+// intent captures the durable outcome the workflow exists to achieve (why it
+// exists), while description captures what the workflow does.
+func (c *Compiler) extractIntent(frontmatter map[string]any) string {
+	value, exists := frontmatter["intent"]
+	if !exists {
+		return ""
+	}
+
+	// Convert the value to string
+	if strValue, ok := value.(string); ok {
+		intent := strings.TrimSpace(strValue)
+		frontmatterMetadataLog.Printf("Extracted intent: %d characters", len(intent))
+		return intent
+	}
+
+	frontmatterMetadataLog.Printf("Intent field is not a string: type=%T", value)
+	return ""
+}
+
 // extractMetadataDocs extracts metadata.docs from frontmatter.
 func (c *Compiler) extractMetadataDocs(frontmatter map[string]any) string {
 	metadata, ok := frontmatter["metadata"].(map[string]any)

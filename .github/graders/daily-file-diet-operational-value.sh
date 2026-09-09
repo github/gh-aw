@@ -13,6 +13,11 @@ MATURATION_SECONDS=172800
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/daily-file-diet-operational-value.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
+local_repo_root=''
+if command -v git >/dev/null 2>&1; then
+    local_repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+fi
+
 definition() {
     cat <<'JSON'
 {
@@ -32,6 +37,10 @@ definition() {
     "missingRule": "Invalid, unavailable, or truncated Git evidence scores null; tree-proven path absence is attainment."
   },
   "primaryMetric": {"id": "assigned-go-file-decomposition", "formula": "initialLines < 1000 => 1; else clamp((initialLines-currentLines)/(initialLines-500),0,1). Proven absence sets currentLines=0.", "direction": "higher_is_better"},
+    "diagnosticMetrics": [
+        {"id": "largest-file-health", "name": "Largest-file health at assignment", "formula": "min(1, 999 / initialLines) when the assignment archive contains eligible files.", "direction": "higher_is_better", "aggregation": "latest"},
+        {"id": "compliant-line-mass-share", "name": "Compliant line-mass share at assignment", "formula": "compliantLines / totalLines when the assignment archive contains eligible files and positive line mass.", "direction": "higher_is_better", "aggregation": "latest"}
+    ],
   "baseline": {"mode": "attainment-only", "value": null, "evidenceCutoff": null, "provenance": []},
   "validationExamples": {
     "targetAttained": {"valid":true,"initialLines":1907,"currentLines":500,"thresholdLines":1000,"targetLines":500},
@@ -110,17 +119,28 @@ assign_case() {
     local extract_dir="$tmp_dir/assignment-archive"
     local root_dir path lines
     local largest_path='' largest_lines=-1
-
-    github_api -H "Accept: application/vnd.github+json" \
-        "repos/$repository/tarball/$commit_sha" >"$archive_file" || return 1
+    local eligible_file_count=0 total_lines=0 compliant_lines=0
 
     mkdir -p "$extract_dir"
-    tar -xzf "$archive_file" -C "$extract_dir" || return 1
-    root_dir=$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)
+    if [[ -n $local_repo_root ]] \
+        && git -C "$local_repo_root" cat-file -e "$commit_sha^{commit}" 2>/dev/null; then
+        git -C "$local_repo_root" archive "$commit_sha" -- pkg | tar -xf - -C "$extract_dir" || return 1
+        root_dir=$extract_dir
+    else
+        github_api -H "Accept: application/vnd.github+json" \
+            "repos/$repository/tarball/$commit_sha" >"$archive_file" || return 1
+        tar -xzf "$archive_file" -C "$extract_dir" || return 1
+        root_dir=$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)
+    fi
     [[ -n $root_dir && -d $root_dir/pkg ]] || return 1
 
     while IFS= read -r -d '' path; do
         lines=$(wc -l <"$root_dir/$path" | tr -d ' ') || return 1
+        eligible_file_count=$((eligible_file_count + 1))
+        total_lines=$((total_lines + lines))
+        if (( lines < THRESHOLD_LINES )); then
+            compliant_lines=$((compliant_lines + lines))
+        fi
         if (( lines > largest_lines )) \
             || { (( lines == largest_lines )) && [[ $path > $largest_path ]]; }; then
             largest_path=$path
@@ -135,14 +155,47 @@ assign_case() {
         --argjson initialLines "$largest_lines" \
         --argjson thresholdLines "$THRESHOLD_LINES" \
         --argjson targetLines "$TARGET_LINES" \
+                --argjson eligibleFileCount "$eligible_file_count" \
+                --argjson totalLines "$total_lines" \
+                --argjson compliantLines "$compliant_lines" \
         --arg subjectSha "$commit_sha" \
         '{path: $path, initialLines: $initialLines, thresholdLines: $thresholdLines,
-          targetLines: $targetLines, subjectSha: $subjectSha}'
+                    targetLines: $targetLines, subjectSha: $subjectSha,
+                    eligibleFileCount: $eligibleFileCount, totalLines: $totalLines,
+                    compliantLines: $compliantLines}'
+}
+
+case_diagnostics() {
+        local case_json=$1 current_lines=$2
+
+        printf '%s\n' "$case_json" | jq -c \
+                --argjson currentLines "$current_lines" \
+                --argjson healthyLimit "$((THRESHOLD_LINES - 1))" '
+                {
+                    "largest-file-health":
+                        (if (.initialLines | type) == "number" and .initialLines > 0
+                         then ([1, ($healthyLimit / .initialLines)] | min) else null end),
+                    "compliant-line-mass-share":
+                        (if (.eligibleFileCount | type) == "number" and .eligibleFileCount > 0
+                                and (.totalLines | type) == "number" and .totalLines > 0
+                                and (.compliantLines | type) == "number"
+                         then (.compliantLines / .totalLines) else null end),
+                    currentLines: $currentLines
+                }'
 }
 
 latest_commit_at_cutoff() {
     local repository=$1 cutoff=$2
-    local repository_json default_branch commits_json
+    local repository_json default_branch commits_json local_commit
+
+    if [[ -n $local_repo_root ]] \
+        && git -C "$local_repo_root" show-ref --verify --quiet refs/remotes/origin/main; then
+        local_commit=$(git -C "$local_repo_root" rev-list -1 --before="$cutoff" refs/remotes/origin/main) || return 1
+        if [[ -n $local_commit ]]; then
+            printf '%s\n' "$local_commit"
+            return
+        fi
+    fi
 
     repository_json=$(github_api "repos/$repository") || return 1
     default_branch=$(printf '%s\n' "$repository_json" | jq -er '.default_branch | select(type == "string" and length > 0)') \
@@ -169,7 +222,7 @@ emit_null() {
 grade_run() {
     local request run_id repository workflow run_sha created_at evidence_at
     local matures_at evidence_cutoff evidence_epoch matures_epoch
-    local case_json path initial_lines opportunity_key evidence value
+    local case_json path initial_lines opportunity_key evidence value diagnostics
     local cutoff_commit blob_sha current_lines
     local tree_file="$tmp_dir/cutoff-tree.json"
     local blob_file="$tmp_dir/cutoff-blob"
@@ -232,6 +285,9 @@ grade_run() {
             and .thresholdLines == $threshold
             and .targetLines == $target
             and (.subjectSha | type == "string" and test("^[0-9a-f]{40}$"))
+            and ((has("eligibleFileCount") | not) or (.eligibleFileCount | type == "number" and . >= 0 and floor == .))
+            and ((has("totalLines") | not) or (.totalLines | type == "number" and . >= 0 and floor == .))
+            and ((has("compliantLines") | not) or (.compliantLines | type == "number" and . >= 0 and floor == .))
         ' >/dev/null; then
         emit_null "run:$run_id" '{"assignmentMissing":true}' "$evidence_cutoff" "$matures_at" \
             "invalid-case"
@@ -248,6 +304,7 @@ grade_run() {
             --argjson targetLines "$TARGET_LINES" \
             '{valid: true, initialLines: $initialLines, currentLines: $initialLines, thresholdLines: $thresholdLines, targetLines: $targetLines}')
         value=$(printf '%s\n' "$evidence" | metric)
+        diagnostics=$(case_diagnostics "$case_json" "$initial_lines")
         jq -cn \
             --argjson value "$value" \
             --arg opportunityKey "$opportunity_key" \
@@ -256,10 +313,11 @@ grade_run() {
             --arg maturesAt "$matures_at" \
             --arg repository "$repository" \
             --arg sha "$run_sha" \
+                        --argjson diagnostics "$diagnostics" \
             '{value: $value, opportunityKey: $opportunityKey, case: $case,
               evidenceCutoff: $evidenceCutoff, maturesAt: $maturesAt,
               provenance: [{repository: $repository, kind: "git-tree", ref: $sha}],
-              diagnostics: {repositoryHealthyAtAssignment: true}}'
+                            diagnostics: ($diagnostics + {repositoryHealthyAtAssignment: true})}'
         return
     fi
 
@@ -269,20 +327,29 @@ grade_run() {
             "cutoff-commit-unavailable"
         return
     fi
-    if ! load_tree "$repository" "$cutoff_commit" "$tree_file"; then
-        emit_null "$opportunity_key" "$case_json" "$evidence_cutoff" "$matures_at" \
-            "cutoff-tree-unavailable"
-        return
-    fi
+    if [[ -n $local_repo_root ]] \
+        && git -C "$local_repo_root" cat-file -e "$cutoff_commit^{commit}" 2>/dev/null; then
+        if git -C "$local_repo_root" cat-file -e "$cutoff_commit:$path" 2>/dev/null; then
+            current_lines=$(git -C "$local_repo_root" show "$cutoff_commit:$path" | wc -l | tr -d ' ') || return 1
+        else
+            current_lines=0
+        fi
+    else
+        if ! load_tree "$repository" "$cutoff_commit" "$tree_file"; then
+            emit_null "$opportunity_key" "$case_json" "$evidence_cutoff" "$matures_at" \
+                "cutoff-tree-unavailable"
+            return
+        fi
 
-    blob_sha=$(jq -r --arg path "$path" \
-        '.tree[] | select(.type == "blob" and .path == $path) | .sha' "$tree_file")
-    if [[ -z $blob_sha ]]; then
-        current_lines=0
-    elif ! current_lines=$(blob_line_count "$repository" "$blob_sha" "$blob_file"); then
-        emit_null "$opportunity_key" "$case_json" "$evidence_cutoff" "$matures_at" \
-            "blob-unavailable"
-        return
+        blob_sha=$(jq -r --arg path "$path" \
+            '.tree[] | select(.type == "blob" and .path == $path) | .sha' "$tree_file")
+        if [[ -z $blob_sha ]]; then
+            current_lines=0
+        elif ! current_lines=$(blob_line_count "$repository" "$blob_sha" "$blob_file"); then
+            emit_null "$opportunity_key" "$case_json" "$evidence_cutoff" "$matures_at" \
+                "blob-unavailable"
+            return
+        fi
     fi
 
     evidence=$(jq -cn \
@@ -292,6 +359,7 @@ grade_run() {
         --argjson targetLines "$TARGET_LINES" \
         '{valid: true, initialLines: $initialLines, currentLines: $currentLines, thresholdLines: $thresholdLines, targetLines: $targetLines}')
     value=$(printf '%s\n' "$evidence" | metric)
+    diagnostics=$(case_diagnostics "$case_json" "$current_lines")
     jq -cn \
         --argjson value "$value" \
         --arg opportunityKey "$opportunity_key" \
@@ -302,11 +370,12 @@ grade_run() {
         --arg cutoffCommit "$cutoff_commit" \
         --arg path "$path" \
         --argjson currentLines "$current_lines" \
+                --argjson diagnostics "$diagnostics" \
         '{value: $value, opportunityKey: $opportunityKey, case: $case,
           evidenceCutoff: $evidenceCutoff, maturesAt: $maturesAt,
           provenance: [{repository: $repository, kind: "git-commit", ref: $cutoffCommit},
                        {repository: $repository, kind: "go-source", ref: ($path + "@" + $cutoffCommit)}],
-          diagnostics: {currentLines: $currentLines}}'
+                    diagnostics: $diagnostics}'
 }
 
 case ${1:-} in

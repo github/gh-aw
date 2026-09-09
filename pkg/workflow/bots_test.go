@@ -325,19 +325,19 @@ Test workflow content.`
 		`Expected compiled workflow to expand "copilot" alias to all Copilot bot identifiers`)
 }
 
-// TestBotsImportMerge tests that bots from imported workflows are merged with top-level bots
+// TestBotsImportMerge tests that on.bots from imported workflows are merged with main workflow bots
 // in the compiled output (regression test for the fix in compiler_orchestrator_workflow.go).
 func TestBotsImportMerge(t *testing.T) {
 	compiler := NewCompiler()
 
-	t.Run("imported_bots_merged_with_top_level_bots", func(t *testing.T) {
+	t.Run("imported_bots_merged_with_main_workflow_bots", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "bots-import-merge-test")
 
-		// Shared workflow defines a bot at the top level (the format used by the importer)
+		// Shared workflow defines an on.bots allowlist without defining a trigger
 		sharedContent := `---
-on: issues
-bots:
-  - "renovate[bot]"
+on:
+  bots:
+    - "renovate[bot]"
 ---
 `
 		sharedPath := filepath.Join(tmpDir, "shared-bots.md")
@@ -376,9 +376,9 @@ imports:
 		tmpDir := testutil.TempDir(t, "bots-import-only-test")
 
 		sharedContent := `---
-on: issues
-bots:
-  - "github-actions[bot]"
+on:
+  bots:
+    - "github-actions[bot]"
 ---
 `
 		sharedPath := filepath.Join(tmpDir, "shared-bots-only.md")
@@ -412,14 +412,49 @@ imports:
 			"Expected compiled workflow to contain bots from import when main workflow has none")
 	})
 
+	t.Run("legacy_top_level_bots_in_import_are_ignored", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "bots-import-legacy-ignored-test")
+
+		sharedContent := `---
+bots:
+  - "renovate[bot]"
+---
+`
+		sharedPath := filepath.Join(tmpDir, "shared-legacy-bots.md")
+		err := os.WriteFile(sharedPath, []byte(sharedContent), 0644)
+		require.NoError(t, err, "Failed to write legacy bot import file")
+
+		mainContent := `---
+on:
+  issues:
+    types: [opened]
+imports:
+  - shared-legacy-bots.md
+---
+
+# Main workflow importing a legacy bot allowlist.
+`
+		mainPath := filepath.Join(tmpDir, "main-legacy-bots.md")
+		err = os.WriteFile(mainPath, []byte(mainContent), 0644)
+		require.NoError(t, err, "Failed to write main workflow file")
+
+		err = compiler.CompileWorkflow(mainPath)
+		require.NoError(t, err, "Legacy top-level bot allowlists should not be merged into imports")
+
+		lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(mainPath))
+		require.NoError(t, err, "Failed to read lock file")
+		assert.NotContains(t, string(lockContent), `GH_AW_ALLOWED_BOTS: "renovate[bot]"`,
+			"Expected legacy top-level bot allowlists in imports to be ignored")
+	})
+
 	t.Run("duplicate_bots_across_top_level_and_import_deduped", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "bots-import-dedup-test")
 
 		sharedContent := `---
-on: issues
-bots:
-  - "dependabot[bot]"
-  - "renovate[bot]"
+on:
+  bots:
+    - "dependabot[bot]"
+    - "renovate[bot]"
 ---
 `
 		sharedPath := filepath.Join(tmpDir, "shared-bots-dup.md")

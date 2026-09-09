@@ -47,7 +47,7 @@ tools:
     wiki: true
     description: "Project glossary and terminology reference"
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [repos, pull_requests]  # scoped to avoid search_repositories (in default); repos covers commits/files, pull_requests covers PRs
   edit:
   bash: true
@@ -96,7 +96,7 @@ evals:
     question: Was a pull request created with glossary updates, or was noop used when the glossary required no changes?
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Glossary Maintainer

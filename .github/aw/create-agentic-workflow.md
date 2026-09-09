@@ -10,6 +10,7 @@ Design and create new workflow files under `.github/workflows/` using the instal
 ## Load These References First
 
 - [designer.md](designer.md)
+- [intent.md](intent.md) for the outcome definition, PromptPex eval derivation, and operational-value inference
 - [github-agentic-workflows.md](github-agentic-workflows.md)
 - [workflow-editing.md](workflow-editing.md)
 - [workflow-constraints.md](workflow-constraints.md)
@@ -40,27 +41,30 @@ When the user requests specific skills or agent plugins, declare them in the bui
 
 ### Interactive mode
 
-Start with exactly:
+When the user has not already stated an automation goal, start with exactly:
 
 > What do you want to automate today?
 
-Then follow a progressive interview — ask one question at a time, advance only when the current phase is clear:
+When the request already states a goal, infer its intent and ask only for information that is still needed. Then follow a progressive interview — ask one question at a time, advance only when the current phase is clear:
 
-1. **Goal** — confirm workflow name (kebab-case), brief description, optional emoji.
-2. **Repository survey for maintenance workflows** — before choosing a portfolio or cadence, inspect the target repository using [maintainer.md](maintainer.md). Infer project type, contribution and validation rules, repository layout, recent activity, issue and pull request state, labels, releases, and CI health. Summarize the observed signals and derive an initial low-risk strategy; ask only for policy or capacity information that cannot be inferred.
-3. **Trigger** — ask "When should this run?" and map to an `on:` block (see trigger mapping in [designer-mappings.md](designer-mappings.md)). For scheduled workflows that create issues or pull requests, also choose how previous results are handled using [Choose the previous-result strategy](#choose-the-previous-result-strategy).
+1. **Goal and intent** — confirm the workflow name, description, and a concise outcome-oriented `intent:`. Derive activation, required-effect, no-op, success, and uncertainty conditions before choosing implementation; see [intent.md](intent.md).
+2. **Repository survey and intent mining** — only for maintenance or underspecified automation requests, inspect bounded repository evidence using [maintainer.md](maintainer.md). Summarize observed signals, propose evidence-backed candidate intents, then select and augment one before choosing a portfolio or cadence.
+3. **Architecture and trigger** — compare feasible architectures against the augmented intent's coverage, timeliness, attention cost, safety, boundedness, determinism, state, complexity, and evidence. Then ask "When should this run?" and map the selected architecture to an `on:` block. For scheduled workflows that create issues or pull requests, also choose how previous results are handled using [Choose the previous-result strategy](#choose-the-previous-result-strategy).
 4. **Scope** — ask what it reads and what it creates or updates; map to `permissions:`, `tools:`, and `safe-outputs:`.
 5. **Data strategy** — ask whether GitHub data should be pre-fetched with `gh` + `jq` (DataOps default); map to `steps:`.
 6. **Guardrails** — ask whether it should block, advise, or silently log; guide toward `noop` and safe-output behavior.
 7. **Context & network** — ask about external APIs, MCP servers, and required secrets; map to `network.allowed` and `env:`.
-8. **Engine** (skip if obvious) — if ambiguous, suggest Copilot as the default.
+8. **Engine** — preserve explicit engine hints. With no engine preference or
+   engine-specific requirement, omit `engine:` and let the configured default
+   apply. If an explicit model requirement forces engine selection, try Copilot
+   first.
 9. **Confirmation** — present a structured summary before generating:
 
    ```text
    Proposed workflow:
    - Name: <workflow-id>
    - Trigger: <event + key options>
-   - Engine: <engine or default>
+   - Engine: <explicit engine or default (omitted)>
    - Tools: <tool summary>
    - Safe outputs: <list or none>
    - Network: <allowed summary>
@@ -146,9 +150,9 @@ When evaluating scenarios, classify any failure before stopping:
 - Before creating the file, check whether `.github/workflows/<workflow-id>.md` already exists.
 - If it exists, choose a more specific ID instead of overwriting.
 
-### 2. Choose the trigger
+### 2. Derive architecture, then choose the trigger
 
-Use the smallest trigger that matches the request. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
+Use the smallest trigger that satisfies the augmented intent. Treat the mappings below as implementation options, not direct substitutions for intent reasoning. See the [Decision Matrix](triggers.md#decision-matrix) in triggers.md for the base trigger-to-use-case mapping.
 
 | Scenario | Trigger and default output | Details |
 |---|---|---|
@@ -157,6 +161,7 @@ Use the smallest trigger that matches the request. See the [Decision Matrix](tri
 | Backend schema/API review | `pull_request` with backend contract `paths:` and `add-comment` | [Backend review guidance](create-agentic-workflow-trigger-details.md#backend-review-guidance) |
 | PR analyzers deciding comment vs issue vs noop | `pull_request` + escalation logic | [PR analyzer escalation](create-agentic-workflow-trigger-details.md#pr-analyzer-escalation-guidance) |
 | Incident workflows | `workflow_run` / `deployment_status` with `create-issue` dedup | [Incident dedup-key templates](create-agentic-workflow-trigger-details.md#incident-dedup-key-templates-workflow_run-and-deployment_status) |
+| CI regressions tied to a pull request | `workflow_run` with PR-comment escalation; repository-wide or unowned failures use deduplicated `create-issue` | Keep the visible output attached to the affected PR when one is known; use an issue when no single owner can be identified |
 | Dependency-license and policy compliance | `pull_request` with manifest `paths:` | [Compliance review guidance](create-agentic-workflow-trigger-details.md#compliance-review-guidance) |
 | Coverage analysis | `pull_request` or CI-linked triggers with explicit fallback | [Coverage-analysis guidance](create-agentic-workflow-trigger-details.md#coverage-analysis-guidance) |
 
@@ -251,11 +256,15 @@ Usually omit:
 
 The markdown body should:
 
-- state the workflow goal clearly
+- state the canonical intent clearly
+- determine applicability using its activation conditions and required evidence
+- produce the required effects only when the evidence supports them
 - reference the triggering context explicitly
 - name the allowed safe outputs when write actions are expected
-- instruct the agent to call `noop` when no visible change is needed
+- instruct the agent to call `noop` with a short reason when an inverse/no-op condition applies, including duplicates or insufficient evidence
 - stay concise and task-focused
+
+When `evals:` are appropriate, derive separate positive and adversarial scenario fixtures from required effects and inverse/no-op conditions as described in [intent.md](intent.md). Each BinEval run receives one fixture; phrase questions for that fixture, or explicitly return `UNKNOWN` when a shared question's scenario is not provided rather than mixing mutually exclusive assertions.
 
 When the workflow generates reports or markdown output, follow [report.md#report-style-and-structure](report.md#report-style-and-structure) and [report.md#workflow-run-references](report.md#workflow-run-references).
 
@@ -264,8 +273,8 @@ When the workflow generates reports or markdown output, follow [report.md#report
 When processing a workflow-creation issue form:
 
 1. extract the workflow name, description, and additional context
-2. derive a unique workflow ID
-3. infer the trigger, tools, network access, and safe outputs
+2. derive and persist a canonical intent, then augment it before implementation choices
+3. derive a unique workflow ID and select an architecture, trigger, tools, network access, and safe outputs from the augmented intent
 4. create exactly one workflow markdown file
 5. compile it with `gh aw compile <workflow-id>`
 6. include the generated `.lock.yml` in the PR
@@ -276,6 +285,7 @@ When processing a workflow-creation issue form:
 ---
 emoji: 🏷️
 description: <brief description>
+intent: <concise outcome, not an implementation>
 on:
   issues:
     types: [opened]

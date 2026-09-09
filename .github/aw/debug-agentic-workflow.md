@@ -104,6 +104,7 @@ Inspect these when available:
 
 - permissions and authentication failures
 - missing or misconfigured tools
+- GitHub MCP DIFC source policy without a matching `safeoutputs` write-sink policy
 - network allowlist problems
 - prompt ambiguity or lack of context
 - timeout pressure
@@ -128,7 +129,7 @@ When you suggest a fix:
 
 1. point to the exact frontmatter or prompt section
 2. explain the reason briefly
-3. validate with `gh aw compile <workflow-name>`
+3. validate with `gh aw compile <workflow-name>` and inspect the generated lock file for both source and sink guard policies when GitHub MCP and safe outputs are used
 4. suggest another run only after the workflow compiles
 
 When token cost is part of the issue, compare before/after runs with `gh aw audit` and inspect `aic`, input/output tokens, and cache read/write tokens. Treat quality regressions as failures even when token usage drops.

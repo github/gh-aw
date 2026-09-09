@@ -130,7 +130,7 @@ async function computeFrontmatterHash(workflowPath, options = {}) {
     log(`canonical.body-text (inlined-imports): ${canonical["body-text"].substring(0, 200)}...`);
   } else {
     // Extract template expressions with env. or vars.
-    const expressions = extractRelevantTemplateExpressions(markdown);
+    const expressions = mergeSortedUniqueStrings(extractRelevantTemplateExpressions(markdown), await collectRuntimeImportTemplateExpressions(frontmatterText, markdown, baseDir, fileReader));
     if (expressions.length > 0) {
       canonical["template-expressions"] = expressions;
       log(`canonical.template-expressions: ${JSON.stringify(expressions)}`);
@@ -347,6 +347,213 @@ function extractRelevantTemplateExpressions(markdown) {
 
   // Remove duplicates and sort
   return [...new Set(expressions)].sort();
+}
+
+/**
+ * Extract all GitHub Actions template expressions.
+ * @param {string} markdown
+ * @returns {string[]}
+ */
+function extractAllTemplateExpressions(markdown) {
+  const expressions = [];
+  const regex = /\$\{\{([^}]+)\}\}/g;
+  let match;
+
+  while ((match = regex.exec(markdown)) !== null) {
+    if (!match[1].trim()) continue;
+    expressions.push(match[0]);
+  }
+
+  return [...new Set(expressions)].sort();
+}
+
+/**
+ * @typedef {Object} RuntimeImportReference
+ * @property {string} path
+ * @property {number|null} startLine
+ * @property {number|null} endLine
+ */
+
+/**
+ * Collect template expressions from content that may be added to the prompt by
+ * runtime imports.
+ * @param {string} frontmatterText
+ * @param {string} markdown
+ * @param {string} baseDir
+ * @param {Function} fileReader
+ * @returns {Promise<string[]>}
+ */
+async function collectRuntimeImportTemplateExpressions(frontmatterText, markdown, baseDir, fileReader) {
+  const seen = new Set();
+  let expressions = await extractRuntimeImportTemplateExpressionsFromMarkdown(markdown, baseDir, seen, fileReader);
+
+  const importedBodies = await collectImportedBodies(frontmatterText, baseDir, new Set(), fileReader);
+  for (const body of importedBodies) {
+    expressions = mergeSortedUniqueStrings(expressions, extractAllTemplateExpressions(body));
+    expressions = mergeSortedUniqueStrings(expressions, await extractRuntimeImportTemplateExpressionsFromMarkdown(body, baseDir, seen, fileReader));
+  }
+
+  return expressions;
+}
+
+/**
+ * @param {string} markdown
+ * @param {string} baseDir
+ * @param {Set<string>} seen
+ * @param {Function} fileReader
+ * @returns {Promise<string[]>}
+ */
+async function extractRuntimeImportTemplateExpressionsFromMarkdown(markdown, baseDir, seen, fileReader) {
+  const refs = extractRuntimeImportReferences(markdown);
+  let expressions = [];
+
+  for (const ref of refs) {
+    const body = await readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader);
+    if (body === null) continue;
+    expressions = mergeSortedUniqueStrings(expressions, extractAllTemplateExpressions(body));
+    expressions = mergeSortedUniqueStrings(expressions, await extractRuntimeImportTemplateExpressionsFromMarkdown(body, baseDir, seen, fileReader));
+  }
+
+  return expressions;
+}
+
+/**
+ * @param {string} markdown
+ * @returns {RuntimeImportReference[]}
+ */
+function extractRuntimeImportReferences(markdown) {
+  if (!markdown) return [];
+
+  const refs = [];
+  const seen = new Set();
+  const regex = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+?)\}\}/g;
+  let match;
+  while ((match = regex.exec(markdown)) !== null) {
+    const target = match[1].trim();
+    if (!target) continue;
+    const rangeMatch = target.match(/^(.+?):(\d+)-(\d+)$/);
+    const ref = rangeMatch ? { path: rangeMatch[1].trim(), startLine: Number.parseInt(rangeMatch[2], 10), endLine: Number.parseInt(rangeMatch[3], 10) } : { path: target, startLine: null, endLine: null };
+    if (/^https?:\/\//i.test(ref.path)) continue;
+    const key = `${ref.path.replace(/\\/g, "/")}:${ref.startLine ?? 0}-${ref.endLine ?? 0}`;
+    if (seen.has(key)) continue;
+    refs.push(ref);
+    seen.add(key);
+  }
+  return refs;
+}
+
+/**
+ * @param {RuntimeImportReference} ref
+ * @param {string} baseDir
+ * @param {Set<string>} seen
+ * @param {Function} fileReader
+ * @returns {Promise<string|null>}
+ */
+async function readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader) {
+  for (const candidate of runtimeImportHashCandidatePaths(ref.path, baseDir)) {
+    const key = `${candidate}:${ref.startLine ?? 0}-${ref.endLine ?? 0}`;
+    if (seen.has(key)) return null;
+    if (fs.existsSync(candidate) && !runtimeImportHashRealPathAllowed(candidate, baseDir)) continue;
+    try {
+      let content = await fileReader(candidate);
+      seen.add(key);
+      if (ref.startLine !== null || ref.endLine !== null) {
+        content = applyRuntimeImportLineRangeForHash(content, ref.startLine, ref.endLine);
+      }
+      const { markdown } = extractFrontmatterAndBody(content);
+      return markdown;
+    } catch (err) {
+      continue;
+    }
+  }
+  return null;
+}
+
+function runtimeImportHashRealPathAllowed(candidate, baseDir) {
+  const workspaceRoot = runtimeImportHashWorkspaceRoot(baseDir);
+  for (const base of [path.join(workspaceRoot, ".github"), path.join(workspaceRoot, ".agents")]) {
+    if (realPathWithinBaseForHash(candidate, base)) return true;
+  }
+  return false;
+}
+
+function realPathWithinBaseForHash(pathToCheck, baseDir) {
+  try {
+    const realBase = fs.realpathSync(baseDir);
+    const realPath = fs.realpathSync(pathToCheck);
+    const relativePath = path.relative(realBase, realPath);
+    return relativePath !== ".." && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} content
+ * @param {number|null} startLine
+ * @param {number|null} endLine
+ * @returns {string}
+ */
+function applyRuntimeImportLineRangeForHash(content, startLine, endLine) {
+  const lines = content.split("\n");
+  const start = startLine && startLine > 0 ? startLine : 1;
+  const end = endLine && endLine > 0 && endLine <= lines.length ? endLine : lines.length;
+  if (start > end || start > lines.length) return "";
+  return lines.slice(start - 1, end).join("\n");
+}
+
+/**
+ * @param {string} importPath
+ * @param {string} baseDir
+ * @returns {string[]}
+ */
+function runtimeImportHashCandidatePaths(importPath, baseDir) {
+  let normalized = String(importPath || "")
+    .trim()
+    .replace(/\\/g, "/");
+  if (normalized.startsWith("/")) {
+    normalized = normalized.replace(/^\/+/, "");
+    if (!normalized.startsWith(".github/") && !normalized.startsWith(".agents/")) {
+      return [];
+    }
+  }
+  if (normalized.startsWith("./")) {
+    normalized = normalized.substring(2);
+  }
+  if (!normalized || normalized.startsWith("../") || normalized.includes("/../")) {
+    return [];
+  }
+
+  const workspaceRoot = runtimeImportHashWorkspaceRoot(baseDir);
+  if (normalized.startsWith(".agents/") || normalized.startsWith(".github/")) {
+    return [path.join(workspaceRoot, normalized)];
+  }
+
+  return [path.join(workspaceRoot, ".github", normalized), path.join(workspaceRoot, ".github", "workflows", normalized), path.join(baseDir, normalized)].map(p => path.normalize(p)).filter((p, index, all) => all.indexOf(p) === index);
+}
+
+/**
+ * @param {string} baseDir
+ * @returns {string}
+ */
+function runtimeImportHashWorkspaceRoot(baseDir) {
+  const normalized = baseDir.replace(/\\/g, "/");
+  const markerIndex = normalized.indexOf("/.github/");
+  if (markerIndex >= 0) {
+    return normalized.substring(0, markerIndex);
+  }
+  if (normalized.endsWith("/.github")) {
+    return path.dirname(baseDir);
+  }
+  return baseDir;
+}
+
+/**
+ * @param  {...string[]} groups
+ * @returns {string[]}
+ */
+function mergeSortedUniqueStrings(...groups) {
+  return [...new Set(groups.flat().filter(Boolean))].sort();
 }
 
 /**
@@ -743,6 +950,9 @@ module.exports = {
   extractFrontmatterAndBody,
   extractImportsFromText,
   extractRelevantTemplateExpressions,
+  extractAllTemplateExpressions,
+  collectRuntimeImportTemplateExpressions,
+  extractRuntimeImportReferences,
   marshalCanonicalJSON,
   marshalSorted,
   extractHashFromLockFile,

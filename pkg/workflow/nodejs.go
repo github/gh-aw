@@ -128,53 +128,17 @@ func buildStandardNpmEngineInstallSteps(
 // Returns:
 //   - []GitHubActionStep: Steps in order: Node.js setup, AWF (if enabled), CLI install
 func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData *WorkflowData) []GitHubActionStep {
+	return buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, true)
+}
+
+func buildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData *WorkflowData, stageCopilotCLI bool) []GitHubActionStep {
 	var steps []GitHubActionStep
 
 	if len(npmSteps) > 0 {
 		steps = append(steps, npmSteps[0]) // Node.js setup step
 	}
 
-	// Inject AWF installation after Node.js setup but before the CLI install steps
-	if isFirewallEnabled(workflowData) {
-		firewallConfig := getFirewallConfig(workflowData)
-		agentConfig := getAgentConfig(workflowData)
-		var awfVersion string
-		if firewallConfig != nil {
-			awfVersion = firewallConfig.Version
-		}
-
-		// gVisor must be installed and registered BEFORE AWF starts the agent container.
-		if isGVisorRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
-			steps = append(steps, generateGVisorInstallStep())
-		}
-
-		// docker-sbx must be installed, authenticated, and smoke-tested BEFORE AWF
-		// starts so the microVM runtime is ready when AWF launches the agent.
-		if isDockerSbxRuntime(workflowData) {
-			if isRuntimeInstallEnabled(workflowData) {
-				steps = append(steps, generateDockerSbxKVMCheckStep())
-				steps = append(steps, generateDockerSbxSecretsCheckStep())
-				steps = append(steps, generateDockerSbxInstallStep())
-				steps = append(steps, generateDockerSbxAuthAndDaemonStep())
-				steps = append(steps, generateDockerSbxPreFlightStep())
-			}
-		}
-		if isCloudHypervisorRuntime(workflowData) {
-			steps = append(steps, generateCloudHypervisorKVMAccessStep())
-			steps = append(steps, generateCloudHypervisorHostPreflightStep())
-			steps = append(steps, generateCloudHypervisorBundleSetupStep(getAWFVersionForSetup(workflowData)))
-		}
-
-		awfInstall := generateAWFInstallationStep(awfVersion, agentConfig)
-		if len(awfInstall) > 0 {
-			steps = append(steps, awfInstall)
-		}
-
-		// Install Docker Compose plugin for ARC/DinD runners where it may not be pre-installed.
-		if isArcDindTopology(workflowData) {
-			steps = append(steps, generateDockerComposeInstallStep())
-		}
-	}
+	steps = appendAWFInstallationSteps(steps, workflowData)
 
 	if len(npmSteps) > 1 {
 		steps = append(steps, npmSteps[1:]...) // CLI installation and subsequent steps
@@ -184,7 +148,7 @@ func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData
 	// With --rootless, the binary is at ~/.local/bin/copilot; otherwise /usr/local/bin/copilot.
 	// On ARC/DinD, the AWF command references ${RUNNER_TEMP}/gh-aw/bin/copilot which is
 	// daemon-visible, so we copy from wherever the install script placed it.
-	if isFirewallEnabled(workflowData) && isArcDindTopology(workflowData) {
+	if stageCopilotCLI && isFirewallEnabled(workflowData) && isArcDindTopology(workflowData) {
 		copyStep := GitHubActionStep([]string{
 			"      - name: Copy Copilot CLI to daemon-visible path",
 			"        run: |",
@@ -196,6 +160,49 @@ func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData
 		steps = append(steps, copyStep)
 	}
 
+	return steps
+}
+
+func appendAWFInstallationSteps(steps []GitHubActionStep, workflowData *WorkflowData) []GitHubActionStep {
+	if !isFirewallEnabled(workflowData) {
+		return steps
+	}
+
+	firewallConfig := getFirewallConfig(workflowData)
+	agentConfig := getAgentConfig(workflowData)
+	awfVersion := ""
+	if firewallConfig != nil {
+		awfVersion = firewallConfig.Version
+	}
+
+	// gVisor must be installed and registered BEFORE AWF starts the agent container.
+	if isGVisorRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
+		steps = append(steps, generateGVisorInstallStep())
+	}
+
+	// docker-sbx must be installed, authenticated, and smoke-tested BEFORE AWF
+	// starts so the microVM runtime is ready when AWF launches the agent.
+	if isDockerSbxRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
+		steps = append(steps, generateDockerSbxKVMCheckStep())
+		steps = append(steps, generateDockerSbxSecretsCheckStep())
+		steps = append(steps, generateDockerSbxInstallStep())
+		steps = append(steps, generateDockerSbxAuthAndDaemonStep())
+		steps = append(steps, generateDockerSbxPreFlightStep())
+	}
+	if isCloudHypervisorRuntime(workflowData) {
+		steps = append(steps, generateCloudHypervisorKVMAccessStep())
+		steps = append(steps, generateCloudHypervisorHostPreflightStep())
+		steps = append(steps, generateCloudHypervisorBundleSetupStep(getAWFVersionForSetup(workflowData)))
+	}
+
+	if awfInstall := generateAWFInstallationStep(awfVersion, agentConfig); len(awfInstall) > 0 {
+		steps = append(steps, awfInstall)
+	}
+
+	// Install Docker Compose plugin for ARC/DinD runners where it may not be pre-installed.
+	if isArcDindTopology(workflowData) {
+		steps = append(steps, generateDockerComposeInstallStep())
+	}
 	return steps
 }
 
@@ -213,7 +220,7 @@ func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData
 // runner tool_cache context. The generated command does not guess fallback paths.
 //
 // Returns:
-//   - string: A shell command that exports PATH with hostedtoolcache bin directories prepended
+//   - string: A shell command that exports PATH with hostedtoolcache bin directories appended
 func GetNpmBinPathSetup() string {
 	// Find all bin directories in hostedtoolcache (Node.js, Python, etc.)
 	// This finds paths like /opt/hostedtoolcache/node/22.13.0/x64/bin
@@ -230,7 +237,7 @@ func GetNpmBinPathSetup() string {
 	// captured by the elixir runtime capture step and exported to GITHUB_ENV,
 	// making it available inside the AWF container. Without this, mix commands
 	// fail because Elixir tries to exec erl which is not found via the find.
-	return `: "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; export PATH="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true`
+	return `: "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr '\n' ':')"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true`
 }
 
 // GenerateDockerSbxNpmCLIInstallStep installs an npm CLI into a runner path that is
@@ -289,14 +296,7 @@ func GetDockerSbxNpmCLIPathSetup(workflowData *WorkflowData) string {
 // By default, --ignore-scripts is added to the install command to prevent pre/post install
 // scripts from executing (supply chain security). Pass options.RunInstallScripts=true to allow scripts.
 func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPrefix string, options NPMInstallOptions) []GitHubActionStep {
-	nodejsLog.Printf(
-		"Generating npm install steps: package=%s, version=%s, includeNodeSetup=%v, isGlobal=%v, runInstallScripts=%v",
-		packageName,
-		version,
-		options.IncludeNodeSetup,
-		options.IsGlobal,
-		options.RunInstallScripts,
-	)
+	nodejsLog.Printf("Generating npm install steps: package=%s, version=%s, includeNodeSetup=%v, isGlobal=%v, runInstallScripts=%v", packageName, version, options.IncludeNodeSetup, options.IsGlobal, options.RunInstallScripts)
 
 	var steps []GitHubActionStep
 

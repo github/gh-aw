@@ -1,0 +1,18 @@
+{
+  "serverArgs": ["--disable-builtin-mcps", "--no-ask-user", "--allow-tool", "web_fetch"],
+  "toolConfig": {
+    "version": 1,
+    "capabilities": {
+      "bash": false,
+      "edit": false,
+      "webFetch": true,
+      "webSearch": false,
+      "mcp": false,
+      "cliProxy": false
+    },
+    "permissions": {
+      "allowedTools": ["read", "web_fetch"]
+    },
+    "explicitlyDisabledTools": ["bash", "cli-proxy", "edit", "github"]
+  }
+}

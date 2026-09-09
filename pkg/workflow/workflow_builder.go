@@ -2,8 +2,11 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 )
@@ -42,6 +45,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		FrontmatterFieldLines:      result.FieldLines,
 		RawMarkdown:                result.Markdown,
 		Description:                c.extractDescription(result.Frontmatter),
+		Intent:                     c.extractIntent(result.Frontmatter),
 		Docs:                       docs,
 		Source:                     c.extractSource(result.Frontmatter),
 		Redirect:                   c.extractRedirect(result.Frontmatter),
@@ -51,7 +55,8 @@ func (c *Compiler) buildInitialWorkflowData(
 		ImportedFiles:              importsResult.ImportedFiles,
 		Skills:                     extractFrontmatterSkills(toolsResult.parsedFrontmatter, result.Frontmatter),
 		SkillReferences:            extractFrontmatterSkillReferences(toolsResult.parsedFrontmatter, result.Frontmatter),
-		Plugins:                    mergeFrontmatterPlugins(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins),
+		Plugins:                    mergeFrontmatterPlugins(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects),
+		PluginReferences:           mergeFrontmatterPluginReferences(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects),
 		ImportedMarkdown:           toolsResult.importedMarkdown, // Only imports WITH inputs
 		ImportPaths:                toolsResult.importPaths,      // Import paths for runtime-import macros (imports without inputs)
 		PromptImports:              toolsResult.promptImports,    // Ordered prompt contributions from imports
@@ -93,6 +98,14 @@ func (c *Compiler) buildInitialWorkflowData(
 		InlinedImports:             inlinedImports,
 		EngineConfigSteps:          engineSetup.configSteps,
 	}
+	if importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(result.Frontmatter) {
+		var importedConcurrency any
+		if err := json.Unmarshal([]byte(importsResult.MergedConcurrency), &importedConcurrency); err == nil {
+			workflowData.Concurrency = c.extractTopLevelYAMLSection(map[string]any{"concurrency": importedConcurrency}, "concurrency")
+		} else {
+			workflowBuilderLog.Printf("Skipping imported concurrency merge: invalid JSON: %v", err)
+		}
+	}
 
 	// Populate checkout configs from parsed frontmatter.
 	// Fall back to raw frontmatter parsing when full ParseFrontmatterConfig fails
@@ -101,12 +114,21 @@ func (c *Compiler) buildInitialWorkflowData(
 		workflowData.CheckoutConfigs = toolsResult.parsedFrontmatter.CheckoutConfigs
 		workflowData.CheckoutDisabled = toolsResult.parsedFrontmatter.CheckoutDisabled
 		workflowData.CheckoutExplicitlyDisabled = toolsResult.parsedFrontmatter.CheckoutExplicitlyDisabled
-	} else if rawCheckout, ok := result.Frontmatter["checkout"]; ok {
-		if checkoutValue, ok := rawCheckout.(bool); ok && !checkoutValue {
-			workflowData.CheckoutDisabled = true
-			workflowData.CheckoutExplicitlyDisabled = true
-		} else if configs, err := ParseCheckoutConfigs(rawCheckout); err == nil {
-			workflowData.CheckoutConfigs = configs
+		workflowData.CheckoutSkipDefault = toolsResult.parsedFrontmatter.CheckoutSkipDefault
+	} else {
+		if rawCheckout, ok := result.Frontmatter["checkout"]; ok {
+			if checkoutValue, ok := rawCheckout.(bool); ok && !checkoutValue {
+				workflowData.CheckoutDisabled = true
+				workflowData.CheckoutExplicitlyDisabled = true
+			} else if configs, err := ParseCheckoutConfigs(rawCheckout); err == nil {
+				workflowData.CheckoutConfigs = configs
+			}
+		}
+		// permissions.contents: none signals that the default workflow-repository
+		// checkout should be skipped (see checkoutSkipDefaultFromPermissions, the
+		// single source of truth shared with the primary ParseFrontmatterConfig path).
+		if checkoutSkipDefaultFromPermissions(result.Frontmatter["permissions"]) {
+			workflowData.CheckoutSkipDefault = true
 		}
 	}
 
@@ -131,6 +153,18 @@ func (c *Compiler) buildInitialWorkflowData(
 			}
 			workflowData.CheckoutConfigs = append(workflowData.CheckoutConfigs, importedConfigs...)
 		}
+	}
+
+	// Warn when permissions.contents: none skips the default checkout but no other
+	// checkout: entries (own repo, imports) are configured, since that leaves the
+	// agent with no working-directory checkout at all (effectively equivalent to
+	// checkout: false, but without the explicit intent that flag signals).
+	if workflowData.CheckoutSkipDefault && !workflowData.CheckoutDisabled && len(workflowData.CheckoutConfigs) == 0 {
+		warningMsg := "permissions.contents: none skips the default workflow-repository checkout, " +
+			"but no other checkout: entries are configured; the agent job will have no repository " +
+			"checked out. Add a target checkout: entry, or set checkout: false to make the intent explicit."
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+		c.IncrementWarningCount()
 	}
 
 	// Auto-disable checkout for pull_request_target-only workflows when not explicitly configured.

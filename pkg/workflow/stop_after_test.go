@@ -271,3 +271,197 @@ jobs:
 		}
 	})
 }
+
+// TestParseOnStopAfterValue tests the shared parseOnStopAfterValue helper used both by
+// ParseFrontmatterConfig (to populate the typed OnStopAfter field) and by
+// extractStopAfterFromOn, ensuring the two never diverge.
+func TestParseOnStopAfterValue(t *testing.T) {
+	tests := []struct {
+		name        string
+		onMap       map[string]any
+		expected    string
+		expectError bool
+	}{
+		{
+			name:     "no stop-after key",
+			onMap:    map[string]any{"push": nil},
+			expected: "",
+		},
+		{
+			name:     "relative delta",
+			onMap:    map[string]any{"stop-after": "+48h"},
+			expected: "+48h",
+		},
+		{
+			name:     "absolute timestamp",
+			onMap:    map[string]any{"stop-after": "2025-12-31 23:59:59"},
+			expected: "2025-12-31 23:59:59",
+		},
+		{
+			name:     "GitHub Actions expression",
+			onMap:    map[string]any{"stop-after": "${{ inputs.stop-after }}"},
+			expected: "${{ inputs.stop-after }}",
+		},
+		{
+			name:        "wrong type",
+			onMap:       map[string]any{"stop-after": 123},
+			expectError: true,
+		},
+		{
+			name:     "nil map",
+			onMap:    nil,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseOnStopAfterValue(tt.onMap)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.expected {
+				t.Errorf("parseOnStopAfterValue() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestParseFrontmatterConfigOnStopAfter verifies that ParseFrontmatterConfig populates
+// the typed FrontmatterConfig.OnStopAfter field from on.stop-after.
+func TestParseFrontmatterConfigOnStopAfter(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_dispatch": nil,
+			"stop-after":        "+48h",
+		},
+	}
+
+	config, err := ParseFrontmatterConfig(frontmatter)
+	if err != nil {
+		t.Fatalf("ParseFrontmatterConfig failed: %v", err)
+	}
+	if config.OnStopAfter != "+48h" {
+		t.Errorf("Expected OnStopAfter to be %q, got %q", "+48h", config.OnStopAfter)
+	}
+}
+
+// TestExtractStopAfterFromOnMatchesTypedFieldValue verifies that extractStopAfterFromOn,
+// when given a cached ParsedFrontmatter, returns a value consistent with the typed
+// OnStopAfter field populated by ParseFrontmatterConfig — both derive from the same
+// shared parseOnStopAfterValue helper, so they cannot diverge.
+func TestExtractStopAfterFromOnMatchesTypedFieldValue(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_dispatch": nil,
+			"stop-after":        "+48h",
+		},
+	}
+
+	parsedFrontmatter, err := ParseFrontmatterConfig(frontmatter)
+	if err != nil {
+		t.Fatalf("ParseFrontmatterConfig failed: %v", err)
+	}
+	if parsedFrontmatter.OnStopAfter != "+48h" {
+		t.Fatalf("Expected typed field to be populated, got %q", parsedFrontmatter.OnStopAfter)
+	}
+
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{ParsedFrontmatter: parsedFrontmatter}
+	stopAfter, err := compiler.extractStopAfterFromOn(frontmatter, workflowData)
+	if err != nil {
+		t.Fatalf("extractStopAfterFromOn failed: %v", err)
+	}
+	if stopAfter != "+48h" {
+		t.Errorf("extractStopAfterFromOn() = %q, want %q", stopAfter, "+48h")
+	}
+}
+
+// TestExtractStopAfterFromOnPrefersTypedFieldOverRawMap is a sentinel test proving that
+// extractStopAfterFromOn returns the typed OnStopAfter field instead of reparsing the raw
+// frontmatter map, by making the two diverge: the typed field is set explicitly to a
+// different value than on.stop-after in the raw map. If production code ever regresses to
+// reparsing the raw map instead of consuming the typed field, this test will fail.
+func TestExtractStopAfterFromOnPrefersTypedFieldOverRawMap(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_dispatch": nil,
+			"stop-after":        "+24h",
+		},
+	}
+
+	parsedFrontmatter := &FrontmatterConfig{
+		On:          frontmatter["on"].(map[string]any),
+		OnStopAfter: "+999h", // deliberately diverges from the raw map's "+24h"
+	}
+
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{ParsedFrontmatter: parsedFrontmatter}
+	stopAfter, err := compiler.extractStopAfterFromOn(frontmatter, workflowData)
+	if err != nil {
+		t.Fatalf("extractStopAfterFromOn failed: %v", err)
+	}
+	if stopAfter != "+999h" {
+		t.Errorf("extractStopAfterFromOn() = %q, want %q (the typed field value, not the raw map's %q)", stopAfter, "+999h", "+24h")
+	}
+}
+
+// TestExtractStopAfterFromOnSurfacesErrorWhenTypedFieldParseFailed verifies that when
+// ParseFrontmatterConfig leaves OnStopAfter empty because the raw value failed to parse
+// (e.g. a non-string value), extractStopAfterFromOn still surfaces the original parse
+// error instead of silently treating stop-after as unset.
+func TestExtractStopAfterFromOnSurfacesErrorWhenTypedFieldParseFailed(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_dispatch": nil,
+			"stop-after":        123, // invalid: must be a string
+		},
+	}
+
+	parsedFrontmatter, err := ParseFrontmatterConfig(frontmatter)
+	if err != nil {
+		t.Fatalf("ParseFrontmatterConfig failed: %v", err)
+	}
+	if parsedFrontmatter.OnStopAfter != "" {
+		t.Fatalf("Expected typed field to remain empty on parse failure, got %q", parsedFrontmatter.OnStopAfter)
+	}
+
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{ParsedFrontmatter: parsedFrontmatter}
+	_, err = compiler.extractStopAfterFromOn(frontmatter, workflowData)
+	if err == nil {
+		t.Fatal("Expected extractStopAfterFromOn to return an error for invalid stop-after type, got nil")
+	}
+}
+
+// TestProcessStopAfterConfigurationGitHubExpression verifies that a stop-after value
+// expressed as a GitHub Actions expression is passed through verbatim without being
+// parsed as a relative delta or absolute timestamp.
+func TestProcessStopAfterConfigurationGitHubExpression(t *testing.T) {
+	tmpDir := t.TempDir()
+	mdFile := filepath.Join(tmpDir, "test-workflow.md")
+
+	compiler := NewCompiler()
+	frontmatter := map[string]any{
+		"on": map[string]any{
+			"workflow_dispatch": nil,
+			"stop-after":        "${{ inputs.stop-after }}",
+		},
+	}
+
+	workflowData := &WorkflowData{}
+	err := compiler.processStopAfterConfiguration(frontmatter, workflowData, mdFile)
+	if err != nil {
+		t.Fatalf("processStopAfterConfiguration failed: %v", err)
+	}
+
+	if workflowData.StopTime != "${{ inputs.stop-after }}" {
+		t.Errorf("Expected stop time expression to be passed through verbatim, got %q", workflowData.StopTime)
+	}
+}

@@ -21,7 +21,7 @@ permissions:
 name: Smoke OTEL
 engine:
   id: codex
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 strict: true
 tools:
   bash: true

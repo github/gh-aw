@@ -252,6 +252,124 @@ func TestParseOperationalValueEvaluatorOutputRejectsFutureEvidence(t *testing.T)
 	}
 }
 
+func TestSelectHistoricalOperationalValueGrader(t *testing.T) {
+	t.Parallel()
+
+	makeManifest := func(entries ...operationalValueGraderManifestEntry) *operationalValueGraderManifest {
+		return &operationalValueGraderManifest{Version: 1, Graders: entries}
+	}
+	makeArtifact := func(results ...graderArtifactResult) *graderResultsArtifact {
+		return &graderResultsArtifact{Version: 1, Results: results}
+	}
+	enabledEntry := operationalValueGraderManifestEntry{ID: "operational-value", Source: "operational-value", Enabled: true}
+	resultWithObservation := graderArtifactResult{ID: "operational-value", Observation: &graderArtifactObservation{}}
+
+	tests := []struct {
+		name        string
+		manifest    *operationalValueGraderManifest
+		artifact    *graderResultsArtifact
+		runID       string
+		wantErr     string
+		wantEntryID string
+	}{
+		{
+			name:     "nil manifest",
+			manifest: nil,
+			artifact: makeArtifact(resultWithObservation),
+			runID:    "123",
+			wantErr:  "run 123 has no grader data",
+		},
+		{
+			name:     "nil artifact",
+			manifest: makeManifest(enabledEntry),
+			artifact: nil,
+			runID:    "123",
+			wantErr:  "run 123 has no grader data",
+		},
+		{
+			name:     "duplicate manifest entries",
+			manifest: makeManifest(enabledEntry, enabledEntry),
+			artifact: makeArtifact(resultWithObservation),
+			runID:    "456",
+			wantErr:  "run 456 grader manifest contains duplicate operational-value graders",
+		},
+		{
+			name:     "duplicate artifact results",
+			manifest: makeManifest(enabledEntry),
+			artifact: makeArtifact(resultWithObservation, resultWithObservation),
+			runID:    "789",
+			wantErr:  "run 789 grader artifact contains duplicate operational-value results",
+		},
+		{
+			name:     "no matching manifest entry",
+			manifest: makeManifest(operationalValueGraderManifestEntry{ID: "other-grader"}),
+			artifact: makeArtifact(resultWithObservation),
+			runID:    "111",
+			wantErr:  "run 111 did not use an enabled operational-value grader",
+		},
+		{
+			name:     "manifest entry not enabled",
+			manifest: makeManifest(operationalValueGraderManifestEntry{ID: "operational-value", Source: "operational-value", Enabled: false}),
+			artifact: makeArtifact(resultWithObservation),
+			runID:    "222",
+			wantErr:  "run 222 did not use an enabled operational-value grader",
+		},
+		{
+			name:     "manifest entry has wrong source",
+			manifest: makeManifest(operationalValueGraderManifestEntry{ID: "operational-value", Source: "other-source", Enabled: true}),
+			artifact: makeArtifact(resultWithObservation),
+			runID:    "333",
+			wantErr:  "run 333 did not use an enabled operational-value grader",
+		},
+		{
+			name:     "no matching artifact result",
+			manifest: makeManifest(enabledEntry),
+			artifact: makeArtifact(graderArtifactResult{ID: "other-result"}),
+			runID:    "444",
+			wantErr:  "run 444 has no replayable operational-value observation",
+		},
+		{
+			name:     "artifact result missing observation",
+			manifest: makeManifest(enabledEntry),
+			artifact: makeArtifact(graderArtifactResult{ID: "operational-value", Observation: nil}),
+			runID:    "555",
+			wantErr:  "run 555 has no replayable operational-value observation",
+		},
+		{
+			name:        "success",
+			manifest:    makeManifest(enabledEntry),
+			artifact:    makeArtifact(resultWithObservation),
+			runID:       "666",
+			wantEntryID: "operational-value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			entry, result, err := selectHistoricalOperationalValueGrader(tt.manifest, tt.artifact, tt.runID)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+				}
+				if entry != nil || result != nil {
+					t.Fatalf("expected nil entry/result on error, got entry=%v result=%v", entry, result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if entry == nil || entry.ID != tt.wantEntryID {
+				t.Fatalf("expected entry with ID %q, got %v", tt.wantEntryID, entry)
+			}
+			if result == nil || result.ID != "operational-value" {
+				t.Fatalf("expected result with ID operational-value, got %v", result)
+			}
+		})
+	}
+}
+
 func TestNewGradersCommand(t *testing.T) {
 	t.Parallel()
 	command := NewGradersCommand()

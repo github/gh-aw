@@ -345,7 +345,10 @@ type FrontmatterConfig struct {
 	// Core workflow fields
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
-	Emoji       string `json:"emoji,omitempty"` // Optional emoji to represent the workflow visually
+	// Intent captures the durable outcome the workflow exists to achieve
+	// (why it exists), as opposed to Description (what it does).
+	Intent string `json:"intent,omitempty"`
+	Emoji  string `json:"emoji,omitempty"` // Optional emoji to represent the workflow visually
 	// Engine accepts both a plain string engine name (e.g. "copilot") and an object-style
 	// configuration (e.g. {id: copilot, max-continuations: 2}).  Using any prevents
 	// JSON unmarshal failures when the engine is an object, which would otherwise cause
@@ -367,7 +370,8 @@ type FrontmatterConfig struct {
 	Labels                      []string                     `json:"labels,omitempty"`
 	Skills                      []any                        `json:"skills,omitempty"`
 	SkillReferences             []SkillReference             `json:"-"`
-	Plugins                     []string                     `json:"plugins,omitempty"`
+	Plugins                     []any                        `json:"plugins,omitempty"`
+	PluginReferences            []PluginReference            `json:"-"`
 	AmbientFolders              []string                     `json:"ambient-folders,omitempty"`
 	GitHubApp                   *GitHubAppConfig             `json:"github-app,omitempty"`
 
@@ -386,6 +390,7 @@ type FrontmatterConfig struct {
 	// Event and trigger configuration
 	On          map[string]any `json:"on,omitempty"`          // Complex trigger config with many variants (too dynamic to type)
 	OnNeeds     []string       `json:"-"`                     // New typed field extracted from on.needs (not in JSON to avoid conflict)
+	OnStopAfter string         `json:"-"`                     // Typed field extracted from on.stop-after (not in JSON to avoid conflict). Accepts a relative delta ("+25h"), an absolute timestamp, or a GitHub Actions expression (e.g. "${{ inputs.stop-after }}").
 	Permissions map[string]any `json:"permissions,omitempty"` // Deprecated: use PermissionsTyped (can be string or map)
 	Concurrency map[string]any `json:"concurrency,omitempty"`
 	If          string         `json:"if,omitempty"`
@@ -461,6 +466,7 @@ type FrontmatterConfig struct {
 	CheckoutConfigs            []*CheckoutConfig `json:"-"`                  // Parsed checkout configs (not in JSON)
 	CheckoutDisabled           bool              `json:"-"`                  // true when checkout: false is set in frontmatter
 	CheckoutExplicitlyDisabled bool              `json:"-"`                  // true only when checkout: false is explicitly written by the user in frontmatter
+	CheckoutSkipDefault        bool              `json:"-"`                  // true when permissions.contents: none skips only the default workflow-repository checkout
 
 	// Model is the top-level LLM model default. An engine.model value overrides it
 	// for that engine instance.

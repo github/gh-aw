@@ -23,6 +23,10 @@ imports:
   - shared/mcp/notion.md
   - shared/otlp.md
   - shared/reporting.md
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: true
 sandbox:
   agent:

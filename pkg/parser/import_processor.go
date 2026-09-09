@@ -28,6 +28,7 @@ type ImportsResult struct {
 	MergedMCPServers                 string                // Merged mcp-servers configuration from all imports
 	MergedEngines                    []string              // Merged engine configurations from all imports
 	MergedPlugins                    []string              // Agent Plugin references from all imports (merged after main-workflow plugins)
+	MergedPluginObjects              []map[string]any      // Object-form Agent Plugin references from all imports
 	MergedSafeOutputs                []string              // Merged safe-outputs configurations from all imports
 	MergedGraders                    string                // Merged graders configuration from all imports (JSON objects, one per line)
 	MergedMCPScripts                 []string              // Merged mcp-scripts configurations from all imports
@@ -78,6 +79,8 @@ type ImportsResult struct {
 	MergedMaxTurnCacheMisses         string                // First max-turn-cache-misses value found across all imports (JSON-encoded, first-wins)
 	MergedMaxAICredits               string                // First max-ai-credits value found across all imports (JSON-encoded, first-wins)
 	MergedMaxDailyAICredits          string                // First max-daily-ai-credits value found across all imports (JSON-encoded, first-wins)
+	MergedConcurrency                string                // First import-safe concurrency.group value found across all imports (JSON-encoded, first-wins)
+	MergedJobDiscriminator           string                // First concurrency.job-discriminator found across all imports (first-wins)
 	MergedExcludedEnv                []string              // Union of excluded-env lists from all imports (deduplicated, used to extend the main workflow's excluded-env)
 	ImportedFiles                    []string              // List of imported file paths (for manifest)
 	AgentFile                        string                // Path to custom agent file (if imported)

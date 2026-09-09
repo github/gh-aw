@@ -252,6 +252,7 @@ func newCreatePullRequestHandlerConfigBuilder(cfg *SafeOutputsConfig, c *CreateP
 		AddIfTrue("require_temporary_id", c.RequireTemporaryID).
 		AddIfNotEmpty("branch_prefix", c.BranchPrefix).
 		AddIfNotEmpty("title_prefix", c.TitlePrefix).
+		AddIfNotEmpty("body_footer", c.BodyFooter).
 		AddTemplatableStringSlice("labels", c.Labels).
 		AddStringSlice("fallback_labels", c.FallbackLabels).
 		AddTemplatableStringSlice("reviewers", c.Reviewers).

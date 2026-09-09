@@ -69,7 +69,7 @@ func analyzeCountContains(pass *analysis.Pass, n ast.Node, generatedFiles filech
 		Pos:            expr.Pos(),
 		End:            expr.End(),
 		Message:        msg,
-		SuggestedFixes: astutil.BuildContainsFix(expr, pkgText, sText, subText, negated, "Replace strings.Count comparison with strings.Contains"),
+		SuggestedFixes: astutil.BuildContainsFix(pass.Files, expr, pkgText, sText, subText, negated, "Replace strings.Count comparison with strings.Contains"),
 	})
 }
 

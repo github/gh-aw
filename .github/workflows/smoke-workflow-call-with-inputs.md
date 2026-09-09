@@ -12,6 +12,11 @@ on:
         required: false
         default: 'generic task'
         type: string
+      task-count:
+        description: 'Optional task count used to verify zero-valued numeric defaults'
+        required: false
+        default: 0
+        type: number
   workflow_dispatch:
     inputs:
       task-description:
@@ -19,6 +24,11 @@ on:
         required: false
         default: 'generic task'
         type: string
+      task-count:
+        description: 'Optional task count used to verify zero-valued numeric defaults'
+        required: false
+        default: 0
+        type: number
 permissions:
   contents: read
   issues: read
@@ -56,6 +66,7 @@ or sequentially in the same GitHub Actions workflow run.
 ## Task
 
 Task description: "${{ inputs.task-description }}"
+Task count: "${{ inputs.task-count }}"
 
 Execute `echo "Running task: ${{ inputs.task-description }}"` and then call the noop safe-output with
 a message that includes the task description so the invocation is identifiable in the logs.

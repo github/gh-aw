@@ -55,6 +55,7 @@ const UNKNOWN_PARAMETER_LIST_PREVIEW_MAX = 10;
  * @property {string} [handlerPath] - Optional file path to handler module (original path from config)
  * @property {number} [timeout] - Timeout in seconds for tool execution (default: 60)
  * @property {string[]} [dependencies] - Runtime dependencies to install before first invocation
+ * @property {string} [_rawName] - Original (pre-normalization) tool name, used internally for collision detection
  */
 
 /**
@@ -487,9 +488,14 @@ function loadToolHandlers(server, tools, basePath) {
  */
 function registerTool(server, tool) {
   const normalizedName = normalizeTool(tool.name);
+  const existing = server.tools[normalizedName];
+  if (existing && existing._rawName !== tool.name) {
+    throw new Error(`${ERR_VALIDATION}: Tool name collision: '${existing._rawName}' and '${tool.name}' both normalize to '${normalizedName}'`);
+  }
   server.tools[normalizedName] = {
     ...tool,
     name: normalizedName,
+    _rawName: tool.name,
   };
   server.debug(`Registered tool: ${normalizedName}`);
 }

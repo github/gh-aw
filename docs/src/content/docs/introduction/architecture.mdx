@@ -11,6 +11,8 @@ head:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import safeOutputsIsolation from '../../../assets/diagrams/architecture-2026-08-29.svg';
 
 GitHub Agentic Workflows (gh-aw) runs AI coding agents — GitHub Copilot, Claude Code, OpenAI Codex, or Google Gemini — inside GitHub Actions with a defense-in-depth security architecture that protects against prompt injection, rogue MCP servers, and compromised agents. This document provides an overview of the security model and its key components.
 
@@ -165,6 +167,8 @@ flowchart LR
     LABEL --> API
 ```
 
+<Image src={safeOutputsIsolation} alt="Diagram showing the agent job writing an agent_output.json artifact, which a threat detection job analyzes for secret leaks and malicious patches; only when approved do scoped safe-output jobs such as create_issue, add_comment, and create_pull_request call the GitHub API, while the agent itself never holds write permissions" />
+
 <Aside type="tip">
 The SafeOutputs subsystem provides security by design: the agent never requires write permissions because all write operations are performed by separate, validated jobs with minimal scoped permissions.
 </Aside>
@@ -288,7 +292,7 @@ flowchart LR
 5. When supported by an agent, AWF creates a trusted `api-proxy` that routes model traffic on the agent's behalf while keeping that traffic behind AWF's network controls. This proxy should not be treated as a separate caller-authentication boundary for arbitrary code already running inside the agent container.
 
 > [!WARNING]
-> The MCP gateway API key that is mounted into the agent container is not a strong security boundary against a compromised or malicious agent. An agent running arbitrary code may extract the key from process memory, runtime state, or other in-container channels. Treat this key as leaked by design and rely on substrate isolation, network policy, and staged permission separation for security.
+> The MCP gateway agent ID that is mounted into the agent container is not a strong security boundary against a compromised or malicious agent. An agent running arbitrary code may extract the identifier from process memory, runtime state, or other in-container channels. Treat this identifier as leaked by design and rely on substrate isolation, network policy, and staged permission separation for security.
 
 ## MCP Server Sandboxing
 

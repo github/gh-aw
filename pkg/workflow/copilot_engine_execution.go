@@ -199,7 +199,7 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 	llmProvider := e.ResolveLLMProvider(workflowData)
 	isBYOKMode := isCopilotBYOKMode(workflowData, sandboxEnabled)
 	modelConfigured := workflowData.Model != ""
-	copilotArgs := e.buildCopilotArgs(workflowData)
+	copilotArgs, copilotToolArgs := e.buildCopilotArgs(workflowData)
 	mkdirCommands := buildCopilotMkdirCommands(copilotArgs)
 	modelEnvVar := getCopilotModelEnvVar(workflowData)
 	timeoutValue := getCopilotTimeoutValue(workflowData)
@@ -208,6 +208,7 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 	command, copilotSDKServerArgsJSON := e.buildCopilotCommand(
 		workflowData, copilotArgs, execPrefix, customCommandScriptSetup, logFile, mkdirCommands, isBYOKMode,
 	)
+	copilotSDKToolConfigJSON := buildCopilotSDKToolConfigJSON(workflowData, copilotToolArgs)
 	env := e.buildCopilotStepEnv(
 		workflowData,
 		llmProvider,
@@ -219,13 +220,14 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 			modelConfigured: modelConfigured,
 		},
 		copilotSDKServerArgsJSON,
+		copilotSDKToolConfigJSON,
 	)
 
 	return []GitHubActionStep{e.buildCopilotExecutionStep(workflowData, command, env, timeoutValue)}
 }
 
 // buildCopilotArgs builds the Copilot CLI argument list based on workflow configuration.
-func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) []string {
+func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) ([]string, []string) {
 	sandboxEnabled := isFirewallEnabled(workflowData)
 	isDetectionJob := isDetectionRun(workflowData)
 	copilotArgs := e.buildCopilotBaseArgs(sandboxEnabled)
@@ -259,15 +261,15 @@ func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) []string {
 		copilotExecLog.Printf("Enabling autopilot mode with max-autopilot-continues=%d", maxCont)
 		copilotArgs = append(copilotArgs, "--autopilot", "--max-autopilot-continues", strconv.Itoa(maxCont))
 	}
-	return e.buildCopilotFeatureArgs(workflowData, copilotArgs)
+	toolArgs := e.computeCopilotToolArguments(workflowData.Tools, workflowData.SafeOutputs, workflowData.MCPScripts, workflowData)
+	return e.buildCopilotFeatureArgs(workflowData, copilotArgs, toolArgs), toolArgs
 }
 
 func copilotNeedsBuiltinMCPs(workflowData *WorkflowData) bool {
-	if workflowData == nil || workflowData.Tools == nil {
+	if workflowData == nil || workflowData.Tools == nil || isCopilotSDKMode(workflowData) {
 		return false
 	}
-	_, hasWebFetch := workflowData.Tools["web-fetch"]
-	return hasWebFetch
+	return isCopilotToolValueEnabled(workflowData.Tools, "web-fetch")
 }
 
 func (e *CopilotEngine) buildCopilotBaseArgs(sandboxEnabled bool) []string {
@@ -284,9 +286,8 @@ func (e *CopilotEngine) buildCopilotBaseArgs(sandboxEnabled bool) []string {
 	return []string{"--add-dir", "/tmp/", "--add-dir", constants.TmpGhAwDirSlash, "--add-dir", constants.TmpGhAwAgentDir, "--log-level", "all", "--log-dir", logsFolder}
 }
 
-func (e *CopilotEngine) buildCopilotFeatureArgs(workflowData *WorkflowData, copilotArgs []string) []string {
+func (e *CopilotEngine) buildCopilotFeatureArgs(workflowData *WorkflowData, copilotArgs []string, toolArgs []string) []string {
 	// Add tool permission arguments based on configuration
-	toolArgs := e.computeCopilotToolArguments(workflowData.Tools, workflowData.SafeOutputs, workflowData.MCPScripts, workflowData)
 	if len(toolArgs) > 0 {
 		copilotExecLog.Printf("Adding %d tool permission arguments", len(toolArgs))
 	}
@@ -306,7 +307,7 @@ func (e *CopilotEngine) buildCopilotFeatureArgs(workflowData *WorkflowData, copi
 	}
 	// Add --allow-all-paths when edit tool is enabled to allow write on all paths
 	// See: https://github.com/github/copilot-cli/issues/67#issuecomment-3411256174
-	if workflowData.ParsedTools != nil && workflowData.ParsedTools.Edit != nil {
+	if isCopilotEditToolEnabled(workflowData.Tools, workflowData) {
 		copilotArgs = append(copilotArgs, "--allow-all-paths")
 	}
 	// Add --no-custom-instructions when bare mode is enabled to suppress automatic
@@ -561,6 +562,7 @@ func (e *CopilotEngine) buildCopilotStepEnv(
 	timeoutValue string,
 	flags copilotStepEnvFlags,
 	copilotSDKServerArgsJSON string,
+	copilotSDKToolConfigJSON string,
 ) map[string]string {
 	useCopilotRequests := hasCopilotRequestsWritePermission(workflowData)
 	env := e.buildCopilotBaseStepEnv(workflowData, llmProvider, timeoutValue, flags.byokMode, useCopilotRequests)
@@ -569,7 +571,7 @@ func (e *CopilotEngine) buildCopilotStepEnv(
 	e.addCopilotModelEnv(env, workflowData, flags.modelConfigured, modelEnvVar)
 	e.addCopilotFinalStepEnv(env, workflowData)
 	e.addCopilotSandboxEnv(env, flags.sandboxEnabled)
-	e.addCopilotSDKStepEnv(env, workflowData, copilotSDKServerArgsJSON)
+	e.addCopilotSDKStepEnv(env, workflowData, copilotSDKServerArgsJSON, copilotSDKToolConfigJSON)
 	return env
 }
 
@@ -698,7 +700,7 @@ func (e *CopilotEngine) addCopilotSandboxEnv(env map[string]string, sandboxEnabl
 	}
 }
 
-func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData *WorkflowData, copilotSDKServerArgsJSON string) {
+func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData *WorkflowData, copilotSDKServerArgsJSON string, copilotSDKToolConfigJSON string) {
 	// When copilot-sdk: true, provide the SDK URI that the harness uses to start a separate headless server.
 	if workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return
@@ -707,7 +709,8 @@ func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData
 	copilotExecLog.Printf("copilot-sdk enabled: set %s=%s", constants.CopilotSDKURIEnvVar, env[constants.CopilotSDKURIEnvVar])
 	env[constants.CopilotSDKDriverEnvVar] = "1"
 	env[constants.CopilotSDKServerArgsEnvVar] = copilotSDKServerArgsJSON
-	copilotExecLog.Printf("copilot-sdk driver mode: set %s and %s", constants.CopilotSDKDriverEnvVar, constants.CopilotSDKServerArgsEnvVar)
+	env[constants.CopilotSDKToolConfigEnvVar] = copilotSDKToolConfigJSON
+	copilotExecLog.Printf("copilot-sdk driver mode: set %s, %s and %s", constants.CopilotSDKDriverEnvVar, constants.CopilotSDKServerArgsEnvVar, constants.CopilotSDKToolConfigEnvVar)
 	if currentPythonPath, exists := env["PYTHONPATH"]; copilotSDKRuntimeID(workflowData) == "python" && (!exists || currentPythonPath == "") {
 		env["PYTHONPATH"] = copilotSDKPythonPathExpression
 	}
@@ -727,6 +730,9 @@ func (e *CopilotEngine) buildCopilotExecutionStep(workflowData *WorkflowData, co
 	// This is a security measure to prevent exposing unnecessary secrets to the AWF container
 	allowedSecrets := e.GetRequiredSecretNames(workflowData)
 	filteredEnv := FilterEnvForSecrets(env, allowedSecrets)
+	if enclavesEnabled(workflowData) {
+		filteredEnv["MCP_GATEWAY_API_KEY"] = "${{ steps.start-mcp-gateway.outputs.gateway-api-key }}"
+	}
 	// Inject GH_TOKEN for CLI proxy (added after filtering since it uses a special
 	// fallback expression that is always allowed when cli-proxy is enabled)
 	addCliProxyGHTokenToEnv(filteredEnv, workflowData)

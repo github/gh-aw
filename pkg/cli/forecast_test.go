@@ -313,6 +313,7 @@ func TestSampleLimitRespected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := filterForecastSampleRuns(runs, "2026-08-01", tt.sampleSize)
 			require.Len(t, got, len(tt.want))
 			for i, wantID := range tt.want {

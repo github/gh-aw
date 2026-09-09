@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,6 +105,78 @@ func TestParseManifestBootstrapAction(t *testing.T) {
 				"name": "EXAMPLE_SECRET",
 			},
 			wantErrMsg: "config[0].prompt is required when type=repo-secret",
+		},
+		{
+			name:       "repo-label happy path",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":        "automation",
+				"description": "Managed by automation",
+				"color":       "1f6feb",
+			},
+			wantAction: repositoryPackageBootstrapAction{
+				Type:        "repo-label",
+				Name:        "automation",
+				Description: "Managed by automation",
+				Color:       "1f6feb",
+			},
+		},
+		{
+			name:       "repo-label missing name",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"description": "Managed by automation",
+				"color":       "1f6feb",
+			},
+			wantErrMsg: "config[0].name is required when type=repo-label",
+		},
+		{
+			name:       "repo-label missing description",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":  "automation",
+				"color": "1f6feb",
+			},
+			wantErrMsg: "config[0].description is required when type=repo-label",
+		},
+		{
+			name:       "repo-label missing color",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":        "automation",
+				"description": "Managed by automation",
+			},
+			wantErrMsg: "config[0].color is required when type=repo-label",
+		},
+		{
+			name:       "repo-label invalid color",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":        "automation",
+				"description": "Managed by automation",
+				"color":       "#1f6feb",
+			},
+			wantErrMsg: "config[0].color must be a 6-character hexadecimal color",
+		},
+		{
+			name:       "repo-label name too long",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":        strings.Repeat("a", bootstrapLabelNameMaxLength+1),
+				"description": "Managed by automation",
+				"color":       "1f6feb",
+			},
+			wantErrMsg: "config[0].name must be at most 50 characters",
+		},
+		{
+			name:       "repo-label description too long",
+			actionType: "repo-label",
+			actionMap: map[string]any{
+				"name":        "automation",
+				"description": strings.Repeat("a", bootstrapLabelDescriptionMaxLength+1),
+				"color":       "1f6feb",
+			},
+			wantErrMsg: "config[0].description must be at most 100 characters",
 		},
 		{
 			name:       "github-app defaults app name from name and mode",

@@ -18,6 +18,12 @@ import (
 // embedded in the workflow's markdown content. It is the first validator called in
 // validateWorkflowData and guards against unsafe GitHub Actions expressions.
 func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath string) error {
+	if envMap := parseEnvYAMLSection(workflowData.Env); len(envMap) > 0 {
+		if err := validateTopLevelEnvExpressions(envMap); err != nil {
+			return formatCompilerError(markdownPath, "error", err.Error(), err)
+		}
+	}
+
 	// Check for secrets serialization expressions FIRST — before the general allowlist —
 	// to provide a specific, actionable error/warning message.
 	// In strict mode this returns an error that stops further validation.
@@ -41,13 +47,11 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	}
 
 	// Validate expressions in runtime-import files at compile time
-	if strings.Contains(workflowData.MarkdownContent, "{{#runtime-import") {
+	runtimeImportValidationSeed := runtimeImportValidationMarkdown(workflowData)
+	if strings.Contains(runtimeImportValidationSeed, "{{#runtime-import") || strings.Contains(runtimeImportValidationSeed, "{{#import") {
 		workflowLog.Printf("Validating runtime-import files")
-		// Go up from .github/workflows/file.md to repo root
-		workflowDir := filepath.Dir(markdownPath) // .github/workflows
-		githubDir := filepath.Dir(workflowDir)    // .github
-		workspaceDir := filepath.Dir(githubDir)   // repo root
-		subAgentWarnings, err := validateRuntimeImportFiles(workflowData.MarkdownContent, workspaceDir)
+		workspaceDir := resolveWorkspaceRoot(markdownPath)
+		subAgentWarnings, err := validateRuntimeImportFiles(runtimeImportValidationSeed, workspaceDir)
 		// Emit best-effort sub-agent frontmatter warnings through the normal warning path
 		// so they are counted and consistently formatted with all other warnings.
 		for _, w := range subAgentWarnings {
@@ -72,6 +76,33 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	}
 
 	return nil
+}
+
+func runtimeImportValidationMarkdown(workflowData *WorkflowData) string {
+	if workflowData == nil {
+		return ""
+	}
+
+	var seed strings.Builder
+	seed.WriteString(workflowData.MarkdownContent)
+	if workflowData.MainWorkflowMarkdown != "" {
+		seed.WriteByte('\n')
+		seed.WriteString(workflowData.MainWorkflowMarkdown)
+	}
+	for _, importPath := range workflowData.ImportPaths {
+		seed.WriteString("\n{{#runtime-import ")
+		seed.WriteString(filepath.ToSlash(importPath))
+		seed.WriteString("}}")
+	}
+	for _, entry := range workflowData.PromptImports {
+		if entry.ImportPath == "" {
+			continue
+		}
+		seed.WriteString("\n{{#runtime-import ")
+		seed.WriteString(filepath.ToSlash(entry.ImportPath))
+		seed.WriteString("}}")
+	}
+	return seed.String()
 }
 
 // tmpNeedle is the literal prefix to scan for in prompt content.
@@ -187,6 +218,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		validateFn func() error
 	}{
 		{logMessage: "Validating sandbox configuration", validateFn: func() error { return validateSandboxConfig(workflowData) }},
+		{logMessage: "Validating GitHub CLI proxy version", validateFn: func() error { return validateGitHubCLIProxyVersion(workflowData) }},
 		{logMessage: "Validating safe-outputs target fields", validateFn: func() error { return validateSafeOutputsTarget(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs max fields", validateFn: func() error { return validateSafeOutputsMax(workflowData.SafeOutputs) }},
 		{logMessage: "Validating steering issue configuration", validateFn: func() error { return validateSteeringIssue(workflowData) }},
@@ -238,6 +270,25 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		}
 	}
 	return nil
+}
+
+func validateGitHubCLIProxyVersion(workflowData *WorkflowData) error {
+	if !isGitHubCLIModeEnabled(workflowData) {
+		return nil
+	}
+	firewallConfig := getFirewallConfig(workflowData)
+	if awfVersionAtLeast(firewallConfig, constants.AWFCliProxyGHListMinVersion) {
+		return nil
+	}
+	effectiveVersion := string(constants.DefaultFirewallVersion)
+	if firewallConfig != nil && firewallConfig.Version != "" {
+		effectiveVersion = firewallConfig.Version
+	}
+	return fmt.Errorf(
+		"tools.github.mode: gh-proxy requires AWF %s or newer because earlier CLI proxy versions do not support gh issue list or gh pr list; the effective AWF version is %s",
+		constants.AWFCliProxyGHListMinVersion,
+		effectiveVersion,
+	)
 }
 
 func (c *Compiler) validateThreatDetectionSandboxRequirement(workflowData *WorkflowData, markdownPath string) error {
@@ -303,6 +354,16 @@ func validateWorkflowConcurrency(workflowData *WorkflowData, markdownPath string
 // emitSandboxRuntimeWarnings warns about sandbox runtime choices that need human
 // review or whose configuration the compiler cannot honour.
 func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdownPath string) {
+	agentConfig := getAgentConfig(workflowData)
+	if agentConfig != nil {
+		switch agentConfig.Runtime {
+		case AgentRuntimeGVisor, AgentRuntimeDockerSbx:
+			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
+				fmt.Sprintf("sandbox.agent.runtime: %s is deprecated and will be removed in a future release. "+
+					"Use sandbox.agent.runtime: docker instead.", agentConfig.Runtime)))
+			c.IncrementWarningCount()
+		}
+	}
 	if isCloudHypervisorRuntime(workflowData) {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
 			"sandbox.agent.runtime: cloud-hypervisor uses a privileged KVM preview path with an attached MCP gateway topology. "+
@@ -317,6 +378,83 @@ func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdo
 				"to read-only, and docker-sbx rejects the policy outright."))
 		c.IncrementWarningCount()
 	}
+}
+
+func (c *Compiler) emitPiThreatDetectionAuthWarning(workflowData *WorkflowData, markdownPath string) {
+	if !c.shouldEmitPiThreatDetectionAuthWarning(workflowData) {
+		return
+	}
+	message := `Threat detection for engine: pi runs on the GitHub Copilot CLI. This workflow does not grant permissions.copilot-requests: write, so detection requires a COPILOT_GITHUB_TOKEN secret. Without that secret, threat detection will fail with "No authentication information found".`
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+	c.IncrementWarningCount()
+}
+
+func (c *Compiler) shouldEmitPiThreatDetectionAuthWarning(workflowData *WorkflowData) bool {
+	if workflowData == nil || hasCopilotRequestsWritePermission(workflowData) ||
+		!IsDetectionJobEnabled(workflowData.SafeOutputs) {
+		return false
+	}
+
+	threatDetection := workflowData.SafeOutputs.ThreatDetection
+	if threatDetection.EngineDisabled {
+		return false
+	}
+
+	configuredEngineID := ResolveEngineID(workflowData)
+	var detectionEnv map[string]string
+	if threatDetection.EngineConfig != nil {
+		if threatDetection.EngineConfig.ID != "" {
+			configuredEngineID = threatDetection.EngineConfig.ID
+		}
+		detectionEnv = threatDetection.EngineConfig.Env
+	}
+	if configuredEngineID != "pi" || c.getThreatDetectionEngineID(workflowData) != "copilot" {
+		return false
+	}
+
+	effectiveEnv := mergeThreatDetectionEngineEnv(workflowData, detectionEnv)
+	if strings.TrimSpace(effectiveEnv[constants.CopilotGitHubToken]) != "" {
+		return false
+	}
+	return strings.TrimSpace(effectiveEnv[constants.CopilotProviderBaseURL]) == "" &&
+		strings.TrimSpace(effectiveEnv[constants.CopilotProviderAPIKey]) == "" &&
+		strings.TrimSpace(effectiveEnv[constants.CopilotProviderBearerToken]) == ""
+}
+
+// emitCustomEngineThreatDetectionWarning reports when threat detection falls back to a
+// built-in engine because the workflow uses a custom engine that the detection analyzer
+// cannot run. Without this notice the detection job fails at runtime with a config_error
+// while the run stays green (the job is continue-on-error by default).
+func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *WorkflowData, markdownPath string) {
+	if workflowData == nil || !IsDetectionJobEnabled(workflowData.SafeOutputs) {
+		return
+	}
+	threatDetection := workflowData.SafeOutputs.ThreatDetection
+	if threatDetection.EngineDisabled {
+		return
+	}
+	// An explicit safe-outputs.threat-detection.engine is the author's own choice.
+	if threatDetection.EngineConfig != nil && threatDetection.EngineConfig.ID != "" {
+		return
+	}
+
+	configuredEngineID := ResolveEngineID(workflowData)
+	if configuredEngineID == "" || configuredEngineID == "pi" || isThreatDetectionCapableEngineID(configuredEngineID) {
+		return
+	}
+	// An engine definition that declares its own detection engine ships a working default.
+	if def := c.engineCatalog.Get(configuredEngineID); def != nil && def.DetectionEngine != "" &&
+		slices.Contains(declarableDetectionEngineIDs, def.DetectionEngine) {
+		return
+	}
+
+	detectionEngineID := c.getThreatDetectionEngineID(workflowData)
+	message := fmt.Sprintf(
+		"Threat detection does not support the custom engine %q, so it runs on the built-in %q engine instead, which requires that engine's credentials. "+
+			"Set safe-outputs.threat-detection.engine to a built-in engine (or false to skip AI analysis), or declare detection-engine in the engine definition.",
+		configuredEngineID, detectionEngineID)
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+	c.IncrementWarningCount()
 }
 
 func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownPath string) {
@@ -336,15 +474,10 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 				"See: https://gh.io/gh-aw/reference/concurrency for details."))
 		c.IncrementWarningCount()
 	}
-	if isAgentSandboxDisabled(workflowData) {
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
-			"Agent sandbox disabled (sandbox.agent: false). This removes firewall protection. "+
-				"The AI agent will have direct network access without firewall filtering. "+
-				"The MCP gateway remains enabled. Only use this for testing or in controlled "+
-				"environments where you trust the AI agent completely."))
-		c.IncrementWarningCount()
-	}
 	c.emitSandboxRuntimeWarnings(workflowData, markdownPath)
+	c.emitPiThreatDetectionAuthWarning(workflowData, markdownPath)
+	c.emitCustomEngineThreatDetectionWarning(workflowData, markdownPath)
+	c.emitPlaywrightBrowserInstallWarning(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.AssignToAgent != nil &&
 		workflowData.SafeOutputs.GitHubApp != nil && workflowData.SafeOutputs.AssignToAgent.GitHubToken == "" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
@@ -356,6 +489,7 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 	}
 
 	c.emitExperimentalFeatureWarnings(workflowData)
+	c.emitSamplesCoverageWarnings(workflowData, markdownPath)
 	if len(workflowData.Command) > 0 && len(workflowData.Bots) > 0 {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
 			"Both slash_command and bots triggers are configured. If a bot listed in bots: "+
@@ -407,6 +541,13 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ApproveWorkflowRun != nil, message: "Using experimental feature: approve-workflow-run"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ReplaceLabel != nil, message: "Using experimental feature: replace-label"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UploadCodeCoverage != nil, message: "Using experimental feature: upload-code-coverage"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.CreateWorkItems != nil, message: "Using experimental feature: ado-create-work-item"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UpdateWorkItems != nil, message: "Using experimental feature: ado-update-work-item"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.CommentOnWorkItems != nil, message: "Using experimental feature: ado-comment-on-work-item"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.AssignWorkItems != nil, message: "Using experimental feature: ado-assign-work-item"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.LinkWorkItems != nil, message: "Using experimental feature: ado-link-work-items"},
+		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UploadWorkItemAttachments != nil, message: "Using experimental feature: ado-upload-workitem-attachment"},
+		{enabled: hasLinearSafeOutputs(workflowData.SafeOutputs), message: "Using experimental feature: Linear safe outputs"},
 		{enabled: detectionConfigured && isFeatureEnabled(constants.GHAWDetectionFeatureFlag, workflowData), message: "Using experimental feature: gh-aw-detection"},
 		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},
@@ -574,4 +715,40 @@ func validateOTLPWorkloadIdentity(workflowData *WorkflowData) error {
 		return errors.New("observability.otlp.workload-identity cannot be combined with GitHub App credentials; use one authentication method only. Example:\n\nobservability:\n  otlp:\n    workload-identity:\n      provider: google\n      audience: my-audience")
 	}
 	return nil
+}
+
+// emitSamplesCoverageWarnings warns when samples replay is active but one or
+// more enabled safe outputs declare no `samples:` entries. Without samples the
+// deterministic replay driver never calls those handlers, so the run silently
+// succeeds without performing the configured operation — a failure mode that is
+// otherwise only visible by inspecting `GH_AW_SAMPLES` in the lock file.
+func (c *Compiler) emitSamplesCoverageWarnings(workflowData *WorkflowData, markdownPath string) {
+	if workflowData == nil || !workflowData.UseSamples {
+		return
+	}
+	missing := safeOutputsMissingSamples(workflowData.SafeOutputs)
+	if len(missing) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
+		fmt.Sprintf("samples replay is enabled but no samples are configured for: %s. "+
+			"These safe outputs will not be exercised — the replay driver replaces the agent, "+
+			"so the run succeeds without producing any output for them. "+
+			"Add a `samples:` list under each safe output to replay it deterministically.",
+			strings.Join(missing, ", "))))
+	c.IncrementWarningCount()
+}
+
+func parseEnvYAMLSection(envYAML string) map[string]any {
+	if strings.TrimSpace(envYAML) == "" {
+		return nil
+	}
+	var raw map[string]any
+	if err := yaml.Unmarshal([]byte(envYAML), &raw); err != nil {
+		return nil
+	}
+	if envMap, ok := raw["env"].(map[string]any); ok {
+		return envMap
+	}
+	return raw
 }

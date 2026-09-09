@@ -247,6 +247,8 @@ type UniversalCLIEngineExecutionConfig struct {
 // construction, common AWF environment variable injection, and step formatting.
 // Engines call this from their GetExecutionSteps implementation, supplying engine-
 // specific parameters via cfg.
+//
+//nolint:largefunc // Keeps universal engine setup in generated execution order.
 func (e *UniversalLLMConsumerEngine) BuildCLIEngineExecutionSteps(
 	workflowData *WorkflowData,
 	logFile string,
@@ -334,6 +336,7 @@ func (e *UniversalLLMConsumerEngine) BuildCLIEngineExecutionSteps(
 		// which causes workflow_dispatch to fail with "failed to parse workflow".
 		"NO_PROXY": constants.AWFNoProxyHosts,
 	}
+	applyPlaywrightBrowserEnv(env, workflowData)
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	e.ApplyUniversalProviderEnv(env, workflowData, firewallEnabled)
 
@@ -342,6 +345,7 @@ func (e *UniversalLLMConsumerEngine) BuildCLIEngineExecutionSteps(
 	}
 
 	applySafeOutputEnvToMap(env, workflowData)
+	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
 
 	// Propagate W3C trace context so engine spans nest under the gh-aw.agent.setup span.
 	applyTraceContextEnvToMap(env)

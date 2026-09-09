@@ -190,9 +190,10 @@ function usdToAIC(usd) {
  * @param {number} params.cacheReadTokens
  * @param {number} params.cacheWriteTokens
  * @param {number} [params.reasoningTokens]
+ * @param {boolean} [params.inputTokensIncludeCache]
  * @returns {number}
  */
-function computeInferenceCostUSD({ provider, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens = 0 }) {
+function computeInferenceCostUSD({ provider, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens = 0, inputTokensIncludeCache }) {
   const pricing = findModelPricing(provider, model);
   if (!pricing) return 0;
 
@@ -201,7 +202,12 @@ function computeInferenceCostUSD({ provider, model, inputTokens, outputTokens, c
   const cacheRead = cacheReadTokens || 0;
   const cacheWrite = cacheWriteTokens || 0;
   const reasoning = reasoningTokens || 0;
-  const effectiveInput = providerIncludesCacheReadsInInput(provider) ? Math.max(input - cacheRead, 0) : input;
+  let effectiveInput = input;
+  if (inputTokensIncludeCache === true) {
+    effectiveInput = Math.max(input - cacheRead - cacheWrite, 0);
+  } else if (typeof inputTokensIncludeCache !== "boolean" && providerIncludesCacheReadsInInput(provider)) {
+    effectiveInput = Math.max(input - cacheRead, 0);
+  }
 
   const promptPrice = pricing.input || 0;
   const completionPrice = pricing.output || 0;
@@ -221,6 +227,7 @@ function computeInferenceCostUSD({ provider, model, inputTokens, outputTokens, c
  * @param {number} params.cacheReadTokens
  * @param {number} params.cacheWriteTokens
  * @param {number} [params.reasoningTokens]
+ * @param {boolean} [params.inputTokensIncludeCache]
  * @returns {number}
  */
 function computeInferenceAIC(params) {

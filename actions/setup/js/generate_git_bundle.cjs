@@ -292,7 +292,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             try {
               execGitSync([...noHooksArgs, "worktree", "add", "--detach", tempWorktree, baseCommitSha], { cwd });
               execGitSync([...noHooksArgs, "am", "--3way", patchResult.patchPath], { cwd: tempWorktree });
-              execGitSync(["bundle", "create", bundlePath, `${baseCommitSha}..HEAD`], { cwd: tempWorktree });
+              execGitSync([...noHooksArgs, "bundle", "create", bundlePath, `${baseCommitSha}..HEAD`], { cwd: tempWorktree });
             } finally {
               try {
                 execGitSync([...noHooksArgs, "worktree", "remove", "--force", tempWorktree], { cwd });

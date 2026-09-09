@@ -107,7 +107,7 @@ var knownTools = map[string]struct{}{
 	"cli-proxy":         {},
 }
 
-func NewTools(toolsMap map[string]any) *Tools {
+func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing tool parsing remains centralized.
 	toolsParserLog.Printf("Creating tools configuration from map with %d entries", len(toolsMap))
 	if toolsMap == nil {
 		return &Tools{
@@ -191,7 +191,7 @@ func NewTools(toolsMap map[string]any) *Tools {
 }
 
 // parseGitHubTool converts raw github tool configuration to GitHubToolConfig
-func parseGitHubTool(val any) *GitHubToolConfig {
+func parseGitHubTool(val any) *GitHubToolConfig { //nolint:largefunc // Existing GitHub tool parsing remains centralized.
 	if val == nil {
 		toolsParserLog.Print("GitHub tool enabled with default configuration")
 		return &GitHubToolConfig{
@@ -479,6 +479,15 @@ func parsePlaywrightTool(val any) *PlaywrightToolConfig {
 	toolsParserLog.Print("Parsing playwright tool configuration")
 
 	if configMap, ok := val.(map[string]any); ok {
+		// A custom mcp-servers.playwright entry (command, url, container, or type) is
+		// merged into the same tools map under the "playwright" key. Don't misclassify
+		// it as the built-in CLI tool: leave tools.Playwright nil so it is handled as a
+		// regular custom MCP server instead.
+		if hasMcp, _ := hasMCPConfig(configMap); hasMcp {
+			toolsParserLog.Print("Playwright configuration has custom MCP fields; not treating as built-in CLI tool")
+			return nil
+		}
+
 		config := &PlaywrightToolConfig{}
 
 		// Handle version field - can be string or number
@@ -492,23 +501,16 @@ func parsePlaywrightTool(val any) *PlaywrightToolConfig {
 			config.Version = fmt.Sprintf("%g", versionNum)
 		}
 
-		// Handle args field - can be []any or []string
-		if argsValue, ok := configMap["args"]; ok {
-			if arr, ok := argsValue.([]any); ok {
-				config.Args = make([]string, 0, len(arr))
-				for _, item := range arr {
-					if str, ok := item.(string); ok {
-						config.Args = append(config.Args, str)
-					}
-				}
-			} else if arr, ok := argsValue.([]string); ok {
-				config.Args = arr
-			}
-		}
-
 		// Handle mode field
 		if mode, ok := configMap["mode"].(string); ok {
 			config.Mode = mode
+		}
+		if browsers, ok := configMap["browsers"].([]any); ok {
+			for _, browser := range browsers {
+				if name, ok := browser.(string); ok {
+					config.Browsers = append(config.Browsers, name)
+				}
+			}
 		}
 
 		return config
@@ -633,7 +635,7 @@ func parseStartupTimeoutTool(val any) *TemplatableInt32 {
 }
 
 // parseMCPServerConfig converts raw MCP server configuration to MCPServerConfig
-func parseMCPServerConfig(val any) MCPServerConfig {
+func parseMCPServerConfig(val any) MCPServerConfig { //nolint:largefunc // Existing custom MCP parsing remains centralized.
 	config := MCPServerConfig{
 		CustomFields: make(map[string]any),
 	}

@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
@@ -130,6 +131,8 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.validateWorkflowModelAliasMap(ctx); err != nil {
 		return err
 	}
+	c.warnCodexCopilotModelCompatibility(ctx.workflowData, ctx.cleanPath)
+	c.warnUnknownConfiguredModels(ctx.workflowData, ctx.cleanPath)
 	if err := c.validateWorkflowEngineSettings(ctx.cleanPath, ctx.workflowData); err != nil {
 		return err
 	}
@@ -157,6 +160,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validateEngineDriver,
 		c.validateEngineMCPSessionTimeout,
 		c.validateEngineMCPToolTimeout,
+		validateCopilotSDKEngineArgs,
 	}
 	for _, check := range checks {
 		if err := check(workflowData); err != nil {
@@ -248,10 +252,41 @@ func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {
 	workflowData.ContainerPinMappings = c.getContainerPinMappings()
 }
 
+func hasExplicitConcurrencyGroup(frontmatter map[string]any) bool {
+	concurrencyValue, ok := frontmatter["concurrency"]
+	if !ok {
+		return false
+	}
+	if concurrencyString, ok := concurrencyValue.(string); ok {
+		return strings.TrimSpace(concurrencyString) != ""
+	}
+	concurrencyMap, ok := concurrencyValue.(map[string]any)
+	if !ok {
+		return false
+	}
+	groupValue, ok := concurrencyMap["group"]
+	if !ok {
+		return false
+	}
+	groupString, ok := groupValue.(string)
+	return ok && strings.TrimSpace(groupString) != ""
+}
+
 func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext) error {
+	if ctx.engineSetup.importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(ctx.frontmatter.Frontmatter) {
+		var importedConcurrency any
+		if err := json.Unmarshal([]byte(ctx.engineSetup.importsResult.MergedConcurrency), &importedConcurrency); err == nil {
+			ctx.workflowData.Concurrency = c.extractTopLevelYAMLSection(map[string]any{"concurrency": importedConcurrency}, "concurrency")
+		} else {
+			orchestratorWorkflowLog.Printf("Skipping imported concurrency merge: invalid JSON: %v", err)
+		}
+	}
+	if ctx.workflowData.ConcurrencyJobDiscriminator == "" {
+		ctx.workflowData.ConcurrencyJobDiscriminator = ctx.engineSetup.importsResult.MergedJobDiscriminator
+	}
 	c.mergeImportedObservability(ctx.workflowData, ctx.engineSetup.importsResult.MergedObservability)
 	if err := c.mergeWorkflowEnv(ctx.frontmatter.Frontmatter, ctx.workflowData, ctx.engineSetup.importsResult); err != nil {
-		return err
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
 	}
 	c.injectOTLPConfig(ctx.workflowData)
 	if len(ctx.engineSetup.importsResult.MergedFeatures) == 0 {
@@ -367,19 +402,27 @@ func applyMergedRawObservability(
 
 func (c *Compiler) mergeWorkflowEnv(frontmatter map[string]any, workflowData *WorkflowData, importsResult *parser.ImportsResult) error {
 	topEnv := ExtractMapField(frontmatter, "env")
-	if importsResult.MergedEnv == "" {
-		setMainWorkflowEnvSources(workflowData, topEnv)
-		return nil
+	var importedEnvJSON string
+	if importsResult != nil {
+		importedEnvJSON = importsResult.MergedEnv
 	}
-	mergedEnvMap, err := mergeEnv(topEnv, importsResult.MergedEnv)
+
+	mergedEnvMap, err := mergeEnv(topEnv, importedEnvJSON)
 	if err != nil {
 		return fmt.Errorf("failed to merge env from imports: %w", err)
+	}
+	if err := validateTopLevelEnvExpressions(mergedEnvMap); err != nil {
+		return err
 	}
 	if len(mergedEnvMap) == 0 {
 		return nil
 	}
+	if importedEnvJSON == "" {
+		setMainWorkflowEnvSources(workflowData, topEnv)
+	} else {
+		workflowData.EnvSources = buildMergedEnvSources(mergedEnvMap, topEnv, importsResult.MergedEnvSources)
+	}
 	workflowData.Env = c.extractTopLevelYAMLSection(map[string]any{"env": mergedEnvMap}, "env")
-	workflowData.EnvSources = buildMergedEnvSources(mergedEnvMap, topEnv, importsResult.MergedEnvSources)
 	return nil
 }
 
@@ -407,7 +450,7 @@ func buildMergedEnvSources(mergedEnv map[string]any, topEnv map[string]any, impo
 }
 
 // extractAdditionalConfigurations extracts cache-memory, repo-memory, mcp-scripts, and safe-outputs configurations
-func (c *Compiler) extractAdditionalConfigurations(
+func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existing orchestration phase remains centralized; this change only adds SDK validation state.
 	frontmatter map[string]any,
 	tools map[string]any,
 	markdownDir string,
@@ -443,6 +486,7 @@ func (c *Compiler) extractAdditionalConfigurations(
 		return err
 	}
 	workflowData.RepoMemoryConfig = repoMemoryConfig
+	ensureRepoMemoryWritePaths(workflowData.SandboxConfig, repoMemoryConfig)
 
 	// Extract and process mcp-scripts and safe-outputs
 	workflowData.Command, workflowData.CommandEvents, workflowData.CommandCentralized, workflowData.CommandPlaceholder = c.extractCommandConfig(frontmatter)
@@ -657,7 +701,7 @@ func ensureOnMap(frontmatter map[string]any) map[string]any {
 }
 
 // processOnSectionAndFilters processes the on section configuration and applies various filters
-func (c *Compiler) processOnSectionAndFilters(
+func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing orchestration phase remains centralized; unrelated to SDK tool catalog changes.
 	frontmatter map[string]any,
 	workflowData *WorkflowData,
 	cleanPath string,

@@ -8,6 +8,8 @@ const {
   extractFrontmatterAndBody,
   extractImportsFromText,
   extractRelevantTemplateExpressions,
+  extractAllTemplateExpressions,
+  extractRuntimeImportReferences,
   marshalCanonicalJSON,
   marshalSorted,
   extractHashFromLockFile,
@@ -148,6 +150,113 @@ engine: copilot`;
 
       const result = extractRelevantTemplateExpressions(markdown);
       expect(result).toEqual(["$" + "{{ env.A }}", "$" + "{{ env.B }}"]);
+    });
+  });
+
+  describe("runtime import expression hashing", () => {
+    it("should extract all expressions from runtime imports and legacy import macros", () => {
+      const markdown = [
+        "{{#runtime-import prompts/direct.md}}",
+        "{{#runtime-import? prompts/optional.md}}",
+        "{{#import: prompts/legacy.md}}",
+        "{{#runtime-import prompts/ranged.md:2-3}}",
+        "{{#runtime-import https://example.com/ignored.md}}",
+      ].join("\n");
+
+      expect(extractRuntimeImportReferences(markdown)).toEqual([
+        { path: "prompts/direct.md", startLine: null, endLine: null },
+        { path: "prompts/optional.md", startLine: null, endLine: null },
+        { path: "prompts/legacy.md", startLine: null, endLine: null },
+        { path: "prompts/ranged.md", startLine: 2, endLine: 3 },
+      ]);
+
+      expect(extractAllTemplateExpressions("A $" + "{{ needs.a.outputs.x }} B $" + "{{ vars.CFG }}")).toEqual(["$" + "{{ needs.a.outputs.x }}", "$" + "{{ vars.CFG }}"]);
+    });
+
+    it("should include the runtime-import expression set in the frontmatter hash", async () => {
+      const workflowPath = "/repo/.github/workflows/runtime-import-hash.md";
+      const promptPath = "/repo/.github/prompts/runtime.md";
+      const files = new Map([
+        [
+          workflowPath,
+          `---
+engine: copilot
+on:
+  workflow_dispatch:
+---
+{{#runtime-import prompts/runtime.md}}
+`,
+        ],
+        [promptPath, "Issue: $" + "{{ needs.select.outputs.issue_numbers }}\n"],
+      ]);
+      const fileReader = async filePath => {
+        if (!files.has(filePath)) throw new Error(`missing ${filePath}`);
+        return files.get(filePath);
+      };
+
+      const hashA = await computeFrontmatterHash(workflowPath, { fileReader });
+      files.set(promptPath, "Unrelated text\nIssue: $" + "{{ needs.select.outputs.issue_numbers }}\n");
+      const hashSameExpression = await computeFrontmatterHash(workflowPath, { fileReader });
+      expect(hashSameExpression).toBe(hashA);
+
+      files.set(promptPath, "Issue: $" + "{{ needs.select.outputs.marker }}\n");
+      const hashB = await computeFrontmatterHash(workflowPath, { fileReader });
+      expect(hashB).not.toBe(hashA);
+    });
+
+    it("should skip symlink runtime imports that resolve outside the workspace", async () => {
+      const tempDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "frontmatter-hash-symlink-"));
+      const workflowsDir = path.join(tempDir, ".github", "workflows");
+      fs.mkdirSync(workflowsDir, { recursive: true });
+      const workflowPath = path.join(workflowsDir, "runtime-import-hash.md");
+      const outsidePath = path.join(tempDir, "outside.md");
+      const symlinkPath = path.join(workflowsDir, "outside-link.md");
+      fs.writeFileSync(
+        workflowPath,
+        `---
+engine: copilot
+on:
+  workflow_dispatch:
+---
+{{#runtime-import outside-link.md}}
+`
+      );
+      fs.writeFileSync(outsidePath, "Outside $" + "{{ needs.outside.outputs.value }}\n");
+      fs.symlinkSync(outsidePath, symlinkPath);
+
+      const hashA = await computeFrontmatterHash(workflowPath);
+      fs.writeFileSync(outsidePath, "Outside $" + "{{ needs.outside.outputs.changed }}\n");
+      const hashB = await computeFrontmatterHash(workflowPath);
+
+      expect(hashB).toBe(hashA);
+    });
+
+    it("should terminate when frontmatter-imported bodies contain cyclic runtime imports", async () => {
+      const workflowPath = "/repo/.github/workflows/runtime-import-cycle-hash.md";
+      const files = new Map([
+        [
+          workflowPath,
+          `---
+engine: copilot
+imports:
+  - shared/a.md
+on:
+  workflow_dispatch:
+---
+Cycle hash coverage.
+`,
+        ],
+        ["/repo/.github/workflows/shared/a.md", "A $" + "{{ needs.a.outputs.value }}\n{{#runtime-import shared/b.md}}\n"],
+        ["/repo/.github/workflows/shared/b.md", "B $" + "{{ needs.b.outputs.value }}\n{{#runtime-import shared/a.md}}\n"],
+      ]);
+      const fileReader = async filePath => {
+        if (!files.has(filePath)) throw new Error(`missing ${filePath}`);
+        return files.get(filePath);
+      };
+
+      const hash = await computeFrontmatterHash(workflowPath, { fileReader });
+
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
     });
   });
 

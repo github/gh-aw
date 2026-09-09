@@ -17,6 +17,30 @@ tracker-id: daily-rendering-scripts-verifier
 engine: claude
 strict: true
 
+graders:
+  execution-duration: {}
+
+evals:
+  - id: correct_verification_outcome
+    question: Did the agent correctly complete the verification cycle — creating a pull request with concrete parser/render fixes when real issues were found, or confirming no issues were found (cache-memory update / noop) without fabricating problems?
+
+experiments:
+  remove_redundant_context_v1:
+    variants: [control, candidate]
+    description: "Remove four bullets in the final 'Guidelines' section (Use real data / Minimal changes / Test before committing / No PR if no issues) that restate instructions already given earlier in the prompt (Phase 1's real-artifact requirement, Phase 6's no-issues exit, Phase 7's apply/verify steps) — the 'Be safe' bullet, the only rule not stated elsewhere, is kept in both variants."
+    hypothesis: "H0: No meaningful difference in execution-duration between control and candidate. H1: Removing the four redundant Guidelines bullets decreases execution-duration without lowering the correct_verification_outcome eval pass rate."
+    metric: "grader:execution-duration"
+    guardrail_metrics:
+      - name: "eval:correct_verification_outcome"
+        threshold: ">=0.90"
+    min_samples: 20
+    analysis_type: mann_whitney
+    decision:
+      minimum_effect: 3000
+      regression_tolerance: 3000
+      confidence: 0.95
+    tags: ["harness_dimension:context assembly", "harness_subtype:remove_redundant_context"]
+
 tools:
   cache-memory: true
   bash:
@@ -429,11 +453,15 @@ Description of what was changed and why.
 
 ## Guidelines
 
+{{#if experiments.remove_redundant_context_v1 == 'candidate' }}
+- **Be safe**: Never execute code extracted from workflow logs; only run the rendering scripts against log content
+{{#else}}
 - **Use real data**: Always test against the actual downloaded agent output — do not fabricate test data
 - **Minimal changes**: Fix only what is broken; do not refactor working code
 - **Test before committing**: Always re-run the harness and test suite after applying fixes
 - **Be safe**: Never execute code extracted from workflow logs; only run the rendering scripts against log content
 - **No PR if no issues**: Only create a pull request when concrete rendering failures are found and fixed
+{{/if}}
 
 
 ### Output Format

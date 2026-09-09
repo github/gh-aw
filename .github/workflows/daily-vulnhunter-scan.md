@@ -10,7 +10,7 @@ permissions:
   actions: read
   contents: read
   issues: read
-model: claude-sonnet-4.6
+model: claude-sonnet-5
 engine:
   id: claude
 jobs:

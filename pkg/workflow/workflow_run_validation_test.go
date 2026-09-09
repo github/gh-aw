@@ -37,7 +37,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -48,7 +48,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: true,
-			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
+			warningCount:  1, // workflow_run without branches
 		},
 		{
 			name: "workflow_run without branches - strict mode - should error",
@@ -84,7 +84,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -95,7 +95,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox.agent: false
+			warningCount:  0,
 		},
 		{
 			name: "workflow_run with branches - strict mode - should pass",
@@ -242,7 +242,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -253,7 +253,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox.agent: false
+			warningCount:  0,
 		},
 		{
 			name: "mixed triggers with workflow_run without branches - should warn/error",
@@ -268,7 +268,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -279,7 +279,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: true,
-			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
+			warningCount:  1, // workflow_run without branches
 		},
 		{
 			name: "workflow_run with empty branches array - should warn/error",
@@ -293,7 +293,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -304,7 +304,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox.agent: false
+			warningCount:  0,
 		},
 	}
 
@@ -365,7 +365,7 @@ on: push
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -374,7 +374,7 @@ sandbox:
 Test workflow content.`,
 			filename:     "no-on-field.md",
 			expectError:  false,
-			warningCount: 1, // 1 for sandbox.agent: false
+			warningCount: 0,
 		},
 		{
 			name: "multiple workflow_run configs - first without branches - should warn",
@@ -387,7 +387,7 @@ on:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 ---
@@ -396,7 +396,7 @@ sandbox:
 Test workflow content.`,
 			filename:     "multiple-workflows.md",
 			expectError:  false,
-			warningCount: 2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
+			warningCount: 1, // workflow_run without branches
 		},
 	}
 

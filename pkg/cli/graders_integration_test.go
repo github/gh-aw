@@ -23,12 +23,28 @@ func TestGradersCommandIntegration(t *testing.T) {
 		{
 			name:       "graders help",
 			args:       []string{"graders", "--help"},
-			wantOutput: []string{"Inspect and replay workflow graders", "operational-value"},
+			wantOutput: []string{"Inspect and replay workflow graders", "operational-value", "run"},
+		},
+		{
+			name:       "run grader help",
+			args:       []string{"graders", "run", "--help"},
+			wantOutput: []string{"Run one grader", "<workflow-id> <grader-id> [run-id]", "--repo"},
+		},
+		{
+			name:       "run grader rejects invalid run ID",
+			args:       []string{"graders", "run", "workflow", "loops", "0"},
+			wantErr:    true,
+			wantOutput: []string{"run ID must be a positive integer"},
 		},
 		{
 			name:       "operational value help",
 			args:       []string{"graders", "operational-value", "--help"},
-			wantOutput: []string{"Regrade the operational-value observation", "--evidence-at", "--repo", "--json"},
+			wantOutput: []string{"Regrade the operational-value observation", "report", "--evidence-at", "--repo", "--json"},
+		},
+		{
+			name:       "operational value report help",
+			args:       []string{"graders", "operational-value", "report", "--help"},
+			wantOutput: []string{"complete operational-value history", "--until", "--cache-dir", "--refresh", "--output"},
 		},
 		{
 			name:       "operational value requires run ID",

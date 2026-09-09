@@ -330,3 +330,27 @@ func (c *Compiler) generateSamplesReplayStep(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("          mkdir -p \"$(dirname \"$GH_AW_AGENT_STDIO_LOG\")\"\n")
 	yaml.WriteString("          node \"${RUNNER_TEMP}/gh-aw/actions/apply_samples.cjs\"\n")
 }
+
+// safeOutputsMissingSamples returns the frontmatter keys of enabled,
+// non-builtin safe outputs that declare no `samples:` entries. Under samples
+// replay these handlers are never exercised: the agent is replaced by the
+// deterministic driver, so a handler without samples silently produces no
+// output at all. The keys are returned in a deterministic (sorted) order.
+func safeOutputsMissingSamples(config *SafeOutputsConfig) []string {
+	if config == nil {
+		return nil
+	}
+	var keys []string
+	for _, handler := range safeOutputHandlers {
+		if handler.Builtin || handler.Key == "" || handler.StructField == "" || handler.ToolName == "" {
+			continue
+		}
+		base := extractBaseSafeOutputConfig(config, handler.StructField)
+		if base == nil || len(base.Samples) > 0 {
+			continue
+		}
+		keys = append(keys, toolDisplayKey(handler.Key))
+	}
+	sort.Strings(keys)
+	return keys
+}

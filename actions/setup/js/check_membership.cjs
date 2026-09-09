@@ -4,6 +4,7 @@
 const { parseRequiredPermissions, parseAllowedBots, checkRepositoryPermission, checkBotStatus, isAllowedBot, isConfusedDeputyAttack } = require("./check_permissions_utils.cjs");
 const { writeDenialSummary } = require("./pre_activation_summary.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { withRetry, isTransientError } = require("./error_recovery.cjs");
 
 /**
  * Attempt to authorize the actor via the bots allowlist.
@@ -121,11 +122,26 @@ async function main() {
         }
 
         try {
-          const response = await github.rest.pulls.get({
-            owner,
-            repo,
-            pull_number: pullNumber,
-          });
+          const response = await withRetry(
+            () =>
+              github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pullNumber,
+              }),
+            {
+              maxRetries: 3,
+              initialDelayMs: 2500,
+              maxDelayMs: 30000,
+              backoffMultiplier: 2,
+              jitterMs: 0,
+              shouldRetry: error => {
+                const status = error?.response?.status ?? error?.status;
+                return (typeof status === "number" && status >= 500) || isTransientError(error);
+              },
+            },
+            "pull request provenance check"
+          );
           const pullRequest = response?.data;
           const headRepo = pullRequest?.head?.repo?.full_name;
           const baseRepo = pullRequest?.base?.repo?.full_name;

@@ -191,6 +191,25 @@ type rpcResponsePayload struct {
 	Error *rpcError `json:"error,omitempty"`
 }
 
+func (p *rpcResponsePayload) UnmarshalJSON(data []byte) error {
+	type responseAlias rpcResponsePayload
+	var decoded struct {
+		responseAlias
+		Result json.RawMessage `json:"result"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = rpcResponsePayload(decoded.responseAlias)
+	var resultMetadata struct {
+		IsError bool `json:"isError"`
+	}
+	if p.Error == nil && len(decoded.Result) > 0 && json.Unmarshal(decoded.Result, &resultMetadata) == nil && resultMetadata.IsError {
+		p.Error = &rpcError{Message: "MCP tool returned an error result"}
+	}
+	return nil
+}
+
 // rpcError represents a JSON-RPC error object.
 type rpcError struct {
 	Code    int           `json:"code"`

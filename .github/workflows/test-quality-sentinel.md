@@ -218,7 +218,7 @@ features:
   gh-aw-detection: true
 experiments:
   model_size:
-    variants: [claude-haiku-4.5, claude-sonnet-4.6]
+    variants: [claude-haiku-4.5, claude-sonnet-5]
     description: "Tests whether a smaller model can preserve test-review decision quality at lower cost versus a larger reasoning-capable model."
     hypothesis: "H0: model-size variant does not improve review usefulness acceptance rate. H1: a larger reasoning-capable model improves review usefulness acceptance rate by >=15 percentage points without materially increasing false-positive change requests."
     metric: review_usefulness_acceptance_rate

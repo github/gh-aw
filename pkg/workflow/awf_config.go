@@ -92,6 +92,9 @@ type AWFConfigFile struct {
 	// Container contains container execution configuration.
 	Container *AWFContainerConfig `json:"container,omitempty"`
 
+	// CloudHypervisor contains Cloud Hypervisor microVM execution configuration.
+	CloudHypervisor *AWFCloudHypervisorConfig `json:"cloudHypervisor,omitempty"`
+
 	// Logging contains logging and diagnostics configuration.
 	Logging *AWFLoggingConfig `json:"logging,omitempty"`
 
@@ -127,6 +130,10 @@ type AWFNetworkConfig struct {
 	// Isolation enables topology-based egress isolation mode.
 	// Maps to: --network-isolation
 	Isolation bool `json:"isolation,omitempty"`
+
+	// VerifySbxEgress enables fail-closed direct-egress verification for Docker sbx.
+	// Maps to: --verify-sbx-egress
+	VerifySbxEgress bool `json:"verifySbxEgress,omitempty"`
 
 	// TopologyAttach lists container names AWF should attach to awf-net.
 	// Maps to: --topology-attach <name> (repeatable)
@@ -201,6 +208,12 @@ type AWFAPIProxyConfig struct {
 	AllowedModels []string `json:"allowedModels,omitempty"`
 	// DisallowedModels is the explicit denylist policy for model names/patterns.
 	DisallowedModels []string `json:"disallowedModels,omitempty"`
+
+	// CACert is a host path to an additional CA certificate for api-proxy
+	// upstream TLS verification. Maps to frontmatter sandbox.agent.ca-cert.
+	// Only emitted for AWF v0.28.10+ (see AWFAPIProxyCACertMinVersion); older
+	// AWF strict config validation rejects the unknown property.
+	CACert string `json:"caCert,omitempty"`
 }
 
 // AWFModelFallbackConfig is the "apiProxy.modelFallback" section of the AWF config file.
@@ -215,7 +228,10 @@ type AWFModelFallbackConfig struct {
 // AWFAPITargetConfig is a single API proxy target entry.
 // Maps to: --<provider>-api-target <host>
 type AWFAPITargetConfig struct {
-	// Host is the hostname (and optional port) of the API endpoint.
+	// Host is the hostname (and optional port) of the API endpoint, or an
+	// explicit http:// URL when the effective AWF version supports HTTP targets.
+	// AWF currently normalizes explicit target ports to the scheme default, so
+	// custom ports are not supported for these targets.
 	Host string `json:"host,omitempty"`
 
 	// AuthHeader is the custom authentication header name sent with API requests.
@@ -272,6 +288,33 @@ type AWFContainerConfig struct {
 	// instead of falling back to the official registry, and it cannot be combined
 	// with legacy image selectors such as imageTag or agentImage.
 	Images map[string]string `json:"images,omitempty"`
+}
+
+// AWFCloudHypervisorConfig is the "cloudHypervisor" section of the AWF config file.
+type AWFCloudHypervisorConfig struct {
+	PreviewEnabled                      bool                            `json:"previewEnabled,omitempty"`
+	MountPolicy                         string                          `json:"mountPolicy,omitempty"`
+	CloudHypervisorBinary               string                          `json:"cloudHypervisorBinary,omitempty"`
+	KernelPath                          string                          `json:"kernelPath,omitempty"`
+	RootfsPath                          string                          `json:"rootfsPath,omitempty"`
+	SupervisorPath                      string                          `json:"supervisorPath,omitempty"`
+	ArtifactManifestPath                string                          `json:"artifactManifestPath,omitempty"`
+	ArtifactManifestBundlePath          string                          `json:"artifactManifestBundlePath,omitempty"`
+	ArtifactReleaseTag                  string                          `json:"artifactReleaseTag,omitempty"`
+	DevelopmentAllowUnattestedArtifacts bool                            `json:"developmentAllowUnattestedArtifacts,omitempty"`
+	VCPUCount                           int                             `json:"vcpuCount,omitempty"`
+	MemoryMiB                           int                             `json:"memoryMib,omitempty"`
+	APITimeoutMs                        int                             `json:"apiTimeoutMs,omitempty"`
+	SHA256                              *AWFCloudHypervisorSHA256Config `json:"sha256,omitempty"`
+}
+
+// AWFCloudHypervisorSHA256Config contains development-only legacy artifact hashes.
+type AWFCloudHypervisorSHA256Config struct {
+	CloudHypervisor string `json:"cloudHypervisor,omitempty"`
+	Virtiofsd       string `json:"virtiofsd,omitempty"`
+	Kernel          string `json:"kernel,omitempty"`
+	Rootfs          string `json:"rootfs,omitempty"`
+	Supervisor      string `json:"supervisor,omitempty"`
 }
 
 // AWFLoggingConfig is the "logging" section of the AWF config file.

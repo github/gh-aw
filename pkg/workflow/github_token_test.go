@@ -62,14 +62,6 @@ func TestGetEffectiveSafeOutputGitHubToken(t *testing.T) {
 	}
 }
 
-func TestGetEffectiveEnclaveGitHubToken(t *testing.T) {
-	expected := "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN }}"
-	result := getEffectiveEnclaveGitHubToken()
-	if result != expected {
-		t.Errorf("getEffectiveEnclaveGitHubToken() = %q, want %q", result, expected)
-	}
-}
-
 func TestGetEffectiveCopilotGitHubToken(t *testing.T) {
 	tests := []struct {
 		name        string

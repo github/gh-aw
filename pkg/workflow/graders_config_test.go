@@ -186,6 +186,48 @@ func TestParseGradersFromFrontmatter_OperationalValueGraderValidation(t *testing
 	}
 }
 
+func TestIsValidOperationalValueEvaluatorRunPath(t *testing.T) {
+	t.Parallel()
+
+	validCases := []string{
+		"evaluator.sh",
+		".github/workflows/graders/test.sh",
+		"./graders/test.sh",
+		"./evaluator.sh",
+		"scripts/nested/evaluator.sh",
+	}
+	for _, tc := range validCases {
+		t.Run("valid_"+tc, func(t *testing.T) {
+			assert.True(t, IsValidOperationalValueEvaluatorRunPath(tc), "expected %q to be valid", tc)
+		})
+	}
+
+	invalidCases := []string{
+		"",
+		"/abs/path.sh",
+		"//evil.com/test.sh",
+		"\\win\\path.sh",
+		"path\\with\\backslash.sh",
+		".",
+		"..",
+		"./",
+		"../test.sh",
+		"./../test.sh",
+		".github/workflows/../secret.sh",
+		".github/workflows//double_slash.sh",
+		"evaluator.js",
+		"evaluator.sh/",
+		"./.",
+		"./..",
+		"./evaluator.js",
+	}
+	for _, tc := range invalidCases {
+		t.Run("invalid_"+tc, func(t *testing.T) {
+			assert.False(t, IsValidOperationalValueEvaluatorRunPath(tc), "expected %q to be invalid", tc)
+		})
+	}
+}
+
 func TestParseGradersFromFrontmatter_RunRejectedForOtherGraders(t *testing.T) {
 	var c Compiler
 	_, err := c.parseGradersFromFrontmatter(map[string]any{
@@ -623,6 +665,26 @@ func TestGenerateGradersStep_OperationalValueUsesActivationRunMetadata(t *testin
 	assert.NotContains(t, output, "getWorkflowRun")
 }
 
+func TestGenerateGradersStep_LargeOperationalValueEvaluatorStaysWithinExpressionLimit(t *testing.T) {
+	c := &Compiler{}
+	initActionPinCacheForTest(c)
+	var yaml strings.Builder
+	grader := &GraderDefinition{ID: "operational-value"}
+	grader.evaluatorContent = "#!/usr/bin/env bash\n" + strings.Repeat("printf value\\n\n", 1800)
+	data := &WorkflowData{Graders: &GradersConfig{Graders: map[string]*GraderDefinition{
+		"operational-value": grader,
+	}}}
+
+	c.generateGradersStep(&yaml, data)
+
+	assert.Contains(t, yaml.String(), "await main(graderManifestB64, graderExecB64)")
+	for lineNumber, line := range strings.Split(yaml.String(), "\n") {
+		if len(line) > MaxExpressionSize {
+			t.Fatalf("generated line %d is %d bytes; maximum is %d", lineNumber+1, len(line), MaxExpressionSize)
+		}
+	}
+}
+
 // TestGenerateGradersStep_BeforeArtifactUpload verifies ordering.
 func TestGenerateGradersStep_BeforeArtifactUpload(t *testing.T) {
 	c := &Compiler{}
@@ -659,16 +721,19 @@ func TestCollectGraderArtifactPaths(t *testing.T) {
 	paths := collectGraderArtifactPaths(&GradersConfig{
 		Graders: map[string]*GraderDefinition{"operational-value": grader},
 	})
-	if len(paths) != 3 {
-		t.Fatalf("expected 3 paths, got %d", len(paths))
+	if len(paths) != 4 {
+		t.Fatalf("expected 4 paths, got %d", len(paths))
 	}
 	if !strings.Contains(paths[0], "grader_manifest.json") {
 		t.Fatal("expected grader_manifest.json in paths")
 	}
-	if !strings.Contains(paths[1], "grader_results.json") {
+	if !strings.Contains(paths[1], "grader_payload.json") {
+		t.Fatal("expected grader_payload.json in paths")
+	}
+	if !strings.Contains(paths[2], "grader_results.json") {
 		t.Fatal("expected grader_results.json in paths")
 	}
-	if !strings.Contains(paths[2], "operational_value_evaluator.sh") {
+	if !strings.Contains(paths[3], "operational_value_evaluator.sh") {
 		t.Fatal("expected operational_value_evaluator.sh in paths")
 	}
 }
@@ -677,8 +742,8 @@ func TestCollectGraderArtifactPathsWithoutOperationalValue(t *testing.T) {
 	paths := collectGraderArtifactPaths(&GradersConfig{
 		Graders: map[string]*GraderDefinition{"retries": {ID: "retries"}},
 	})
-	if len(paths) != 2 {
-		t.Fatalf("expected manifest and results paths, got %v", paths)
+	if len(paths) != 3 {
+		t.Fatalf("expected manifest, payload, and results paths, got %v", paths)
 	}
 }
 
@@ -698,13 +763,12 @@ func TestCollectGraderArtifactPaths_AgentGradersDir(t *testing.T) {
 	}
 }
 
-// TestGenerateGraderRedactionStep_CustomOnly verifies that the redaction step is only emitted
-// when custom (non-builtin) grader scripts are present.
-func TestGenerateGraderRedactionStep_CustomOnly(t *testing.T) {
+// TestGenerateGraderRedactionStep verifies every grader payload is redacted before upload.
+func TestGenerateGraderRedactionStep(t *testing.T) {
 	c := &Compiler{stepOrderTracker: NewStepOrderTracker()}
 	var yaml strings.Builder
 
-	// Built-in only — no redaction step
+	// Built-in payloads also contain trace data and must be redacted.
 	data := &WorkflowData{
 		Graders: &GradersConfig{
 			Graders: map[string]*GraderDefinition{
@@ -713,11 +777,12 @@ func TestGenerateGraderRedactionStep_CustomOnly(t *testing.T) {
 		},
 	}
 	c.generateGraderRedactionStep(&yaml, "", data)
-	if yaml.Len() > 0 {
-		t.Error("expected no redaction step for built-in-only graders")
+	if !strings.Contains(yaml.String(), "Redact grader outputs") {
+		t.Error("expected redaction step for built-in grader payload")
 	}
 
 	// Custom script — should emit redaction step
+	yaml.Reset()
 	data.Graders.Graders["my-custom"] = &GraderDefinition{
 		ID:     "my-custom",
 		Script: "return {value: 1}",

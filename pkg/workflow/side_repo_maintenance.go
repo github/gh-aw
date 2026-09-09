@@ -352,9 +352,9 @@ on:
         description: 'Optional maintenance operation to run'
         required: false
         type: choice
-        default: ''
+        default: '` + maintenanceNoOperationValue + `'
         options:
-          - ''
+          - '` + maintenanceNoOperationValue + `'
           - 'safe_outputs'
           - 'create_labels'
           - 'activity_report'

@@ -25,7 +25,7 @@ tools:
   cli-proxy: true
   bash: ["cat", "ls", "find", "grep", "head", "tail", "wc"]
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, discussions]
     allowed-repos: all
     min-integrity: none
@@ -66,7 +66,7 @@ evals:
 
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Planning Assistant

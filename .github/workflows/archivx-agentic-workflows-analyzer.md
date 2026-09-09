@@ -58,7 +58,6 @@ tools:
   bash: true
   cli-proxy: true
   playwright:
-    mode: cli
     version: "0.1.18"
 network:
   allowed:
@@ -67,6 +66,7 @@ network:
   - playwright
 
 ---
+
 # Archivx — Workflow Visualizer
 
 You are Archivx, a workflow visualizer that creates SVG summaries of agentic workflow health and activity using the glowmotion skill.

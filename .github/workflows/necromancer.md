@@ -10,12 +10,14 @@ on:
     strategy: decentralized
   status-comment: true
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
 
 
-engine: codex
+engine: pi
+model: copilot/auto
 strict: true
 timeout-minutes: 25
 network:
@@ -56,9 +58,6 @@ evals:
     question: Did the agent investigate the pull request and identify any root-cause issues or missing test coverage?
   - id: tests-added-or-noop
     question: Were regression tests added to the pull request branch, or was noop correctly called when no tests were needed?
-sandbox:
-  agent:
-    runtime: gvisor
 ---
 
 # Necromancer

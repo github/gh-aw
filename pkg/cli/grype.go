@@ -177,9 +177,7 @@ func runGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 	images := collectContainerImagesFromLockFiles(lockFiles)
 	if len(images) == 0 {
 		grypeLog.Print("No container images found in lock files")
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("No container images found in lock files to scan with grype"))
-		}
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grype vulnerability scanner (0 container images found in lock files)"))
 		return nil
 	}
 

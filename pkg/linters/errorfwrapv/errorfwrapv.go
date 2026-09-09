@@ -7,7 +7,6 @@ package errorfwrapv
 import (
 	"errors"
 	"go/ast"
-	"go/token"
 	"go/types"
 	"strconv"
 
@@ -67,12 +66,12 @@ func analyzeFmtErrorfCall(pass *analysis.Pass, n ast.Node, generatedFiles filech
 	if len(call.Args) == 0 {
 		return
 	}
-	lit, ok := call.Args[0].(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
+	formatStr, ok := astutil.ResolveFormatString(call.Args[0])
+	if !ok {
 		return
 	}
 
-	verbs := parseFormatVerbs(lit.Value)
+	verbs := parseFormatVerbs(formatStr)
 	errorArgVerbs, wrappedErrorArgs, hasVerbV := classifyErrorArgs(pass, call, verbs)
 
 	if hasVerbV {
@@ -153,11 +152,11 @@ func needsWrapping(verbs []rune) bool {
 	return false
 }
 
+// parseFormatVerbs scans a format string produced by astutil.ResolveFormatString
+// — the unquoted literal segments of a fmt.Errorf format-string argument,
+// concatenated in order — for format verbs.
 func parseFormatVerbs(s string) []formatVerb {
 	var verbs []formatVerb
-	if len(s) >= 2 {
-		s = s[1 : len(s)-1]
-	}
 
 	nextArgIdx := 0
 	for i := 0; i < len(s); i++ {

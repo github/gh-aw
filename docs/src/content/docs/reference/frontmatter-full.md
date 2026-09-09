@@ -28,6 +28,13 @@ name: "My Workflow"
 # (optional)
 description: "Description of the workflow"
 
+# Optional statement of the durable outcome the workflow exists to achieve. Unlike
+# 'description', which explains what the workflow does, 'intent' explains why the
+# workflow exists and should stay implementation-independent. Rendered as a
+# comment in the generated GitHub Actions YAML file (.lock.yml).
+# (optional)
+intent: "example-value"
+
 # Optional emoji to represent the workflow visually in listings and UI surfaces.
 # (optional)
 emoji: "example-value"
@@ -559,6 +566,18 @@ on:
     branches-ignore: []
       # Array of strings
 
+    # Filter by workflow run conclusion (for example, failure). Compiled into a
+    # guarded if: condition.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    conclusion: "success"
+
+    # Format 2: array
+    conclusion: []
+      # Array items: string
+
   # Release event trigger
   # (optional)
   release:
@@ -852,10 +871,11 @@ on:
       {}
 
   # Time when workflow should stop running. Supports multiple formats: absolute
-  # dates (YYYY-MM-DD HH:MM:SS, June 1 2025, 1st June 2025, 06/01/2025, etc.) or
-  # relative time deltas (+25h, +3d, +1d12h30m). Maximum values for time deltas:
-  # 12mo, 52w, 365d, 8760h (365 days). Note: Minute unit 'm' is not allowed for
-  # stop-after; minimum unit is hours 'h'.
+  # dates (YYYY-MM-DD HH:MM:SS, June 1 2025, 1st June 2025, 06/01/2025, etc.),
+  # relative time deltas (+25h, +3d, +1d12h30m), or a GitHub Actions expression
+  # (e.g. ${{ inputs.stop-after }}) resolved at workflow runtime. Maximum values for
+  # time deltas: 12mo, 52w, 365d, 8760h (365 days). Note: Minute unit 'm' is not
+  # allowed for stop-after; minimum unit is hours 'h'.
   # (optional)
   stop-after: "example-value"
 
@@ -1053,7 +1073,7 @@ on:
   # Format 2: List of label names; the workflow fires when the triggering label
   # matches any entry.
   labels: []
-    # Array items: undefined
+    # Array items: A non-empty string value.
 
   # Allow the bot-posted-menu / user-checks-box pattern: when a workflow posts a
   # checkbox-menu comment as a GitHub App bot and a human maintainer edits it to
@@ -1068,6 +1088,13 @@ on:
   # match a valid environment configured in the repository settings.
   # (optional)
   manual-approval: "example-value"
+
+  # Minimum time after the most recent completed workflow run where the agent job
+  # started before another agent run may start. Uses Go duration syntax (for
+  # example, '5m', '1h', or '1h30m'), must be at least 5 minutes, and does not
+  # support GitHub Actions expressions.
+  # (optional)
+  cooldown: "example-value"
 
   # AI reaction to add/remove on triggering item. Scalar form accepts one of: +1,
   # -1, laugh, confused, heart, hooray, rocket, eyes, none. Object form implies
@@ -1494,6 +1521,16 @@ on:
     # (optional)
     organization-projects: "read"
 
+    # Permission level for organization custom org roles (read/write/none). Controls
+    # access to custom organization role metadata.
+    # (optional)
+    organization-custom-org-roles: "read"
+
+    # Permission level for organization custom repository roles (read/write/none).
+    # Controls access to custom repository role metadata.
+    # (optional)
+    organization-custom-repository-roles: "read"
+
     # Permission level for security events (read/write/none). Controls access to view
     # and manage code scanning alerts and security findings.
     # (optional)
@@ -1540,10 +1577,11 @@ on:
 
 # ⚠️ Experimental. Agent Plugins to install after the agentic engine. Each GitHub
 # repository reference must include a ref that the compiler resolves to a commit
-# SHA. Using this field emits a compile-time warning.
+# SHA. Using this field emits a compile-time warning. Entries may also be objects
+# to configure per-plugin authentication via github-token or github-app, for
+# installing plugins from private repositories.
 # (optional)
 plugins: []
-  # Array of A plugin repository reference in owner/repository[/path]@ref format
 
 # GitHub token permissions for the workflow. Controls what the GITHUB_TOKEN can
 # access during execution. Use the principle of least privilege - only grant the
@@ -1648,6 +1686,16 @@ permissions:
   # manage organization-level GitHub Projects boards.
   # (optional)
   organization-projects: "read"
+
+  # Permission level for organization custom org roles (read/write/none). Controls
+  # access to custom organization role metadata.
+  # (optional)
+  organization-custom-org-roles: "read"
+
+  # Permission level for organization custom repository roles (read/write/none).
+  # Controls access to custom repository role metadata.
+  # (optional)
+  organization-custom-repository-roles: "read"
 
   # Permission level for security events (read/write/none). Controls access to view
   # and manage code scanning alerts and security findings.
@@ -2253,6 +2301,12 @@ sandbox:
     # (optional)
     token-steering: true
 
+    # Host path to an additional CA certificate for API proxy upstream TLS
+    # verification. The file is bind-mounted read-only into the API proxy sidecar.
+    # Maps to apiProxy.caCert; requires AWF v0.28.10 or later.
+    # (optional)
+    ca-cert: "example-value"
+
     # Sandbox runtime profile for the agent container. Each value selects one
     # supported security and topology profile: 'docker' (default) runs the agent under
     # Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs
@@ -2427,10 +2481,10 @@ sandbox:
     # (optional)
     port: 1
 
-    # API key for authenticating with the MCP gateway (supports ${{ secrets.* }}
-    # syntax)
+    # Agent/session identifier for authenticating with the MCP gateway (supports ${{
+    # secrets.* }} syntax)
     # (optional)
-    api-key: "example-value"
+    agent-id: "example-value"
 
     # Gateway domain for URL generation (default: 'host.docker.internal' when agent is
     # enabled, 'localhost' when disabled)
@@ -2457,7 +2511,7 @@ steps:
   {}
 
 # Format 2: array
-steps: []
+steps: [{"prompt":"Analyze the issue and create a plan"}]
   # Array items: undefined
 
 # Custom workflow steps to run at the very beginning of the agent job, before
@@ -2473,7 +2527,7 @@ pre-steps:
   {}
 
 # Format 2: array
-pre-steps: []
+pre-steps: [{"name":"Mint short-lived token","id":"mint","uses":"some-org/token-minting-action@v1","with":{"scope":"target-org/target-repo"}}]
   # Array items: undefined
 
 # Custom workflow steps to run immediately before AI execution, after all
@@ -2486,7 +2540,7 @@ pre-agent-steps:
   {}
 
 # Format 2: array
-pre-agent-steps: []
+pre-agent-steps: [{"name":"Prepare final context","run":"echo \"ready\""}]
   # Array items: undefined
 
 # Custom workflow steps to run after AI execution
@@ -2498,7 +2552,7 @@ post-steps:
   {}
 
 # Format 2: array
-post-steps: []
+post-steps: [{"name":"Verify Post-Steps Execution","run":"echo \"✅ Post-steps are executing correctly\"\necho \"This step runs after the AI agent completes\"\n"},{"name":"Upload Test Results","if":"always()","uses":"actions/upload-artifact@v4","with":{"name":"post-steps-test-results","path":"/tmp/gh-aw/","retention-days":1,"if-no-files-found":"ignore"}}]
   # Array items: undefined
 
 # AI engine configuration that specifies which AI processor interprets and
@@ -2956,6 +3010,12 @@ engine:
   # engine registry. Defaults to id when omitted.
   # (optional)
   runtime-id: "example-value"
+
+  # Built-in engine used to run threat detection for workflows using this engine.
+  # Required for custom engines because the threat detection analyzer only supports
+  # built-in engines; defaults to 'copilot' when omitted.
+  # (optional)
+  detection-engine: "copilot"
 
   # Optional engine-specific secret bindings for behavior-defined engines.
   # (optional)
@@ -3642,7 +3702,8 @@ tools:
     # Format 2: Array of GitHub MCP server toolset names to enable specific groups of
     # GitHub API functionalities
     toolsets: []
-      # Array items: undefined
+      # Array items: A GitHub MCP server toolset name that enables a specific group of
+      # GitHub API functionalities.
 
     # Volume mounts for the containerized GitHub MCP server (format:
     # 'host:container:mode' where mode is 'ro' for read-only or 'rw' for read-write).
@@ -3982,6 +4043,84 @@ tools:
     # (optional)
     features: "example-value"
 
+  # Linear tools provided by Linear's official hosted MCP server
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Enable Linear using the well-known LINEAR_API_KEY secret
+  linear: null
+
+  # Format 2: object
+  linear:
+    # Optional Linear API key or OAuth access token secret reference. Defaults to ${{
+    # secrets.LINEAR_API_KEY }}.
+    # (optional)
+    token: "${{ secrets.LINEAR_API_KEY }}"
+
+    # Linear MCP toolset name(s) to enable. Toolsets are expanded to gateway-enforced
+    # allowed tools.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: A Linear MCP toolset name that enables a related group of read-only
+    # Linear tools.
+    toolsets: "all"
+
+    # Format 2: Array of Linear MCP toolset names
+    toolsets: ["issues","projects"]
+      # Array items: A Linear MCP toolset name that enables a related group of read-only
+      # Linear tools.
+
+    # List of allowed Linear MCP tool names or wildcard patterns. When toolsets are
+    # set, every pattern must match a tool in those toolsets.
+    # (optional)
+    allowed: ["*"]
+      # Array of strings
+
+    # Whether failure to connect to Linear should fail MCP gateway startup. Defaults
+    # to true.
+    # (optional)
+    required: true
+  # Jira tools provided by Atlassian's remote Rovo MCP service. This integration
+  # supports non-interactive CI/CD authentication only.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Disable the Jira integration, including a Jira configuration inherited
+  # from an import.
+  jira: false
+
+  # Format 2: object
+  jira:
+    # Atlassian Rovo MCP endpoint. Defaults to the official hosted endpoint.
+    # (optional)
+    url: "example-value"
+
+    # Approved read-only Jira MCP tools the agent may call. Required; all-tools access
+    # and write-capable tools are not supported.
+    allowed: []
+      # Array of strings
+
+    # Non-interactive authentication for GitHub Actions.
+    # Accepted formats:
+
+    # Format 1: object
+    auth:
+      type: null
+
+      # Atlassian service account API key, sent with the HTTP bearer scheme.
+      token: "example-value"
+
+    # Format 2: object
+    auth:
+      type: null
+
+      # Atlassian account email stored as a GitHub Actions secret.
+      email: "example-value"
+
+      # Atlassian API token stored as a GitHub Actions secret.
+      token: "example-value"
+
   # Bash shell command execution tool. Supports wildcards: '*' (all commands),
   # 'command *' (command with any args, e.g., 'date *', 'echo *'). Default safe
   # commands: echo, ls, pwd, cat, head, tail, grep, wc, sort, uniq, date.
@@ -4040,34 +4179,46 @@ tools:
   edit:
     {}
 
-  # Playwright browser automation tool for web scraping, testing, and UI
-  # interactions in containerized browsers
+  # Playwright CLI browser automation tool for web scraping, testing, and UI
+  # interactions
   # (optional)
   # Accepted formats:
 
   # Format 1: Enable Playwright tool with default settings
   playwright: null
 
-  # Format 2: Playwright tool configuration with custom version and arguments
+  # Format 2: Playwright CLI configuration
   playwright:
-    # Optional version pin. In CLI mode (recommended): the @playwright/cli npm package
-    # version (e.g., '0.1.11'). In MCP mode (deprecated): the Playwright browser
-    # Docker image version (e.g., 'v1.56.1'). Omit to use the default version.
+    # Optional @playwright/cli npm package version pin. Omit to use the default
+    # version.
     # (optional)
     version: null
 
-    # Optional additional arguments to append to the generated MCP server command (MCP
-    # mode only)
+    # Removed: legacy MCP-mode argument list. Accepted here only so the compiler can
+    # reject 'mode: mcp' configurations with actionable migration guidance instead of
+    # an unhelpful schema error.
     # (optional)
     args: []
       # Array of strings
 
-    # Integration mode: 'cli' (recommended) installs @playwright/cli via npm for
-    # token-efficient CLI invocations — use playwright-cli commands in bash and
-    # localhost to reach local servers; 'mcp' (deprecated) runs a Docker-based MCP
-    # server.
+    # Integration mode. Only 'cli' is supported. The compiler rejects the removed
+    # 'mcp' value with migration guidance. Must be a literal value; GitHub Actions
+    # expressions are rejected.
     # (optional)
+    # Accepted formats:
+
+    # Format 1: string
     mode: "cli"
+
+    # Format 2: Not allowed at runtime: mode must be the literal 'cli' value, not a
+    # GitHub Actions expression.
+    mode: "example-value"
+
+    # Browsers to provision before the agent starts. Defaults to Chromium. Chrome and
+    # Chrome for Testing are accepted as aliases for Chromium.
+    # (optional)
+    browsers: []
+      # Array of strings
 
   # GitHub Agentic Workflows MCP server for workflow introspection and analysis.
   # Provides tools for checking status, compiling workflows, downloading logs, and
@@ -4137,7 +4288,7 @@ tools:
       timeout-minutes: 1
 
   # Format 4: Array of cache-memory configurations for multiple caches
-  cache-memory: []
+  cache-memory: [{"id":"default","key":"memory-default"},{"id":"session","key":"memory-session"}]
     # Array items: object
 
   # Private-preview GitHub Drives configuration. Do not configure unless GitHub has
@@ -4406,7 +4557,7 @@ tools:
       timeout-minutes: 1
 
   # Format 4: Array of repo-memory configurations for multiple memory locations
-  repo-memory: []
+  repo-memory: [{"id":"default","branch-name":"memory/default"},{"id":"session","branch-name":"memory/session"}]
     # Array items: object
 
 # ⚠️ Experimental. Top-level Language Server Protocol (LSP) configuration for
@@ -8450,6 +8601,250 @@ safe-outputs:
 
   # Format 2: Enable workflow run approval with default configuration
   approve-workflow-run: null
+
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Configuration for creating Jira Cloud issues through the privileged
+  # safe-output execution path.
+  jira-create-issue:
+    # Maximum number of Jira issues to create (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # Preview Jira issue creation without sending an HTTP mutation.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: string
+    staged: "example-value"
+
+  # Format 2: Enable Jira issue creation with default configuration.
+  jira-create-issue: null
+
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Configuration for updating Jira Cloud issue summaries or descriptions
+  # through the privileged safe-output execution path.
+  jira-update-issue:
+    # Maximum number of Jira issues to update (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # Preview Jira issue updates without sending an HTTP mutation.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: string
+    staged: "example-value"
+
+  # Format 2: Enable Jira issue updates with default configuration.
+  jira-update-issue: null
+
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Configuration for commenting on Jira Cloud issues through the
+  # privileged safe-output execution path.
+  jira-add-comment:
+    # Maximum number of Jira comments to add (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # Preview Jira comments without sending an HTTP mutation.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: string
+    staged: "example-value"
+
+  # Format 2: Enable Jira comments with default configuration.
+  jira-add-comment: null
+
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Configuration for adding labels to Jira Cloud issues through the
+  # privileged safe-output execution path.
+  jira-add-label:
+    # Maximum number of Jira labels to add (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # Preview Jira label additions without sending an HTTP mutation.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: string
+    staged: "example-value"
+
+  # Format 2: Enable Jira label additions with default configuration.
+  jira-add-label: null
+
+  # Experimental. Create Linear issues through the isolated safe_outputs job.
+  # (optional)
+  linear-create-issue:
+    # Trusted Linear team model UUID.
+    team-id: "example-value"
+
+    # Optional trusted Linear project identifier from a project URL or model UUID.
+    # (optional)
+    project-id: "example-value"
+
+    # Maximum number of Linear issues to create (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Experimental. Add comments to one trusted Linear issue through the isolated
+  # safe_outputs job.
+  # (optional)
+  linear-add-comment:
+    # Trusted Linear issue UUID or shorthand identifier such as ENG-123.
+    target: "example-value"
+
+    # Maximum number of Linear comments to add (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Experimental. Update explicitly enabled fields on one trusted Linear issue
+  # through the isolated safe_outputs job.
+  # (optional)
+  linear-update-issue:
+    # Trusted Linear issue UUID or shorthand identifier such as ENG-123.
+    target: "example-value"
+
+    # Allow the agent to update the Linear issue title.
+    # (optional)
+    title: null
+
+    # Allow the agent to replace the Linear issue description.
+    # (optional)
+    body: null
+
+    # Maximum number of updates to apply (default: 1).
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: string
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
 
   # Enable AI agents to add comments to GitHub issues, pull requests, or
   # discussions. Supports templating, cross-repository commenting, and automatic
@@ -19763,6 +20158,10 @@ safe-outputs:
   # (optional)
   github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Linear personal API key expression used only by the trusted safe_outputs job.
+  # (optional)
+  linear-token: "example-value"
+
   # GitHub App credentials for minting installation access tokens. When configured,
   # a token will be generated using the app credentials and used for all safe output
   # operations.
@@ -20470,6 +20869,12 @@ safe-outputs:
       # engine registry. Defaults to id when omitted.
       # (optional)
       runtime-id: "example-value"
+
+      # Built-in engine used to run threat detection for workflows using this engine.
+      # Required for custom engines because the threat detection analyzer only supports
+      # built-in engines; defaults to 'copilot' when omitted.
+      # (optional)
+      detection-engine: "copilot"
 
       # Optional engine-specific secret bindings for behavior-defined engines.
       # (optional)
@@ -22604,7 +23009,7 @@ checkout:
 
 # Format 2: Multiple checkout configurations
 checkout: []
-  # Array items: undefined
+  # Array items: Configuration for a single actions/checkout step
 
 # Format 3: Set to false to disable the default checkout step. The agent job will
 # not check out any repository (dev-mode checkouts are unaffected).

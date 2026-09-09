@@ -14,7 +14,7 @@ permissions:
 
 
 tracker-id: linter-miner
-model: copilot/gpt-5.4
+model: copilot/mai-code-1-flash-picker
 engine:
   id: copilot
   copilot-sdk: true
@@ -26,7 +26,7 @@ network:
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, discussions, issues, repos]
   cache-memory:
     key: linter-miner-state-${{ github.workflow }}
@@ -80,7 +80,7 @@ timeout-minutes: 120
 max-turns: 1000
 sandbox:
   agent:
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 ---
 
 # Linter Miner
@@ -214,7 +214,7 @@ Be concise. List at most 5 candidates.
 ## agent: `code-pattern-scanner`
 ---
 description: Scans the Go source with Serena and grep to find error-prone patterns that would benefit from a custom linter
-model: copilot/gpt-5.4
+model: copilot/mai-code-1-flash-picker
 ---
 You are a Go static-analysis expert. Scan the non-test Go files under `pkg/` and `cmd/` of this repository for recurring error-prone patterns that are not already caught by existing linters.
 
@@ -231,7 +231,7 @@ Output a JSON array of candidate linter ideas (same schema as discussion-miner).
 ## agent: `linter-writer`
 ---
 description: Implements a new Go analysis linter package following the pkg/linters/largefunc conventions
-model: copilot/gpt-5.4
+model: copilot/mai-code-1-flash-picker
 ---
 You are a Go engineer implementing a custom `go/analysis` linter.
 

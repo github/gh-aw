@@ -312,13 +312,6 @@ func TestApplyGradersArtifact(t *testing.T) {
 	})
 }
 
-func TestIsGradersArtifactRequested(t *testing.T) {
-	t.Parallel()
-	assert.True(t, isGradersArtifactRequested(true, nil))
-	assert.True(t, isGradersArtifactRequested(false, []string{"graders"}))
-	assert.False(t, isGradersArtifactRequested(false, []string{"usage"}))
-}
-
 func TestIsEvalsArtifactRequested(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

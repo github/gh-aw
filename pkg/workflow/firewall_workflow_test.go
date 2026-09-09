@@ -214,8 +214,8 @@ Test workflow with legacy security.`
 
 	lockStr := string(lockContent)
 
-	// Legacy mode should use sudo -E awf
-	assert.Contains(t, lockStr, "sudo -E awf", "Legacy security mode should use 'sudo -E awf' command")
+	// Legacy mode should preserve the runner PATH across sudo's secure_path.
+	assert.Contains(t, lockStr, `sudo -E /usr/bin/env PATH="$PATH" /usr/local/bin/awf`, "Legacy security mode should preserve PATH across sudo")
 
 	// Should emit --legacy-security flag
 	assert.Contains(t, lockStr, "--legacy-security", "Legacy security mode should emit --legacy-security flag")
@@ -258,7 +258,7 @@ Test workflow with strict security (default).`
 	lockStr := string(lockContent)
 
 	// Strict mode should NOT use sudo
-	assert.NotContains(t, lockStr, "sudo -E awf", "Strict security mode should NOT use 'sudo -E awf'")
+	assert.NotContains(t, lockStr, "sudo -E ", "Strict security mode should NOT use sudo")
 
 	// Should NOT emit --legacy-security flag
 	assert.NotContains(t, lockStr, "--legacy-security", "Strict security mode should NOT emit --legacy-security")

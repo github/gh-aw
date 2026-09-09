@@ -46,3 +46,20 @@ func TestCompileOptionsPropagateForceRefreshContainerPins(t *testing.T) {
 		t.Fatal("expected ForceRefreshContainerPins to be propagated to CompileConfig")
 	}
 }
+
+func TestCompileOptionsPropagateModels(t *testing.T) {
+	t.Parallel()
+
+	modelsFlag := compileCmd.Flags().Lookup("models")
+	if modelsFlag == nil {
+		t.Fatal("expected --models flag on compile command")
+	}
+	if modelsFlag.DefValue != "false" {
+		t.Fatalf("expected --models default to be false, got %s", modelsFlag.DefValue)
+	}
+
+	config := (&compileCmdOptions{models: true}).toCompileConfig(nil)
+	if !config.Models {
+		t.Fatal("expected Models to be propagated to CompileConfig")
+	}
+}

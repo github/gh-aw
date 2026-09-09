@@ -4,8 +4,8 @@
  * Claude Code CLI Harness with Retry Logic
  *
  * Wraps the Claude Code CLI command with retry logic for failures that occur after the session
- * has been partially executed.  Passes all arguments to the claude subprocess, transparently
- * forwarding stdin/stdout/stderr.
+ * has been partially executed.  Passes all arguments to the claude subprocess, forwarding
+ * stdout/stderr; stdin is closed since the prompt is delivered via CLI argument, not stdin.
  *
  * Retry policy:
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the

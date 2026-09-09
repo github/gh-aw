@@ -4,7 +4,7 @@
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
-const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp_gateway_log.cjs");
+const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
 /**
@@ -50,12 +50,24 @@ function getReadableTokenUsagePaths(paths) {
  * @returns {string}
  */
 function extractRequestId(line) {
-  const match = line.match(/"request_id"\s*:\s*"((?:\\.|[^"\\])*)"/);
-  return match ? match[1] : "";
+  const requestMatch = line.match(/"request_id"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  return requestMatch ? requestMatch[1] : "";
 }
 
 /**
- * Reads token usage files and deduplicates overlapping lines by request_id.
+ * Extracts a cross-file dedupe key with lightweight matching (no full JSON parse).
+ * @param {string} line
+ * @returns {string}
+ */
+function extractTokenUsageDedupeKey(line) {
+  const requestId = extractRequestId(line);
+  if (!requestId) return "";
+  const eventMatch = line.match(/"event"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  return `${eventMatch ? eventMatch[1] : "token_usage"}:${requestId}`;
+}
+
+/**
+ * Reads token usage files and deduplicates overlapping lines by event and request_id.
  * Falls back to raw line dedupe when request_id is absent.
  * @param {string[]} paths
  * @returns {string}
@@ -76,8 +88,7 @@ function readDedupedTokenUsage(paths) {
     for (const line of fileContent.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const requestId = extractRequestId(trimmed);
-      const dedupeKey = requestId ? `request_id:${requestId}` : trimmed;
+      const dedupeKey = extractTokenUsageDedupeKey(trimmed) || trimmed;
       if (uniqueLineKeys.has(dedupeKey)) continue;
       uniqueLineKeys.add(dedupeKey);
       dedupedLines.push(trimmed);
@@ -205,6 +216,9 @@ async function main() {
       core.info("Token usage file contained no valid entries");
       return;
     }
+    for (const warning of summary.aiCreditsWarnings) {
+      core.warning(`[ai-credits] ${warning}`);
+    }
     const markdown = generateTokenUsageSummary(summary);
     const workingSet = calculateWorkingSetFromJSONL(content).workingSet;
     if (markdown.length > 0) {
@@ -234,7 +248,7 @@ async function main() {
       cache_read_tokens: summary.totalCacheReadTokens,
       cache_write_tokens: summary.totalCacheWriteTokens,
       ambient_context: Math.round(summary.ambientContextTokens || 0),
-      ai_credits: Number((summary.totalAIC || 0).toFixed(3)),
+      ai_credits: summary.aiCreditsSource === "awf_reported" ? Number(summary.totalAIC.toFixed(6)) : Number((summary.totalAIC || 0).toFixed(3)),
       ...(primaryModel ? { primary_model: primaryModel } : {}),
     };
     fs.writeFileSync(AGENT_USAGE_PATH, JSON.stringify(agentUsage) + "\n");
@@ -244,8 +258,8 @@ async function main() {
       core.setOutput("primary_model", primaryModel);
       core.info(`Primary model: ${primaryModel}`);
     }
-    if (summary.totalAIC > 0) {
-      const aic = summary.totalAIC.toFixed(3);
+    if (summary.aiCreditsSource === "awf_reported" || summary.totalAIC > 0) {
+      const aic = formatAICForOutput(summary.totalAIC, summary.aiCreditsSource);
       core.exportVariable("GH_AW_AIC", aic);
       core.setOutput("aic", aic);
       core.info(`AI Credits: ${aic}`);
@@ -267,6 +281,7 @@ if (typeof module !== "undefined" && module.exports) {
     main,
     getReadableTokenUsagePaths,
     extractRequestId,
+    extractTokenUsageDedupeKey,
     readDedupedTokenUsage,
     getSummaryTitle,
     buildStepSummarySection,

@@ -50,7 +50,8 @@ MCPServerConfig (general)
 
 Based on the provided JSON schema, the implementation supports:
 
-**Repos Scope:**
+#### Repos Scope
+
 - `"all"` - All repositories accessible by the token
 - `"public"` - Public repositories only
 - Array of patterns:
@@ -69,7 +70,8 @@ Integrity levels are based on the combination of the `author_association` field 
 
 ### 3. Frontmatter Syntax
 
-**Minimal Example:**
+#### Minimal Example
+
 ```yaml
 tools:
   github:
@@ -79,7 +81,8 @@ tools:
     min-integrity: unapproved
 ```
 
-**With Repository Patterns:**
+#### With Repository Patterns
+
 ```yaml
 tools:
   github:
@@ -92,7 +95,8 @@ tools:
     min-integrity: approved
 ```
 
-**Public Repositories Only:**
+#### Public Repositories Only
+
 ```yaml
 tools:
   github:
@@ -160,7 +164,7 @@ When GitHub guard policies are configured, the compiler automatically derives a 
   - `"owner/prefix*"` → `"private:owner/prefix*"` (prefix wildcard → keep as-is)
   - `"owner/repo"` → `"private:owner/repo"` (specific repo → keep as-is)
 
-**Example - Public Repositories:**
+#### Example - Public Repositories
 
 ```yaml
 tools:
@@ -178,7 +182,7 @@ Generates safeoutputs guard-policy:
 }
 ```
 
-**Example - Specific Repositories:**
+#### Example - Specific Repositories
 
 ```yaml
 tools:
@@ -201,7 +205,8 @@ Generates safeoutputs guard-policy:
 }
 ```
 
-**Implementation:**
+#### Implementation
+
 - Function: `deriveSafeOutputsGuardPolicyFromGitHub()` in `pkg/workflow/mcp_github_config.go`
 - Called during MCP renderer setup for safeoutputs server
 - Tests: `pkg/workflow/safeoutputs_guard_policy_test.go`

@@ -118,8 +118,11 @@ func TestHasMCPServersWithGitHubDisabled(t *testing.T) {
 			name: "github: false with other MCP tool still returns true",
 			data: &WorkflowData{
 				Tools: map[string]any{
-					"github":     false,
-					"playwright": nil,
+					"github": false,
+					"example": map[string]any{
+						"type": "http",
+						"url":  "https://example.com/mcp",
+					},
 				},
 			},
 			expected: true,

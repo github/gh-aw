@@ -39,7 +39,7 @@ The number of runtime JavaScript, JSON, and shell files copied to the destinatio
 
 ```yaml
 steps:
-  - uses: actions/checkout@v6
+  - uses: actions/checkout@v7
     with:
       sparse-checkout: |
         actions

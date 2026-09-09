@@ -82,6 +82,7 @@ invalid json line
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create a temporary directory
 			tmpDir := t.TempDir()
 
@@ -274,6 +275,7 @@ func TestGatewayTruncateString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := stringutil.Truncate(tt.input, tt.maxLen)
 			assert.Equal(t, tt.want, result)
 			assert.LessOrEqual(t, len(result), tt.maxLen)
@@ -459,6 +461,7 @@ func TestRPCMessageEntryEffectiveType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, tt.want, tt.entry.EffectiveType())
 		})
 	}
@@ -706,6 +709,7 @@ func TestParseRPCMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tmpDir := t.TempDir()
 			logPath := filepath.Join(tmpDir, "rpc-messages.jsonl")
 			err := os.WriteFile(logPath, []byte(tt.logContent), 0644)
@@ -758,6 +762,7 @@ func TestParseGatewayLogsFallsBackToRPCMessages(t *testing.T) {
 func TestFindRPCMessagesPath(t *testing.T) {
 	t.Parallel()
 	t.Run("rpc-messages in mcp-logs subdirectory", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		mcpDir := filepath.Join(tmpDir, "mcp-logs")
 		require.NoError(t, os.MkdirAll(mcpDir, 0755))
@@ -769,6 +774,7 @@ func TestFindRPCMessagesPath(t *testing.T) {
 	})
 
 	t.Run("rpc-messages in root directory", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		rpcPath := filepath.Join(tmpDir, "rpc-messages.jsonl")
 		require.NoError(t, os.WriteFile(rpcPath, []byte("{}"), 0644))
@@ -778,6 +784,7 @@ func TestFindRPCMessagesPath(t *testing.T) {
 	})
 
 	t.Run("mcp-logs subdirectory takes priority over root", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		mcpDir := filepath.Join(tmpDir, "mcp-logs")
 		require.NoError(t, os.MkdirAll(mcpDir, 0755))
@@ -791,6 +798,7 @@ func TestFindRPCMessagesPath(t *testing.T) {
 	})
 
 	t.Run("not found returns empty string", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		result := findRPCMessagesPath(tmpDir)
 		assert.Empty(t, result, "should return empty string when not found")
@@ -1153,6 +1161,7 @@ func TestExtractToolCallsStatusInference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tmpDir := t.TempDir()
 			gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
 			require.NoError(t, os.WriteFile(gatewayLogPath, []byte(tt.logLine+"\n"), 0600))

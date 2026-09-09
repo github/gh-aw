@@ -1,7 +1,7 @@
 ---
 mcp-servers:
   kreuzberg:
-    container: "ghcr.io/kreuzberg-dev/kreuzberg"
+    container: "ghcr.io/xberg-io/xberg"
     version: "latest"
     entrypointArgs:
       - "mcp"

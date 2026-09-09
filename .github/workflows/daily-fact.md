@@ -14,10 +14,10 @@ permissions:
   actions: read
   discussions: read
 tracker-id: daily-fact-thread
-model: gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
-  bare: true
+  model-provider: openai
 strict: true
 experiments:
   reasoning_depth:
@@ -36,7 +36,7 @@ experiments:
     start_date: "2026-05-11"
     issue: 31324
 timeout-minutes: 15
-runs-on: aw-gpu-runner-T4
+runs-on: ubuntu-latest
 runtimes:
   node:
     version: "22"
@@ -48,11 +48,11 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
       - default
       - discussions

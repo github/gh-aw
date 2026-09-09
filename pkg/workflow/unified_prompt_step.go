@@ -56,7 +56,7 @@ func removeConsecutiveEmptyLines(content string) string {
 }
 
 // collectPromptSections collects all prompt sections in the order they should be appended
-func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
+func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { //nolint:largefunc // Existing prompt section assembly preserves emitted section ordering.
 	var sections []PromptSection
 
 	// 0. XPia instructions (unless disabled by feature flag)
@@ -91,6 +91,18 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
 			Content: playwrightPromptFile,
 			IsFile:  true,
 		})
+
+		// 3b. AWF-aware Playwright policy (CLI mode + firewall/AWF sandbox enabled).
+		// This reinforces the secure loopback/proxy topology and takes precedence
+		// over generic Playwright CLI skill guidance such as runtime npm installs
+		// or navigation to arbitrary example domains.
+		if isPlaywrightCLIMode(data.Tools) && isFirewallEnabled(data) {
+			unifiedPromptLog.Print("Adding playwright AWF policy section")
+			sections = append(sections, PromptSection{
+				Content: playwrightAWFPromptFile,
+				IsFile:  true,
+			})
+		}
 	}
 
 	// 4. Trial mode note (if in trial mode)
@@ -271,7 +283,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
 //
 // The function handles chunking for large content and ensures proper environment variable handling.
 // Returns the combined expression mappings for use in the placeholder substitution step.
-func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, builtinSections []PromptSection, userPromptChunks []string, expressionMappings []*ExpressionMapping, data *WorkflowData) []*ExpressionMapping {
+func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, builtinSections []PromptSection, userPromptChunks []string, expressionMappings []*ExpressionMapping, data *WorkflowData) []*ExpressionMapping { //nolint:largefunc // Existing prompt generation preserves emitted YAML ordering.
 	unifiedPromptLog.Print("Generating unified prompt creation step")
 	unifiedPromptLog.Printf("Built-in sections: %d, User prompt chunks: %d", len(builtinSections), len(userPromptChunks))
 
@@ -475,7 +487,7 @@ func sharedToolBudget(family string, names []string, max *string) string {
 //
 // The static intro (gh CLI warning, temporary ID rules, noop note) lives in
 // actions/setup/md/safe_outputs_prompt.md and is included by the caller before these sections.
-func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *CommentMemoryConfig) []PromptSection {
+func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *CommentMemoryConfig) []PromptSection { //nolint:largefunc // Explicit tool checks keep the agent-facing list aligned with safe-output configuration.
 	if safeOutputs == nil {
 		safeOutputs = &SafeOutputsConfig{}
 	}
@@ -508,6 +520,27 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	}
 	if safeOutputs.CreateAgentSessions != nil {
 		tools = append(tools, toolWithMaxBudget("create_agent_session", safeOutputs.CreateAgentSessions.Max))
+	}
+	if safeOutputs.LinearCreateIssue != nil {
+		tools = append(tools, toolWithMaxBudget("linear_create_issue", safeOutputs.LinearCreateIssue.Max))
+	}
+	if safeOutputs.LinearAddComment != nil {
+		tools = append(tools, toolWithMaxBudget("linear_add_comment", safeOutputs.LinearAddComment.Max))
+	}
+	if safeOutputs.LinearUpdateIssue != nil {
+		tools = append(tools, toolWithMaxBudget("linear_update_issue", safeOutputs.LinearUpdateIssue.Max))
+	}
+	if safeOutputs.JiraCreateIssue != nil {
+		tools = append(tools, toolWithMaxBudget("jira_create_issue", safeOutputs.JiraCreateIssue.Max))
+	}
+	if safeOutputs.JiraUpdateIssue != nil {
+		tools = append(tools, toolWithMaxBudget("jira_update_issue", safeOutputs.JiraUpdateIssue.Max))
+	}
+	if safeOutputs.JiraAddComment != nil {
+		tools = append(tools, toolWithMaxBudget("jira_add_comment", safeOutputs.JiraAddComment.Max))
+	}
+	if safeOutputs.JiraAddLabel != nil {
+		tools = append(tools, toolWithMaxBudget("jira_add_label", safeOutputs.JiraAddLabel.Max))
 	}
 	if safeOutputs.CreatePullRequests != nil {
 		tools = append(tools, toolWithMaxBudget("create_pull_request", safeOutputs.CreatePullRequests.Max))

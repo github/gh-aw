@@ -269,7 +269,7 @@ tool := &mcp.Tool{
 
 1. **JSON Schema Draft 2020-12 Extensions**
    - Watch for new draft features and adoption
-   - Enhanced validation capabilities
+   - Additional validation capabilities
    - Better documentation generation support
 
 2. **Performance Optimizations**
@@ -277,7 +277,7 @@ tool := &mcp.Tool{
    - Faster reflection-based type analysis
    - Reduced memory allocations
 
-3. **Enhanced Type Support**
+3. **Extended Type Support**
    - Better handling of Go's type system nuances
    - Support for more complex generic types
    - Custom scalar type mapping improvements

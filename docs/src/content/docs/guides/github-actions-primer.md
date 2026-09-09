@@ -27,7 +27,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run tests
         run: npm test
 ```
@@ -41,14 +41,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: npm run build
 
   test:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: npm test
 ```
 
@@ -59,7 +59,7 @@ jobs:
 ```yaml
 steps:
   # Action step - uses a pre-built action
-  - uses: actions/checkout@v6
+  - uses: actions/checkout@v7
 
   # Run step - executes a shell command
   - name: Install dependencies

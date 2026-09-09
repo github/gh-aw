@@ -27,17 +27,18 @@ graph LR
     WF[Workflow] --> CV[Centralized Validation]
     WF --> DV[Domain-Specific Validation]
     CV --> validation.go
-    DV --> strict_mode.go
+    DV --> strict_mode_validation.go
+    DV --> strict_mode_permissions_validation.go
     DV --> pip.go
     DV --> npm.go
-    DV --> expression_safety.go
+    DV --> expression_safety_validation.go
     DV --> engine.go
     DV --> mcp-config.go
 ```
 
 ### Centralized Validation
 
-**Location:** `pkg/workflow/validation.go` (782 lines)
+**Location:** `pkg/workflow/validation.go` (core compile-time checks)
 
 **Purpose:** General-purpose validation that applies across the entire workflow system
 
@@ -61,11 +62,11 @@ graph LR
 
 ### Domain-Specific Validation
 
-Domain-specific validation is organized into separate files:
+Domain-specific validation is organized into separate files in `pkg/workflow/`:
 
 #### Strict Mode Validation
 
-**Files:** `pkg/workflow/strict_mode.go`, `pkg/workflow/validation_strict_mode.go`
+**Files:** `pkg/workflow/strict_mode_validation.go` and the `strict_mode_*.go` validators
 
 Enforces security and safety constraints in strict mode:
 - `validateStrictPermissions()` - Refuses write permissions
@@ -77,9 +78,7 @@ Enforces security and safety constraints in strict mode:
 
 **File:** `pkg/workflow/pip.go`
 
-Validates Python package availability on PyPI:
-- `validatePipPackages()` - Validates pip packages
-- `validateUvPackages()` - Validates uv packages
+Validates Python package availability on PyPI.
 
 #### NPM Package Validation
 
@@ -89,16 +88,16 @@ Validates NPX package availability on npm registry.
 
 #### Expression Safety
 
-**File:** `pkg/workflow/expression_safety.go`
+**File:** `pkg/workflow/expression_safety_validation.go`
 
-Validates GitHub Actions expression security with allowlist-based validation.
+Validates GitHub Actions expression security with allowlist-based validation. The matching test coverage lives in `pkg/workflow/expression_safety_test.go`.
 
 ### Validation Decision Tree
 
 ```mermaid
 graph TD
     A[New Validation Requirement] --> B{Security or strict mode?}
-    B -->|Yes| C[strict_mode.go]
+    B -->|Yes| C[strict_mode_validation.go]
     B -->|No| D{Only applies to one domain?}
     D -->|Yes| E{Domain-specific file exists?}
     E -->|Yes| F[Add to domain file]

@@ -1,0 +1,71 @@
+<svg width="720" height="300" viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="aw-safe-outputs-title aw-safe-outputs-desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+  <title id="aw-safe-outputs-title">Safe Outputs permission isolation</title>
+  <desc id="aw-safe-outputs-desc">The read-only agent job writes an agent_output.json artifact. A threat detection job analyzes the artifact for secret leaks and malicious patches. If approved, separate scoped safe-output jobs (create_issue, add_comment, create_pull_request) call the GitHub API; the agent itself never holds write permissions.</desc>
+
+  <rect x="0" y="0" width="720" height="300" fill="#ffffff"/>
+
+  <!-- Agent Job -->
+  <rect x="24" y="24" width="180" height="252" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+  <text x="114" y="46" text-anchor="middle" font-size="11" font-weight="600" fill="#59636e">AGENT JOB</text>
+  <text x="114" y="60" text-anchor="middle" font-size="9" fill="#59636e">read-only permissions</text>
+
+  <rect x="44" y="120" width="140" height="44" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="114" y="146" text-anchor="middle" font-size="11" fill="#1f2328">AI Agent</text>
+
+  <rect x="44" y="200" width="140" height="48" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="114" y="222" text-anchor="middle" font-size="10" fill="#1f2328">agent_output.json</text>
+  <text x="114" y="236" text-anchor="middle" font-size="9" fill="#59636e">(artifact)</text>
+
+  <line x1="114" y1="164" x2="114" y2="200" stroke="#1f2328" stroke-width="1"/>
+  <polygon points="114,200 110,192 118,192" fill="#1f2328"/>
+
+  <!-- arrow to detection -->
+  <line x1="204" y1="224" x2="250" y2="224" stroke="#1f2328" stroke-width="1"/>
+  <polygon points="250,224 242,220 242,228" fill="#1f2328"/>
+
+  <!-- Detection Job -->
+  <rect x="252" y="180" width="150" height="88" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+  <text x="327" y="200" text-anchor="middle" font-size="10" font-weight="600" fill="#59636e">THREAT DETECTION</text>
+  <text x="327" y="228" text-anchor="middle" font-size="9" fill="#1f2328">secret leaks</text>
+  <text x="327" y="242" text-anchor="middle" font-size="9" fill="#1f2328">malicious patches</text>
+
+  <!-- approved arrow (focal, blue) -->
+  <line x1="402" y1="210" x2="452" y2="210" stroke="#0969da" stroke-width="1.5"/>
+  <polygon points="452,210 444,206 444,214" fill="#0969da"/>
+  <text x="427" y="200" text-anchor="middle" font-size="8" fill="#0969da">approved</text>
+
+  <!-- blocked arrow -->
+  <line x1="327" y1="180" x2="327" y2="88" stroke="#59636e" stroke-width="1"/>
+  <polygon points="327,88 323,96 331,96" fill="#59636e"/>
+  <text x="358" y="128" text-anchor="middle" font-size="8" fill="#59636e">blocked</text>
+  <rect x="272" y="56" width="110" height="30" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text x="327" y="75" text-anchor="middle" font-size="9" fill="#1f2328">Workflow fails</text>
+
+  <!-- Safe Output Jobs -->
+  <rect x="454" y="24" width="150" height="252" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+  <text x="529" y="46" text-anchor="middle" font-size="11" font-weight="600" fill="#59636e">SAFE OUTPUT JOBS</text>
+  <text x="529" y="60" text-anchor="middle" font-size="9" fill="#59636e">scoped write permissions</text>
+
+  <rect x="474" y="80" width="110" height="34" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="529" y="101" text-anchor="middle" font-size="9" fill="#1f2328">create_issue</text>
+
+  <rect x="474" y="126" width="110" height="34" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="529" y="147" text-anchor="middle" font-size="9" fill="#1f2328">add_comment</text>
+
+  <rect x="474" y="172" width="110" height="34" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="529" y="189" text-anchor="middle" font-size="9" fill="#1f2328">create_pull_request</text>
+
+  <!-- arrows from detection to jobs -->
+  <path d="M452,210 L464,210 L464,97" fill="none" stroke="#0969da" stroke-width="1"/>
+  <line x1="464" y1="97" x2="474" y2="97" stroke="#0969da" stroke-width="1"/>
+  <line x1="464" y1="143" x2="474" y2="143" stroke="#0969da" stroke-width="1"/>
+  <line x1="464" y1="189" x2="474" y2="189" stroke="#0969da" stroke-width="1"/>
+
+  <!-- GitHub API -->
+  <rect x="628" y="120" width="80" height="60" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+  <text x="668" y="145" text-anchor="middle" font-size="9" fill="#1f2328">GitHub</text>
+  <text x="668" y="159" text-anchor="middle" font-size="9" fill="#1f2328">API</text>
+
+  <line x1="584" y1="150" x2="628" y2="150" stroke="#1f2328" stroke-width="1"/>
+  <polygon points="628,150 620,146 620,154" fill="#1f2328"/>
+</svg>

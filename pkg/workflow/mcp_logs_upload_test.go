@@ -11,7 +11,7 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-func TestMCPLogsUpload(t *testing.T) {
+func TestPlaywrightCLIArtifactsUpload(t *testing.T) {
 	// Create a temporary directory for the test
 	tmpDir := testutil.TempDir(t, "test-*")
 
@@ -55,18 +55,12 @@ Please navigate to example.com and take a screenshot.
 
 	lockContentStr := string(lockContent)
 
-	// Verify Playwright MCP configuration uses official Docker image
-	if !strings.Contains(lockContentStr, "mcr.microsoft.com/playwright/mcp") {
-		t.Error("Expected Playwright MCP configuration to include official Docker image 'mcr.microsoft.com/playwright/mcp'")
+	if strings.Contains(lockContentStr, "mcr.microsoft.com/playwright/mcp") {
+		t.Error("Expected compiled workflow not to contain the removed Playwright MCP image")
 	}
 
-	// Verify the playwright output directory is pre-created and made writable so the Docker container
-	// (which runs as a non-root user) can write screenshots to the mounted volume path
-	if !strings.Contains(lockContentStr, "mkdir -p /tmp/gh-aw/mcp-logs/playwright") {
-		t.Error("Expected 'mkdir -p /tmp/gh-aw/mcp-logs/playwright' in Start MCP Gateway step to pre-create screenshot directory")
-	}
-	if !strings.Contains(lockContentStr, "chmod 777 /tmp/gh-aw/mcp-logs/playwright") {
-		t.Error("Expected 'chmod 777 /tmp/gh-aw/mcp-logs/playwright' in Start MCP Gateway step so non-root Docker user can write screenshots")
+	if !strings.Contains(lockContentStr, "npm install -g @playwright/cli@") {
+		t.Error("Expected compiled workflow to install Playwright CLI")
 	}
 
 	// Verify MCP logs are uploaded via the unified artifact upload

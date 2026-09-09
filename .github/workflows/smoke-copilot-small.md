@@ -23,6 +23,7 @@ engine:
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
+  - shared/playwright-title-test.md
 tools:
   bash:
     - "*"

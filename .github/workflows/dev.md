@@ -12,7 +12,7 @@ name: Dev
 description: Daily status report for gh-aw project
 timeout-minutes: 30
 strict: false
-model: gpt-5.4
+model: gpt-5.3-codex
 engine:
   id: codex
 permissions:
@@ -30,7 +30,7 @@ imports:
   - shared/reporting.md
 tools:
   github:
-    mode: gh-proxy
+    mode: local
   cli-proxy: true
 
 evals:
@@ -40,7 +40,7 @@ evals:
     question: Did the agent create a daily status report with relevant project updates?
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 <!--

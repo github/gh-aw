@@ -11,7 +11,6 @@
 package workflow
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -23,8 +22,6 @@ import (
 )
 
 var sandboxValidationLog = logger.New("workflow:sandbox_validation")
-
-const minSandboxDisableJustificationLength = 20
 
 var githubActionsExpressionPattern = regexp.MustCompile(`\$\{\{[\s\S]*\}\}`)
 var mcpGatewayEnvNamePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
@@ -77,7 +74,7 @@ func validateMountsSyntax(mounts []string) error {
 
 // validateSandboxConfig validates the sandbox configuration
 // Returns an error if the configuration is invalid
-func validateSandboxConfig(workflowData *WorkflowData) error {
+func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefunc // Existing sandbox validation remains centralized.
 	if workflowData == nil {
 		return nil
 	}
@@ -89,22 +86,20 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 	sandboxConfig := workflowData.SandboxConfig
 
 	// Check if sandbox.agent: false was specified
-	// This requires the "dangerously-disable-sandbox-agent" feature to include a
-	// justification string. Without a valid justification, disabling the sandbox
-	// is a validation error.
+	// This requires the "dangerously-disable-sandbox-agent" feature to be explicitly enabled.
 	if sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
-		justification, err := getSandboxDisableJustification(workflowData)
-		if err != nil {
-			flag := string(constants.DangerouslyDisableSandboxAgentFeatureFlag)
+		flag := string(constants.DangerouslyDisableSandboxAgentFeatureFlag)
+		value, found := getFeatureValueCaseInsensitive(workflowData.Features, flag)
+		enabled, isBoolean := value.(bool)
+		if !found || !isBoolean || !enabled {
 			return NewValidationError(
 				"sandbox.agent",
 				"false",
-				fmt.Sprintf("disabling the agent sandbox removes a trust boundary: '%s' must be a literal justification string (%d+ chars, no expressions): %v", flag, minSandboxDisableJustificationLength, err),
-				fmt.Sprintf("Add the feature value to your workflow frontmatter:\n\nfeatures:\n  %s: \"controlled environment with no internet access\"\nsandbox:\n  agent: false\n\nSee: %s", flag, constants.DocsSandboxURL),
+				fmt.Sprintf("disabling the agent sandbox removes a trust boundary and requires 'features.%s: true'", flag),
+				fmt.Sprintf("Explicitly enable the dangerous sandbox opt-out:\n\nfeatures:\n  %s: true\nsandbox:\n  agent: false\n\nSee: %s", flag, constants.DocsSandboxURL),
 			)
 		}
-		sandboxConfig.Agent.DisableReason = justification
-		sandboxValidationLog.Printf("sandbox.agent: false permitted by %s justification: %q", constants.DangerouslyDisableSandboxAgentFeatureFlag, justification)
+		sandboxValidationLog.Printf("sandbox.agent: false permitted by features.%s: true", flag)
 
 		if workflowData.EngineConfig != nil &&
 			workflowData.EngineConfig.ID == string(constants.CodexEngine) &&
@@ -278,6 +273,23 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 			return err
 		}
 		sandboxValidationLog.Printf("Validated MCP gateway port: %d", sandboxConfig.MCP.Port)
+		// Dynamic enclave delegation derives a private control-plane port by adding
+		// enclaveDelegationControlPortOffset to this data-plane port (see
+		// buildMCPGatewayContainerCommand/writeMCPGatewayExports). Reject configured
+		// ports that would push the derived control port past the valid TCP range,
+		// rather than silently emitting an unusable MCP_GATEWAY_DELEGATION_CONTROL_LISTEN
+		// value at runtime.
+		if enclaveDynamicRepositoryPolicyEnabled(workflowData) &&
+			sandboxConfig.MCP.Port+enclaveDelegationControlPortOffset > constants.MaxNetworkPort {
+			return NewConfigurationError(
+				"sandbox.mcp.port",
+				strconv.Itoa(sandboxConfig.MCP.Port),
+				fmt.Sprintf("port must leave room for the dynamic enclave delegation control port (port+%d) within the valid TCP range (%d-%d)",
+					enclaveDelegationControlPortOffset, constants.MinNetworkPort, constants.MaxNetworkPort),
+				fmt.Sprintf("Choose a sandbox.mcp.port no greater than %d, or remove the custom port to use the default.",
+					constants.MaxNetworkPort-enclaveDelegationControlPortOffset),
+			)
+		}
 	}
 
 	if sandboxConfig.MCP != nil {
@@ -416,44 +428,6 @@ func validateSandboxRuntimeProfile(workflowData *WorkflowData, agentConfig *Agen
 	}
 
 	return nil
-}
-
-func getSandboxDisableJustification(workflowData *WorkflowData) (string, error) {
-	if workflowData == nil || workflowData.Features == nil {
-		return "", errors.New("features block is missing dangerously-disable-sandbox-agent configuration. Expected a non-empty string justification under features when sandbox.agent is false. Example:\nfeatures:\n  dangerously-disable-sandbox-agent: \"Temporary migration while hardening container profile\"")
-	}
-
-	flagName := string(constants.DangerouslyDisableSandboxAgentFeatureFlag)
-	value, found := getFeatureValueCaseInsensitive(workflowData.Features, flagName)
-	if !found {
-		return "", errors.New("dangerously-disable-sandbox-agent key is missing from features. Expected a non-empty string justification under features when sandbox.agent is false. Example:\nfeatures:\n  dangerously-disable-sandbox-agent: \"Temporary migration while hardening container profile\"")
-	}
-
-	justification, ok := value.(string)
-	if !ok {
-		return "", NewValidationError(
-			"features.dangerously-disable-sandbox-agent",
-			fmt.Sprintf("%T", value),
-			"dangerously-disable-sandbox-agent feature value must be a string justification",
-			"Provide a string justification.\n\nExample:\nfeatures:\n  dangerously-disable-sandbox-agent: \"Temporary migration while hardening container profile\"",
-		)
-	}
-
-	trimmed := strings.TrimSpace(justification)
-	if len(trimmed) < minSandboxDisableJustificationLength {
-		return "", NewValidationError(
-			"features.dangerously-disable-sandbox-agent",
-			trimmed,
-			fmt.Sprintf("dangerously-disable-sandbox-agent justification is shorter than %d characters", minSandboxDisableJustificationLength),
-			fmt.Sprintf("Provide a descriptive justification string with at least %d characters.\n\nExample:\nfeatures:\n  dangerously-disable-sandbox-agent: \"Temporary migration while hardening container profile\"", minSandboxDisableJustificationLength),
-		)
-	}
-
-	if githubActionsExpressionPattern.MatchString(trimmed) {
-		return "", errors.New("dangerously-disable-sandbox-agent justification uses a GitHub Actions expression. Expected a literal explanatory string, not an expression. Example:\nfeatures:\n  dangerously-disable-sandbox-agent: \"Temporary migration while hardening container profile\"")
-	}
-
-	return trimmed, nil
 }
 
 func getFeatureValueCaseInsensitive(features map[string]any, flagName string) (any, bool) {

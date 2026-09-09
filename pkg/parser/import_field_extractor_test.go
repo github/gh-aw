@@ -991,6 +991,19 @@ func TestToImportsResult_MergedExcludedEnv(t *testing.T) {
 	assert.Equal(t, []string{"MY_TOKEN"}, result.MergedExcludedEnv)
 }
 
+func TestExtractConcurrencyJobDiscriminator_FirstImportWins(t *testing.T) {
+	acc := newImportAccumulator()
+	acc.extractConcurrencyJobDiscriminator(map[string]any{
+		"concurrency": map[string]any{"job-discriminator": "${{ inputs.first_id }}"},
+	}, "first.md")
+	acc.extractConcurrencyJobDiscriminator(map[string]any{
+		"concurrency": map[string]any{"job-discriminator": "${{ inputs.second_id }}"},
+	}, "second.md")
+
+	result := acc.toImportsResult(nil)
+	assert.Equal(t, "${{ inputs.first_id }}", result.MergedJobDiscriminator)
+}
+
 // TestValidateGitHubAppJSON verifies that validateGitHubAppJSON accepts well-formed
 // GitHub App configuration JSON with the required identity and key fields, and
 // rejects empty, malformed, or incomplete input.

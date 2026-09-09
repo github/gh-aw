@@ -38,6 +38,15 @@ mcp-scripts:
       # JSON fields to fetch
       JSON_FIELDS="number,title,state,author,createdAt,updatedAt,closedAt,body,labels,assignees,comments,milestone,url"
       
+      OUTPUT_FILE=$(mktemp)
+      PAGE_OUTPUT_FILE=""
+      MERGED_OUTPUT_FILE=""
+      FILTERED_OUTPUT_FILE=""
+      cleanup() {
+        rm -f "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" "$MERGED_OUTPUT_FILE" "$FILTERED_OUTPUT_FILE"
+      }
+      trap cleanup EXIT
+
       # Fetch all items updated in a date window. REST results are ordered by
       # updated time, so stop only after reaching the requested boundary.
       if [[ -n "$SINCE" ]]; then
@@ -52,32 +61,44 @@ mcp-scripts:
           API_PATH="repos/${GITHUB_REPOSITORY}/issues"
         fi
         PAGE=1
-        OUTPUT="[]"
+        echo '[]' > "$OUTPUT_FILE"
         while :; do
-          PAGE_OUTPUT=$(gh api "${API_PATH}?state=${STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}")
-          [[ "$(jq 'length' <<< "$PAGE_OUTPUT")" -eq 0 ]] && break
-          OUTPUT=$(jq -cn --argjson all "$OUTPUT" --argjson page "$PAGE_OUTPUT" '$all + $page')
-          [[ "$(jq -r '.[-1].updated_at' <<< "$PAGE_OUTPUT")" < "$SINCE" ]] && break
+          PAGE_OUTPUT_FILE=$(mktemp)
+          gh api "${API_PATH}?state=${STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}" > "$PAGE_OUTPUT_FILE"
+          [[ "$(jq 'length' < "$PAGE_OUTPUT_FILE")" -eq 0 ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
+          MERGED_OUTPUT_FILE=$(mktemp)
+          jq -s '.[0] + .[1]' "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$MERGED_OUTPUT_FILE"
+          mv "$MERGED_OUTPUT_FILE" "$OUTPUT_FILE"
+          MERGED_OUTPUT_FILE=""
+          [[ "$(jq -r '.[-1].updated_at' < "$PAGE_OUTPUT_FILE")" < "$SINCE" ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
+          rm -f "$PAGE_OUTPUT_FILE"
+          PAGE_OUTPUT_FILE=""
           PAGE=$((PAGE + 1))
         done
-        OUTPUT=$(jq --arg since "$SINCE" '[.[] | select(.pull_request == null and .updated_at >= $since) | {
+        FILTERED_OUTPUT_FILE=$(mktemp)
+        jq --arg since "$SINCE" '[.[] | select(.pull_request == null and .updated_at >= $since) | {
           number, title, state: (.state | ascii_upcase), author: .user, createdAt: .created_at,
           updatedAt: .updated_at, closedAt: .closed_at, body, labels, assignees,
           comments: {totalCount: .comments}, milestone, url: .html_url
-        }]' <<< "$OUTPUT")
+        }]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+        mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
+        FILTERED_OUTPUT_FILE=""
       elif [[ -n "$REPO" ]]; then
-        OUTPUT=$(gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO")
+        gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO" > "$OUTPUT_FILE"
       else
-        OUTPUT=$(gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS")
+        gh issue list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" > "$OUTPUT_FILE"
       fi
       
       # Apply jq filter if specified
       if [[ -n "$JQ_FILTER" ]]; then
-        jq "$JQ_FILTER" <<< "$OUTPUT"
+        jq "$JQ_FILTER" "$OUTPUT_FILE"
       else
         # Return schema and size instead of full data
-        ITEM_COUNT=$(jq 'length' <<< "$OUTPUT")
-        DATA_SIZE=${#OUTPUT}
+        ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
+        DATA_SIZE=$(wc -c < "$OUTPUT_FILE" | tr -d '[:space:]')
+        if [[ "$DATA_SIZE" -gt 0 ]]; then
+          DATA_SIZE=$((DATA_SIZE - 1))
+        fi
         
         # Validate values are numeric
         if ! [[ "$ITEM_COUNT" =~ ^[0-9]+$ ]]; then
@@ -162,6 +183,15 @@ mcp-scripts:
       # JSON fields to fetch
       JSON_FIELDS="number,title,state,author,createdAt,updatedAt,mergedAt,closedAt,headRefName,baseRefName,isDraft,reviewDecision,additions,deletions,changedFiles,labels,assignees,reviewRequests,url"
       
+      OUTPUT_FILE=$(mktemp)
+      PAGE_OUTPUT_FILE=""
+      MERGED_OUTPUT_FILE=""
+      FILTERED_OUTPUT_FILE=""
+      cleanup() {
+        rm -f "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" "$MERGED_OUTPUT_FILE" "$FILTERED_OUTPUT_FILE"
+      }
+      trap cleanup EXIT
+
       # Fetch all items updated in a date window. REST results are ordered by
       # updated time, so stop only after reaching the requested boundary.
       if [[ -n "$SINCE" ]]; then
@@ -178,33 +208,45 @@ mcp-scripts:
         REST_STATE="$STATE"
         [[ "$STATE" == "merged" ]] && REST_STATE="closed"
         PAGE=1
-        OUTPUT="[]"
+        echo '[]' > "$OUTPUT_FILE"
         while :; do
-          PAGE_OUTPUT=$(gh api "${API_PATH}?state=${REST_STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}")
-          [[ "$(jq 'length' <<< "$PAGE_OUTPUT")" -eq 0 ]] && break
-          OUTPUT=$(jq -cn --argjson all "$OUTPUT" --argjson page "$PAGE_OUTPUT" '$all + $page')
-          [[ "$(jq -r '.[-1].updated_at' <<< "$PAGE_OUTPUT")" < "$SINCE" ]] && break
+          PAGE_OUTPUT_FILE=$(mktemp)
+          gh api "${API_PATH}?state=${REST_STATE}&sort=updated&direction=desc&per_page=100&page=${PAGE}" > "$PAGE_OUTPUT_FILE"
+          [[ "$(jq 'length' < "$PAGE_OUTPUT_FILE")" -eq 0 ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
+          MERGED_OUTPUT_FILE=$(mktemp)
+          jq -s '.[0] + .[1]' "$OUTPUT_FILE" "$PAGE_OUTPUT_FILE" > "$MERGED_OUTPUT_FILE"
+          mv "$MERGED_OUTPUT_FILE" "$OUTPUT_FILE"
+          MERGED_OUTPUT_FILE=""
+          [[ "$(jq -r '.[-1].updated_at' < "$PAGE_OUTPUT_FILE")" < "$SINCE" ]] && { rm -f "$PAGE_OUTPUT_FILE"; PAGE_OUTPUT_FILE=""; break; }
+          rm -f "$PAGE_OUTPUT_FILE"
+          PAGE_OUTPUT_FILE=""
           PAGE=$((PAGE + 1))
         done
-        OUTPUT=$(jq --arg since "$SINCE" --arg state "$STATE" '[.[] | select(.updated_at >= $since and ($state != "merged" or .merged_at != null)) | {
+        FILTERED_OUTPUT_FILE=$(mktemp)
+        jq --arg since "$SINCE" --arg state "$STATE" '[.[] | select(.updated_at >= $since and ($state != "merged" or .merged_at != null)) | {
           number, title, state: (.state | ascii_upcase), author: .user, createdAt: .created_at,
           updatedAt: .updated_at, mergedAt: .merged_at, closedAt: .closed_at,
           headRefName: .head.ref, baseRefName: .base.ref, isDraft: .draft, labels, assignees,
           additions, deletions, changedFiles: .changed_files, url: .html_url
-        }]' <<< "$OUTPUT")
+        }]' "$OUTPUT_FILE" > "$FILTERED_OUTPUT_FILE"
+        mv "$FILTERED_OUTPUT_FILE" "$OUTPUT_FILE"
+        FILTERED_OUTPUT_FILE=""
       elif [[ -n "$REPO" ]]; then
-        OUTPUT=$(gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO")
+        gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" --repo "$REPO" > "$OUTPUT_FILE"
       else
-        OUTPUT=$(gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS")
+        gh pr list --state "$STATE" --limit "$LIMIT" --json "$JSON_FIELDS" > "$OUTPUT_FILE"
       fi
       
       # Apply jq filter if specified
       if [[ -n "$JQ_FILTER" ]]; then
-        jq "$JQ_FILTER" <<< "$OUTPUT"
+        jq "$JQ_FILTER" "$OUTPUT_FILE"
       else
         # Return schema and size instead of full data
-        ITEM_COUNT=$(jq 'length' <<< "$OUTPUT")
-        DATA_SIZE=${#OUTPUT}
+        ITEM_COUNT=$(jq 'length' < "$OUTPUT_FILE")
+        DATA_SIZE=$(wc -c < "$OUTPUT_FILE" | tr -d '[:space:]')
+        if [[ "$DATA_SIZE" -gt 0 ]]; then
+          DATA_SIZE=$((DATA_SIZE - 1))
+        fi
         
         # Validate values are numeric
         if ! [[ "$ITEM_COUNT" =~ ^[0-9]+$ ]]; then

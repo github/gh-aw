@@ -61,7 +61,7 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
     - `difc-proxy: true` - Enable DIFC (Data Integrity and Flow Control) proxy injection. When set alongside `tools.github.min-integrity`, injects proxy steps around the agent for full network-boundary integrity enforcement.
     - `cli-proxy: true` - Enable AWF CLI proxy sidecar for secure read-only `gh` CLI access without exposing `GITHUB_TOKEN` (requires AWF v0.26.0+). Prerequisite for `integrity-reactions`; the compiler enables it automatically when `integrity-reactions: true` is set.
     - `integrity-reactions: true` - Enable reaction-based integrity promotion/demotion. Maintainers can use 👍/❤️ reactions to promote content to `approved` and 👎/😕 to demote it to `none`. Compiler automatically enables `cli-proxy`. Requires `tools.github.min-integrity` to be set and MCPG >= v0.2.18. Defaults: endorsement reactions THUMBS_UP/HEART, disapproval reactions THUMBS_DOWN/CONFUSED, endorser-min-integrity: approved, disapproval-integrity: none.
-    - `dangerously-disable-sandbox-agent: "<justification>"` - Required when `sandbox.agent: false` is set. Must be a plain string justification (minimum 20 characters; expressions are not allowed) that explains why disabling the sandbox is safe for this workflow.
+    - `dangerously-disable-sandbox-agent: true` - Required when `sandbox.agent: false` is set. This opt-out is rejected in strict mode.
 
 - **`experiments:`** - A/B testing experiments for balanced variant selection (object)
   - Maps experiment names to variant lists (bare array) or full config objects
@@ -218,6 +218,17 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
     checkout: false
     ```
 
+  - Target-only checkout for sidecar/MultiRepoOps workflows: set `permissions.contents: none` to skip only the automatic workflow-repository checkout while still checking out other explicitly configured `checkout:` entries (e.g. a target repository). Unlike `checkout: false`, additional checkout entries are unaffected:
+
+    ```yaml
+    permissions:
+      contents: none
+    checkout:
+      - repository: octo-org/target-repository
+        path: target
+        github-token: ${{ secrets.TARGET_REPO_PAT }}
+    ```
+
   - Single checkout (object):
 
     ```yaml
@@ -318,13 +329,14 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 
   - When `engine.env` sets `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` (custom provider endpoints, e.g. OpenRouter), `model-fallback` is disabled automatically so provider-specific model slugs pass through verbatim; set it explicitly to override.
 
-  - To disable the agent firewall while keeping MCP gateway enabled, you must provide the dangerous-disable justification feature:
+  - To disable the agent firewall while keeping MCP gateway enabled, set `strict: false` and enable the dangerous sandbox opt-out:
 
     ```yaml
     features:
-      dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+      dangerously-disable-sandbox-agent: true
     sandbox:
       agent: false
+    strict: false
     ```
 
   - **`sandbox.agent.runtime`** (string) selects the sandbox security and topology profile: `docker` (default: rootless AWF with network isolation), `docker-sudo-iptables` (privileged AWF with legacy iptables networking and host/service access), `gvisor` (gVisor `runsc` kernel-level isolation), `docker-sbx` (KVM microVM), or `cloud-hypervisor` (preview KVM runtime). Omitting the field is equivalent to `docker`. gVisor and Docker sbx are incompatible with `runner.topology: arc-dind`; the compiler derives the privileged setup each runtime needs. Docker sbx also requires `DOCKER_PAT`/`DOCKER_USERNAME` secrets and a KVM-capable runner when runtime installation is enabled.

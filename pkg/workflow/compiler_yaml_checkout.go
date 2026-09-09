@@ -195,7 +195,7 @@ func (c *Compiler) generateRepositoryImportCheckouts(yaml *strings.Builder, repo
 
 		// Generate a sanitized directory name for the checkout
 		// Use a consistent format: owner-repo-ref
-		// NOTE: Path must be relative to GITHUB_WORKSPACE for actions/checkout@v6
+		// NOTE: Path must be relative to GITHUB_WORKSPACE for actions/checkout@v7
 		sanitizedRef := sanitizeRefForPath(ref)
 		checkoutPath := fmt.Sprintf(".github/aw/imports/%s-%s-%s", owner, repo, sanitizedRef)
 

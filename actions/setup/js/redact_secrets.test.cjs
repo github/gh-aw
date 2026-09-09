@@ -434,6 +434,20 @@ describe("redact_secrets.cjs", () => {
         });
       });
 
+      describe("Linear tokens", () => {
+        it("should redact Linear API keys", async () => {
+          const testFile = path.join(tempDir, "test.txt");
+          const linearKey = "lin_api_" + "C".repeat(40);
+          fs.writeFileSync(testFile, `Linear Key: ${linearKey}`);
+          process.env.GH_AW_SECRET_NAMES = "";
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+          await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          const redacted = fs.readFileSync(testFile, "utf8");
+          expect(redacted).toBe("Linear Key: ***REDACTED***");
+          expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Linear API Key"));
+        });
+      });
+
       describe("combined built-in and custom secrets", () => {
         it("should redact both built-in patterns and custom secrets", async () => {
           const testFile = path.join(tempDir, "test.txt");

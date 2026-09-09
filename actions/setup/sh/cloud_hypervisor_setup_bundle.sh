@@ -6,8 +6,7 @@ set +o histexpand
 #
 # Outputs (GITHUB_OUTPUT):
 #   binary_path, virtiofsd_path, kernel_path, rootfs_path, supervisor_path
-#   binary_sha256, virtiofsd_sha256, kernel_sha256, rootfs_sha256,
-#   supervisor_sha256
+#   manifest_path, manifest_bundle_path, release_tag
 
 set -euo pipefail
 
@@ -17,14 +16,39 @@ if [[ -z "${GH_AW_AWF_VERSION:-}" ]]; then
 fi
 
 version="${GH_AW_AWF_VERSION}"
-if [[ "${version}" != v* ]]; then
+if [[ "${version,,}" == "latest" ]]; then
+  # GitHub has no "releases/download/latest/<asset>" URL: only
+  # "releases/latest/download/<asset>" resolves the latest release, and it
+  # does not reveal the resolved tag. Resolve the concrete release tag up
+  # front so every subsequent step (asset URLs, manifest release-tag
+  # comparison) operates on a single explicit, verifiable version.
+  echo "::group::Resolve latest cloud-hypervisor release tag"
+  auth_header=()
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    auth_header=(-H "Authorization: token ${GH_TOKEN}")
+  elif [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    auth_header=(-H "Authorization: token ${GITHUB_TOKEN}")
+  fi
+  if ! latest_release_json="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/github/gh-aw-firewall/releases/latest")"; then
+    echo "::error::failed to resolve the latest gh-aw-firewall release tag: could not reach the GitHub releases API"
+    exit 1
+  fi
+  version="$(jq -r '.tag_name // empty' <<<"${latest_release_json}")"
+  if [[ -z "${version}" ]]; then
+    echo "::error::failed to resolve the latest gh-aw-firewall release tag: no tag_name in API response"
+    exit 1
+  fi
+  echo "resolved latest release tag: ${version}"
+  echo "::endgroup::"
+elif [[ "${version}" != v* ]]; then
   version="v${version}"
 fi
 
 asset_base_url="https://github.com/github/gh-aw-firewall/releases/download/${version}"
 asset_name="cloud-hypervisor-test-x86_64.tar.gz"
-checksums_name="cloud-hypervisor-test-x86_64.SHA256SUMS"
 manifest_name="cloud-hypervisor-test-x86_64.manifest.json"
+manifest_bundle_name="cloud-hypervisor-test-x86_64.manifest.sigstore.jsonl"
 
 bundle_root="${RUNNER_TEMP}/gh-aw/cloud-hypervisor/${version}"
 extract_dir="${bundle_root}/bundle"
@@ -32,8 +56,8 @@ mkdir -p "${bundle_root}" "${extract_dir}"
 
 echo "::group::Download cloud-hypervisor bundle (${version})"
 curl -fsSL -o "${bundle_root}/${asset_name}" "${asset_base_url}/${asset_name}"
-curl -fsSL -o "${bundle_root}/${checksums_name}" "${asset_base_url}/${checksums_name}"
 curl -fsSL -o "${bundle_root}/${manifest_name}" "${asset_base_url}/${manifest_name}"
+curl -fsSL -o "${bundle_root}/${manifest_bundle_name}" "${asset_base_url}/${manifest_bundle_name}"
 echo "downloaded release assets"
 echo "::endgroup::"
 
@@ -60,8 +84,6 @@ tar --no-same-owner --no-same-permissions -xzf "${archive_path}" -C "${extract_d
 echo "bundle extracted to ${extract_dir}"
 echo "::endgroup::"
 
-sha_file="${bundle_root}/${checksums_name}"
-
 resolve_path() {
   local rel="$1"
   if [[ -z "${rel}" ]]; then
@@ -87,32 +109,6 @@ resolve_path() {
   fi
 
   return 1
-}
-
-lookup_sha256() {
-  local rel="$1"
-  local full="$2"
-  local candidate
-  for candidate in "${rel#./}" "$(basename "${rel#./}")" "${full#"${bundle_root}"/}" "${full#"${extract_dir}"/}"; do
-    local sum
-    sum="$(awk -v target="${candidate}" '{sub(/^\.\//, "", $2); if ($2==target) {print $1; exit}}' "${sha_file}")"
-    if [[ -n "${sum}" ]]; then
-      echo "${sum}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-verify_sha256() {
-  local expected="$1"
-  local file="$2"
-  local actual
-  actual="$(sha256sum "${file}" | awk '{print $1}')"
-  if [[ "${actual}" != "${expected}" ]]; then
-    echo "::error::checksum verification failed for ${file}"
-    exit 1
-  fi
 }
 
 validate_extracted_file() {
@@ -159,46 +155,35 @@ if [[ "$(dirname "${binary_path}")" != "$(dirname "${virtiofsd_path}")" ]]; then
   exit 1
 fi
 
-binary_sha256="$(lookup_sha256 "${binary_rel}" "${binary_path}" || true)"
-kernel_sha256="$(lookup_sha256 "${kernel_rel}" "${kernel_path}" || true)"
-rootfs_sha256="$(lookup_sha256 "${rootfs_rel}" "${rootfs_path}" || true)"
-supervisor_sha256="$(lookup_sha256 "${supervisor_rel}" "${supervisor_path}" || true)"
-virtiofsd_sha256="$(lookup_sha256 "${virtiofsd_rel}" "${virtiofsd_path}" || true)"
-
-if [[ -z "${binary_sha256}" || -z "${kernel_sha256}" || -z "${rootfs_sha256}" || -z "${supervisor_sha256}" || -z "${virtiofsd_sha256}" ]]; then
-  echo "::error::failed to resolve one or more cloud-hypervisor SHA256 digests from ${checksums_name}"
-  exit 1
-fi
-
 manifest_path="${bundle_root}/${manifest_name}"
-if ! jq -e '
+manifest_bundle_path="${bundle_root}/${manifest_bundle_name}"
+if [[ ! -f "${manifest_path}" || -L "${manifest_path}" ]] || ! jq -e '
   .schemaVersion == 1
+  and .release.repository == "github/gh-aw-firewall"
+  and .release.workflow == "github/gh-aw-firewall/.github/workflows/release.yml"
+  and .release.tag == $releaseTag
+  and (.release.sourceCommit | type == "string" and test("^[0-9a-f]{40}$"))
   and .architecture == "x86_64"
-  and (.cloudHypervisor.version | type == "string" and length > 0)
-  and (.cloudHypervisor.binarySha256 | type == "string" and test("^[0-9A-Fa-f]{64}$"))
-  and (.virtiofsd.version | type == "string" and length > 0)
-  and (.virtiofsd.binarySha256 | type == "string" and test("^[0-9A-Fa-f]{64}$"))
-' "${manifest_path}" >/dev/null; then
-  echo "::error::${manifest_name} does not match the cloud-hypervisor release bundle contract"
-  exit 1
+  and (.artifacts.cloudHypervisor.file == "cloud-hypervisor")
+  and (.artifacts.virtiofsd.file == "virtiofsd")
+  and (.artifacts.kernel.file == "vmlinux.bin")
+  and (.artifacts.rootfs.file == "rootfs.ext4")
+  and (.artifacts.supervisor.file == "awf-supervisor")
+  and ([.artifacts[] | .sha256] | all(type == "string" and test("^[0-9A-Fa-f]{64}$")))
+' --arg releaseTag "${version}" "${manifest_path}" >/dev/null; then
+ echo "::error::${manifest_name} does not match the cloud-hypervisor release bundle contract"
+ exit 1
 fi
 
-manifest_binary_sha256="$(jq -r '.cloudHypervisor.binarySha256 | ascii_downcase' "${manifest_path}")"
-manifest_virtiofsd_sha256="$(jq -r '.virtiofsd.binarySha256 | ascii_downcase' "${manifest_path}")"
-if [[ "${manifest_binary_sha256}" != "${binary_sha256,,}" || "${manifest_virtiofsd_sha256}" != "${virtiofsd_sha256,,}" ]]; then
-  echo "::error::${manifest_name} digest fields do not match ${checksums_name}"
-  exit 1
+if [[ ! -f "${manifest_bundle_path}" || -L "${manifest_bundle_path}" ]] || ! jq -e -s '
+ length > 0 and all(.[]; type == "object" and .mediaType == "application/vnd.dev.sigstore.bundle.v0.3+json" and .verificationMaterial != null)
+' "${manifest_bundle_path}" >/dev/null; then
+ echo "::error::${manifest_bundle_name} is missing or malformed"
+ exit 1
 fi
 
-echo "::group::Verify cloud-hypervisor bundle checksums"
-verify_sha256 "${binary_sha256}" "${binary_path}"
-verify_sha256 "${kernel_sha256}" "${kernel_path}"
-verify_sha256 "${rootfs_sha256}" "${rootfs_path}"
-verify_sha256 "${supervisor_sha256}" "${supervisor_path}"
-verify_sha256 "${virtiofsd_sha256}" "${virtiofsd_path}"
 chmod 0755 "${binary_path}" "${supervisor_path}" "${virtiofsd_path}"
-echo "bundle checksums verified"
-echo "::endgroup::"
+chmod 0444 "${manifest_path}" "${manifest_bundle_path}"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
@@ -207,11 +192,9 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "rootfs_path=${rootfs_path}"
     echo "supervisor_path=${supervisor_path}"
     echo "virtiofsd_path=${virtiofsd_path}"
-    echo "binary_sha256=${binary_sha256}"
-    echo "kernel_sha256=${kernel_sha256}"
-    echo "rootfs_sha256=${rootfs_sha256}"
-    echo "supervisor_sha256=${supervisor_sha256}"
-    echo "virtiofsd_sha256=${virtiofsd_sha256}"
+    echo "manifest_path=${manifest_path}"
+    echo "manifest_bundle_path=${manifest_bundle_path}"
+    echo "release_tag=${version}"
   } >> "${GITHUB_OUTPUT}"
 fi
 if [[ -n "${GITHUB_ENV:-}" ]]; then
@@ -221,11 +204,9 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
     echo "GH_AW_CLOUD_HYPERVISOR_ROOTFS=${rootfs_path}"
     echo "GH_AW_CLOUD_HYPERVISOR_SUPERVISOR=${supervisor_path}"
     echo "GH_AW_CLOUD_HYPERVISOR_VIRTIOFSD=${virtiofsd_path}"
-    echo "GH_AW_CLOUD_HYPERVISOR_BINARY_SHA256=${binary_sha256}"
-    echo "GH_AW_CLOUD_HYPERVISOR_KERNEL_SHA256=${kernel_sha256}"
-    echo "GH_AW_CLOUD_HYPERVISOR_ROOTFS_SHA256=${rootfs_sha256}"
-    echo "GH_AW_CLOUD_HYPERVISOR_SUPERVISOR_SHA256=${supervisor_sha256}"
-    echo "GH_AW_CLOUD_HYPERVISOR_VIRTIOFSD_SHA256=${virtiofsd_sha256}"
+    echo "GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST=${manifest_path}"
+    echo "GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE=${manifest_bundle_path}"
+    echo "GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG=${version}"
   } >> "${GITHUB_ENV}"
 fi
 

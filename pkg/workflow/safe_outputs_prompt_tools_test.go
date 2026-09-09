@@ -109,6 +109,29 @@ func TestBuildSafeOutputsSectionsCustomTools(t *testing.T) {
 			expectedTools: []string{"add_comment", "create_issue", "noop", "deploy", "notify"},
 		},
 		{
+			name: "external issue tools appear in tools list",
+			safeOutputs: &SafeOutputsConfig{
+				LinearCreateIssue: &LinearCreateIssueConfig{},
+				LinearAddComment:  &LinearTargetConfig{},
+				LinearUpdateIssue: &LinearUpdateIssueConfig{},
+				JiraCreateIssue:   &JiraSafeOutputConfig{},
+				JiraUpdateIssue:   &JiraSafeOutputConfig{},
+				JiraAddComment:    &JiraSafeOutputConfig{},
+				JiraAddLabel:      &JiraSafeOutputConfig{},
+				NoOp:              &NoOpConfig{},
+			},
+			expectedTools: []string{
+				"linear_create_issue",
+				"linear_add_comment",
+				"linear_update_issue",
+				"jira_create_issue",
+				"jira_update_issue",
+				"jira_add_comment",
+				"jira_add_label",
+				"noop",
+			},
+		},
+		{
 			name: "mix of predefined tools, custom jobs, scripts, and actions all appear",
 			safeOutputs: &SafeOutputsConfig{
 				CreateIssues: &CreateIssuesConfig{},

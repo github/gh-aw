@@ -10,19 +10,19 @@ sandbox:
   agent:
     id: awf
   mcp:
-    version: v0.4.13
+    version: v0.4.15
 enclaves:
   - script:
     repos:
       - repo: octo-org/private-service
-        sensitivity: confidential
+        sensitivity: trusted
   - agent:
       model: gpt-5
       github:
         cli: issues-read-v1
     repos:
       - repo: octo-org/private-service
-        sensitivity: confidential
+        sensitivity: trusted
 timeout-minutes: 5
 ---
 

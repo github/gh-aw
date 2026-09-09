@@ -67,7 +67,9 @@ check_privilege_separation() {
     # Find all compiled workflow files
     find .github/workflows -name "*.lock.yml" | while read -r workflow; do
         # Check if agent job has write permissions
-        if grep -A 50 "^jobs:" "$workflow" | grep -A 20 "^\s*agent:" | grep -qE "issues:\s*write|pull-requests:\s*write|contents:\s*write"; then
+        jobs_section=$(grep -A 50 "^jobs:" "$workflow" 2>/dev/null || true)
+        agent_section=$(grep -A 20 "^\s*agent:" <<< "$jobs_section" 2>/dev/null || true)
+        if grep -qE "issues:\s*write|pull-requests:\s*write|contents:\s*write" <<< "$agent_section"; then
             log_critical "SEC-001: Agent job in $workflow has write permissions"
             failed=1
         fi
@@ -283,7 +285,8 @@ check_rfc2119() {
     
     # Check key sections have RFC 2119 keywords
     for section in "Security Architecture" "Configuration Semantics" "Execution Guarantees"; do
-        if ! grep -A 200 "## .*$section" "$spec_file" 2>/dev/null | grep -q "MUST\|SHALL\|SHOULD\|MAY"; then
+        section_text=$(grep -A 200 "## .*$section" "$spec_file" 2>/dev/null || true)
+        if ! grep -q "MUST\|SHALL\|SHOULD\|MAY" <<< "$section_text"; then
             log_medium "REQ-001: Section '$section' may lack RFC 2119 keywords"
             failed=1
         fi
@@ -307,7 +310,8 @@ check_type_completeness() {
         
         # Check for required sections
         for section in "MCP Tool Schema" "Operational Semantics" "Configuration Parameters" "Security Requirements" "Required Permissions"; do
-            if grep -A 200 "^#### Type: $type_name" "$spec_file" 2>/dev/null | grep -q "**$section**"; then
+            type_section=$(grep -A 200 "^#### Type: $type_name" "$spec_file" 2>/dev/null || true)
+            if grep -q "**$section**" <<< "$type_section"; then
                 ((sections_found += 1))
             fi
         done
@@ -333,7 +337,8 @@ check_verification_methods() {
     # Check key requirements have verification methods
     # Accept both bold (**Verification:**) and italic (*Verification*:) formats
     for req in "AR1" "AR2" "AR3" "SP1" "SP2" "SP3"; do
-        if ! grep -A 30 "\*\*Requirement $req:\|\*\*Property $req:" "$spec_file" 2>/dev/null | grep -qE "\*\*Verification\*\*:|\*Verification\*:|\*\*Formal Definition\*\*:|\*Formal Definition\*:"; then
+        req_section=$(grep -A 30 "\*\*Requirement $req:\|\*\*Property $req:" "$spec_file" 2>/dev/null || true)
+        if ! grep -qE "\*\*Verification\*\*:|\*Verification\*:|\*\*Formal Definition\*\*:|\*Formal Definition\*:" <<< "$req_section"; then
             log_low "REQ-003: Requirement $req may lack verification method"
             failed=1
         fi
@@ -478,7 +483,15 @@ def yaml_fields(struct_name):
 
 
 def properties(node):
-    result = dict(node.get("properties", {}))
+    result = {}
+    ref = node.get("$ref", "")
+    defs_prefix = "#/$defs/"
+    if ref.startswith(defs_prefix):
+        result.update(properties(schema["$defs"][ref[len(defs_prefix):]]))
+    for name, definition in node.get("properties", {}).items():
+        if name in result and result[name] != definition:
+            raise ValueError(f"conflicting schema definitions for property: {name}")
+        result[name] = definition
     for alternative in ("allOf", "anyOf", "oneOf"):
         for child in node.get(alternative, []):
             for name, definition in properties(child).items():
@@ -554,7 +567,8 @@ check_mce_constraint_disclosure() {
     fi
     
     # Verify add_comment description contains CONSTRAINTS or IMPORTANT keyword
-    if ! grep -A 5 '"add_comment"' "$tools_json" | grep -qE "CONSTRAINTS|IMPORTANT.*constraint|validation constraint"; then
+    add_comment_section=$(grep -A 5 '"add_comment"' "$tools_json" 2>/dev/null || true)
+    if ! grep -qE "CONSTRAINTS|IMPORTANT.*constraint|validation constraint" <<< "$add_comment_section"; then
         log_medium "MCE-001: add_comment tool description missing required CONSTRAINTS/IMPORTANT disclosure"
         failed=1
     fi
@@ -1771,7 +1785,8 @@ check_create_check_run_handler() {
             failed=1
         fi
         # Verify the target-conditional branch exists in the registry
-        if ! grep -A 15 '"create-check-run"' "$handler_registry" | grep -q "Target"; then
+        create_check_run_section=$(grep -A 15 '"create-check-run"' "$handler_registry" 2>/dev/null || true)
+        if ! grep -q "Target" <<< "$create_check_run_section"; then
             log_high "TYPE-008: create_check_run permission builder does not branch on Target field (Section 7.3 v1.23.0)"
             failed=1
         fi
@@ -1874,7 +1889,8 @@ check_wildcard_target_requirements() {
     fi
 
     # Check that the validation error is returned early before recording the operation
-    if ! grep -A 3 "validateWildcardTargetRequirement" "$gateway_handler" | grep -q "return wildcardTargetValidationError"; then
+    wildcard_validation_section=$(grep -A 3 "validateWildcardTargetRequirement" "$gateway_handler" 2>/dev/null || true)
+    if ! grep -q "return wildcardTargetValidationError" <<< "$wildcard_validation_section"; then
         log_critical "TYPE-010: Wildcard target validation error is not returned early before recording (Section 7.0.1)"
         failed=1
     fi

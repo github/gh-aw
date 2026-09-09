@@ -84,7 +84,7 @@ const (
 	// Workflow frontmatter usage:
 	//
 	//	features:
-	//	  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+	//	  dangerously-disable-sandbox-agent: true
 	DangerouslyDisableSandboxAgentFeatureFlag FeatureFlag = "dangerously-disable-sandbox-agent"
 	// GHAWDetectionFeatureFlag controls the external threat-detect binary detection path.
 	// The external detector is enabled by default. Set this flag to false to use

@@ -21,6 +21,7 @@ const { getAssignToAgentAssigned, getAssignToAgentErrors, getAssignToAgentErrorC
 const { createPrReviewBufferRegistry } = require("./pr_review_buffer.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
+const { parseIntTemplatable } = require("./templatable.cjs");
 const { createManifestLogger, ensureManifestExists, extractCreatedItemFromResult, writeTemporaryIdMapFile, writeSafeOutputErrorReport } = require("./safe_output_manifest.cjs");
 const { loadCustomSafeOutputJobTypes, loadCustomSafeOutputScriptHandlers, loadCustomSafeOutputActionHandlers, isStagedMode } = require("./safe_output_helpers.cjs");
 const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.cjs");
@@ -36,7 +37,14 @@ const GITHUB_TOKEN_CONFIG_KEY = "github-token";
  * Maps safe output types to their handler module file paths
  */
 const HANDLER_MAP = {
+  linear_create_issue: "./linear_create_issue.cjs",
+  linear_add_comment: "./linear_add_comment.cjs",
+  linear_update_issue: "./linear_update_issue.cjs",
   create_issue: "./create_issue.cjs",
+  jira_create_issue: "./jira_create_issue.cjs",
+  jira_update_issue: "./jira_update_issue.cjs",
+  jira_add_comment: "./jira_add_comment.cjs",
+  jira_add_label: "./jira_add_label.cjs",
   add_comment: "./add_comment.cjs",
   comment_memory: "./comment_memory.cjs",
   create_discussion: "./create_discussion.cjs",
@@ -44,6 +52,7 @@ const HANDLER_MAP = {
   close_discussion: "./close_discussion.cjs",
   add_labels: "./add_labels.cjs",
   remove_labels: "./remove_labels.cjs",
+  replace_label: "./replace_label.cjs",
   update_issue: "./update_issue.cjs",
   update_discussion: "./update_discussion.cjs",
   link_sub_issue: "./link_sub_issue.cjs",
@@ -83,6 +92,12 @@ const HANDLER_MAP = {
   report_incomplete: "./report_incomplete_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
+  ado_create_work_item: "./create_work_item.cjs",
+  ado_update_work_item: "./update_work_item.cjs",
+  ado_comment_on_work_item: "./comment_on_work_item.cjs",
+  ado_assign_work_item: "./assign_work_item.cjs",
+  ado_link_work_items: "./link_work_items.cjs",
+  ado_upload_workitem_attachment: "./upload_workitem_attachment.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
   update_project: "./update_project.cjs",
   upload_artifact: "./upload_artifact.cjs",
@@ -124,7 +139,12 @@ const WTD3_REQUIREMENT_ID = "WTD3";
  * @type {Set<string>}
  */
 const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
+  "linear_create_issue",
+  "linear_add_comment",
   "create_issue",
+  "jira_create_issue",
+  "jira_update_issue",
+  "jira_add_comment",
   "add_comment",
   "create_pull_request",
   "comment_memory",
@@ -145,6 +165,8 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "missing_data",
   "create_report_incomplete_issue",
   "report_incomplete",
+  "ado_create_work_item",
+  "ado_comment_on_work_item",
 ]);
 
 /**
@@ -163,6 +185,7 @@ const THREAT_WARNING_CONVERTIBLE_TYPES = new Map([["push_to_pull_request_branch"
  * @type {Set<string>}
  */
 const THREAT_WARNING_ABORT_TYPES = new Set([
+  "linear_update_issue",
   "noop",
   "close_issue",
   "link_sub_issue",
@@ -174,7 +197,9 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "resolve_pull_request_review_thread",
   "dismiss_pull_request_review",
   "add_labels",
+  "jira_add_label",
   "remove_labels",
+  "replace_label",
   "add_reviewer",
   "assign_milestone",
   "assign_to_agent",
@@ -193,6 +218,10 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "call_workflow",
   "autofix_code_scanning_alert",
   "create_agent_session",
+  "ado_update_work_item",
+  "ado_assign_work_item",
+  "ado_link_work_items",
+  "ado_upload_workitem_attachment",
 ]);
 
 /**
@@ -977,10 +1006,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
 
       // Unknown message type - warn the user
       const loadError = handlerLoadErrorsByHandlerMap.get(messageHandlers)?.get(messageType);
-      const loadErrorSuffix = loadError ? ` The handler was configured but failed to load: ${loadError}` : "";
-      core.warning(
-        `⚠️ No handler loaded for message type '${messageType}' (message ${i + 1}/${messages.length}). The message will be skipped. This may happen if the safe output type is not configured in the workflow's safe-outputs section.${loadErrorSuffix}`
-      );
+      const warning = loadError
+        ? `No handler available for message type '${messageType}' (message ${i + 1}/${messages.length}). The handler was configured but failed to load: ${loadError}`
+        : `No handler loaded for message type '${messageType}' (message ${i + 1}/${messages.length}). The message will be skipped. This may happen if the safe output type is not configured in the workflow's safe-outputs section.`;
+      core.warning(warning);
       results.push({
         type: messageType,
         messageIndex: i,
@@ -1095,6 +1124,11 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         });
         core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
       }
+      if (result && result.temporaryId && result.temporaryIdEntry) {
+        const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+        temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
+        core.info(`Registered Azure DevOps temporary ID: ${result.temporaryId}`);
+      }
 
       // If this was a successful upload_artifact, register the artifact URL so that
       // subsequent messages can have '#aw_ID' references replaced with the real URL.
@@ -1134,7 +1168,21 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       // Check if this output was created with unresolved temporary IDs
       // For create_issue, create_discussion, add_comment - check if body has unresolved IDs
 
-      // Handle add_comment which returns an array of comments
+      // Handle the current add_comment result shape.
+      if (messageType === "add_comment" && result?.commentId && result?.repo) {
+        const contentToCheck = getContentToCheck(messageType, message, result);
+        if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
+          core.info(`Comment ${result.commentId} on ${result.repo}#${result.itemNumber} was created with unresolved temporary IDs - tracking for update`);
+          outputsWithUnresolvedIds.push({
+            type: messageType,
+            message,
+            result,
+            originalTempIdMapSize: tempIdMapSizeBefore,
+          });
+        }
+      }
+
+      // Handle the legacy add_comment result shape.
       if (messageType === "add_comment" && Array.isArray(result)) {
         const contentToCheck = getContentToCheck(messageType, message, result);
         if (contentToCheck && hasUnresolvedTemporaryIds(contentToCheck, temporaryIdMap, artifactUrlMap)) {
@@ -1145,12 +1193,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
               outputsWithUnresolvedIds.push({
                 type: messageType,
                 message: message,
-                result: {
-                  commentId: comment._tracking.commentId,
-                  itemNumber: comment._tracking.itemNumber,
-                  repo: comment._tracking.repo,
-                  isDiscussion: comment._tracking.isDiscussion,
-                },
+                result: { ...comment._tracking, ...(comment.body ? { body: comment.body } : {}) },
                 originalTempIdMapSize: tempIdMapSizeBefore,
               });
             }
@@ -1285,6 +1328,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
                 originalTempIdMapSize: tempIdMapSizeBefore,
               });
             }
+            if (result && result.temporaryId && result.temporaryIdEntry) {
+              const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+              temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
+            }
           }
 
           // Update the result to success
@@ -1348,7 +1395,7 @@ function getContentToCheck(messageType, message, result) {
     case "create_discussion":
       return message.body || "";
     case "add_comment":
-      return message.body || "";
+      return result?.body || message.body || "";
     case "comment_memory":
       return result?.managedBody || message.body || "";
     case "create_pull_request":
@@ -1365,9 +1412,11 @@ function getContentToCheck(messageType, message, result) {
  * @param {string} repo - Repository in "owner/repo" format
  * @param {number} issueNumber - Issue number to update
  * @param {string} updatedBody - Updated body content with resolved temp IDs
+ * @param {string[]} [allowedMentionAliases] - Mention aliases allowed by the workflow
+ * @param {number} [maxMentions] - Maximum distinct allowed mentions to preserve
  * @returns {Promise<void>}
  */
-async function updateIssueBody(github, context, repo, issueNumber, updatedBody, allowedMentionAliases = []) {
+async function updateIssueBody(github, context, repo, issueNumber, updatedBody, allowedMentionAliases = [], maxMentions = undefined) {
   const [owner, repoName] = repo.split("/");
 
   core.info(`Updating issue ${repo}#${issueNumber} body with resolved temporary IDs`);
@@ -1376,7 +1425,7 @@ async function updateIssueBody(github, context, repo, issueNumber, updatedBody, 
     owner,
     repo: repoName,
     issue_number: issueNumber,
-    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases }),
+    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases, maxMentions }),
   });
 
   core.info(`✓ Updated issue ${repo}#${issueNumber}`);
@@ -1389,9 +1438,11 @@ async function updateIssueBody(github, context, repo, issueNumber, updatedBody, 
  * @param {string} repo - Repository in "owner/repo" format
  * @param {number} prNumber - Pull request number to update
  * @param {string} updatedBody - Updated body content with resolved temp IDs
+ * @param {string[]} [allowedMentionAliases] - Mention aliases allowed by the workflow
+ * @param {number} [maxMentions] - Maximum distinct allowed mentions to preserve
  * @returns {Promise<void>}
  */
-async function updatePullRequestBody(github, context, repo, prNumber, updatedBody, allowedMentionAliases = []) {
+async function updatePullRequestBody(github, context, repo, prNumber, updatedBody, allowedMentionAliases = [], maxMentions = undefined) {
   const [owner, repoName] = repo.split("/");
 
   core.info(`Updating pull request ${repo}#${prNumber} body with resolved temporary IDs`);
@@ -1400,7 +1451,7 @@ async function updatePullRequestBody(github, context, repo, prNumber, updatedBod
     owner,
     repo: repoName,
     pull_number: prNumber,
-    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases }),
+    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases, maxMentions }),
   });
 
   core.info(`✓ Updated pull request ${repo}#${prNumber}`);
@@ -1413,9 +1464,11 @@ async function updatePullRequestBody(github, context, repo, prNumber, updatedBod
  * @param {string} repo - Repository in "owner/repo" format
  * @param {number} discussionNumber - Discussion number to update
  * @param {string} updatedBody - Updated body content with resolved temp IDs
+ * @param {string[]} [allowedMentionAliases] - Mention aliases allowed by the workflow
+ * @param {number} [maxMentions] - Maximum distinct allowed mentions to preserve
  * @returns {Promise<void>}
  */
-async function updateDiscussionBody(github, context, repo, discussionNumber, updatedBody, allowedMentionAliases = []) {
+async function updateDiscussionBody(github, context, repo, discussionNumber, updatedBody, allowedMentionAliases = [], maxMentions = undefined) {
   const [owner, repoName] = repo.split("/");
 
   core.info(`Updating discussion ${repo}#${discussionNumber} body with resolved temporary IDs`);
@@ -1453,7 +1506,7 @@ async function updateDiscussionBody(github, context, repo, discussionNumber, upd
 
   await github.graphql(mutation, {
     discussionId,
-    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases }),
+    body: sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases, maxMentions }),
   });
 
   core.info(`✓ Updated discussion ${repo}#${discussionNumber}`);
@@ -1467,14 +1520,16 @@ async function updateDiscussionBody(github, context, repo, discussionNumber, upd
  * @param {number} commentId - Comment ID to update
  * @param {string} updatedBody - Updated body content with resolved temp IDs
  * @param {boolean} isDiscussion - Whether this is a discussion comment
+ * @param {string[]} [allowedMentionAliases] - Mention aliases allowed by the workflow
+ * @param {number} [maxMentions] - Maximum distinct allowed mentions to preserve
  * @returns {Promise<void>}
  */
-async function updateCommentBody(github, context, repo, commentId, updatedBody, isDiscussion = false, allowedMentionAliases = []) {
+async function updateCommentBody(github, context, repo, commentId, updatedBody, isDiscussion = false, allowedMentionAliases = [], maxMentions = undefined) {
   const [owner, repoName] = repo.split("/");
 
   core.info(`Updating comment ${commentId} body with resolved temporary IDs`);
 
-  const sanitizedBody = sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases });
+  const sanitizedBody = sanitizeContent(updatedBody, { allowedAliases: allowedMentionAliases, maxMentions });
 
   if (isDiscussion) {
     // For discussion comments, we need to use GraphQL
@@ -1514,9 +1569,11 @@ async function updateCommentBody(github, context, repo, commentId, updatedBody, 
  * @param {Array<{type: string, message: any, result: any, originalTempIdMapSize: number}>} trackedOutputs - Outputs that need updating
  * @param {Map<string, {repo: string, number: number}>} temporaryIdMap - Current temporary ID map
  * @param {Map<string, string>} [artifactUrlMap] - Optional artifact URL map for resolving artifact references
+ * @param {string[]} [allowedMentionAliases] - Mention aliases allowed by the workflow
+ * @param {number} [maxMentions] - Maximum distinct allowed mentions to preserve
  * @returns {Promise<number>} Number of successful updates
  */
-async function processSyntheticUpdates(github, context, trackedOutputs, temporaryIdMap, artifactUrlMap, allowedMentionAliases = []) {
+async function processSyntheticUpdates(github, context, trackedOutputs, temporaryIdMap, artifactUrlMap, allowedMentionAliases = [], maxMentions = undefined) {
   let updateCount = 0;
 
   core.info(`\n=== Processing Synthetic Updates ===`);
@@ -1549,17 +1606,17 @@ async function processSyntheticUpdates(github, context, trackedOutputs, temporar
             // Update based on the original type
             switch (tracked.type) {
               case "create_issue":
-                await updateIssueBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases);
+                await updateIssueBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases, maxMentions);
                 updateCount++;
                 break;
               case "create_discussion":
-                await updateDiscussionBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases);
+                await updateDiscussionBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases, maxMentions);
                 updateCount++;
                 break;
               case "add_comment":
                 // Update comment using the tracked comment ID
                 if (tracked.result.commentId) {
-                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, tracked.result.isDiscussion, allowedMentionAliases);
+                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, tracked.result.isDiscussion, allowedMentionAliases, maxMentions);
                   updateCount++;
                 } else {
                   core.debug(`Skipping synthetic update for comment - comment ID not tracked`);
@@ -1567,14 +1624,14 @@ async function processSyntheticUpdates(github, context, trackedOutputs, temporar
                 break;
               case "comment_memory":
                 if (tracked.result.commentId) {
-                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, false, allowedMentionAliases);
+                  await updateCommentBody(github, context, tracked.result.repo, tracked.result.commentId, updatedContent, false, allowedMentionAliases, maxMentions);
                   updateCount++;
                 } else {
                   core.debug(`Skipping synthetic update for comment_memory - comment ID not tracked`);
                 }
                 break;
               case "create_pull_request":
-                await updatePullRequestBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases);
+                await updatePullRequestBody(github, context, tracked.result.repo, tracked.result.number, updatedContent, allowedMentionAliases, maxMentions);
                 updateCount++;
                 break;
               default:
@@ -1679,6 +1736,7 @@ async function main() {
     }
 
     const allowedMentionAliases = config.mentions != null ? await resolveAllowedMentionsFromPayload(context, github, core, config.mentions) : [];
+    const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
 
     // Load and initialize handlers based on configuration (factory pattern)
     const messageHandlers = await loadHandlers(config, prReviewBufferRegistry, allowedMentionAliases);
@@ -1762,7 +1820,7 @@ async function main() {
       // Convert temp ID map back to Map
       const temporaryIdMap = new Map(Object.entries(processingResult.temporaryIdMap));
 
-      syntheticUpdateCount = await processSyntheticUpdates(github, context, processingResult.outputsWithUnresolvedIds, temporaryIdMap, processingResult.artifactUrlMap, allowedMentionAliases);
+      syntheticUpdateCount = await processSyntheticUpdates(github, context, processingResult.outputsWithUnresolvedIds, temporaryIdMap, processingResult.artifactUrlMap, allowedMentionAliases, maxMentions);
     }
 
     // Write step summaries for all processed safe-outputs
@@ -1979,4 +2037,5 @@ module.exports = {
   partitionFailureResults,
   computeSafeOutputsStatus,
   setSafeOutputsStatusOutputs,
+  processSyntheticUpdates,
 };

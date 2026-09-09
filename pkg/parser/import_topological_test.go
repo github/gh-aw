@@ -5,6 +5,7 @@ package parser_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -126,7 +127,7 @@ tools:
 			// Expected: roots (d, e, f) first, then their dependents
 			// Multiple valid orderings exist due to independence between branches
 			// Key constraints: f before c, c and d before a, e before b
-			expectedOrder: []string{"d.md", "e.md", "b.md", "f.md", "c.md", "a.md"},
+			expectedOrder: []string{"d.md", "f.md", "c.md", "a.md", "e.md", "b.md"},
 		},
 		{
 			name: "wide tree with many independent branches",
@@ -193,9 +194,9 @@ tools:
 ---`,
 			},
 			mainImports: []string{"z-parent.md", "y-parent.md"},
-			// Children come first in alphabetical order (a, b),
-			// then parents in alphabetical order (y, z)
-			expectedOrder: []string{"a-child.md", "b-child.md", "y-parent.md", "z-parent.md"},
+			// Each dependency precedes its parent, with independent branches
+			// retaining the declaration order of their parents.
+			expectedOrder: []string{"a-child.md", "z-parent.md", "b-child.md", "y-parent.md"},
 		},
 		{
 			name: "multi-level dependency chain",
@@ -377,9 +378,9 @@ Tool configuration here.`,
 	assert.Equal(t, "a.md", result.ImportedFiles[1])
 }
 
-// TestImportTopologicalSortPreservesAlphabeticalForSameLevel tests that
-// imports at the same level (same in-degree) are sorted alphabetically
-func TestImportTopologicalSortPreservesAlphabeticalForSameLevel(t *testing.T) {
+// TestImportTopologicalSortPreservesDeclarationOrder tests that independent
+// imports retain their declaration order.
+func TestImportTopologicalSortPreservesDeclarationOrder(t *testing.T) {
 	tempDir := testutil.TempDir(t, "import-topo-alpha-*")
 
 	// Create multiple root files (no dependencies)
@@ -411,11 +412,11 @@ tools:
 	result, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, tempDir, nil, "", "")
 	require.NoError(t, err)
 
-	// All are roots, should be sorted alphabetically
+	// All are roots, so declaration order is preserved.
 	assert.Len(t, result.ImportedFiles, 3)
-	assert.Equal(t, "a-root.md", result.ImportedFiles[0])
-	assert.Equal(t, "m-root.md", result.ImportedFiles[1])
-	assert.Equal(t, "z-root.md", result.ImportedFiles[2])
+	assert.Equal(t, "z-root.md", result.ImportedFiles[0])
+	assert.Equal(t, "a-root.md", result.ImportedFiles[1])
+	assert.Equal(t, "m-root.md", result.ImportedFiles[2])
 }
 
 // TestImportTopologicalSortBeatsLexicalParentOrdering ensures that dependency
@@ -497,5 +498,138 @@ tools:
 			continue
 		}
 		assert.Equal(t, baseline, result.ImportedFiles)
+	}
+}
+
+func TestImportedStepFieldsFollowDependencyOrder(t *testing.T) {
+	files := map[string]string{
+		"shared/base.md": `---
+steps:
+  - name: STEP-BASE
+pre-agent-steps:
+  - name: PRE-BASE
+post-steps:
+  - name: POST-BASE
+---`,
+		"shared/a.md": `---
+imports:
+  - base.md
+steps:
+  - name: STEP-A
+pre-agent-steps:
+  - name: PRE-A
+post-steps:
+  - name: POST-A
+max-turns: 10
+---`,
+		"shared/b.md": `---
+imports:
+  - base.md
+steps:
+  - name: STEP-B
+pre-agent-steps:
+  - name: PRE-B
+post-steps:
+  - name: POST-B
+max-turns: 20
+---`,
+	}
+	tests := []struct {
+		name          string
+		imports       []string
+		expectedFiles []string
+		expectedNames []string
+		expectedMax   string
+	}{
+		{
+			name:          "diamond preserves sibling declaration order",
+			imports:       []string{"shared/a.md", "shared/b.md"},
+			expectedFiles: []string{"shared/base.md", "shared/a.md", "shared/b.md"},
+			expectedNames: []string{"BASE", "A", "B"},
+			expectedMax:   "10",
+		},
+		{
+			name:          "reversed diamond preserves sibling declaration order",
+			imports:       []string{"shared/b.md", "shared/a.md"},
+			expectedFiles: []string{"shared/base.md", "shared/b.md", "shared/a.md"},
+			expectedNames: []string{"BASE", "B", "A"},
+			expectedMax:   "20",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := testutil.TempDir(t, "import-step-order-*")
+			for name, content := range files {
+				fullPath := filepath.Join(tempDir, name)
+				require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755))
+				require.NoError(t, os.WriteFile(fullPath, []byte(content), 0600))
+			}
+
+			result, err := parser.ProcessImportsFromFrontmatterWithSource(
+				map[string]any{"imports": tt.imports}, tempDir, nil, "", "")
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedFiles, result.ImportedFiles)
+			assert.Equal(t, tt.expectedMax, result.MergedMaxTurns, "scalar precedence must remain discovery-order first-wins")
+			assertNamesInOrder(t, result.MergedSteps, "STEP-", tt.expectedNames)
+			assertNamesInOrder(t, result.MergedPreAgentSteps, "PRE-", tt.expectedNames)
+			assertNamesInOrder(t, result.MergedPostSteps, "POST-", tt.expectedNames)
+		})
+	}
+}
+
+func TestImportedStepsAreRoleInvariant(t *testing.T) {
+	tempDir := testutil.TempDir(t, "import-role-order-*")
+	files := map[string]string{
+		"a.md": `---
+imports:
+  - b.md
+steps:
+  - name: STEP-A
+---`,
+		"b.md": `---
+steps:
+  - name: STEP-B
+---`,
+	}
+	for name, content := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(tempDir, name), []byte(content), 0600))
+	}
+
+	importedA, err := parser.ProcessImportsFromFrontmatterWithSource(
+		map[string]any{"imports": []string{"a.md"}}, tempDir, nil, "", "")
+	require.NoError(t, err)
+	assertNamesInOrder(t, importedA.MergedSteps, "STEP-", []string{"B", "A"})
+
+	rootA, err := parser.ProcessImportsFromFrontmatterWithSource(
+		map[string]any{"imports": []string{"b.md"}}, tempDir, nil, "", "")
+	require.NoError(t, err)
+	assertNamesInOrder(t, rootA.MergedSteps+"\n"+files["a.md"], "STEP-", []string{"B", "A"})
+}
+
+func TestUnrelatedImportedStepsPreserveDeclarationOrder(t *testing.T) {
+	tempDir := testutil.TempDir(t, "import-sibling-order-*")
+	files := map[string]string{
+		"z.md": "---\nsteps:\n  - name: STEP-Z\n---",
+		"a.md": "---\nsteps:\n  - name: STEP-A\n---",
+	}
+	for name, content := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(tempDir, name), []byte(content), 0600))
+	}
+
+	result, err := parser.ProcessImportsFromFrontmatterWithSource(
+		map[string]any{"imports": []string{"z.md", "a.md"}}, tempDir, nil, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"z.md", "a.md"}, result.ImportedFiles)
+	assertNamesInOrder(t, result.MergedSteps, "STEP-", []string{"Z", "A"})
+}
+
+func assertNamesInOrder(t *testing.T, content, prefix string, names []string) {
+	t.Helper()
+	previous := -1
+	for _, name := range names {
+		current := strings.Index(content, "name: "+prefix+name+"\n")
+		assert.Greater(t, current, previous, "%s%s must follow the previous entry in %q", prefix, name, content)
+		previous = current
 	}
 }

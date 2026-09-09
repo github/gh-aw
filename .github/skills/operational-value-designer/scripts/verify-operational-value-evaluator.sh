@@ -37,6 +37,15 @@ printf '%s\n' "$definition" | jq -e '
     and (.primaryMetric.id | type == "string" and length > 0)
     and (.primaryMetric.formula | type == "string" and length > 0)
     and (.primaryMetric.direction == "higher_is_better")
+    and ((.diagnosticMetrics // []) | type == "array")
+    and (all((.diagnosticMetrics // [])[];
+        (.id | type == "string" and length > 0)
+        and (.name | type == "string" and length > 0)
+        and (.formula | type == "string" and length > 0)
+        and .direction == "higher_is_better"
+        and (.aggregation == "latest" or .aggregation == "mean")))
+    and ([.primaryMetric.id] + [(.diagnosticMetrics // [])[].id] | unique | length)
+        == (1 + ((.diagnosticMetrics // []) | length))
     and (.validationExamples | has("targetAttained") and has("targetMissed") and has("missing") and has("malformed"))
     and (.baseline.mode == "baseline-comparable" or .baseline.mode == "attainment-only")
     and (if .baseline.mode == "baseline-comparable" then
@@ -96,7 +105,8 @@ request=$(jq -cn \
             config: {verification: true}
         }')
 grade_run=$(printf '%s\n' "$request" | "$evaluator" --grade-run)
-printf '%s\n' "$grade_run" | jq -e --arg evidenceAt "$evidence_at" '
+diagnostic_metrics=$(printf '%s\n' "$definition" | jq -c '.diagnosticMetrics // []')
+printf '%s\n' "$grade_run" | jq -e --arg evidenceAt "$evidence_at" --argjson diagnosticMetrics "$diagnostic_metrics" '
         def timestamp:
             type == "string"
             and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$");
@@ -116,6 +126,10 @@ printf '%s\n' "$grade_run" | jq -e --arg evidenceAt "$evidence_at" '
             and (.kind | type == "string" and length > 0)
             and (.ref | type == "string" and length > 0)))
         and ((has("diagnostics") | not) or (.diagnostics | type == "object"))
+        and (all($diagnosticMetrics[];
+            .id as $id
+            | (.diagnostics[$id] == null
+                or (.diagnostics[$id] | type == "number" and isfinite and . >= 0 and . <= 1))))
         and ((has("message") | not) or (.message | type == "string"))
 ' >/dev/null || fail "--grade-run returned an invalid operational-value observation"
 

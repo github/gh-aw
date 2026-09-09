@@ -16,7 +16,7 @@ sandbox:
 tracker-id: daily-token-consumption-report
 engine:
   id: goose
-model: copilot/claude-sonnet-4.5
+model: copilot/claude-sonnet-5
 strict: true
 network:
   allowed:

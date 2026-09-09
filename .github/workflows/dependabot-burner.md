@@ -59,7 +59,7 @@ tools:
   edit:
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default, pull_requests]
   bash:
     - "make dependabot && make build"
@@ -289,7 +289,7 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 # Dependabot Burner

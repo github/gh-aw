@@ -34,6 +34,8 @@ observability:
 
 Once configured, gh-aw exports built-in workflow spans such as setup and conclusion events to the configured OTLP backend.
 
+Use the bare secret expression for authorization headers, as shown above, rather than adding an authentication scheme prefix. For Sentry endpoints, gh-aw automatically rewrites `Authorization` to `x-sentry-auth`, so no prefix is needed.
+
 ### Organization-wide defaults
 
 When a workflow does not configure `observability.otlp` (in its own frontmatter or through an import), the compiler falls back to a default OTLP configuration read from the GitHub Actions environment:

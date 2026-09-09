@@ -21,6 +21,8 @@ The `checkout:` frontmatter field controls how `actions/checkout` is invoked in 
 
 For multi-repository workflows, list multiple entries to clone several repos into the workspace. Mark the agent's primary target with `current: true` when working from a central repository that targets a different repo.
 
+For sidecar workflows that only need to check out a target repository and not their own, set `permissions.contents: none` to skip the automatic workflow-repository checkout while keeping other configured `checkout:` entries intact — see [Target-Only Checkout](/gh-aw/reference/checkout/#target-only-checkout-permissionscontents-none).
+
 When `current: true` points to a checkout in a subdirectory, pull-request patch generation for `create-pull-request` and `push-to-pull-request-branch` runs from that checkout path (when targeting that repository). This ensures PR patches include the real file changes instead of workspace-root gitlinks/subproject entries.
 
 ```yaml wrap
@@ -215,12 +217,12 @@ engine:
 
 steps:
   - name: Checkout main repo
-    uses: actions/checkout@v6
+    uses: actions/checkout@v7
     with:
       path: main-repo
 
   - name: Checkout secondary repo
-    uses: actions/checkout@v6
+    uses: actions/checkout@v7
     with:
       repository: org/secondary-repo
       token: ${{ secrets.CROSS_REPO_PAT }}

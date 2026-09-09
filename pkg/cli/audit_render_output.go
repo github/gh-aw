@@ -20,7 +20,14 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	runID := processedRun.Run.DatabaseID
 	runOutputDir := opts.OutputDir
 	processedRun.Run.SafeItemsCount = len(extractCreatedItemsFromManifest(runOutputDir))
-	auditData := buildRenderedAuditData(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull)
+	if !ok {
+		auditData = buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+		auditData.CacheSource = auditCacheSourceFull
+		if err := writeAuditData(runOutputDir, auditData); err != nil {
+			return err
+		}
+	}
 	if err := renderAuditOutput(auditData, runOutputDir, opts.JSONOutput, opts.Verbose); err != nil {
 		return err
 	}
@@ -29,6 +36,18 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	parseAuditLogsIfRequested(runID, runOutputDir, opts)
 	renderAuditCompletion(runOutputDir, opts.JSONOutput)
 	return nil
+}
+
+func buildRenderedAuditDataFromCache(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) AuditData {
+	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceLogs)
+	if !ok {
+		return buildRenderedAuditData(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+	}
+	createdItems := extractCreatedItemsFromManifest(runOutputDir)
+	addAuditOutcomeSummary(ctx, &auditData, createdItems)
+	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
+	auditData.Comparison = buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
+	return auditData
 }
 
 func buildRenderedAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) AuditData {

@@ -16,10 +16,10 @@ permissions:
 
   copilot-requests: write
 tracker-id: daily-news-weekday
-model: copilot/gpt-5.4
+model: openai/gpt-5.4
 engine:
   id: pi
-  bare: true
+  model-provider: openai
 
 timeout-minutes: 30  # Reduced from 45 since pre-fetching data is faster
 experiments:

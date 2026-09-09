@@ -31,6 +31,16 @@ Quick-reference mapping tables for `.github/aw/designer.md`. Load this file duri
 | "post a comment" | `add-comment` |
 | "create an issue" | `create-issue` |
 | "update issue title/body" | `update-issue` |
+| "create a Jira issue" | `jira-create-issue` |
+| "update Jira issue ENG-123" | `jira-update-issue` |
+| "comment on Jira issue ENG-123" | `jira-add-comment` |
+| "add a Jira label" | `jira-add-label` |
+| "create a Linear issue" | `linear-create-issue` (experimental) |
+| "update Linear issue" | `linear-update-issue` (experimental) |
+| "comment on Linear issue" | `linear-add-comment` (experimental) |
+| "create an Azure DevOps work item" | `ado-create-work-item` (experimental) |
+| "update an Azure DevOps work item" | `ado-update-work-item` (experimental) |
+| "comment/assign/link Azure DevOps work items" | `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items` (experimental) |
 | "close the issue" | `close-issue` |
 | "assign someone", "remove assignment" | `assign-to-user`, `unassign-from-user` |
 | "set issue type/field/milestone" | `set-issue-type`, `set-issue-field`, `assign-milestone` |
@@ -108,6 +118,7 @@ For less common ecosystems (Swift, PHP, Dart, Haskell, Perl, fonts, Deno, Elixir
 | "monitor workflow failures and trends" | `MonitorOps` |
 | "process a big backlog in chunks" | `BatchOps` |
 | "run manually with input parameters" | `DispatchOps` |
+| "keep advancing a feature one chunk at a time" | `Feature Grower` |
 | "apply a label-based workflow" | `LabelOps` |
 | "operate across multiple repositories" | `MultiRepoOps` |
 | "coordinate multiple sub-agents" | `Orchestration` |

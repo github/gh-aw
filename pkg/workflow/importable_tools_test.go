@@ -73,14 +73,13 @@ Uses imported playwright tool.
 
 	workflowData := string(lockFileContent)
 
-	// Verify playwright is configured in the MCP config
-	if !strings.Contains(workflowData, `"playwright"`) {
-		t.Error("Expected compiled workflow to contain playwright tool")
+	// Verify the imported Playwright tool installs the CLI.
+	if !strings.Contains(workflowData, "npm install -g @playwright/cli@") {
+		t.Error("Expected compiled workflow to install Playwright CLI")
 	}
 
-	// Verify playwright Docker image
-	if !strings.Contains(workflowData, "mcr.microsoft.com/playwright/mcp") {
-		t.Error("Expected compiled workflow to contain playwright Docker image")
+	if strings.Contains(workflowData, "mcr.microsoft.com/playwright/mcp") {
+		t.Error("Expected compiled workflow not to contain the removed Playwright MCP image")
 	}
 }
 
@@ -245,8 +244,8 @@ Uses all imported tools.
 	workflowData := string(lockFileContent)
 
 	// Verify tools are present
-	if !strings.Contains(workflowData, `"playwright"`) {
-		t.Error("Expected compiled workflow to contain playwright tool")
+	if !strings.Contains(workflowData, "npm install -g @playwright/cli@") {
+		t.Error("Expected compiled workflow to install Playwright CLI")
 	}
 	// Per MCP Gateway Specification v1.0.0, agentic-workflows uses containerized format
 	if !strings.Contains(workflowData, `"`+constants.AgenticWorkflowsMCPServerID.String()+`"`) {
@@ -254,83 +253,8 @@ Uses all imported tools.
 	}
 
 	// Verify specific configurations
-	if !strings.Contains(workflowData, "mcr.microsoft.com/playwright/mcp") {
-		t.Error("Expected compiled workflow to contain playwright Docker image")
-	}
-}
-
-// TestImportPlaywrightWithCustomArgs tests playwright with custom arguments
-func TestImportPlaywrightWithCustomArgs(t *testing.T) {
-	tempDir := testutil.TempDir(t, "test-*")
-
-	// Create a shared workflow with playwright tool with custom args
-	sharedPath := filepath.Join(tempDir, "shared-playwright-args.md")
-	sharedContent := `---
-description: "Shared playwright with custom args"
-tools:
-  playwright:
-    version: "v1.41.0"
-    args:
-      - "--custom-flag"
-      - "value"
-network:
-  allowed:
-    - playwright
----
-
-# Shared Playwright with Args
-`
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
-		t.Fatalf("Failed to write shared file: %v", err)
-	}
-
-	// Create main workflow that imports playwright
-	workflowPath := filepath.Join(tempDir, "main-workflow.md")
-	workflowContent := `---
-on: issues
-engine: copilot
-imports:
-  - shared-playwright-args.md
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
----
-
-# Main Workflow
-
-Uses imported playwright with custom args.
-`
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
-		t.Fatalf("Failed to write workflow file: %v", err)
-	}
-
-	// Compile the workflow
-	compiler := workflow.NewCompiler()
-	if err := compiler.CompileWorkflow(workflowPath); err != nil {
-		t.Fatalf("CompileWorkflow failed: %v", err)
-	}
-
-	// Read the generated lock file
-	lockFilePath := stringutil.MarkdownToLockFile(workflowPath)
-	lockFileContent, err := os.ReadFile(lockFilePath)
-	if err != nil {
-		t.Fatalf("Failed to read lock file: %v", err)
-	}
-
-	workflowData := string(lockFileContent)
-
-	// Verify playwright is configured
-	if !strings.Contains(workflowData, `"playwright"`) {
-		t.Error("Expected compiled workflow to contain playwright tool")
-	}
-
-	// Verify custom args are present
-	if !strings.Contains(workflowData, "--custom-flag") {
-		t.Error("Expected compiled workflow to contain --custom-flag custom argument")
-	}
-	if !strings.Contains(workflowData, "value") {
-		t.Error("Expected compiled workflow to contain custom argument value")
+	if strings.Contains(workflowData, "mcr.microsoft.com/playwright/mcp") {
+		t.Error("Expected compiled workflow not to contain the removed Playwright MCP image")
 	}
 }
 
@@ -803,7 +727,7 @@ permissions:
 tools:
   bash: true
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 imports:
@@ -894,7 +818,7 @@ permissions:
   contents: read
   issues: read
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 imports:
@@ -968,7 +892,7 @@ permissions:
 tools:
   github: false
 features:
-  dangerously-disable-sandbox-agent: "controlled environment with no internet access"
+  dangerously-disable-sandbox-agent: true
 sandbox:
   agent: false
 imports:

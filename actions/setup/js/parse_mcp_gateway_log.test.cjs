@@ -1,6 +1,8 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+const fs = require("fs");
+const path = require("path");
 const {
   generateGatewayLogSummary,
   generatePlainTextGatewaySummary,
@@ -19,6 +21,7 @@ const {
   parseTokenUsageJsonl,
   generateTokenUsageSummary,
   formatDurationMs,
+  writeStepSummaryWithTokenUsage,
 } = require("./parse_mcp_gateway_log.cjs");
 
 describe("parse_mcp_gateway_log", () => {
@@ -1837,6 +1840,395 @@ Some content here.`;
     test("returns null for empty content", () => {
       expect(parseTokenUsageJsonl("")).toBeNull();
       expect(parseTokenUsageJsonl("   \n  ")).toBeNull();
+    });
+
+    test("prefers the exact AWF-reported total from run 33157406852", () => {
+      const content = fs.readFileSync(path.join(__dirname, "fixtures", "awf-v0.28.7-aic-token-usage.jsonl"), "utf8");
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary).not.toBeNull();
+      expect(summary.totalRequests).toBe(5);
+      expect(summary.totalInputTokens).toBe(39376);
+      expect(summary.totalCacheReadTokens).toBe(57984);
+      expect(summary.totalOutputTokens).toBe(175);
+      expect(summary.aiCreditsSource).toBe("awf_reported");
+      expect(summary.entries.map(entry => entry.deltaAIC)).toEqual([0.29142, 0.2928, 0.15018, 0.1506, 0.15102]);
+      expect(summary.totalAIC).toBe(1.03602);
+      expect(generateTokenUsageSummary(summary)).toContain("1.03602");
+    });
+
+    test("retains legacy recomputation when AWF-reported fields are absent", () => {
+      const content = fs
+        .readFileSync(path.join(__dirname, "fixtures", "awf-v0.28.7-aic-token-usage.jsonl"), "utf8")
+        .trim()
+        .split("\n")
+        .map(line => {
+          const record = JSON.parse(line);
+          delete record.ai_credits_this_response;
+          delete record.ai_credits_total;
+          return JSON.stringify(record);
+        })
+        .join("\n");
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary.aiCreditsSource).toBe("recomputed");
+      expect(summary.totalAIC).toBeCloseTo(0.44538, 6);
+    });
+
+    test("falls back to legacy pricing and warns for malformed AWF-reported AIC fields", () => {
+      const content = JSON.stringify({
+        provider: "copilot",
+        model: "gpt-4o-mini-2024-07-18",
+        input_tokens: 19288,
+        output_tokens: 35,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        ai_credits_this_response: "0.29142",
+        ai_credits_total: -1,
+      });
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary.aiCreditsSource).toBe("recomputed");
+      expect(summary.entries[0].deltaAIC).toBeCloseTo(0.29142, 6);
+      expect(summary.totalAIC).toBeCloseTo(0.29142, 6);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("1 token usage record(s)")]);
+      expect(generateTokenUsageSummary(summary)).toContain("Warning:");
+    });
+
+    test("treats null AWF-reported AIC fields as malformed rather than zero", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          provider: "copilot",
+          model: "gpt-4o-mini-2024-07-18",
+          input_tokens: 19288,
+          output_tokens: 35,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          ai_credits_this_response: null,
+          ai_credits_total: null,
+        })
+      );
+
+      expect(summary.aiCreditsSource).toBe("recomputed");
+      expect(summary.totalAIC).toBeCloseTo(0.29142, 6);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("fallback accounting")]);
+    });
+
+    test("extends the last valid AWF-reported total with fallback pricing when a later total is malformed", () => {
+      const records = fs
+        .readFileSync(path.join(__dirname, "fixtures", "awf-v0.28.7-aic-token-usage.jsonl"), "utf8")
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      records.at(-1).ai_credits_total = "1.03602";
+      const summary = parseTokenUsageJsonl(records.map(record => JSON.stringify(record)).join("\n"));
+
+      expect(summary.aiCreditsSource).toBe("awf_reported");
+      expect(summary.entries.at(-1).deltaAIC).toBe(0.15102);
+      expect(summary.totalAIC).toBe(1.03602);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("1 token usage record(s)")]);
+    });
+
+    test("exports the exact AWF-reported total to the main job output", async () => {
+      const tokenUsagePath = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+      const content = fs.readFileSync(path.join(__dirname, "fixtures", "awf-v0.28.7-aic-token-usage.jsonl"), "utf8");
+      const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === tokenUsagePath);
+      const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation((filePath, encoding) => {
+        if (filePath === tokenUsagePath) return content;
+        return "";
+      });
+      const coreObj = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        exportVariable: vi.fn(),
+        setOutput: vi.fn(),
+        summary: {
+          addRaw: vi.fn(),
+          write: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      try {
+        await writeStepSummaryWithTokenUsage(coreObj);
+      } finally {
+        existsSpy.mockRestore();
+        readSpy.mockRestore();
+      }
+
+      expect(coreObj.exportVariable).toHaveBeenCalledWith("GH_AW_AIC", "1.03602");
+      expect(coreObj.setOutput).toHaveBeenCalledWith("aic", "1.03602");
+      expect(coreObj.info).toHaveBeenCalledWith("AI Credits: 1.03602");
+    });
+
+    test.each([
+      [true, 0.018],
+      [false, 0.0255],
+    ])("propagates explicit input_tokens_include_cache=%s through legacy repricing", (inputTokensIncludeCache, expectedAIC) => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          provider: "copilot",
+          model: "gpt-4o-mini-2024-07-18",
+          input_tokens: 1000,
+          output_tokens: 100,
+          cache_read_tokens: 400,
+          cache_write_tokens: 100,
+          input_tokens_include_cache: inputTokensIncludeCache,
+        })
+      );
+
+      expect(summary.entries[0].inputTokensIncludeCache).toBe(inputTokensIncludeCache);
+      expect(summary.entries[0].deltaAIC).toBeCloseTo(expectedAIC, 6);
+      expect(summary.totalAIC).toBeCloseTo(expectedAIC, 6);
+    });
+
+    test("distinguishes zero AWF-reported credits from absent fields", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          provider: "copilot",
+          model: "gpt-4o-mini-2024-07-18",
+          input_tokens: 1000,
+          output_tokens: 100,
+          cache_read_tokens: 0,
+          cache_write_tokens: 0,
+          ai_credits_this_response: 0,
+          ai_credits_total: 0,
+        })
+      );
+
+      expect(summary.aiCreditsSource).toBe("awf_reported");
+      expect(summary.entries[0].deltaAIC).toBe(0);
+      expect(summary.totalAIC).toBe(0);
+      expect(summary.aiCreditsWarnings).toEqual([]);
+      expect(generateTokenUsageSummary(summary)).toContain("| **Total** | | **1,000** | **100** | **0** | **0** | | **0** |");
+    });
+
+    test("exports AWF-reported zero to the main job output", async () => {
+      const tokenUsagePath = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+      const content = JSON.stringify({
+        provider: "copilot",
+        model: "gpt-4o-mini-2024-07-18",
+        input_tokens: 1000,
+        output_tokens: 100,
+        ai_credits_this_response: 0,
+        ai_credits_total: 0,
+      });
+      const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === tokenUsagePath);
+      const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation(filePath => {
+        if (filePath === tokenUsagePath) return content;
+        return "";
+      });
+      const coreObj = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        exportVariable: vi.fn(),
+        setOutput: vi.fn(),
+        summary: {
+          addRaw: vi.fn(),
+          write: vi.fn().mockResolvedValue(undefined),
+        },
+      };
+
+      try {
+        await writeStepSummaryWithTokenUsage(coreObj);
+      } finally {
+        existsSpy.mockRestore();
+        readSpy.mockRestore();
+      }
+
+      expect(coreObj.exportVariable).toHaveBeenCalledWith("GH_AW_AIC", "0");
+      expect(coreObj.setOutput).toHaveBeenCalledWith("aic", "0");
+      expect(coreObj.info).toHaveBeenCalledWith("AI Credits: 0");
+    });
+
+    test("aggregates AWF-reported credits by model without changing the run total", () => {
+      const content = [
+        {
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 10,
+          output_tokens: 1,
+          ai_credits_this_response: 0.2,
+          ai_credits_total: 0.2,
+        },
+        {
+          model: "claude-sonnet-4-6",
+          provider: "copilot",
+          input_tokens: 20,
+          output_tokens: 2,
+          ai_credits_this_response: 0.8,
+          ai_credits_total: 1,
+        },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n");
+
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary.byModel["gpt-4o-mini"].aic).toBe(0.2);
+      expect(summary.byModel["claude-sonnet-4-6"].aic).toBe(0.8);
+      expect(summary.totalAIC).toBe(1);
+    });
+
+    test("keeps model names such as __proto__ as data without polluting object prototypes", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          model: "__proto__",
+          provider: "copilot",
+          input_tokens: 10,
+          output_tokens: 1,
+          ai_credits_this_response: 0.1,
+          ai_credits_total: 0.1,
+        })
+      );
+
+      expect(Object.getPrototypeOf(summary.byModel)).toBeNull();
+      expect(summary.byModel["__proto__"].aic).toBe(0.1);
+      expect(Object.prototype).not.toHaveProperty("aic");
+    });
+
+    test("deduplicates repeated request IDs before aggregating reported credits", () => {
+      const record = {
+        request_id: "same-request",
+        model: "gpt-4o-mini",
+        provider: "copilot",
+        input_tokens: 10,
+        output_tokens: 1,
+        ai_credits_this_response: 0.2,
+        ai_credits_total: 0.2,
+      };
+      const summary = parseTokenUsageJsonl(`${JSON.stringify(record)}\n${JSON.stringify(record)}\n`);
+
+      expect(summary.totalRequests).toBe(1);
+      expect(summary.totalInputTokens).toBe(10);
+      expect(summary.byModel["gpt-4o-mini"].aic).toBe(0.2);
+      expect(summary.totalAIC).toBe(0.2);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("1 duplicate token usage record(s)")]);
+    });
+
+    test("warns and uses legacy provider semantics for invalid input_tokens_include_cache", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          provider: "copilot",
+          model: "gpt-4o-mini-2024-07-18",
+          input_tokens: 1000,
+          output_tokens: 100,
+          cache_read_tokens: 400,
+          cache_write_tokens: 100,
+          input_tokens_include_cache: "invalid",
+        })
+      );
+
+      expect(summary.totalAIC).toBeCloseTo(0.0195, 6);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("invalid input_tokens_include_cache")]);
+    });
+
+    test("does not warn for invalid input_tokens_include_cache when AWF delta is valid", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          provider: "copilot",
+          model: "gpt-4o-mini-2024-07-18",
+          input_tokens: 1000,
+          output_tokens: 100,
+          cache_read_tokens: 400,
+          cache_write_tokens: 100,
+          input_tokens_include_cache: "invalid",
+          ai_credits_this_response: 0.123,
+          ai_credits_total: 0.123,
+        })
+      );
+
+      expect(summary.totalAIC).toBe(0.123);
+      expect(summary.aiCreditsWarnings).toEqual([]);
+    });
+
+    test("uses the chronologically last valid AWF-reported total", () => {
+      const content = [
+        {
+          timestamp: "2026-08-28T09:00:02Z",
+          request_id: "third",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 300,
+          output_tokens: 1,
+          ai_credits_this_response: 1,
+          ai_credits_total: 3,
+        },
+        {
+          timestamp: "2026-08-28T09:00:00Z",
+          request_id: "first",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 100,
+          output_tokens: 1,
+          ai_credits_this_response: 1,
+          ai_credits_total: 1,
+        },
+        {
+          timestamp: "2026-08-28T09:00:01Z",
+          request_id: "second",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 200,
+          output_tokens: 1,
+          ai_credits_this_response: 1,
+          ai_credits_total: 2,
+        },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n");
+
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary.entries.map(entry => entry.runningAIC)).toEqual([1, 2, 3]);
+      expect(summary.totalAIC).toBe(3);
+      expect(summary.ambientContextTokens).toBe(100);
+      expect(summary.aiCreditsWarnings).toEqual([]);
+    });
+
+    test("warns when AWF cumulative and per-request reported credits diverge", () => {
+      const content = [
+        {
+          request_id: "one",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 1,
+          output_tokens: 1,
+          ai_credits_this_response: 0.2,
+          ai_credits_total: 0.2,
+        },
+        {
+          request_id: "two",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 1,
+          output_tokens: 1,
+          ai_credits_this_response: 0.8,
+          ai_credits_total: 0.9,
+        },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n");
+
+      const summary = parseTokenUsageJsonl(content);
+
+      expect(summary.totalAIC).toBe(0.9);
+      expect(summary.aiCreditsWarnings).toEqual([expect.stringContaining("differs from the sum")]);
+    });
+
+    test("keeps large AWF-reported totals compact in the human-readable table", () => {
+      const summary = parseTokenUsageJsonl(
+        JSON.stringify({
+          request_id: "large",
+          model: "gpt-4o-mini",
+          provider: "copilot",
+          input_tokens: 1,
+          output_tokens: 1,
+          ai_credits_this_response: 1234.56789,
+          ai_credits_total: 1234.56789,
+        })
+      );
+
+      expect(generateTokenUsageSummary(summary)).toContain("| 1.2K | 1.2K |");
     });
 
     test("parses a single entry and aggregates totals", () => {

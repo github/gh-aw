@@ -4836,7 +4836,8 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
     });
 
-    it("still creates failure issue when terminal_reason: completed but report_incomplete is also present", async () => {
+    it("keeps the step failed when failure issue creation fails after a successful agent reports incomplete", async () => {
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
       // Agent produced both a non-noop item and a report_incomplete signal
       fs.writeFileSync(
         path.join(tmpDir, "agent_output.json"),
@@ -4849,7 +4850,9 @@ describe("handle_agent_failure", () => {
       );
       fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), '{"type":"result","subtype":"success","terminal_reason":"completed","num_turns":10}\n');
 
-      const createIssueMock = vi.fn(async () => ({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_123" } }));
+      const createIssueMock = vi.fn(async () => {
+        throw new Error("issue creation failed");
+      });
       const createCommentMock = vi.fn(async () => ({ data: { id: 1001 } }));
 
       global.github = {
@@ -4875,6 +4878,36 @@ describe("handle_agent_failure", () => {
 
       // report_incomplete overrides the hasCompletedDespiteJobFailure exemption
       expect(createIssueMock).toHaveBeenCalled();
+      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(global.core.warning).toHaveBeenCalledWith("Failed to create or update failure tracking issue: issue creation failed");
+    });
+
+    it("marks the step failed when failure issue reporting is disabled", async () => {
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "false";
+      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "report_incomplete", reason: "mcp_crash" }] }));
+
+      const createIssueMock = vi.fn();
+      global.github = {
+        rest: {
+          search: {
+            issuesAndPullRequests: vi.fn(),
+          },
+          issues: {
+            create: createIssueMock,
+            createComment: vi.fn(),
+          },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+
+      vi.resetModules();
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+
+      expect(global.core.setFailed).toHaveBeenCalledWith("Agent reported that it could not complete the task");
+      expect(createIssueMock).not.toHaveBeenCalled();
     });
 
     it("ignores report_incomplete when it only describes task_complete registration trouble after successful outputs", async () => {

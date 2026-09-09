@@ -154,7 +154,7 @@ await main();`
 // for the evals job. These mirror the inline detection engine execution path:
 //  1. Install the agentic engine (same binary as the agent job)
 //  2. Execute the engine through AWF (network-restricted sandbox) to answer eval questions
-func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string {
+func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint:largefunc
 	// Determine engine ID (same resolution order as detection).
 	engineID := c.getEvalsEngineID(data)
 
@@ -168,6 +168,7 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string {
 		// Shallow copy all fields from the main engine config
 		copy := *data.EngineConfig
 		evalsEngineConfig = &copy
+		evalsEngineConfig.Agent = ""
 		if evalsEngineConfig.ID == "" {
 			evalsEngineConfig.ID = engineID
 		}

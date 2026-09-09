@@ -57,7 +57,7 @@ func sanitizeCopilotShellCommand(cmdStr string) (string, bool) {
 // computeCopilotToolArguments computes the --allow-tool arguments for Copilot CLI based on tool configurations.
 // It handles bash/shell tools, edit tools, safe outputs, mcp-scripts, and MCP server tools.
 // Returns a sorted list of arguments ready to be passed to the Copilot CLI.
-func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOutputs *SafeOutputsConfig, mcpScripts *MCPScriptsConfig, workflowData *WorkflowData) []string {
+func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOutputs *SafeOutputsConfig, mcpScripts *MCPScriptsConfig, workflowData *WorkflowData) []string { //nolint:largefunc // Existing engine permission mapping is intentionally centralized.
 	copilotEngineToolsLog.Printf("Computing tool arguments: tools=%d", len(tools))
 	if tools == nil {
 		tools = make(map[string]any)
@@ -67,14 +67,16 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	hasRestrictedBashAllowlist := false
 	hasUnrestrictedBash := false
 
-	// Check if bash has wildcard - if so, use --allow-all-tools instead
+	// Check if bash has wildcard - if so, use --allow-all-tools in CLI mode.
+	// SDK mode must keep shell permission scoped because its explicit session
+	// catalog can contain non-shell tools that wildcard bash must not authorize.
 	if bashConfig, hasBash := tools["bash"]; hasBash {
 		if bashCommands, ok := bashConfig.([]any); ok {
 			// Check for :* or * wildcard - if present, allow all tools
 			for _, cmd := range bashCommands {
 				if cmdStr, ok := cmd.(string); ok {
 					if cmdStr == ":*" || cmdStr == "*" {
-						if copilotNeedsBuiltinMCPs(workflowData) {
+						if copilotNeedsBuiltinMCPs(workflowData) || isCopilotSDKMode(workflowData) {
 							hasUnrestrictedBash = true
 							break
 						}
@@ -90,9 +92,9 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	// Handle bash/shell tools (when no wildcard)
 	if hasUnrestrictedBash {
 		args = append(args, "--allow-tool", "shell")
-	} else if bashConfig, hasBash := tools["bash"]; hasBash {
+	} else if bashConfig, hasBash := tools["bash"]; hasBash && isCopilotToolValueEnabled(tools, "bash") {
 		if bashCommands, ok := bashConfig.([]any); ok {
-			hasRestrictedBashAllowlist = true
+			hasRestrictedBashAllowlist = len(bashCommands) > 0
 			// Add specific shell commands
 			for _, cmd := range bashCommands {
 				if cmdStr, ok := cmd.(string); ok {
@@ -137,7 +139,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		}
 		// When playwright is configured in CLI mode, playwright-cli must be executable.
 		// Automatically add shell(playwright-cli:*) to the restricted bash allowlist.
-		if workflowData != nil && isPlaywrightCLIMode(workflowData.Tools) {
+		if isPlaywrightCLIMode(effectiveWorkflowData.Tools) {
 			args = append(args, "--allow-tool", "shell(playwright-cli:*)")
 		}
 		// When GitHub CLI mode is enabled (tools.github.mode: gh-proxy), GitHub access
@@ -149,11 +151,8 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 
 	// Handle edit tools requirement for file write access
 	// Note: safe-outputs do not need write permission as they use MCP
-	if _, hasEdit := tools["edit"]; hasEdit {
+	if isCopilotEditToolEnabled(tools, workflowData) {
 		copilotEngineToolsLog.Print("Edit tool enabled, adding write permission")
-		args = append(args, "--allow-tool", "write")
-	} else if workflowData != nil && workflowData.DriveMemoryConfig != nil && len(workflowData.DriveMemoryConfig.Drives) > 0 {
-		copilotEngineToolsLog.Print("Drive-memory enabled, adding write permission")
 		args = append(args, "--allow-tool", "write")
 	}
 
@@ -170,7 +169,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	}
 
 	// Handle web-fetch builtin tool (Copilot CLI uses web_fetch with underscore)
-	if _, hasWebFetch := tools["web-fetch"]; hasWebFetch {
+	if isCopilotToolValueEnabled(tools, "web-fetch") {
 		copilotEngineToolsLog.Print("Web-fetch tool enabled, adding web_fetch permission")
 		// web-fetch -> web_fetch
 		args = append(args, "--allow-tool", "web_fetch")
@@ -236,18 +235,27 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		if toolConfigMap, ok := toolConfig.(map[string]any); ok {
 			if hasMcp, _ := hasMCPConfig(toolConfigMap); hasMcp {
 				copilotEngineToolsLog.Printf("Adding custom MCP server permission: %s", toolName)
-				// Allow the entire MCP server
-				args = append(args, "--allow-tool", toolName)
-
-				// If it has specific allowed tools, add them individually
+				hasAllowedField := false
+				allowWholeServer := true
 				if allowed, hasAllowed := toolConfigMap["allowed"]; hasAllowed {
+					hasAllowedField = true
+					allowWholeServer = false
 					if allowedList, ok := allowed.([]any); ok {
 						for _, allowedTool := range allowedList {
 							if toolStr, ok := allowedTool.(string); ok {
+								if toolStr == "*" {
+									allowWholeServer = true
+									break
+								}
 								args = append(args, "--allow-tool", fmt.Sprintf("%s(%s)", toolName, toolStr))
 							}
 						}
 					}
+				}
+				// SDK permission checks use individual entries when an MCP allowlist
+				// exists. CLI mode retains the server-wide grant for compatibility.
+				if !isCopilotSDKMode(workflowData) || !hasAllowedField || allowWholeServer {
+					args = append(args, "--allow-tool", toolName)
 				}
 			}
 		}

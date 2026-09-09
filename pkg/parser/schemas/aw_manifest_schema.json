@@ -20,15 +20,29 @@
     "emoji": {
       "type": "string"
     },
+    "icon": {
+      "type": "string",
+      "description": "Optional icon for the package: an emoji, a GitHub primer octicon in :name: format (e.g. :check-circle:), or a package resource path to an SVG file."
+    },
     "description": {
       "type": "string"
     },
     "license": {
       "type": "string"
     },
+    "private": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the package is private and unavailable for installation."
+    },
+    "experimental": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the package is experimental and may change without notice."
+    },
     "includes": {
       "type": "array",
-      "description": "Installable package entries. String entries use folder naming conventions to infer type: workflows under workflows/, agentic-workflows/, or .github/workflows/; skill directories under skills/ or .github/skills/; agent files under agents/ or .github/agents/. Object entries map a package-relative 'source' to a repository-root-relative 'destination' under .github/workflows/.",
+      "description": "Installable package entries, or paths to aw.yml manifests to compose recursively. String entries use folder naming conventions to infer type: workflows under workflows/, agentic-workflows/, or .github/workflows/; skill directories under skills/ or .github/skills/; agent files under agents/ or .github/agents/. A string may end in /* to include supported direct children of one directory. Object entries map a package-relative 'source' to a repository-root-relative 'destination' under .github/workflows/. A wildcard mapping installs each matching file into the destination folder.",
       "items": {
         "oneOf": [
           {
@@ -36,19 +50,19 @@
           },
           {
             "type": "object",
-            "description": "Source-to-destination mapping. 'source' is resolved relative to the package root (including nested packages); 'destination' is resolved relative to the consuming repository root.",
+            "description": "Source-to-destination mapping. 'source' is resolved relative to the package root (including nested packages); 'destination' is resolved relative to the consuming repository root. When 'source' ends in /*, 'destination' must be the .github/workflows folder.",
             "required": ["source", "destination"],
             "additionalProperties": false,
             "properties": {
               "source": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Package-relative path of the file to install (.md agentic workflow or .yml action workflow)."
+                "description": "Package-relative path of the file to install (.md agentic workflow or .yml action workflow), or a directory followed by /* to install its supported direct children."
               },
               "destination": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Repository-root-relative install path. Must be a direct child of .github/workflows/."
+                "description": "Repository-root-relative install path. Must be a direct child of .github/workflows/, or the .github/workflows folder when source uses a wildcard."
               },
               "kind": {
                 "type": "string",
@@ -457,6 +471,32 @@
               },
               "optional": {
                 "type": "boolean"
+              }
+            }
+          },
+          {
+            "description": "repo-label: create or update a repository label",
+            "type": "object",
+            "required": ["type", "name", "description", "color"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "repo-label"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^[0-9A-Fa-f]{6}$"
               }
             }
           },

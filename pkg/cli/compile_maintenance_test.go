@@ -179,6 +179,266 @@ Test workflow that creates issues without expiration.
 	}
 }
 
+func TestCompileSpecificFiles_PreservesDisabledImplicitActionFailureExpiry(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github/workflows")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatalf("Failed to create workflows directory: %v", err)
+	}
+
+	t.Chdir(tempDir)
+
+	initCmd := exec.Command("git", "init")
+	initCmd.Dir = tempDir
+	if err := initCmd.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	workflowContent := `---
+name: "Test Workflow No Expires"
+on:
+  workflow_dispatch:
+engine: copilot
+---
+
+Test workflow without expiration.
+`
+	workflowPath := filepath.Join(workflowsDir, "test-no-expires.md")
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write workflow file: %v", err)
+	}
+
+	config := CompileConfig{}
+	if _, err := CompileWorkflows(context.Background(), config); err != nil {
+		t.Fatalf("Full CompileWorkflows failed: %v", err)
+	}
+
+	lockPath := filepath.Join(workflowsDir, "test-no-expires.lock.yml")
+	fullCompileContent, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("Failed to read full compile output: %v", err)
+	}
+	if !strings.Contains(string(fullCompileContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`) {
+		t.Fatal("Full compile should disable the implicit action failure expiry")
+	}
+
+	config.MarkdownFiles = []string{"test-no-expires"}
+	if _, err := CompileWorkflows(context.Background(), config); err != nil {
+		t.Fatalf("Targeted CompileWorkflows failed: %v", err)
+	}
+
+	targetedCompileContent, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("Failed to read targeted compile output: %v", err)
+	}
+	if string(targetedCompileContent) != string(fullCompileContent) {
+		t.Fatal("Targeted compile should produce the same lock file as a full compile")
+	}
+}
+
+// TestCompileSpecificFiles_PreservesExplicitActionFailureExpiry verifies that a
+// targeted compile does not zero out an explicitly configured
+// maintenance.action_failure_issue_expires value, even when no
+// agentics-maintenance.yml exists yet (the first-compile case).
+func TestCompileSpecificFiles_PreservesExplicitActionFailureExpiry(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github/workflows")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatalf("Failed to create workflows directory: %v", err)
+	}
+
+	t.Chdir(tempDir)
+
+	initCmd := exec.Command("git", "init")
+	initCmd.Dir = tempDir
+	if err := initCmd.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	awConfig := `{
+  "maintenance": {
+    "action_failure_issue_expires": 48
+  }
+}
+`
+	if err := os.WriteFile(filepath.Join(workflowsDir, "aw.json"), []byte(awConfig), 0644); err != nil {
+		t.Fatalf("Failed to write aw.json: %v", err)
+	}
+
+	workflowContent := `---
+name: "Test Workflow No Expires"
+on:
+  workflow_dispatch:
+engine: copilot
+---
+
+Test workflow without expiration.
+`
+	workflowPath := filepath.Join(workflowsDir, "test-no-expires.md")
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write workflow file: %v", err)
+	}
+
+	// Targeted compile, with no agentics-maintenance.yml present yet.
+	config := CompileConfig{MarkdownFiles: []string{"test-no-expires"}}
+	if _, err := CompileWorkflows(context.Background(), config); err != nil {
+		t.Fatalf("Targeted CompileWorkflows failed: %v", err)
+	}
+
+	lockPath := filepath.Join(workflowsDir, "test-no-expires.lock.yml")
+	content, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("Failed to read targeted compile output: %v", err)
+	}
+	if !strings.Contains(string(content), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "48"`) {
+		t.Fatal("Targeted compile must preserve the explicit 48-hour action failure expiry, not reset it to 0")
+	}
+}
+
+// TestCompileSpecificFiles_PatchesDirectPathOutsideDefaultWorkflowDir verifies
+// that a targeted compile of a direct file path outside the default workflow
+// directory patches the lock file actually emitted next to that input, and
+// does not touch an unrelated lock file of the same workflow ID in the
+// default workflow directory.
+func TestCompileSpecificFiles_PatchesDirectPathOutsideDefaultWorkflowDir(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github/workflows")
+	customDir := filepath.Join(tempDir, "custom")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatalf("Failed to create workflows directory: %v", err)
+	}
+	if err := os.MkdirAll(customDir, 0755); err != nil {
+		t.Fatalf("Failed to create custom directory: %v", err)
+	}
+
+	t.Chdir(tempDir)
+
+	initCmd := exec.Command("git", "init")
+	initCmd.Dir = tempDir
+	if err := initCmd.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	workflowContent := `---
+name: "Test Workflow No Expires"
+on:
+  workflow_dispatch:
+engine: copilot
+---
+
+Test workflow without expiration.
+`
+	// Same workflow ID (derived from base file name) in both the default
+	// workflow directory and an unrelated custom directory.
+	defaultPath := filepath.Join(workflowsDir, "foo.md")
+	if err := os.WriteFile(defaultPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write default workflow file: %v", err)
+	}
+	customPath := filepath.Join(customDir, "foo.md")
+	if err := os.WriteFile(customPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write custom workflow file: %v", err)
+	}
+
+	// Seed the default lock file with an explicit non-zero marker to make sure
+	// it is left untouched by the targeted compile of the unrelated custom path.
+	defaultLockPath := filepath.Join(workflowsDir, "foo.lock.yml")
+	sentinelContent := "GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: \"168\"\n"
+	if err := os.WriteFile(defaultLockPath, []byte(sentinelContent), 0644); err != nil {
+		t.Fatalf("Failed to seed default lock file: %v", err)
+	}
+
+	// Targeted compile of the direct path outside the default workflow directory.
+	config := CompileConfig{MarkdownFiles: []string{customPath}}
+	if _, err := CompileWorkflows(context.Background(), config); err != nil {
+		t.Fatalf("Targeted CompileWorkflows failed: %v", err)
+	}
+
+	customLockPath := filepath.Join(customDir, "foo.lock.yml")
+	customLockContent, err := os.ReadFile(customLockPath)
+	if err != nil {
+		t.Fatalf("Failed to read custom compile output: %v", err)
+	}
+	if !strings.Contains(string(customLockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`) {
+		t.Fatal("Compiling a direct path outside the default workflow directory should still reconcile its own lock file")
+	}
+
+	// The unrelated default-directory lock file (sharing the same workflow ID)
+	// must remain untouched by the targeted compile of the custom path.
+	defaultLockContent, err := os.ReadFile(defaultLockPath)
+	if err != nil {
+		t.Fatalf("Failed to read default lock file: %v", err)
+	}
+	if string(defaultLockContent) != sentinelContent {
+		t.Fatal("Targeted compile of a direct path must not rewrite an unrelated lock file with the same workflow ID")
+	}
+}
+
+// TestCompileSpecificFiles_DisablesExpiryWhenCloseExpiredJobDisabled verifies
+// that the implicit action-failure expiry marker is disabled when
+// agentics-maintenance.yml exists but its close-expired-entities job has been
+// disabled via maintenance.disabled_jobs, since nothing would consume the marker.
+func TestCompileSpecificFiles_DisablesExpiryWhenCloseExpiredJobDisabled(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github/workflows")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatalf("Failed to create workflows directory: %v", err)
+	}
+
+	t.Chdir(tempDir)
+
+	initCmd := exec.Command("git", "init")
+	initCmd.Dir = tempDir
+	if err := initCmd.Run(); err != nil {
+		t.Fatalf("Failed to initialize git repo: %v", err)
+	}
+
+	awConfig := `{
+  "maintenance": {
+    "disabled_jobs": ["close-expired-entities"]
+  }
+}
+`
+	if err := os.WriteFile(filepath.Join(workflowsDir, "aw.json"), []byte(awConfig), 0644); err != nil {
+		t.Fatalf("Failed to write aw.json: %v", err)
+	}
+
+	// A pre-existing maintenance workflow file, present but (per aw.json above)
+	// not actually running the close-expired-entities job.
+	maintenancePath := filepath.Join(workflowsDir, "agentics-maintenance.yml")
+	maintenanceContent := "name: agentics-maintenance\non:\n  schedule:\n    - cron: '37 0 * * *'\n"
+	if err := os.WriteFile(maintenancePath, []byte(maintenanceContent), 0644); err != nil {
+		t.Fatalf("Failed to create maintenance workflow: %v", err)
+	}
+
+	workflowContent := `---
+name: "Test Workflow No Expires"
+on:
+  workflow_dispatch:
+engine: copilot
+---
+
+Test workflow without expiration.
+`
+	workflowPath := filepath.Join(workflowsDir, "test-no-expires.md")
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write workflow file: %v", err)
+	}
+
+	config := CompileConfig{MarkdownFiles: []string{"test-no-expires"}}
+	if _, err := CompileWorkflows(context.Background(), config); err != nil {
+		t.Fatalf("Targeted CompileWorkflows failed: %v", err)
+	}
+
+	lockPath := filepath.Join(workflowsDir, "test-no-expires.lock.yml")
+	content, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("Failed to read targeted compile output: %v", err)
+	}
+	if !strings.Contains(string(content), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`) {
+		t.Fatal("Implicit expiry marker should be disabled when the close-expired-entities job is disabled, even if agentics-maintenance.yml exists")
+	}
+}
+
 func TestCompileWithCustomDir_SkipsMaintenanceWorkflow(t *testing.T) {
 	// Create temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")

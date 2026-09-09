@@ -42,6 +42,8 @@ package workflow
 //
 
 // extractSafeOutputsConfig extracts output configuration from frontmatter
+//
+//nolint:largefunc // Existing centralized safe-output extraction remains intentionally sequential.
 func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOutputsConfig {
 	safeOutputsConfigLog.Print("Extracting safe-outputs configuration from frontmatter")
 
@@ -52,12 +54,24 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			safeOutputsConfigLog.Printf("Processing safe-outputs configuration with %d top-level keys", len(outputMap))
 			config = &SafeOutputsConfig{}
 
+			config.CreateWorkItems = c.parseCreateWorkItemConfig(outputMap)
+			config.UpdateWorkItems = c.parseUpdateWorkItemConfig(outputMap)
+			config.CommentOnWorkItems = c.parseCommentOnWorkItemConfig(outputMap)
+			config.AssignWorkItems = c.parseAssignWorkItemConfig(outputMap)
+			config.LinkWorkItems = c.parseLinkWorkItemsConfig(outputMap)
+			config.UploadWorkItemAttachments = c.parseUploadWorkItemAttachmentConfig(outputMap)
+			config.LinearCreateIssue = c.parseLinearCreateIssueConfig(outputMap)
+			config.LinearAddComment = c.parseLinearAddCommentConfig(outputMap)
+			config.LinearUpdateIssue = c.parseLinearUpdateIssueConfig(outputMap)
+
 			// Handle create-issue
 			issuesConfig := c.parseCreateIssuesConfig(outputMap)
 			if issuesConfig != nil {
 				safeOutputsConfigLog.Print("Configured create-issue output handler")
 				config.CreateIssues = issuesConfig
 			}
+
+			c.extractJiraSafeOutputConfigs(outputMap, config)
 
 			// Handle create-agent-session
 			agentSessionConfig := c.parseAgentSessionConfig(outputMap)
@@ -383,11 +397,12 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				// Enable report-incomplete by default if safe-outputs exists and it wasn't explicitly disabled.
 				// This ensures agents always have a first-class channel to signal task incompletion.
 				if _, exists := outputMap["report-incomplete"]; !exists {
-					trueVal := "true"
+					trueVal := defaultReportIncompleteCreateIssue(config)
 					config.ReportIncomplete = &ReportIncompleteConfig{
 						CreateIssue: &trueVal,
 						TitlePrefix: "",
 						Labels:      nil,
+						Implicit:    true,
 					}
 				}
 			}

@@ -105,5 +105,5 @@ imports:
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflow(mainFile)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mapping was used where sequence is expected")
+	assert.Contains(t, err.Error(), "Unknown properties: role, secret")
 }

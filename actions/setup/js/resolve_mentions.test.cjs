@@ -149,6 +149,12 @@ describe("resolve_mentions.cjs", () => {
             result = await resolveMentionsLazily(mentions, [], "owner", "repo", mockGithub, mockCore);
           (expect(result.totalMentions).toBe(60), expect(result.limitExceeded).toBe(!0), expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Mention limit exceeded")));
         }),
+        it("should not count known authors toward the 50 mention resolution limit", async () => {
+          const knownAuthors = Array.from({ length: 60 }, (_, i) => `known${i}`),
+            mentions = knownAuthors.map(author => `@${author}`).join(" "),
+            result = await resolveMentionsLazily(mentions, knownAuthors, "owner", "repo", mockGithub, mockCore);
+          (expect(result.allowedMentions).toEqual(knownAuthors), expect(result.limitExceeded).toBe(!1));
+        }),
         it("should preserve case in allowed mentions", async () => {
           mockGithub.rest.repos.listCollaborators.mockResolvedValue({ data: [{ login: "maintainer1", type: "User", permissions: { maintain: !0, admin: !1, push: !1 } }] });
           const result = await resolveMentionsLazily("Hello @Maintainer1", [], "owner", "repo", mockGithub, mockCore);

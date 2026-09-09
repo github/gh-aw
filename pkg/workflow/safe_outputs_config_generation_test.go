@@ -280,7 +280,7 @@ func TestGenerateSafeOutputsConfigMissingToolWithIssue(t *testing.T) {
 func TestGenerateSafeOutputsConfigMentions(t *testing.T) {
 	enabled := true
 	allowedCollaborators := false
-	max := 5
+	max := "5"
 
 	data := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{
@@ -305,6 +305,24 @@ func TestGenerateSafeOutputsConfigMentions(t *testing.T) {
 	assert.True(t, mentions["enabled"].(bool), "enabled should be true")
 	assert.False(t, mentions["allowedCollaborators"].(bool), "allowedCollaborators should be false")
 	assert.InDelta(t, float64(5), mentions["max"], 0.0001, "max should be 5")
+}
+
+func TestGenerateSafeOutputsConfigMentionsTemplatableMax(t *testing.T) {
+	max := "${{ inputs.max-mentions }}"
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			Mentions: &MentionsConfig{Max: &max},
+		},
+	}
+
+	result, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &parsed))
+	mentions, ok := parsed["mentions"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, max, mentions["max"])
 }
 
 func TestGenerateSafeOutputsConfigNormalizeClosingKeywordsPerType(t *testing.T) {
@@ -1104,6 +1122,60 @@ func TestGenerateSafeOutputsConfigRepoMemory(t *testing.T) {
 	assert.Equal(t, "notes", mem1["id"], "Second memory id should match")
 	assert.Equal(t, "/tmp/gh-aw/repo-memory/notes", mem1["dir"], "Second memory dir should be correct")
 	assert.InDelta(t, float64(2048), mem1["max_file_size"], 0.0001, "Second memory max_file_size should match")
+}
+
+// TestGenerateSafeOutputsConfigRepoMemoryFilters tests that generateSafeOutputsConfig
+// passes allowed-extensions/file-glob through to the push_repo_memory preflight config,
+// so the MCP tool preflight can apply the same eligibility filtering as the agent-side
+// filter step and the push job (regression: preflight was previously unfiltered).
+func TestGenerateSafeOutputsConfigRepoMemoryFilters(t *testing.T) {
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{},
+		RepoMemoryConfig: &RepoMemoryConfig{
+			Memories: []RepoMemoryEntry{
+				{
+					ID:                "default",
+					MaxFileSize:       5120,
+					MaxPatchSize:      20480,
+					MaxFileCount:      50,
+					AllowedExtensions: []string{".json", ".md"},
+					FileGlob:          []string{"*.json", "metrics/**"},
+				},
+				{
+					ID:           "notes",
+					MaxFileSize:  2048,
+					MaxPatchSize: 8192,
+					MaxFileCount: 20,
+				},
+			},
+		},
+	}
+
+	result, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err, "generateSafeOutputsConfig should not return an error")
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &parsed), "Result must be valid JSON")
+
+	pushRepoMemory, ok := parsed["push_repo_memory"].(map[string]any)
+	require.True(t, ok, "Expected push_repo_memory key in config")
+	memories, ok := pushRepoMemory["memories"].([]any)
+	require.True(t, ok, "Expected memories to be an array")
+	require.Len(t, memories, 2, "Expected 2 memory entries")
+
+	mem0, ok := memories[0].(map[string]any)
+	require.True(t, ok, "First memory entry should be a map")
+	allowedExts, ok := mem0["allowed_extensions"].([]any)
+	require.True(t, ok, "First memory should carry allowed_extensions")
+	assert.Equal(t, []any{".json", ".md"}, allowedExts, "allowed_extensions should be passed through")
+	assert.Equal(t, "*.json metrics/**", mem0["file_glob"], "file_glob should be joined with spaces")
+
+	mem1, ok := memories[1].(map[string]any)
+	require.True(t, ok, "Second memory entry should be a map")
+	_, hasAllowedExts := mem1["allowed_extensions"]
+	assert.False(t, hasAllowedExts, "Second memory should not carry allowed_extensions when unset")
+	_, hasFileGlob := mem1["file_glob"]
+	assert.False(t, hasFileGlob, "Second memory should not carry file_glob when unset")
 }
 
 // TestGenerateSafeOutputsConfigNoRepoMemory tests that push_repo_memory is absent

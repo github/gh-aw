@@ -137,7 +137,7 @@ func isNoOpReportAsIssueEnabled(reportAsIssue *string) bool {
 // maintenance workflow is deleted and the function returns immediately.
 // opts.RepoSlug is the owner/repo slug used to determine the default branch for the push
 // trigger; pass an empty string to fall back to "main".
-func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWorkflowOptions) error {
+func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWorkflowOptions) error { //nolint:largefunc // Existing workflow orchestration remains centralized.
 	workflowDataList := opts.WorkflowDataList
 	workflowDir := opts.WorkflowDir
 	version := opts.Version
@@ -176,6 +176,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 			ActionTag:       actionTag,
 			Resolver:        resolver,
 			CustomCron:      autoUpgradeCronFrom(repoConfig),
+			UpgradeOptions:  autoUpgradeOptionsFrom(repoConfig),
 		})
 	}
 
@@ -248,6 +249,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 			ActionTag:       actionTag,
 			Resolver:        resolver,
 			CustomCron:      autoUpgradeCronFrom(repoConfig),
+			UpgradeOptions:  autoUpgradeOptionsFrom(repoConfig),
 		})
 	}
 
@@ -336,6 +338,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		ActionTag:       actionTag,
 		Resolver:        resolver,
 		CustomCron:      autoUpgradeCronFrom(repoConfig),
+		UpgradeOptions:  autoUpgradeOptionsFrom(repoConfig),
 	})
 }
 
@@ -346,6 +349,13 @@ func autoUpgradeCronFrom(cfg *RepoConfig) string {
 		return ""
 	}
 	return cfg.AutoUpgradeCron
+}
+
+func autoUpgradeOptionsFrom(cfg *RepoConfig) []string {
+	if cfg == nil {
+		return nil
+	}
+	return cfg.AutoUpgradeOptions
 }
 
 // handleMaintenanceDisabled handles the case where maintenance is disabled in repo config.
@@ -420,7 +430,7 @@ func allCopilotWorkflowsUseOrgBilling(workflowDataList []*WorkflowData) bool {
 // since safe-outputs.report-failure-as-issue defaults to true, treating the
 // implicit default as an always-on trigger would force agentics-maintenance.yml
 // into essentially every repository with a gh-aw workflow.
-func scanWorkflowsForExpires(workflowDataList []*WorkflowData, repoConfig *RepoConfig) (bool, int, string) {
+func scanWorkflowsForExpires(workflowDataList []*WorkflowData, repoConfig *RepoConfig) (bool, int, string) { //nolint:largefunc // Existing expiration scan remains centralized.
 	hasExpires := false
 	minExpires := 0 // Track minimum expires value in hours
 	triggerReason := ""
@@ -518,11 +528,25 @@ func scanWorkflowsForExpires(workflowDataList []*WorkflowData, repoConfig *RepoC
 // are never affected by this function, because an explicit configuration
 // always makes scanWorkflowsForExpires report hasExpires=true.
 func disableDefaultActionFailureExpiryMarkers(workflowDataList []*WorkflowData, workflowDir string) {
+	var lockFiles []string
 	for _, workflowData := range workflowDataList {
 		if workflowData == nil || workflowData.WorkflowID == "" {
 			continue
 		}
-		lockFile := filepath.Join(workflowDir, workflowData.WorkflowID+".lock.yml")
+		lockFiles = append(lockFiles, filepath.Join(workflowDir, workflowData.WorkflowID+".lock.yml"))
+	}
+	patchActionFailureExpiryMarkersInFiles(lockFiles)
+}
+
+// patchActionFailureExpiryMarkersInFiles disables the implicit action-failure
+// expiry marker (see actionFailureIssueExpiryLineRegex) in each of the given
+// lock files, in place. Missing files (e.g. from --no-emit compiles) are
+// skipped without error.
+func patchActionFailureExpiryMarkersInFiles(lockFiles []string) {
+	for _, lockFile := range lockFiles {
+		if lockFile == "" {
+			continue
+		}
 		content, err := os.ReadFile(lockFile)
 		if err != nil {
 			// Lock file may not exist (e.g. --no-emit compiles); nothing to patch.

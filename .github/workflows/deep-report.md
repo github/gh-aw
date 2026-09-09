@@ -65,6 +65,8 @@ safe-outputs:
     group: true
 
 tools:
+  github:
+    mode: local
   repo-memory:
     branch-name: memory/deep-report
     description: "Long-term insights, patterns, and trend data"
@@ -100,7 +102,7 @@ evals:
 
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
 ### DeepReport - Intelligence Gathering Agent

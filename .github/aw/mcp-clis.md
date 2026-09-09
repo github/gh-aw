@@ -22,9 +22,8 @@ Each server is a standalone executable on `PATH`. Invoke from bash with `--name 
 
 **Examples:**
 ```bash
-playwright --help
-playwright browser_navigate --url https://example.com
-playwright browser_snapshot
+github --help
+github issue_read --method get --owner org --repo repo --issue_number 42
 
 safeoutputs add_comment --item_number 42 --body "Analysis complete"
 

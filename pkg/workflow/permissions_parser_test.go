@@ -212,6 +212,98 @@ func TestPermissionsParser_HasContentsReadAccess(t *testing.T) {
 	}
 }
 
+func TestPermissionsParser_ContentsIsNone(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions string
+		expected    bool
+	}{
+		{
+			name:        "shorthand none reports contents is none",
+			permissions: "permissions: none",
+			expected:    true,
+		},
+		{
+			name:        "shorthand read-all does not report contents is none",
+			permissions: "permissions: read-all",
+			expected:    false,
+		},
+		{
+			name: "explicit contents: none reports contents is none",
+			permissions: `permissions:
+  contents: none
+  issues: write`,
+			expected: true,
+		},
+		{
+			name: "explicit contents: read does not report contents is none",
+			permissions: `permissions:
+  contents: read`,
+			expected: false,
+		},
+		{
+			name: "no contents permission does not report contents is none",
+			permissions: `permissions:
+  issues: write`,
+			expected: false,
+		},
+		{
+			name:        "empty permissions does not report contents is none",
+			permissions: "",
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewPermissionsParser(tt.permissions)
+			result := parser.ContentsIsNone()
+			if result != tt.expected {
+				t.Errorf("ContentsIsNone() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewPermissionsParserFromValue_ContentsIsNone(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions any
+		expected    bool
+	}{
+		{
+			name:        "raw string shorthand none",
+			permissions: "none",
+			expected:    true,
+		},
+		{
+			name:        "raw map with contents: none",
+			permissions: map[string]any{"contents": "none", "issues": "write"},
+			expected:    true,
+		},
+		{
+			name:        "raw map with contents: read",
+			permissions: map[string]any{"contents": "read"},
+			expected:    false,
+		},
+		{
+			name:        "nil permissions",
+			permissions: nil,
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewPermissionsParserFromValue(tt.permissions)
+			result := parser.ContentsIsNone()
+			if result != tt.expected {
+				t.Errorf("ContentsIsNone() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestContainsCheckout(t *testing.T) {
 	tests := []struct {
 		name        string

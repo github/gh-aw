@@ -157,6 +157,41 @@ function isAgenticEngineTimeout(logContent) {
 const MODEL_NOT_SUPPORTED_PATTERN =
   /(?:The requested model is not supported|invalid model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|unknown model\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?\s+(?:is\s+)?(?:not found|does not exist|not supported|not available|unavailable)|404\b[^\n]*\bModel\s+not\s+found|No model available\b[^\n]*policy enablement)/i;
 
+/**
+ * Determines if Codex emitted a `turn.failed` event for a model that does not
+ * support its custom tool schema.
+ * @param {string} output - Collected stdout+stderr from the process
+ * @returns {boolean}
+ */
+function isUnsupportedModelToolsError(output) {
+  return output.split(/\r?\n/).some(line => {
+    try {
+      const event = JSON.parse(line);
+      if (event?.type !== "turn.failed" || !event.error) return false;
+
+      const candidates = [event.error];
+      for (let visited = 0; visited < 8 && candidates.length > 0; visited++) {
+        const current = candidates.shift();
+        if (!current || typeof current !== "object") continue;
+        if (current.message === "Invalid value: 'custom'" && current.param === "tools") return true;
+
+        if (current.error && typeof current.error === "object") candidates.push(current.error);
+        for (const value of [current.message, current.metadata?.raw]) {
+          if (typeof value !== "string") continue;
+          try {
+            candidates.push(JSON.parse(value));
+          } catch {
+            // Ignore non-JSON strings.
+          }
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
+}
+
 // Pattern: Generic HTTP 400 Bad Request responses emitted by engine / SDK wrappers.
 // NOTE: keep in sync with HTTP_400_RESPONSE_ERROR_PATTERN in copilot_harness.cjs.
 // Also matches "400 400 400 no model endpoints available given user constraints" which is emitted
@@ -359,7 +394,7 @@ function detectErrors(logContent) {
     inferenceAccessError: INFERENCE_ACCESS_ERROR_PATTERN.test(logContent),
     mcpPolicyError: MCP_POLICY_BLOCKED_PATTERN.test(logContent),
     agenticEngineTimeout: isAgenticEngineTimeout(logContent),
-    modelNotSupportedError: MODEL_NOT_SUPPORTED_PATTERN.test(logContent),
+    modelNotSupportedError: MODEL_NOT_SUPPORTED_PATTERN.test(logContent) || isUnsupportedModelToolsError(logContent),
     http400ResponseError: HTTP_400_RESPONSE_ERROR_PATTERN.test(logContent),
     capiQuotaExceededError: isCAPIQuotaExceededError(logContent),
     invocationCapExceeded: isInvocationCapExceededError(logContent),
@@ -590,6 +625,7 @@ module.exports = {
   isInvocationCapExceededError,
   isMaxCacheMissesExceededError,
   isAgenticEngineTimeout,
+  isUnsupportedModelToolsError,
   isStepTimeout,
   detectStepTimeoutFromEnvironment,
   INFERENCE_ACCESS_ERROR_PATTERN,

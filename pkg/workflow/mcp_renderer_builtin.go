@@ -10,70 +10,6 @@ import (
 
 var mcpRendererBuiltinLog = logger.New("workflow:mcp_renderer_builtin")
 
-// RenderPlaywrightMCP generates the Playwright MCP server configuration
-func (r *MCPConfigRendererUnified) RenderPlaywrightMCP(yaml *strings.Builder, playwrightTool any) {
-	mcpRendererLog.Printf("Rendering Playwright MCP: format=%s, inline_args=%t", r.options.Format, r.options.InlineArgs)
-
-	// Parse playwright tool configuration to strongly-typed struct
-	playwrightConfig := parsePlaywrightTool(playwrightTool)
-
-	if r.options.Format == "toml" {
-		r.renderPlaywrightTOML(yaml, playwrightConfig)
-		// Add guard policies for TOML format as a separate section
-		if len(r.options.WriteSinkGuardPolicies) > 0 {
-			mcpRendererLog.Print("Adding guard-policies to playwright TOML (derived from GitHub guard-policy)")
-			renderGuardPoliciesToml(yaml, r.options.WriteSinkGuardPolicies, "playwright")
-		}
-		return
-	}
-
-	// JSON format
-	renderPlaywrightMCPConfigWithOptions(yaml, playwrightConfig, r.options.IsLast, r.options.IncludeCopilotFields, r.options.InlineArgs, r.options.WriteSinkGuardPolicies, r.options.ContainerPinMappings)
-}
-
-// renderPlaywrightTOML generates Playwright MCP configuration in TOML format
-// Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
-// Uses MCP Gateway spec format: container, entrypointArgs, mounts, and args fields.
-func (r *MCPConfigRendererUnified) renderPlaywrightTOML(yaml *strings.Builder, playwrightConfig *PlaywrightToolConfig) {
-	mcpRendererBuiltinLog.Print("Rendering Playwright MCP in TOML format")
-	customArgs := getPlaywrightCustomArgs(playwrightConfig)
-
-	// Use official Playwright MCP Docker image (no version tag - only one image).
-	// Apply container_pins mapping so private-cloud runners use the configured mirror.
-	playwrightImage := resolveGatewayContainerFromMappings("mcr.microsoft.com/playwright/mcp", r.options.ContainerPinMappings)
-
-	yaml.WriteString("          \n")
-	yaml.WriteString("          [mcp_servers.playwright]\n")
-	yaml.WriteString("          container = \"" + playwrightImage + "\"\n")
-
-	// Docker runtime args (goes before container image in docker run command)
-	// Add security-opt and ipc flags for Chromium browser compatibility in GitHub Actions
-	// --security-opt seccomp=unconfined: Required for Chromium sandbox to function properly
-	// --ipc=host: Provides shared memory access required by Chromium
-	yaml.WriteString("          args = [\n")
-	yaml.WriteString("            \"--init\",\n")
-	yaml.WriteString("            \"--network\",\n")
-	yaml.WriteString("            \"host\",\n")
-	yaml.WriteString("            \"--security-opt\",\n")
-	yaml.WriteString("            \"seccomp=unconfined\",\n")
-	yaml.WriteString("            \"--ipc=host\",\n")
-	yaml.WriteString("          ]\n")
-
-	// Entrypoint args for Playwright MCP server (goes after container image)
-	yaml.WriteString("          entrypointArgs = [\n")
-	yaml.WriteString("            \"--output-dir\",\n")
-	yaml.WriteString("            \"/tmp/gh-aw/mcp-logs/playwright\"")
-
-	// Append custom args if present
-	writeArgsToYAML(yaml, customArgs, "            ")
-
-	yaml.WriteString("\n")
-	yaml.WriteString("          ]\n")
-
-	// Add volume mounts
-	yaml.WriteString("          mounts = [\"/tmp/gh-aw/mcp-logs:/tmp/gh-aw/mcp-logs:rw\"]\n")
-}
-
 // RenderSafeOutputsMCP generates the Safe Outputs MCP server configuration
 func (r *MCPConfigRendererUnified) RenderSafeOutputsMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	mcpRendererLog.Printf("Rendering Safe Outputs MCP: format=%s", r.options.Format)
@@ -192,7 +128,7 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 
 // renderAgenticWorkflowsTOML generates Agentic Workflows MCP configuration in TOML format
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
-func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Builder) {
+func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Builder) { //nolint:largefunc // Existing TOML emission preserves field ordering.
 	mcpRendererBuiltinLog.Printf("Rendering Agentic Workflows MCP in TOML format: action_mode=%s", r.options.ActionMode)
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers." + constants.AgenticWorkflowsMCPServerID.String() + "]\n")
@@ -258,7 +194,7 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 
 // renderSafeOutputsMCPConfigWithOptions generates the Safe Outputs MCP server configuration with engine-specific options.
 // The server runs as a containerized stdio MCP server in the published gh-aw node image.
-func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, workflowData *WorkflowData) {
+func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, workflowData *WorkflowData) { //nolint:largefunc // Existing config emission preserves field ordering.
 	mcpRendererBuiltinLog.Printf("Rendering Safe Outputs MCP config with options: isLast=%v, includeCopilotFields=%v", isLast, includeCopilotFields)
 	containerImage := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
 	yaml.WriteString("              \"" + constants.SafeOutputsMCPServerID.String() + "\": {\n")
@@ -357,7 +293,7 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 // renderAgenticWorkflowsMCPConfigWithOptions generates the Agentic Workflows MCP server configuration with engine-specific options
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
-func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode, guardPolicies map[string]any, containerPinMappings map[string]string) {
+func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode, guardPolicies map[string]any, containerPinMappings map[string]string) { //nolint:largefunc // Existing config emission preserves field ordering.
 	mcpRendererBuiltinLog.Printf("Rendering Agentic Workflows MCP config: isLast=%v, includeCopilotFields=%v, actionMode=%v", isLast, includeCopilotFields, actionMode)
 
 	// Environment variables: map of env var name to value (literal) or source variable (reference)

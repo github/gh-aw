@@ -118,8 +118,8 @@ func TestValidateStrictSandboxCustomization(t *testing.T) {
 			name: "sandbox.mcp with only allowed fields is permitted",
 			sandbox: &SandboxConfig{
 				MCP: &MCPGatewayRuntimeConfig{
-					Port:   8080,
-					APIKey: "${{ secrets.MCP_KEY }}",
+					Port:    8080,
+					AgentID: "${{ secrets.MCP_KEY }}",
 				},
 			},
 			expectError: false,

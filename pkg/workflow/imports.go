@@ -298,6 +298,17 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 		}
 	}
 
+	// Recompute the implicit report-incomplete create-issue default now that imports are
+	// merged. The default is originally computed from only the main workflow's own
+	// safe-outputs block, before Linear (or other) handlers supplied by an import are
+	// visible. Without recomputing here, a main workflow that declares only global fields
+	// (e.g. linear-token) could inherit an implicit `create-issue: true` default meant for
+	// a GitHub-only configuration, even though the merged result is Linear-only.
+	if result.ReportIncomplete != nil && result.ReportIncomplete.Implicit {
+		recomputed := defaultReportIncompleteCreateIssue(result)
+		result.ReportIncomplete.CreateIssue = &recomputed
+	}
+
 	// Apply protected-files exclude lists accumulated from type-conflicting imports.
 	// These are merged as a set so that importing a base workflow can add to exclusions
 	// without completely replacing the main workflow's handler configuration.
@@ -444,6 +455,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	}
 	if result.GitHubToken == "" && importedConfig.GitHubToken != "" {
 		result.GitHubToken = importedConfig.GitHubToken
+	}
+	if result.LinearToken == "" && importedConfig.LinearToken != "" {
+		result.LinearToken = importedConfig.LinearToken
 	}
 	if result.GitHubApp == nil && importedConfig.GitHubApp != nil {
 		result.GitHubApp = importedConfig.GitHubApp

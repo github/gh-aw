@@ -120,15 +120,15 @@ func buildMaintenanceWorkflowTriggerYAML(
 
 // buildMaintenanceDispatchInputsYAML returns the workflow_dispatch trigger block.
 func buildMaintenanceDispatchInputsYAML() string {
-	return `  workflow_dispatch:
+	return fmt.Sprintf(`  workflow_dispatch:
     inputs:
       operation:
         description: 'Optional maintenance operation to run'
         required: false
         type: choice
-        default: ''
+        default: '%[1]s'
         options:
-          - ''
+          - '%[1]s'
           - 'disable'
           - 'enable'
           - 'update'
@@ -146,7 +146,7 @@ func buildMaintenanceDispatchInputsYAML() string {
         required: false
         type: string
         default: ''
-`
+`, maintenanceNoOperationValue)
 }
 
 // buildMaintenanceWorkflowCallYAML returns the workflow_call trigger block.

@@ -16,6 +16,7 @@ const { detectForkPR, checkBranchPushable } = require("./pr_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { checkFileProtection, checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
+const { POLICY_FILE_PROTECTION_DENIED_REASON_CODE } = require("./error_codes.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { renderTemplateFromFile, buildProtectedFileList, getPromptPath } = require("./messages_core.cjs");
 const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
@@ -524,8 +525,8 @@ async function main(config = {}) {
           protection.source === "allowlist"
             ? `Cannot push to pull request branch: patch modifies files outside the allowed-files list (${filesStr}). Add the files to the allowed-files configuration field or remove them from the patch.`
             : `Cannot push to pull request branch: patch modifies protected files (${filesStr}). Add them to the allowed-files configuration field or set protected-files: fallback-to-issue to create a review issue instead.`;
-        core.error(msg);
-        return { success: false, error: msg };
+        core.warning(msg);
+        return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg };
       }
       if (protection.action === "fallback") {
         protectedFilesForFallback = protection.files;
@@ -1118,8 +1119,8 @@ async function main(config = {}) {
                   bundleProtection.source === "post-apply"
                     ? `Cannot push to pull request branch: bundle modifies files outside the allowed-files list (${filesStr}). Add the files to the allowed-files configuration field or remove them from the bundle.`
                     : `Cannot push to pull request branch: bundle modifies protected files (${filesStr}). Add them to the allowed-files configuration field or set protected-files: fallback-to-issue to create a review issue instead.`;
-                core.error(msg);
-                return { success: false, error: msg };
+                core.warning(msg);
+                return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error: msg };
               }
               if (bundleProtection.action === "fallback") {
                 core.warning(`Protected file protection triggered (fallback-to-issue): ${bundleProtection.files.join(", ")}. Will create review issue instead of pushing.`);

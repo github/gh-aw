@@ -93,6 +93,24 @@ func TestCompilerLoadRepoConfig_CachesResult(t *testing.T) {
 	}
 }
 
+func TestCompilerRepoConfigStrictOverridesFrontmatter(t *testing.T) {
+	gitRoot := t.TempDir()
+	workflowsDir := filepath.Join(gitRoot, ".github", "workflows")
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
+		t.Fatalf("Failed to create workflows directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workflowsDir, "aw.json"), []byte(`{"strict":true}`), 0o600); err != nil {
+		t.Fatalf("Failed to write aw.json: %v", err)
+	}
+
+	compiler := NewCompiler()
+	compiler.gitRoot = gitRoot
+
+	if !compiler.effectiveStrictMode(map[string]any{"strict": false}) {
+		t.Fatal("Expected repository strict mode to override workflow frontmatter")
+	}
+}
+
 func TestCompilerLoadRepoConfig_CachesError(t *testing.T) {
 	gitRoot := t.TempDir()
 	workflowsDir := filepath.Join(gitRoot, ".github", "workflows")

@@ -19,6 +19,12 @@ const (
 	defaultAgentStdioLogPath = "/tmp/gh-aw/agent-stdio.log"
 	// runSummaryFileName is the name of the summary file created in each run folder
 	runSummaryFileName = "run_summary.json"
+	// jobsAPIResponseFileName is the raw GitHub Actions jobs API response cached for each run
+	jobsAPIResponseFileName = "jobs.json"
+	// runAPIResponseFileName is the raw GitHub Actions run API response cached for each run
+	runAPIResponseFileName = "run.json"
+	// auditFileName is the structured audit report cached for each run
+	auditFileName = "audit.json"
 	// defaultLogsOutputDir is the default directory for downloaded workflow logs
 	defaultLogsOutputDir = ".github/aw/logs"
 )
@@ -37,14 +43,16 @@ const (
 	// MaxConcurrentDownloads limits the number of parallel artifact downloads
 	MaxConcurrentDownloads = 10
 	// APICallCooldown is the minimum pause between successive batch-fetch iterations to
-	// avoid hitting the GitHub API rate limit when processing many runs in a single
-	// invocation.  checkAndWaitForRateLimit always sleeps at least this long.
+	// avoid hitting the GitHub API rate limit when no explicit usage ceiling is configured.
 	APICallCooldown = 500 * time.Millisecond
 	// RateLimitThreshold is the minimum number of GitHub API core requests that must
 	// remain before the rate-limit helper considers the budget healthy.  When the
 	// remaining count falls at or below this value the helper sleeps until the reset
 	// window so subsequent iterations are not rejected with a 403/429.
 	RateLimitThreshold = 10
+	// RateLimitWarningThresholdPercent is the core quota percentage at or below
+	// which non-JSON logs output warns that the API limit is approaching.
+	RateLimitWarningThresholdPercent = 20
 	// rateLimitResetBuffer is the extra duration added on top of the computed wait time
 	// after a rate-limit reset to avoid resuming right on the boundary.
 
@@ -72,6 +80,9 @@ type WorkflowRun struct {
 	HeadBranch          string    `json:"headBranch"`
 	HeadSha             string    `json:"headSha"`
 	DisplayTitle        string    `json:"displayTitle"`
+	Attempt             int       `json:"attempt,omitempty"`
+	Repository          string    `json:"repository,omitempty"`
+	Actor               string    `json:"actor,omitempty"`
 	Duration            time.Duration
 	ActionMinutes       float64 // Billable Actions minutes estimated from wall-clock time
 	TokenUsage          int
@@ -232,10 +243,11 @@ type MissingDataSummary struct {
 
 // MCPToolUsageSummary aggregates MCP tool usage across all runs
 type MCPToolUsageSummary struct {
-	Summary        []MCPToolSummary    `json:"summary" console:"title:Tool Statistics"`             // Aggregated statistics per tool
-	Servers        []MCPServerStats    `json:"servers,omitempty" console:"title:Server Statistics"` // Server-level statistics
-	ToolCalls      []MCPToolCall       `json:"tool_calls" console:"-"`                              // Individual tool call records (excluded from console)
-	FilteredEvents []DifcFilteredEvent `json:"filtered_events,omitempty" console:"-"`               // DIFC filtered events (excluded from console display)
+	Summary        []MCPToolSummary        `json:"summary" console:"title:Tool Statistics"`             // Aggregated statistics per tool
+	Servers        []MCPServerStats        `json:"servers,omitempty" console:"title:Server Statistics"` // Server-level statistics
+	ToolCalls      []MCPToolCall           `json:"tool_calls" console:"-"`                              // Individual tool call records (excluded from console)
+	FilteredEvents []DifcFilteredEvent     `json:"filtered_events,omitempty" console:"-"`               // DIFC filtered events (excluded from console display)
+	Integrity      *IntegrityFilterSummary `json:"integrity,omitempty" console:"-"`                     // Aggregate DIFC integrity-filter activity
 }
 
 // ErrNoArtifacts indicates that a workflow run has no artifacts
@@ -291,27 +303,48 @@ type RunSummary struct {
 // DownloadResult represents the result of downloading and processing a workflow run
 type DownloadResult struct {
 	RunAnalysis
-	Error    error
-	Skipped  bool
-	Cached   bool // True if loaded from cached summary
-	LogsPath string
+	Error           error
+	Skipped         bool
+	Cached          bool // True if loaded from cached summary
+	LogsPath        string
+	storageReserved bool
 }
 
 // JobInfo represents basic information about a workflow job
 type JobInfo struct {
-	Name        string    `json:"name"`
-	Status      string    `json:"status"`
-	Conclusion  string    `json:"conclusion"`
-	StartedAt   time.Time `json:"started_at,omitzero"`
-	CompletedAt time.Time `json:"completed_at,omitzero"`
-	Steps       []JobStep `json:"steps,omitempty"`
+	ID              int64     `json:"id,omitempty"`
+	RunID           int64     `json:"run_id,omitempty"`
+	RunURL          string    `json:"run_url,omitempty"`
+	RunAttempt      int       `json:"run_attempt,omitempty"`
+	NodeID          string    `json:"node_id,omitempty"`
+	HeadSha         string    `json:"head_sha,omitempty"`
+	URL             string    `json:"url,omitempty"`
+	HTMLURL         string    `json:"html_url,omitempty"`
+	Status          string    `json:"status"`
+	Conclusion      string    `json:"conclusion"`
+	CreatedAt       time.Time `json:"created_at,omitzero"`
+	StartedAt       time.Time `json:"started_at,omitzero"`
+	CompletedAt     time.Time `json:"completed_at,omitzero"`
+	Name            string    `json:"name"`
+	Steps           []JobStep `json:"steps,omitempty"`
+	CheckRunURL     string    `json:"check_run_url,omitempty"`
+	Labels          []string  `json:"labels,omitempty"`
+	RunnerID        int64     `json:"runner_id,omitempty"`
+	RunnerName      string    `json:"runner_name,omitempty"`
+	RunnerGroupID   int64     `json:"runner_group_id,omitempty"`
+	RunnerGroupName string    `json:"runner_group_name,omitempty"`
+	WorkflowName    string    `json:"workflow_name,omitempty"`
+	HeadBranch      string    `json:"head_branch,omitempty"`
 }
 
 // JobStep represents basic information about an individual workflow job step.
 type JobStep struct {
-	Name       string `json:"name"`
-	Status     string `json:"status,omitempty"`
-	Conclusion string `json:"conclusion,omitempty"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status,omitempty"`
+	Conclusion  string    `json:"conclusion,omitempty"`
+	Number      int       `json:"number,omitempty"`
+	StartedAt   time.Time `json:"started_at,omitzero"`
+	CompletedAt time.Time `json:"completed_at,omitzero"`
 }
 
 // JobInfoWithDuration extends JobInfo with calculated duration

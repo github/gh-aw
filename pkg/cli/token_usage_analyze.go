@@ -62,12 +62,15 @@ func analyzeTokenUsageAICOnly(runDir string, verbose bool) (*TokenUsageSummary, 
 	usageJSONLFiles := findUsageJSONLFiles(runDir)
 	if len(usageJSONLFiles) > 0 {
 		console.LogVerbose(verbose, "  Found usage JSONL files: "+strings.Join(usageJSONLFiles, ", "))
-		totalAIC, found, err := sumAICFromUsageJSONLFiles(usageJSONLFiles)
+		totalAIC, found, warnings, err := sumAICFromUsageJSONLFilesWithWarnings(usageJSONLFiles)
 		if err != nil {
 			return nil, err
 		}
 		if found {
-			return &TokenUsageSummary{TotalAIC: totalAIC}, nil
+			for _, warning := range warnings {
+				tokenUsageLog.Printf("AIC-only analysis warning: %s", warning)
+			}
+			return &TokenUsageSummary{TotalAIC: totalAIC, Warnings: warnings}, nil
 		}
 	}
 
@@ -78,22 +81,17 @@ func analyzeTokenUsageAICOnly(runDir string, verbose bool) (*TokenUsageSummary, 
 			console.LogVerbose(verbose, fmt.Sprintf("  Found token usage file: %s (%d bytes)", filepath.Base(filePath), fileInfo.Size()))
 		}
 
-		entries, err := scanTokenUsageEntries(filePath)
+		summary, err := parseTokenUsageFile(filePath)
 		if err != nil {
 			return nil, err
 		}
-		if len(entries) == 0 {
+		if summary == nil || !summary.AICFound {
 			goto fallback
 		}
-		totalAIC := 0.0
-		for _, entry := range entries {
-			model := entry.Model
-			if model == "" {
-				model = "unknown"
-			}
-			totalAIC += computeModelInferenceAIC(entry.Provider, model, entry.InputTokens, entry.OutputTokens, entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens)
+		for _, warning := range summary.Warnings {
+			tokenUsageLog.Printf("AIC-only analysis warning: %s", warning)
 		}
-		return &TokenUsageSummary{TotalAIC: totalAIC}, nil
+		return &TokenUsageSummary{TotalAIC: summary.TotalAIC, Warnings: summary.Warnings}, nil
 	}
 
 fallback:

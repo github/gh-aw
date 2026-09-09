@@ -2,150 +2,67 @@
 
 package workflow
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
-func TestCodexEnginePlaywrightToolsExpansion(t *testing.T) {
+func TestCodexEnginePlaywrightUsesCLI(t *testing.T) {
 	engine := NewCodexEngine()
 
 	tests := []struct {
-		name     string
-		input    map[string]any
-		expected int // Expected number of playwright tools
+		name  string
+		input map[string]any
 	}{
 		{
-			name:     "playwright null expands to copilot agent tools",
-			input:    map[string]any{"playwright": nil},
-			expected: 21, // Should expand to all 21 copilot agent playwright tools
+			name:  "playwright null does not create MCP config",
+			input: map[string]any{"playwright": nil},
 		},
 		{
-			name: "playwright with config preserves config and adds tools",
+			name: "playwright CLI config does not create MCP config",
 			input: map[string]any{
 				"playwright": map[string]any{
-					"version": "v1.40.0",
+					"mode":    "cli",
+					"version": "0.1.18",
 				},
 			},
-			expected: 21, // Should still expand to all 21 tools
 		},
 		{
-			name:     "no playwright tool",
-			input:    map[string]any{"github": nil},
-			expected: 0, // No playwright tools expected
+			name: "legacy MCP config does not create MCP config",
+			input: map[string]any{
+				"playwright": map[string]any{"mode": "mcp"},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := engine.expandNeutralToolsToCodexToolsFromMap(tt.input)
-
-			if tt.expected == 0 {
-				// Should not have playwright in result
-				if _, hasPlaywright := result["playwright"]; hasPlaywright {
-					t.Error("Expected no playwright tool in result")
-				}
-			} else {
-				// Should have playwright with correct number of allowed tools
-				playwrightTool, hasPlaywright := result["playwright"]
-				if !hasPlaywright {
-					t.Error("Expected playwright tool in result")
-					return
-				}
-
-				playwrightConfig, ok := playwrightTool.(map[string]any)
-				if !ok {
-					t.Error("Expected playwright tool to be a map")
-					return
-				}
-
-				allowed, hasAllowed := playwrightConfig["allowed"]
-				if !hasAllowed {
-					t.Error("Expected playwright tool to have 'allowed' field")
-					return
-				}
-
-				allowedSlice, ok := allowed.([]any)
-				if !ok {
-					t.Error("Expected 'allowed' field to be a slice")
-					return
-				}
-
-				if len(allowedSlice) != tt.expected {
-					t.Errorf("Expected %d playwright tools, got %d", tt.expected, len(allowedSlice))
-				}
-
-				// Verify that all expected copilot agent tools are present
-				expectedTools := GetPlaywrightTools()
-				if len(allowedSlice) != len(expectedTools) {
-					t.Errorf("Expected %d tools to match copilot agent tools, got %d", len(expectedTools), len(allowedSlice))
-				}
-
-				// Check that some key tools are present
-				toolsStr := strings.Join(func() []string {
-					var tools []string
-					for _, tool := range allowedSlice {
-						if str, ok := tool.(string); ok {
-							tools = append(tools, str)
-						}
-					}
-					return tools
-				}(), ",")
-
-				expectedKeyTools := []string{"browser_click", "browser_navigate", "browser_type", "browser_snapshot"}
-				for _, keyTool := range expectedKeyTools {
-					if !strings.Contains(toolsStr, keyTool) {
-						t.Errorf("Expected key tool '%s' to be present in allowed tools: %s", keyTool, toolsStr)
-					}
-				}
+			if playwrightRaw, hasPlaywright := result["playwright"]; hasPlaywright {
+				t.Errorf("expected playwright to be absent from MCP config, got: %v", playwrightRaw)
 			}
 		})
 	}
 }
 
-// TestCodexEnginePlaywrightCLIMode verifies that expandNeutralToolsToCodexTools preserves
-// the Mode field and does not add an MCP raw entry for playwright in CLI mode.
-func TestCodexEnginePlaywrightCLIMode(t *testing.T) {
+func TestCodexEnginePlaywrightPreservesCustomMCPServer(t *testing.T) {
 	engine := NewCodexEngine()
 
-	t.Run("CLI mode preserves Mode field and skips MCP raw entry", func(t *testing.T) {
-		input := map[string]any{
-			"playwright": map[string]any{
-				"mode":    "cli",
-				"version": "0.1.11",
-			},
-		}
-		result := engine.expandNeutralToolsToCodexToolsFromMap(input)
+	input := map[string]any{
+		"playwright": map[string]any{
+			"command": "npx",
+			"args":    []any{"--yes", "@playwright/mcp@0.0.79", "--no-sandbox"},
+			"allowed": []any{"browser_navigate", "browser_snapshot"},
+		},
+	}
 
-		// In CLI mode, playwright should NOT appear in the raw map as an MCP config
-		if playwrightRaw, hasPlaywright := result["playwright"]; hasPlaywright {
-			t.Errorf("Expected playwright to be absent from raw map in CLI mode, but got: %v", playwrightRaw)
-		}
-	})
-
-	t.Run("MCP mode (explicit) still adds MCP raw entry", func(t *testing.T) {
-		input := map[string]any{
-			"playwright": map[string]any{
-				"mode": "mcp",
-			},
-		}
-		result := engine.expandNeutralToolsToCodexToolsFromMap(input)
-
-		if _, hasPlaywright := result["playwright"]; !hasPlaywright {
-			t.Error("Expected playwright MCP config to be present in raw map for mcp mode")
-		}
-	})
-
-	t.Run("default mode (no mode field) still adds MCP raw entry", func(t *testing.T) {
-		input := map[string]any{
-			"playwright": map[string]any{
-				"version": "v1.41.0",
-			},
-		}
-		result := engine.expandNeutralToolsToCodexToolsFromMap(input)
-
-		if _, hasPlaywright := result["playwright"]; !hasPlaywright {
-			t.Error("Expected playwright MCP config to be present in raw map for default mode")
-		}
-	})
+	result := engine.expandNeutralToolsToCodexToolsFromMap(input)
+	playwrightRaw, hasPlaywright := result["playwright"]
+	if !hasPlaywright {
+		t.Fatal("expected custom mcp-servers.playwright entry to be preserved for MCP rendering")
+	}
+	playwrightMap, ok := playwrightRaw.(map[string]any)
+	if !ok {
+		t.Fatalf("expected playwright entry to remain a map, got %T", playwrightRaw)
+	}
+	if command, _ := playwrightMap["command"].(string); command != "npx" {
+		t.Errorf("expected custom command to be preserved, got: %v", playwrightMap["command"])
+	}
 }

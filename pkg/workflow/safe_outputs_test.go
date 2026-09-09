@@ -11,6 +11,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAddCustomSafeOutputEnvVarsSortsKeys(t *testing.T) {
+	steps := []string{}
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			Env: map[string]string{
+				"Z_VAR": "last",
+				"A_VAR": "first",
+				"M_VAR": "middle",
+			},
+		},
+	}
+
+	(&Compiler{}).addCustomSafeOutputEnvVars(&steps, data)
+
+	require.Equal(t, []string{
+		"          A_VAR: first\n",
+		"          M_VAR: middle\n",
+		"          Z_VAR: last\n",
+	}, steps)
+}
+
 // ========================================
 // HasSafeOutputsEnabled Tests
 // ========================================

@@ -71,6 +71,9 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 	if fc.Description != "" {
 		result["description"] = fc.Description
 	}
+	if fc.Intent != "" {
+		result["intent"] = fc.Intent
+	}
 	if fc.Engine != nil {
 		result["engine"] = fc.Engine
 	}

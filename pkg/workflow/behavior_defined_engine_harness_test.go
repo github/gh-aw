@@ -79,6 +79,7 @@ func TestBehaviorDefinedEngineHarnessScript(t *testing.T) {
 				Firewall: &FirewallConfig{Enabled: true},
 			},
 		}
+
 		steps := engine.GetExecutionSteps(workflowData, "/tmp/test.log")
 		require.GreaterOrEqual(t, len(steps), 2, "should have at least harness-write and execution steps")
 
@@ -132,6 +133,24 @@ func TestBehaviorDefinedEngineHarnessScript(t *testing.T) {
 		harnessStep := eng.buildHarnessWriteStep()
 		assert.Nil(t, harnessStep, "harness write step must be skipped when script contains the heredoc delimiter")
 	})
+}
+
+func TestBehaviorDefinedEngineCustomCommandWithHarnessInstallsNode(t *testing.T) {
+	engine, err := NewBehaviorDefinedEngine(newHarnessEngineDefinition())
+	require.NoError(t, err)
+
+	steps := engine.GetInstallationSteps(&WorkflowData{
+		Name:         "test",
+		EngineConfig: &EngineConfig{Command: "/custom/testharness"},
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+	})
+	stepContent := strings.Join(flattenSteps(steps), "\n")
+
+	assert.Contains(t, stepContent, "Setup Node.js")
+	assert.Contains(t, stepContent, "Install AWF binary")
+	assert.NotContains(t, stepContent, "Copy Copilot CLI to daemon-visible path")
 }
 
 func TestBehaviorDefinedEngineMCPCapability(t *testing.T) {

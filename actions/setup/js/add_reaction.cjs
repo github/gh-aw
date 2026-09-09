@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { getErrorMessage, isLockedError } = require("./error_helpers.cjs");
+const { getErrorMessage, isLockedError, isRateLimitError } = require("./error_helpers.cjs");
 const { ERR_API, ERR_NOT_FOUND, ERR_VALIDATION } = require("./error_codes.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 
@@ -181,6 +181,10 @@ function handleReactionError(error) {
     return;
   }
   const errorMessage = getErrorMessage(error);
+  if (isRateLimitError(error)) {
+    core.warning(`Cannot add reaction due to GitHub API rate limiting: ${errorMessage}`);
+    return;
+  }
   core.setFailed(`${ERR_API}: Failed to add reaction: ${errorMessage}`);
 }
 

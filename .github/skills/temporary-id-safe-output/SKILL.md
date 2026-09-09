@@ -24,7 +24,7 @@ Example: `aw_abc`, `aw_abc123`, `aw_Test123`
 
 ### 1. Shared Module: `temporary_id.cjs`
 
-Location: `pkg/workflow/js/temporary_id.cjs`
+Location: `actions/setup/js/temporary_id.cjs`
 
 This module provides shared utilities for temporary ID handling:
 
@@ -45,7 +45,7 @@ The `create_issue` job outputs a temporary ID map that other jobs can consume:
 **Go changes** (`pkg/workflow/create_issue.go`):
 - No changes needed - already outputs `temporary_id_map` 
 
-**JavaScript changes** (`pkg/workflow/js/create_issue.cjs`):
+**JavaScript changes** (`actions/setup/js/create_issue.cjs`):
 - Generate temporary ID for each created issue
 - Build map of `temporary_id -> issue_number`
 - Output map via `core.setOutput("temporary_id_map", JSON.stringify(map))`
@@ -128,7 +128,7 @@ if (resolved.wasTemporaryId) {
 
 #### Step 4: Update Agent Ingestion Validation
 
-In `pkg/workflow/js/collect_ndjson_output.cjs`:
+In `actions/setup/js/collect_ndjson_output.cjs`:
 
 Add validation for fields that accept temporary IDs:
 ```javascript
@@ -202,7 +202,7 @@ safe-outputs:
 
 ### Unit Tests
 
-Add tests in `pkg/workflow/js/temporary_id.test.cjs` for:
+Add tests in `actions/setup/js/temporary_id.test.cjs` for:
 - `isTemporaryId()` with valid and invalid inputs
 - `resolveIssueNumber()` with temporary IDs and regular numbers
 - `loadTemporaryIdMap()` with various JSON inputs

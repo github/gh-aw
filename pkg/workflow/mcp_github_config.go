@@ -63,6 +63,7 @@ package workflow
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -73,6 +74,85 @@ import (
 )
 
 var githubConfigLog = logger.New("workflow:mcp_github_config")
+
+func dynamicEnclaveGitHubGuardRepos(workflowData *WorkflowData) []string {
+	enclave := enclaveDynamicRepositoryPolicyConfig(workflowData)
+	if enclave == nil || enclave.Dynamic == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	repos := make([]string, 0, len(enclave.Dynamic.AllowedRepositories)+len(enclave.Dynamic.AllowedOwners))
+	add := func(repo string) {
+		repo = strings.TrimSpace(repo)
+		if repo == "" {
+			return
+		}
+		if _, ok := seen[repo]; ok {
+			return
+		}
+		seen[repo] = struct{}{}
+		repos = append(repos, repo)
+	}
+	for _, repo := range enclave.Dynamic.AllowedRepositories {
+		add(repo)
+	}
+	for _, owner := range enclave.Dynamic.AllowedOwners {
+		add(owner + "/*") //nolint:manualpathconcat // GitHub owner/repo guard patterns are not filesystem paths.
+	}
+	sort.Strings(repos)
+	return repos
+}
+
+func dynamicEnclaveGitHubGuardPolicies(workflowData *WorkflowData) map[string]any {
+	repos := dynamicEnclaveGitHubGuardRepos(workflowData)
+	if len(repos) == 0 {
+		return nil
+	}
+	return map[string]any{
+		"allow-only": map[string]any{
+			"min-integrity": GitHubIntegrityApproved,
+			"repos":         repos,
+		},
+	}
+}
+
+func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolicies map[string]any) bool {
+	if len(explicitGuardPolicies) > 0 {
+		return false
+	}
+	if workflowData == nil {
+		return true
+	}
+	githubTool, hasGitHub := workflowData.Tools["github"]
+	if !hasGitHub {
+		return true
+	}
+	return githubTool != false
+}
+
+// dynamicEnclaveWriteSinkGuardPolicy builds a write-sink guard policy for data returned
+// by a dynamic enclave. The destination visibility is resolved at runtime from the
+// workflow repository; the dynamic sensitivity limits the accepted source secrecy labels.
+func dynamicEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]any {
+	enclave := enclaveDynamicRepositoryPolicyConfig(workflowData)
+	if enclave == nil || enclave.Dynamic == nil {
+		return nil
+	}
+	accept := []string{"*"}
+	if enclave.Dynamic.Sensitivity != "public" {
+		repos := dynamicEnclaveGitHubGuardRepos(workflowData)
+		accept = make([]string, 0, len(repos))
+		for _, repo := range repos {
+			accept = append(accept, transformRepoPattern(repo))
+		}
+	}
+	return map[string]any{
+		"write-sink": map[string]any{
+			"accept":          accept,
+			"sink-visibility": sinkVisibilityRuntimeExpr,
+		},
+	}
+}
 
 // hasGitHubTool checks if the GitHub tool is configured (using ParsedTools)
 func hasGitHubTool(parsedTools *Tools) bool {
@@ -537,23 +617,22 @@ func transformRepoPattern(pattern string) string {
 // Two cases produce a non-nil policy:
 //  1. Explicit guard policy — when repos/min-integrity are set on the GitHub tool, a write-sink
 //     policy is derived from those settings (e.g. "private:myorg/myrepo").
-//  2. Auto-lockdown — when the GitHub tool is present without explicit guard policies and without
-//     a GitHub App configured, auto-lockdown detection will set repos=all at runtime, so a
+//  2. Auto-lockdown — when the GitHub tool is present without explicit guard policies,
+//     auto-lockdown detection will set repos=all at runtime, so a
 //     write-sink policy with accept=["*"] is returned to match that runtime behaviour.
 //
 // When private-to-public-flows: allow is declared, sink-visibility is omitted from the returned
 // policy per MCP Gateway Specification Section 10.9.3: the blanket allow disables both
 // forcePublicRepos and sink-visibility enforcement.
 //
-// Returns nil when workflowData is nil, when no GitHub tool is present, or when a GitHub App is
-// configured (auto-lockdown is skipped for GitHub App tokens, which are already repo-scoped).
+// Returns nil when workflowData is nil, or when neither the GitHub tool nor a dynamic repository enclave is present.
 func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[string]any {
 	if workflowData == nil || workflowData.Tools == nil {
-		return nil
+		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 	rawGithubTool, hasGitHub := workflowData.Tools["github"]
 	if !hasGitHub {
-		return nil
+		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 
 	toolConfig, _ := rawGithubTool.(map[string]any)
@@ -577,11 +656,12 @@ func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[stri
 	}
 
 	// When no explicit guard policy is configured but automatic lockdown detection would run
-	// (GitHub tool present and not disabled, no GitHub App configured), return accept=["*"]
-	// because automatic lockdown always sets repos=all at runtime.
+	// (GitHub tool present and not disabled), return accept=["*"] because automatic lockdown
+	// always sets repos=all at runtime. GitHub App token scope is authentication, not a
+	// substitute for the DIFC sink labels enforced by the MCP gateway.
 	// sink-visibility is set as a runtime expression so that the write-sink guard can enforce
 	// public/private/internal semantics based on the actual repository visibility at workflow execution time.
-	if rawGithubTool != false && len(getGitHubGuardPolicies(toolConfig)) == 0 && !hasGitHubApp(toolConfig) {
+	if rawGithubTool != false && len(getGitHubGuardPolicies(toolConfig)) == 0 {
 		writeSink := map[string]any{
 			"accept": []string{"*"},
 		}
@@ -591,6 +671,10 @@ func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[stri
 		return map[string]any{
 			"write-sink": writeSink,
 		}
+	}
+
+	if rawGithubTool == false {
+		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 
 	return nil

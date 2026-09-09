@@ -14,6 +14,10 @@ permissions:
   discussions: read
   copilot-requests: write
 tracker-id: daily-storify
+engine:
+  id: codex
+  model-provider: github
+model: copilot/gpt-5.3-codex
 strict: true
 timeout-minutes: 45
 network:

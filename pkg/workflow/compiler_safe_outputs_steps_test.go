@@ -15,13 +15,14 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 	fetchDepthZero := 0
 
 	tests := []struct {
-		name             string
-		safeOutputs      *SafeOutputsConfig
-		checkoutConfigs  []*CheckoutConfig
-		trialMode        bool
-		trialRepo        string
-		checkContains    []string
-		checkNotContains []string
+		name                string
+		safeOutputs         *SafeOutputsConfig
+		checkoutConfigs     []*CheckoutConfig
+		checkoutSkipDefault bool
+		trialMode           bool
+		trialRepo           string
+		checkContains       []string
+		checkNotContains    []string
 	}{
 		{
 			name: "create pull request only mirrors agent default checkout",
@@ -258,6 +259,27 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 				"--filter=blob:none",
 			},
 		},
+		{
+			name: "target-only checkout (CheckoutSkipDefault) omits default checkout but keeps target repo",
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{
+					TargetRepoSlug: "org/target-repo",
+				},
+			},
+			checkoutConfigs: []*CheckoutConfig{
+				{
+					Repository: "org/target-repo",
+					Path:       "target-repo",
+				},
+			},
+			checkoutSkipDefault: true,
+			checkContains: []string{
+				"org/target-repo",
+			},
+			checkNotContains: []string{
+				"name: Checkout repository",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -271,9 +293,10 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 			}
 
 			workflowData := &WorkflowData{
-				Name:            "Test Workflow",
-				SafeOutputs:     tt.safeOutputs,
-				CheckoutConfigs: tt.checkoutConfigs,
+				Name:                "Test Workflow",
+				SafeOutputs:         tt.safeOutputs,
+				CheckoutConfigs:     tt.checkoutConfigs,
+				CheckoutSkipDefault: tt.checkoutSkipDefault,
 			}
 
 			steps := compiler.buildSharedPRCheckoutSteps(workflowData)

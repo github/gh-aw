@@ -74,7 +74,7 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 }
 
 // extractSandboxConfig extracts sandbox configuration from front matter
-func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConfig {
+func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConfig { //nolint:largefunc // Existing parser handles legacy and current sandbox shapes in one place.
 	frontmatterExtractionSecurityLog.Print("Extracting sandbox configuration from frontmatter")
 
 	sandbox, exists := frontmatter["sandbox"]
@@ -148,7 +148,7 @@ func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConf
 }
 
 // extractAgentSandboxConfig extracts agent sandbox configuration
-func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
+func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig { //nolint:largefunc // Existing parser handles all sandbox.agent fields in one pass.
 	// Handle boolean format: agent: false (disables agent sandbox but keeps MCP gateway)
 	if agentBool, ok := agentVal.(bool); ok {
 		if !agentBool {
@@ -344,6 +344,15 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 		}
 	}
 
+	// Extract ca-cert (host path to an additional CA certificate for API proxy
+	// upstream TLS verification; maps to apiProxy.caCert).
+	if caCertVal, hasCACert := agentObj["ca-cert"]; hasCACert {
+		if value, ok := caCertVal.(string); ok {
+			agentConfig.CACert = strings.TrimSpace(value)
+			frontmatterExtractionSecurityLog.Print("Extracted sandbox.agent.ca-cert")
+		}
+	}
+
 	// Extract targets (per-provider API proxy target overrides, e.g. authHeader, extraHeaders)
 	if targetsVal, hasTargets := agentObj["targets"]; hasTargets {
 		if targetsObj, ok := targetsVal.(map[string]any); ok {
@@ -388,7 +397,7 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 // extractMCPGatewayConfig extracts MCP gateway configuration from frontmatter
 // Per MCP Gateway Specification v1.0.0: Only container-based execution is supported.
 // Direct command execution is not supported.
-func (c *Compiler) extractMCPGatewayConfig(mcpVal any) *MCPGatewayRuntimeConfig {
+func (c *Compiler) extractMCPGatewayConfig(mcpVal any) *MCPGatewayRuntimeConfig { //nolint:largefunc // Existing parser handles all sandbox.mcp fields in one pass.
 	// Handle nil or boolean false
 	if mcpVal == nil {
 		return nil
@@ -443,10 +452,10 @@ func (c *Compiler) extractMCPGatewayConfig(mcpVal any) *MCPGatewayRuntimeConfig 
 		}
 	}
 
-	// Extract apiKey
-	if apiKeyVal, hasAPIKey := mcpObj["api-key"]; hasAPIKey {
-		if apiKeyStr, ok := apiKeyVal.(string); ok {
-			mcpConfig.APIKey = apiKeyStr
+	// Extract agent ID
+	if agentIDVal, hasAgentID := mcpObj["agent-id"]; hasAgentID {
+		if agentIDStr, ok := agentIDVal.(string); ok {
+			mcpConfig.AgentID = agentIDStr
 		}
 	}
 
@@ -584,7 +593,7 @@ func (c *Compiler) extractMCPGatewayConfig(mcpVal any) *MCPGatewayRuntimeConfig 
 }
 
 // extractSRTConfig extracts Sandbox Runtime configuration from a map
-func (c *Compiler) extractSRTConfig(configVal any) *SandboxRuntimeConfig {
+func (c *Compiler) extractSRTConfig(configVal any) *SandboxRuntimeConfig { //nolint:largefunc // Existing SRT config extraction preserves legacy key handling.
 	configObj, ok := configVal.(map[string]any)
 	if !ok {
 		return nil

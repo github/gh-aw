@@ -5,7 +5,8 @@
  *
  * Wraps the OpenAI Codex CLI command with retry logic for failures that occur after the
  * session has been partially executed.  Passes all arguments to the codex subprocess,
- * transparently forwarding stdin/stdout/stderr.
+ * forwarding stdout/stderr; stdin is closed since the prompt is delivered via
+ * --prompt-file, not stdin.
  *
  * Retry policy:
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the
@@ -92,6 +93,61 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
+
+// Codex's `turn.failed` event nests the actual provider error as a JSON string inside
+// `error.message` (sometimes doubly-nested, e.g. `error.message` -> `{"error": {...}}`).
+// This is a specific, common form of "unsupported model" failure: the configured model does
+// not support the `custom` tool type Codex uses for its `apply_patch`/freeform tool schema.
+// The provider rejects the whole request before any work happens, surfacing as:
+//   {"error": {"message": "Invalid value: 'custom'", "type": "invalid_request_error",
+//              "param": "tools", "code": "unknown_parameter"}}
+// This is a model-capability mismatch, not a malformed request, so it warrants a dedicated,
+// more actionable message than the generic invalid_request_error handling below.
+
+/**
+ * Unwraps up to a few levels of Codex's nested provider error payload to find the
+ * innermost object that carries string `param`/`code` fields.
+ * @param {unknown} error
+ * @returns {{ param?: string, code?: string } | null}
+ */
+function extractNestedProviderErrorDetails(error) {
+  const candidates = [error];
+  for (let visited = 0; visited < 8 && candidates.length > 0; visited++) {
+    const current = candidates.shift();
+    if (!current || typeof current !== "object") continue;
+    /** @type {{ param?: unknown, code?: unknown, error?: unknown, message?: unknown, metadata?: unknown }} */
+    const candidate = current;
+    if (typeof candidate.param === "string" && typeof candidate.code === "string") {
+      return { param: candidate.param, code: candidate.code };
+    }
+    if (candidate.error && typeof candidate.error === "object") candidates.push(candidate.error);
+    if (typeof candidate.message === "string") {
+      const parsed = parseJsonOrUndefined(candidate.message);
+      if (parsed !== undefined) candidates.push(parsed);
+    }
+    if (candidate.metadata && typeof candidate.metadata === "object") {
+      /** @type {{ raw?: unknown }} */
+      const metadata = candidate.metadata;
+      if (typeof metadata.raw === "string") {
+        const parsed = parseJsonOrUndefined(metadata.raw);
+        if (parsed !== undefined) candidates.push(parsed);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {string} value
+ * @returns {unknown}
+ */
+function parseJsonOrUndefined(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
 
 // Post-result watchdog: once the agent writes a terminal safe-output the harness
 // arms a watchdog timer and kills the Codex process if it is still running after
@@ -197,6 +253,28 @@ function isInvalidRequestError(output) {
     try {
       const event = JSON.parse(line);
       return event?.type === "turn.failed" && event.error && INVALID_REQUEST_ERROR_PATTERN.test(JSON.stringify(event.error));
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Determines if Codex emitted a `turn.failed` provider event indicating the configured model
+ * does not support Codex's required `custom` tool-calling schema (the provider rejects the
+ * `tools` request parameter with code `unknown_parameter`). This is a model-capability mismatch
+ * — the model itself is valid but incompatible with Codex — so it is surfaced as a dedicated,
+ * non-retryable condition with actionable guidance rather than the generic invalid-request message.
+ * @param {string} output - Collected stdout+stderr from the process
+ * @returns {boolean}
+ */
+function isUnsupportedModelToolsError(output) {
+  return output.split(/\r?\n/).some(line => {
+    try {
+      const event = JSON.parse(line);
+      if (event?.type !== "turn.failed" || !event.error) return false;
+      const details = extractNestedProviderErrorDetails(event.error);
+      return !!details && details.param === "tools" && details.code === "unknown_parameter";
     } catch {
       return false;
     }
@@ -778,6 +856,7 @@ async function main() {
       const isMissingApiKey = isMissingApiKeyError(result.output);
       const isServer = isServerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
+      const isUnsupportedModelTools = isUnsupportedModelToolsError(result.output);
       const isInvalidRequest = isInvalidRequestError(result.output);
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
@@ -792,6 +871,7 @@ async function main() {
           ` isMissingApiKeyError=${isMissingApiKey}` +
           ` isServerError=${isServer}` +
           ` isInvalidModelError=${isInvalidModel}` +
+          ` isUnsupportedModelToolsError=${isUnsupportedModelTools}` +
           ` isInvalidRequestError=${isInvalidRequest}` +
           ` permissionDeniedCount=${permissionDeniedCount}` +
           ` hasNumerousPermissionDenied=${hasNumerousPermissionDenied}` +
@@ -846,6 +926,15 @@ async function main() {
 
       if (isInvalidModel) {
         log(`attempt ${attempt + 1}: invalid/unsupported model configuration — not retrying (specify a valid engine model name in workflow frontmatter)`);
+        return { action: "stop" };
+      }
+
+      if (isUnsupportedModelTools) {
+        log(
+          `attempt ${attempt + 1}: configured model does not support Codex's required tool-calling schema` +
+            ` ("tools" param rejected with code "unknown_parameter") — not retrying` +
+            ` (pick a model documented as compatible with Codex CLI, or remove the \`model:\` override in workflow frontmatter to use the engine default)`
+        );
         return { action: "stop" };
       }
 
@@ -913,6 +1002,7 @@ if (typeof module !== "undefined" && module.exports) {
     isMissingApiKeyError,
     isServerError,
     isInvalidModelError,
+    isUnsupportedModelToolsError,
     isInvalidRequestError,
     isReconnectExhaustedError,
     countPermissionDeniedIssues,

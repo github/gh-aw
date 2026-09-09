@@ -10,6 +10,10 @@ on:
     events: [pull_request_comment]
 max-daily-ai-credits: 10000
 timeout-minutes: 10
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5.3-codex
 strict: false
 permissions:
   pull-requests: read

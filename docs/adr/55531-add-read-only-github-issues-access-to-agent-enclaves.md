@@ -26,7 +26,7 @@ This was considered because it would be simpler for users and would reduce speci
 
 Instead of starting a dedicated compiler-owned proxy, the implementation could have shared the primary agent's GitHub connectivity or passed token-bearing configuration directly into AWF or the enclave.
 
-This was considered because it would avoid new proxy lifecycle scripts and reduce moving pieces. It was rejected because the diff explicitly adds `start_enclave_github_proxy.sh` and `stop_enclave_github_proxy.sh`, masks and hands off only limited runtime values through `GITHUB_ENV`, excludes `MCP_GATEWAY_API_KEY` from the primary agent, and documents that the primary agent must not receive the proxy address, key, CA path, identity, capability, PAT, or repository catalog. Reusing the primary path would contradict the isolation model implemented here.
+This was considered because it would avoid new proxy lifecycle scripts and reduce moving pieces. It was rejected because the diff explicitly adds `start_enclave_github_proxy.sh` and `stop_enclave_github_proxy.sh`, masks and hands off only limited runtime values through `GITHUB_ENV`, excludes `MCP_GATEWAY_AGENT_ID` from the primary agent, and documents that the primary agent must not receive the proxy address, agent ID, CA path, identity, capability, PAT, or repository catalog. Reusing the primary path would contradict the isolation model implemented here.
 
 ### Consequences
 

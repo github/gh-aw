@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"golang.org/x/sync/errgroup"
 )
 
 // renderLogsOutput finalizes processedRuns and renders them in the appropriate output
@@ -62,10 +63,18 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 		processedRuns[i].Run.MissingDataCount = len(processedRuns[i].MissingData)
 		processedRuns[i].Run.NoopCount = len(processedRuns[i].Noops)
 	}
+	if opts.audit {
+		if err := writeLogsAuditsAndTrain(processedRuns, opts); err != nil {
+			return LogsData{}, fmt.Errorf("audit log pattern training: %w", err)
+		}
+	}
 
 	// Build structured logs data
 	logsOrchestratorLog.Printf("Building logs data from %d processed runs (continuation=%t)", len(processedRuns), opts.continuation != nil)
 	logsData := buildLogsData(processedRuns, opts.outputDir, opts.continuation)
+	logsData.Continuations = opts.continuations
+	logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(opts.apiRateLimit)
+	logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(opts.apiRateLimits)
 
 	// When no explicit start_date/end_date was requested and the newest run in the
 	// result is unexpectedly old, warn the caller so stale data is never served
@@ -81,6 +90,9 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 	// When only the usage artifact was downloaded, add a hint so consumers know how
 	// to fetch additional artifact sets (agent logs, firewall data, etc.).
 	var hints []string
+	if opts.message != "" {
+		hints = append(hints, opts.message)
+	}
 	if isUsageOnlyArtifactFilter(opts.artifactFilter) {
 		hints = append(hints, usageOnlyArtifactHintMessage())
 	}
@@ -96,14 +108,26 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 		}
 	}
 
-	// Train drain3 weights if requested.
-	if opts.train {
+	// Train drain3 weights if requested, or inline with audit generation.
+	if opts.train && !opts.audit {
 		if err := TrainDrain3Weights(processedRuns, opts.outputDir, opts.verbose); err != nil {
 			return logsData, fmt.Errorf("log pattern training: %w", err)
 		}
 	}
 
 	return logsData, nil
+}
+
+func writeLogsAuditsAndTrain(processedRuns []ProcessedRun, opts renderLogsOutputOptions) error {
+	var group errgroup.Group
+	group.Go(func() error {
+		writeLogsAuditFiles(processedRuns, opts.verbose)
+		return nil
+	})
+	group.Go(func() error {
+		return TrainDrain3Weights(processedRuns, opts.outputDir, opts.verbose)
+	})
+	return group.Wait()
 }
 
 func renderLogsOutputTSV(logsData LogsData, verbose bool) error {
@@ -119,6 +143,8 @@ func renderLogsOutputTSV(logsData LogsData, verbose bool) error {
 func renderLogsOutputCrossRun(processedRuns []ProcessedRun, logsData LogsData, opts renderLogsOutputOptions) error {
 	inputs := processedRunsToCrossRunInputs(processedRuns)
 	report := buildCrossRunAuditReport(inputs)
+	report.GitHubAPIRateLimit = logsData.GitHubAPIRateLimit
+	report.GitHubAPIRateLimits = logsData.GitHubAPIRateLimits
 	if opts.jsonOutput {
 		return renderCrossRunReportJSON(report)
 	}

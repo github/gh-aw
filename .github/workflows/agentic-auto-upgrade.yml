@@ -68,6 +68,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_OPERATION: upgrade
           GH_AW_CMD_PREFIX: ./gh-aw
+          GH_AW_UPGRADE_OPTIONS: '["--pre-releases"]'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

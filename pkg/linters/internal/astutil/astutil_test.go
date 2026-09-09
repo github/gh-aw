@@ -484,7 +484,7 @@ func TestBuildContainsFix(t *testing.T) {
 		Y:  ast.NewIdent("b"),
 	}
 
-	fixes := BuildContainsFix(expr, "strings", "s", "sub", false, "test message")
+	fixes := BuildContainsFix(nil, expr, "strings", "s", "sub", false, "test message")
 	if len(fixes) != 1 {
 		t.Fatalf("got %d fixes, want 1", len(fixes))
 	}
@@ -496,12 +496,41 @@ func TestBuildContainsFix(t *testing.T) {
 	}
 
 	// negated
-	fixes = BuildContainsFix(expr, "strings", "s", "sub", true, "negated message")
+	fixes = BuildContainsFix(nil, expr, "strings", "s", "sub", true, "negated message")
 	if got := string(fixes[0].TextEdits[0].NewText); got != "!strings.Contains(s, sub)" {
 		t.Fatalf("negated NewText = %q, want %q", got, "!strings.Contains(s, sub)")
 	}
 	if fixes[0].Message != "negated message" {
 		t.Fatalf("negated Message = %q, want %q", fixes[0].Message, "negated message")
+	}
+
+	// overlapping comment suppresses fix
+	src := `package p
+func f() bool {
+	return strings.Count("a", "b" /* comment */) > 0
+}`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "p.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("ParseFile failed: %v", err)
+	}
+	var binExpr *ast.BinaryExpr
+	ast.Inspect(file, func(n ast.Node) bool {
+		if be, ok := n.(*ast.BinaryExpr); ok {
+			binExpr = be
+			return false
+		}
+		return true
+	})
+	if binExpr == nil {
+		t.Fatal("expected BinaryExpr")
+	}
+	if !HasOverlappingComment([]*ast.File{file}, binExpr.Pos(), binExpr.End()) {
+		t.Fatal("expected HasOverlappingComment to be true for test expression")
+	}
+	fixesWithComment := BuildContainsFix([]*ast.File{file}, binExpr, "strings", "s", "sub", false, "test message")
+	if len(fixesWithComment) != 0 {
+		t.Fatalf("got %d fixes with overlapping comment, want 0", len(fixesWithComment))
 	}
 }
 
@@ -1044,6 +1073,76 @@ func TestStringLitValue(t *testing.T) {
 			got, ok := StringLitValue(tt.expr)
 			if ok != tt.wantOK || got != tt.want {
 				t.Fatalf("StringLitValue() = (%q, %v), want (%q, %v)", got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestResolveFormatString(t *testing.T) {
+	t.Parallel()
+
+	strLit := func(v string) ast.Expr { return &ast.BasicLit{Kind: token.STRING, Value: v} }
+	concat := func(exprs ...ast.Expr) ast.Expr {
+		result := exprs[0]
+		for _, e := range exprs[1:] {
+			result = &ast.BinaryExpr{X: result, Op: token.ADD, Y: e}
+		}
+		return result
+	}
+
+	tests := []struct {
+		name   string
+		expr   ast.Expr
+		want   string
+		wantOK bool
+	}{
+		{
+			name:   "plain string literal",
+			expr:   strLit(`"operation failed: %w"`),
+			want:   "operation failed: %w",
+			wantOK: true,
+		},
+		{
+			name:   "concatenation of two literals",
+			expr:   concat(strLit(`"a"`), strLit(`"b: %v"`)),
+			want:   "ab: %v",
+			wantOK: true,
+		},
+		{
+			name:   "concatenation with a leading non-literal identifier returns ok=false",
+			expr:   concat(ast.NewIdent("message"), strLit(`"\n\nOriginal error: %v"`)),
+			want:   "",
+			wantOK: false,
+		},
+		{
+			name:   "opaque operand between literal segments returns ok=false",
+			expr:   concat(strLit(`"abc%"`), ast.NewIdent("errStr"), strLit(`"v..."`)),
+			want:   "",
+			wantOK: false,
+		},
+		{
+			name:   "concatenation of only non-literal identifiers",
+			expr:   concat(ast.NewIdent("a"), ast.NewIdent("b")),
+			wantOK: false,
+		},
+		{
+			name:   "non-ADD binary expression",
+			expr:   &ast.BinaryExpr{X: strLit(`"a"`), Op: token.SUB, Y: strLit(`"b"`)},
+			wantOK: false,
+		},
+		{
+			name:   "bare identifier",
+			expr:   ast.NewIdent("x"),
+			wantOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := ResolveFormatString(tt.expr)
+			if ok != tt.wantOK || got != tt.want {
+				t.Fatalf("ResolveFormatString() = (%q, %v), want (%q, %v)", got, ok, tt.want, tt.wantOK)
 			}
 		})
 	}

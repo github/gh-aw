@@ -59,6 +59,21 @@ func TestGenerateAutoUpdateWorkflow_Disabled(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "agentic-auto-upgrade.yml should not be created when disabled")
 }
 
+func TestGenerateAutoUpdateWorkflow_UpgradeOptions(t *testing.T) {
+	dir := t.TempDir()
+
+	err := GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+		WorkflowDir:    dir,
+		Enabled:        true,
+		UpgradeOptions: []string{"--pre-releases"},
+	})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(dir, AutoUpdateWorkflowFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `GH_AW_UPGRADE_OPTIONS: '["--pre-releases"]'`)
+}
+
 func TestGenerateAutoUpdateWorkflow_DisabledDeletesExistingFile(t *testing.T) {
 	dir := t.TempDir()
 

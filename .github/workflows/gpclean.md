@@ -55,6 +55,10 @@ experiments:
     weight: [50, 50]
     start_date: "2026-05-24"
 
+engine:
+  id: codex
+  model-provider: openai
+model: openai/gpt-5-codex
 strict: false
 
 imports:
@@ -126,6 +130,8 @@ Use the repository's SBOM (Software Bill of Materials) to get accurate dependenc
 
 **IMPORTANT**: The SBOM has been pre-downloaded to `/tmp/gh-aw/agent/sbom.json` in the frontmatter setup step. **Use this file directly** - do NOT try to download it again using curl or gh api (you do not have a GitHub token in the agent environment).
 
+**IMPORTANT**: These are plain local files on disk, not MCP resources. Read them with the bash tool (e.g. `cat /tmp/gh-aw/agent/sbom.json` or `cat /tmp/gh-aw/cache-memory/gpclean/state.json`) or a text-reading tool. Do NOT attempt to read them via `read_mcp_resource` or any MCP server (`github`, `local_cache`, etc.) - these files are not exposed as MCP resources and such calls will always fail.
+
 1. **Use Pre-Downloaded SBOM**:
    - The SBOM file is already available at `/tmp/gh-aw/agent/sbom.json`
    - It was downloaded using the GitHub Dependency Graph API with `contents: read` permission
@@ -178,7 +184,7 @@ For the selected module:
 
 5. **If no GPL dependency found**:
    - Update cache-memory state: add module to `checked_modules`
-   - Exit successfully (no issue created)
+   - Call `noop` with a short message naming the module checked and stating no GPL dependency was found, then stop
 
 ### Phase 2: Deep Research Using Web-Fetch
 
@@ -441,11 +447,13 @@ After creating the issue:
 
 ## Error Handling
 
-- If the SBOM file `/tmp/gh-aw/agent/sbom.json` is missing or corrupted, report the error and exit (this should not happen as it's pre-downloaded in frontmatter)
-- If `go mod graph` fails, report the error and exit
+- If the SBOM file `/tmp/gh-aw/agent/sbom.json` is missing or corrupted, call `noop` explaining the error and stop (this should not happen as it's pre-downloaded in frontmatter)
+- If `go mod graph` fails, call `noop` explaining the error and stop
 - If license detection fails for a module, document it in the issue and recommend manual review
-- If no direct dependencies exist, exit successfully
+- If no direct dependencies exist, call `noop` explaining that there was nothing to check and stop
 - If cache-memory state is corrupted, reinitialize it
+- If no GPL dependency is found for the selected module, call `noop` summarizing which module was checked and stop - do NOT leave the run without calling a safe output
+- **Always finish the run by either creating an issue (Phase 3) or calling `noop`** - never end the run silently, even if blocked by unexpected tool or environment errors
 
 ## Example Module Selection Flow
 

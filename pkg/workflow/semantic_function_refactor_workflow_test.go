@@ -70,7 +70,7 @@ func TestSemanticFunctionRefactorWorkflowCostGuardrails(t *testing.T) {
 		`17 2 * * *`,
 		`GH_AW_MAX_DAILY_AI_CREDITS: "300"`,
 		`"maxAiCredits":300`,
-		`claude-sonnet-4.6`,
+		`claude-sonnet-5`,
 		`name: Precompute semantic refactor slice`,
 		`/tmp/gh-aw/agent/semantic-function-refactor/targets.txt`,
 		`/tmp/gh-aw/agent/semantic-function-refactor/go-files.txt`,

@@ -149,6 +149,7 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `apiProxy.targets.copilot.extraHeaders` | config-only (frontmatter: `sandbox.agent.targets.copilot.extraHeaders`; maps to `AWF_BYOK_EXTRA_HEADERS`) | `pkg/workflow/copilot_byok_extra_fields_compilation_test.go` (`TestCopilotBYOKExtraFieldsInCompiledWorkflow`) |
 | `apiProxy.targets.copilot.extraBodyFields` | config-only (frontmatter: `sandbox.agent.targets.copilot.extraBodyFields`; maps to `AWF_BYOK_EXTRA_BODY_FIELDS`) | `pkg/workflow/copilot_byok_extra_fields_compilation_test.go` (`TestCopilotBYOKExtraFieldsInCompiledWorkflow`) |
 | `apiProxy.targets.copilot.sessionId` | config-only (frontmatter: `sandbox.agent.targets.copilot.sessionId`; maps to `AWF_PROVIDER_SESSION_ID`) | `pkg/workflow/copilot_byok_extra_fields_compilation_test.go` (`TestCopilotBYOKExtraFieldsInCompiledWorkflow`) |
+| `apiProxy.caCert` | config-only (frontmatter: `sandbox.agent.ca-cert`; gated to AWF v0.28.10+ via `AWFAPIProxyCACertMinVersion`) | `pkg/workflow/awf_config_test.go` |
 | `container.dockerHostPathPrefix` | `--docker-host-path-prefix` | `pkg/workflow/awf_config_test.go` |
 
 Agents SHOULD treat this class of mismatch as a regression signal and open a corrective PR when detected.

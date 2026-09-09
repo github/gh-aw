@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,38 +23,51 @@ var reportLog = logger.New("cli:logs_report")
 
 // LogsData represents the complete structured data for logs output
 type LogsData struct {
-	Summary           LogsSummary                `json:"summary" console:"title:Workflow Logs Summary"`
-	Runs              []RunData                  `json:"runs" console:"title:Workflow Logs Overview"`
-	Episodes          []EpisodeData              `json:"episodes" console:"-"`
-	Edges             []EpisodeEdge              `json:"edges" console:"-"`
-	ToolUsage         []ToolUsageSummary         `json:"tool_usage,omitempty" console:"title:🛠️  Tool Usage Summary,omitempty"`
-	MCPToolUsage      *MCPToolUsageSummary       `json:"mcp_tool_usage,omitempty" console:"title:🔧 MCP Tool Usage,omitempty"`
-	Observability     []ObservabilityInsight     `json:"observability_insights,omitempty" console:"-"`
-	ErrorsAndWarnings []ErrorSummary             `json:"errors_and_warnings,omitempty" console:"title:Errors and Warnings,omitempty"`
-	MissingTools      []MissingToolSummary       `json:"missing_tools,omitempty" console:"title:🛠️  Missing Tools Summary,omitempty"`
-	MissingData       []MissingDataSummary       `json:"missing_data,omitempty" console:"title:📊 Missing Data Summary,omitempty"`
-	MCPFailures       []MCPFailureSummary        `json:"mcp_failures,omitempty" console:"-"`
-	AccessLog         *AccessLogSummary          `json:"access_log,omitempty" console:"title:Access Log Analysis,omitempty"`
-	FirewallLog       *FirewallLogSummary        `json:"firewall_log,omitempty" console:"title:🔥 Firewall Log Analysis,omitempty"`
-	RedactedDomains   *RedactedDomainsLogSummary `json:"redacted_domains,omitempty" console:"title:🔒 Redacted URL Domains,omitempty"`
-	Continuation      *ContinuationData          `json:"continuation,omitempty" console:"-"`
-	LogsLocation      string                     `json:"logs_location" console:"-"`
-	Message           string                     `json:"message,omitempty" console:"-"`
-	StaleWarning      string                     `json:"stale_warning,omitempty" console:"-"`
+	Summary             LogsSummary                 `json:"summary" console:"title:Workflow Logs Summary"`
+	Runs                []RunData                   `json:"runs" console:"title:Workflow Logs Overview"`
+	Episodes            []EpisodeData               `json:"episodes" console:"-"`
+	Edges               []EpisodeEdge               `json:"edges" console:"-"`
+	ToolUsage           []ToolUsageSummary          `json:"tool_usage,omitempty" console:"title:🛠️  Tool Usage Summary,omitempty"`
+	MCPToolUsage        *MCPToolUsageSummary        `json:"mcp_tool_usage,omitempty" console:"title:🔧 MCP Tool Usage,omitempty"`
+	Observability       []ObservabilityInsight      `json:"observability_insights,omitempty" console:"-"`
+	ErrorsAndWarnings   []ErrorSummary              `json:"errors_and_warnings,omitempty" console:"title:Errors and Warnings,omitempty"`
+	MissingTools        []MissingToolSummary        `json:"missing_tools,omitempty" console:"title:🛠️  Missing Tools Summary,omitempty"`
+	MissingData         []MissingDataSummary        `json:"missing_data,omitempty" console:"title:📊 Missing Data Summary,omitempty"`
+	MCPFailures         []MCPFailureSummary         `json:"mcp_failures,omitempty" console:"-"`
+	AccessLog           *AccessLogSummary           `json:"access_log,omitempty" console:"title:Access Log Analysis,omitempty"`
+	FirewallLog         *FirewallLogSummary         `json:"firewall_log,omitempty" console:"title:🔥 Firewall Log Analysis,omitempty"`
+	RedactedDomains     *RedactedDomainsLogSummary  `json:"redacted_domains,omitempty" console:"title:🔒 Redacted URL Domains,omitempty"`
+	Continuation        *ContinuationData           `json:"continuation,omitempty" console:"-"`
+	Continuations       []WorkflowContinuation      `json:"continuations,omitempty" console:"-"`
+	LogsLocation        string                      `json:"logs_location" console:"-"`
+	Message             string                      `json:"message,omitempty" console:"-"`
+	StaleWarning        string                      `json:"stale_warning,omitempty" console:"-"`
+	GitHubAPIRateLimit  *GitHubAPIRateLimitReport   `json:"github_api_rate_limit,omitempty" console:"-"`
+	GitHubAPIRateLimits []*GitHubAPIRateLimitReport `json:"github_api_rate_limits,omitempty" console:"-"`
 }
 
-// ContinuationData provides parameters to continue querying when timeout is reached
+// ContinuationData provides parameters to continue an incomplete logs query.
 type ContinuationData struct {
-	Message      string `json:"message"`
-	WorkflowName string `json:"workflow_name,omitempty"`
-	Count        int    `json:"count,omitempty"`
-	StartDate    string `json:"start_date,omitempty"`
-	EndDate      string `json:"end_date,omitempty"`
-	Engine       string `json:"engine,omitempty"`
-	Branch       string `json:"branch,omitempty"`
-	AfterRunID   int64  `json:"after_run_id,omitempty"`
-	BeforeRunID  int64  `json:"before_run_id,omitempty"`
-	Timeout      int    `json:"timeout,omitempty"`
+	Message               string `json:"message"`
+	WorkflowName          string `json:"workflow_name,omitempty"`
+	Count                 int    `json:"count,omitempty"`
+	StartDate             string `json:"start_date,omitempty"`
+	EndDate               string `json:"end_date,omitempty"`
+	Engine                string `json:"engine,omitempty"`
+	Branch                string `json:"branch,omitempty"`
+	AfterRunID            int64  `json:"after_run_id,omitempty"`
+	BeforeRunID           int64  `json:"before_run_id,omitempty"`
+	Timeout               int    `json:"timeout,omitempty"`
+	MaxGitHubAPIRateLimit int    `json:"max_github_api_rate_limit,omitempty"`
+	MaxStorageMB          int    `json:"max_storage,omitempty"`
+	PruneOlderRuns        bool   `json:"prune_older_runs,omitempty"`
+}
+
+// WorkflowContinuation identifies a per-target cursor in a combined
+// multi-workflow report.
+type WorkflowContinuation struct {
+	Repository string `json:"repository,omitempty"`
+	ContinuationData
 }
 
 // LogsSummary contains aggregate metrics across all runs
@@ -161,6 +175,7 @@ type RunData struct {
 	UpdatedAt                  time.Time              `json:"updated_at,omitzero" console:"-"`
 	URL                        string                 `json:"url" console:"-"`
 	LogsPath                   string                 `json:"logs_path" console:"header:Logs Path"`
+	AuditPath                  string                 `json:"audit_path,omitempty" console:"-"`
 	Event                      string                 `json:"event" console:"-"`
 	Branch                     string                 `json:"branch" console:"-"`
 	HeadSHA                    string                 `json:"head_sha,omitempty" console:"-"`
@@ -348,18 +363,30 @@ func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 
 // applyAwInfoToRunData copies repository/ref metadata from aw_info.json onto the run data.
 func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
-	runData.Repository = awInfo.Repository
 	if awInfo.Repository != "" {
+		runData.Repository = awInfo.Repository
 		if parts := strings.SplitN(awInfo.Repository, "/", 2); len(parts) == 2 {
 			runData.Organization = parts[0]
 		}
 	}
-	runData.Ref = awInfo.Ref
-	runData.SHA = awInfo.SHA
-	runData.Actor = awInfo.Actor
-	runData.RunAttempt = awInfo.RunAttempt
-	runData.TargetRepo = awInfo.TargetRepo
-	runData.EventName = awInfo.EventName
+	if awInfo.Ref != "" {
+		runData.Ref = awInfo.Ref
+	}
+	if awInfo.SHA != "" {
+		runData.SHA = awInfo.SHA
+	}
+	if awInfo.Actor != "" {
+		runData.Actor = awInfo.Actor
+	}
+	if awInfo.RunAttempt != "" {
+		runData.RunAttempt = awInfo.RunAttempt
+	}
+	if awInfo.TargetRepo != "" {
+		runData.TargetRepo = awInfo.TargetRepo
+	}
+	if awInfo.EventName != "" {
+		runData.EventName = awInfo.EventName
+	}
 	// Fall back to inferring the workflow path from the display name when the
 	// GitHub API returned an empty path (e.g. for scheduled agentic runs).
 	// This handles both fresh runs and old cached RunSummary entries whose
@@ -367,6 +394,27 @@ func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
 	// logs_run_processor.go was applied.
 	if runData.WorkflowPath == "" && awInfo.WorkflowName != "" {
 		runData.WorkflowPath = inferWorkflowPathFromDisplayName(awInfo.WorkflowName)
+	}
+}
+
+func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
+	if run.Repository != "" {
+		runData.Repository = run.Repository
+	}
+	if run.HeadSha != "" {
+		runData.SHA = run.HeadSha
+	}
+	if run.Actor != "" {
+		runData.Actor = run.Actor
+	}
+	if run.Event != "" {
+		runData.EventName = run.Event
+	}
+	if run.Attempt > 0 {
+		runData.RunAttempt = strconv.Itoa(run.Attempt)
+	}
+	if parts := strings.SplitN(run.Repository, "/", 2); len(parts) == 2 {
+		runData.Organization = parts[0]
 	}
 }
 
@@ -435,7 +483,7 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		ambientContext = pr.TokenUsage.AmbientContext
 	}
 
-	return RunData{
+	runData := RunData{
 		RunID:                      run.DatabaseID,
 		Number:                     run.Number,
 		WorkflowName:               run.WorkflowName,
@@ -471,6 +519,7 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		UpdatedAt:                  run.UpdatedAt,
 		URL:                        run.URL,
 		LogsPath:                   run.LogsPath,
+		AuditPath:                  existingAuditPath(run.LogsPath),
 		Event:                      run.Event,
 		Branch:                     run.HeadBranch,
 		HeadSHA:                    run.HeadSha,
@@ -485,6 +534,8 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		Experiments:                extractExperimentData(run.LogsPath),
 		Graders:                    extractGradersData(run.LogsPath),
 	}
+	applyGitHubMetadataToRunData(&runData, run)
+	return runData
 }
 
 // buildLogsData creates structured logs data from processed runs

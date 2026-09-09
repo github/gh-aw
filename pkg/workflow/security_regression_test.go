@@ -584,8 +584,8 @@ network: defaults
 
 # Defaults Test
 Test network defaults.`,
-			expectedDomains: []string{"api.github.com", "github.com"},
-			description:     "Default domains should be applied for copilot",
+			expectedDomains: []string{"www.googleapis.com"},
+			description:     "Default domains should be applied without enabling engine domains",
 		},
 	}
 

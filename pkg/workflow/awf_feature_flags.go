@@ -23,7 +23,7 @@ func awfVersionAtLeast(firewallConfig *FirewallConfig, minVersion constants.Vers
 }
 
 // awfSupportsCliProxy returns true when the effective AWF version supports --difc-proxy-host
-// and --difc-proxy-ca-cert (introduced in AWF v0.26.0).
+// and --difc-proxy-ca-cert (introduced in AWF v0.25.17).
 func awfSupportsCliProxy(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFCliProxyMinVersion)
 }
@@ -95,6 +95,24 @@ func awfSupportsContainerImages(firewallConfig *FirewallConfig) bool {
 // runtime (gh-aw-firewall v0.28.6+; see AWFCloudHypervisorFilesystemAllowWriteMinVersion).
 func awfSupportsCloudHypervisorFilesystemAllowWrite(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFCloudHypervisorFilesystemAllowWriteMinVersion)
+}
+
+// awfSupportsAPIProxyCACert returns true when the effective AWF version supports
+// apiProxy.caCert in awf-config.json.
+func awfSupportsAPIProxyCACert(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFAPIProxyCACertMinVersion)
+}
+
+// awfSupportsVerifySbxEgress returns true when the effective AWF version supports
+// network.verifySbxEgress for Docker sbx runtime egress verification.
+func awfSupportsVerifySbxEgress(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFVerifySbxEgressMinVersion)
+}
+
+// awfSupportsHTTPAPITargets returns true when the effective AWF version supports
+// explicit http:// schemes in apiProxy target hosts.
+func awfSupportsHTTPAPITargets(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFHTTPAPITargetMinVersion)
 }
 
 // awfEmitsFilesystemAllowWrite reports whether the compiler may emit the

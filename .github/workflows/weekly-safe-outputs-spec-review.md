@@ -9,13 +9,14 @@ on:
   workflow_dispatch:
 
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
 
 tracker-id: weekly-safe-outputs-spec-review
-engine: codex
-model: copilot/mai-code-1-flash-picker
+engine: pi
+model: copilot/auto
 strict: true
 
 network:

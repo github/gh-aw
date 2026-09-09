@@ -44,3 +44,19 @@ func TestDailyPerformanceSummaryUsesStableWindowMetrics(t *testing.T) {
 		}
 	}
 }
+
+func TestGitHubQueryScriptsUseFileBackedPagination(t *testing.T) {
+	t.Parallel()
+	content, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "shared", "github-queries-mcp-script.md"))
+	if err != nil {
+		t.Fatalf("failed to read GitHub query MCP scripts: %v", err)
+	}
+	text := string(content)
+
+	if strings.Contains(text, "--argjson all") {
+		t.Error("query scripts must not pass accumulated API data through command arguments")
+	}
+	if count := strings.Count(text, `jq -s '.[0] + .[1]'`); count != 3 {
+		t.Errorf("expected all three paginated query scripts to merge data through files, got %d", count)
+	}
+}

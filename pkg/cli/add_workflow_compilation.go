@@ -20,19 +20,13 @@ import (
 var addWorkflowCompilationLog = logger.New("cli:add_workflow_compilation")
 
 // compileWorkflow compiles a workflow file without refreshing stop time.
-// This is a convenience wrapper around compileWorkflowWithRefresh.
+// This is a convenience wrapper around compileWorkflowWithActionRef.
 func compileWorkflow(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride string) error {
 	return compileWorkflowWithActionRef(ctx, filePath, verbose, quiet, engineOverride, "")
 }
 
 func compileWorkflowWithActionRef(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride, actionRef string) error {
 	return compileWorkflowWithRefreshAndActionRef(ctx, filePath, verbose, quiet, engineOverride, actionRef, false, false)
-}
-
-// compileWorkflowWithRefresh compiles a workflow file with optional stop time refresh.
-// This function handles the compilation process and ensures .gitattributes is updated.
-func compileWorkflowWithRefresh(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride string, refreshStopTime bool, approve bool) error {
-	return compileWorkflowWithRefreshAndActionRef(ctx, filePath, verbose, quiet, engineOverride, "", refreshStopTime, approve)
 }
 
 func compileWorkflowWithRefreshAndActionRef(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride, actionRef string, refreshStopTime bool, approve bool) error {
@@ -66,12 +60,6 @@ func compileWorkflowWithRefreshAndActionRef(ctx context.Context, filePath string
 	// This helper function is used in contexts where instructions should not be automatically written
 
 	return nil
-}
-
-// compileWorkflowWithTracking compiles a workflow and tracks generated files.
-// This is a convenience wrapper around compileWorkflowWithTrackingAndRefresh.
-func compileWorkflowWithTracking(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride string, tracker *FileTracker) error {
-	return compileWorkflowWithTrackingAndActionRef(ctx, filePath, verbose, quiet, engineOverride, "", tracker)
 }
 
 func compileWorkflowWithTrackingAndActionRef(ctx context.Context, filePath string, verbose bool, quiet bool, engineOverride, actionRef string, tracker *FileTracker) error {
@@ -149,21 +137,13 @@ type compileDepsOptions struct {
 	tracker         *FileTracker
 }
 
-// compileDispatchWorkflowDependencies compiles any dispatch-workflow .md dependencies of
-// workflowFile that are present locally but lack a corresponding .lock.yml. This must be
-// called before compiling the main workflow, because the dispatch-workflow validator
-// requires every referenced .md workflow to have an up-to-date .lock.yml.
-func compileDispatchWorkflowDependencies(ctx context.Context, workflowFile string, verbose, quiet bool, engineOverride string, force bool, tracker *FileTracker) {
-	compileDispatchWorkflowDependenciesWithActionRef(ctx, workflowFile, verbose, quiet, engineOverride, "", force, tracker)
-}
-
 func compileDispatchWorkflowDependenciesWithActionRef(ctx context.Context, workflowFile string, verbose, quiet bool, engineOverride, actionRef string, force bool, tracker *FileTracker) {
 	compileSafeOutputsWorkflowDependencies(ctx, workflowFile, "dispatch-workflow dependency", dispatchWorkflowNamesForCompilation, compileDepsOptions{
 		verbose: verbose, quiet: quiet, engineOverride: engineOverride, actionRef: actionRef, force: force, propagateErrors: false, tracker: tracker,
 	})
 }
 
-// compileCallWorkflowDependencies compiles any call-workflow .md worker dependencies of
+// compileCallWorkflowDependenciesWithActionRef compiles any call-workflow .md worker dependencies of
 // workflowFile that are present locally but lack a corresponding .lock.yml. This must be
 // called before compiling the main workflow, because the call-workflow validator requires
 // every referenced .md worker to have an up-to-date .lock.yml.
@@ -172,10 +152,6 @@ func compileDispatchWorkflowDependenciesWithActionRef(ctx context.Context, workf
 // the dynamic tool-generation path maps every worker .md to a .lock.yml reference, so a
 // worker whose lock cannot be produced would leave the orchestrator referencing a file that
 // does not exist.
-func compileCallWorkflowDependencies(ctx context.Context, workflowFile string, verbose, quiet bool, engineOverride string, force bool, tracker *FileTracker) error {
-	return compileCallWorkflowDependenciesWithActionRef(ctx, workflowFile, verbose, quiet, engineOverride, "", force, tracker)
-}
-
 func compileCallWorkflowDependenciesWithActionRef(ctx context.Context, workflowFile string, verbose, quiet bool, engineOverride, actionRef string, force bool, tracker *FileTracker) error {
 	return compileSafeOutputsWorkflowDependencies(ctx, workflowFile, "call-workflow worker", callWorkflowNamesForCompilation, compileDepsOptions{
 		verbose: verbose, quiet: quiet, engineOverride: engineOverride, actionRef: actionRef, force: force, propagateErrors: true, tracker: tracker,

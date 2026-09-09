@@ -79,21 +79,47 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId } = options;
+  const { baseUrl, apiKeyEnvVar, modelId, api } = options;
   return JSON.stringify({
     providers: {
       "aw-gateway": {
         baseUrl,
-        api: "openai-completions",
+        api: api || "openai-completions",
         apiKey: apiKeyEnvVar,
         models: [{ id: modelId }],
       },
     },
   });
+}
+
+/**
+ * Resolve the Pi API family for a given normalized GH_AW_LLM_PROVIDER value.
+ *
+ * Real OpenAI models are only published under the "openai-responses" API in Pi's
+ * upstream model catalog (@earendil-works/pi-ai) — the "openai-completions" family
+ * is reserved for OpenAI-compatible-but-not-OpenAI providers (Groq, DeepSeek, etc.).
+ * Since OpenAI's Chat Completions endpoint rejects function tools whenever
+ * reasoning_effort is anything other than "none" (see
+ * https://developers.openai.com/api/docs/guides/responses-vs-chat-completions),
+ * routing the "openai" provider through /responses keeps tool calling working for
+ * all reasoning-capable models without requiring workflow authors to opt in.
+ *
+ * GitHub/Copilot models keep their chat-completions-style gateway protocol.
+ * Anthropic uses its native Messages API so the proxy receives /v1/messages and
+ * can apply Anthropic prompt caching.
+ *
+ * @param {string} provider - normalized GH_AW_LLM_PROVIDER value (e.g. "openai", "anthropic", "github")
+ * @returns {string}
+ */
+function resolvePiApiForProvider(provider) {
+  if (provider === "openai" || provider === "codex") {
+    return "openai-responses";
+  }
+  return provider === "anthropic" ? "anthropic-messages" : "openai-completions";
 }
 
 async function main() {
@@ -127,7 +153,10 @@ async function main() {
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId });
+  const api = resolvePiApiForProvider(provider);
+  logger(`resolved gateway api=${api} (provider=${provider})`);
+
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, "utf8");
   logger(`wrote ${outputPath}`);
@@ -140,4 +169,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, DEFAULT_PI_CODING_AGENT_DIR };
+module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, DEFAULT_PI_CODING_AGENT_DIR };

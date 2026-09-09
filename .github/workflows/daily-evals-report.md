@@ -11,18 +11,22 @@ permissions:
   issues: read
   pull-requests: read
 max-daily-ai-credits: 3000
-model: copilot/mai-code-1-flash-picker
+model: copilot/gpt-5.3-codex
 engine:
   id: codex
 tracker-id: daily-evals-report
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
     memory: 4g
 features:
   gh-aw-detection: true
 timeout-minutes: 45
+tools:
+  github:
+    mode: local
+
 imports:
   - uses: shared/meta-analysis-base.md
     with:

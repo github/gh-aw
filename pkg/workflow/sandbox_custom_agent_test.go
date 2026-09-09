@@ -100,7 +100,7 @@ func TestCustomAWFConfiguration(t *testing.T) {
 	})
 
 	t.Run("docker-sudo-iptables does not pass --rootless", func(t *testing.T) {
-		// The docker-sudo-iptables profile runs `sudo -E awf`, which requires awf to be
+		// The docker-sudo-iptables profile runs AWF with sudo, which requires awf to be
 		// in /usr/local/bin (non-rootless install path).
 		agentConfig := &AgentSandboxConfig{
 			ID:      "awf",
@@ -220,7 +220,7 @@ sandbox:
 		}
 		lockStr := string(lockContent)
 
-		// Verify custom command is used instead of sudo -E awf
+		// Verify the custom command is used instead of privileged AWF.
 		if !strings.Contains(lockStr, "custom-awf-wrapper") {
 			t.Error("Expected custom command 'custom-awf-wrapper' in compiled workflow")
 		}
@@ -288,9 +288,9 @@ sandbox:
 		}
 		lockStr := string(lockContent)
 
-		// Verify standard AWF command is used (rootless mode - no sudo -E awf)
-		if strings.Contains(lockStr, "sudo -E awf") {
-			t.Error("Expected no sudo -E awf with legacy type field (network isolation is the default)")
+		// Verify standard AWF command is used (rootless mode, no sudo).
+		if strings.Contains(lockStr, "sudo -E ") {
+			t.Error("Expected no sudo with legacy type field (network isolation is the default)")
 		}
 		if !strings.Contains(lockStr, "awf --config") {
 			t.Error("Expected rootless AWF invocation with legacy type field")

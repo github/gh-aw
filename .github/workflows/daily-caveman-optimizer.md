@@ -21,7 +21,7 @@ engine:
 strict: true
 experiments:
   model_size:
-    variants: [claude-sonnet-4.6, claude-haiku-4.5]
+    variants: [claude-sonnet-5, claude-haiku-4.5]
     description: "Tests whether Claude Haiku produces equivalent instruction conciseness improvements at lower token cost versus Claude Sonnet."
     hypothesis: "H0: no change in PR creation rate or run success rate. H1: Claude Haiku reduces AI credit usage >=30% with equivalent run success rate (>=0.90)."
     metric: ai_credits_total
@@ -58,12 +58,12 @@ safe-outputs:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   cache-memory: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default]
   edit:
   bash:

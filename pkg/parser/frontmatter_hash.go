@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -130,6 +131,7 @@ func ComputeFrontmatterHashFromParsedContent(frontmatterText, markdownBody strin
 		fullBody = normalizeFrontmatterText(markdownBody)
 	} else {
 		relevantExpressions = extractRelevantTemplateExpressions(markdownBody)
+		relevantExpressions = mergeSortedUniqueStrings(relevantExpressions, collectRuntimeImportTemplateExpressions(frontmatterText, markdownBody, baseDir, fileReader))
 	}
 
 	return computeFrontmatterHashTextBasedWithReader(frontmatterText, fullBody, baseDir, cache, relevantExpressions, fileReader)
@@ -205,6 +207,7 @@ func computeFrontmatterHashFromContent(content string, parsedFrontmatter map[str
 		fullBody = normalizeFrontmatterText(markdown)
 	} else {
 		relevantExpressions = extractRelevantTemplateExpressions(markdown)
+		relevantExpressions = mergeSortedUniqueStrings(relevantExpressions, collectRuntimeImportTemplateExpressions(frontmatterText, markdown, baseDir, fileReader))
 	}
 
 	// Compute hash using text-based approach with custom file reader
@@ -246,6 +249,44 @@ func extractRelevantTemplateExpressions(markdown string) []string {
 	sort.Strings(expressions)
 	frontmatterHashLog.Printf("Found %d relevant template expression(s) referencing env./vars.", len(expressions))
 	return expressions
+}
+
+func extractAllTemplateExpressions(markdown string) []string {
+	var expressions []string
+	seen := make(map[string]struct {
+	})
+	matches := templateExpressionRegex.FindAllStringSubmatch(markdown, -1)
+	for _, match := range matches {
+		if len(match) < 2 || strings.TrimSpace(match[1]) == "" {
+			continue
+		}
+		expr := match[0]
+		if !setutil.Contains(seen, expr) {
+			expressions = append(expressions, expr)
+			seen[expr] = struct {
+			}{}
+		}
+	}
+	sort.Strings(expressions)
+	return expressions
+}
+
+func mergeSortedUniqueStrings(groups ...[]string) []string {
+	seen := make(map[string]struct {
+	})
+	var merged []string
+	for _, group := range groups {
+		for _, item := range group {
+			if item == "" || setutil.Contains(seen, item) {
+				continue
+			}
+			merged = append(merged, item)
+			seen[item] = struct {
+			}{}
+		}
+	}
+	sort.Strings(merged)
+	return merged
 }
 
 // extractFrontmatterAndBodyText extracts frontmatter as raw text without parsing YAML
@@ -526,6 +567,213 @@ func collectImportedBodies(frontmatterText, baseDir string, visited map[string]s
 	}
 
 	return importedBodyTexts, nil
+}
+
+type runtimeImportReference struct {
+	path      string
+	startLine int
+	endLine   int
+}
+
+var (
+	runtimeImportReferenceRe = regexp.MustCompile(`\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)([^{}]+?)\}\}`)
+	runtimeImportLineRangeRe = regexp.MustCompile(`^(.+?):(\d+)-(\d+)$`)
+)
+
+func collectRuntimeImportTemplateExpressions(frontmatterText, markdownBody, baseDir string, fileReader FileReader) []string {
+	seen := map[string]struct{}{}
+	expressions := extractRuntimeImportTemplateExpressionsFromMarkdown(markdownBody, baseDir, seen, fileReader)
+
+	importedBodies, err := collectImportedBodies(frontmatterText, baseDir, map[string]struct{}{}, fileReader)
+	if err != nil {
+		return expressions
+	}
+	for _, body := range importedBodies {
+		expressions = mergeSortedUniqueStrings(expressions, extractAllTemplateExpressions(body))
+		expressions = mergeSortedUniqueStrings(expressions, extractRuntimeImportTemplateExpressionsFromMarkdown(body, baseDir, seen, fileReader))
+	}
+
+	return expressions
+}
+
+func extractRuntimeImportTemplateExpressionsFromMarkdown(markdownBody, baseDir string, seen map[string]struct{}, fileReader FileReader) []string {
+	refs := extractRuntimeImportReferences(markdownBody)
+	if len(refs) == 0 {
+		return nil
+	}
+
+	var expressions []string
+	for _, ref := range refs {
+		body, ok := readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader)
+		if !ok {
+			continue
+		}
+		expressions = mergeSortedUniqueStrings(expressions, extractAllTemplateExpressions(body))
+		expressions = mergeSortedUniqueStrings(expressions, extractRuntimeImportTemplateExpressionsFromMarkdown(body, baseDir, seen, fileReader))
+	}
+	return expressions
+}
+
+func extractRuntimeImportReferences(markdownBody string) []runtimeImportReference {
+	if markdownBody == "" {
+		return nil
+	}
+	var refs []runtimeImportReference
+	seen := make(map[string]struct {
+	})
+	matches := runtimeImportReferenceRe.FindAllStringSubmatch(markdownBody, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		target := strings.TrimSpace(match[1])
+		if target == "" {
+			continue
+		}
+		ref := runtimeImportReference{path: target}
+		if rangeMatch := runtimeImportLineRangeRe.FindStringSubmatch(target); len(rangeMatch) == 4 {
+			ref.path = strings.TrimSpace(rangeMatch[1])
+			fmt.Sscanf(rangeMatch[2], "%d", &ref.startLine)
+			fmt.Sscanf(rangeMatch[3], "%d", &ref.endLine)
+		}
+		if strings.HasPrefix(ref.path, "http://") || strings.HasPrefix(ref.path, "https://") {
+			continue
+		}
+		key := fmt.Sprintf("%s:%d-%d", filepath.ToSlash(ref.path), ref.startLine, ref.endLine)
+		if setutil.Contains(seen, key) {
+			continue
+		}
+		refs = append(refs, ref)
+		seen[key] = struct {
+		}{}
+	}
+	return refs
+}
+
+func readRuntimeImportBodyForHash(ref runtimeImportReference, baseDir string, seen map[string]struct{}, fileReader FileReader) (string, bool) {
+	for _, candidate := range runtimeImportHashCandidatePaths(ref.path, baseDir) {
+		key := fmt.Sprintf("%s:%d-%d", candidate, ref.startLine, ref.endLine)
+		if setutil.Contains(seen, key) {
+			return "", false
+		}
+		if runtimeImportHashLocalPathExists(candidate) && !runtimeImportHashRealPathAllowed(candidate, baseDir) {
+			continue
+		}
+		rawContent, err := fileReader(candidate)
+		if err != nil {
+			continue
+		}
+		seen[key] = struct {
+		}{}
+		content := string(rawContent)
+		if ref.startLine > 0 || ref.endLine > 0 {
+			content = applyRuntimeImportLineRangeForHash(content, ref.startLine, ref.endLine)
+		}
+		body, extractErr := ExtractMarkdownContent(content)
+		if extractErr == nil {
+			content = body
+		}
+		return content, true
+	}
+	return "", false
+}
+
+func runtimeImportHashLocalPathExists(candidate string) bool {
+	_, err := os.Stat(candidate)
+	return err == nil
+}
+
+func runtimeImportHashRealPathAllowed(candidate, baseDir string) bool {
+	workspaceRoot := runtimeImportHashWorkspaceRoot(baseDir)
+	for _, base := range []string{
+		filepath.Join(workspaceRoot, strings.TrimSuffix(constants.GithubDir, "/")),
+		filepath.Join(workspaceRoot, ".agents"),
+	} {
+		if realPathWithinBaseForHash(candidate, base) {
+			return true
+		}
+	}
+	return false
+}
+
+func realPathWithinBaseForHash(pathToCheck, baseDir string) bool {
+	realBase, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return false
+	}
+	realPath, err := filepath.EvalSymlinks(pathToCheck)
+	if err != nil {
+		return false
+	}
+	relativePath, err := filepath.Rel(realBase, realPath)
+	return err == nil && relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) && !filepath.IsAbs(relativePath)
+}
+
+func applyRuntimeImportLineRangeForHash(content string, startLine, endLine int) string {
+	lines := strings.Split(content, "\n")
+	start := startLine
+	if start <= 0 {
+		start = 1
+	}
+	end := endLine
+	if end <= 0 || end > len(lines) {
+		end = len(lines)
+	}
+	if start > end || start > len(lines) {
+		return ""
+	}
+	return strings.Join(lines[start-1:end], "\n")
+}
+
+func runtimeImportHashCandidatePaths(importPath, baseDir string) []string {
+	normalized := filepath.ToSlash(strings.TrimSpace(importPath))
+	if strings.HasPrefix(normalized, "/") {
+		normalized = strings.TrimLeft(normalized, "/")
+		if !strings.HasPrefix(normalized, constants.GithubDir) && !strings.HasPrefix(normalized, ".agents/") {
+			return nil
+		}
+	}
+	normalized = strings.TrimPrefix(normalized, "./")
+	if normalized == "" || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") {
+		return nil
+	}
+
+	workspaceRoot := runtimeImportHashWorkspaceRoot(baseDir)
+	if strings.HasPrefix(normalized, ".agents/") {
+		return []string{filepath.Join(workspaceRoot, filepath.FromSlash(normalized))}
+	}
+	if strings.HasPrefix(normalized, constants.GithubDir) {
+		return []string{filepath.Join(workspaceRoot, filepath.FromSlash(normalized))}
+	}
+
+	candidates := []string{
+		filepath.Join(workspaceRoot, strings.TrimSuffix(constants.GithubDir, "/"), filepath.FromSlash(normalized)),
+		filepath.Join(workspaceRoot, strings.TrimSuffix(constants.GithubDir, "/"), "workflows", filepath.FromSlash(normalized)),
+		filepath.Join(baseDir, filepath.FromSlash(normalized)),
+	}
+	deduped := candidates[:0]
+	seen := make(map[string]struct {
+	})
+	for _, candidate := range candidates {
+		clean := filepath.Clean(candidate)
+		if !setutil.Contains(seen, clean) {
+			deduped = append(deduped, clean)
+			seen[clean] = struct {
+			}{}
+		}
+	}
+	return deduped
+}
+
+func runtimeImportHashWorkspaceRoot(baseDir string) string {
+	normalized := filepath.ToSlash(baseDir)
+	if before, _, ok := strings.Cut(normalized, "/.github/"); ok {
+		return filepath.FromSlash(before)
+	}
+	if strings.HasSuffix(normalized, "/.github") {
+		return filepath.Dir(baseDir)
+	}
+	return baseDir
 }
 
 // ComputeBodyHashFromParsedContent computes a SHA-256 hash of the markdown body (after frontmatter)

@@ -142,6 +142,8 @@ Common expressions:
 `job-discriminator` is a gh-aw extension and is stripped from the compiled lock file. It does not appear in the generated GitHub Actions YAML.
 :::
 
+Shared workflows may define `concurrency.job-discriminator`. When multiple shared workflows define it, the first imported value wins; a value in the main workflow always takes precedence.
+
 :::note
 `job-discriminator` has no effect on workflows triggered by `workflow_dispatch`-only, `push`, or `pull_request` events, or when the engine provides an explicit job-level concurrency configuration.
 :::

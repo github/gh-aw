@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -95,75 +96,46 @@ func parseMentionsConfig(mentions any) *MentionsConfig {
 			}
 		}
 
-		// Parse allowed list
-		if allowed, exists := mentionsMap["allowed"]; exists {
-			if allowedArray, ok := allowed.([]any); ok {
-				var allowedStrings []string
-				for _, item := range allowedArray {
-					if str, ok := item.(string); ok {
-						// Normalize username by removing '@' prefix if present
-						normalized := str
-						if str != "" && str[0] == '@' {
-							normalized = str[1:]
-							safeOutputMessagesLog.Printf("Normalized mention '%s' to '%s'", str, normalized)
-						}
-						allowedStrings = append(allowedStrings, normalized)
-					}
-				}
-				config.Allowed = allowedStrings
-			}
-		}
+		config.Allowed = parseMentionNames(mentionsMap["allowed"])
 
 		// Parse allowed-teams list
-		if allowedTeams, exists := mentionsMap["allowed-teams"]; exists {
-			if allowedTeamsArray, ok := allowedTeams.([]any); ok {
-				var allowedTeamsStrings []string
-				for _, item := range allowedTeamsArray {
-					if str, ok := item.(string); ok {
-						// Normalize team slug by removing '@' prefix if present
-						normalized := str
-						if str != "" && str[0] == '@' {
-							normalized = str[1:]
-							safeOutputMessagesLog.Printf("Normalized team mention '%s' to '%s'", str, normalized)
-						}
-						allowedTeamsStrings = append(allowedTeamsStrings, normalized)
-					}
-				}
-				config.AllowedTeams = allowedTeamsStrings
-			}
-		}
+		config.AllowedTeams = parseMentionNames(mentionsMap["allowed-teams"])
 
-		// Parse max
-		if maxVal, exists := mentionsMap["max"]; exists {
-			switch v := maxVal.(type) {
-			case int:
-				if v >= 1 {
-					config.Max = &v
-				}
-			case int64:
-				intVal := int(v)
-				if intVal >= 1 {
-					config.Max = &intVal
-				}
-			case uint64:
-				intVal := int(v)
-				if intVal >= 1 {
-					config.Max = &intVal
-				}
-			case float64:
-				intVal := int(v)
-				// Warn if truncation occurs
-				if v != float64(intVal) {
-					safeOutputMessagesLog.Printf("mentions.max: float value %.2f truncated to integer %d", v, intVal)
-				}
-				if intVal >= 1 {
-					config.Max = &intVal
+		// Parse max as a templatable integer.
+		if err := preprocessIntFieldAsString(mentionsMap, "max", safeOutputMessagesLog); err != nil {
+			safeOutputMessagesLog.Printf("mentions.max: %v", err)
+		} else if maxValue, exists := mentionsMap["max"]; exists {
+			if max, ok := maxValue.(string); ok {
+				if templatableIntValue(&max) >= 1 || isExpression(max) {
+					config.Max = &max
+				} else {
+					safeOutputMessagesLog.Printf("mentions.max must be at least 1, got %q", max)
 				}
 			}
 		}
 	}
 
 	return config
+}
+
+func parseMentionNames(value any) []string {
+	names, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(names))
+	for _, item := range names {
+		name, ok := item.(string)
+		if !ok {
+			continue
+		}
+		normalized := strings.TrimPrefix(name, "@")
+		if normalized != name {
+			safeOutputMessagesLog.Printf("Normalized mention '%s' to '%s'", name, normalized)
+		}
+		result = append(result, normalized)
+	}
+	return result
 }
 
 // serializeMessagesConfig converts SafeOutputMessagesConfig to JSON for passing as environment variable

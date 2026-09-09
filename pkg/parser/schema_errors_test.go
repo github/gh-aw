@@ -127,6 +127,15 @@ func TestSynthesizeOneOfTypeConflictMessage(t *testing.T) {
 			wantAny: []string{"expected string or array, got number", "Valid toolsets", "default", "toolsets: default"},
 		},
 		{
+			name: "Linear toolsets field with number type produces actionable message",
+			lines: []string{
+				"at '/tools/linear/toolsets': 'oneOf' failed, none matched",
+				"- at '/tools/linear/toolsets': got number, want string",
+				"- at '/tools/linear/toolsets': got number, want array",
+			},
+			wantAny: []string{"expected string or array, got number", "Valid toolsets", "issues", "toolsets: [issues, projects]"},
+		},
+		{
 			name: "unknown field produces generic message without hints",
 			lines: []string{
 				"at '/foo': 'oneOf' failed, none matched",

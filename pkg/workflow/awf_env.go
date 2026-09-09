@@ -74,14 +74,14 @@ func injectMaxAICreditsExpression(awfConfigJSON string, expr string) string {
 //   - coreSecretVarNames: engine-specific fixed secret env var names (e.g. ["COPILOT_GITHUB_TOKEN"])
 //
 // The function augments coreSecretVarNames with:
-//   - MCP_GATEWAY_API_KEY when MCP servers are present
+//   - MCP_GATEWAY_AGENT_ID when MCP servers are present
 //   - GITHUB_MCP_SERVER_TOKEN when the GitHub tool is present
 //   - HTTP MCP header secret var names (values always contain ${{ secrets.* }})
 //   - mcp-scripts env var names whose values contain ${{ secrets.* }} or a job-output expression
 //   - engine.env var names whose values contain ${{ secrets.* }} or a job-output expression
 //   - agent.env var names whose values contain ${{ secrets.* }} or a job-output expression
 //   - names listed in the frontmatter excluded-env field (unconditionally)
-func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames []string) []string {
+func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames []string) []string { //nolint:largefunc // Existing environment classification logic is intentionally kept together.
 	seen := make(map[string]struct {
 	})
 	var names []string
@@ -99,9 +99,13 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 		addUnique(name)
 	}
 
-	// MCP gateway API key is always a secret when MCP servers are present.
+	// MCP gateway agent ID is always a secret when MCP servers are present.
 	if HasMCPServers(workflowData) {
+		addUnique("MCP_GATEWAY_AGENT_ID")
+	}
+	if enclavesEnabled(workflowData) {
 		addUnique("MCP_GATEWAY_API_KEY")
+		addUnique(enclaveGitHubDelegationEnv)
 	}
 
 	// GitHub MCP server token is always a secret when the GitHub tool is present.
@@ -164,10 +168,10 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 		addUnique(enclaveMCPReadinessTimeoutEnv)
 	}
 	if enclaveGitHubIssuesEnabled(workflowData) {
-		addUnique(enclaveGitHubProxyContainerEnv)
-		addUnique(enclaveGitHubProxyIdentityEnv)
-		addUnique(enclaveGitHubProxyCACertEnv)
-		addUnique(enclaveGitHubProxyRootKeyEnv)
+		addUnique(enclaveGitHubMCPAgentIDEnv)
+	}
+	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+		addUnique(enclaveGitHubDelegationControlEndpointEnv)
 	}
 
 	// Explicitly excluded env vars from the frontmatter excluded-env field.

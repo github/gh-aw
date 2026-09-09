@@ -52,6 +52,11 @@
       "description": "Enable or disable the builtin centralized /help slash command handler. Defaults to true when omitted. Set to false to disable.",
       "type": "boolean"
     },
+    "strict": {
+      "description": "Enforce strict mode for every workflow compiled in this repository. Only true is accepted so workflows cannot opt out with frontmatter.",
+      "type": "boolean",
+      "const": true
+    },
     "utc": {
       "description": "Project home UTC offset used when rendering local times in CLI output. Must be a numeric UTC offset such as +00:00 or -08:00.",
       "type": "string",
@@ -68,7 +73,7 @@
         },
         {
           "type": "object",
-          "description": "Enable auto-upgrade with a custom schedule. Providing an object implies enabled.",
+          "description": "Enable auto-upgrade with a custom schedule or upgrade options. Providing an object implies enabled.",
           "additionalProperties": false,
           "properties": {
             "cron": {
@@ -77,6 +82,16 @@
               "minLength": 9,
               "pattern": "^[0-9*/,\\-]+ [0-9*/,\\-]+ [0-9*/,\\-]+ [0-9*/,\\-]+ [0-9*/,\\-]+$",
               "examples": ["0 9 * * 1", "30 5 * * 1-5", "0 0 * * 0"]
+            },
+            "options": {
+              "description": "Supported command-line options passed to gh aw upgrade.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["--pre-releases"]
+              },
+              "uniqueItems": true,
+              "examples": [["--pre-releases"]]
             }
           }
         }

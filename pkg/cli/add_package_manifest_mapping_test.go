@@ -13,6 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCleanManifestRelativePathRejectsAbsoluteForms(t *testing.T) {
+	t.Parallel()
+
+	for _, input := range []string{"/tmp/reviewer.md", `\tmp\reviewer.md`, `C:/tmp/reviewer.md`} {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+			_, err := cleanManifestRelativePath(input)
+			assert.EqualError(t, err, "absolute paths are not allowed")
+		})
+	}
+}
+
 // setupMappingPackageTest wires the package resolution hooks so that only the manifest and
 // README of a package are available, and auto-scan is disabled.
 func setupMappingPackageTest(t *testing.T, manifest map[string]string) {

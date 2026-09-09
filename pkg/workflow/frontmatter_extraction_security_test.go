@@ -27,6 +27,18 @@ func TestExtractAgentSandboxConfigVersion(t *testing.T) {
 	})
 }
 
+func TestExtractMCPGatewayConfigAgentID(t *testing.T) {
+	compiler := &Compiler{}
+
+	config := compiler.extractMCPGatewayConfig(map[string]any{
+		"container": "ghcr.io/github/gh-aw-mcpg",
+		"agent-id":  "configured-agent-id",
+	})
+
+	require.NotNil(t, config, "Should extract MCP gateway config")
+	assert.Equal(t, "configured-agent-id", config.AgentID, "Should extract sandbox.mcp.agent-id")
+}
+
 func TestExtractAgentSandboxConfigPlatform(t *testing.T) {
 	compiler := &Compiler{}
 
@@ -210,6 +222,37 @@ func TestExtractAgentSandboxConfigTokenSteering(t *testing.T) {
 
 		require.NotNil(t, config)
 		assert.Nil(t, config.TokenSteering)
+	})
+}
+
+func TestExtractAgentSandboxConfigCACert(t *testing.T) {
+	compiler := &Compiler{}
+
+	t.Run("extracts sandbox.agent.ca-cert", func(t *testing.T) {
+		config := compiler.extractAgentSandboxConfig(map[string]any{
+			"id":      "awf",
+			"ca-cert": "/etc/ssl/certs/internal-ca.pem",
+		})
+
+		require.NotNil(t, config)
+		assert.Equal(t, "/etc/ssl/certs/internal-ca.pem", config.CACert)
+	})
+
+	t.Run("ca-cert is empty when absent", func(t *testing.T) {
+		config := compiler.extractAgentSandboxConfig(map[string]any{"id": "awf"})
+
+		require.NotNil(t, config)
+		assert.Empty(t, config.CACert)
+	})
+
+	t.Run("ca-cert is empty when value is not a string", func(t *testing.T) {
+		config := compiler.extractAgentSandboxConfig(map[string]any{
+			"id":      "awf",
+			"ca-cert": 42,
+		})
+
+		require.NotNil(t, config)
+		assert.Empty(t, config.CACert)
 	})
 }
 

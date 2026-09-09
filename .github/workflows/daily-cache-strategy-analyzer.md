@@ -14,15 +14,16 @@ permissions:
   pull-requests: read
   discussions: read
 tracker-id: daily-cache-strategy-analyzer
-model: "${{ needs.activation.outputs.model_size }}"
+model: openai/gpt-5.3-codex
 engine:
   id: codex
+  model-provider: openai
 strict: true
 experiments:
   model_size:
-    variants: [gpt-5.4, gpt-5.4-mini]
+    variants: [gpt-5.3-codex, gpt-5.3-codex-spark]
     description: "Compares codex-compatible models for cache issue detection quality and efficiency."
-    hypothesis: "H0: no change in issue creation rate or run success rate. H1: gpt-5.4-mini reduces AI Credits while keeping run success rate >=0.90."
+    hypothesis: "H0: no change in issue creation rate or run success rate. H1: gpt-5.3-codex-spark reduces AI Credits while keeping run success rate >=0.90."
     metric: ai_credits_total
     secondary_metrics: [run_success_rate, run_duration_ms]
     guardrail_metrics:
@@ -40,12 +41,12 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: docker-sbx
+    runtime: cloud-hypervisor
 tools:
   cache-memory: true
   cli-proxy: true
   github:
-    mode: gh-proxy
+    mode: local
 safe-outputs:
   create-issue:
     expires: 7d

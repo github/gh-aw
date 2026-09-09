@@ -339,9 +339,11 @@ func (c *Compiler) generateSetRuntimePathsStep() []string {
 	return []string{
 		"      - name: Set runtime paths\n",
 		"        id: set-runtime-paths\n",
+		"        env:\n",
+		"          GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}\n",
 		"        run: |\n",
 		"          if [ -z \"${RUNNER_TOOL_CACHE:-}\" ]; then\n",
-		"            echo \"RUNNER_TOOL_CACHE=${{ runner.tool_cache }}\" >> \"$GITHUB_ENV\"\n",
+		"            echo \"RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}\" >> \"$GITHUB_ENV\"\n",
 		"          fi\n",
 		"          {\n",
 		"            echo \"GH_AW_SAFE_OUTPUTS=${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl\"\n",

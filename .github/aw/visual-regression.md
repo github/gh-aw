@@ -19,11 +19,12 @@ permissions:
   contents: read
   pull-requests: read
 engine: copilot
+network:
+  allowed:
+    - local
+    - playwright
 tools:
   playwright:
-    allowed_domains:
-      - localhost
-      - 127.0.0.1
   cache-memory:
     key: visual-regression-baselines-${{ github.event.pull_request.base.ref }}
     retention-days: 30
@@ -53,7 +54,7 @@ Otherwise compare each screenshot to its baseline. Post a comment summarizing: p
 
 - **`cache-memory` key per base branch** — scopes baselines to `main`, `develop`, etc.
 - **Explicit baseline source** — state whether baselines come from `cache-memory`, a generated artifact, or a branch directory; do not leave baseline origin implicit.
-- **`allowed_domains: [localhost, 127.0.0.1]`** — prevents SSRF; serve app locally
+- **`network.allowed: [local, playwright]`** — prevents SSRF; serve app locally, allow browser binary downloads
 - **`retention-days: 30`** — beyond the default 7-day cache expiry
 - **Filesystem-safe timestamps** — `YYYY-MM-DD-HH-MM-SS`; colons break artifact filenames
 - **Minimal permissions** — all PR writes go through `safe-outputs`

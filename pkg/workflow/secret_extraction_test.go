@@ -266,6 +266,25 @@ func TestSharedExtractSecretsFromMap(t *testing.T) {
 	}
 }
 
+func TestExtractEnvExpressionsFromValuePrefersFallbackForDuplicateVariable(t *testing.T) {
+	result := ExtractEnvExpressionsFromValue("${{ env.HOST || 'localhost' }}/${{ env.HOST }}")
+
+	assert.Equal(t, map[string]string{
+		"HOST": "${{ env.HOST || 'localhost' }}",
+	}, result)
+}
+
+func TestExtractEnvExpressionsFromMapPrefersFallbackForDuplicateVariable(t *testing.T) {
+	result := ExtractEnvExpressionsFromMap(map[string]string{
+		"HOST_WITH_FALLBACK": "${{ env.HOST || 'localhost' }}",
+		"HOST":               "${{ env.HOST }}",
+	})
+
+	assert.Equal(t, map[string]string{
+		"HOST": "${{ env.HOST || 'localhost' }}",
+	}, result)
+}
+
 // TestSharedReplaceSecretsWithEnvVars tests the shared ReplaceSecretsWithEnvVars utility function
 func TestSharedReplaceSecretsWithEnvVars(t *testing.T) {
 	tests := []struct {

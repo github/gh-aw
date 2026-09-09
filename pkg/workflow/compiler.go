@@ -144,7 +144,7 @@ func shouldDowngradeDefaultToolsetPermissionError(githubTool *GitHubToolConfig) 
 
 // generateAndValidateYAML generates GitHub Actions YAML and validates
 // the output size and format.
-func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownPath string, lockFile string) (string, []string, []string, error) {
+func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownPath string, lockFile string) (string, []string, []string, error) { //nolint:largefunc // Existing YAML generation and validation remains centralized.
 	// Generate the YAML content along with the collected body secrets and action refs
 	// (returned to avoid a second scan of the full YAML in the caller for safe update enforcement).
 	yamlContent, bodySecrets, bodyActions, err := c.generateYAML(workflowData, markdownPath)
@@ -435,7 +435,7 @@ func (c *Compiler) readLockFileFromHEAD(lockFile string) (string, error) {
 // This function avoids re-parsing when workflow data has already been extracted,
 // making it efficient for scenarios where the same workflow is compiled multiple times
 // or when workflow data comes from a non-file source.
-func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error {
+func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error { //nolint:largefunc // Existing compilation lifecycle remains centralized.
 	// Store markdownPath for use in dynamic tool generation and prompt generation
 	c.markdownPath = markdownPath
 
@@ -472,6 +472,15 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 	lockFile = filepath.Clean(lockFile)
 
 	workflowLog.Printf("Starting compilation: %s -> %s", markdownPath, lockFile)
+
+	// CompileWorkflowData is also a public entry point, so enforce the
+	// strict-mode sandbox restriction here rather than relying on the
+	// orchestrator path to validate it.
+	if err := c.withEffectiveStrictMode(workflowData.RawFrontmatter, func() error {
+		return c.validateStrictFirewall("", nil, workflowData.SandboxConfig)
+	}); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 
 	// Resolve and cache the baseline manifest only when safe update mode is active.
 	// This avoids unnecessary git/filesystem reads on compile paths that skip safe update

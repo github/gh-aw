@@ -120,7 +120,7 @@ func TestWithMountedCLIShellCommandsInRestrictedBash_PlaywrightCLIMode(t *testin
 		assert.Equal(t, []any{"*"}, bash, "bash should remain exactly [\"*\"] — wildcard preserved and nothing injected")
 	})
 
-	t.Run("playwright mcp mode (not cli) does not add playwright-cli:*", func(t *testing.T) {
+	t.Run("playwright default mode adds playwright-cli:*", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Tools: map[string]any{
 				"bash":       []any{"echo"},
@@ -130,14 +130,8 @@ func TestWithMountedCLIShellCommandsInRestrictedBash_PlaywrightCLIMode(t *testin
 		result := withMountedCLIShellCommandsInRestrictedBash(workflowData)
 		require.NotNil(t, result, "result should not be nil")
 		bash, ok := result["bash"].([]any)
-		// No servers, no playwright CLI → no changes; bash might be unchanged
-		if ok {
-			for _, cmd := range bash {
-				if cmdStr, ok := cmd.(string); ok {
-					assert.NotEqual(t, "playwright-cli:*", cmdStr, "playwright-cli:* should not be injected in MCP mode")
-				}
-			}
-		}
+		require.True(t, ok, "bash should be a []any")
+		assert.Contains(t, bash, "playwright-cli:*")
 	})
 
 	t.Run("playwright-cli:* not duplicated when already present", func(t *testing.T) {

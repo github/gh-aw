@@ -54,16 +54,18 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	if data.RunsOn == "" {
 		data.RunsOn = "runs-on: ubuntu-latest"
 	}
+	// Preserve explicit false intent before default-tool resolution mutates or
+	// removes entries. Runtime integrations use this alongside the effective
+	// post-default tools map to distinguish absent, disabled, and enabled tools.
+	if err := prepareToolsForDefaults(data); err != nil {
+		return err
+	}
+
 	// Capture whether tools.bash was explicitly set to false before default-tool resolution
 	// removes the "bash" key entirely (unless overridden by required git commands). This lets
 	// us distinguish "bash explicitly refused" from "bash never configured", which both end up
 	// with an absent "bash" key after applyDefaultTools.
-	bashExplicitlyFalse := false
-	if bashVal, hasBash := data.Tools["bash"]; hasBash {
-		if boolVal, isBool := bashVal.(bool); isBool && !boolVal {
-			bashExplicitlyFalse = true
-		}
-	}
+	bashExplicitlyFalse := isToolExplicitlyFalse(data.Tools["bash"])
 	data.Tools = c.applyDefaultTools(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions)
 	data.BashDisabled = isBashFullyDisabled(data.Tools, bashExplicitlyFalse)
 	data.ParsedTools = NewTools(data.Tools)
@@ -74,6 +76,26 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	}
 	applyDefaultPermissions(data)
 	return nil
+}
+
+func prepareToolsForDefaults(data *WorkflowData) error {
+	data.ExplicitlyDisabledTools = collectExplicitlyDisabledTools(data.Tools)
+	return expandJiraToolConfig(data.Tools)
+}
+
+func isToolExplicitlyFalse(value any) bool {
+	enabled, ok := value.(bool)
+	return ok && !enabled
+}
+
+func collectExplicitlyDisabledTools(tools map[string]any) map[string]struct{} {
+	disabled := make(map[string]struct{})
+	for name, value := range tools {
+		if enabled, ok := value.(bool); ok && !enabled {
+			disabled[name] = struct{}{}
+		}
+	}
+	return disabled
 }
 
 // populateWorkflowDataCache pre-computes and stores cached values derived from data.Permissions,
@@ -531,7 +553,7 @@ func isBashFullyDisabled(tools map[string]any, wasExplicitlyFalse bool) bool {
 }
 
 // applyDefaultTools adds default read-only GitHub MCP tools, creating github tool if not present
-func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) map[string]any {
+func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) map[string]any { //nolint:largefunc // Existing defaulting logic is centralized; SDK changes only preserve explicit disabled state before this runs.
 	toolsLog.Printf("Applying default tools: existingToolCount=%d", len(tools))
 	// Always apply default GitHub tools (create github section if it doesn't exist)
 

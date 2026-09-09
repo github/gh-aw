@@ -77,7 +77,7 @@ This will:
 
 ## Playwright Browser Access
 
-With **CLI mode** (`mode: cli`, recommended), `playwright-cli` runs directly on the runner — not in a Docker container. Use `localhost` directly to reach the dev server:
+With the built-in Playwright CLI integration, `playwright-cli` runs directly on the runner — not in a Docker container. Use `localhost` directly to reach the dev server:
 
 ```bash
 playwright-cli browser_navigate --url "http://localhost:4321/gh-aw/"
@@ -111,7 +111,7 @@ This will:
 ## Usage Notes
 
 - The server runs on `http://localhost:4321` and is accessible at `http://localhost:4321/gh-aw/` for curl/bash and playwright-cli
-- With CLI mode (`mode: cli`), use `localhost` directly for all playwright-cli commands — no bridge IP needed
+- With the built-in Playwright CLI integration, use `localhost` directly for all playwright-cli commands — no bridge IP needed
 - Always clean up the server when done to avoid orphan processes
 - If the server fails to start, check `/tmp/gh-aw/agent/preview.log` for errors
 - Node.js >= 22 is required; ensure `runtimes: node: version: "22"` is set in the workflow frontmatter

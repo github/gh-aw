@@ -388,6 +388,12 @@ Create one issue titled:
 Impact Efficiency Report - YYYY-MM-DD
 ```
 
+Format the report for progressive disclosure:
+
+- Begin with the compact `### Executive Summary` and keep the key takeaway, critical findings, and recommendations visible.
+- Use `###` headings for report sections and `####` headings for subsections.
+- Wrap verbose tables, long lists, or extended analysis in `<details><summary><b>View full findings</b></summary>` blocks.
+
 The report must include:
 
 ### Executive Summary

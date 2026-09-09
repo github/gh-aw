@@ -44,29 +44,11 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 			continue
 		}
 
-		var setupSteps []string
-		var preSteps []string
-		var regularSteps []string
-		if hasSetupSteps {
-			steps, err := c.extractPinnedJobSteps("setup-steps", jobName, configMap, data)
-			if err != nil {
-				return fmt.Errorf("setup-steps for built-in job '%s' could not be processed: %w. Check that setup-steps is an array of valid step objects", jobName, err)
-			}
-			setupSteps = append(setupSteps, steps...)
-		}
-		if hasPreSteps {
-			steps, err := c.extractPinnedJobSteps("pre-steps", jobName, configMap, data)
-			if err != nil {
-				return fmt.Errorf("pre-steps for built-in job '%s' could not be processed: %w. Check that pre-steps is an array of valid step objects", jobName, err)
-			}
-			preSteps = append(preSteps, steps...)
-		}
-		if hasSteps && targetJobName == string(constants.ActivationJobName) {
-			steps, err := c.extractPinnedJobSteps("steps", jobName, configMap, data)
-			if err != nil {
-				return fmt.Errorf("steps for built-in job '%s' could not be processed: %w. Check that steps is an array of valid step objects", jobName, err)
-			}
-			regularSteps = append(regularSteps, steps...)
+		setupSteps, preSteps, regularSteps, err := c.extractBuiltinJobPreSteps(
+			jobName, targetJobName, configMap, data, hasSetupSteps, hasPreSteps, hasSteps,
+		)
+		if err != nil {
+			return err
 		}
 		if len(setupSteps) == 0 && len(preSteps) == 0 && len(regularSteps) == 0 {
 			continue
@@ -79,6 +61,33 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	return nil
+}
+
+func (c *Compiler) extractBuiltinJobPreSteps(jobName, targetJobName string, configMap map[string]any, data *WorkflowData, hasSetupSteps, hasPreSteps, hasSteps bool) ([]string, []string, []string, error) {
+	setupSteps, err := c.extractOptionalBuiltinJobSteps("setup-steps", jobName, configMap, data, hasSetupSteps)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	preSteps, err := c.extractOptionalBuiltinJobSteps("pre-steps", jobName, configMap, data, hasPreSteps)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	regularSteps, err := c.extractOptionalBuiltinJobSteps("steps", jobName, configMap, data, hasSteps && targetJobName == string(constants.ActivationJobName))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return setupSteps, preSteps, regularSteps, nil
+}
+
+func (c *Compiler) extractOptionalBuiltinJobSteps(field, jobName string, configMap map[string]any, data *WorkflowData, enabled bool) ([]string, error) {
+	if !enabled {
+		return nil, nil
+	}
+	steps, err := c.extractPinnedJobSteps(field, jobName, configMap, data)
+	if err != nil {
+		return nil, fmt.Errorf("%s for built-in job '%s' could not be processed: %w. Check that %s is an array of valid step objects", field, jobName, err, field)
+	}
+	return steps, nil
 }
 
 func insertActivationStepsBeforeArtifactStaging(jobName string, steps []string, activationSteps []string) []string {
@@ -170,112 +179,131 @@ func (c *Compiler) applyBuiltinJobAugmentations(data *WorkflowData) error {
 
 	allJobs := c.jobManager.GetAllJobs()
 	for configuredJobName, rawConfig := range data.Jobs {
-		targetJobName := normalizeBuiltinJobAlias(configuredJobName)
-		if !isBuiltinJobName(targetJobName) {
-			continue
-		}
-
-		configMap, ok := rawConfig.(map[string]any)
-		if !ok {
-			return fmt.Errorf("jobs.%s expects an object, got %T. Example: jobs:\n  %s:\n    runs-on: ubuntu-latest", configuredJobName, rawConfig, configuredJobName)
-		}
-
-		augmentedNeeds, err := extractBuiltinJobNeedsAugmentation(configuredJobName, configMap)
-		if err != nil {
+		if err := c.applyBuiltinJobAugmentation(configuredJobName, rawConfig, data, allJobs); err != nil {
 			return err
-		}
-		augmentedIf, err := extractBuiltinJobIfAugmentation(configuredJobName, configMap)
-		if err != nil {
-			return err
-		}
-		_, hasPermissions := configMap["permissions"]
-		_, hasTimeout := configMap["timeout-minutes"]
-		if hasTimeout && targetJobName != string(constants.AgentJobName) && targetJobName != string(constants.DetectionJobName) {
-			return fmt.Errorf("jobs.%s.timeout-minutes is supported only for the generated agent and detection jobs", configuredJobName)
-		}
-		if len(augmentedNeeds) == 0 && augmentedIf == "" && !hasPermissions && !hasTimeout {
-			continue
-		}
-
-		targetJob, exists := c.jobManager.GetJob(targetJobName)
-		if !exists {
-			// Report the actual field(s) the author configured so they can identify the problem.
-			augmentedField := configuredJobName + ".needs"
-			if len(augmentedNeeds) == 0 {
-				if augmentedIf != "" {
-					augmentedField = configuredJobName + ".if"
-				} else if hasTimeout {
-					augmentedField = configuredJobName + ".timeout-minutes"
-				} else {
-					augmentedField = configuredJobName + ".permissions"
-				}
-			} else if augmentedIf != "" || hasPermissions || hasTimeout {
-				augmentedField = configuredJobName
-			}
-			return fmt.Errorf("jobs.%s requires an existing built-in job %q, but this workflow does not generate it. Add the corresponding trigger/feature, or rename the job", augmentedField, targetJobName)
-		}
-
-		if hasPermissions {
-			if err := applyBuiltinJobPermissionsAugmentation(configuredJobName, targetJobName, configMap, targetJob); err != nil {
-				return err
-			}
-		}
-		if hasTimeout {
-			if err := extractCustomJobTimeoutMinutes(targetJob, configuredJobName, configMap); err != nil {
-				return err
-			}
-		}
-
-		normalizedNeeds := make([]string, 0, len(augmentedNeeds))
-		for _, rawNeed := range augmentedNeeds {
-			need := normalizeBuiltinJobAlias(rawNeed)
-			if need == targetJobName {
-				return fmt.Errorf("jobs.%s.needs lists %q, but a job should not depend on itself. Remove the self-reference from needs", configuredJobName, rawNeed)
-			}
-			if _, known := allJobs[need]; !known {
-				return fmt.Errorf("jobs.%s.needs: unknown job %q. Expected a job defined in this workflow or a generated built-in job. Example:\njobs:\n  %s:\n    needs: [activation]", configuredJobName, rawNeed, configuredJobName)
-			}
-			normalizedNeeds = append(normalizedNeeds, need)
-		}
-
-		// Capture compiler-owned needs before adding user-supplied ones.
-		// These are the prerequisites the compiler established (e.g. activation) and
-		// must be guarded explicitly when the user condition contains a status function.
-		compilerOwnedNeeds := make([]string, len(targetJob.Needs))
-		copy(compilerOwnedNeeds, targetJob.Needs)
-
-		seen := make(map[string]struct{}, len(targetJob.Needs)+len(normalizedNeeds))
-		mergedNeeds := make([]string, 0, len(targetJob.Needs)+len(normalizedNeeds))
-		for _, need := range targetJob.Needs {
-			if _, alreadySeen := seen[need]; alreadySeen {
-				continue
-			}
-			seen[need] = struct{}{}
-			mergedNeeds = append(mergedNeeds, need)
-		}
-		for _, need := range normalizedNeeds {
-			if _, alreadySeen := seen[need]; alreadySeen {
-				continue
-			}
-			seen[need] = struct{}{}
-			mergedNeeds = append(mergedNeeds, need)
-		}
-		targetJob.Needs = mergedNeeds
-		if augmentedIf != "" {
-			// Guard against status-function bypasses: when the user condition contains a
-			// status function (always, failure, cancelled, success), GitHub Actions removes
-			// the implicit success() check for all needs. Compiler-owned prerequisites such
-			// as activation perform security and permission checks and must always succeed,
-			// so we add explicit result == 'success' guards for those jobs only.
-			guardedIf := c.guardIfAgainstStatusFuncBypass(augmentedIf, compilerOwnedNeeds)
-			targetJob.If = c.combineJobIfConditions(targetJob.If, guardedIf)
-			compilerJobsLog.Printf("Applied jobs.%s.if augmentation to %q", configuredJobName, targetJobName)
-		}
-		if len(normalizedNeeds) > 0 {
-			compilerJobsLog.Printf("Applied jobs.%s.needs augmentation to %q: %v", configuredJobName, targetJobName, normalizedNeeds)
 		}
 	}
 	return nil
+}
+
+type builtinJobAugmentation struct {
+	needs          []string
+	ifCondition    string
+	hasPermissions bool
+	hasTimeout     bool
+}
+
+func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (builtinJobAugmentation, map[string]any, error) {
+	configMap, ok := rawConfig.(map[string]any)
+	if !ok {
+		return builtinJobAugmentation{}, nil, fmt.Errorf("jobs.%s expects an object, got %T. Example: jobs:\n  %s:\n    runs-on: ubuntu-latest", jobName, rawConfig, jobName)
+	}
+	needs, err := extractBuiltinJobNeedsAugmentation(jobName, configMap)
+	if err != nil {
+		return builtinJobAugmentation{}, nil, err
+	}
+	ifCondition, err := extractBuiltinJobIfAugmentation(jobName, configMap)
+	if err != nil {
+		return builtinJobAugmentation{}, nil, err
+	}
+	_, hasPermissions := configMap["permissions"]
+	_, hasTimeout := configMap["timeout-minutes"]
+	if hasTimeout && targetJobName != string(constants.AgentJobName) && targetJobName != string(constants.DetectionJobName) {
+		return builtinJobAugmentation{}, nil, fmt.Errorf("jobs.%s.timeout-minutes is supported only for the generated agent and detection jobs", jobName)
+	}
+	return builtinJobAugmentation{needs, ifCondition, hasPermissions, hasTimeout}, configMap, nil
+}
+
+func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, data *WorkflowData, allJobs map[string]*Job) error {
+	targetJobName := normalizeBuiltinJobAlias(jobName)
+	if !isBuiltinJobName(targetJobName) {
+		return nil
+	}
+	augmentation, configMap, err := parseBuiltinJobAugmentation(jobName, targetJobName, rawConfig)
+	if err != nil {
+		return err
+	}
+	if len(augmentation.needs) == 0 && augmentation.ifCondition == "" && !augmentation.hasPermissions && !augmentation.hasTimeout {
+		return nil
+	}
+	targetJob, exists := c.jobManager.GetJob(targetJobName)
+	if !exists {
+		return fmt.Errorf("jobs.%s requires an existing built-in job %q, but this workflow does not generate it. Add the corresponding trigger/feature, or rename the job", augmentedBuiltinJobField(jobName, targetJobName, augmentation), targetJobName)
+	}
+	if augmentation.hasPermissions {
+		if err := applyBuiltinJobPermissionsAugmentation(jobName, targetJobName, configMap, targetJob); err != nil {
+			return err
+		}
+	}
+	if augmentation.hasTimeout {
+		if err := extractCustomJobTimeoutMinutes(targetJob, jobName, configMap); err != nil {
+			return err
+		}
+	}
+	return c.applyBuiltinJobNeedsAndIf(jobName, targetJobName, targetJob, data.Jobs, allJobs, augmentation)
+}
+
+func augmentedBuiltinJobField(jobName, targetJobName string, augmentation builtinJobAugmentation) string {
+	if len(augmentation.needs) > 0 && (augmentation.ifCondition != "" || augmentation.hasPermissions || augmentation.hasTimeout) {
+		return jobName
+	}
+	if len(augmentation.needs) > 0 {
+		return jobName + ".needs"
+	}
+	if augmentation.ifCondition != "" {
+		return jobName + ".if"
+	}
+	if augmentation.hasTimeout {
+		return jobName + ".timeout-minutes"
+	}
+	return targetJobName + ".permissions"
+}
+
+func (c *Compiler) applyBuiltinJobNeedsAndIf(jobName, targetJobName string, targetJob *Job, customJobs map[string]any, allJobs map[string]*Job, augmentation builtinJobAugmentation) error {
+	normalizedNeeds, err := normalizeBuiltinJobAugmentationNeeds(jobName, targetJobName, augmentation.needs, allJobs)
+	if err != nil {
+		return err
+	}
+	compilerOwnedNeeds := selectCompilerOwnedNeeds(targetJob.Needs, customJobs)
+	targetJob.Needs = mergeJobNeeds(targetJob.Needs, normalizedNeeds)
+	if augmentation.ifCondition != "" {
+		targetJob.If = c.combineJobIfConditions(targetJob.If, c.guardIfAgainstStatusFuncBypass(augmentation.ifCondition, compilerOwnedNeeds))
+		compilerJobsLog.Printf("Applied jobs.%s.if augmentation to %q", jobName, targetJobName)
+	}
+	if len(normalizedNeeds) > 0 {
+		compilerJobsLog.Printf("Applied jobs.%s.needs augmentation to %q: %v", jobName, targetJobName, normalizedNeeds)
+	}
+	return nil
+}
+
+func normalizeBuiltinJobAugmentationNeeds(jobName, targetJobName string, needs []string, allJobs map[string]*Job) ([]string, error) {
+	normalized := make([]string, 0, len(needs))
+	for _, rawNeed := range needs {
+		need := normalizeBuiltinJobAlias(rawNeed)
+		if need == targetJobName {
+			return nil, fmt.Errorf("jobs.%s.needs lists %q, but a job should not depend on itself. Remove the self-reference from needs", jobName, rawNeed)
+		}
+		if _, known := allJobs[need]; !known {
+			return nil, fmt.Errorf("jobs.%s.needs: unknown job %q. Expected a job defined in this workflow or a generated built-in job. Example:\njobs:\n  %s:\n    needs: [activation]", jobName, rawNeed, jobName)
+		}
+		normalized = append(normalized, need)
+	}
+	return normalized, nil
+}
+
+func mergeJobNeeds(existing, added []string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(added))
+	merged := make([]string, 0, len(existing)+len(added))
+	for _, needs := range [][]string{existing, added} {
+		for _, need := range needs {
+			if _, alreadySeen := seen[need]; alreadySeen {
+				continue
+			}
+			seen[need] = struct{}{}
+			merged = append(merged, need)
+		}
+	}
+	return merged
 }
 
 // applyBuiltinJobPermissionsAugmentation merges user-declared jobs.<built-in>.permissions
@@ -302,6 +330,22 @@ func applyBuiltinJobPermissionsAugmentation(configuredJobName, targetJobName str
 	targetJob.Permissions = merged.RenderToYAML()
 	compilerJobsLog.Printf("Applied jobs.%s.permissions augmentation to %q", configuredJobName, targetJobName)
 	return nil
+}
+
+// selectCompilerOwnedNeeds returns the prerequisites of a built-in job that the compiler owns,
+// i.e. the needs that are not custom jobs declared under top-level `jobs:`. Custom jobs are
+// auto-wired as prerequisites of built-in jobs but remain author-owned, so the author picks
+// their result semantics (for example an `if: always()` agent that analyses a failing probe
+// job). Compiler-owned prerequisites such as activation must stay guarded.
+func selectCompilerOwnedNeeds(needs []string, customJobs map[string]any) []string {
+	owned := make([]string, 0, len(needs))
+	for _, need := range needs {
+		if _, isCustomJob := customJobs[need]; isCustomJob && !isBuiltinJobName(need) {
+			continue
+		}
+		owned = append(owned, need)
+	}
+	return owned
 }
 
 // guardIfAgainstStatusFuncBypass returns userCondition augmented with explicit

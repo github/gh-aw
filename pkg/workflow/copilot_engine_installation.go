@@ -36,6 +36,7 @@ type copilotSDKInstallSpec struct {
 
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
+const copilotSDKWebFetchDependency = "undici@6.28.0"
 
 // inlineMavenVersion is the pinned Maven version used to bootstrap Maven for inline Java drivers
 // on runners that don't have it pre-installed (e.g. self-hosted). GitHub-hosted runners already
@@ -115,30 +116,7 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 
 	// Skip standard Copilot CLI installation if custom command is specified.
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
-		// Keep firewall runtime installation when firewall is enabled, since the
-		// custom engine command still runs inside the AWF harness.
-		if isFirewallEnabled(workflowData) {
-			copilotInstallLog.Printf("Skipping Copilot CLI installation: custom command specified (%s); keeping AWF runtime installation because firewall is enabled", workflowData.EngineConfig.Command)
-			var steps []GitHubActionStep
-			if len(inlineDriverWriteStep) > 0 {
-				steps = append(steps, inlineDriverWriteStep)
-			}
-			if len(sdkInstallStep) > 0 {
-				steps = append(steps, sdkInstallStep)
-			}
-			return appendCopilotLSPInstallSteps(BuildNpmEngineInstallStepsWithAWF(steps, workflowData), workflowData)
-		}
-		var steps []GitHubActionStep
-		if len(inlineDriverWriteStep) > 0 {
-			steps = append(steps, inlineDriverWriteStep)
-		}
-		if len(sdkInstallStep) > 0 {
-			copilotInstallLog.Printf("Skipping Copilot CLI installation: custom command specified (%s); keeping Copilot SDK install step", workflowData.EngineConfig.Command)
-			steps = append(steps, sdkInstallStep)
-			return appendCopilotLSPInstallSteps(steps, workflowData)
-		}
-		copilotInstallLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
-		return appendCopilotLSPInstallSteps(steps, workflowData)
+		return getCustomCopilotCommandInstallationSteps(workflowData, inlineDriverWriteStep, sdkInstallStep)
 	}
 
 	// Version selection follows a three-level priority:
@@ -179,6 +157,27 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	}
 	steps := BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
 
+	return appendCopilotLSPInstallSteps(steps, workflowData)
+}
+
+func getCustomCopilotCommandInstallationSteps(workflowData *WorkflowData, inlineDriverWriteStep, sdkInstallStep GitHubActionStep) []GitHubActionStep {
+	var steps []GitHubActionStep
+	if len(inlineDriverWriteStep) > 0 {
+		steps = append(steps, inlineDriverWriteStep)
+	}
+	if len(sdkInstallStep) > 0 {
+		steps = append(steps, sdkInstallStep)
+	}
+
+	if isFirewallEnabled(workflowData) {
+		copilotInstallLog.Printf("Skipping Copilot CLI installation: custom command specified (%s); keeping AWF runtime installation because firewall is enabled", workflowData.EngineConfig.Command)
+		return appendCopilotLSPInstallSteps(buildNpmEngineInstallStepsWithAWF(steps, workflowData, false), workflowData)
+	}
+	if len(sdkInstallStep) > 0 {
+		copilotInstallLog.Printf("Skipping Copilot CLI installation: custom command specified (%s); keeping Copilot SDK install step", workflowData.EngineConfig.Command)
+	} else {
+		copilotInstallLog.Printf("Skipping installation steps: custom command specified (%s)", workflowData.EngineConfig.Command)
+	}
 	return appendCopilotLSPInstallSteps(steps, workflowData)
 }
 
@@ -261,7 +260,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version,
+		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -274,7 +273,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 		)
 	case "typescript":
 		spec.stepName = "Install GitHub Copilot SDK (TypeScript)"
-		spec.command = workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " ts-node typescript"
+		spec.command = workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency + " ts-node typescript"
 	case "go":
 		spec.stepName = "Install GitHub Copilot SDK (Go)"
 		spec.command = workspaceCommandPrefix + "go get github.com/github/copilot-sdk/go@v" + version
@@ -298,7 +297,7 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version,
+		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {

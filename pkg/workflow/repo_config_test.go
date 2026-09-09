@@ -62,6 +62,23 @@ func TestLoadRepoConfig_EmptyObject(t *testing.T) {
 	assert.True(t, cfg.IsHelpCommandEnabled(), "help command should be enabled by default")
 }
 
+func TestLoadRepoConfig_StrictTrue(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"strict": true}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err, "aw.json should accept strict: true")
+	assert.True(t, cfg.Strict, "strict mode should be enforced")
+}
+
+func TestLoadRepoConfig_StrictFalseRejected(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"strict": false}`)
+
+	_, err := LoadRepoConfig(dir)
+	assert.Error(t, err, "aw.json should reject strict: false")
+}
+
 func TestLoadRepoConfig_HelpCommandFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeAWJSON(t, dir, `{"help_command": false}`)
@@ -222,7 +239,7 @@ func TestLoadRepoConfig_ContainerPinsKeyNoDigestAllowed(t *testing.T) {
 		},
 		{
 			name: "image without tag accepted",
-			key:  `"mcr.microsoft.com/playwright/mcp"`,
+			key:  `"alpine"`,
 		},
 		{
 			name:    "digest-pinned key rejected",
@@ -515,6 +532,23 @@ func TestLoadRepoConfig_AutoUpgradeCron(t *testing.T) {
 		require.NotNil(t, cfg.AutoUpgrade, "auto_upgrade should be set")
 		assert.True(t, *cfg.AutoUpgrade, "empty object should imply enabled")
 		assert.Empty(t, cfg.AutoUpgradeCron, "AutoUpgradeCron should be empty when cron is omitted")
+	})
+
+	t.Run("object form loads upgrade options", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAWJSON(t, dir, `{"auto_upgrade": {"options": ["--pre-releases"]}}`)
+
+		cfg, err := LoadRepoConfig(dir)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"--pre-releases"}, cfg.AutoUpgradeOptions)
+	})
+
+	t.Run("rejects unsupported upgrade options", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAWJSON(t, dir, `{"auto_upgrade": {"options": ["--unknown"]}}`)
+
+		_, err := LoadRepoConfig(dir)
+		assert.Error(t, err, "unsupported auto-upgrade options should return an error")
 	})
 
 	t.Run("boolean true has no cron", func(t *testing.T) {

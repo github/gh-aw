@@ -164,6 +164,12 @@ func renderConsoleTokenUsage(tokenUsage *TokenUsageSummary) {
 		tokenUsage.TotalRequests,
 		console.FormatNumber(tokenUsage.TotalSteeringEvents),
 	)
+	if len(tokenUsage.Warnings) > 0 {
+		fmt.Fprintln(os.Stderr, "  token_usage_warnings:")
+		for _, warning := range tokenUsage.Warnings {
+			fmt.Fprintf(os.Stderr, "    %s\n", warning)
+		}
+	}
 }
 
 func renderConsoleGitHubAPIUsage(rateLimit *GitHubRateLimitUsage) {

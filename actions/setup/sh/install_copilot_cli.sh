@@ -36,7 +36,7 @@ COPILOT_TOOLCACHE_MAX_DEPTH=4
 # argument nor a GH_AW_COMPILED_VERSION-backed compat.json lookup is available.
 # It is the last resort (priority 3) after engine.version (priority 1) and
 # compat.json toolcache lookup (priority 2).
-DEFAULT_COPILOT_VERSION="1.0.80"
+DEFAULT_COPILOT_VERSION="1.0.83"
 COMPAT_URL="${COPILOT_COMPAT_URL:-https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json}"
 COMPILED_GH_AW_VERSION="${GH_AW_COMPILED_VERSION:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,6 +60,16 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+OS="$(uname -s)"
+IS_WINDOWS=false
+case "$OS" in
+  MINGW*|MSYS*|CYGWIN*)
+    IS_WINDOWS=true
+    ROOTLESS=true
+    INSTALL_DIR="${HOME}/.local/bin"
+    ;;
+esac
 
 # In rootless mode, install into the user's home directory instead of /usr/local/bin
 # so that ARC/DinD runners with allowPrivilegeEscalation: false can run without sudo.
@@ -105,8 +115,7 @@ echo "Cleaning up stale AWF chroot directories..."
 maybe_sudo find /tmp -maxdepth 1 -name 'awf-*-chroot-home' -type d -exec rm -rf -- {} + 2>/dev/null || true
 maybe_sudo find /tmp -maxdepth 1 -name 'awf-chroot-*' -type d -exec rm -rf -- {} + 2>/dev/null || true
 
-# Detect OS and architecture
-OS="$(uname -s)"
+# Detect architecture
 ARCH="$(uname -m)"
 
 # Map architecture to Copilot CLI naming
@@ -120,10 +129,15 @@ esac
 case "$OS" in
   Linux) PLATFORM="linux" ;;
   Darwin) PLATFORM="darwin" ;;
+  MINGW*|MSYS*|CYGWIN*) PLATFORM="win32" ;;
   *) echo "ERROR: Unsupported operating system: ${OS}"; exit 1 ;;
 esac
 
-TARBALL_NAME="copilot-${PLATFORM}-${ARCH_NAME}.tar.gz"
+if [ "$IS_WINDOWS" = "true" ]; then
+  TARBALL_NAME="copilot-${PLATFORM}-${ARCH_NAME}.zip"
+else
+  TARBALL_NAME="copilot-${PLATFORM}-${ARCH_NAME}.tar.gz"
+fi
 REQUESTED_VERSION="${VERSION:-latest}"
 
 echo "Installing GitHub Copilot CLI${VERSION:+ version $VERSION} (os: ${OS}, arch: ${ARCH})..."
@@ -615,8 +629,24 @@ echo "✓ Checksum verification passed for ${TARBALL_NAME}"
 
 # Extract and install binary
 echo "Installing binary to ${INSTALL_DIR}..."
-maybe_sudo tar -xz -C "${INSTALL_DIR}" -f "${TEMP_DIR}/${TARBALL_NAME}"
-maybe_sudo chmod +x "${INSTALL_DIR}/copilot"
+if [ "$IS_WINDOWS" = "true" ]; then
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -qo "${TEMP_DIR}/${TARBALL_NAME}" -d "${INSTALL_DIR}"
+  elif command -v 7z >/dev/null 2>&1; then
+    7z x -y "-o${INSTALL_DIR}" "${TEMP_DIR}/${TARBALL_NAME}" >/dev/null
+  else
+    echo "ERROR: unzip or 7z is required for Windows installation"
+    exit 1
+  fi
+  cat > "${INSTALL_DIR}/copilot" <<EOF
+#!/usr/bin/env bash
+exec "${INSTALL_DIR}/copilot.exe" "\$@"
+EOF
+  chmod +x "${INSTALL_DIR}/copilot"
+else
+  maybe_sudo tar -xz -C "${INSTALL_DIR}" -f "${TEMP_DIR}/${TARBALL_NAME}"
+  maybe_sudo chmod +x "${INSTALL_DIR}/copilot"
+fi
 
 # In rootless mode, add the install dir to PATH for subsequent steps.
 # $GITHUB_PATH is the mechanism for persisting PATH additions across steps in GitHub Actions.

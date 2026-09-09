@@ -25,25 +25,25 @@ print_timing() {
   echo "⏱️  TIMING: $label took ${duration}ms"
 }
 
-# Usage: check_mcp_servers.sh GATEWAY_CONFIG_PATH GATEWAY_URL GATEWAY_API_KEY
+# Usage: check_mcp_servers.sh GATEWAY_CONFIG_PATH GATEWAY_URL GATEWAY_AGENT_ID
 #
 # Arguments:
 #   GATEWAY_CONFIG_PATH : Path to the gateway output configuration file (gateway-output.json)
 #   GATEWAY_URL         : The HTTP URL of the MCP gateway (e.g., http://localhost:8080)
-#   GATEWAY_API_KEY     : API key for gateway authentication
+#   GATEWAY_AGENT_ID    : Agent/session identifier for gateway authentication
 #
 # Exit codes:
 #   0 - At least one server connected and no required servers failed (optional server failures logged as warnings)
 #   1 - Invalid arguments, configuration file issues, no successful connections, or required server failures
 
 if [ "$#" -ne 3 ]; then
-  echo "Usage: $0 GATEWAY_CONFIG_PATH GATEWAY_URL GATEWAY_API_KEY" >&2
+  echo "Usage: $0 GATEWAY_CONFIG_PATH GATEWAY_URL GATEWAY_AGENT_ID" >&2
   exit 1
 fi
 
 GATEWAY_CONFIG_PATH="$1"
 GATEWAY_URL="$2"
-GATEWAY_API_KEY="$3"
+GATEWAY_AGENT_ID="$3"
 
 # Optional comma-separated list of non-critical server names. The gateway output
 # does not echo the `required` flag from the input configuration, so the caller

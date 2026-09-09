@@ -143,7 +143,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 
 **Optimized Configuration:**
 - `timeout-minutes: 45` (unchanged)
-- Enhanced efficiency instructions in prompt
+- Added efficiency instructions to the prompt
 - Systematic fix workflow with early termination
 - Concise action-focused approach
 
@@ -158,7 +158,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 - **Cost estimate**: $1.19-1.58 per run
 
 **Optimization Strategy:**
-- Enhanced prompt with efficiency guidelines
+- Added efficiency guidelines to the prompt
 - Early termination conditions (stop after 3 failed attempts)
 - Focus on systematic fixes without over-analysis
 - Prioritize formatting/linting over complex test failures

@@ -11,18 +11,27 @@ on:
         description: "Topic for the haiku"
         required: false
         default: "Windows runners"
+  workflow_call:
+    inputs:
+      topic:
+        description: "Topic for the haiku"
+        required: false
+        type: string
+        default: "Windows runners"
 
 permissions:
   contents: read
 
+  copilot-requests: write
 concurrency:
   job-discriminator: ${{ github.run_id }}
 
 runs-on: windows-latest
 
-model: copilot/gpt-5.4-mini
+model: copilot/gpt-5.3-codex
 engine:
-  id: copilot
+  id: codex
+  model-provider: github
 
 network: {}
 

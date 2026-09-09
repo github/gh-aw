@@ -34,7 +34,8 @@ type zizmorFinding struct {
 		Symbolic struct {
 			Key struct {
 				Local struct {
-					GivenPath string `json:"given_path"`
+					GivenPath    string `json:"given_path"`
+					VerbatimPath string `json:"verbatim_path"`
 				} `json:"Local"`
 			} `json:"key"`
 			Annotation string `json:"annotation"`
@@ -301,6 +302,9 @@ func parseAndDisplayZizmorOutput(stdout, stderr string, verbose bool) (int, int,
 			})
 			for _, location := range finding.Locations {
 				filePath := location.Symbolic.Key.Local.GivenPath
+				if filePath == "" {
+					filePath = location.Symbolic.Key.Local.VerbatimPath
+				}
 				if filePath != "" && !setutil.Contains(affectedFiles, filePath) {
 					affectedFiles[filePath] = struct {
 					}{}

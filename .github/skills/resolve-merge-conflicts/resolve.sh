@@ -4,13 +4,46 @@ set -euo pipefail
 usage() {
     cat <<'EOF'
 Usage: resolve.sh [BASE_REF]
+       resolve.sh --verify-markers
 
 Merge BASE_REF (default: origin/main) without committing, then resolve
 workflow lock-file-only conflicts by running make recompile.
 
 If a merge is already in progress, BASE_REF is ignored and the current
 conflicts are processed.
+
+--verify-markers scans all .github/workflows/*.md source files (not just
+files touched by the current diff) for leftover git conflict-marker lines
+(<<<<<<<, |||||||, =======, >>>>>>>) and exits non-zero listing any hits.
+Run it after resolving mixed conflicts and before compiling, and as a
+standalone pre-flight check any time a source workflow file may have been
+merged manually — `git diff --check` only inspects changed hunks and will
+not catch markers already committed in unchanged file content.
 EOF
+}
+
+verify_markers() {
+    local repo_root
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null) ||
+        die "run this command inside a Git repository"
+    cd "$repo_root"
+
+    local pattern='^(<{7}|\|{7}|={7}|>{7})([^=<>|]|$)'
+    local hits=0
+    while IFS= read -r -d '' file; do
+        local matches
+        matches=$(grep -nE "$pattern" -- "$file" || true)
+        if [[ -n $matches ]]; then
+            hits=1
+            echo "error: leftover conflict marker(s) in $file:" >&2
+            echo "$matches" >&2
+        fi
+    done < <(find .github/workflows -maxdepth 1 -name '*.md' -print0 2>/dev/null)
+
+    if (( hits )); then
+        die "unresolved conflict markers found in workflow source; fix before compiling"
+    fi
+    echo "No conflict markers found in .github/workflows/*.md"
 }
 
 die() {
@@ -20,6 +53,10 @@ die() {
 
 if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
     usage
+    exit 0
+fi
+if [[ ${1:-} == "--verify-markers" ]]; then
+    verify_markers
     exit 0
 fi
 if (( $# > 1 )); then
@@ -71,6 +108,13 @@ if (( ${#conflicts[@]} > 0 )); then
 else
     echo "No unresolved source conflicts; recompiling workflows..."
 fi
+
+# A manually resolved .md source conflict can silently leave behind a
+# conflict-marker line (e.g. "|||||| base (original)") that git diff --check
+# will not flag once staged/committed. Fail fast before compiling so the
+# error surfaces here instead of during a later scheduled recompilation.
+verify_markers
+
 make recompile
 
 if (( ${#conflicts[@]} > 0 )); then

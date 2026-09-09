@@ -33,11 +33,11 @@ func TestHasMCPServers(t *testing.T) {
 			workflowData: &WorkflowData{
 				Tools: map[string]any{
 					"playwright": map[string]any{
-						"version": "v1.41.0",
+						"version": "0.1.18",
 					},
 				},
 			},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "workflow with cache-memory tool",
@@ -131,7 +131,7 @@ func TestHasMCPServers(t *testing.T) {
 					"playwright": true,
 				},
 			},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "workflow with playwright in CLI mode is not an MCP server",
@@ -145,7 +145,7 @@ func TestHasMCPServers(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "workflow with playwright in MCP mode (explicit) is an MCP server",
+			name: "workflow with removed playwright MCP mode is not an MCP server",
 			workflowData: &WorkflowData{
 				Tools: map[string]any{
 					"playwright": map[string]any{
@@ -153,7 +153,7 @@ func TestHasMCPServers(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "workflow with playwright CLI mode plus other MCP tool still has MCP servers",

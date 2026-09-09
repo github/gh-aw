@@ -48,13 +48,39 @@ steps:
       set -e
       make build
       "$GITHUB_WORKSPACE/gh-aw" --version
+  - name: Install crane (digest resolution fallback)
+    continue-on-error: true
+    run: |
+      set -e
+      go install github.com/google/go-containerregistry/cmd/crane@v0.22.1
+      echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+  - name: Refresh container image pins (best effort)
+    continue-on-error: true
+    shell: bash
+    run: |
+      set -uo pipefail
+      output_dir="/tmp/gh-aw/agent/image-scan"
+      mkdir -p "$output_dir"
+      # A failure to resolve a digest for one image (e.g. an upstream registry
+      # returning 403/rate-limited) must not block the Syft/Grype/Grant scan
+      # below, so this step is intentionally decoupled and best-effort: any
+      # images that fail to refresh here simply keep their last-known pin.
+      "$GITHUB_WORKSPACE/gh-aw" compile --force-refresh-container-pins 2>&1 | tee "$output_dir/compile-output.txt"
+      # continue-on-error above keeps the job running even on failure; this
+      # explicit check additionally surfaces a visible ::warning:: annotation
+      # in the run summary so recurring resolution failures aren't missed.
+      refresh_status="${PIPESTATUS[0]}"
+      if [ "$refresh_status" -ne 0 ]; then
+        echo "::warning::Container pin refresh failed (exit $refresh_status) for one or more images; continuing with last-known pins. See $output_dir/compile-output.txt for details."
+      fi
   - name: Run compile with vulnerability scanners
     continue-on-error: true
     run: |
       set -uo pipefail
       output_dir="/tmp/gh-aw/agent/image-scan"
       mkdir -p "$output_dir"
-      "$GITHUB_WORKSPACE/gh-aw" compile --force-refresh-container-pins --syft --grype --grant 2>&1 | tee "$output_dir/compile-output.txt" || true
+      echo "" >> "$output_dir/compile-output.txt"
+      "$GITHUB_WORKSPACE/gh-aw" compile --syft --grype --grant 2>&1 | tee -a "$output_dir/compile-output.txt" || true
 post-steps:
   - name: Enforce critical vulnerability and license gates
     if: always()

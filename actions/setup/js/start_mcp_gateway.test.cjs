@@ -27,6 +27,7 @@ import {
   resolveGatewayHealthRetryConfig,
   normalizeSinkVisibilityEncoding,
   resolveCopilotConfigPaths,
+  validateGatewayAgentIdentifiers,
 } from "./start_mcp_gateway.cjs";
 
 describe("start_mcp_gateway logging", () => {
@@ -44,6 +45,11 @@ describe("start_mcp_gateway logging", () => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
     expect(source).toContain(`stdio: ["pipe", outputFd, stderrFd]`);
     expect(source).toContain(`path.join(os.tmpdir(), "gh-aw-mcp-gateway-")`);
+  });
+
+  it("exports the gateway agent ID as the AWF API key handoff", () => {
+    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
+    expect(source).toContain("`gateway-api-key=${agentId}`");
   });
 });
 
@@ -121,7 +127,7 @@ describe("start_mcp_gateway startup diagnostics", () => {
   });
 
   it("redacts bearer headers and structured credential keys", () => {
-    const sample = ["Authorization: ******", '{"apiKey":"redact-me"}', "token=redact-me"].join("\n");
+    const sample = ["Authorization: ******", '{"agentId":"redact-me"}', "token=redact-me"].join("\n");
     const redacted = redactGatewayDiagnostics(sample);
     expect(redacted).not.toContain("redact-me");
     expect(redacted.match(/\[REDACTED\]/g)).toHaveLength(3);
@@ -491,5 +497,26 @@ describe("start_mcp_gateway extractOptionalServerNames", () => {
   it("returns an empty list when no servers are configured", () => {
     expect(extractOptionalServerNames({})).toEqual([]);
     expect(extractOptionalServerNames({ mcpServers: null })).toEqual([]);
+  });
+});
+
+describe("start_mcp_gateway gateway agent identifier validation", () => {
+  it.each([
+    ["accepts a singular agent ID", { agentId: "agent-1" }, null],
+    ["accepts one plural agent ID", { agentIds: ["agent-1"] }, null],
+    ["accepts multiple plural agent IDs", { agentIds: ["agent-1", "agent-2"] }, null],
+    ["rejects an empty plural agent ID list", { agentIds: [] }, "ERROR: Gateway 'agentIds' must be a non-empty array of non-empty strings"],
+    ["rejects a non-array plural agent ID", { agentIds: "agent-1" }, "ERROR: Gateway 'agentIds' must be a non-empty array of non-empty strings"],
+    ["rejects an empty ID in the plural list", { agentIds: ["agent-1", ""] }, "ERROR: Gateway 'agentIds' must be a non-empty array of non-empty strings"],
+    ["rejects a non-string ID in the plural list", { agentIds: ["agent-1", 2] }, "ERROR: Gateway 'agentIds' must be a non-empty array of non-empty strings"],
+    ["rejects both identifier forms", { agentId: "agent-1", agentIds: ["agent-1"] }, "ERROR: Gateway configuration must specify exactly one of 'agentId' or 'agentIds'"],
+    ["rejects neither identifier form", {}, "ERROR: Gateway configuration must specify exactly one of 'agentId' or 'agentIds'"],
+  ])("%s", (_name, gateway, expectedError) => {
+    expect(validateGatewayAgentIdentifiers(gateway)).toBe(expectedError);
+  });
+
+  it("rejects an empty or malformed singular agent ID", () => {
+    expect(validateGatewayAgentIdentifiers({ agentId: "" })).toBe("ERROR: Gateway 'agentId' must be a non-empty string");
+    expect(validateGatewayAgentIdentifiers({ agentId: ["agent-1"] })).toBe("ERROR: Gateway 'agentId' must be a non-empty string");
   });
 });

@@ -15,8 +15,11 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var addPackageOwnershipLog = logger.New("cli:add_package_ownership")
 
 const packageOwnershipSchemaVersion = 1
 
@@ -45,6 +48,7 @@ func writePackageOwnershipRecords(workflows []*ResolvedWorkflow, tracker *FileTr
 	if len(groups) == 0 {
 		return nil
 	}
+	addPackageOwnershipLog.Printf("Writing package ownership records for %d package group(s)", len(groups))
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("failed to find git root for package ownership records: %w", err)
@@ -74,6 +78,7 @@ func writePackageOwnershipRecords(workflows []*ResolvedWorkflow, tracker *FileTr
 		if err := os.WriteFile(recordPath, data, constants.FilePermPublic); err != nil {
 			return fmt.Errorf("failed to write package ownership record %s: %w", recordPath, err)
 		}
+		addPackageOwnershipLog.Printf("Wrote package ownership record %s (%d file entries)", recordPath, len(record.Files))
 	}
 	return nil
 }
@@ -81,7 +86,7 @@ func writePackageOwnershipRecords(workflows []*ResolvedWorkflow, tracker *FileTr
 func packageManagedWorkflowGroups(workflows []*ResolvedWorkflow) map[string][]*ResolvedWorkflow {
 	groups := make(map[string][]*ResolvedWorkflow)
 	for _, resolved := range workflows {
-		if resolved == nil || resolved.Spec == nil || !resolved.Spec.FromRepositoryManifest {
+		if resolved == nil || resolved.Spec == nil || !resolved.Spec.FromRepositoryManifest || resolved.IsPackageProjectFile {
 			continue
 		}
 		source := packageSourceForSpec(resolved.Spec, resolved.SourceInfo)
@@ -208,9 +213,12 @@ func packageOwnershipAllowsOverwrite(gitRoot, destination, packageSource string)
 			}
 			current, err := fileSHA256(filepath.Join(gitRoot, filepath.FromSlash(file.Destination)))
 			if err != nil {
+				addPackageOwnershipLog.Printf("Ownership check for %s: package=%s owned=true drifted=true (digest read failed: %v)", destination, packageSource, err)
 				return true, true
 			}
-			return true, current != file.SHA256
+			drifted := current != file.SHA256
+			addPackageOwnershipLog.Printf("Ownership check for %s: package=%s owned=true drifted=%t", destination, packageSource, drifted)
+			return true, drifted
 		}
 	}
 	return false, false
@@ -256,6 +264,7 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 		return err
 	}
 	packageBase := repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath)
+	addPackageOwnershipLog.Printf("Syncing manifest-managed resources for package=%s, resource_files=%d", packageBase, len(pkg.ResourceFiles))
 	recordPath := packageOwnershipRecordPath(gitRoot, packageBase)
 	record := packageOwnershipRecord{
 		SchemaVersion:  packageOwnershipSchemaVersion,
@@ -318,6 +327,7 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 	}
 	var rollbacks []fileRollback
 	rollbackChanges := func() {
+		addPackageOwnershipLog.Printf("Rolling back %d file change(s) for package=%s", len(rollbacks), packageBase)
 		for _, rollback := range slices.Backward(rollbacks) {
 			if rollback.existed {
 				_ = os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic)

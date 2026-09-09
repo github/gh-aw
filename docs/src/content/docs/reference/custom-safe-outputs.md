@@ -5,7 +5,10 @@ sidebar:
   order: 5
 ---
 
-Custom safe outputs extend built-in GitHub operations to integrate with third-party services — Slack, Discord, Notion, Jira, databases, or any external API requiring authentication. Use them for any write operation that built-in safe outputs don't cover.
+Custom safe outputs extend built-in GitHub operations to integrate with third-party services — Slack, Discord, Notion, databases, or any external API requiring authentication. Use them for write operations that built-in safe outputs do not already cover.
+
+> [!NOTE]
+> Jira Cloud now has built-in safe outputs for issue creation, issue updates, comments, and label additions. Use the built-in Jira handlers when those operations are sufficient, and reach for custom safe outputs only when you need unsupported Jira mutations or another external system.
 
 ## Quick Start
 

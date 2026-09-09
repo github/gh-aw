@@ -36,12 +36,14 @@ type CompileConfig struct {
 	ActionTag                 string   // Pin action refs to this SHA or version tag (e.g. v1, <full-sha>). Sets release mode unless ActionMode is already "action". Mutually exclusive with GHAwRef at the CLI layer.
 	ActionsRepo               string   // Override the external actions repository (default: github/gh-aw-actions)
 	Stats                     bool     // Display statistics table sorted by file size
+	Models                    bool     // Warn about configured models absent from the observed active model inventory
 	FailFast                  bool     // Stop at first error instead of collecting all errors
 	ScheduleSeed              string   // Override repository slug used for fuzzy schedule scattering (e.g. owner/repo)
 	Approve                   bool     // Approve all safe update changes, skipping safe update enforcement regardless of strict mode setting.
 	ValidateImages            bool     // Require Docker to be available for container image validation (fail instead of skipping when Docker is unavailable)
 	PriorManifestFile         string   // Path to a JSON file containing pre-cached manifests (map[lockFile]*GHAWManifest) collected at MCP server startup; takes precedence over git HEAD / filesystem reads for safe update enforcement
 	GHESCompat                bool     // Enable GHES-compatible v3 artifact actions (overrides aw.json ghes field)
+	activeModels              *activeModelInventory
 }
 
 func (c CompileConfig) shellcheckEnabled() bool {

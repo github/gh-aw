@@ -291,7 +291,7 @@ export function createFsSyncMethodResolver(sourceCode: TSESLint.SourceCode, fsSy
 
 type TryCatchSuggestionOptions = {
   indent: string;
-  todoComment: string;
+  todoComment?: string;
   errorPrefix: string;
 };
 
@@ -311,7 +311,7 @@ export function buildTryCatchSuggestion(stmtText: string, options: TryCatchSugge
     "try {",
     indentedStatement,
     `${indent}} catch (err) {`,
-    `${indent}  // ${todoComment}`,
+    ...(todoComment ? [`${indent}  // ${todoComment}`] : []),
     `${indent}  throw new Error(`,
     `${indent}    "${errorPrefix}" + (err instanceof Error ? err.message : String(err)),`,
     `${indent}    { cause: err },`,

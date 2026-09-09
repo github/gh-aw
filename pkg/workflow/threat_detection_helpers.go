@@ -144,6 +144,14 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		"bash": []any{"*"},
 	}
 	d.EngineConfig = resolveExternalDetectorEngineConfig(data, engineID)
+	// threat-detect currently resolves the selected engine by its standard
+	// executable name and has no custom-command option. Keep the standard
+	// Copilot CLI installed for external detection rather than propagating a
+	// command that threat-detect cannot consume.
+	if engineID == "copilot" && d.EngineConfig.Command != "" {
+		threatLog.Printf("Ignoring custom Copilot command for external detector; threat-detect requires the standard Copilot CLI")
+		d.EngineConfig.Command = ""
+	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(d) != LLMProviderGitHub {
 		d.EngineConfig.LLMProvider = LLMProviderOpenAI
 	}
@@ -185,6 +193,7 @@ func resolveExternalDetectorEngineConfig(data *WorkflowData, engineID string) *E
 		return &EngineConfig{
 			ID:                       engineID,
 			Version:                  data.EngineConfig.Version,
+			Command:                  data.EngineConfig.Command,
 			LLMProvider:              data.EngineConfig.LLMProvider,
 			Config:                   data.EngineConfig.Config,
 			Args:                     data.EngineConfig.Args,
@@ -228,4 +237,19 @@ func engineCoreSecretVarNames(engineID string) []string {
 	default:
 		return []string{}
 	}
+}
+
+// inheritedDetectionModel returns the main workflow model when the detection engine can
+// interpret it. Workflows using a custom engine run detection on a built-in engine that
+// does not understand the custom engine's model IDs, so their model is not inherited and
+// the detection engine's own default model is used instead.
+func inheritedDetectionModel(data *WorkflowData) string {
+	if data == nil {
+		return ""
+	}
+	engineID := ResolveEngineID(data)
+	if engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
+		return data.Model
+	}
+	return ""
 }

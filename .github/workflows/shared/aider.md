@@ -16,6 +16,7 @@ pre-agent-steps:
       AIDER_CHECK_UPDATE: "false"
 engine:
   id: aider
+  detection-engine: copilot
   version: "0.86.2"
   display-name: Aider
   description: Aider AI pair programming CLI running in scripting (non-interactive) mode

@@ -117,7 +117,7 @@ Key helper functions in `engine_helpers.go`:
 **File**: custom_engine.go (373 lines)
 
 **Strengths**:
-- ✅ Simple, focused implementation
+- ✅ Focused implementation
 - ✅ Supports user-defined steps
 - ✅ Falls back to Claude/Codex parsing
 

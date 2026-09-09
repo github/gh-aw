@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -660,6 +661,46 @@ func TestSliceToSteps_RoundTrip(t *testing.T) {
 				assert.True(t, compareStepValues(resultVal, origVal), "Round trip should preserve value for key %q in step %d", key, i)
 			}
 		}
+	}
+}
+
+func TestMapToStep_TimeoutMinutesNumericTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		val  any
+		want int
+	}{
+		{"int", 5, 5},
+		{"int64", int64(10), 10},
+		{"uint64", uint64(15), 15},
+		{"float64", float64(20), 20},
+		{"string", "25", 25},
+		{"negative int", -5, 0},
+		{"zero int", 0, 0},
+		{"negative int64", int64(-10), 0},
+		{"zero uint64", uint64(0), 0},
+		{"negative float64", float64(-20), 0},
+		{"fractional float64", 1.9, 0},
+		{"out of range float64", math.MaxFloat64, 0},
+		{"NaN float64", math.NaN(), 0},
+		{"negative string", "-25", 0},
+		{"zero string", "0", 0},
+		{"non-numeric string", "abc", 0},
+		{"bool", true, 0},
+		{"nil", nil, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stepMap := map[string]any{
+				"name":            "Test",
+				"run":             "echo test",
+				"timeout-minutes": tt.val,
+			}
+			step, err := MapToStep(stepMap)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, step.TimeoutMinutes)
+		})
 	}
 }
 

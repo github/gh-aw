@@ -20,6 +20,7 @@ func TestCheckoutDisabled(t *testing.T) {
 		frontmatter                string
 		expectedHasDefaultCheckout bool
 		expectedHasDevModeCheckout bool
+		expectTargetRepo           string
 		description                string
 	}{
 		{
@@ -63,6 +64,29 @@ strict: false
 			expectedHasDevModeCheckout: true,
 			description:                "When checkout is not set, the default checkout step is included",
 		},
+		{
+			name: "permissions.contents: none skips default checkout but keeps target checkout",
+			frontmatter: `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: none
+  issues: read
+tools:
+  github:
+    toolsets: [issues]
+engine: claude
+checkout:
+  - repository: octo-org/target-repository
+    path: target
+strict: false
+---`,
+			expectedHasDefaultCheckout: false,
+			expectedHasDevModeCheckout: true,
+			expectTargetRepo:           "octo-org/target-repository",
+			description:                "permissions.contents: none should skip only the default workflow-repository checkout while target-only checkout entries are still generated",
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,6 +122,9 @@ strict: false
 
 			assert.Equal(t, tt.expectedHasDefaultCheckout, hasDefaultCheckout, "%s: default checkout presence mismatch", tt.description)
 			assert.Equal(t, tt.expectedHasDevModeCheckout, hasDevModeCheckout, "%s: dev-mode checkout should not be affected", tt.description)
+			if tt.expectTargetRepo != "" {
+				assert.Contains(t, agentSection, tt.expectTargetRepo, "%s: target repository checkout should still be present", tt.description)
+			}
 		})
 	}
 }

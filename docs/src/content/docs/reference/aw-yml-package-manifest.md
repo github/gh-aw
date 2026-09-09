@@ -29,10 +29,52 @@ The package root is the folder that contains `aw.yml`.
 | `min-version` | string | No | Minimum compatible `gh aw` version in `vMAJOR.minor.patch` form, such as `v0.38.0`. |
 | `name` | string | Yes | Human-readable package name. Must be non-empty after trimming whitespace. |
 | `emoji` | string | No | Optional package emoji for display in package metadata. |
+| `icon` | string | No | Optional package icon: an emoji, a GitHub primer octicon name in `:name:` format (e.g. `:check-circle:`), or a package resource path to an SVG file. |
 | `description` | string | No | Optional package description. `gh aw add` warns when it exceeds 255 characters. |
+| `private` | boolean | No | Marks the package as unavailable for installation. Defaults to `false`; `gh aw add` refuses packages set to `true`. |
+| `experimental` | boolean | No | Marks the package as experimental. Defaults to `false`; `gh aw add` displays a warning when set to `true`. |
 | `files` | array of strings | No | Deprecated; use `includes`. Package-root-relative paths. Agentic markdown workflows under `workflows/` or `.github/workflows/`; raw GitHub Actions YAML (`.yml`) is also accepted as direct children of `.github/workflows/`. |
-| `includes` | array | No | Installable entries. Each entry is either a path string (same rules as `files`, plus skill and agent paths) or a source-to-destination mapping. |
+| `includes` | array | No | Installable entries, or paths to other `aw.yml` manifests whose installable files are included recursively. Each entry is either a path string (same rules as `files`, plus skill and agent paths), a path ending in `/*` that matches supported direct children, or a source-to-destination mapping. |
 | `resources` | array | No | Repository assets copied from package-relative `source` paths to allowlisted repository-relative `destination` paths. |
+| `config` | array | No | Experimental ordered repository setup actions applied by `gh aw add-wizard`. |
+
+### Repository labels
+
+Use a `repo-label` config action to create a repository label or reconcile an
+existing label's description and color:
+
+```yaml
+config:
+  - type: repo-label
+    name: automation
+    description: Managed by an agentic workflow
+    color: 1f6feb
+```
+
+The `name` must be non-empty and at most 50 characters. The `description` must
+be non-empty and at most 100 characters. `color` must be a six-character
+hexadecimal value without a leading `#`.
+
+## Imported manifests
+
+Use `includes` entries naming `aw.yml` files to compose a package from manifests in the same repository:
+
+```yaml
+name: Central Agentic Ops
+includes:
+  - activity/aw.yml
+  - ambient-context/aw.yml
+  - dashboard/aw.yml
+```
+
+These paths are resolved relative to the manifest that declares them and must name an
+`aw.yml` file within the top-level package root. Imports are recursive. The imported
+manifests' workflows, resources, skills, and agents are combined into one install list;
+metadata and `config` continue to come from the top-level manifest.
+
+`gh aw` rejects import cycles and any files that would install to the same destination,
+including case-insensitive destination clashes. A manifest that only declares imports does
+not auto-discover workflows from its own directory.
 
 ## Installable workflows
 
@@ -45,7 +87,9 @@ If `files` is present, valid entries become the install bundle. Two entry kinds 
 
 - A **string entry** that starts with `.github/` is resolved relative to the **consuming repository root**, even inside a nested package. For example, `.github/workflows/nightly.md` in `factory/aw.yml` refers to the repository-root file, not to `factory/.github/workflows/nightly.md`.
 - Every other string entry (such as `workflows/review.md`) is resolved relative to the package root.
+- A string entry may end in a single `/*` wildcard (such as `workflows/*`) to include supported direct children of that directory. The wildcard does not recurse, and `*` is not supported in any other position. Matches are filtered by the same workflow, skill, and agent path rules as explicit entries.
 - A **mapping entry** always resolves `source` relative to the package root and `destination` relative to the consuming repository root.
+- A mapping `source` may end in `/*`. For wildcard mappings, `destination` must be the `.github/workflows/` folder, and each matching file keeps its source filename.
 
 ### Source-to-destination mappings
 
@@ -60,13 +104,15 @@ includes:
   - source: payload/workflows/controller.yml
     destination: .github/workflows/controller.yml
     kind: action-workflow
+  - source: payload/extra-workflows/*
+    destination: .github/workflows/
 ```
 
 With a nested package reference such as `owner/repo/factory`, the files above are fetched from `factory/payload/workflows/` and installed to `.github/workflows/`. Because the sources live outside `.github/workflows/` in the distribution repository, they never run there.
 
 The optional `kind` field is either `agentic-workflow` (`.md`) or `action-workflow` (`.yml`) and must match the source extension.
 
-Mappings are rejected when `source` or `destination` is absolute, contains `..`, points at a symbolic link, uses an unsupported extension (or `.lock.yml`), changes the file extension between source and destination, or targets anything other than a direct child of `.github/workflows/`. Two entries installing to the same destination are rejected before any file is written.
+Mappings are rejected when `source` or `destination` is absolute, contains `..`, points at a symbolic link, uses an unsupported extension (or `.lock.yml`), changes the file extension between source and destination, or targets anything other than a direct child of `.github/workflows/`. A wildcard mapping is the exception: it targets the `.github/workflows/` folder, then preserves each matching source filename. Two entries installing to the same destination are rejected before any file is written.
 
 `gh aw add`, `gh aw add-wizard`, and `gh aw update` all use these same mapping rules.
 
@@ -106,6 +152,7 @@ name: Repo Assist
 emoji: 🤖
 description: Friendly repository automation for review and issue triage
 includes:
+  - packages/common/aw.yml
   - workflows/review.md                # agentic workflow — compiled on install
   - .github/workflows/nightly-review.md # repository-root-relative string entry
   - .github/workflows/ci.yml           # raw Actions YAML — copied verbatim

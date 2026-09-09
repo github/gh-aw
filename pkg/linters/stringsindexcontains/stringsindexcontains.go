@@ -64,7 +64,7 @@ func analyzeIndexContains(pass *analysis.Pass, n ast.Node, generatedFiles filech
 	} else {
 		msg = "use strings.Contains(" + sText + ", " + subText + ") instead of strings.Index comparison"
 	}
-	fix := astutil.BuildContainsFix(expr, pkgText, sText, subText, negated, "Replace strings.Index comparison with strings.Contains")
+	fix := astutil.BuildContainsFix(pass.Files, expr, pkgText, sText, subText, negated, "Replace strings.Index comparison with strings.Contains")
 	pass.Report(analysis.Diagnostic{
 		Pos:            expr.Pos(),
 		End:            expr.End(),

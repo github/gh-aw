@@ -6,10 +6,8 @@ package parser
 import (
 	"errors"
 	"slices"
-	"sort"
 
 	"github.com/github/gh-aw/pkg/setutil"
-	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 // topologicalSortImports sorts imports in topological order using Kahn's algorithm.
@@ -18,14 +16,13 @@ import (
 // workflowFile is the path to the top-level workflow file, used for error context
 // when a circular import is detected.
 // Returns an error if a circular import is detected.
-func topologicalSortImports(imports []string, baseDir string, cache *ImportCache, workflowFile string) ([]string, error) {
+func topologicalSortImports(imports []string, dependencies map[string][]string, importPaths map[string]string, priorities map[string]int, workflowFile string) ([]string, error) {
 	importLog.Printf("Starting topological sort of %d imports", len(imports))
 	allImportsSet := toImportSet(imports)
-	dependencies := buildImportDependencies(imports, baseDir, cache)
 	inDegree := calculateInDegree(imports, dependencies, allImportsSet)
 	importLog.Printf("Calculated in-degrees: %v", inDegree)
 	queue := collectRootImports(imports, inDegree)
-	result := runKahnTopologicalSort(imports, dependencies, allImportsSet, inDegree, queue)
+	result := runKahnTopologicalSort(imports, dependencies, allImportsSet, inDegree, queue, priorities)
 
 	importLog.Printf("Topological sort complete: %v", result)
 	if len(result) < len(imports) {
@@ -34,7 +31,7 @@ func topologicalSortImports(imports []string, baseDir string, cache *ImportCache
 		cyclePath := findCyclePath(cycleNodes, dependencies)
 		if len(cyclePath) > 0 {
 			return nil, &ImportCycleError{
-				Chain:        cyclePath,
+				Chain:        displayImportPaths(cyclePath, importPaths),
 				WorkflowFile: workflowFile,
 			}
 		}
@@ -57,46 +54,13 @@ func toImportSet(imports []string) map[string]struct {
 	return allImportsSet
 }
 
-func buildImportDependencies(imports []string, baseDir string, cache *ImportCache) map[string][]string {
-	dependencies := make(map[string][]string, len(imports))
-	for _, importPath := range imports {
-		nestedImports, err := resolveNestedImportPaths(importPath, baseDir, cache)
-		if err != nil {
-			importLog.Printf("Failed to resolve dependencies for %s during topological sort: %v", importPath, err)
-			dependencies[importPath] = []string{}
-			continue
-		}
-		dependencies[importPath] = nestedImports
-		importLog.Printf("Import %s has %d dependencies: %v", importPath, len(nestedImports), nestedImports)
-	}
-	return dependencies
-}
-
-func resolveNestedImportPaths(importPath, baseDir string, cache *ImportCache) ([]string, error) {
-	filePath, _ := splitPathAndSection(importPath)
-	fullPath, err := ResolveIncludePath(filePath, baseDir, cache)
-	if err != nil {
-		return nil, err
-	}
-	content, err := readFileFunc(fullPath)
-	if err != nil {
-		return nil, err
-	}
-	result, err := extractFrontmatterForImport(fullPath, content)
-	if err != nil {
-		return nil, err
-	}
-	return extractImportPaths(result.Frontmatter), nil
-}
-
 func calculateInDegree(imports []string, dependencies map[string][]string, allImportsSet map[string]struct {
 }) map[string]int {
 	inDegree := make(map[string]int, len(imports))
 	for _, imp := range imports {
 		inDegree[imp] = 0
 	}
-	sortedImports := sortedDependencyKeys(dependencies)
-	for _, imp := range sortedImports {
+	for _, imp := range imports {
 		for _, dep := range dependencies[imp] {
 			if setutil.Contains(allImportsSet, dep) {
 				inDegree[imp]++
@@ -104,11 +68,6 @@ func calculateInDegree(imports []string, dependencies map[string][]string, allIm
 		}
 	}
 	return inDegree
-}
-
-func sortedDependencyKeys(dependencies map[string][]string) []string {
-	sortedImports := sliceutil.SortedKeys(dependencies)
-	return sortedImports
 }
 
 func collectRootImports(imports []string, inDegree map[string]int) []string {
@@ -128,29 +87,38 @@ func runKahnTopologicalSort(
 	allImportsSet map[string]struct {
 	}, inDegree map[string]int,
 	queue []string,
+	priorities map[string]int,
 ) []string {
 	result := make([]string, 0, len(imports))
-	sortedImports := sortedDependencyKeys(dependencies)
+	declarationOrder := make(map[string]int, len(imports))
+	for index, imp := range imports {
+		declarationOrder[imp] = index
+	}
 	for len(queue) > 0 {
-		sort.Strings(queue)
+		slices.SortStableFunc(queue, func(a, b string) int {
+			if diff := priorities[a] - priorities[b]; diff != 0 {
+				return diff
+			}
+			return declarationOrder[a] - declarationOrder[b]
+		})
 		current := queue[0]
 		queue = queue[1:]
 		result = append(result, current)
 		importLog.Printf("Processing import %s (in-degree was 0)", current)
-		queue = reduceDependentInDegrees(current, sortedImports, dependencies, allImportsSet, inDegree, queue)
+		queue = reduceDependentInDegrees(current, imports, dependencies, allImportsSet, inDegree, queue)
 	}
 	return result
 }
 
 func reduceDependentInDegrees(
 	current string,
-	sortedImports []string,
+	imports []string,
 	dependencies map[string][]string,
 	allImportsSet map[string]struct {
 	}, inDegree map[string]int,
 	queue []string,
 ) []string {
-	for _, imp := range sortedImports {
+	for _, imp := range imports {
 		for _, dep := range dependencies[imp] {
 			if dep == current && setutil.Contains(allImportsSet, imp) {
 				inDegree[imp]--
@@ -165,6 +133,18 @@ func reduceDependentInDegrees(
 	return queue
 }
 
+func displayImportPaths(paths []string, importPaths map[string]string) []string {
+	displayPaths := make([]string, 0, len(paths))
+	for _, fullPath := range paths {
+		if importPath, ok := importPaths[fullPath]; ok {
+			displayPaths = append(displayPaths, importPath)
+		} else {
+			displayPaths = append(displayPaths, fullPath)
+		}
+	}
+	return displayPaths
+}
+
 func findCycleNodes(imports, result []string) map[string]struct {
 } {
 	cycleNodes := make(map[string]struct {
@@ -176,43 +156,4 @@ func findCycleNodes(imports, result []string) map[string]struct {
 		}
 	}
 	return cycleNodes
-}
-
-// extractImportPaths extracts just the import paths from frontmatter.
-func extractImportPaths(frontmatter map[string]any) []string {
-	var imports []string
-
-	if frontmatter == nil {
-		return imports
-	}
-
-	importsField, exists := frontmatter["imports"]
-	if !exists {
-		return imports
-	}
-
-	// Parse imports field - can be array of strings or objects with path
-	switch v := importsField.(type) {
-	case []any:
-		for _, item := range v {
-			switch importItem := item.(type) {
-			case string:
-				imports = append(imports, importItem)
-			case map[string]any:
-				if pathValue, hasPath := importItem["path"]; hasPath {
-					if pathStr, ok := pathValue.(string); ok {
-						imports = append(imports, pathStr)
-					}
-				} else if usesValue, hasUses := importItem["uses"]; hasUses {
-					if pathStr, ok := usesValue.(string); ok {
-						imports = append(imports, pathStr)
-					}
-				}
-			}
-		}
-	case []string:
-		imports = v
-	}
-
-	return imports
 }

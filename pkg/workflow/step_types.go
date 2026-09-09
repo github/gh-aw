@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"strconv"
 
 	"github.com/github/gh-aw/pkg/importinpututil"
@@ -117,34 +118,13 @@ func MapToStep(stepMap map[string]any) (*WorkflowStep, error) {
 		step.With = with
 	}
 	if env, ok := stepMap["env"].(map[string]any); ok {
-		// Convert map[string]any to map[string]string
-		step.Env = make(map[string]string)
-		for k, v := range env {
-			if strVal, ok := v.(string); ok {
-				step.Env[k] = strVal
-			} else if v != nil {
-				// Arrays and maps are serialized as JSON so that shell consumers
-				// (e.g. jq --argjson) receive valid JSON. This handles both the
-				// []any / map[string]any case returned by encoding/json and the
-				// typed-slice case (e.g. []string) returned by goccy/go-yaml.
-				step.Env[k] = marshalEnvValue(v)
-			}
-		}
+		step.Env = parseStepEnv(env)
 	}
 	if continueOnError, ok := stepMap["continue-on-error"]; ok {
-		switch value := continueOnError.(type) {
-		case bool:
-			templatableValue := TemplatableBool(strconv.FormatBool(value))
-			step.ContinueOnError = &templatableValue
-		case string:
-			if value == "true" || value == "false" || isExpression(value) {
-				templatableValue := TemplatableBool(value)
-				step.ContinueOnError = &templatableValue
-			}
-		}
+		step.ContinueOnError = parseStepContinueOnError(continueOnError)
 	}
-	if timeoutMinutes, ok := stepMap["timeout-minutes"].(int); ok {
-		step.TimeoutMinutes = timeoutMinutes
+	if timeoutMinutesVal, ok := stepMap["timeout-minutes"]; ok {
+		step.TimeoutMinutes = parseStepTimeoutMinutes(timeoutMinutesVal)
 	}
 
 	stepType := "unknown"
@@ -155,6 +135,67 @@ func MapToStep(stepMap map[string]any) (*WorkflowStep, error) {
 	}
 	stepTypesLog.Printf("Successfully converted step: type=%s, name=%s", stepType, step.Name)
 	return step, nil
+}
+
+func parseStepEnv(env map[string]any) map[string]string {
+	result := make(map[string]string)
+	for k, v := range env {
+		if strVal, ok := v.(string); ok {
+			result[k] = strVal
+		} else if v != nil {
+			result[k] = marshalEnvValue(v)
+		}
+	}
+	return result
+}
+
+func parseStepContinueOnError(val any) *TemplatableBool {
+	switch value := val.(type) {
+	case bool:
+		templatableValue := TemplatableBool(strconv.FormatBool(value))
+		return &templatableValue
+	case string:
+		if value == "true" || value == "false" || isExpression(value) {
+			templatableValue := TemplatableBool(value)
+			return &templatableValue
+		}
+	}
+	return nil
+}
+
+// parseStepTimeoutMinutes converts a YAML `timeout-minutes` value into a positive
+// number of minutes. Values that are not positive integers within the platform int
+// range are ignored (returning 0, which omits the field from the rendered step).
+func parseStepTimeoutMinutes(val any) int {
+	switch v := val.(type) {
+	case int:
+		if v > 0 {
+			return v
+		}
+	case int64:
+		if v > 0 && v <= int64(math.MaxInt) {
+			return int(v)
+		}
+	case uint64:
+		if v > 0 && v <= uint64(math.MaxInt) {
+			return int(v)
+		}
+	case float64:
+		// float64 loses integer precision near MaxInt on 64-bit platforms, so treat
+		// values at or above the rounded float boundary as out of range. Only
+		// integral values are accepted so fractional timeouts are not truncated.
+		if math.IsNaN(v) || math.IsInf(v, 0) || v != math.Trunc(v) {
+			return 0
+		}
+		if v >= 1 && v < float64(math.MaxInt) {
+			return int(v)
+		}
+	case string:
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 0
 }
 
 // Clone creates a deep copy of the WorkflowStep
