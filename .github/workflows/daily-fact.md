@@ -14,7 +14,7 @@ permissions:
   actions: read
   discussions: read
 tracker-id: daily-fact-thread
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
   model-provider: openai
