@@ -1,10 +1,10 @@
 {
-  "run_date": "2026-09-09T00:58:52Z",
-  "run_id": "34297064125",
-  "prior_run_id": "34263114529",
+  "run_date": "2026-09-09T06:39:51Z",
+  "run_id": "34319834014",
+  "prior_run_id": "34297064125",
   "summary": {
     "eligible_total": 4,
-    "cooldown_skipped": 2,
+    "cooldown_skipped": 0,
     "category_counts": {
       "bug": 3,
       "refactor": 1
@@ -38,7 +38,12 @@
         "pr-priority:high",
         "pr-action:fast_track",
         "pr-batch:workflow-reliability"
-      ]
+      ],
+      "score_breakdown": {
+        "impact": 45,
+        "urgency": 24,
+        "quality": 13
+      }
     },
     {
       "number": 57313,
@@ -53,7 +58,12 @@
         "pr-priority:medium",
         "pr-action:batch_review",
         "pr-batch:workflow-reliability"
-      ]
+      ],
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 15,
+        "quality": 12
+      }
     },
     {
       "number": 56568,
@@ -68,7 +78,12 @@
         "pr-priority:medium",
         "pr-action:batch_review",
         "pr-batch:workflow-reliability"
-      ]
+      ],
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 21,
+        "quality": 12
+      }
     },
     {
       "number": 56562,
@@ -83,10 +98,15 @@
         "pr-priority:medium",
         "pr-action:batch_review",
         "pr-batch:workflow-reliability"
-      ]
+      ],
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 18,
+        "quality": 11
+      }
     }
   ],
-  "cooldown_skipped": [59579, 59572],
+  "cooldown_skipped": [],
   "batches": [
     {
       "id": "workflow-reliability",

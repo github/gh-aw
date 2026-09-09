@@ -1,16 +1,16 @@
 # PR Triage Summary
 
-- Run: 34263114529
-- Date: 2026-09-08T18:30:15Z
+- Run: 34319834014
+- Date: 2026-09-09T06:39:51Z
 - Eligible PRs: 4
-- Cooldown skipped: 1
-- Fast-track: 2
-- Batch review: 2
+- Cooldown skipped: 0
+- Fast-track: 1
+- Batch review: 3
 
 ## Eligible PRs
-- #58310 — bug / high / 80 / fast_track
-- #57313 — bug / medium / 50 / batch_review
-- #56568 — bug / high / 68 / fast_track
+- #58310 — bug / high / 82 / fast_track
+- #57313 — bug / medium / 57 / batch_review
+- #56568 — bug / high / 68 / batch_review
 - #56562 — refactor / medium / 61 / batch_review
 
 ## Batch
