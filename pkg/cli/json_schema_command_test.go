@@ -17,19 +17,33 @@ func TestJSONSchemaCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		schemaName string
-		properties []string
+		name        string
+		schemaName  string
+		oneOfCount  int
+		validOutput []any
 	}{
 		{
 			name:       "audit",
 			schemaName: "audit",
-			properties: []string{"overview", "metrics", "downloaded_files"},
+			oneOfCount: 3,
+			validOutput: []any{
+				AuditData{
+					Overview:        OverviewData{},
+					Metrics:         MetricsData{},
+					DownloadedFiles: []FileInfo{},
+				},
+				AuditDiff{},
+				[]AuditDiff{{}},
+			},
 		},
 		{
 			name:       "logs",
 			schemaName: "logs",
-			properties: []string{"summary", "runs", "logs_location"},
+			oneOfCount: 2,
+			validOutput: []any{
+				LogsData{},
+				CrossRunAuditReport{},
+			},
 		},
 	}
 
@@ -58,12 +72,24 @@ func TestJSONSchemaCommand(t *testing.T) {
 			if err := json.Unmarshal([]byte(first), &schema); err != nil {
 				t.Fatalf("unmarshal %s schema: %v", tt.schemaName, err)
 			}
-			if _, err := schema.Resolve(&jsonschema.ResolveOptions{}); err != nil {
+			resolved, err := schema.Resolve(&jsonschema.ResolveOptions{})
+			if err != nil {
 				t.Fatalf("resolve %s schema: %v", tt.schemaName, err)
 			}
-			for _, property := range tt.properties {
-				if _, ok := schema.Properties[property]; !ok {
-					t.Errorf("%s schema is missing property %q", tt.schemaName, property)
+			if len(schema.OneOf) != tt.oneOfCount {
+				t.Errorf("%s schema has %d output shapes, want %d", tt.schemaName, len(schema.OneOf), tt.oneOfCount)
+			}
+			for _, output := range tt.validOutput {
+				data, err := json.Marshal(output)
+				if err != nil {
+					t.Fatalf("marshal %T: %v", output, err)
+				}
+				var value any
+				if err := json.Unmarshal(data, &value); err != nil {
+					t.Fatalf("unmarshal %T: %v", output, err)
+				}
+				if err := resolved.Validate(value); err != nil {
+					t.Errorf("%s schema does not validate %T output: %v", tt.schemaName, output, err)
 				}
 			}
 

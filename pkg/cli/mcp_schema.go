@@ -61,9 +61,9 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 	)
 	switch name {
 	case "audit":
-		schema, err = GenerateOutputSchema[AuditData]()
+		schema, err = generateAuditOutputSchema()
 	case "logs":
-		schema, err = GenerateOutputSchema[LogsData]()
+		schema, err = generateLogsOutputSchema()
 	default:
 		return nil, fmt.Errorf("unsupported schema: %s", name)
 	}
@@ -71,6 +71,34 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
 	}
 	return MarshalOutputSchema(schema)
+}
+
+func generateAuditOutputSchema() (*jsonschema.Schema, error) {
+	auditData, err := GenerateOutputSchema[AuditData]()
+	if err != nil {
+		return nil, err
+	}
+	auditDiff, err := GenerateOutputSchema[AuditDiff]()
+	if err != nil {
+		return nil, err
+	}
+	auditDiffs, err := GenerateOutputSchema[[]AuditDiff]()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{auditData, auditDiff, auditDiffs}}, nil
+}
+
+func generateLogsOutputSchema() (*jsonschema.Schema, error) {
+	logsData, err := GenerateOutputSchema[LogsData]()
+	if err != nil {
+		return nil, err
+	}
+	crossRun, err := GenerateOutputSchema[CrossRunAuditReport]()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{logsData, crossRun}}, nil
 }
 
 func generateSchemaWithDefaults[T any](defaults map[string]any) (*jsonschema.Schema, error) {
