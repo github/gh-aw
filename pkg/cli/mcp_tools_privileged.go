@@ -110,6 +110,7 @@ type logsArgs struct {
 	Branch                string   `json:"branch,omitempty" jsonschema:"Filter runs by branch name"`
 	AfterRunID            int64    `json:"after_run_id,omitempty" jsonschema:"Filter runs with database ID after this value (exclusive)"`
 	BeforeRunID           int64    `json:"before_run_id,omitempty" jsonschema:"Filter runs with database ID before this value (exclusive)"`
+	IgnoreWorkflowRuns    []int64  `json:"ignore_workflow_runs,omitempty" jsonschema:"Workflow run IDs to exclude"`
 	Timeout               int      `json:"timeout,omitempty" jsonschema:"Maximum time in minutes to spend downloading logs (default: auto-scales with count in the MCP server, rounded up in 40-run increments; e.g. 1 minute up to 40, 2 minutes for 41-80, 3 minutes for 81-120, and so on)"`
 	MaxGitHubAPIRateLimit int      `json:"max_github_api_rate_limit,omitempty" jsonschema:"Maximum used GitHub core API requests before waiting for reset. Positive values are absolute; negative values reserve requests from the API-reported limit (for example, 12000 or -2000)."`
 	MaxStorageMB          int      `json:"max_storage,omitempty" jsonschema:"Maximum logs storage in MB after pruning non-essential cache data (0 means unlimited)."`
@@ -364,6 +365,13 @@ func appendLogsFilterArgs(cmdArgs []string, args logsArgs) []string {
 	}
 	if args.BeforeRunID > 0 {
 		cmdArgs = append(cmdArgs, "--before-run-id", strconv.FormatInt(args.BeforeRunID, 10))
+	}
+	if len(args.IgnoreWorkflowRuns) > 0 {
+		runIDs := make([]string, len(args.IgnoreWorkflowRuns))
+		for i, runID := range args.IgnoreWorkflowRuns {
+			runIDs[i] = strconv.FormatInt(runID, 10)
+		}
+		cmdArgs = append(cmdArgs, "--ignore-workflow-runs", strings.Join(runIDs, ","))
 	}
 	if args.MaxGitHubAPIRateLimit != 0 {
 		cmdArgs = append(cmdArgs, "--max-github-api-rate-limit", strconv.Itoa(args.MaxGitHubAPIRateLimit))

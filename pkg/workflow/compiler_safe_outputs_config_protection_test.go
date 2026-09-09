@@ -27,19 +27,19 @@ func TestProtectedFilesExclude(t *testing.T) {
 		{
 			name:               "exclude AGENTS.md from create-pull-request",
 			excludeFiles:       []string{"AGENTS.md"},
-			wantExcludedFromPF: []string{"AGENTS.md"},
+			wantExcludedFromPF: []string{"AGENTS.md", "CHANGELOG.md"},
 			wantPresentInPF:    []string{"package.json", "go.mod", "CODEOWNERS", "DESIGN.md"},
 		},
 		{
 			name:               "exclude multiple files",
 			excludeFiles:       []string{"AGENTS.md", "CLAUDE.md"},
-			wantExcludedFromPF: []string{"AGENTS.md", "CLAUDE.md"},
+			wantExcludedFromPF: []string{"AGENTS.md", "CLAUDE.md", "CHANGELOG.md"},
 			wantPresentInPF:    []string{"package.json", "go.mod"},
 		},
 		{
 			name:               "empty exclude list leaves defaults intact",
 			excludeFiles:       nil,
-			wantExcludedFromPF: nil,
+			wantExcludedFromPF: []string{"CHANGELOG.md"},
 			wantPresentInPF:    []string{"package.json", "go.mod"},
 		},
 	}
@@ -160,6 +160,7 @@ func TestProtectedFilesExcludePushToPRBranch(t *testing.T) {
 		}
 	}
 	assert.NotContains(t, pfStrings, "AGENTS.md", "AGENTS.md should be excluded from protected_files")
+	assert.NotContains(t, pfStrings, "CHANGELOG.md", "CHANGELOG.md should be excluded by default from protected_files")
 	assert.Contains(t, pfStrings, "package.json", "package.json should still be in protected_files")
 
 	// Dot-folder prefixes are no longer in protected_path_prefixes — they are
@@ -376,12 +377,13 @@ func TestHandlerConfigInjectsCurrentCheckoutPatchWorkspacePath(t *testing.T) {
 }
 
 // TestProtectTopLevelMdFiles verifies that well-known top-level Markdown files
-// (README.md, CONTRIBUTING.md, CHANGELOG.md, SECURITY.md, CODE_OF_CONDUCT.md) are
-// always included in the protected_files list in both handler configs.
+// (README.md, CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md) are always
+// included in the protected_files list in both handler configs, while CHANGELOG.md
+// is intentionally excluded by default to allow routine changelog updates.
 func TestProtectTopLevelMdFiles(t *testing.T) {
 	config := extractHandlerManagerConfigJSON(t)
 
-	expectedFiles := []string{"README.md", "CONTRIBUTING.md", "CHANGELOG.md", "SECURITY.md", "CODE_OF_CONDUCT.md"}
+	expectedFiles := []string{"README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md"}
 	for _, handlerName := range []string{"create_pull_request", "push_to_pull_request_branch"} {
 		handlerCfg, ok := config[handlerName]
 		require.True(t, ok, "%s handler should be present", handlerName)

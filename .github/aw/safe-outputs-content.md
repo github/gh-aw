@@ -293,7 +293,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
         - "docs/**/*.md"              # e.g. restrict to Markdown docs
       excluded-files:                 # Optional: glob patterns to strip from the patch entirely
         - "**/*.lock"
-      protected-files: request_review # Optional: "request_review" (default), "blocked", "fallback-to-issue", or "allowed"
+      protected-files: request-review # Optional: "request-review" (default), "blocked", "fallback-to-issue", or "allowed"
       allowed-branches:               # Optional: glob patterns for allowed source branch names per run
         - "feature/*"
       allowed-base-branches:          # Optional: glob patterns for allowed base branch overrides per run
@@ -308,7 +308,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
 
   **Allowed Source Branches**: When `allowed-branches` is set, the branch used for PR creation (agent-provided `branch` or the current checkout branch when omitted) must match one of the configured glob patterns.
 
-  **File Restrictions**: **Always specify `allowed-files`** — this is the primary guardrail for `create-pull-request`. Scope it to specific file extensions (e.g., `"**/*.md"`, `"**/*.ts"`) or directory paths (e.g., `"src/**"`, `"docs/**"`) matching the workflow's purpose. Omitting `allowed-files` allows the agent to touch any file in the repository, which significantly expands blast radius. Use `excluded-files` to additionally strip specific files (e.g. lock files) from the patch before any checks. The `protected-files` field controls handling of sensitive files (package manifests, CI configs, agent instruction files): `request_review` (default — create the PR but submit a `REQUEST_CHANGES` review so a human approves before merge), `blocked` (hard-block), `fallback-to-issue` (push branch and create a review issue), or `allowed` (no restriction — use only when the workflow is explicitly designed to manage these files). Object form is also supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
+  **File Restrictions**: **Always specify `allowed-files`** — this is the primary guardrail for `create-pull-request`. Scope it to specific file extensions (e.g., `"**/*.md"`, `"**/*.ts"`) or directory paths (e.g., `"src/**"`, `"docs/**"`) matching the workflow's purpose. Omitting `allowed-files` allows the agent to touch any file in the repository, which significantly expands blast radius. Use `excluded-files` to additionally strip specific files (e.g. lock files) from the patch before any checks. The `protected-files` field controls handling of sensitive files (package manifests, CI configs, agent instruction files): `request-review` (default — create the PR but submit a `REQUEST_CHANGES` review so a human approves before merge), `blocked` (hard-block), `fallback-to-issue` (push branch and create a review issue), or `allowed` (no restriction — use only when the workflow is explicitly designed to manage these files). Object form is also supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
 
   **Auto-Expiration**: The `expires` field auto-closes PRs after a time period. Supports integers (days) or relative formats (2h, 7d, 2w, 1m, 1y). Minimum duration: 2 hours. Only for same-repo PRs without target-repo. Generates `agentics-maintenance.yml` workflow.
 

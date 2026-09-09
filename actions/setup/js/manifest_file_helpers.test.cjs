@@ -484,6 +484,21 @@ index abc..def 100644
       expect(result.action).toBe("allow");
     });
 
+    it("should allow CHANGELOG.md while protecting adjacent top-level documentation", () => {
+      const changelogResult = checkFileProtection(makePatch("CHANGELOG.md"), {
+        protected_files: ["README.md", "CONTRIBUTING.md"],
+        protected_files_policy: "request-review",
+      });
+      expect(changelogResult.action).toBe("allow");
+
+      const readmeResult = checkFileProtection(makePatch("README.md"), {
+        protected_files: ["README.md", "CONTRIBUTING.md"],
+        protected_files_policy: "request-review",
+      });
+      expect(readmeResult.action).toBe("request_review");
+      expect(readmeResult.files).toContain("README.md");
+    });
+
     it("should deny protected file even when it matches the allowlist (orthogonal checks)", () => {
       const result = checkFileProtection(makePatch("package.json"), {
         allowed_files: ["package.json"],

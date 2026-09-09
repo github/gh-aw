@@ -291,13 +291,15 @@ description: Safe-output reference for update, label, milestone, project, releas
         - "src/**"
       excluded-files:                 # Optional: glob patterns to strip from the patch entirely
         - "**/*.lock"
-      protected-files: blocked        # Optional: "blocked" (default), "fallback-to-issue", or "allowed"
+      protected-files: request-review # Optional: "request-review" (default), "blocked", "fallback-to-issue", or "allowed"
       max-patch-size: 2048            # Optional: per-output cap on git patch size in KB (overrides global; default: 4096 KB, max: 10240)
   ```
 
   Cross-repository pushes are supported via `target-repo` (and `head-repo`/`head-github-token` for fork-backed PRs) plus an `allowed-repos` allowlist. To trigger CI on pushed commits, use `github-token-for-extra-empty-commit` or set the magic secret `GH_AW_CI_TRIGGER_TOKEN`.
 
   **File Restrictions**: Same as `create-pull-request`: **always specify `allowed-files`** scoped to specific file extensions or paths to limit the agent's reach. `excluded-files` strips files before all checks, and `protected-files` controls handling of sensitive files. Object form supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
+
+  `push-to-pull-request-branch` now uses the same `request-review` default as `create-pull-request`. Protected-file changes are still surfaced in the PR as a `REQUEST_CHANGES` review, while `blocked` remains available when a workflow requires a hard failure. `CHANGELOG.md` is excluded from the PR handlers' default protected-file set so routine release updates do not require an explicit exception; other shared handlers continue to protect it.
 
   **Compile-time warnings for `target: "*"`**: When `target: "*"` is set, the compiler emits warnings if:
   1. The checkout configuration does not include a wildcard fetch pattern — add `fetch: ["*"]` with `fetch-depth: 0` so the agent can access all PR branches at runtime

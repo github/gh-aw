@@ -408,6 +408,7 @@ func fetchWorkflowRunBatch(ctx context.Context, opts LogsDownloadOptions, before
 		Ref:                    opts.Ref,
 		BeforeRunID:            opts.BeforeRunID,
 		AfterRunID:             opts.AfterRunID,
+		IgnoreWorkflowRuns:     opts.IgnoreWorkflowRuns,
 		RepoOverride:           opts.RepoOverride,
 		OldestFetchedCreatedAt: &oldestFetchedCreatedAt,
 		ProcessedCount:         processedCount,

@@ -31,8 +31,7 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 "startedAt": "2026-01-01T00:00:01Z",
 "updatedAt": "2026-01-01T00:01:00Z",
 "attempt": 2
-}
-]`
+}]`
 
 	var runs []WorkflowRun
 	require.NoError(t, json.Unmarshal([]byte(rawJSON), &runs), "unmarshal should succeed")
@@ -42,6 +41,16 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 	assert.Equal(t, "My Workflow", runs[0].WorkflowName, "WorkflowName should be populated")
 	assert.Empty(t, runs[0].WorkflowPath, "WorkflowPath should be empty when 'path' field is absent")
 	assert.Equal(t, 2, runs[0].Attempt, "Attempt should be populated")
+}
+
+func TestFilterIgnoredWorkflowRuns(t *testing.T) {
+	runs := []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}
+
+	filtered := filterIgnoredWorkflowRuns(runs, []int64{100, 300})
+
+	require.Len(t, filtered, 1)
+	assert.Equal(t, int64(200), filtered[0].DatabaseID)
+	assert.Equal(t, []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}, runs)
 }
 
 func TestApplyWorkflowRunListRepository(t *testing.T) {

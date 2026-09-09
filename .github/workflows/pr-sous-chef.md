@@ -10,7 +10,7 @@ on:
     strategy: centralized
     name: souschef
     events: [pull_request_comment]
-  skip-if-no-match: "is:pr is:open -is:draft"
+  skip-if-no-match: "is:pr is:open -is:draft -author:app/dependabot"
 permissions:
   contents: read
   pull-requests: read
@@ -80,7 +80,7 @@ steps:
         set +e
         gh pr list --repo "$EXPR_GITHUB_REPOSITORY" \
           --state open \
-          --search "is:pr is:open -is:draft -label:broccoli sort:updated-desc" \
+          --search "is:pr is:open -is:draft -author:app/dependabot -label:broccoli sort:updated-desc" \
           --limit "$pr_limit" \
           --json number,title,url,headRefOid,headRefName,createdAt,updatedAt,changedFiles,author,mergeStateStatus,statusCheckRollup \
           > "$candidate_file" 2>&1

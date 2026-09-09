@@ -37,6 +37,23 @@ func TestFindMaiCode11FlashPricing(t *testing.T) {
 	assert.InDelta(t, 0.00000025, pricing["cache_write"], 1e-12)
 }
 
+func TestFindGPT6AstraPricing(t *testing.T) {
+	t.Parallel()
+	for _, provider := range []string{"github-copilot", "openai"} {
+		t.Run(provider, func(t *testing.T) {
+			t.Parallel()
+			pricing, ok := findModelPricing(provider, "gpt-6-astra")
+			require.True(t, ok)
+			assert.InDelta(t, 0.001, pricing["input"], 1e-12)
+			assert.InDelta(t, 0.005, pricing["output"], 1e-12)
+			assert.InDelta(t, 0.0001, pricing["cache_read"], 1e-12)
+			if provider == "github-copilot" {
+				assert.InDelta(t, 0.00125, pricing["cache_write"], 1e-12)
+			}
+		})
+	}
+}
+
 func TestFindGrok45CacheReadPricing(t *testing.T) {
 	t.Parallel()
 	pricing, ok := findModelPricing("github-copilot", "grok-4.5")

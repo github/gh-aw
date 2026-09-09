@@ -533,7 +533,7 @@ This protects against supply chain attacks where an AI agent could inadvertently
 
 ### What Is Protected
 
-The following are always protected unless explicitly excluded: package manifests such as `package.json`, `go.mod`, `go.sum`, `Gemfile`, `Pipfile`, `pyproject.toml`, and other runtime lockfiles; security configuration such as `CODEOWNERS` and `DESIGN.md`; agent instruction files such as `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and other engine-specific instruction files; common top-level documentation such as `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`; specific protected directories such as `.github/`, `.agents/`, `.githooks/`, and `.husky/`; and any top-level directory starting with `.` such as `.cursor/`, `.vscode/`, or `.devcontainer/`. The dot-directory rule also catches newly created hidden configuration directories without requiring an explicit list update.
+The following are always protected unless explicitly excluded: package manifests such as `package.json`, `go.mod`, `go.sum`, `Gemfile`, `Pipfile`, `pyproject.toml`, and other runtime lockfiles; security configuration such as `CODEOWNERS` and `DESIGN.md`; agent instruction files such as `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and other engine-specific instruction files; common top-level documentation such as `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`; and specific protected directories such as `.github/`, `.agents/`, `.githooks/`, and `.husky/`. Although `CHANGELOG.md` is part of the shared protected-file set, these PR handlers remove it from that set by default. Any top-level directory starting with `.` such as `.cursor/`, `.vscode/`, or `.devcontainer/` is protected, including newly created hidden configuration directories.
 
 ### Policy Options
 
@@ -543,7 +543,7 @@ The `protected-files` field accepts either a string policy value or an object wi
 
 | Value | Behavior |
 |-------|-----------|
-| `request_review` (default) | Create the pull request and submit a `REQUEST_CHANGES` review listing the protected files. The agent's work is preserved, and a human reviewer must approve before merge. |
+| `request-review` (default) | Create the pull request and submit a `REQUEST_CHANGES` review listing the protected files. The agent's work is preserved, and a human reviewer must approve before merge. The legacy `request_review` spelling is also accepted. |
 | `blocked` | Hard-block: the safe output fails with an error |
 | `fallback-to-issue` | Create a review issue with instructions for the human to apply or reject the changes manually |
 | `allowed` | No restriction — all protected file changes are permitted. **Use only when the workflow is explicitly designed to manage these files.** |
@@ -554,7 +554,7 @@ The `protected-files` field accepts either a string policy value or an object wi
 safe-outputs:
   create-pull-request:
     protected-files:
-      policy: fallback-to-issue   # same values as string form (default: request_review)
+      policy: fallback-to-issue   # same values as string form (default: request-review)
       exclude:
         - AGENTS.md               # allow the agent to update its own instruction file
         - CHANGELOG.md            # allow the agent to update the changelog
@@ -565,7 +565,7 @@ safe-outputs:
 The `exclude` list names files by **basename** (e.g., `AGENTS.md`) or **path prefix** (e.g., `.agents/`) to remove from the default protected set. Dot-folder path prefixes in the `exclude` list (e.g. `.cursor/`) also opt that directory out of the general top-level-dot-folder protection rule. The remaining protected files still enforce the configured policy. This is useful when a workflow is explicitly designed to manage one specific instruction file or configuration directory without disabling all protection.
 
 :::tip[Workflows that update top-level Markdown files]
-If your workflow is explicitly designed to modify a root-level Markdown file such as `CHANGELOG.md` or `README.md`, add it to the `exclude` list so the agent can commit the change.
+`CHANGELOG.md` is excluded by default. If your workflow is explicitly designed to modify another protected root-level Markdown file such as `README.md`, add it to the `exclude` list so the agent can commit the change.
 
 ```yaml wrap
 safe-outputs:
@@ -573,7 +573,7 @@ safe-outputs:
     protected-files:
       policy: blocked
       exclude:
-        - CHANGELOG.md   # this workflow updates the changelog
+        - README.md      # this workflow updates the README
 ```
 :::
 
@@ -604,7 +604,7 @@ on:
         type: string
         default: fallback-to-issue
         description: >
-          Protected-file policy: 'request_review', 'blocked', 'fallback-to-issue', or 'allowed'.
+          Protected-file policy: 'request-review', 'request_review' (legacy alias), 'blocked', 'fallback-to-issue', or 'allowed'.
       patch-format:
         type: string
         default: bundle

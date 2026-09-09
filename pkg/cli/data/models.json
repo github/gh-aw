@@ -515,6 +515,16 @@
           "provider_type": "openai",
           "wire_api": "responses"
         },
+        "gpt-6-astra": {
+          "cost": {
+            "input": "0.001",
+            "output": "0.005",
+            "cache_read": "0.0001",
+            "cache_write": "0.00125"
+          },
+          "provider_type": "openai",
+          "wire_api": "responses"
+        },
         "raptor-mini": {
           "cost": {
             "input": "2.5e-07",
@@ -891,6 +901,15 @@
             "cache_read": "2e-07"
           },
           "provider_type": "openai"
+        },
+        "gpt-6-astra": {
+          "cost": {
+            "input": "0.001",
+            "output": "0.005",
+            "cache_read": "0.0001"
+          },
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-image-1": {
           "cost": {},

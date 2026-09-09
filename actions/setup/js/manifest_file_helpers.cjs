@@ -249,7 +249,7 @@ function checkFileProtection(patchContent, config) {
   if (config.protected_files_policy === "fallback-to-issue") {
     return { action: "fallback", files: allFound };
   }
-  if (config.protected_files_policy === "request_review") {
+  if (config.protected_files_policy === "request-review" || config.protected_files_policy === "request_review") {
     return { action: "request_review", files: allFound };
   }
   return { action: "deny", source: "protected", files: allFound };
@@ -334,7 +334,7 @@ function checkFileProtectionPostApply(actualFiles, config) {
   if (config.protected_files_policy === "fallback-to-issue") {
     return { action: "fallback", files: allProtected };
   }
-  if (config.protected_files_policy === "request_review") {
+  if (config.protected_files_policy === "request-review" || config.protected_files_policy === "request_review") {
     return { action: "request_review", files: allProtected };
   }
   return { action: "deny", source: "protected", files: allProtected };

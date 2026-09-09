@@ -6,26 +6,27 @@ package cli
 
 // LogsDownloadOptions holds parameters for DownloadWorkflowLogs.
 type LogsDownloadOptions struct {
-	WorkflowName   string
-	Count          int
-	StartDate      string
-	EndDate        string
-	OutputDir      string
-	Engine         string
-	Runtime        string
-	Ref            string
-	BeforeRunID    int64
-	AfterRunID     int64
-	RepoOverride   string
-	Verbose        bool
-	ToolGraph      bool
-	NoStaged       bool
-	FirewallOnly   bool
-	NoFirewall     bool
-	Parse          bool
-	JSONOutput     bool
-	TimeoutMinutes int
-	TimeoutSeconds int
+	WorkflowName       string
+	Count              int
+	StartDate          string
+	EndDate            string
+	OutputDir          string
+	Engine             string
+	Runtime            string
+	Ref                string
+	BeforeRunID        int64
+	AfterRunID         int64
+	IgnoreWorkflowRuns []int64
+	RepoOverride       string
+	Verbose            bool
+	ToolGraph          bool
+	NoStaged           bool
+	FirewallOnly       bool
+	NoFirewall         bool
+	Parse              bool
+	JSONOutput         bool
+	TimeoutMinutes     int
+	TimeoutSeconds     int
 	// MaxGitHubAPIRateLimit is the maximum number of core API requests that may
 	// be used in the current window before downloads wait for the reset. Negative
 	// values reserve that many requests from the API-reported limit.
@@ -111,6 +112,7 @@ type continuationOptions struct {
 	engine                string
 	branch                string
 	afterRunID            int64
+	ignoreWorkflowRuns    []int64
 	count                 int
 	timeoutMinutes        int
 	maxGitHubAPIRateLimit int

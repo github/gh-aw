@@ -121,7 +121,9 @@ type CreatePullRequestsConfig struct {
 	CloseOlderConfig               `yaml:",inline"` // Shared close-older settings; Enabled is sourced from close-older-pull-requests.
 }
 
-// parseCreatePullRequestsConfig handles only create-pull-request (singular) configuration
+// parseCreatePullRequestsConfig handles only create-pull-request (singular) configuration.
+//
+//nolint:funlen // Large config parser keeps all create-pull-request validation in one place for clarity.
 func (c *Compiler) parseCreatePullRequestsConfig(outputMap map[string]any) *CreatePullRequestsConfig {
 	// Check for singular form only
 	if _, exists := outputMap["create-pull-request"]; !exists {
@@ -153,7 +155,10 @@ func (c *Compiler) parseCreatePullRequestsConfig(outputMap map[string]any) *Crea
 			protectedFilesExclude = preprocessProtectedFilesField(configData, createPRLog)
 
 			// Validate protected-files string enum after object-form preprocessing.
-			validateStringEnumField(configData, "protected-files", []string{"blocked", "allowed", "fallback-to-issue", "request_review"}, createPRLog)
+			validateStringEnumField(configData, "protected-files", []string{"blocked", "allowed", "fallback-to-issue", "request_review", "request-review"}, createPRLog)
+			if value, ok := configData["protected-files"].(string); ok {
+				configData["protected-files"] = normaliseProtectedFilesPolicy(value)
+			}
 
 			// Pre-process patch-format: valid values are "bundle" (default) and "am".
 			validateStringEnumField(configData, "patch-format", []string{"am", "bundle"}, createPRLog)

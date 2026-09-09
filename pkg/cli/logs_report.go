@@ -48,19 +48,20 @@ type LogsData struct {
 
 // ContinuationData provides parameters to continue an incomplete logs query.
 type ContinuationData struct {
-	Message               string `json:"message"`
-	WorkflowName          string `json:"workflow_name,omitempty"`
-	Count                 int    `json:"count,omitempty"`
-	StartDate             string `json:"start_date,omitempty"`
-	EndDate               string `json:"end_date,omitempty"`
-	Engine                string `json:"engine,omitempty"`
-	Branch                string `json:"branch,omitempty"`
-	AfterRunID            int64  `json:"after_run_id,omitempty"`
-	BeforeRunID           int64  `json:"before_run_id,omitempty"`
-	Timeout               int    `json:"timeout,omitempty"`
-	MaxGitHubAPIRateLimit int    `json:"max_github_api_rate_limit,omitempty"`
-	MaxStorageMB          int    `json:"max_storage,omitempty"`
-	PruneOlderRuns        bool   `json:"prune_older_runs,omitempty"`
+	Message               string  `json:"message"`
+	WorkflowName          string  `json:"workflow_name,omitempty"`
+	Count                 int     `json:"count,omitempty"`
+	StartDate             string  `json:"start_date,omitempty"`
+	EndDate               string  `json:"end_date,omitempty"`
+	Engine                string  `json:"engine,omitempty"`
+	Branch                string  `json:"branch,omitempty"`
+	AfterRunID            int64   `json:"after_run_id,omitempty"`
+	BeforeRunID           int64   `json:"before_run_id,omitempty"`
+	IgnoreWorkflowRuns    []int64 `json:"ignore_workflow_runs,omitempty"`
+	Timeout               int     `json:"timeout,omitempty"`
+	MaxGitHubAPIRateLimit int     `json:"max_github_api_rate_limit,omitempty"`
+	MaxStorageMB          int     `json:"max_storage,omitempty"`
+	PruneOlderRuns        bool    `json:"prune_older_runs,omitempty"`
 }
 
 // WorkflowContinuation identifies a per-target cursor in a combined

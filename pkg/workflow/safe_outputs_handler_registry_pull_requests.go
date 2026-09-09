@@ -15,6 +15,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 		if c.MaxPatchSize > 0 {
 			maxPatchSize = c.MaxPatchSize
 		}
+		protectedFilesPolicy := pushToPullRequestBranchProtectedFilesPolicy(c)
 		builder := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("target", c.Target).
@@ -30,11 +31,11 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddTemplatableStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "push-to-pull-request-branch", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
-			AddStringPtr("protected_files_policy", c.ManifestFilesPolicy).
+			AddDefault("protected_files_policy", protectedFilesPolicy).
 			AddStringSlice("protected_files", getAllManifestFiles()).
 			AddStringSlice("protected_path_prefixes", getProtectedPathPrefixes()).
 			AddDefault("protect_top_level_dot_folders", true).
-			AddStringSlice("_protected_files_exclude", c.ProtectedFilesExclude).
+			AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 			AddStringSlice("allowed_files", c.AllowedFiles).
 			AddStringSlice("excluded_files", c.ExcludedFiles).
 			AddIfNotEmpty("patch_format", c.PatchFormat).
@@ -279,7 +280,7 @@ func newCreatePullRequestHandlerConfigBuilder(cfg *SafeOutputsConfig, c *CreateP
 		AddStringSlice("protected_files", getAllManifestFiles()).
 		AddStringSlice("protected_path_prefixes", getProtectedPathPrefixes()).
 		AddDefault("protect_top_level_dot_folders", true).
-		AddStringSlice("_protected_files_exclude", c.ProtectedFilesExclude).
+		AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 		AddStringSlice("allowed_files", c.AllowedFiles).
 		AddStringSlice("excluded_files", c.ExcludedFiles).
 		AddIfTrue("preserve_branch_name", c.PreserveBranchName).
@@ -292,12 +293,45 @@ func newCreatePullRequestHandlerConfigBuilder(cfg *SafeOutputsConfig, c *CreateP
 		AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged))
 }
 
-func createPullRequestProtectedFilesPolicy(c *CreatePullRequestsConfig) string {
-	protectedFilesPolicy := "request_review"
-	if c.ManifestFilesPolicy != nil {
-		protectedFilesPolicy = *c.ManifestFilesPolicy
+func normaliseProtectedFilesPolicy(policy string) string {
+	switch policy {
+	case "request_review", "request-review":
+		return "request-review"
+	case "fallback_to_issue", "fallback-to-issue":
+		return "fallback-to-issue"
+	default:
+		return policy
 	}
-	return protectedFilesPolicy
+}
+
+func defaultProtectedFilesExclude(excludes []string) []string {
+	seen := make(map[string]struct{}, len(excludes)+1)
+	result := make([]string, 0, len(excludes)+1)
+	for _, file := range append([]string{"CHANGELOG.md"}, excludes...) {
+		if file == "" {
+			continue
+		}
+		if _, exists := seen[file]; exists {
+			continue
+		}
+		seen[file] = struct{}{}
+		result = append(result, file)
+	}
+	return result
+}
+
+func createPullRequestProtectedFilesPolicy(c *CreatePullRequestsConfig) string {
+	if c == nil || c.ManifestFilesPolicy == nil {
+		return "request-review"
+	}
+	return normaliseProtectedFilesPolicy(*c.ManifestFilesPolicy)
+}
+
+func pushToPullRequestBranchProtectedFilesPolicy(c *PushToPullRequestBranchConfig) string {
+	if c == nil || c.ManifestFilesPolicy == nil {
+		return "request-review"
+	}
+	return normaliseProtectedFilesPolicy(*c.ManifestFilesPolicy)
 }
 
 func createPullRequestMaxPatchSize(cfg *SafeOutputsConfig, c *CreatePullRequestsConfig) int {

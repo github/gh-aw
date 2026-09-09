@@ -9714,14 +9714,14 @@ safe-outputs:
     # (optional)
     github-token-for-extra-empty-commit: "example-value"
 
-    # Controls protected-file protection. String form: request_review (default),
+    # Controls protected-file protection. String form: request-review (default),
     # blocked, allowed, or fallback-to-issue — or a GitHub Actions expression for
     # reusable workflows. Object form: { policy, exclude } to customize the
     # protected-file set.
     # (optional)
     # Accepted formats:
 
-    # Format 1: Controls protected-file protection. request_review (default): create
+    # Format 1: Controls protected-file protection. request-review (default): create
     # the PR but prepend a caution block and submit a REQUEST_CHANGES review for
     # manual scrutiny. blocked: hard-block any patch that modifies package manifests
     # (e.g. package.json, go.mod), engine instruction files (e.g. AGENTS.md,
@@ -9731,7 +9731,7 @@ safe-outputs:
     protected-files: "blocked"
 
     # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed',
-    # 'fallback-to-issue', or 'request_review' at runtime. Use in reusable
+    # 'fallback-to-issue', or 'request-review' at runtime. Use in reusable
     # workflow_call workflows to parameterize the policy per caller.
     protected-files: "example-value"
 
@@ -9742,14 +9742,14 @@ safe-outputs:
       # (optional)
       # Accepted formats:
 
-      # Format 1: Protection policy. request_review (default): create the PR but prepend
+      # Format 1: Protection policy. request-review (default): create the PR but prepend
       # a caution block and submit a REQUEST_CHANGES review. blocked: hard-block any
       # patch that modifies protected files. allowed: allow all changes.
       # fallback-to-issue: push the branch but create a review issue instead of a PR.
       policy: "blocked"
 
       # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed',
-      # 'fallback-to-issue', or 'request_review' at runtime.
+      # 'fallback-to-issue', or 'request-review' at runtime.
       policy: "example-value"
 
       # List of filenames or path prefixes to remove from the default protected-file
@@ -16334,22 +16334,26 @@ safe-outputs:
     # repository slugs (e.g. '${{ inputs[\'allowed-repos\'] }}')
     allowed-repos: "example-value"
 
-    # Controls protected-file protection. String form: blocked (default), allowed, or
-    # fallback-to-issue — or a GitHub Actions expression for reusable workflows.
-    # Object form: { policy, exclude } to customize the protected-file set.
+    # Controls protected-file protection. String form: request-review (default),
+    # blocked, allowed, or fallback-to-issue — or a GitHub Actions expression for
+    # reusable workflows. The legacy request_review spelling is also accepted. Object
+    # form: { policy, exclude } to customize the protected-file set.
     # (optional)
     # Accepted formats:
 
-    # Format 1: Controls protected-file protection. blocked (default): hard-block any
-    # patch that modifies package manifests (e.g. package.json, go.mod), engine
-    # instruction files (e.g. AGENTS.md, CLAUDE.md) or .github/ files. allowed: allow
-    # all changes. fallback-to-issue: create a review issue instead of pushing to the
-    # PR branch, so a human can review the changes before applying.
+    # Format 1: Controls protected-file protection. request-review (default): create
+    # the PR and submit a REQUEST_CHANGES review for manual scrutiny. blocked:
+    # hard-block any patch that modifies package manifests (e.g. package.json,
+    # go.mod), engine instruction files (e.g. AGENTS.md, CLAUDE.md) or .github/ files.
+    # allowed: allow all changes. fallback-to-issue: create a review issue instead of
+    # pushing to the PR branch, so a human can review the changes before applying. The
+    # legacy request_review spelling is also accepted.
     protected-files: "blocked"
 
-    # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed', or
-    # 'fallback-to-issue' at runtime. Use in reusable workflow_call workflows to
-    # parameterize the policy per caller.
+    # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed',
+    # 'fallback-to-issue', 'request-review', or the legacy 'request_review' at
+    # runtime. Use in reusable workflow_call workflows to parameterize the policy per
+    # caller.
     protected-files: "example-value"
 
     # Format 3: Object form for granular control over the protected-file set. Use the
@@ -16359,13 +16363,15 @@ safe-outputs:
       # (optional)
       # Accepted formats:
 
-      # Format 1: Protection policy. blocked (default): hard-block any patch that
-      # modifies protected files. allowed: allow all changes. fallback-to-issue: create
-      # a review issue instead of pushing.
+      # Format 1: Protection policy. request-review (default): create the PR and submit
+      # a REQUEST_CHANGES review. blocked: hard-block any patch that modifies protected
+      # files. allowed: allow all changes. fallback-to-issue: create a review issue
+      # instead of pushing. The legacy request_review spelling is also accepted.
       policy: "blocked"
 
-      # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed', or
-      # 'fallback-to-issue' at runtime.
+      # Format 2: GitHub Actions expression that resolves to 'blocked', 'allowed',
+      # 'fallback-to-issue', 'request-review', or the legacy 'request_review' at
+      # runtime.
       policy: "example-value"
 
       # List of filenames or path prefixes to remove from the default protected-file

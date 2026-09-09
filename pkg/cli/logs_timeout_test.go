@@ -16,6 +16,7 @@ func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 		MaxGitHubAPIRateLimit: -2000,
 		MaxStorageMB:          10240,
 		PruneOlderRuns:        true,
+		IgnoreWorkflowRuns:    []int64{123, 456},
 	})
 	command := strings.Join(cmdArgs, " ")
 
@@ -27,6 +28,9 @@ func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 	}
 	if !strings.Contains(command, "--prune-older-runs") {
 		t.Fatalf("command args do not include older-run pruning mode: %s", command)
+	}
+	if !strings.Contains(command, "--ignore-workflow-runs 123,456") {
+		t.Fatalf("command args do not include ignored workflow runs: %s", command)
 	}
 }
 

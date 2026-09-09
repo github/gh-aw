@@ -64,6 +64,8 @@ func TestNewLogsCommand(t *testing.T) {
 	assert.NotNil(t, afterRunIDFlag, "Should have 'after-run-id' flag")
 	beforeRunIDFlag := flags.Lookup("before-run-id")
 	assert.NotNil(t, beforeRunIDFlag, "Should have 'before-run-id' flag")
+	ignoreWorkflowRunsFlag := flags.Lookup("ignore-workflow-runs")
+	assert.NotNil(t, ignoreWorkflowRunsFlag, "Should have 'ignore-workflow-runs' flag")
 	lastFlag := flags.Lookup("last")
 	assert.NotNil(t, lastFlag, "Should have 'last' flag")
 	assert.Contains(t, lastFlag.Usage, "--count/-c", "--last usage should mention the canonical --count/-c flag")
@@ -329,6 +331,28 @@ func TestLogsCommandRunIDFilters(t *testing.T) {
 			assert.Equal(t, "int64", flag.Value.Type(), "Flag %s should be int64 type", tt.flagName)
 		})
 	}
+}
+
+func TestLogsCommandIgnoreWorkflowRuns(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("ignore-workflow-runs", "123,github/gh-aw/456,123"))
+
+	opts, err := loadCommonLogsOptions(cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{123, 456}, opts.IgnoreWorkflowRuns)
+}
+
+func TestLogsCommandRejectsInvalidIgnoredWorkflowRun(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("ignore-workflow-runs", "github/gh-aw/not-a-run"))
+
+	_, err := loadCommonLogsOptions(cmd)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "github/gh-aw/not-a-run")
+	assert.Contains(t, err.Error(), "expected a positive run ID or slug/ID")
+	assert.Contains(t, err.Error(), "123 or github/gh-aw/123")
 }
 
 func TestLogsCommandOutputFlag(t *testing.T) {

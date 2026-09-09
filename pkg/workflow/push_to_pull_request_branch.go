@@ -185,10 +185,11 @@ func (c *Compiler) parsePushToPullRequestBranchConfig(outputMap map[string]any) 
 			exclude := preprocessProtectedFilesField(configMap, pushToPullRequestBranchLog)
 			pushToBranchConfig.ProtectedFilesExclude = exclude
 			// Validate policy string (no-op if the field was replaced by preprocessor)
-			manifestFilesEnums := []string{"blocked", "allowed", "fallback-to-issue"}
+			manifestFilesEnums := []string{"blocked", "allowed", "fallback-to-issue", "request_review", "request-review"}
 			validateStringEnumField(configMap, "protected-files", manifestFilesEnums, pushToPullRequestBranchLog)
 			if strVal, ok := configMap["protected-files"].(string); ok {
-				pushToBranchConfig.ManifestFilesPolicy = &strVal
+				normalised := normaliseProtectedFilesPolicy(strVal)
+				pushToBranchConfig.ManifestFilesPolicy = &normalised
 			}
 
 			// Parse allowed-files: list of glob patterns forming a strict allowlist of eligible files
