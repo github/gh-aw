@@ -1,5 +1,8 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
+
+syncRuntimePromptTemplates(import.meta.url);
 
 describe("check_version_updates", () => {
   let mockCore;

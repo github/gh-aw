@@ -18,6 +18,7 @@
 
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
 
 const CONFIG_URL = "https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json";
 const FETCH_TIMEOUT_MS = 120_000;
@@ -104,31 +105,12 @@ function getRunUrl() {
 function buildBlockedVersionIssueBody(compiledVersion) {
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || (typeof context !== "undefined" ? context.workflow : "") || "unknown";
   const runUrl = getRunUrl();
-  const lines = [
-    `<!-- gh-aw-blocked-compiler-version: ${compiledVersion} -->`,
-    "",
-    "## Agentic workflows are blocked",
-    "",
-    `This repository has one or more workflows compiled with ${markdownCode(compiledVersion)}, which is in the blocked versions list.`,
-    "",
-    "Activation fails before the agent, safe outputs, and conclusion jobs can run.",
-    "",
-    "### Latest blocked run",
-    "",
-    `- Workflow: ${markdownCode(workflowName)}`,
-  ];
-  if (runUrl) {
-    lines.push(`- Run: ${runUrl}`);
-  }
-  lines.push(
-    "",
-    "### Action required",
-    "",
-    "Update `gh-aw` to the latest version and recompile the affected workflows with `gh aw compile`.",
-    "",
-    "This issue is updated by the activation-stage version check when another blocked run is detected."
-  );
-  return lines.join("\n");
+  return renderTemplateFromFile(getPromptPath("blocked_compiler_version_issue.md"), {
+    compiled_version: compiledVersion,
+    compiled_version_code: markdownCode(compiledVersion),
+    workflow_name_code: markdownCode(workflowName),
+    run_url_line: runUrl ? `- Run: ${runUrl}` : "",
+  });
 }
 
 /**
