@@ -131,6 +131,21 @@ type mcpServerCrossRunHealthWire struct {
 	Unreliable    bool    `json:"unreliable"`
 }
 
+type mcpFailureSummaryWire struct {
+	ServerName string   `json:"server_name"`
+	Count      int      `json:"count"`
+	Workflows  []string `json:"workflows"`
+	RunIDs     []int64  `json:"run_ids"`
+}
+
+type domainAnalysisWireSchema struct {
+	TotalRequests  int      `json:"total_requests"`
+	AllowedCount   int      `json:"allowed_count"`
+	BlockedCount   int      `json:"blocked_count"`
+	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	BlockedDomains []string `json:"blocked_domains,omitempty"`
+}
+
 func generateAuditDataOutputSchema() (*jsonschema.Schema, error) {
 	schema, err := GenerateOutputSchema[AuditData]()
 	if err != nil {
@@ -156,6 +171,20 @@ func generateLogsDataOutputSchema() (*jsonschema.Schema, error) {
 		return nil, err
 	}
 	if err := replaceArrayItemSchema(schema, []string{"tool_usage"}, wire); err != nil {
+		return nil, err
+	}
+	mcpFailures, err := GenerateOutputSchema[mcpFailureSummaryWire]()
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceArrayItemSchema(schema, []string{"mcp_failures"}, mcpFailures); err != nil {
+		return nil, err
+	}
+	accessAnalysis, err := GenerateOutputSchema[domainAnalysisWireSchema]()
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceMapValueSchema(schema, []string{"access_log", "by_workflow"}, accessAnalysis); err != nil {
 		return nil, err
 	}
 	return schema, nil
@@ -189,6 +218,22 @@ func replaceArrayItemSchema(schema *jsonschema.Schema, path []string, replacemen
 		return fmt.Errorf("schema property %q is not an array", path[len(path)-1])
 	}
 	target.Items = replacement
+	return nil
+}
+
+func replaceMapValueSchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	target := schema
+	for _, property := range path {
+		var ok bool
+		target, ok = target.Properties[property]
+		if !ok {
+			return fmt.Errorf("schema property %q not found", property)
+		}
+	}
+	if target.AdditionalProperties == nil {
+		return fmt.Errorf("schema property %q is not a map", path[len(path)-1])
+	}
+	target.AdditionalProperties = replacement
 	return nil
 }
 

@@ -59,6 +59,25 @@ func TestJSONSchemaCommand(t *testing.T) {
 						},
 						Runs: 1,
 					}},
+					MCPFailures: []MCPFailureSummary{{
+						ServerName: "github",
+						AggregatedSummaryBase: AggregatedSummaryBase{
+							Count:     1,
+							Workflows: []string{"example"},
+							RunIDs:    []int64{1},
+						},
+					}},
+					AccessLog: &AccessLogSummary{
+						ByWorkflow: map[string]*DomainAnalysis{
+							"example": {
+								AnalysisBase: AnalysisBase{
+									TotalRequests:   3,
+									AllowedRequests: 2,
+									BlockedRequests: 1,
+								},
+							},
+						},
+					},
 				},
 				CrossRunAuditReport{
 					MCPHealth: []MCPServerCrossRunHealth{{

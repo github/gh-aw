@@ -1734,9 +1734,6 @@
                   "type": "string"
                 }
               },
-              "first_reason": {
-                "type": "string"
-              },
               "run_ids": {
                 "type": [
                   "null",
@@ -1751,7 +1748,6 @@
               "server_name",
               "count",
               "workflows",
-              "first_reason",
               "run_ids"
             ],
             "additionalProperties": false
@@ -1793,11 +1789,17 @@
             "by_workflow": {
               "type": "object",
               "additionalProperties": {
-                "type": [
-                  "null",
-                  "object"
-                ],
+                "type": "object",
                 "properties": {
+                  "total_requests": {
+                    "type": "integer"
+                  },
+                  "allowed_count": {
+                    "type": "integer"
+                  },
+                  "blocked_count": {
+                    "type": "integer"
+                  },
                   "allowed_domains": {
                     "type": [
                       "null",
@@ -1815,21 +1817,12 @@
                     "items": {
                       "type": "string"
                     }
-                  },
-                  "total_requests": {
-                    "type": "integer"
-                  },
-                  "allowed_requests": {
-                    "type": "integer"
-                  },
-                  "blocked_requests": {
-                    "type": "integer"
                   }
                 },
                 "required": [
                   "total_requests",
-                  "allowed_requests",
-                  "blocked_requests"
+                  "allowed_count",
+                  "blocked_count"
                 ],
                 "additionalProperties": false
               }
