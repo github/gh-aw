@@ -1,9 +1,14 @@
 {
-  "last_updated": "2026-09-08",
+  "last_updated": "2026-09-09",
   "pending_tasks": [
     {
-      "file": ".github/workflows/smoke-copilot-aoai-entra.md",
-      "created": "2026-09-08",
+      "file": "pkg/workflow/engine_inline_definition_validation.go",
+      "created": "2026-09-09",
+      "status": "pending"
+    },
+    {
+      "file": ".github/workflows/craft.md",
+      "created": "2026-09-09",
       "status": "pending"
     }
   ]
