@@ -24,7 +24,7 @@ The gh-aw maintainers revise this Candidate Recommendation using security-review
 
 This specification covers `pkg/workflow/`, related `pkg/parser/` and `actions/setup/` validation, and the daily optimizer. It excludes runtime detection-job internals, external scanner ecosystems, and non-compiler repositories.
 
-A conforming implementation satisfies every MUST in Sections 2–6. Rules are specification-first, secure by default, mapped bidirectionally to implementation, and auditable through version history.
+A conforming implementation satisfies every MUST in Sections 2–8. Rules are specification-first, secure by default, mapped bidirectionally to implementation, and auditable through version history.
 
 ## 2. Spec-to-Implementation Sync
 
@@ -42,57 +42,69 @@ Each version maps to the minimum compatible binary. A version change MUST update
 | `1.0.15`–`1.0.21` | `v0.72.1`–`v0.83.6` | Adds CTR-021–023 and editorial/mapping updates. |
 | `1.0.8`–`1.0.14` | `v0.72.1` | Establishes CTR-016, CTR-018–020; earlier versions establish CTR-001–015. |
 
-## 3. Rule Model and Requirements
+## 3. Threat Model Overview
 
-Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagnostic, implementation mapping, and test. The compiler MUST produce deterministic, actionable diagnostics and either reject insecure generation or apply a safe rewrite.
+Generated workflows run with elevated permissions and consume untrusted content (issues, PRs, comments, external tool output). The catalog in Section 5 groups the threats a conforming compiler MUST detect into five classes: unauthorized privilege or scope expansion, unsafe or bypassed sandboxing, injection (template, shell, or subprocess argument), unsafe output and supply-chain routes, and compile-time drift between manifests, mappings, and the rules that reference them. Each class maps to one or more `CTR-*` rules with a stable trigger and compiler action.
 
-### 3.1 Rule Catalog
+## 4. Governance and Responsibilities
 
-| Rule | Required detection and action |
-|---|---|
-| CTR-001 Privilege Escalation | Reject unauthorized generated-job write permissions. |
-| CTR-002 Unpinned Action Integrity | Reject unpinned action references in strict contexts. |
-| CTR-003 Unsafe Tool Scope Expansion | Reject or warn on policy-violating wildcard or overbroad tool scope. |
-| CTR-004 Sandbox Bypass Configuration | Reject generated configuration that disables required sandboxing. |
-| CTR-005 Unsafe Output Route | Reject direct write paths that bypass safe outputs. |
-| CTR-006 Template Injection | Reject user-controlled expressions directly embedded in shell commands. |
-| CTR-007 Markdown Content Security | Detect unsafe external markdown, including obfuscation, scripts, and social engineering. |
-| CTR-008 Pull Request Target Safety | Reject unsafe `pull_request_target` checkout patterns. |
-| CTR-009 Shell Expansion in Safe-Outputs | Reject dangerous shell expansion in safe-output scripts. |
-| CTR-010 Expression Safety Allowlist | Reject unauthorized or multiline GitHub Actions expressions. |
-| CTR-011 Network Firewall Configuration | Reject missing firewall prerequisites and strict-mode wildcard domains. |
-| CTR-012 Safe-Outputs Wildcard Push Scope | Warn for unconstrained wildcard PR-branch pushes. |
-| CTR-013 Argument Injection via Package/Image Names | Reject hyphen-prefixed package and image names before subprocess use. |
-| CTR-014 Supply Chain Attack via Install Scripts | Warn, or reject in strict mode, when Node install scripts are enabled. |
-| CTR-015 Allowed Label Glob Scope | Reject bare `*` safe-output allowed-label patterns. |
-| CTR-016 Compile-Time Manifest Drift | Reject new restricted secrets or action references absent from an existing manifest. |
-| CTR-017 Secret Leakage via Environment Variables | Warn, or reject in strict mode, for uncontrolled secret-expression placement. |
-| CTR-018 Version Integrity Bypass | Warn, or reject in strict mode, for `check-for-updates: false`. |
-| CTR-019 Cache-Memory Integrity Enforcement | Require cache updates only after successful agent and threat-detection jobs. |
-| CTR-020 Conditional Import Security | Reject `imports` entries containing `if`. |
-| CTR-021 Workflow Run Trigger Branch Scope | Warn, or reject in strict mode, for unscoped `workflow_run`; always reject missing `workflows`. |
-| CTR-022 Git Subprocess Argument Injection | Reject unsafe remote ref/path arguments before invoking Git. |
-| CTR-023 Bash Command Allowlist Illusion | Reject explicit bash restrictions for engines that cannot enforce them. |
-| CTR-025 Framework Self-Prompt Misattribution | Strip only a leading framework `<system>` block before analysis. |
-| CTR-026 Generated Job Timeout Expression Injection | Reject non-positive or expression job timeout values. |
+Maintainers own the rule catalog, its implementation mapping, and its test coverage; the daily optimizer (Section 6) reviews new candidate threats and reports coverage gaps. Every rule addition, deprecation, or mapping change MUST be reviewed against this specification in the same pull request that changes the implementation, per the Spec-to-Implementation Sync table in Section 2.
 
-### 3.2 Lifecycle and Deprecation
+## 5. Rule Model and Requirements
+
+Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagnostic, implementation mapping, and test.
+
+### 5.1 Core Rule Catalog
+
+- **CTR-001 Privilege Escalation**: Reject unauthorized generated-job write permissions.
+- **CTR-002 Unpinned Action Integrity**: Reject unpinned action references in strict contexts.
+- **CTR-003 Unsafe Tool Scope Expansion**: Reject or warn on policy-violating wildcard or overbroad tool scope.
+- **CTR-004 Sandbox Bypass Configuration**: Reject generated configuration that disables required sandboxing.
+- **CTR-005 Unsafe Output Route**: Reject direct write paths that bypass safe outputs.
+- **CTR-006 Template Injection**: Reject user-controlled expressions directly embedded in shell commands.
+- **CTR-007 Markdown Content Security**: Detect unsafe external markdown, including obfuscation, scripts, and social engineering.
+- **CTR-008 Pull Request Target Safety**: Reject unsafe `pull_request_target` checkout patterns.
+- **CTR-009 Shell Expansion in Safe-Outputs**: Reject dangerous shell expansion in safe-output scripts.
+- **CTR-010 Expression Safety Allowlist**: Reject unauthorized or multiline GitHub Actions expressions.
+- **CTR-011 Network Firewall Configuration**: Reject missing firewall prerequisites and strict-mode wildcard domains.
+- **CTR-012 Safe-Outputs Wildcard Push Scope**: Warn for unconstrained wildcard PR-branch pushes.
+- **CTR-013 Argument Injection via Package/Image Names**: Reject hyphen-prefixed package and image names before subprocess use.
+- **CTR-014 Supply Chain Attack via Install Scripts**: Warn, or reject in strict mode, when Node install scripts are enabled.
+- **CTR-015 Allowed Label Glob Scope**: Reject bare `*` safe-output allowed-label patterns.
+- **CTR-016 Compile-Time Manifest Drift**: Reject new restricted secrets or action references absent from an existing manifest.
+- **CTR-017 Secret Leakage via Environment Variables**: Warn, or reject in strict mode, for uncontrolled secret-expression placement.
+- **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
+- **CTR-019 Cache-Memory Integrity Enforcement**: Require cache updates only after successful agent and threat-detection jobs.
+- **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
+- **CTR-021 Workflow Run Trigger Branch Scope**: Warn, or reject in strict mode, for unscoped `workflow_run`; always reject missing `workflows`.
+- **CTR-022 Git Subprocess Argument Injection**: Reject unsafe remote ref/path arguments before invoking Git.
+- **CTR-023 Bash Command Allowlist Illusion**: Reject explicit bash restrictions for engines that cannot enforce them.
+- **CTR-025 Framework Self-Prompt Misattribution**: Strip only a leading framework `<system>` block before analysis.
+- **CTR-026 Generated Job Timeout Expression Injection**: Reject non-positive or expression job timeout values.
+
+### 5.2 Compiler Response Requirements
+
+The compiler MUST produce deterministic, actionable diagnostics and either reject insecure generation or apply a safe rewrite for every active rule in Section 5.1.
+
+### 5.3 Candidacy and Lifecycle
 
 When a threat is found, maintainers MUST add its mapping and test if covered, or implement detection, tests, and documentation if not. Experimental threats MUST NOT fail production compilation. Candidates need a trigger, action, stable diagnostic, test, deployment evidence, and security-maintainer review before becoming normative.
 
+### 5.4 Deprecation Policy
+
 Removing a rule dependency MUST deprecate—not delete—the catalog and mapping rows in the same change set. The catalog records the version and reason; mapped tests become `[DEPRECATED]`; the mapping implementation cell is cleared; and the changelog records the retirement. `TestFormal_DeprecationPolicy_SpecArtifactsConform` enforces this policy.
 
-## 4. Daily Optimizer Protocol
+## 6. Daily Optimizer Protocol
 
 The daily optimizer MUST review recent compiler changes, related validation paths, open/recent security findings, and this catalog. For each candidate threat, it MUST determine coverage, update the mapping/tests if covered, or implement, test, and document remediation if uncovered. Its output MUST be either a pull request or an explicit noop report.
 
-### 4.1 Suppressions
+### 6.1 Suppressions
 
 `threat-detection-suppress` entries MUST provide a rule and non-empty reason; `expires` is optional ISO 8601. Active entries MUST retain rule, reason, and expiry in the lock-file manifest. Expired entries do not suppress a rule.
 
-The optimizer SHOULD resolve false positives affecting non-strict rejection controls within 10 business days. It MUST report older suppressions as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days.
+The optimizer SHOULD resolve false positives affecting non-strict rejection controls within 10 business days. It MUST report older suppressions as `SLA_BREACH` with rule, reason, age, owner, and expiry, and MUST create a follow-up action after 20 business days. The mechanically-verified norms for suppression handling are cataloged as `T-CTR-024`–`T-CTR-029` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 False-Positive Handling Norms).
 
-### 4.2 Failure Safeguards
+### 6.2 Failure Safeguards
 
 | Failure | Required behavior |
 |---|---|
@@ -101,53 +113,103 @@ The optimizer SHOULD resolve false positives affecting non-strict rejection cont
 | Rate limit | Apply `RATE_LIMIT_RETRY_CONFIG`; after exhaustion emit `OPTIMIZER_RATE_LIMITED` with endpoint and retry metadata. Count neither completion nor noop; retry next window. |
 | Missed schedule | Emit `OPTIMIZER_MISSED_CRON` with scheduled and detected times and lookback; do not count completion and create a follow-up action. |
 
-## 5. Implementation Mapping
+The mechanically-verified norms for these safeguards are cataloged as `T-CTR-030`–`T-CTR-038`, `T-CTR-040` in `specs/compiler-threat-detection-compliance/README.md` (Section 6.6 Optimizer Failure Safeguards).
+
+## 7. Implementation Mapping
 
 Every active rule MUST map to implementation and test coverage. References are patterns and MUST be verified against concrete paths whenever changed.
 
-| Rule | Implementation | Tests |
-|---|---|---|
-| CTR-001 | `pkg/workflow/*permissions*validation*.go`, `compiler_builtin_job_augmentation.go` | `*permissions*_test.go`, `compiler_custom_jobs_test.go` |
-| CTR-002–003 | `pkg/workflow/*action*.go`, `tools_validation*.go`, strict-mode validation | `*action*_test.go`, `*tools*_test.go` |
-| CTR-004 | sandbox validation, `enclaves.go`, `enclave_github_proxy.go` | sandbox, enclave, and proxy tests |
-| CTR-005 | safe-output compiler/validation; setup safe-output and manifest helpers | safe-output and setup helper tests |
-| CTR-006 | template/heredoc validation, `mcp_renderer_guard.go` | template-injection and MCP tests |
-| CTR-007–008 | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
-| CTR-009–012 | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
-| CTR-013–015 | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
-| CTR-016–019 | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
-| CTR-020 | `pkg/parser/import_bfs.go` | `pkg/parser/import_bfs_test.go` |
-| CTR-021–023 | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
-| CTR-025 | `actions/setup/js/setup_threat_detection.cjs` | `setup_threat_detection.test.cjs` |
-| CTR-026 | custom-job properties and timeout resolution | custom-job and timeout tests |
+### 7.1 Baseline Rule Mapping
 
-### 5.1 Latest Mapping Audit (2026-09-09)
+| Rule ID | Primary Implementation Areas | Test Coverage Targets |
+|---------|------------------------------|-----------------------|
+| CTR-001 Privilege Escalation | `pkg/workflow/*permissions*validation*.go`, `compiler_builtin_job_augmentation.go` | `*permissions*_test.go`, `compiler_custom_jobs_test.go` |
+| CTR-002 Unpinned Action Integrity | `pkg/workflow/*action*.go`, `tools_validation*.go`, strict-mode validation | `*action*_test.go`, `*tools*_test.go` |
+| CTR-003 Unsafe Tool Scope Expansion | `pkg/workflow/*action*.go`, `tools_validation*.go`, strict-mode validation | `*action*_test.go`, `*tools*_test.go` |
+| CTR-004 Sandbox Bypass Configuration | sandbox validation, `enclaves.go`, `enclave_github_proxy.go` | sandbox, enclave, and proxy tests |
+| CTR-005 Unsafe Output Route | safe-output compiler/validation; setup safe-output and manifest helpers | safe-output and setup helper tests |
+| CTR-006 Template Injection | template/heredoc validation, `mcp_renderer_guard.go` | template-injection and MCP tests |
+| CTR-007 Markdown Content Security | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
+| CTR-008 Pull Request Target Safety | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
+| CTR-009 Shell Expansion in Safe-Outputs | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
+| CTR-010 Expression Safety Allowlist | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
+| CTR-011 Network Firewall Configuration | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
+| CTR-012 Safe-Outputs Wildcard Push Scope | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
+| CTR-013 Argument Injection via Package/Image Names | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
+| CTR-014 Supply Chain Attack via Install Scripts | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
+| CTR-015 Allowed Label Glob Scope | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
+| CTR-016 Compile-Time Manifest Drift | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
+| CTR-017 Secret Leakage via Environment Variables | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
+| CTR-018 Version Integrity Bypass | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
+| CTR-019 Cache-Memory Integrity Enforcement | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
+| CTR-020 Conditional Import Security | `pkg/parser/import_bfs.go` | `pkg/parser/import_bfs_test.go` |
+| CTR-021 Workflow Run Trigger Branch Scope | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
+| CTR-022 Git Subprocess Argument Injection | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
+| CTR-023 Bash Command Allowlist Illusion | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
+| CTR-025 Framework Self-Prompt Misattribution | `actions/setup/js/setup_threat_detection.cjs` | `setup_threat_detection.test.cjs` |
+| CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
+
+### 7.2 Mapping Audit (2026-09-09)
 
 CTR-001–026 have implementation and test references with no `TODO` placeholders. The available history began at `bce650c`, with no additional compiler/parser diff in the review window. No critical alert was open. Alert #672 (`go/allocation-size-overflow`) concerns `make(map[string]any, len(tools)+1)` in `pkg/workflow/mcp_setup_generator.go`; its in-process, schema-validated map capacity is not a new compiler threat class. Other reviewed high alerts are outside conformance scope. No live suppression annotation or `SLA_BREACH` was found.
 
 Historical audits through 2026-09-06 confirmed existing coverage or recorded mapping-only updates for CTR-001, CTR-004–007, CTR-009–012, CTR-016–021, CTR-023, and CTR-025; no audit added an uncovered threat class.
 
-## 6. Compliance Testing
+## 8. Compliance Testing
 
 Each active rule MUST have at least one deterministic test that covers its primary trigger and stable diagnostic. Rule additions MUST add tests in the same change set; deprecated-rule tests become `[DEPRECATED]`.
 
+### 8.1 Test ID Catalog
+
+| Test ID | Rule | Detection Trigger | Expected Compiler Action | Stable Diagnostic ID |
+|---------|------|--------------------|---------------------------|----------------------|
+| **T-CTR-001** | CTR-001 Privilege Escalation | Reject unauthorized generated-job write permissions | Reject unauthorized generated-job write permissions. | `CTR-001` |
+| **T-CTR-002** | CTR-002 Unpinned Action Integrity | Reject unpinned action references in strict contexts | Reject unpinned action references in strict contexts. | `CTR-002` |
+| **T-CTR-003** | CTR-003 Unsafe Tool Scope Expansion | Reject or warn on policy-violating wildcard or overbroad tool scope | Reject or warn on policy-violating wildcard or overbroad tool scope. | `CTR-003` |
+| **T-CTR-004** | CTR-004 Sandbox Bypass Configuration | Reject generated configuration that disables required sandboxing | Reject generated configuration that disables required sandboxing. | `CTR-004` |
+| **T-CTR-005** | CTR-005 Unsafe Output Route | Reject direct write paths that bypass safe outputs | Reject direct write paths that bypass safe outputs. | `CTR-005` |
+| **T-CTR-006** | CTR-006 Template Injection | Reject user-controlled expressions directly embedded in shell commands | Reject user-controlled expressions directly embedded in shell commands. | `CTR-006` |
+| **T-CTR-007** | CTR-007 Markdown Content Security | Detect unsafe external markdown, including obfuscation, scripts, and social engineering | Detect unsafe external markdown, including obfuscation, scripts, and social engineering. | `CTR-007` |
+| **T-CTR-008** | CTR-008 Pull Request Target Safety | Reject unsafe `pull_request_target` checkout patterns | Reject unsafe `pull_request_target` checkout patterns. | `CTR-008` |
+| **T-CTR-009** | CTR-009 Shell Expansion in Safe-Outputs | Reject dangerous shell expansion in safe-output scripts | Reject dangerous shell expansion in safe-output scripts. | `CTR-009` |
+| **T-CTR-010** | CTR-010 Expression Safety Allowlist | Reject unauthorized or multiline GitHub Actions expressions | Reject unauthorized or multiline GitHub Actions expressions. | `CTR-010` |
+| **T-CTR-011** | CTR-011 Network Firewall Configuration | Reject missing firewall prerequisites and strict-mode wildcard domains | Reject missing firewall prerequisites and strict-mode wildcard domains. | `CTR-011` |
+| **T-CTR-012** | CTR-012 Safe-Outputs Wildcard Push Scope | Warn for unconstrained wildcard PR-branch pushes | Warn for unconstrained wildcard PR-branch pushes. | `CTR-012` |
+| **T-CTR-013** | CTR-013 Argument Injection via Package/Image Names | Reject hyphen-prefixed package and image names before subprocess use | Reject hyphen-prefixed package and image names before subprocess use. | `CTR-013` |
+| **T-CTR-014** | CTR-014 Supply Chain Attack via Install Scripts | Warn, or reject in strict mode, when Node install scripts are enabled | Warn, or reject in strict mode, when Node install scripts are enabled. | `CTR-014` |
+| **T-CTR-015** | CTR-015 Allowed Label Glob Scope | Reject bare `*` safe-output allowed-label patterns | Reject bare `*` safe-output allowed-label patterns. | `CTR-015` |
+| **T-CTR-016** | CTR-016 Compile-Time Manifest Drift | Reject new restricted secrets or action references absent from an existing manifest | Reject new restricted secrets or action references absent from an existing manifest. | `CTR-016` |
+| **T-CTR-017** | CTR-017 Secret Leakage via Environment Variables | Warn, or reject in strict mode, for uncontrolled secret-expression placement | Warn, or reject in strict mode, for uncontrolled secret-expression placement. | `CTR-017` |
+| **T-CTR-018** | CTR-018 Version Integrity Bypass | Warn, or reject in strict mode, for `check-for-updates: false` | Warn, or reject in strict mode, for `check-for-updates: false`. | `CTR-018` |
+| **T-CTR-019** | CTR-019 Cache-Memory Integrity Enforcement | Require cache updates only after successful agent and threat-detection jobs | Require cache updates only after successful agent and threat-detection jobs. | `CTR-019` |
+| **T-CTR-020** | CTR-020 Conditional Import Security | Reject `imports` entries containing `if` | Reject `imports` entries containing `if`. | `CTR-020` |
+| **T-CTR-021** | CTR-021 Workflow Run Trigger Branch Scope | Warn, or reject in strict mode, for unscoped `workflow_run`; always reject missing `workflows` | Warn, or reject in strict mode, for unscoped `workflow_run`; always reject missing `workflows`. | `CTR-021` |
+| **T-CTR-022** | CTR-022 Git Subprocess Argument Injection | Reject unsafe remote ref/path arguments before invoking Git | Reject unsafe remote ref/path arguments before invoking Git. | `CTR-022` |
+| **T-CTR-023** | CTR-023 Bash Command Allowlist Illusion | Reject explicit bash restrictions for engines that cannot enforce them | Reject explicit bash restrictions for engines that cannot enforce them. | `CTR-023` |
+| **T-CTR-039** | CTR-025 Framework Self-Prompt Misattribution | Strip only a leading framework `<system>` block before analysis | Strip only a leading framework `<system>` block before analysis. | `CTR-025` |
+| **T-CTR-041** | CTR-026 Generated Job Timeout Expression Injection | Reject non-positive or expression job timeout values | Reject non-positive or expression job timeout values. | `CTR-026` |
+
+The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
+
+### 8.2 Optimizer Protocol Test ID Catalog
+
 | Test IDs | Rules |
 |---|---|
-| T-CTR-001–015 | CTR-001–015 |
-| T-CTR-016–023 | CTR-016–023 |
-| T-CTR-039 | CTR-025 |
-| T-CTR-041 | CTR-026 |
-| T-CTR-024–038, T-CTR-040 | Suppression and optimizer protocol requirements in Section 4 |
+| T-CTR-024–038, T-CTR-040 | Suppression and optimizer protocol requirements in Section 6 |
 
-The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output. Optimizer tests cover suppression validation/auditing/SLA/expiration; degraded API, timeout, and rate-limit handling; and missed schedules.
+Optimizer tests cover suppression validation/auditing/SLA/expiration; degraded API, timeout, and rate-limit handling; and missed schedules. The concrete norm-to-test mapping is maintained in `specs/compiler-threat-detection-compliance/README.md` (Section 6.4 and Section 6.6 norm tables) and enforced against `pkg/workflow/compiler_threat_optimizer_protocol_test.go` by `TestFormal_ComplianceReadmeNormTestNamesStaySynced`.
 
-## 7. References
+### 8.3 Deprecated Test ID Retirement
+
+A test ID that is deprecated under Section 5.4 MUST remain listed in Section 8.1, marked `[DEPRECATED]`, but MUST leave the required conformance gate: `requiredTestIDs()` excludes any row marked `[DEPRECATED]`, so a deprecated rule's test is retained for audit history without being required to pass.
+
+## 9. References
 
 - RFC 2119: Key words for use in RFCs to Indicate Requirement Levels
 - GitHub Actions syntax and permissions documentation
 - gh-aw security architecture and safe-output specifications
 
-## 8. Change Log
+## 10. Change Log
 
 | Version | Change |
 |---|---|
