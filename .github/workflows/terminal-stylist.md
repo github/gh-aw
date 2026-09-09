@@ -7,10 +7,11 @@ on:
   schedule: daily
 
 permissions:
+  copilot-requests: write
   contents: read
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 
 timeout-minutes: 10
 
