@@ -84,6 +84,9 @@ type usageActivityGateway struct {
 
 type usageActivityGatewayCall struct {
 	ToolCallID   string  `json:"tool_call_id"`
+	Timestamp    string  `json:"timestamp"`
+	ServerName   string  `json:"server_name"`
+	ToolName     string  `json:"tool_name"`
 	RequestSize  int     `json:"request_size"`
 	ResponseSize int     `json:"response_size"`
 	DurationMS   float64 `json:"duration_ms"`
@@ -303,6 +306,9 @@ func buildUsageActivityToolCalls(gateway *usageActivityGateway) []MCPToolCall {
 	for _, call := range gateway.ToolCalls {
 		calls = append(calls, MCPToolCall{
 			ToolCallID: call.ToolCallID,
+			Timestamp:  call.Timestamp,
+			ServerName: call.ServerName,
+			ToolName:   call.ToolName,
 			InputSize:  call.RequestSize,
 			OutputSize: call.ResponseSize,
 			Duration:   formatActivityDuration(call.DurationMS),
