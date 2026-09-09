@@ -1230,3 +1230,31 @@ func TestCompactLogsDataEpisodesEmptySliceNotNull(t *testing.T) {
 		t.Errorf("expected JSON to contain \"edges\":[], got: %s", jsonStr)
 	}
 }
+
+func TestRenderLogsJSONIncludesMCPToolCalls(t *testing.T) {
+	t.Parallel()
+
+	logsData := buildLogsData([]ProcessedRun{{
+		Run: WorkflowRun{DatabaseID: 12345, WorkflowName: "Test Workflow"},
+		MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{
+			ToolCallID: "call-1",
+			Timestamp:  "2026-09-09T00:00:00Z",
+			ServerName: "github",
+			ToolName:   "issue_read",
+			InputSize:  100,
+			OutputSize: 200,
+			Duration:   "25ms",
+			Status:     "success",
+		}}},
+	}}, t.TempDir(), nil)
+
+	var output bytes.Buffer
+	require.NoError(t, renderLogsJSONToWriter(&output, logsData, false))
+
+	var rendered LogsData
+	require.NoError(t, json.Unmarshal(output.Bytes(), &rendered))
+	require.NotNil(t, rendered.MCPToolUsage)
+	require.Len(t, rendered.MCPToolUsage.ToolCalls, 1)
+	assert.Equal(t, "github", rendered.MCPToolUsage.ToolCalls[0].ServerName)
+	assert.Equal(t, "issue_read", rendered.MCPToolUsage.ToolCalls[0].ToolName)
+}

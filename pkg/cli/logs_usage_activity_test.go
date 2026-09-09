@@ -34,7 +34,7 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 		"gateway":{
 			"total_calls":5,
 			"failed_calls":1,
-			"tool_calls":[{"tool_call_id":"call-1","request_size":100,"response_size":200,"duration_ms":25,"outcome":"success"}]
+			"tool_calls":[{"tool_call_id":"call-1","timestamp":"2026-09-09T00:00:00Z","server_name":"github","tool_name":"issue_read","request_size":100,"response_size":200,"duration_ms":25,"outcome":"success"}]
 		}
 	}`), 0o644), "should write usage activity summary")
 
@@ -51,7 +51,7 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 	require.NotNil(t, summary.Gateway, "gateway section should be present")
 	assert.Equal(t, 5, summary.Gateway.TotalCalls, "gateway total_calls should be parsed from JSON")
 	require.Len(t, summary.Gateway.ToolCalls, 1, "gateway tool_calls should be parsed from JSON")
-	assert.Equal(t, usageActivityGatewayCall{ToolCallID: "call-1", RequestSize: 100, ResponseSize: 200, DurationMS: 25, Outcome: "success"}, summary.Gateway.ToolCalls[0])
+	assert.Equal(t, usageActivityGatewayCall{ToolCallID: "call-1", Timestamp: "2026-09-09T00:00:00Z", ServerName: "github", ToolName: "issue_read", RequestSize: 100, ResponseSize: 200, DurationMS: 25, Outcome: "success"}, summary.Gateway.ToolCalls[0])
 
 	var result DownloadResult
 	applyUsageActivitySummaryToResult(summary, &result, true)
@@ -59,6 +59,9 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 	require.Len(t, result.MCPToolUsage.ToolCalls, 1, "loaded gateway summary should populate MCP call records")
 	assert.Equal(t, MCPToolCall{
 		ToolCallID: "call-1",
+		Timestamp:  "2026-09-09T00:00:00Z",
+		ServerName: "github",
+		ToolName:   "issue_read",
 		InputSize:  100,
 		OutputSize: 200,
 		Duration:   "25ms",
@@ -98,7 +101,7 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 				{ServerName: "github", ToolName: "issue_read", CallCount: 5, FailedCalls: 2, TotalInputSize: 100, TotalOutputSize: 200, MaxInputSize: 70, MaxOutputSize: 140, AvgDurationMS: 12, MaxDurationMS: 30},
 			},
 			ToolCalls: []usageActivityGatewayCall{
-				{ToolCallID: "call-1", RequestSize: 100, ResponseSize: 200, DurationMS: 25, Outcome: "success"},
+				{ToolCallID: "call-1", Timestamp: "2026-09-09T00:00:00Z", ServerName: "github", ToolName: "issue_read", RequestSize: 100, ResponseSize: 200, DurationMS: 25, Outcome: "success"},
 			},
 		},
 		Integrity: &IntegrityFilterSummary{
@@ -122,6 +125,9 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 	require.NotNil(t, result.MCPToolUsage, "gateway summary should be backfilled")
 	require.Len(t, result.MCPToolUsage.ToolCalls, 1, "usage-summary backfill should include tool call rows")
 	assert.Equal(t, "call-1", result.MCPToolUsage.ToolCalls[0].ToolCallID, "opaque tool call ID should be preserved")
+	assert.Equal(t, "2026-09-09T00:00:00Z", result.MCPToolUsage.ToolCalls[0].Timestamp, "call timestamp should be preserved")
+	assert.Equal(t, "github", result.MCPToolUsage.ToolCalls[0].ServerName, "server name should be preserved")
+	assert.Equal(t, "issue_read", result.MCPToolUsage.ToolCalls[0].ToolName, "tool name should be preserved")
 	assert.Equal(t, 100, result.MCPToolUsage.ToolCalls[0].InputSize, "request size should be mapped to input size")
 	assert.Equal(t, 200, result.MCPToolUsage.ToolCalls[0].OutputSize, "response size should be mapped to output size")
 	assert.Equal(t, "25ms", result.MCPToolUsage.ToolCalls[0].Duration, "duration should be formatted")

@@ -220,6 +220,9 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "tool_calls": [
       {
         "tool_call_id": "call-1",
+        "timestamp": "2026-09-09T00:00:00Z",
+        "server_name": "github",
+        "tool_name": "issue_read",
         "request_size": 200,
         "response_size": 800,
         "duration_ms": 100,
