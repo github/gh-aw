@@ -38,6 +38,10 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
+	cachedRuns, err := loadCachedLogsJSON(opts.CachedJSON)
+	if err != nil {
+		return err
+	}
 
 	if err := ensureLogsGitignore(); err != nil {
 		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)
@@ -177,8 +181,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 
 	// Download artifacts for all runs concurrently.
 	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
-	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit})
-
 	filters := runFilterOpts{
 		engine:            opts.Engine,
 		runtime:           opts.Runtime,
@@ -188,12 +190,18 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		safeOutputType:    opts.SafeOutputType,
 		filteredIntegrity: opts.FilteredIntegrity,
 		evalsOnly:         opts.EvalsOnly,
+		gradersOnly:       opts.GradersOnly,
 	}
+	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit, cachedRuns: cachedRuns, filters: filters})
 
 	// Process download results applying the same filters as DownloadWorkflowLogs.
 	var processedRuns []ProcessedRun
 	var storageLimitReached bool
 	for _, result := range downloadResults {
+		if result.CachedRun != nil {
+			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
+			continue
+		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
 			storageLimitReached = true
 		}
