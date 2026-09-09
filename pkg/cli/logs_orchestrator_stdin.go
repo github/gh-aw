@@ -61,6 +61,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	}
 
 	if len(opts.RunURLs) == 0 {
+		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
+		logsData.Message = "No runs found. No run IDs or URLs were provided on stdin."
+		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
+			return err
+		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
 		return nil
 	}

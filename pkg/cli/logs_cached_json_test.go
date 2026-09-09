@@ -73,6 +73,24 @@ func TestWriteCachedLogsJSONUpdatesFileInPlace(t *testing.T) {
 	assert.Nil(t, result.Runs[0].TokenUsageSummary, "cached output should match the compact JSON response")
 }
 
+func TestDownloadWorkflowLogsFromEmptyStdinUpdatesCachedJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[{"run_id":1}]}`), 0o600))
+
+	err := DownloadWorkflowLogsFromStdin(context.Background(), StdinLogsOptions{
+		OutputDir:  t.TempDir(),
+		CachedJSON: path,
+	})
+	require.NoError(t, err)
+
+	updated, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var result LogsData
+	require.NoError(t, json.Unmarshal(updated, &result))
+	assert.Empty(t, result.Runs)
+	assert.Equal(t, "No runs found. No run IDs or URLs were provided on stdin.", result.Message)
+}
+
 func TestPrepareLogsDataUpdatesCachedJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[]}`), 0o600))
