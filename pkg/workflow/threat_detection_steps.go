@@ -4,6 +4,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"path/filepath"
 	"strconv"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -14,7 +15,7 @@ import (
 // These steps run after the agent job completes and analyze agent output for threats using the
 // same agentic engine with sandbox.agent and fully blocked network.
 // The detection job downloads the agent artifact to access the output files.
-func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
+func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolint:largefunc // Existing detection job step assembly is kept in generated order.
 	threatLog.Print("Building threat detection steps for detection job")
 	if data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil {
 		return nil
@@ -218,16 +219,16 @@ func (c *Compiler) buildCleanFirewallDirsStep() []string {
 // YAML `with:` blocks (e.g. actions/upload-artifact's `path:` list), which are not
 // executed in a shell and cannot expand ${RUNNER_TEMP}.
 func detectionFirewallLogsDir(data *WorkflowData) string {
-	return resolvedThreatDetectionDir(data) + "/sandbox/firewall"
+	return filepath.Join(resolvedThreatDetectionDir(data), "sandbox/firewall")
 }
 
 // detectionFirewallLogsDirExpr is the YAML with:-block counterpart of
 // detectionFirewallLogsDir (see rewriteArcDindPathExpr).
 func detectionFirewallLogsDirExpr(data *WorkflowData) string {
 	if isArcDindTopology(data) {
-		return rewriteArcDindPathExpr(constants.ThreatDetectionDir) + "/sandbox/firewall"
+		return filepath.Join(rewriteArcDindPathExpr(constants.ThreatDetectionDir), "sandbox/firewall")
 	}
-	return constants.ThreatDetectionDir + "/sandbox/firewall"
+	return filepath.Join(constants.ThreatDetectionDir, "sandbox/firewall")
 }
 
 // buildCopyDetectionFirewallLogsStep creates a step that copies the detection AWF run's
@@ -549,8 +550,8 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 	}
 	if isFirewallEnabled(data) {
 		steps = append(steps,
-			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",
-			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",  //nolint:manualpathconcat // YAML artifact path list entry, not a filesystem join.
+			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n", //nolint:manualpathconcat // YAML artifact path list entry, not a filesystem join.
 		)
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
@@ -623,7 +624,7 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	// paired buildCopyThreatDetectBinaryStep then stages the installed binary to
 	// the daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory so it is resolvable
 	// inside the AWF chroot.
-	installCmd := fmt.Sprintf("bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s", version)
+	installCmd := "bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" " + version
 	if isArcDindTopology(data) {
 		installCmd += " --rootless"
 	}

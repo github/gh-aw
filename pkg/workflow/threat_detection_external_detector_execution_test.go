@@ -123,6 +123,21 @@ func TestBuildExternalDetectorPathSetup(t *testing.T) {
 			wantHostSetup:     false,
 			wantCommandPrefix: false,
 		},
+		{
+			name: "non-copilot engine on arc-dind still prepends PATH for staged threat-detect",
+			data: &WorkflowData{
+				AI: "claude",
+				RunnerConfig: &RunnerConfig{
+					Topology: RunnerTopologyArcDind,
+				},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			},
+			engineID:          "claude",
+			wantHostSetup:     false,
+			wantCommandPrefix: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -287,6 +302,142 @@ func TestBuildExternalDetectorExecutionStepPropagatesRunnerTopology(t *testing.T
 		}
 		if strings.Contains(allSteps, `\"proxyLogsDir\":\"${RUNNER_TEMP}/gh-aw/sandbox/firewall/logs\"`) {
 			t.Errorf("did not expect non-arc-dind external detector execution to rewrite proxyLogsDir under ${RUNNER_TEMP}/gh-aw;\ngot:\n%s", allSteps)
+		}
+	})
+}
+
+// TestBuildExternalDetectorExecutionStepArcDindThreatDetectionRWMount verifies that on
+// ARC/DinD the read-write mount granted for detection_result.json targets the same
+// daemon-visible ${RUNNER_TEMP}/gh-aw/threat-detection path that the (auto-rewritten)
+// threat-detect command actually writes to, closing the gap described in
+// github/gh-aw#59487 where the mount and the command disagreed on the destination path.
+func TestBuildExternalDetectorExecutionStepArcDindThreatDetectionRWMount(t *testing.T) {
+	compiler := NewCompiler()
+
+	t.Run("arc-dind mounts the daemon-visible threat-detection directory", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			RunnerConfig: &RunnerConfig{
+				Topology: RunnerTopologyArcDind,
+			},
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		allSteps := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
+
+		if !strings.Contains(allSteps, `--mount '${RUNNER_TEMP}/gh-aw/threat-detection:${RUNNER_TEMP}/gh-aw/threat-detection:rw'`) {
+			t.Errorf("expected arc-dind execution step to mount the daemon-visible threat-detection dir read-write;\ngot:\n%s", allSteps)
+		}
+		if !strings.Contains(allSteps, "--output ${RUNNER_TEMP}/gh-aw/threat-detection/detection_result.json") {
+			t.Errorf("expected arc-dind threat-detect invocation to write results under the same daemon-visible path;\ngot:\n%s", allSteps)
+		}
+		if strings.Contains(allSteps, "--mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw") {
+			t.Errorf("did not expect arc-dind execution step to mount the non-daemon-visible /tmp/gh-aw/threat-detection path;\ngot:\n%s", allSteps)
+		}
+	})
+
+	t.Run("non-arc-dind mounts the standard /tmp/gh-aw/threat-detection directory", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		allSteps := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
+
+		if !strings.Contains(allSteps, "--mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw") {
+			t.Errorf("expected non-arc-dind execution step to mount /tmp/gh-aw/threat-detection read-write;\ngot:\n%s", allSteps)
+		}
+	})
+}
+
+// TestBuildCopyThreatDetectBinaryStep verifies that the threat-detect binary is staged
+// into the daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory only on ARC/DinD, mirroring
+// the existing Copilot CLI staging step. Without this staging step, threat-detect is
+// installed on the runner host but is not resolvable inside the AWF chroot on ARC/DinD,
+// which is the exact "command not found" (exit 127) failure reported in github/gh-aw#59487.
+func TestBuildCopyThreatDetectBinaryStep(t *testing.T) {
+	compiler := NewCompiler()
+
+	t.Run("arc-dind stages the installed binary", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			RunnerConfig: &RunnerConfig{
+				Topology: RunnerTopologyArcDind,
+			},
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		steps := compiler.buildCopyThreatDetectBinaryStep(data)
+		allSteps := strings.Join(steps, "")
+
+		if len(steps) == 0 {
+			t.Fatal("expected arc-dind to emit a staging step for threat-detect")
+		}
+		if !strings.Contains(allSteps, `mkdir -p "${RUNNER_TEMP}/gh-aw/bin"`) {
+			t.Errorf("expected staging step to create ${RUNNER_TEMP}/gh-aw/bin;\ngot:\n%s", allSteps)
+		}
+		if !strings.Contains(allSteps, `cp "$THREAT_DETECT_SRC" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"`) {
+			t.Errorf("expected staging step to copy threat-detect into ${RUNNER_TEMP}/gh-aw/bin;\ngot:\n%s", allSteps)
+		}
+		if !strings.Contains(allSteps, "exit 127") {
+			t.Errorf("expected staging step to fail explicitly if the source binary is missing;\ngot:\n%s", allSteps)
+		}
+	})
+
+	t.Run("non-arc-dind emits no staging step", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		if steps := compiler.buildCopyThreatDetectBinaryStep(data); len(steps) != 0 {
+			t.Errorf("expected non-arc-dind to emit no threat-detect staging step, got:\n%s", strings.Join(steps, ""))
+		}
+	})
+}
+
+// TestBuildInstallThreatDetectStepArcDindUsesRootless verifies that the threat-detect
+// installer is invoked with --rootless on ARC/DinD, matching the detection job's
+// rootless AWF/Copilot installation policy (allowPrivilegeEscalation: false forbids sudo).
+func TestBuildInstallThreatDetectStepArcDindUsesRootless(t *testing.T) {
+	compiler := NewCompiler()
+
+	t.Run("arc-dind passes --rootless", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			RunnerConfig: &RunnerConfig{
+				Topology: RunnerTopologyArcDind,
+			},
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		allSteps := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
+		if !strings.Contains(allSteps, "install_threat_detect_binary.sh") || !strings.Contains(allSteps, "--rootless") {
+			t.Errorf("expected arc-dind install step to pass --rootless;\ngot:\n%s", allSteps)
+		}
+	})
+
+	t.Run("non-arc-dind omits --rootless", func(t *testing.T) {
+		data := &WorkflowData{
+			AI: "claude",
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		allSteps := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
+		if strings.Contains(allSteps, "--rootless") {
+			t.Errorf("did not expect non-arc-dind install step to pass --rootless;\ngot:\n%s", allSteps)
 		}
 	})
 }

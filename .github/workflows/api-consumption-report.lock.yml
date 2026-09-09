@@ -1788,7 +1788,7 @@ jobs:
       - name: Prepare threat detection files
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"
+          bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh" "/tmp/gh-aw" "/tmp/gh-aw/threat-detection"
       - name: Setup threat detection
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1963,7 +1963,7 @@ jobs:
           DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}
           GH_AW_DETECTION_CONTINUE_ON_ERROR: "true"
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
+          bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" "/tmp/gh-aw/threat-detection/detection_result.json"
 
   evals:
     needs:

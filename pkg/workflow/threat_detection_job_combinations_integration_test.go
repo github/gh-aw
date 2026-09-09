@@ -367,6 +367,73 @@ Test workflow.
 	}
 }
 
+// TestArcDindExternalThreatDetectionStagesBinaryAndAgreesOnPaths is the integration
+// regression test for github/gh-aw#59487: on runner.topology: arc-dind with the
+// gh-aw-detection feature flag, the compiled detection job must stage the threat-detect
+// binary into the daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory (so it resolves
+// inside the AWF chroot) and every step that touches the detection working directory
+// (RW mount, execution command, firewall log copy, artifact upload, conclusion) must
+// agree on the same daemon-visible ${RUNNER_TEMP}/gh-aw/threat-detection path.
+func TestArcDindExternalThreatDetectionStagesBinaryAndAgreesOnPaths(t *testing.T) {
+	frontmatter := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: claude
+runner:
+  topology: arc-dind
+safe-outputs:
+  threat-detection:
+    engine: claude
+features:
+  gh-aw-detection: true
+---
+Test workflow.
+`
+
+	tmpDir := testutil.TempDir(t, "threat-detection-arc-dind-*")
+	mdPath := filepath.Join(tmpDir, "test.md")
+	lockPath := stringutil.MarkdownToLockFile(mdPath)
+
+	require.NoError(t, os.WriteFile(mdPath, []byte(frontmatter), 0o644))
+
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(mdPath), "CompileWorkflow must succeed")
+
+	rawBytes, err := os.ReadFile(lockPath)
+	require.NoError(t, err, "lock file must be readable")
+	yaml := string(rawBytes)
+
+	detectionSection := extractJobSection(yaml, string(constants.DetectionJobName))
+	require.NotEmpty(t, detectionSection, "detection job section must be present")
+
+	assert.Contains(t, detectionSection, "install_threat_detect_binary.sh",
+		"detection job must install the threat-detect binary")
+	assert.Contains(t, detectionSection, "--rootless",
+		"threat-detect installation on arc-dind must use --rootless, matching AWF/Copilot install policy")
+	assert.Contains(t, detectionSection, "Copy threat-detect binary to daemon-visible path",
+		"detection job must stage threat-detect into ${RUNNER_TEMP}/gh-aw/bin on arc-dind")
+	assert.Contains(t, detectionSection, `cp "$THREAT_DETECT_SRC" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"`,
+		"staging step must copy the installed binary into the daemon-visible bin directory")
+
+	// The RW mount, the threat-detect command's --output path, the firewall log copy
+	// destination, the uploaded artifact path, and the conclusion step's result path
+	// must all agree on the same daemon-visible directory.
+	assert.Contains(t, detectionSection, `--mount '${RUNNER_TEMP}/gh-aw/threat-detection:${RUNNER_TEMP}/gh-aw/threat-detection:rw'`,
+		"RW mount must target the daemon-visible threat-detection directory")
+	assert.Contains(t, detectionSection, "--output ${RUNNER_TEMP}/gh-aw/threat-detection/detection_result.json",
+		"threat-detect command must write results under the daemon-visible directory")
+	assert.Contains(t, detectionSection, "${{ runner.temp }}/gh-aw/threat-detection/detection_result.json",
+		"uploaded detection artifact must reference the daemon-visible result path")
+	assert.Contains(t, detectionSection, `bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" "${RUNNER_TEMP}/gh-aw/threat-detection/detection_result.json"`,
+		"conclusion step must read the result from the same daemon-visible path")
+	assert.Contains(t, detectionSection, `bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh" "/tmp/gh-aw" "${RUNNER_TEMP}/gh-aw/threat-detection"`,
+		"prepare step must stage files into the same daemon-visible destination")
+
+	assert.NotContains(t, detectionSection, "--mount /tmp/gh-aw/threat-detection:/tmp/gh-aw/threat-detection:rw",
+		"detection job must not mount the non-daemon-visible /tmp/gh-aw/threat-detection path read-write on arc-dind")
+}
+
 // TestWorkflowFilesCompile compiles each cli/workflows fixture that exercises
 // threat detection variants and verifies no compilation error occurs.
 // This ensures the .md files in pkg/cli/workflows/ are kept in sync with the compiler.

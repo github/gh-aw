@@ -357,6 +357,16 @@ safe-outputs:
       id: copilot
 ```
 
+## ARC/DinD Runner Support
+
+On `runner.topology: arc-dind` (see [ARC + Copilot Agent](/gh-aw/reference/arc-dind-copilot-agent/)), the external `threat-detect` binary is invoked *inside* the AWF sandbox rather than on the runner host. Because the DinD chroot's filesystem does not include the runner host's `/usr/local/bin` or `~/.local/bin`, the compiler automatically:
+
+- Installs `threat-detect` with `--rootless` (matching the sandbox's non-privileged install policy).
+- Copies the installed binary into `${RUNNER_TEMP}/gh-aw/bin`, the same daemon-visible directory used to stage the Copilot CLI, and prepends it to `PATH` inside the sandbox.
+- Rewrites the threat-detection working directory (mounts, result file, firewall log copies, uploaded artifact, and conclusion step) from `/tmp/gh-aw/threat-detection` to `${RUNNER_TEMP}/gh-aw/threat-detection` so every step agrees on the same daemon-visible path.
+
+No additional configuration is required — these adjustments are applied automatically whenever `runner.topology: arc-dind` is set alongside threat detection.
+
 ## Error Handling
 
 **When Threats Are Detected:**
@@ -444,6 +454,7 @@ The protection list is composed of four sources:
 | **Custom steps not running** | Verify YAML indentation, ensure steps array is properly formatted, review compilation output, check if AI detection failed first |
 | **Large patches cause timeouts** | Increase `jobs.detection.timeout-minutes` (10 minutes by default, or `vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES`), configure `max-patch-size`, truncate content before analysis, or split changes into smaller PRs |
 | **False positives** | Refine prompt with specific exclusions, adjust tool thresholds, add workflow context explaining patterns, review detection logs |
+| **`threat-detect: command not found` (exit 127) on ARC/DinD** | Ensure the workflow was compiled with a current version of gh-aw; on `runner.topology: arc-dind` the binary is automatically staged to `${RUNNER_TEMP}/gh-aw/bin` and added to `PATH` inside the sandbox. If this error persists, recompile the workflow (`gh aw compile`) to pick up the staging step. |
 
 ## Learn More
 

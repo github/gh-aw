@@ -659,8 +659,8 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	// risk that keeps detection.log off this artifact.
 	if isFirewallEnabled(data) {
 		steps = append(steps,
-			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",
-			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",  //nolint:manualpathconcat // YAML artifact path list entry, not a filesystem join.
+			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n", //nolint:manualpathconcat // YAML artifact path list entry, not a filesystem join.
 		)
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
