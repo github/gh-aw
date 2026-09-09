@@ -215,6 +215,22 @@ safe-outputs:
           ./security-scan.sh
 ```
 
+### Workflows Using a Custom Engine
+
+Threat detection only runs on the built-in engines. When a workflow uses a custom engine, detection runs on `copilot` by default (so it needs Copilot credentials) and the compiler emits a warning. Set `safe-outputs.threat-detection.engine` to another built-in engine, or to `false` to skip AI analysis.
+
+Custom engine definitions can ship their own default with the `detection-engine` key (`copilot`, `claude`, or `codex`), which removes the warning for every workflow using that engine:
+
+```yaml wrap
+engine:
+  id: my-engine
+  detection-engine: claude
+  behaviors:
+    # ...
+```
+
+An explicit `safe-outputs.threat-detection.engine` in a workflow always wins over `detection-engine`.
+
 ## Custom Detection Steps
 
 Add specialized security scanning tools alongside or instead of AI detection. You can run steps **before** the AI engine (for setup, gateway connections, etc.) and steps **after** (for additional scanning based on AI results).

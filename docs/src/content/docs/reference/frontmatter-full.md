@@ -3011,6 +3011,12 @@ engine:
   # (optional)
   runtime-id: "example-value"
 
+  # Built-in engine used to run threat detection for workflows using this engine.
+  # Required for custom engines because the threat detection analyzer only supports
+  # built-in engines; defaults to 'copilot' when omitted.
+  # (optional)
+  detection-engine: "copilot"
+
   # Optional engine-specific secret bindings for behavior-defined engines.
   # (optional)
   auth: []
@@ -20857,6 +20863,12 @@ safe-outputs:
       # engine registry. Defaults to id when omitted.
       # (optional)
       runtime-id: "example-value"
+
+      # Built-in engine used to run threat detection for workflows using this engine.
+      # Required for custom engines because the threat detection analyzer only supports
+      # built-in engines; defaults to 'copilot' when omitted.
+      # (optional)
+      detection-engine: "copilot"
 
       # Optional engine-specific secret bindings for behavior-defined engines.
       # (optional)
