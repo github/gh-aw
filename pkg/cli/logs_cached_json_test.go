@@ -40,11 +40,21 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	require.ErrorContains(t, err, "missing runs array")
 }
 
+func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[{"run_id":42,"run_attempt":"bogus"}]}`), 0o600))
+
+	_, err := loadCachedLogsJSON(path)
+
+	require.ErrorContains(t, err, "invalid run_attempt")
+}
+
 func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
+	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
 	runs := cachedLogsRuns{
-		42: {RunID: 42, Repository: "github/gh-aw", EngineID: "copilot", Status: "completed", Conclusion: "success", RunAttempt: "1"},
+		42: {RunID: 42, Repository: "github/gh-aw", EngineID: "copilot", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt},
 	}
-	run := WorkflowRun{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1}
+	run := WorkflowRun{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt}
 
 	_, ok := runs.lookup(run, runFilterOpts{engine: "copilot"})
 	assert.True(t, ok)
@@ -52,7 +62,7 @@ func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
 	assert.False(t, ok)
 	_, ok = runs.lookup(run, runFilterOpts{runtime: "gvisor"})
 	assert.False(t, ok)
-	_, ok = runs.lookup(WorkflowRun{DatabaseID: 42, Repository: "other/repo"}, runFilterOpts{})
+	_, ok = runs.lookup(WorkflowRun{DatabaseID: 42, Repository: "other/repo", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt}, runFilterOpts{})
 	assert.False(t, ok)
 }
 
@@ -80,6 +90,24 @@ func TestCachedLogsLookupRejectsChangedRun(t *testing.T) {
 	}
 }
 
+func TestCachedLogsLookupRejectsUnknownIdentity(t *testing.T) {
+	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+	runs := cachedLogsRuns{
+		42: {RunID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt},
+		43: {RunID: 43, Status: "completed", Conclusion: "success", UpdatedAt: updatedAt},
+	}
+
+	tests := []WorkflowRun{
+		{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", UpdatedAt: updatedAt},
+		{DatabaseID: 42, Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt},
+		{DatabaseID: 43, Status: "completed", Conclusion: "success", UpdatedAt: updatedAt},
+	}
+	for _, run := range tests {
+		_, ok := runs.lookup(run, runFilterOpts{})
+		assert.False(t, ok)
+	}
+}
+
 func TestCachedJSONCanSatisfy(t *testing.T) {
 	usageFilter := []string{constants.UsageArtifactName.String()}
 	assert.True(t, cachedJSONCanSatisfy(usageFilter, false, false, false, false))
@@ -94,12 +122,15 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 	cached := RunData{
 		RunID:        42,
 		WorkflowName: "cached-workflow",
+		Repository:   "github/gh-aw",
 		Status:       "completed",
 		Conclusion:   "success",
+		RunAttempt:   "1",
+		UpdatedAt:    time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
 		LogsPath:     "/previous/run-42",
 	}
 
-	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42, Status: "completed", Conclusion: "success"}}, runArtifactsConcurrentOptions{
+	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: cached.UpdatedAt}}, runArtifactsConcurrentOptions{
 		outputDir:    t.TempDir(),
 		maxRuns:      1,
 		cachedRuns:   cachedLogsRuns{42: cached},
@@ -114,31 +145,47 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 
 func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 	cached := RunData{
-		RunID:              42,
-		WorkflowName:       "cached-workflow",
-		Status:             "completed",
-		Conclusion:         "success",
-		Duration:           "2m0s",
-		TokenUsage:         1200,
-		Turns:              4,
-		ErrorCount:         1,
-		WarningCount:       2,
-		GitHubAPICalls:     3,
-		EngineID:           "copilot",
-		CreatedAt:          time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
-		LogsPath:           "/previous/run-42",
-		Classification:     "normal",
-		IntentionalFailure: true,
+		RunID:                      42,
+		WorkflowName:               "cached-workflow",
+		Status:                     "completed",
+		Conclusion:                 "success",
+		Duration:                   "2m0s",
+		TokenUsageSummary:          &TokenUsageSummary{TotalSteeringEvents: 2},
+		TokenUsage:                 1200,
+		Turns:                      4,
+		ErrorCount:                 1,
+		WarningCount:               2,
+		GitHubAPICalls:             3,
+		TemporaryIDMappings:        4,
+		ChainedTargetCount:         1,
+		ChainedFollowupActionCount: 2,
+		DelegatedTempTargetCount:   1,
+		TemporaryIDMapStatus:       temporaryIDMapStatusMissing,
+		EngineID:                   "copilot",
+		CreatedAt:                  time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
+		LogsPath:                   "/previous/run-42",
+		Classification:             "normal",
+		IntentionalFailure:         true,
 	}
 
-	data := buildLogsData([]ProcessedRun{processedRunFromCachedData(cached)}, t.TempDir(), nil)
+	processedRun := processedRunFromCachedData(cached)
+	assert.Empty(t, processedRun.Run.LogsPath)
+
+	data := buildLogsData([]ProcessedRun{processedRun}, t.TempDir(), nil)
 
 	require.Equal(t, []RunData{cached}, data.Runs)
 	assert.Equal(t, 1, data.Summary.TotalRuns)
 	assert.Equal(t, "2.0m", data.Summary.TotalDuration)
+	assert.Equal(t, 2, data.Summary.TotalSteeringEvents)
 	assert.Equal(t, 1200, data.Summary.TotalTokens)
 	assert.Equal(t, 4, data.Summary.TotalTurns)
 	assert.Equal(t, 3, data.Summary.TotalGitHubAPICalls)
+	assert.Equal(t, 1, data.Summary.RunsWithTemporaryIDChains)
+	assert.Equal(t, 1, data.Summary.RunsWithDelegatedTempTargets)
+	assert.Equal(t, 1, data.Summary.RunsWithMissingTemporaryIDMap)
+	assert.Equal(t, 4, data.Summary.TotalTemporaryIDMappings)
+	assert.Equal(t, 1, data.Summary.TotalChainedTargets)
+	assert.Equal(t, 2, data.Summary.TotalChainedFollowupActions)
 	assert.Equal(t, map[string]int{"copilot": 1}, data.Summary.EngineCounts)
 	assert.Equal(t, 1, data.Summary.IntentionalFailureRuns)
 }

@@ -28,6 +28,9 @@ func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
 	}
 	runs := make(cachedLogsRuns, len(logsData.Runs))
 	for _, run := range logsData.Runs {
+		if err := normalizeCachedLogRun(&run); err != nil {
+			return nil, err
+		}
 		if run.RunID != 0 {
 			runs[run.RunID] = run
 		}
@@ -44,16 +47,13 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 	if cached.Status != "completed" || run.Status != "completed" || cached.Conclusion != run.Conclusion {
 		return RunData{}, false
 	}
-	if cached.RunAttempt != "" && run.Attempt > 0 && cached.RunAttempt != strconv.Itoa(run.Attempt) {
+	if cached.RunAttempt == "" || run.Attempt <= 0 || cached.RunAttempt != strconv.Itoa(run.Attempt) {
 		return RunData{}, false
 	}
-	if cached.RunAttempt == "" && run.Attempt > 1 {
+	if cached.UpdatedAt.IsZero() || run.UpdatedAt.IsZero() || !cached.UpdatedAt.Equal(run.UpdatedAt) {
 		return RunData{}, false
 	}
-	if !cached.UpdatedAt.IsZero() && !run.UpdatedAt.IsZero() && !cached.UpdatedAt.Equal(run.UpdatedAt) {
-		return RunData{}, false
-	}
-	if cached.Repository != "" && run.Repository != "" && !strings.EqualFold(cached.Repository, run.Repository) {
+	if cached.Repository == "" || run.Repository == "" || !strings.EqualFold(cached.Repository, run.Repository) {
 		return RunData{}, false
 	}
 	if filters.engine != "" &&
@@ -69,6 +69,18 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 		return RunData{}, false
 	}
 	return cached, true
+}
+
+func normalizeCachedLogRun(run *RunData) error {
+	if run.RunAttempt == "" {
+		return nil
+	}
+	attempt, err := strconv.Atoi(run.RunAttempt)
+	if err != nil || attempt <= 0 {
+		return fmt.Errorf("failed to parse cached logs JSON: invalid run_attempt for run %d", run.RunID)
+	}
+	run.RunAttempt = strconv.Itoa(attempt)
+	return nil
 }
 
 func cachedJSONCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
@@ -103,7 +115,6 @@ func processedRunFromCachedData(data RunData) ProcessedRun {
 			MissingToolCount: data.MissingToolCount,
 			MissingDataCount: data.MissingDataCount,
 			SafeItemsCount:   data.SafeItemsCount,
-			LogsPath:         data.LogsPath,
 		},
 		AwContext:           data.AwContext,
 		TaskDomain:          data.TaskDomain,

@@ -29,7 +29,8 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 "conclusion": "success",
 "createdAt": "2026-01-01T00:00:00Z",
 "startedAt": "2026-01-01T00:00:01Z",
-"updatedAt": "2026-01-01T00:01:00Z"
+"updatedAt": "2026-01-01T00:01:00Z",
+"attempt": 2
 }
 ]`
 
@@ -40,6 +41,48 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 	assert.Equal(t, int64(42), runs[0].DatabaseID, "DatabaseID should be populated")
 	assert.Equal(t, "My Workflow", runs[0].WorkflowName, "WorkflowName should be populated")
 	assert.Empty(t, runs[0].WorkflowPath, "WorkflowPath should be empty when 'path' field is absent")
+	assert.Equal(t, 2, runs[0].Attempt, "Attempt should be populated")
+}
+
+func TestApplyWorkflowRunListRepository(t *testing.T) {
+	runs := []WorkflowRun{
+		{DatabaseID: 1, Repository: ""},
+		{DatabaseID: 2, Repository: "cached/repo"},
+	}
+
+	applyWorkflowRunListRepository(runs, "github.com/github/gh-aw")
+
+	assert.Equal(t, "github/gh-aw", runs[0].Repository)
+	assert.Equal(t, "cached/repo", runs[1].Repository)
+}
+
+func TestListWorkflowRunsPopulatesCacheIdentity(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGHScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
+		"cat <<'EOF'\n" +
+		`[{"databaseId":42,"workflowName":"Daily report","status":"completed","conclusion":"success","updatedAt":"2026-01-01T00:01:00Z","attempt":3}]` + "\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	runs, _, err := listWorkflowRunsWithPagination(ListWorkflowRunsOptions{
+		Context:      context.Background(),
+		WorkflowName: "daily-report",
+		Limit:        1,
+		RepoOverride: "github/gh-aw",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, 3, runs[0].Attempt)
+	assert.Equal(t, "github/gh-aw", runs[0].Repository)
+	argsLog, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(argsLog), "displayTitle,attempt")
+	assert.Contains(t, string(argsLog), "--repo github/gh-aw")
 }
 
 func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
