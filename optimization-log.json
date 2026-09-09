@@ -225,5 +225,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 18
+  },
+  {
+    "date": "2026-09-09",
+    "workflow_name": "CI Optimization Coach",
+    "workflow_file": "ci-coach",
+    "total_aic_analyzed": 322.78,
+    "runs_audited": 1,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 30
   }
 ]
