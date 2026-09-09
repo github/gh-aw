@@ -11,11 +11,11 @@ permissions:
   pull-requests: read
   issues: read
   copilot-requests: write
-model: openai/gpt-5.4
+model: copilot/gpt-5.4
 strict: false
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 network: 
    allowed: [defaults, node, go, "api.github.com", containers]
 imports:
