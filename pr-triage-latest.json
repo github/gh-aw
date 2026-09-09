@@ -1,117 +1,48 @@
 {
-  "run_date": "2026-09-09T06:39:51Z",
-  "run_id": "34319834014",
-  "prior_run_id": "34297064125",
+  "run_date": "2026-09-09T12:35:47Z",
+  "run_id": "34351612394",
+  "prior_run_id": "34319834014",
   "summary": {
-    "eligible_total": 4,
-    "cooldown_skipped": 0,
+    "eligible_total": 1,
+    "cooldown_skipped": 3,
     "category_counts": {
-      "bug": 3,
-      "refactor": 1
+      "bug": 1
     },
     "risk_counts": {
-      "high": 2,
-      "medium": 2
+      "high": 1
     },
     "priority_counts": {
-      "high": 1,
-      "medium": 3
+      "medium": 1
     },
     "action_counts": {
-      "fast_track": 1,
-      "batch_review": 3,
+      "batch_review": 1,
       "auto_merge": 0,
+      "fast_track": 0,
       "close": 0
     }
   },
   "prs": [
     {
-      "number": 58310,
-      "category": "bug",
-      "risk": "high",
-      "score": 82,
-      "action": "fast_track",
-      "labels": [
-        "pr-agent:copilot",
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-batch:workflow-reliability"
-      ],
-      "score_breakdown": {
-        "impact": 45,
-        "urgency": 24,
-        "quality": 13
-      }
-    },
-    {
-      "number": 57313,
-      "category": "bug",
-      "risk": "medium",
-      "score": 57,
-      "action": "batch_review",
-      "labels": [
-        "pr-agent:copilot",
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-batch:workflow-reliability"
-      ],
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 15,
-        "quality": 12
-      }
-    },
-    {
       "number": 56568,
       "category": "bug",
       "risk": "high",
-      "score": 68,
+      "score": 65,
       "action": "batch_review",
       "labels": [
         "pr-agent:copilot",
         "pr-type:bug",
         "pr-risk:high",
         "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-batch:workflow-reliability"
+        "pr-action:batch_review"
       ],
       "score_breakdown": {
-        "impact": 35,
-        "urgency": 21,
-        "quality": 12
-      }
-    },
-    {
-      "number": 56562,
-      "category": "refactor",
-      "risk": "medium",
-      "score": 61,
-      "action": "batch_review",
-      "labels": [
-        "pr-agent:copilot",
-        "pr-type:refactor",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-batch:workflow-reliability"
-      ],
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 18,
-        "quality": 11
+        "impact": 38,
+        "urgency": 17,
+        "quality": 10
       }
     }
   ],
-  "cooldown_skipped": [],
-  "batches": [
-    {
-      "id": "workflow-reliability",
-      "prs": [58310, 57313, 56568, 56562]
-    }
-  ],
+  "cooldown_skipped": [59724, 59722, 59720],
+  "batches": [],
   "report_issue": "created"
 }
