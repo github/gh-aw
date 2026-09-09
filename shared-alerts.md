@@ -47,3 +47,13 @@
 - **STALE ALERT REMOVED:** PR #43527 (quality gate) — verified MERGED 2026-07-05T13:28:36Z. The prior "URGENT, not yet merged" note is obsolete; do not repeat.
 - Reviewer/gate agents (Impeccable, Matt Pocock, PR Code Quality Reviewer, Test Quality Sentinel, Design Decision Gate) show 1/1 clean runs in the 2026-09-01 metrics snapshot — reclassified from "deprecation candidate" to "recovered — monitor" pending more sampled runs.
 - New (unverified pattern, single-run sample) failures observed 2026-09-01: daily-firewall-report, daily-go-test-parallelizer, lint-monster — flagged for WHM log check, not yet filed.
+
+## Resolution — 2026-09-09 (Workflow Health Manager)
+- **lint-monster**: confirmed recurring (4/5 recent runs failed). Already tracked by open #59609
+  "[aw] LintMonster failed" + backlog #58126. DO NOT RE-FILE.
+- **daily-go-test-parallelizer**: recovered (4/4 recent completed runs successful). Already
+  tracked by open WIP #59631. DO NOT RE-FILE.
+- **daily-firewall-report**: recovered on most recent run after 2 prior failures. No open issue
+  needed; monitor for recurrence (historical churn: #59348, #57586, #53023, cache fix #57219).
+- 299/299 workflows compile with lock files present, compile-validate clean — no compilation
+  issues this run.
