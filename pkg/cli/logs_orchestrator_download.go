@@ -22,6 +22,7 @@ type logsDownloadRuntime struct {
 	fetchAllInRange bool
 	filters         runFilterOpts
 	storageLimit    *logsStorageLimit
+	cachedRuns      cachedLogsRuns
 }
 
 type workflowRunBatch struct {
@@ -44,6 +45,7 @@ type processWorkflowRunBatchOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
+	cachedRuns             cachedLogsRuns
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -54,6 +56,13 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	artifactFilter, err := resolveLogsArtifactFilter(opts.ArtifactSets, opts.Verbose)
 	if err != nil {
 		return logsDownloadRuntime{}, err
+	}
+	cachedRuns, err := loadCachedLogsJSON(opts.CachedJSON)
+	if err != nil {
+		return logsDownloadRuntime{}, err
+	}
+	if !cachedJSONCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+		cachedRuns = nil
 	}
 	if err := prepareLogsDownloadOutput(ctx, opts); err != nil {
 		return logsDownloadRuntime{}, err
@@ -71,6 +80,7 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 		artifactFilter:  artifactFilter,
 		fetchAllInRange: opts.StartDate != "" || opts.EndDate != "",
 		storageLimit:    storageLimit,
+		cachedRuns:      cachedRuns,
 		filters: runFilterOpts{
 			engine:            opts.Engine,
 			runtime:           opts.Runtime,
@@ -289,6 +299,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		maxConcurrentDownloads: opts.maxConcurrentDownloads,
 		storageLimit:           runtime.storageLimit,
 		maxGitHubAPIRateLimit:  opts.MaxGitHubAPIRateLimit,
+		cachedRuns:             runtime.cachedRuns,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	// Only mark this batch as storage-limit-truncated when one of its own
@@ -519,9 +530,18 @@ func appendProcessedWorkflowRuns(
 		maxConcurrentDownloads: opts.maxConcurrentDownloads,
 		storageLimit:           opts.storageLimit,
 		maxGitHubAPIRateLimit:  opts.maxGitHubAPIRateLimit,
+		cachedRuns:             opts.cachedRuns,
+		filters:                opts.filters,
 	})
 	var storageLimitReached bool
 	for _, result := range downloadResults {
+		if result.CachedRun != nil {
+			if len(processedRuns) < opts.count {
+				processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
+				batchProcessed++
+			}
+			continue
+		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
 			storageLimitReached = true
 		}
@@ -640,14 +660,19 @@ func handleEmptyProcessedRuns(
 	if len(processedRuns) > 0 {
 		return false, nil
 	}
-	if opts.JSONOutput {
+	if opts.JSONOutput || opts.CachedJSON != "" {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, continuation)
 		logsData.Continuations = continuations
 		logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 		logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 		logsData.Message = noRunsMessage(opts.StartDate, timeoutReached, storageLimitReached)
-		if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
-			return true, fmt.Errorf("failed to render JSON output: %w", err)
+		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
+			return true, err
+		}
+		if opts.JSONOutput {
+			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
+				return true, fmt.Errorf("failed to render JSON output: %w", err)
+			}
 		}
 	}
 	if timeoutReached {

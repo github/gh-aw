@@ -525,10 +525,10 @@
       "digest": "sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23",
       "pinned_image": "ghcr.io/github/gh-aw-node@sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23"
     },
-    "ghcr.io/github/github-mcp-server:v1.11.0": {
-      "image": "ghcr.io/github/github-mcp-server:v1.11.0",
-      "digest": "sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699",
-      "pinned_image": "ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"
+    "ghcr.io/github/github-mcp-server:v1.12.1": {
+      "image": "ghcr.io/github/github-mcp-server:v1.12.1",
+      "digest": "sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560",
+      "pinned_image": "ghcr.io/github/github-mcp-server:v1.12.1@sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560"
     },
     "ghcr.io/oraios/serena:1.7.0": {
       "image": "ghcr.io/oraios/serena:1.7.0",
@@ -537,8 +537,8 @@
     },
     "ghcr.io/xberg-io/xberg:latest": {
       "image": "ghcr.io/xberg-io/xberg:latest",
-      "digest": "sha256:33ce549f7730212336a60048335fc059be4a838bf415b96321906428c847ce60",
-      "pinned_image": "ghcr.io/xberg-io/xberg:latest@sha256:33ce549f7730212336a60048335fc059be4a838bf415b96321906428c847ce60"
+      "digest": "sha256:9f15a7c552c321b75a7c30bc3e8c4cba28ef6f662c440287cc9a8539296f6ef3",
+      "pinned_image": "ghcr.io/xberg-io/xberg:latest@sha256:9f15a7c552c321b75a7c30bc3e8c4cba28ef6f662c440287cc9a8539296f6ef3"
     },
     "grafana/mcp-grafana:1.1.0-alpine": {
       "image": "grafana/mcp-grafana:1.1.0-alpine",

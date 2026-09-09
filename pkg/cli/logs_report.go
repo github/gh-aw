@@ -252,6 +252,43 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 	agg.totalSafeItems += run.SafeItemsCount
 }
 
+func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
+	agg.totalDuration += parseDurationString(run.Duration)
+	agg.totalAIC += run.AIC
+	if run.TokenUsageSummary != nil {
+		agg.totalSteeringEvents += run.TokenUsageSummary.TotalSteeringEvents
+	}
+	agg.totalTokens += run.TokenUsage
+	agg.totalActionMinutes += run.ActionMinutes
+	agg.totalTurns += run.Turns
+	agg.totalErrors += run.ErrorCount
+	agg.totalWarnings += run.WarningCount
+	agg.totalMissingTools += run.MissingToolCount
+	agg.totalMissingData += run.MissingDataCount
+	agg.totalSafeItems += run.SafeItemsCount
+	agg.totalGitHubAPICalls += run.GitHubAPICalls
+	agg.accumulateChainMetrics(SafeOutputChainMetrics{
+		TemporaryIDMapStatus:       run.TemporaryIDMapStatus,
+		TemporaryIDMappings:        run.TemporaryIDMappings,
+		ChainedTargetCount:         run.ChainedTargetCount,
+		ChainedFollowupActionCount: run.ChainedFollowupActionCount,
+		DelegatedTempTargetCount:   run.DelegatedTempTargetCount,
+		ClosedTempTargetCount:      run.ClosedTempTargetCount,
+	})
+	switch run.FailureKind {
+	case "driver_exit":
+		agg.totalDriverExitFailures++
+	case "agent_logic":
+		agg.totalAgentLogicFailures++
+	}
+	if run.EngineID != "" {
+		agg.engineCounts[run.EngineID]++
+	}
+	if run.IntentionalFailure {
+		agg.intentionalFailureRuns++
+	}
+}
+
 // accumulateChainMetrics adds safe-output chain metrics of a run to the aggregate.
 func (agg *logsAggregate) accumulateChainMetrics(chainMetrics SafeOutputChainMetrics) {
 	agg.totalTemporaryIDMappings += chainMetrics.TemporaryIDMappings
@@ -421,6 +458,10 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 // buildRunData converts a processed run into RunData while accumulating rollup totals.
 // localRepo guards against cross-repo misclassification of intentional-failure workflows.
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate) RunData {
+	if pr.cachedData != nil {
+		agg.accumulateCachedRunTotals(*pr.cachedData)
+		return *pr.cachedData
+	}
 	run := pr.Run
 
 	agg.accumulateRunTotals(pr)

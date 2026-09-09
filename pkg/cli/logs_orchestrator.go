@@ -326,6 +326,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 		countLimitReached: result.countLimitReached,
 		suppressRender:    opts.SuppressRender,
 		apiRateLimit:      apiRateLimit,
+		cachedJSON:        opts.CachedJSON,
 	})
 }
 
