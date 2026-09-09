@@ -65,7 +65,7 @@ evals:
   - id: summary-comment-added
     question: Does the agent output confirm that a summary comment was added to the original conversation thread?
 
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 ---
 
 # /cloclo

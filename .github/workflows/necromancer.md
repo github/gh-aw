@@ -16,6 +16,7 @@ permissions:
 
 
 engine: codex
+model: copilot/gpt-5.3-codex
 strict: true
 timeout-minutes: 25
 network:

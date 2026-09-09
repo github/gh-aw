@@ -8,6 +8,7 @@ on:
     name: grumpy
     events: [pull_request_comment, pull_request_review_comment]
 engine: codex
+model: copilot/gpt-5.3-codex
 permissions:
   contents: read
   pull-requests: read
