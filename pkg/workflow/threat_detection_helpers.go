@@ -248,7 +248,7 @@ func inheritedDetectionModel(data *WorkflowData) string {
 		return ""
 	}
 	engineID := ResolveEngineID(data)
-	if engineID == "" || isThreatDetectionCapableEngineID(engineID) {
+	if engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
 		return data.Model
 	}
 	return ""

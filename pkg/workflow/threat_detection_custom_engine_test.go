@@ -104,6 +104,7 @@ func TestGetThreatDetectionEngineIDNormalization(t *testing.T) {
 	}{
 		{name: "built-in engine unchanged", data: &WorkflowData{AI: "claude"}, expected: "claude"},
 		{name: "pi normalized to copilot", data: &WorkflowData{AI: "pi"}, expected: "copilot"},
+		{name: "embedded unsupported engine falls back", data: &WorkflowData{AI: "gemini"}, expected: defaultThreatDetectionEngineID},
 		{name: "unknown custom engine falls back", data: &WorkflowData{AI: "harness-engine"}, expected: defaultThreatDetectionEngineID},
 		{name: "declared detection engine wins", data: &WorkflowData{AI: "custom-declared"}, expected: "codex"},
 		{name: "unsupported declared engine falls back", data: &WorkflowData{AI: "custom-invalid"}, expected: defaultThreatDetectionEngineID},

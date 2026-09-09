@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -213,12 +212,9 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 const defaultThreatDetectionEngineID = "copilot"
 
 // isThreatDetectionCapableEngineID reports whether the threat detection analyzer can run
-// with the given engine ID. Only built-in engines are supported.
+// with the given engine ID.
 func isThreatDetectionCapableEngineID(engineID string) bool {
-	if engineID == "" {
-		return false
-	}
-	return parser.BuiltinVirtualFileExists(builtinEnginePath(engineID))
+	return slices.Contains(declarableDetectionEngineIDs, engineID)
 }
 
 // declarableDetectionEngineIDs are the engine IDs accepted for the engine definition's

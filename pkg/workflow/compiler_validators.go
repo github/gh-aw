@@ -439,7 +439,7 @@ func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *Workflow
 	}
 
 	configuredEngineID := ResolveEngineID(workflowData)
-	if configuredEngineID == "" || isThreatDetectionCapableEngineID(configuredEngineID) {
+	if configuredEngineID == "" || configuredEngineID == "pi" || isThreatDetectionCapableEngineID(configuredEngineID) {
 		return
 	}
 	// An engine definition that declares its own detection engine ships a working default.
