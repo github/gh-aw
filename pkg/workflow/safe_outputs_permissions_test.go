@@ -331,7 +331,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 		},
 		{
-			name: "push-to-pull-request-branch with fallback-as-pull-request false - no pull-requests permission but administration read",
+			name: "push-to-pull-request-branch with fallback-as-pull-request false - requires pull-requests read and administration read",
 			safeOutputs: &SafeOutputsConfig{
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
 					BaseSafeOutputConfig:  BaseSafeOutputConfig{},
@@ -340,6 +340,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 			expected: map[PermissionScope]PermissionLevel{
 				PermissionContents:       PermissionWrite,
+				PermissionPullRequests:   PermissionRead,
 				PermissionAdministration: PermissionRead,
 			},
 		},

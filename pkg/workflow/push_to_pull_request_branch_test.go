@@ -224,6 +224,10 @@ safe-outputs:
 	}
 
 	lockContentStr := string(lockContent)
+	safeOutputsJobSection := extractJobSection(lockContentStr, "safe_outputs")
+	if safeOutputsJobSection == "" {
+		t.Fatalf("Could not find safe_outputs job in lock file")
+	}
 	pushConfig := extractPushToPullRequestBranchHandlerConfig(t, lockContent)
 	fallbackAsPullRequest, exists := pushConfig["fallback_as_pull_request"]
 	if !exists {
@@ -236,8 +240,11 @@ safe-outputs:
 	if fallbackAsPullRequestBool {
 		t.Errorf("Expected fallback_as_pull_request=false, got %#v", fallbackAsPullRequestBool)
 	}
-	if strings.Contains(lockContentStr, "pull-requests: write") {
+	if strings.Contains(safeOutputsJobSection, "pull-requests: write") {
 		t.Errorf("Generated workflow should NOT have pull-requests: write permission when fallback-as-pull-request is false")
+	}
+	if !strings.Contains(safeOutputsJobSection, "pull-requests: read") {
+		t.Errorf("Generated workflow should have pull-requests: read permission when fallback-as-pull-request is false")
 	}
 }
 

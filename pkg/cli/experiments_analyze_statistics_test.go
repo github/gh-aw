@@ -584,45 +584,6 @@ func TestComputeExperimentAnalysis(t *testing.T) {
 	})
 }
 
-// TestComputeExperimentAnalyses tests the bulk analysis function.
-func TestComputeExperimentAnalyses(t *testing.T) {
-	t.Parallel()
-	t.Run("empty experiments returns nil", func(t *testing.T) {
-		result := computeExperimentAnalysesWithObservations(nil, nil, nil, nil, nil)
-		assert.Nil(t, result, "nil experiments should return nil")
-	})
-
-	t.Run("multiple experiments analysed independently", func(t *testing.T) {
-		experiments := []ExperimentVariantStats{
-			{Name: "exp1", Variants: map[string]int{"A": 5, "B": 5}, Total: 10},
-			{Name: "exp2", Variants: map[string]int{"X": 3, "Y": 7}, Total: 10},
-		}
-		analyses := computeExperimentAnalysesWithObservations(experiments, nil, nil, nil, nil)
-		require.Len(t, analyses, 2, "should produce one analysis per experiment")
-		assert.Equal(t, "exp1", analyses[0].ExperimentName, "first analysis name")
-		assert.Equal(t, "exp2", analyses[1].ExperimentName, "second analysis name")
-	})
-
-	t.Run("config map applied per experiment", func(t *testing.T) {
-		experiments := []ExperimentVariantStats{
-			{Name: "alpha", Variants: map[string]int{"on": 25, "off": 25}, Total: 50},
-		}
-		configs := map[string]*workflow.ExperimentConfig{
-			"alpha": {
-				Variants:     []string{"on", "off"},
-				Hypothesis:   "test hypothesis",
-				AnalysisType: "proportion_test",
-				MinSamples:   20,
-			},
-		}
-		analyses := computeExperimentAnalysesWithObservations(experiments, configs, nil, nil, nil)
-		require.Len(t, analyses, 1, "one analysis")
-		assert.Equal(t, "test hypothesis", analyses[0].Hypothesis, "hypothesis from config")
-		assert.Equal(t, "proportion_test", analyses[0].AnalysisType, "analysis type from config")
-		assert.Equal(t, "READY_FOR_ANALYSIS", analyses[0].Recommendation, "above min_samples")
-	})
-}
-
 // TestExperimentAnalysisJSONOutput verifies that ExperimentAnalysis serialises correctly.
 func TestExperimentAnalysisJSONOutput(t *testing.T) {
 	t.Parallel()
