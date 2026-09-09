@@ -128,3 +128,55 @@ strict: false
 		})
 	}
 }
+
+func TestCheckoutDisabledWithGitHubAppTargetUsesContentsReadForMintedToken(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "checkout-disabled-app-test")
+
+	testContent := `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: none
+  issues: read
+tools:
+  github:
+    toolsets: [issues]
+engine: claude
+checkout:
+  - repository: octo-org/target-repository
+    path: target
+    github-app:
+      app-id: ${{ vars.TARGET_APP_CLIENT_ID }}
+      private-key: ${{ secrets.TARGET_APP_PRIVATE_KEY }}
+      owner: octo-org
+      repositories:
+        - target-repository
+strict: false
+---
+
+# Test Workflow
+
+Target-only checkout with explicit GitHub App auth.
+`
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644), "should write test file")
+
+	compiler := NewCompiler()
+	compiler.SetActionMode(ActionModeDev)
+	require.NoError(t, compiler.CompileWorkflow(testFile), "should compile workflow")
+
+	lockFile := stringutil.MarkdownToLockFile(testFile)
+	lockContent, err := os.ReadFile(lockFile)
+	require.NoError(t, err, "should read lock file")
+	lockContentStr := string(lockContent)
+
+	agentJobStart := strings.Index(lockContentStr, "\n  agent:")
+	require.NotEqual(t, -1, agentJobStart, "agent job not found in compiled workflow")
+	agentSection := lockContentStr[agentJobStart:]
+	assert.NotContains(t, agentSection, "name: Checkout repository", "default checkout should be skipped when contents is none")
+	assert.Contains(t, agentSection, "repository: octo-org/target-repository", "target checkout should still be present")
+	assert.Contains(t, agentSection, "id: checkout-app-token-0", "checkout app token step should be generated")
+	assert.Contains(t, agentSection, "permission-contents: read", "checkout app token should request contents read")
+	assert.NotContains(t, agentSection, "permission-contents: none", "checkout app token must not request contents none")
+}
