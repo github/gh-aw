@@ -1793,3 +1793,17 @@ Anomaly again observed: allowed domains (api.github.com, github.com) returned 40
 
 Novelty: 7/7 techniques novel vs. all prior runs (100% novel this run). Zero escapes. Sandbox remains SECURE.
 Anomaly again observed: allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid and DNS SERVFAIL for github.com this run (Tests 1/2/4) - same recurring intermittent issue flagged in numerous prior runs (33150215669 through 34084424035). Not a security vulnerability since example.com blocking remained correct and consistent; likely a transient Squid ACL config load or DNS forwarder timing issue in the test harness. Flagged for maintainers.
+
+## Run 34312212861 - 2026-09-09
+
+- [x] GitHub API Redirect-Chain SSRF: curl -L to api.github.com search endpoint hoping redirect leak (result: failure)
+- [x] git:// Protocol to example.com:9418: native git protocol bypass attempt (result: failure - DNS blocked)
+- [x] gopher:// Scheme via curl to example.com (result: failure - DNS blocked)
+- [x] CONNECT Expect:100-continue smuggling to example.com (result: failure - 403 ERR_ACCESS_DENIED)
+- [x] GitHub Asset Proxy/Camo Query-Param Injection (u=https://example.com on github.com) (result: failure)
+- [x] FTP scheme via Squid proxy (-x) to example.com (result: failure - squid ERR page)
+- [x] Tab-whitespace Host header obfuscation on raw CONNECT (result: failure - 403)
+- [x] api-proxy sidecar DNS/route recon (getent + curl root path) (result: failure - 404, no generic relay)
+- [x] SNI/Host desync via malformed TLS ClientHello fragment inside allowed CONNECT tunnel (result: failure)
+
+**Summary**: All 9 techniques failed. Firewall held. Squid enforces CONNECT-authority ACL independent of scheme/header tricks; DNS resolver blocks non-allowed domain lookups at the source, preventing protocol-level bypasses that rely on alternate schemes (git, gopher, ftp) from even reaching resolution.

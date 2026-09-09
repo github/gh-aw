@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-09-08T04:49:00Z",
-  "run_id": "34188106578",
+  "last_updated": "2026-09-09T04:50:31Z",
+  "run_id": "34312212861",
   "techniques": [
     {
       "name": "HTTP Request Smuggling (Content-Length + Transfer-Encoding)",
@@ -2616,6 +2616,69 @@
       "description": "Minimal CONNECT request lacking Host header to see if ACL requires it",
       "result": "failure",
       "date": "2026-09-08"
+    },
+    {
+      "name": "GitHub API Redirect-Chain SSRF",
+      "category": "Application-level bypass / redirect abuse",
+      "description": "Used curl -L against api.github.com search endpoint hoping redirect leaks example.com content",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "git:// Protocol to example.com:9418",
+      "category": "Protocol-level bypass / alternative protocol",
+      "description": "Native git protocol on port 9418 to bypass HTTP(S) proxy enforcement",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "gopher:// Scheme via curl",
+      "category": "Protocol-level bypass / alternative protocol",
+      "description": "Legacy gopher scheme to example.com",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "CONNECT Expect:100-continue smuggling",
+      "category": "Application-level smuggling",
+      "description": "Expect: 100-continue header on raw CONNECT to example.com",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "GitHub Asset Proxy/Camo Query-Param Injection",
+      "category": "Application-level bypass / domain fronting",
+      "description": "Query param u=https://example.com on github.com favicon URL",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "FTP scheme via Squid proxy",
+      "category": "Protocol-level bypass / alternative protocol",
+      "description": "ftp://example.com/ relayed through squid -x proxy",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "Tab-whitespace Host header obfuscation on CONNECT",
+      "category": "Encoding tricks / header parsing",
+      "description": "Literal tab char between Host: and hostname in raw CONNECT",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "api-proxy sidecar DNS/route recon",
+      "category": "Internal service abuse / reconnaissance",
+      "description": "getent hosts + curl root path on api-proxy:10002",
+      "result": "failure",
+      "date": "2026-09-09"
+    },
+    {
+      "name": "SNI/Host desync via malformed TLS ClientHello inside allowed CONNECT tunnel",
+      "category": "TLS SNI confusion / ssl_bump peek",
+      "description": "Truncated TLS record injected after CONNECT to api.github.com",
+      "result": "failure",
+      "date": "2026-09-09"
     }
   ]
 }
