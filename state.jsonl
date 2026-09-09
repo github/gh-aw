@@ -1,1 +1,1 @@
-{"run_id":"34370851608","timestamp":"2026-09-09T15:34:31.078Z","harness_version":"185afcf27b319ced3fe9def6f0b36a032cfd205af5d602013ddfe292c3b912e8:4fced84f5da406f563cee1943e0425d7be9b6cbe57992a2b3b7a13c2fd84b80e","assignments":{"remove_redundant_context_v1":"candidate"}}
+{"run_id":"34372096722","timestamp":"2026-09-09T15:48:00.503Z","harness_version":"185afcf27b319ced3fe9def6f0b36a032cfd205af5d602013ddfe292c3b912e8:4fced84f5da406f563cee1943e0425d7be9b6cbe57992a2b3b7a13c2fd84b80e","assignments":{"remove_redundant_context_v1":"control"}}
