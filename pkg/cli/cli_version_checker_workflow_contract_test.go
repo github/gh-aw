@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCLIVersionCheckerUsesCodexModel(t *testing.T) {
+func TestCLIVersionCheckerUsesCopilotModel(t *testing.T) {
 	t.Parallel()
 
 	repoRoot, err := gitutil.FindGitRoot()
@@ -22,5 +22,5 @@ func TestCLIVersionCheckerUsesCodexModel(t *testing.T) {
 	workflowPath := filepath.Join(repoRoot, ".github", "workflows", "cli-version-checker.md")
 	content, err := os.ReadFile(workflowPath)
 	require.NoError(t, err)
-	require.Contains(t, string(content), "model: openai/gpt-5.3-codex")
+	require.Contains(t, string(content), "model: copilot/gpt-5.4")
 }
