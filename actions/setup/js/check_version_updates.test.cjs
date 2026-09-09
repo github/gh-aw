@@ -426,6 +426,39 @@ describe("check_version_updates", () => {
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
   });
 
+  it("should skip issue notification when github APIs are unavailable", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    global.github = {}; // no rest.search / rest.issues
+
+    await runMain();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub issue APIs are unavailable"));
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+  });
+
+  it("should retry the issue search on a transient error before creating an issue", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    const searchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("secondary rate limit exceeded"))
+      .mockResolvedValueOnce({ data: { items: [] } });
+    const createMock = vi.fn().mockResolvedValue({ data: { number: 42, html_url: "https://github.com/owner/repo/issues/42" } });
+    global.github = {
+      rest: {
+        search: { issuesAndPullRequests: searchMock },
+        issues: { create: createMock, update: vi.fn() },
+      },
+    };
+
+    await runMain();
+
+    expect(searchMock).toHaveBeenCalledTimes(2);
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+  });
+
   it("should skip blocked version issue creation when disabled", async () => {
     process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
     process.env.GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE = "false";

@@ -39,6 +39,7 @@ The repository could provide a standalone watchdog workflow that checks compiled
 - Activation-stage version checking becomes more complex because it now owns issue lookup/update behavior in addition to compatibility validation.
 - The workflow needs additional permission wiring and input propagation, which increases compiler and generated workflow surface area.
 - Issue creation/update can fail independently, requiring best-effort error handling and tests to ensure the root blocked-version error remains the primary failure.
+- The activation-stage notification only honors a literal `false` for `safe-outputs.report-failure-as-issue`; it does not participate in that setting's category-filter arrays (e.g. `["!blocked_version"]`), since those categories describe the downstream conclusion job's own failure taxonomy and are not available at the activation stage. Workflows relying on category filtering to suppress specific conclusion-job failure types will still receive blocked-version issues unless they disable reporting outright.
 
 #### Neutral
 - Generated workflows now pass workflow name and reporting policy into the blocked-version check step.

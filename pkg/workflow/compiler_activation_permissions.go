@@ -167,8 +167,36 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	return permsMap
 }
 
+// activationBlockedVersionIssueEnabled reports whether the activation-stage
+// blocked-version check may create/update a notification issue, and is used
+// to conservatively grant issues: write at compile time. It reuses
+// conclusionReportFailureAsIssueEnabled, which only detects a literal "false"
+// for safe-outputs.report-failure-as-issue. It intentionally does NOT honor
+// that setting's category-filter arrays (ReportFailureAsIssueCategories /
+// ReportFailureAsIssueExcludedCategories, e.g. report-failure-as-issue:
+// ["!blocked_version"]): those categories describe failures detected by the
+// downstream conclusion job and are not available this early in the
+// workflow. A workflow that only wants to suppress blocked-version
+// notifications must set report-failure-as-issue to a literal false.
 func (c *Compiler) activationBlockedVersionIssueEnabled(ctx *activationJobBuildContext) bool {
 	return !ctx.data.UpdateCheckDisabled && IsReleasedVersion(c.version) && conclusionReportFailureAsIssueEnabled(ctx.data)
+}
+
+// activationBlockedVersionReportAsIssueValue returns the templatable
+// report-failure-as-issue value to embed in the blocked-version check step's
+// environment. Unlike activationBlockedVersionIssueEnabled (used to
+// conservatively grant issues: write at compile time), this preserves runtime
+// expressions (e.g. "${{ inputs.report-failure-as-issue }}") instead of
+// collapsing them to a compile-time boolean, so the value is only resolved
+// once GitHub Actions evaluates the expression at runtime. Defaults to "true"
+// when report-failure-as-issue is unset.
+func activationBlockedVersionReportAsIssueValue(ctx *activationJobBuildContext) *string {
+	if ctx.data.SafeOutputs == nil || ctx.data.SafeOutputs.ReportFailureAsIssue == nil {
+		v := "true"
+		return &v
+	}
+	v := ctx.data.SafeOutputs.ReportFailureAsIssue.String()
+	return &v
 }
 
 func (c *Compiler) addCentralizedCommandActivationPermissions(permsMap map[PermissionScope]PermissionLevel, ctx *activationJobBuildContext) {

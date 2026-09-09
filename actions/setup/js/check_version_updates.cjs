@@ -134,6 +134,15 @@ function buildBlockedVersionIssueBody(compiledVersion) {
 /**
  * Find an existing open blocked-version issue for this compiler version.
  *
+ * NOTE: This relies on the GitHub search index, which is eventually consistent.
+ * During a repo-wide blocked-version outage, many activation runs can fire close
+ * together; two runs can both observe `items: []` before the index catches up and
+ * both proceed to create an issue, producing duplicates. This is accepted as a
+ * best-effort tradeoff (consistent with other dedup lookups in this codebase, e.g.
+ * handle_agent_failure.cjs) rather than a correctness guarantee. The call is wrapped
+ * in withRetry so transient failures and secondary rate limits (more likely during a
+ * fan-out of many concurrent activation failures) don't silently drop the lookup.
+ *
  * @param {string} owner
  * @param {string} repo
  * @param {string} compiledVersion
@@ -141,10 +150,15 @@ function buildBlockedVersionIssueBody(compiledVersion) {
  */
 async function findExistingBlockedVersionIssue(owner, repo, compiledVersion) {
   const title = buildBlockedVersionIssueTitle(compiledVersion);
-  const result = await github.rest.search.issuesAndPullRequests({
-    q: `repo:${owner}/${repo} is:issue is:open in:title "${title}"`,
-    per_page: 10,
-  });
+  const result = await withRetry(
+    () =>
+      github.rest.search.issuesAndPullRequests({
+        q: `repo:${owner}/${repo} is:issue is:open in:title "${title}"`,
+        per_page: 10,
+      }),
+    {},
+    "search for existing blocked compiler version issue"
+  );
   const existing = result.data.items.find(item => item.title === title && !item.pull_request);
   return existing ? { number: existing.number, html_url: existing.html_url } : null;
 }
@@ -173,25 +187,35 @@ async function reportBlockedVersionIssue(compiledVersion) {
   try {
     const existing = await findExistingBlockedVersionIssue(owner, repo, compiledVersion);
     if (existing) {
-      const updatedIssue = await github.rest.issues.update({
-        owner,
-        repo,
-        issue_number: existing.number,
-        title,
-        body,
-        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-      });
+      const updatedIssue = await withRetry(
+        () =>
+          github.rest.issues.update({
+            owner,
+            repo,
+            issue_number: existing.number,
+            title,
+            body,
+            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+          }),
+        {},
+        "update blocked compiler version issue"
+      );
       core.info(`Updated blocked compiler version issue #${updatedIssue.data.number}: ${updatedIssue.data.html_url}`);
       return;
     }
 
-    const newIssue = await github.rest.issues.create({
-      owner,
-      repo,
-      title,
-      body,
-      headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-    });
+    const newIssue = await withRetry(
+      () =>
+        github.rest.issues.create({
+          owner,
+          repo,
+          title,
+          body,
+          headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+        }),
+      {},
+      "create blocked compiler version issue"
+    );
     core.info(`Created blocked compiler version issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
   } catch (err) {
     core.warning(`Could not create or update blocked compiler version issue: ${getErrorMessage(err)}`);
