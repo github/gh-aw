@@ -79,6 +79,9 @@ function isHttpRequestCall(call: TSESTree.CallExpression, sourceCode: TSESLint.S
 
 type ResponseCallback = TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression;
 
+// Node's EventEmitter treats "on" and "addListener" as synonyms, and "once" for a one-shot variant.
+const LISTENER_METHODS = new Set(["on", "once", "addListener"]);
+
 /** Returns the response callback argument of an http request call, when it has a single named response parameter. */
 function getResponseCallback(call: TSESTree.CallExpression): ResponseCallback | null {
   for (const arg of call.arguments) {
@@ -90,14 +93,71 @@ function getResponseCallback(call: TSESTree.CallExpression): ResponseCallback | 
   return null;
 }
 
-/** Returns true when `call` is `<name>.on("error", ...)` / `<name>.once("error", ...)`. */
+/** Returns true when `call` is `<name>.on("error", ...)` / `<name>.once("error", ...)` / `<name>.addListener("error", ...)`. */
 function isErrorListenerCall(call: TSESTree.CallExpression, name: string): boolean {
   const callee = call.callee;
   if (callee.type !== AST_NODE_TYPES.MemberExpression || callee.computed) return false;
   if (callee.object.type !== AST_NODE_TYPES.Identifier || callee.object.name !== name) return false;
-  if (callee.property.type !== AST_NODE_TYPES.Identifier || (callee.property.name !== "on" && callee.property.name !== "once")) return false;
+  if (callee.property.type !== AST_NODE_TYPES.Identifier || !LISTENER_METHODS.has(callee.property.name)) return false;
   const firstArg = call.arguments[0];
   return firstArg !== undefined && firstArg.type === AST_NODE_TYPES.Literal && firstArg.value === "error";
+}
+
+/** Returns true when `node` is a direct `<http>.request(...)` / `<http>.get(...)` call expression. */
+function isHttpRequestResultExpression(node: TSESTree.Node | null | undefined, sourceCode: TSESLint.SourceCode): boolean {
+  if (!node) return false;
+  return node.type === AST_NODE_TYPES.CallExpression && isHttpRequestCall(node, sourceCode);
+}
+
+/**
+ * Returns true when `name` (declared at `scopeNode`) is bound, via a single variable declarator,
+ * to the direct result of an http/https `request()`/`get()` call — e.g. `const req = http.request(...)` —
+ * and every write to the binding keeps it holding such a request, so a reassigned variable pointing at an
+ * unrelated object is never treated as a Node request.
+ */
+function isHttpRequestResultBinding(name: string, scopeNode: TSESTree.Node, sourceCode: TSESLint.SourceCode): boolean {
+  const variable = resolveVariable(name, scopeNode, sourceCode);
+  if (!variable || variable.defs.length !== 1) return false;
+  const def = variable.defs[0];
+  if (def.type !== "Variable") return false;
+  const declarator = def.node as TSESTree.VariableDeclarator;
+  if (declarator.id.type !== AST_NODE_TYPES.Identifier) return false;
+  if (!isHttpRequestResultExpression(declarator.init, sourceCode)) return false;
+  // Any write other than another http request call means the binding may no longer denote a request.
+  for (const reference of variable.references) {
+    if (!reference.isWrite()) continue;
+    if (!isHttpRequestResultExpression(reference.writeExpr, sourceCode)) return false;
+  }
+  return true;
+}
+
+/**
+ * Returns the callback attached via the `req.on("response", cb)` idiom (or `.once`/`.addListener`
+ * variant, including the chained `http.request(...).on("response", cb)` form), when `req` resolves
+ * to the direct result of an http/https `request()`/`get()` call and `cb` has a single named
+ * response parameter. Returns null otherwise.
+ */
+function getResponseEventCallback(call: TSESTree.CallExpression, sourceCode: TSESLint.SourceCode): ResponseCallback | null {
+  const callee = call.callee;
+  if (callee.type !== AST_NODE_TYPES.MemberExpression || callee.computed) return null;
+  if (callee.property.type !== AST_NODE_TYPES.Identifier || !LISTENER_METHODS.has(callee.property.name)) return null;
+  const firstArg = call.arguments[0];
+  if (!firstArg || firstArg.type !== AST_NODE_TYPES.Literal || firstArg.value !== "response") return null;
+
+  const object = callee.object;
+  let isFromHttpRequest = false;
+  if (object.type === AST_NODE_TYPES.Identifier) {
+    isFromHttpRequest = isHttpRequestResultBinding(object.name, object, sourceCode);
+  } else if (object.type === AST_NODE_TYPES.CallExpression) {
+    isFromHttpRequest = isHttpRequestCall(object, sourceCode);
+  }
+  if (!isFromHttpRequest) return null;
+
+  const cb = call.arguments[1];
+  if (!cb || (cb.type !== AST_NODE_TYPES.FunctionExpression && cb.type !== AST_NODE_TYPES.ArrowFunctionExpression)) return null;
+  const firstParam = cb.params[0];
+  if (!firstParam || firstParam.type !== AST_NODE_TYPES.Identifier) return null;
+  return cb;
 }
 
 export const requireHttpResponseErrorListenerRule = createRule({
@@ -109,7 +169,9 @@ export const requireHttpResponseErrorListenerRule = createRule({
         "Require an 'error' event listener on the response object passed to http.request()/http.get()/https.request()/https.get() callbacks. " +
         "Node emits 'error' on the IncomingMessage itself for socket-level failures that occur while the body is streamed " +
         "(reset connections, decompression failures, aborted sockets); a listener on the request does not catch these, " +
-        "so an unhandled response 'error' event crashes the action. " +
+        "so an unhandled response 'error' event crashes the action. Also recognizes the `req.on(\"response\", cb)` idiom " +
+        "(listening for the response event on the request object returned by request()/get(), rather than an inline callback) " +
+        'and treats `.addListener("error", ...)` as equivalent to `.on("error", ...)` since it is a documented EventEmitter alias. ' +
         'Scope: only fires when the http/https module identifier is statically resolved through a `require("http")`-style binding.',
     },
     schema: [],
@@ -123,31 +185,40 @@ export const requireHttpResponseErrorListenerRule = createRule({
   create(context) {
     const sourceCode = context.sourceCode;
 
+    /** Reports `callback` when its declared response parameter never gets an 'error' listener attached. */
+    function checkResponseCallback(callback: ResponseCallback) {
+      const param = callback.params[0];
+      if (!param || param.type !== AST_NODE_TYPES.Identifier) return;
+      const responseName = param.name;
+
+      const variable = sourceCode.getDeclaredVariables(callback).find(candidate => candidate.name === responseName);
+      if (!variable) return;
+
+      const hasErrorListener = variable.references.some(ref => {
+        const id = ref.identifier;
+        const parent = id.parent;
+        if (!parent || parent.type !== AST_NODE_TYPES.MemberExpression || parent.object !== id) return false;
+        const grandparent = parent.parent;
+        return grandparent !== undefined && grandparent.type === AST_NODE_TYPES.CallExpression && grandparent.callee === parent && isErrorListenerCall(grandparent, responseName);
+      });
+
+      if (!hasErrorListener) {
+        context.report({ node: param, messageId: "missingResponseErrorListener" });
+      }
+    }
+
     return {
       CallExpression(node: TSESTree.CallExpression) {
-        if (!isHttpRequestCall(node, sourceCode)) return;
-
-        const callback = getResponseCallback(node);
-        if (!callback) return;
-
-        const param = callback.params[0];
-        if (!param || param.type !== AST_NODE_TYPES.Identifier) return;
-        const responseName = param.name;
-
-        const variable = sourceCode.getDeclaredVariables(callback).find(candidate => candidate.name === responseName);
-        if (!variable) return;
-
-        const hasErrorListener = variable.references.some(ref => {
-          const id = ref.identifier;
-          const parent = id.parent;
-          if (!parent || parent.type !== AST_NODE_TYPES.MemberExpression || parent.object !== id) return false;
-          const grandparent = parent.parent;
-          return grandparent !== undefined && grandparent.type === AST_NODE_TYPES.CallExpression && grandparent.callee === parent && isErrorListenerCall(grandparent, responseName);
-        });
-
-        if (!hasErrorListener) {
-          context.report({ node: param, messageId: "missingResponseErrorListener" });
+        // Inline callback form: http.request(options, res => { ... })
+        if (isHttpRequestCall(node, sourceCode)) {
+          const callback = getResponseCallback(node);
+          if (callback) checkResponseCallback(callback);
         }
+
+        // Separate-listener idiom: req.on("response", res => { ... }) / .once(...) / .addListener(...),
+        // including the chained http.request(...).on("response", cb) form.
+        const responseCallback = getResponseEventCallback(node, sourceCode);
+        if (responseCallback) checkResponseCallback(responseCallback);
       },
     };
   },

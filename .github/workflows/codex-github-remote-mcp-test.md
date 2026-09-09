@@ -9,6 +9,7 @@ permissions:
   contents: read
   issues: read
 engine: codex
+model: copilot/gpt-5.3-codex
 imports:
   - shared/otlp.md
   - shared/graders.md

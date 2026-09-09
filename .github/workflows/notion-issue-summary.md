@@ -26,7 +26,7 @@ imports:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 strict: true
 sandbox:
   agent:
