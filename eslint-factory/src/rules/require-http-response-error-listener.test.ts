@@ -98,4 +98,44 @@ describe("require-http-response-error-listener", () => {
       invalid: [],
     });
   });
+
+  it("valid: '.addListener(\"error\", ...)' is treated as an 'error' listener", () => {
+    cjsRuleTester.run("require-http-response-error-listener", requireHttpResponseErrorListenerRule, {
+      valid: [
+        `const http = require("http"); http.request(options, res => { res.on("data", () => {}); res.addListener("error", reject); });`,
+        `const https = require("https"); https.get(url, res => { res.addListener("error", err => { reject(err); }); res.on("end", () => {}); });`,
+      ],
+      invalid: [],
+    });
+  });
+
+  it("valid: request bindings reassigned to an unrelated object are ignored", () => {
+    cjsRuleTester.run("require-http-response-error-listener", requireHttpResponseErrorListenerRule, {
+      valid: [
+        `const http = require("http"); let req = http.request(options); req = makeClient(); req.on("response", res => { res.resume(); });`,
+        `const http = require("http"); let req = makeClient(); req = http.request(options); req.on("response", res => { res.resume(); });`,
+      ],
+      invalid: [],
+    });
+  });
+
+  it("invalid: the 'req.on(\"response\", cb)' idiom is checked for a response 'error' listener", () => {
+    cjsRuleTester.run("require-http-response-error-listener", requireHttpResponseErrorListenerRule, {
+      valid: [
+        `const http = require("http"); const req = http.request(options); req.on("response", res => { res.on("data", () => {}); res.on("error", reject); }); req.on("error", reject);`,
+        `const https = require("https"); const req = https.get(url); req.once("response", res => { res.on("error", reject); }); req.on("error", reject);`,
+        `const http = require("http"); http.request(options).on("response", res => { res.on("error", reject); }).on("error", reject);`,
+      ],
+      invalid: [
+        {
+          code: `const http = require("http"); const req = http.request(options); req.on("response", res => { let data = ""; res.on("data", chunk => { data += chunk; }); }); req.on("error", reject);`,
+          errors: [{ messageId: "missingResponseErrorListener" }],
+        },
+        {
+          code: `const http = require("http"); http.request(options).on("response", res => { res.resume(); }).on("error", reject);`,
+          errors: [{ messageId: "missingResponseErrorListener" }],
+        },
+      ],
+    });
+  });
 });

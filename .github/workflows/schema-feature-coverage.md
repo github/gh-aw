@@ -12,6 +12,7 @@ permissions:
 
 
 engine: codex
+model: copilot/gpt-5.3-codex
 strict: true
 network:
   allowed:

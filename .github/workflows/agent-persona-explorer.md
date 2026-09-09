@@ -4,7 +4,7 @@ emoji: "🎭"
 description: Explores agentic-workflows custom agent behavior by generating software personas and analyzing responses to common automation tasks
 on: daily
 max-daily-ai-credits: 10000
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
   model-provider: openai
