@@ -1,10 +1,10 @@
 {
-  "run_date": "2026-09-08T18:30:15Z",
-  "run_id": "34263114529",
-  "prior_run_id": "34226663599",
+  "run_date": "2026-09-09T00:58:52Z",
+  "run_id": "34297064125",
+  "prior_run_id": "34263114529",
   "summary": {
     "eligible_total": 4,
-    "cooldown_skipped": 1,
+    "cooldown_skipped": 2,
     "category_counts": {
       "bug": 3,
       "refactor": 1
@@ -14,22 +14,22 @@
       "medium": 2
     },
     "priority_counts": {
-      "high": 2,
-      "medium": 2
+      "high": 1,
+      "medium": 3
     },
     "action_counts": {
-      "fast_track": 2,
-      "batch_review": 2
-    },
-    "auto_merge": 0,
-    "close": 0
+      "fast_track": 1,
+      "batch_review": 3,
+      "auto_merge": 0,
+      "close": 0
+    }
   },
   "prs": [
     {
       "number": 58310,
       "category": "bug",
       "risk": "high",
-      "score": 80,
+      "score": 82,
       "action": "fast_track",
       "labels": [
         "pr-agent:copilot",
@@ -44,7 +44,7 @@
       "number": 57313,
       "category": "bug",
       "risk": "medium",
-      "score": 50,
+      "score": 57,
       "action": "batch_review",
       "labels": [
         "pr-agent:copilot",
@@ -60,13 +60,13 @@
       "category": "bug",
       "risk": "high",
       "score": 68,
-      "action": "fast_track",
+      "action": "batch_review",
       "labels": [
         "pr-agent:copilot",
         "pr-type:bug",
         "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
+        "pr-priority:medium",
+        "pr-action:batch_review",
         "pr-batch:workflow-reliability"
       ]
     },
@@ -86,18 +86,11 @@
       ]
     }
   ],
-  "cooldown_skipped": [
-    59502
-  ],
+  "cooldown_skipped": [59579, 59572],
   "batches": [
     {
       "id": "workflow-reliability",
-      "prs": [
-        58310,
-        57313,
-        56568,
-        56562
-      ]
+      "prs": [58310, 57313, 56568, 56562]
     }
   ],
   "report_issue": "created"
