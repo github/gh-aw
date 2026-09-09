@@ -64,7 +64,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "engine-gemini-test"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/workflow.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.55.1"
+          GH_AW_INFO_VERSION: "0.59.0"
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "gemini"
       - name: Generate agentic run info
@@ -307,7 +307,7 @@ jobs:
       contents: read
     timeout-minutes: 60
     env:
-      GH_AW_ENGINE_VERSION: "0.55.1"
+      GH_AW_ENGINE_VERSION: "0.59.0"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_WORKFLOW_ID_SANITIZED: workflow
     outputs:
@@ -341,7 +341,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "engine-gemini-test"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/workflow.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.55.1"
+          GH_AW_INFO_VERSION: "0.59.0"
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "gemini"
       - name: Checkout repository
@@ -389,7 +389,7 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Install Gemini CLI
-        run: npm install --ignore-scripts -g @google/gemini-cli@0.55.1
+        run: npm install --ignore-scripts -g @google/gemini-cli@0.59.0
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
@@ -713,7 +713,7 @@ jobs:
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "engine-gemini-test"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/workflow.lock.yml@${{ github.ref }}
-          GH_AW_INFO_VERSION: "0.55.1"
+          GH_AW_INFO_VERSION: "0.59.0"
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "gemini"
       - name: Check team membership for workflow

@@ -1263,12 +1263,6 @@
           "items": {
             "type": "object",
             "properties": {
-              "ToolName": {
-                "type": "string"
-              },
-              "CallCount": {
-                "type": "integer"
-              },
               "name": {
                 "type": "string"
               },
@@ -1286,8 +1280,6 @@
               }
             },
             "required": [
-              "ToolName",
-              "CallCount",
               "name",
               "total_calls",
               "runs"
@@ -2063,6 +2055,15 @@
             "before_run_id": {
               "type": "integer"
             },
+            "ignore_workflow_runs": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "integer"
+              }
+            },
             "timeout": {
               "type": "integer"
             },
@@ -2118,6 +2119,15 @@
               },
               "before_run_id": {
                 "type": "integer"
+              },
+              "ignore_workflow_runs": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
               },
               "timeout": {
                 "type": "integer"
@@ -2433,16 +2443,16 @@
               "server_name": {
                 "type": "string"
               },
-              "tool_call_count": {
-                "type": "integer"
-              },
-              "error_count": {
-                "type": "integer"
-              },
               "runs_connected": {
                 "type": "integer"
               },
               "total_runs": {
+                "type": "integer"
+              },
+              "total_calls": {
+                "type": "integer"
+              },
+              "total_errors": {
                 "type": "integer"
               },
               "error_rate": {
@@ -2454,9 +2464,10 @@
             },
             "required": [
               "server_name",
-              "tool_call_count",
               "runs_connected",
               "total_runs",
+              "total_calls",
+              "total_errors",
               "error_rate",
               "unreliable"
             ],

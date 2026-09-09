@@ -805,13 +805,13 @@
                   "server_name": {
                     "type": "string"
                   },
-                  "tool_call_count": {
+                  "request_count": {
+                    "type": "integer"
+                  },
+                  "tool_calls": {
                     "type": "integer"
                   },
                   "error_count": {
-                    "type": "integer"
-                  },
-                  "request_count": {
                     "type": "integer"
                   },
                   "error_rate": {
@@ -829,8 +829,9 @@
                 },
                 "required": [
                   "server_name",
-                  "tool_call_count",
                   "request_count",
+                  "tool_calls",
+                  "error_count",
                   "error_rate",
                   "error_rate_str",
                   "avg_latency",

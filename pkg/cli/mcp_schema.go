@@ -74,7 +74,7 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 }
 
 func generateAuditOutputSchema() (*jsonschema.Schema, error) {
-	auditData, err := GenerateOutputSchema[AuditData]()
+	auditData, err := generateAuditDataOutputSchema()
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +90,106 @@ func generateAuditOutputSchema() (*jsonschema.Schema, error) {
 }
 
 func generateLogsOutputSchema() (*jsonschema.Schema, error) {
-	logsData, err := GenerateOutputSchema[LogsData]()
+	logsData, err := generateLogsDataOutputSchema()
 	if err != nil {
 		return nil, err
 	}
-	crossRun, err := GenerateOutputSchema[CrossRunAuditReport]()
+	crossRun, err := generateCrossRunAuditOutputSchema()
 	if err != nil {
 		return nil, err
 	}
 	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{logsData, crossRun}}, nil
+}
+
+// These wire types mirror custom MarshalJSON output, which reflection cannot infer.
+type toolUsageSummaryWire struct {
+	Name          string `json:"name"`
+	TotalCalls    int    `json:"total_calls"`
+	Runs          int    `json:"runs"`
+	MaxOutputSize int    `json:"max_output_size,omitempty"`
+	MaxDuration   string `json:"max_duration,omitempty"`
+}
+
+type mcpServerHealthDetailWire struct {
+	ServerName   string  `json:"server_name"`
+	RequestCount int     `json:"request_count"`
+	ToolCalls    int     `json:"tool_calls"`
+	ErrorCount   int     `json:"error_count"`
+	ErrorRate    float64 `json:"error_rate"`
+	ErrorRateStr string  `json:"error_rate_str"`
+	AvgLatency   string  `json:"avg_latency"`
+	Status       string  `json:"status"`
+}
+
+type mcpServerCrossRunHealthWire struct {
+	ServerName    string  `json:"server_name"`
+	RunsConnected int     `json:"runs_connected"`
+	TotalRuns     int     `json:"total_runs"`
+	TotalCalls    int     `json:"total_calls"`
+	TotalErrors   int     `json:"total_errors"`
+	ErrorRate     float64 `json:"error_rate"`
+	Unreliable    bool    `json:"unreliable"`
+}
+
+func generateAuditDataOutputSchema() (*jsonschema.Schema, error) {
+	schema, err := GenerateOutputSchema[AuditData]()
+	if err != nil {
+		return nil, err
+	}
+	wire, err := GenerateOutputSchema[mcpServerHealthDetailWire]()
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceArrayItemSchema(schema, []string{"mcp_server_health", "servers"}, wire); err != nil {
+		return nil, err
+	}
+	return schema, nil
+}
+
+func generateLogsDataOutputSchema() (*jsonschema.Schema, error) {
+	schema, err := GenerateOutputSchema[LogsData]()
+	if err != nil {
+		return nil, err
+	}
+	wire, err := GenerateOutputSchema[toolUsageSummaryWire]()
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceArrayItemSchema(schema, []string{"tool_usage"}, wire); err != nil {
+		return nil, err
+	}
+	return schema, nil
+}
+
+func generateCrossRunAuditOutputSchema() (*jsonschema.Schema, error) {
+	schema, err := GenerateOutputSchema[CrossRunAuditReport]()
+	if err != nil {
+		return nil, err
+	}
+	wire, err := GenerateOutputSchema[mcpServerCrossRunHealthWire]()
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceArrayItemSchema(schema, []string{"mcp_health"}, wire); err != nil {
+		return nil, err
+	}
+	return schema, nil
+}
+
+func replaceArrayItemSchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	target := schema
+	for _, property := range path {
+		var ok bool
+		target, ok = target.Properties[property]
+		if !ok {
+			return fmt.Errorf("schema property %q not found", property)
+		}
+	}
+	if target.Items == nil {
+		return fmt.Errorf("schema property %q is not an array", path[len(path)-1])
+	}
+	target.Items = replacement
+	return nil
 }
 
 func generateSchemaWithDefaults[T any](defaults map[string]any) (*jsonschema.Schema, error) {

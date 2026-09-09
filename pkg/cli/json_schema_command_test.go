@@ -31,6 +31,16 @@ func TestJSONSchemaCommand(t *testing.T) {
 					Overview:        OverviewData{},
 					Metrics:         MetricsData{},
 					DownloadedFiles: []FileInfo{},
+					MCPServerHealth: &MCPServerHealth{
+						Servers: []MCPServerHealthDetail{{
+							MCPServerStatsBase: MCPServerStatsBase{
+								ServerName:    "github",
+								ToolCallCount: 3,
+								ErrorCount:    1,
+							},
+							RequestCount: 3,
+						}},
+					},
 				},
 				AuditDiff{},
 				[]AuditDiff{{}},
@@ -41,8 +51,26 @@ func TestJSONSchemaCommand(t *testing.T) {
 			schemaName: "logs",
 			oneOfCount: 2,
 			validOutput: []any{
-				LogsData{},
-				CrossRunAuditReport{},
+				LogsData{
+					ToolUsage: []ToolUsageSummary{{
+						ToolUsageStatsBase: ToolUsageStatsBase{
+							ToolName:  "github_get_issue",
+							CallCount: 3,
+						},
+						Runs: 1,
+					}},
+				},
+				CrossRunAuditReport{
+					MCPHealth: []MCPServerCrossRunHealth{{
+						MCPServerStatsBase: MCPServerStatsBase{
+							ServerName:    "github",
+							ToolCallCount: 3,
+							ErrorCount:    1,
+						},
+						RunsConnected: 1,
+						TotalRuns:     1,
+					}},
+				},
 			},
 		},
 	}
