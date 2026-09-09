@@ -65,6 +65,8 @@ type runArtifactsConcurrentOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
+	cachedRuns             cachedLogsRuns
+	filters                runFilterOpts
 }
 
 // buildConcurrentDownloadParams constructs download parameters by parsing the optional
@@ -156,6 +158,11 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 
 	// Each download task runs concurrently with context awareness.
 	for i, run := range runs {
+		if cachedResult, ok := cachedJSONDownloadResult(run, opts.cachedRuns, opts.filters); ok {
+			results[i] = cachedResult
+			completedCount.Add(1)
+			continue
+		}
 		p.Go(func(ctx context.Context) error {
 			result, _ := processSingleRunDownload(ctx, run, params, &completedCount, progressBar)
 			results[i] = result
@@ -174,6 +181,20 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 	}
 	logsOrchestratorLog.Printf("Concurrent download complete: total=%d, results=%d", totalRuns, len(results))
 	return results
+}
+
+func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filters runFilterOpts) (DownloadResult, bool) {
+	cachedRun, ok := cachedRuns.lookup(run, filters)
+	if !ok {
+		return DownloadResult{}, false
+	}
+	logsOrchestratorLog.Printf("Reusing run %d from cached logs JSON", run.DatabaseID)
+	return DownloadResult{
+		RunAnalysis: RunAnalysis{Run: run},
+		Cached:      true,
+		CachedRun:   &cachedRun,
+		LogsPath:    cachedRun.LogsPath,
+	}, true
 }
 
 // resolveRunRepoContext returns a copy of params with dlOwner/dlRepo/dlHost resolved to

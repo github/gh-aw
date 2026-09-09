@@ -128,6 +128,7 @@ type ProcessedRun struct {
 	WorkingSet              *WorkingSetMetrics
 	GitHubRateLimitUsage    *GitHubRateLimitUsage
 	JobDetails              []JobInfoWithDuration
+	cachedData              *RunData
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.
@@ -306,6 +307,7 @@ type DownloadResult struct {
 	Error           error
 	Skipped         bool
 	Cached          bool // True if loaded from cached summary
+	CachedRun       *RunData
 	LogsPath        string
 	storageReserved bool
 }
