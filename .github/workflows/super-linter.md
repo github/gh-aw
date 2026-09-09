@@ -7,6 +7,7 @@ on:
   schedule:
     - cron: "daily around 14:00 on weekdays" # ~2 PM UTC, weekdays only
 permissions:
+  copilot-requests: write
   contents: read
   actions: read
   issues: read
@@ -16,8 +17,8 @@ safe-outputs:
     expires: 2d
     title-prefix: "[linter] "
     labels: [automation, code-quality, cookie]
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 name: Super Linter Report
 timeout-minutes: 15
 imports:
@@ -105,9 +106,6 @@ tools:
   edit:
   bash:
     - "*"
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Super Linter Analysis Report

@@ -510,8 +510,8 @@ permissions:
 features:
   gh-aw-detection: true
 
-model: copilot/gpt-5.3-codex
-engine: codex
+model: copilot/auto
+engine: pi
 imports:
   - shared/mcp-pagination.md
   - shared/github-guard-policy.md
