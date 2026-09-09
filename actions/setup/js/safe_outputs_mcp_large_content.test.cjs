@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import crypto from "crypto";
-describe.sequential("safe_outputs_mcp_server.cjs large content handling", () => {
+describe("safe_outputs_mcp_server.cjs large content handling", () => {
   let originalEnv, tempOutputDir, tempConfigFile, tempOutputFile;
   (beforeEach(() => {
     ((originalEnv = { ...process.env }),

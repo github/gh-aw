@@ -7,13 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
 
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 
 tools:
   cli-proxy: true
@@ -34,9 +35,6 @@ imports:
 
 
   - shared/otlp.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Repository Tree Map Generator

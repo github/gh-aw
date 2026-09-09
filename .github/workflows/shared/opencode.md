@@ -1,6 +1,7 @@
 ---
 engine:
   id: opencode
+  detection-engine: copilot
   version: "1.2.14"
   display-name: OpenCode
   description: OpenCode CLI with headless mode and multi-provider LLM support

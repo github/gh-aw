@@ -501,9 +501,11 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime gvisor                              # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--after-run-id`, `--artifacts`, `--before-run-id`, `--cache-before`, `--count/-c`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--json/-j`, `--last`, `--no-firewall`, `--output/-o`, `--parse`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--after-run-id`, `--artifacts`, `--before-run-id`, `--cache-before`, `--cached-json`, `--count/-c`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--json/-j`, `--last`, `--no-firewall`, `--output/-o`, `--parse`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. The `--last` flag is an alias for `--count/-c`.
+
+`--cached-json` reuses compatible runs from an earlier logs JSON response and overwrites that file with the updated response.
 
 #### `audit`
 

@@ -778,7 +778,7 @@ func isEngineDefinitionForm(def *EngineDefinition) bool {
 	// Treat richer metadata-only objects as shared engine definitions. Plain engine
 	// config objects ("id", "model", "env", etc.) should continue down the normal
 	// EngineConfig path instead of being registered as catalog entries.
-	if def.DisplayName != "" || def.RuntimeID != "" || def.Experimental || def.GHSkillAgentName != "" || def.Behaviors != nil || len(def.Auth) > 0 {
+	if def.DisplayName != "" || def.RuntimeID != "" || def.Experimental || def.GHSkillAgentName != "" || def.Behaviors != nil || def.DetectionEngine != "" || len(def.Auth) > 0 {
 		return true
 	}
 	if def.Provider.Name != "" || def.Provider.Auth != nil || def.Provider.Request != nil {

@@ -36,7 +36,7 @@ function canWriteToDefaultPath() {
 const canWriteDefault = canWriteToDefaultPath();
 
 // Skip tests that require /opt access when running locally without permissions
-(describe.skipIf(!canWriteDefault).sequential("safe_outputs_mcp_server.cjs defaults handling", () => {
+(describe.skipIf(!canWriteDefault)("safe_outputs_mcp_server.cjs defaults handling", () => {
   let originalEnv, tempConfigFile, tempOutputDir;
   (beforeEach(() => {
     ((originalEnv = { ...process.env }),
@@ -183,7 +183,7 @@ const canWriteDefault = canWriteToDefaultPath();
       });
     }));
 }),
-  describe.sequential("safe_outputs_mcp_server.cjs branch parameter handling", () => {
+  describe("safe_outputs_mcp_server.cjs branch parameter handling", () => {
     const toolsJsonPath = path.join(__dirname, "safe_outputs_tools.json");
     (it("should have optional branch parameter for create_pull_request", async () => {
       const tempConfigPath = path.join("/tmp", `test-config-${Date.now()}-${Math.random().toString(36).substring(7)}.json`);
@@ -290,7 +290,7 @@ const canWriteDefault = canWriteToDefaultPath();
         });
       }));
   }),
-  describe.sequential("safe_outputs_mcp_server.cjs tool call response format", () => {
+  describe("safe_outputs_mcp_server.cjs tool call response format", () => {
     const toolsJsonPath = path.join(__dirname, "safe_outputs_tools.json");
     // Provide a target repo so the create_issue handler's resolveAndValidateRepo
     // succeeds without depending on the ambient CI env (GITHUB_REPOSITORY).

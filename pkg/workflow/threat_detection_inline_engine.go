@@ -12,6 +12,8 @@ import (
 // buildDetectionEngineExecutionStep creates the engine execution step for inline threat detection.
 // It uses the same agentic engine already installed in the agent job, but runs it through
 // sandbox.agent (AWF) with no allowed domains (network fully blocked) and no MCP configured.
+//
+//nolint:largefunc // Existing inline detection step assembly is intentionally kept together.
 func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []string {
 	// Check if threat detection has engine explicitly disabled
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil {
@@ -96,7 +98,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		detectionEngineConfig.HarnessMaxRetries = "0"
 	}
 
-	resolvedDetectionModel := data.Model
+	resolvedDetectionModel := inheritedDetectionModel(data)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		resolvedDetectionModel = data.SafeOutputs.ThreatDetection.Model
 	}
