@@ -257,7 +257,25 @@ func TestActivationStepsAddVersionCheckStep(t *testing.T) {
 		steps := strings.Join(ctx.steps, "")
 		assert.Contains(t, steps, "Check compile-agentic version")
 		assert.Contains(t, steps, "GH_AW_COMPILED_VERSION: \"v1.2.3\"")
+		assert.Contains(t, steps, "GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE: \"true\"")
+		assert.Contains(t, steps, "GH_AW_WORKFLOW_NAME: \"\"")
 		assert.Contains(t, steps, "check_version_updates.cjs")
+	})
+
+	t.Run("disables blocked version issue reporting when failure issues are disabled", func(t *testing.T) {
+		originalIsRelease := isReleaseBuild
+		isReleaseBuild = true
+		t.Cleanup(func() { isReleaseBuild = originalIsRelease })
+
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{ReportFailureAsIssue: templatableBoolPtr("false")},
+		})
+
+		compiler.addActivationVersionCheckStep(ctx)
+
+		steps := strings.Join(ctx.steps, "")
+		assert.Contains(t, steps, "GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE: \"false\"")
 	})
 
 	t.Run("skips version check for dev builds", func(t *testing.T) {
@@ -267,6 +285,34 @@ func TestActivationStepsAddVersionCheckStep(t *testing.T) {
 		compiler.addActivationVersionCheckStep(ctx)
 
 		assert.Empty(t, ctx.steps)
+	})
+}
+
+func TestActivationBlockedVersionIssuePermissions(t *testing.T) {
+	originalIsRelease := isReleaseBuild
+	isReleaseBuild = true
+	t.Cleanup(func() { isReleaseBuild = originalIsRelease })
+
+	t.Run("adds issues write for released compiler version checks", func(t *testing.T) {
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{})
+
+		permissions, err := compiler.buildActivationPermissions(ctx)
+
+		require.NoError(t, err)
+		assert.Contains(t, permissions, "issues: write")
+	})
+
+	t.Run("omits issues write when failure issue reporting is disabled", func(t *testing.T) {
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{ReportFailureAsIssue: templatableBoolPtr("false")},
+		})
+
+		permissions, err := compiler.buildActivationPermissions(ctx)
+
+		require.NoError(t, err)
+		assert.NotContains(t, permissions, "issues: write")
 	})
 }
 

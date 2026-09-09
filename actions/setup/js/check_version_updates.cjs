@@ -21,6 +21,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const CONFIG_URL = "https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json";
 const FETCH_TIMEOUT_MS = 120_000;
+const BLOCKED_VERSION_ISSUE_TITLE_PREFIX = "[aw] Workflows blocked by compile-agentic";
+const GITHUB_API_VERSION = "2022-11-28";
 
 /**
  * Parse an official version string (must be in vMAJOR.MINOR.PATCH format).
@@ -56,6 +58,144 @@ function compareVersions(a, b) {
     if (pa[i] !== pb[i]) return pa[i] - pb[i];
   }
   return 0;
+}
+
+/**
+ * Build the stable issue title used to deduplicate blocked compiler notifications.
+ *
+ * @param {string} compiledVersion
+ * @returns {string}
+ */
+function buildBlockedVersionIssueTitle(compiledVersion) {
+  return `${BLOCKED_VERSION_ISSUE_TITLE_PREFIX} ${compiledVersion}`;
+}
+
+/**
+ * Return a Markdown-safe inline-code representation.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function markdownCode(value) {
+  return `\`${String(value).replace(/`/g, "\\`")}\``;
+}
+
+/**
+ * Build a link to the current workflow run when the GitHub Actions context is available.
+ *
+ * @returns {string}
+ */
+function getRunUrl() {
+  const repoFullName = process.env.GITHUB_REPOSITORY || (globalThis.context?.repo ? `${globalThis.context.repo.owner}/${globalThis.context.repo.repo}` : "");
+  const runId = process.env.GITHUB_RUN_ID || String(globalThis.context?.runId || "");
+  if (!repoFullName || !runId) {
+    return "";
+  }
+  const serverUrl = process.env.GITHUB_SERVER_URL || globalThis.context?.serverUrl || "https://github.com";
+  return `${serverUrl}/${repoFullName}/actions/runs/${runId}`;
+}
+
+/**
+ * Build the body for the blocked compiler notification issue.
+ *
+ * @param {string} compiledVersion
+ * @returns {string}
+ */
+function buildBlockedVersionIssueBody(compiledVersion) {
+  const workflowName = process.env.GH_AW_WORKFLOW_NAME || globalThis.context?.workflow || "unknown";
+  const runUrl = getRunUrl();
+  const lines = [
+    `<!-- gh-aw-blocked-compiler-version: ${compiledVersion} -->`,
+    "",
+    "## Agentic workflows are blocked",
+    "",
+    `This repository has one or more workflows compiled with ${markdownCode(compiledVersion)}, which is in the blocked versions list.`,
+    "",
+    "Activation fails before the agent, safe outputs, and conclusion jobs can run.",
+    "",
+    "### Latest blocked run",
+    "",
+    `- Workflow: ${markdownCode(workflowName)}`,
+  ];
+  if (runUrl) {
+    lines.push(`- Run: ${runUrl}`);
+  }
+  lines.push(
+    "",
+    "### Action required",
+    "",
+    "Update `gh-aw` to the latest version and recompile the affected workflows with `gh aw compile`.",
+    "",
+    "This issue is updated by the activation-stage version check when another blocked run is detected."
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Find an existing open blocked-version issue for this compiler version.
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} compiledVersion
+ * @returns {Promise<{number: number, html_url: string} | null>}
+ */
+async function findExistingBlockedVersionIssue(owner, repo, compiledVersion) {
+  const title = buildBlockedVersionIssueTitle(compiledVersion);
+  const result = await github.rest.search.issuesAndPullRequests({
+    q: `repo:${owner}/${repo} is:issue is:open in:title "${title}"`,
+    per_page: 10,
+  });
+  const existing = result.data.items.find(item => item.title === title && !item.pull_request);
+  return existing ? { number: existing.number, html_url: existing.html_url } : null;
+}
+
+/**
+ * Best-effort issue notification for blocked compiler versions. Failures here must not
+ * mask the primary blocked-version error.
+ *
+ * @param {string} compiledVersion
+ * @returns {Promise<void>}
+ */
+async function reportBlockedVersionIssue(compiledVersion) {
+  if (process.env.GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE === "false") {
+    core.info("Blocked compiler version issue reporting is disabled");
+    return;
+  }
+  if (!globalThis.github?.rest?.issues || !globalThis.github?.rest?.search || !globalThis.context?.repo) {
+    core.info("GitHub issue APIs are unavailable; skipping blocked compiler version issue notification");
+    return;
+  }
+
+  const { owner, repo } = globalThis.context.repo;
+  const title = buildBlockedVersionIssueTitle(compiledVersion);
+  const body = buildBlockedVersionIssueBody(compiledVersion);
+
+  try {
+    const existing = await findExistingBlockedVersionIssue(owner, repo, compiledVersion);
+    if (existing) {
+      const updatedIssue = await github.rest.issues.update({
+        owner,
+        repo,
+        issue_number: existing.number,
+        title,
+        body,
+        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+      });
+      core.info(`Updated blocked compiler version issue #${updatedIssue.data.number}: ${updatedIssue.data.html_url}`);
+      return;
+    }
+
+    const newIssue = await github.rest.issues.create({
+      owner,
+      repo,
+      title,
+      body,
+      headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+    });
+    core.info(`Created blocked compiler version issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
+  } catch (err) {
+    core.warning(`Could not create or update blocked compiler version issue: ${getErrorMessage(err)}`);
+  }
 }
 
 /**
@@ -128,6 +268,7 @@ async function main() {
       .addRaw("This version has been revoked, typically due to a security issue.\n\n")
       .addRaw("**Action required:** Update `gh-aw` to the latest version and recompile your workflow with `gh aw compile`.\n");
     await core.summary.write();
+    await reportBlockedVersionIssue(compiledVersion);
     core.setFailed(`Blocked compile-agentic version: ${compiledVersion} is in the blocked versions list. Update gh-aw to the latest version and recompile your workflow.`);
     return;
   }
@@ -157,4 +298,12 @@ async function main() {
   core.info(`✅ Version check passed: ${compiledVersion}`);
 }
 
-module.exports = { main };
+module.exports = {
+  buildBlockedVersionIssueBody,
+  buildBlockedVersionIssueTitle,
+  compareVersions,
+  findExistingBlockedVersionIssue,
+  main,
+  parseVersion,
+  reportBlockedVersionIssue,
+};

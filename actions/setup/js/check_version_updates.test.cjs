@@ -23,11 +23,18 @@ describe("check_version_updates", () => {
     };
 
     global.core = mockCore;
+    global.github = {};
+    global.context = { repo: { owner: "owner", repo: "repo" }, workflow: "Test workflow", runId: 123 };
 
     mockFetch = vi.fn();
     vi.stubGlobal("fetch", mockFetch);
 
     delete process.env.GH_AW_COMPILED_VERSION;
+    delete process.env.GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE;
+    delete process.env.GH_AW_WORKFLOW_NAME;
+    delete process.env.GITHUB_REPOSITORY;
+    delete process.env.GITHUB_RUN_ID;
+    delete process.env.GITHUB_SERVER_URL;
 
     vi.resetModules();
 
@@ -38,6 +45,9 @@ describe("check_version_updates", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    delete global.core;
+    delete global.github;
+    delete global.context;
   });
 
   /**
@@ -334,6 +344,105 @@ describe("check_version_updates", () => {
     await runMain();
     expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
     expect(mockCore.summary.write).toHaveBeenCalled();
+  });
+
+  it("should create a deduplicated issue when version is blocked", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    process.env.GH_AW_WORKFLOW_NAME = "Blocked workflow";
+    process.env.GITHUB_REPOSITORY = "owner/repo";
+    process.env.GITHUB_RUN_ID = "456";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    const searchMock = vi.fn().mockResolvedValue({ data: { items: [] } });
+    const createMock = vi.fn().mockResolvedValue({ data: { number: 42, html_url: "https://github.com/owner/repo/issues/42" } });
+    global.github = {
+      rest: {
+        search: { issuesAndPullRequests: searchMock },
+        issues: { create: createMock, update: vi.fn() },
+      },
+    };
+
+    await runMain();
+
+    expect(searchMock).toHaveBeenCalledWith({
+      q: 'repo:owner/repo is:issue is:open in:title "[aw] Workflows blocked by compile-agentic v1.0.0"',
+      per_page: 10,
+    });
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: "owner",
+        repo: "repo",
+        title: "[aw] Workflows blocked by compile-agentic v1.0.0",
+        body: expect.stringContaining("Workflow: `Blocked workflow`"),
+      })
+    );
+    expect(createMock.mock.calls[0][0].body).toContain("https://github.com/owner/repo/actions/runs/456");
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+  });
+
+  it("should update an existing blocked version issue when version is blocked", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    const searchMock = vi.fn().mockResolvedValue({
+      data: {
+        items: [{ number: 7, html_url: "https://github.com/owner/repo/issues/7", title: "[aw] Workflows blocked by compile-agentic v1.0.0" }],
+      },
+    });
+    const updateMock = vi.fn().mockResolvedValue({ data: { number: 7, html_url: "https://github.com/owner/repo/issues/7" } });
+    const createMock = vi.fn();
+    global.github = {
+      rest: {
+        search: { issuesAndPullRequests: searchMock },
+        issues: { create: createMock, update: updateMock },
+      },
+    };
+
+    await runMain();
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: "owner",
+        repo: "repo",
+        issue_number: 7,
+        title: "[aw] Workflows blocked by compile-agentic v1.0.0",
+      })
+    );
+    expect(createMock).not.toHaveBeenCalled();
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+  });
+
+  it("should continue failing the version check when blocked issue creation fails", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    global.github = {
+      rest: {
+        search: { issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { items: [] } }) },
+        issues: { create: vi.fn().mockRejectedValue(new Error("Resource not accessible by integration")), update: vi.fn() },
+      },
+    };
+
+    await runMain();
+
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not create or update blocked compiler version issue"));
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+  });
+
+  it("should skip blocked version issue creation when disabled", async () => {
+    process.env.GH_AW_COMPILED_VERSION = "v1.0.0";
+    process.env.GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE = "false";
+    mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.0.0"], minimumVersion: "" }));
+    const createMock = vi.fn();
+    global.github = {
+      rest: {
+        search: { issuesAndPullRequests: vi.fn() },
+        issues: { create: createMock, update: vi.fn() },
+      },
+    };
+
+    await runMain();
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(mockCore.info).toHaveBeenCalledWith("Blocked compiler version issue reporting is disabled");
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
   });
 
   // ---------------------------------------------------------------------------

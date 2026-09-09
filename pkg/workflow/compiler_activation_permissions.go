@@ -38,6 +38,13 @@ func activationJobNeedsAppToken(ctx *activationJobBuildContext) bool {
 
 func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permissions {
 	appPerms := NewPermissions()
+	addActivationAppInteractionPermissions(appPerms, ctx)
+	addActivationAppLabelAndGuardrailPermissions(appPerms, ctx)
+	addActivationAppInferredPermissions(appPerms, ctx)
+	return appPerms
+}
+
+func addActivationAppInteractionPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	addActivationInteractionPermissions(
 		appPerms,
 		activationInteractionPermissionsOptions{
@@ -86,13 +93,9 @@ func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permiss
 			},
 		)
 	}
-	// Keep this aligned with addActivationLabelPermissions: app-token scopes are
-	// computed separately from GITHUB_TOKEN scopes because app-token permissions
-	// only apply to steps using the minted app token, while label permissions in
-	// addActivationLabelPermissions are only for GITHUB_TOKEN execution paths.
-	// This intentionally mirrors addActivationLabelPermissions without the
-	// ActivationGitHubApp == nil guard because this function runs only when
-	// activationJobNeedsAppToken confirms app-token minting is enabled.
+}
+
+func addActivationAppLabelAndGuardrailPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	if ctx.shouldRemoveLabel {
 		if slices.Contains(ctx.filteredLabelEvents, "issues") || slices.Contains(ctx.filteredLabelEvents, "pull_request") {
 			appPerms.Set(PermissionIssues, PermissionWrite)
@@ -107,15 +110,14 @@ func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permiss
 	if hasMaxDailyAICGuardrail(ctx.data) {
 		appPerms.Set(PermissionActions, PermissionRead)
 	}
-	// Add GitHub App-only permissions inferred from activation job gh CLI commands so the
-	// minted App token includes the scopes those commands require (e.g. codespaces: read
-	// for `gh codespace list`). Only App-only scopes are passed here.
+}
+
+func addActivationAppInferredPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	for scope, level := range ctx.activationInferredPerms {
 		if IsGitHubAppOnlyScope(scope) {
 			appPerms.Set(scope, level)
 		}
 	}
-	return appPerms
 }
 
 // buildActivationPermissions builds activation job permissions from workflow features and selected interactions.
@@ -142,6 +144,9 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	if isSteeringIssueEnabled(ctx.data) {
 		permsMap[PermissionIssues] = PermissionWrite
 	}
+	if c.activationBlockedVersionIssueEnabled(ctx) {
+		permsMap[PermissionIssues] = PermissionWrite
+	}
 	addActivationInteractionPermissionsMap(permsMap, activationInteractionPermissionsOptions{
 		onSection:                         ctx.data.On,
 		hasReaction:                       ctx.hasReaction,
@@ -160,6 +165,10 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 		permsMap[PermissionIdToken] = PermissionWrite
 	}
 	return permsMap
+}
+
+func (c *Compiler) activationBlockedVersionIssueEnabled(ctx *activationJobBuildContext) bool {
+	return !ctx.data.UpdateCheckDisabled && IsReleasedVersion(c.version) && conclusionReportFailureAsIssueEnabled(ctx.data)
 }
 
 func (c *Compiler) addCentralizedCommandActivationPermissions(permsMap map[PermissionScope]PermissionLevel, ctx *activationJobBuildContext) {
