@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -40,6 +41,18 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 	if !ok {
 		return RunData{}, false
 	}
+	if cached.Status != "completed" || run.Status != "completed" || cached.Conclusion != run.Conclusion {
+		return RunData{}, false
+	}
+	if cached.RunAttempt != "" && run.Attempt > 0 && cached.RunAttempt != strconv.Itoa(run.Attempt) {
+		return RunData{}, false
+	}
+	if cached.RunAttempt == "" && run.Attempt > 1 {
+		return RunData{}, false
+	}
+	if !cached.UpdatedAt.IsZero() && !run.UpdatedAt.IsZero() && !cached.UpdatedAt.Equal(run.UpdatedAt) {
+		return RunData{}, false
+	}
 	if cached.Repository != "" && run.Repository != "" && !strings.EqualFold(cached.Repository, run.Repository) {
 		return RunData{}, false
 	}
@@ -56,6 +69,10 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 		return RunData{}, false
 	}
 	return cached, true
+}
+
+func cachedJSONCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
+	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !audit && !train && !toolGraph
 }
 
 func processedRunFromCachedData(data RunData) ProcessedRun {

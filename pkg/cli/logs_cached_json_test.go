@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,9 +42,9 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 
 func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
 	runs := cachedLogsRuns{
-		42: {RunID: 42, Repository: "github/gh-aw", EngineID: "copilot"},
+		42: {RunID: 42, Repository: "github/gh-aw", EngineID: "copilot", Status: "completed", Conclusion: "success", RunAttempt: "1"},
 	}
-	run := WorkflowRun{DatabaseID: 42, Repository: "github/gh-aw"}
+	run := WorkflowRun{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1}
 
 	_, ok := runs.lookup(run, runFilterOpts{engine: "copilot"})
 	assert.True(t, ok)
@@ -55,14 +56,50 @@ func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestCachedLogsLookupRejectsChangedRun(t *testing.T) {
+	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+	runs := cachedLogsRuns{
+		42: {
+			RunID:      42,
+			Status:     "completed",
+			Conclusion: "success",
+			RunAttempt: "1",
+			UpdatedAt:  updatedAt,
+		},
+	}
+
+	tests := []WorkflowRun{
+		{DatabaseID: 42, Status: "in_progress", Conclusion: "", Attempt: 1, UpdatedAt: updatedAt},
+		{DatabaseID: 42, Status: "completed", Conclusion: "failure", Attempt: 1, UpdatedAt: updatedAt},
+		{DatabaseID: 42, Status: "completed", Conclusion: "success", Attempt: 2, UpdatedAt: updatedAt},
+		{DatabaseID: 42, Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt.Add(time.Minute)},
+	}
+	for _, run := range tests {
+		_, ok := runs.lookup(run, runFilterOpts{})
+		assert.False(t, ok)
+	}
+}
+
+func TestCachedJSONCanSatisfy(t *testing.T) {
+	usageFilter := []string{constants.UsageArtifactName.String()}
+	assert.True(t, cachedJSONCanSatisfy(usageFilter, false, false, false, false))
+	assert.False(t, cachedJSONCanSatisfy(nil, false, false, false, false))
+	assert.False(t, cachedJSONCanSatisfy(usageFilter, true, false, false, false))
+	assert.False(t, cachedJSONCanSatisfy(usageFilter, false, true, false, false))
+	assert.False(t, cachedJSONCanSatisfy(usageFilter, false, false, true, false))
+	assert.False(t, cachedJSONCanSatisfy(usageFilter, false, false, false, true))
+}
+
 func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 	cached := RunData{
 		RunID:        42,
 		WorkflowName: "cached-workflow",
+		Status:       "completed",
+		Conclusion:   "success",
 		LogsPath:     "/previous/run-42",
 	}
 
-	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42}}, runArtifactsConcurrentOptions{
+	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42, Status: "completed", Conclusion: "success"}}, runArtifactsConcurrentOptions{
 		outputDir:    t.TempDir(),
 		maxRuns:      1,
 		cachedRuns:   cachedLogsRuns{42: cached},
