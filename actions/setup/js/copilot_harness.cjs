@@ -88,7 +88,7 @@ const { isCAPIQuotaExceededError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
-const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
+const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 
 const AWF_CONFIG_PATH = process.env.GH_AW_AWF_CONFIG_PATH || "/tmp/gh-aw/awf-config.json";
 
@@ -660,6 +660,7 @@ function extractTokenCountFromOutput(output) {
  *   isInvocationCapExceeded?: boolean,
  *   isNullTypeToolCall?: boolean,
  *   isQuotaExceeded?: boolean,
+ *   isTrustedAICreditsBudgetExhausted?: boolean,
  *   isSDKSessionIdleTimeout?: boolean,
  *   hasNumerousPermissionDenied?: boolean,
  *   tokenCount?: number,
@@ -668,6 +669,7 @@ function extractTokenCountFromOutput(output) {
  */
 function classifyCopilotFailure(detection) {
   if (detection.isInvocationCapExceeded) return "invocation_cap_exceeded";
+  if (detection.isTrustedAICreditsBudgetExhausted) return "ai_credits_exhausted";
   if (detection.isQuotaExceeded) return "capi_quota_exceeded";
   if (detection.isMCPPolicy) return "mcp_policy_blocked";
   if (detection.isModelNotSupported) return "model_not_supported";
@@ -1347,6 +1349,13 @@ async function main() {
           const isInvocationCapExceeded = nonRetryableGuard.maxRunsExceeded;
           const tokenCount = extractTokenCountFromOutput(result.output);
           const attemptDurationMs = result.durationMs ?? 0;
+          const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
+          const providerAuthFailure = parseProviderAuthFailure(result.output);
+          const isProxyHTTP403AuthFailure = !!providerAuthFailure && providerAuthFailure.statusCode === "403" && isLikelyAWFAPIProxyURL(providerAuthFailure.providerUrl);
+          const shouldCheckAuditForAICreditsExceeded = nonRetryableGuard.aiCreditsExceeded || isAuthenticationFailed || isProxyHTTP403AuthFailure;
+          const auditAICreditsExceeded = shouldCheckAuditForAICreditsExceeded ? parseMaxAICreditsExceededFromAuditLog() : false;
+          const trustedAICreditsExceeded = !!proxyAICreditsRejection || auditAICreditsExceeded;
+          const isTrustedAICreditsBudgetExhausted = trustedAICreditsExceeded && (!isAuthenticationFailed || !!proxyAICreditsRejection || isProxyHTTP403AuthFailure);
           const failureClass = classifyCopilotFailure({
             hasOutput: result.hasOutput,
             isAuthErr,
@@ -1359,6 +1368,7 @@ async function main() {
             isInvocationCapExceeded,
             isNullTypeToolCall,
             isQuotaExceeded,
+            isTrustedAICreditsBudgetExhausted,
             isSDKSessionIdleTimeout,
             hasNumerousPermissionDenied,
             tokenCount,
@@ -1424,21 +1434,36 @@ async function main() {
             return { action: "stop", exitCode: 0 };
           }
 
-          const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
           if (proxyAICreditsRejection) {
             log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
           }
-          const trustedAICreditsExceeded = nonRetryableGuard.aiCreditsExceeded && (!!proxyAICreditsRejection || parseMaxAICreditsExceededFromAuditLog());
           if (nonRetryableGuard.aiCreditsExceeded && !trustedAICreditsExceeded) {
             log(`attempt ${attempt + 1}: AI credits marker found in CLI output without trusted firewall audit confirmation — preserving normal failure handling`);
           }
           // Some CLIs surface the proxy's budget rejection as an authentication failure (e.g. Claude Code
           // reports `error: authentication_failed` for "403 Maximum AI credits exceeded"). When the trusted
           // proxy signature is present that veto must not mask intentional budget enforcement.
-          const shouldTreatAICreditsExceededAsSuccess = trustedAICreditsExceeded && (!isAuthenticationFailed || !!proxyAICreditsRejection);
+          const shouldTreatAICreditsExceededAsSuccess = isTrustedAICreditsBudgetExhausted;
           if (shouldTreatAICreditsExceededAsSuccess || isInvocationCapExceeded) {
             const reasons = [];
-            if (shouldTreatAICreditsExceededAsSuccess) reasons.push("AI credits budget exceeded");
+            if (shouldTreatAICreditsExceededAsSuccess) {
+              /** @type {string} */
+              let budgetUsageDetails = "";
+              if (proxyAICreditsRejection) {
+                budgetUsageDetails = ` (configured cap=${proxyAICreditsRejection.maxAICredits}, observed usage=${proxyAICreditsRejection.aiCredits})`;
+              } else {
+                const { aiCredits: observedAICredits } = parseAICreditsErrorInfoFromAuditLog();
+                const configuredMaxAICredits = parseMaxAICreditsFromAuditLog();
+                if (configuredMaxAICredits && observedAICredits) {
+                  budgetUsageDetails = ` (configured cap=${configuredMaxAICredits}, observed usage=${observedAICredits})`;
+                } else if (configuredMaxAICredits) {
+                  budgetUsageDetails = ` (configured cap=${configuredMaxAICredits})`;
+                } else if (observedAICredits) {
+                  budgetUsageDetails = ` (observed usage=${observedAICredits})`;
+                }
+              }
+              reasons.push(`AI credits budget exceeded${budgetUsageDetails}`);
+            }
             if (isInvocationCapExceeded) {
               reasons.push("LLM invocation cap saturated — the pooled per-run budget is fully exhausted; retries cannot make progress");
             }
