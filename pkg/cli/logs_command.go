@@ -447,13 +447,14 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 func parseIgnoredWorkflowRunIDs(values []string) ([]int64, error) {
 	runIDs := make([]int64, 0, len(values))
 	for _, value := range values {
+		originalValue := value
 		value = strings.TrimSpace(value)
 		if index := strings.LastIndexByte(value, '/'); index >= 0 {
 			value = value[index+1:]
 		}
 		runID, err := strconv.ParseInt(value, 10, 64)
 		if err != nil || runID <= 0 {
-			return nil, fmt.Errorf("invalid workflow run %q: expected a positive run ID or slug/ID", value)
+			return nil, fmt.Errorf("invalid workflow run %q: expected a positive run ID or slug/ID (for example, 123 or github/gh-aw/123)", originalValue)
 		}
 		if !slices.Contains(runIDs, runID) {
 			runIDs = append(runIDs, runID)
@@ -568,7 +569,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("ref", "", "Filter runs by branch or tag name (e.g., main, v1.0.0)")
 	logsCmd.Flags().Int64("before-run-id", 0, "Filter runs with database ID before this value (exclusive)")
 	logsCmd.Flags().Int64("after-run-id", 0, "Filter runs with database ID after this value (exclusive)")
-	logsCmd.Flags().StringSlice("ignore-workflow-runs", nil, "Workflow run IDs or slug/ID values to exclude")
+	logsCmd.Flags().StringSlice("ignore-workflow-runs", nil, "Workflow run IDs or slug/ID values to exclude (slug is informational; matching uses the numeric ID)")
 	addRepoFlag(logsCmd)
 	logsCmd.Flags().Bool("tool-graph", false, "Generate Mermaid tool sequence graph from agent logs")
 	logsCmd.Flags().Bool("exclude-staged", false, "Exclude workflow runs that executed in staged mode (safe outputs previewed but not applied)")

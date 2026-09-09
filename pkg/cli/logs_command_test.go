@@ -350,7 +350,9 @@ func TestLogsCommandRejectsInvalidIgnoredWorkflowRun(t *testing.T) {
 	_, err := loadCommonLogsOptions(cmd)
 
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "github/gh-aw/not-a-run")
 	assert.Contains(t, err.Error(), "expected a positive run ID or slug/ID")
+	assert.Contains(t, err.Error(), "123 or github/gh-aw/123")
 }
 
 func TestLogsCommandOutputFlag(t *testing.T) {

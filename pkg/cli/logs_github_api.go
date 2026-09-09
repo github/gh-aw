@@ -603,7 +603,7 @@ func filterIgnoredWorkflowRuns(runs []WorkflowRun, ignoredRunIDs []int64) []Work
 	if len(ignoredRunIDs) == 0 {
 		return runs
 	}
-	filtered := runs[:0]
+	filtered := make([]WorkflowRun, 0, len(runs))
 	for _, run := range runs {
 		if !slices.Contains(ignoredRunIDs, run.DatabaseID) {
 			filtered = append(filtered, run)
