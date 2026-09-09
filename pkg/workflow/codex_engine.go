@@ -93,10 +93,17 @@ func (e *CodexEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider
 	return resolveEngineLLMProvider(workflowData, LLMProviderOpenAI)
 }
 
+// codexModelID strips a known LLM provider prefix (for example "openai/" or
+// "copilot/") from the configured model so the Codex CLI receives a bare model
+// name. Codex rejects provider-scoped identifiers and silently falls back to
+// generic model metadata when it does not recognize the name.
 func codexModelID(model string) string {
 	model = strings.TrimSpace(model)
 	provider, modelID, found := strings.Cut(model, "/")
-	if found && strings.EqualFold(provider, "copilot") {
+	if !found || modelID == "" {
+		return model
+	}
+	if _, known := llmProviderAliases[strings.ToLower(strings.TrimSpace(provider))]; known {
 		return modelID
 	}
 	return model
