@@ -49,6 +49,55 @@ func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
 	require.ErrorContains(t, err, "invalid run_attempt")
 }
 
+func TestWriteCachedLogsJSONUpdatesFileInPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[{"run_id":1}]}`), 0o600))
+	data := LogsData{
+		Runs: []RunData{{
+			RunID:             2,
+			WorkflowName:      "updated-workflow",
+			TokenUsageSummary: &TokenUsageSummary{TotalInputTokens: 100},
+		}},
+	}
+	data.Summary.TotalRuns = 1
+
+	require.NoError(t, writeCachedLogsJSON(path, data, false))
+
+	updated, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var result LogsData
+	require.NoError(t, json.Unmarshal(updated, &result))
+	require.Len(t, result.Runs, 1)
+	assert.Equal(t, int64(2), result.Runs[0].RunID)
+	assert.Equal(t, "updated-workflow", result.Runs[0].WorkflowName)
+	assert.Nil(t, result.Runs[0].TokenUsageSummary, "cached output should match the compact JSON response")
+}
+
+func TestPrepareLogsDataUpdatesCachedJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[]}`), 0o600))
+
+	_, err := prepareLogsData([]ProcessedRun{{
+		Run: WorkflowRun{
+			DatabaseID:   42,
+			WorkflowName: "updated-workflow",
+			Status:       "completed",
+		},
+	}}, renderLogsOutputOptions{
+		outputDir:  t.TempDir(),
+		cachedJSON: path,
+	})
+	require.NoError(t, err)
+
+	updated, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var result LogsData
+	require.NoError(t, json.Unmarshal(updated, &result))
+	require.Len(t, result.Runs, 1)
+	assert.Equal(t, int64(42), result.Runs[0].RunID)
+	assert.Equal(t, "updated-workflow", result.Runs[0].WorkflowName)
+}
+
 func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
 	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
 	runs := cachedLogsRuns{

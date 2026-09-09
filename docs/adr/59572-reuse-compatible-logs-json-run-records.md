@@ -12,7 +12,7 @@ The `gh aw logs` command currently recomputes run records by downloading and pro
 
 ### Decision
 
-We will allow `gh aw logs` to reuse prior `--json` output as a cache source when a cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSON retains. When reuse is valid, the command will preserve cached run records in rebuilt JSON output and recompute aggregate totals from the combined cached and newly processed data.
+We will allow `gh aw logs` to reuse prior `--json` output as a cache source when a cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSON retains. When reuse is valid, the command will preserve cached run records in rebuilt JSON output, recompute aggregate totals from the combined cached and newly processed data, and overwrite the file passed to `--cached-json` with the updated JSON response.
 
 ### Alternatives Considered
 
@@ -34,6 +34,7 @@ The project could have created a separate opaque cache artifact tailored specifi
 - Re-running `gh aw logs` can avoid downloading and reprocessing artifacts for unchanged completed runs, reducing cost and latency.
 - Cache reuse remains conservative because compatibility checks reject stale or insufficient cached records.
 - Rebuilt reports can combine cached and fresh records while preserving existing JSON output structure.
+- The cache file is ready for the next invocation without requiring separate output redirection.
 
 #### Negative
 - The logs pipeline becomes more complex because download, stdin, filtering, and aggregation paths must all account for cached records.

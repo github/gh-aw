@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 type cachedLogsRuns map[int64]RunData
@@ -37,6 +40,21 @@ func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
 	}
 	logsCacheLog.Printf("Loaded %d run records from cached logs JSON", len(runs))
 	return runs, nil
+}
+
+func writeCachedLogsJSON(path string, data LogsData, verbose bool) error {
+	if path == "" {
+		return nil
+	}
+	var output bytes.Buffer
+	if err := renderLogsJSONToWriter(&output, data, verbose); err != nil {
+		return fmt.Errorf("failed to render updated cached logs JSON: %w", err)
+	}
+	if err := os.WriteFile(path, output.Bytes(), constants.FilePermPublic); err != nil {
+		return fmt.Errorf("failed to update cached logs JSON: %w", err)
+	}
+	logsCacheLog.Printf("Updated cached logs JSON: path=%s", path)
+	return nil
 }
 
 func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunData, bool) {

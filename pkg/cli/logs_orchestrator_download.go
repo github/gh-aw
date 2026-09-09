@@ -660,14 +660,19 @@ func handleEmptyProcessedRuns(
 	if len(processedRuns) > 0 {
 		return false, nil
 	}
-	if opts.JSONOutput {
+	if opts.JSONOutput || opts.CachedJSON != "" {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, continuation)
 		logsData.Continuations = continuations
 		logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 		logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 		logsData.Message = noRunsMessage(opts.StartDate, timeoutReached, storageLimitReached)
-		if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
-			return true, fmt.Errorf("failed to render JSON output: %w", err)
+		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
+			return true, err
+		}
+		if opts.JSONOutput {
+			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
+				return true, fmt.Errorf("failed to render JSON output: %w", err)
+			}
 		}
 	}
 	if timeoutReached {

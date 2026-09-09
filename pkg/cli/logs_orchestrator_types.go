@@ -162,4 +162,5 @@ type renderLogsOutputOptions struct {
 	suppressRender bool
 	apiRateLimit   *GitHubAPIRateLimitReport
 	apiRateLimits  []*GitHubAPIRateLimitReport
+	cachedJSON     string
 }
