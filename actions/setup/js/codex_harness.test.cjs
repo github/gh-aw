@@ -1531,8 +1531,11 @@ setInterval(() => {}, 1000);`,
      */
     function writeTrustedAICreditsExceededAudit(tempDir) {
       const auditDir = path.join(tempDir, "sandbox", "firewall", "audit");
+      const tokenUsageDir = path.join(auditDir, "api-proxy-logs");
       fs.mkdirSync(auditDir, { recursive: true });
-      fs.writeFileSync(path.join(auditDir, "log.jsonl"), `${JSON.stringify({ max_ai_credits_exceeded: true })}\n`, "utf8");
+      fs.mkdirSync(tokenUsageDir, { recursive: true });
+      fs.writeFileSync(path.join(auditDir, "log.jsonl"), `${JSON.stringify({ type: "response", status: 200, max_ai_credits: 300 })}\n`, "utf8");
+      fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), `${JSON.stringify({ status: 200, ai_credits_total: 302.111025 })}\n`, "utf8");
       return path.join(tempDir, "agent-output.json");
     }
 
