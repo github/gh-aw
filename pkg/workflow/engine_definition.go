@@ -499,6 +499,9 @@ func knownEngineImportWithCompilerRef(importPath string) string {
 	if strings.Contains(importPath, "@") {
 		return importPath
 	}
+	if !strings.HasPrefix(importPath, "github/gh-aw/") {
+		return importPath + "@main"
+	}
 	ref := versionToGitRef(GetVersion())
 	if ref == "" {
 		return importPath
