@@ -46,6 +46,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
+	"github.com/github/gh-aw/pkg/linters/slicecontainsloop"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
@@ -123,6 +124,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	regexpdynamicpattern.Analyzer,
 	ssljson.Analyzer,
 	seenmapbool.Analyzer,
+	slicecontainsloop.Analyzer,
 	sortslice.Analyzer,
 	sprintferrdot.Analyzer,
 	sprintferrorsnew.Analyzer,

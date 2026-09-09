@@ -54,6 +54,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
+	"github.com/github/gh-aw/pkg/linters/slicecontainsloop"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
@@ -151,6 +152,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"regexpcompileinfunction", regexpcompileinfunction.Analyzer},
 		{"regexpdynamicpattern", regexpdynamicpattern.Analyzer},
 		{"seenmapbool", seenmapbool.Analyzer},
+		{"slicecontainsloop", slicecontainsloop.Analyzer},
 		{"sortslice", sortslice.Analyzer},
 		{"sprintferrdot", sprintferrdot.Analyzer},
 		{"sprintferrorsnew", sprintferrorsnew.Analyzer},

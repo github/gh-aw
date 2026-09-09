@@ -49,6 +49,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `regexpcompileinfunction` — reports `regexp.Compile` / `regexp.MustCompile` and their POSIX variants called inside functions that should be package-level.
 - `regexpdynamicpattern` — reports regexp compile calls whose pattern is not a compile-time constant string.
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
+- `slicecontainsloop` — reports explicit membership-search loops over slices that can be replaced with `slices.Contains`.
 - `sortslice` — reports `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc`.
 - `sprintferrdot` — reports redundant `.Error()` calls on error values passed to `fmt` format functions where the fmt package calls `.Error()` automatically.
 - `sprintferrorsnew` — reports `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead.
@@ -144,6 +145,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `regexpcompileinfunction` | Custom `go/analysis` analyzer that flags regexp compilation inside function bodies |
 | `regexpdynamicpattern` | Custom `go/analysis` analyzer that flags regexp compile calls with non-constant patterns |
 | `seenmapbool` | Custom `go/analysis` analyzer that flags `map[string]bool` used as a set that should use `map[string]struct{}` |
+| `slicecontainsloop` | Custom `go/analysis` analyzer that flags explicit membership-search loops over slices that can be replaced with `slices.Contains` |
 | `sortslice` | Custom `go/analysis` analyzer that flags `sort.Slice` / `sort.SliceStable` calls that should use `slices.SortFunc` / `slices.SortStableFunc` |
 | `sprintferrdot` | Custom `go/analysis` analyzer that flags redundant `.Error()` calls on error values passed to `fmt` format functions |
 | `sprintferrorsnew` | Custom `go/analysis` analyzer that flags `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead |
