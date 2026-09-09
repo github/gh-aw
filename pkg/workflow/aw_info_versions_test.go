@@ -314,8 +314,8 @@ func TestAwmgVersionInAwInfo(t *testing.T) {
 		{
 			name:                "Dynamic enclave without explicit MCP Gateway version",
 			mcpGatewayVersion:   "",
-			expectedAwmgVersion: string(constants.MCPGDynamicRepositoryDelegationMinVersion),
-			description:         "Should use the dynamic delegation minimum MCP gateway version when no explicit version is configured",
+			expectedAwmgVersion: string(constants.DefaultMCPGatewayVersion),
+			description:         "Should use the default MCP gateway version when it satisfies the dynamic delegation minimum",
 		},
 	}
 
