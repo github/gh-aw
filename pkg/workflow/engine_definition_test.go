@@ -301,6 +301,32 @@ func TestKnownEngineImportsDownload_UsesRawGitHubURL(t *testing.T) {
 	require.Equal(t, "/github/gh-aw/refs/heads/main/.github/aw/engines.json", gotPath)
 }
 
+func TestKnownEngineImportWithCompilerRef_UsesTargetDefaultBranch(t *testing.T) {
+	knownEngineImportsTestMu.Lock()
+	defer knownEngineImportsTestMu.Unlock()
+
+	originalAPIBaseURL := knownEngineImportsAPIBaseURL
+	originalHTTPClient := knownEngineImportsHTTPClient
+	t.Cleanup(func() {
+		knownEngineImportsAPIBaseURL = originalAPIBaseURL
+		knownEngineImportsHTTPClient = originalHTTPClient
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/owner/repo" {
+			t.Errorf("request path = %q, want %q", r.URL.Path, "/repos/owner/repo")
+		}
+		_, _ = w.Write([]byte(`{"default_branch":"trunk"}`))
+	}))
+	defer server.Close()
+
+	knownEngineImportsAPIBaseURL = server.URL
+	knownEngineImportsHTTPClient = server.Client
+
+	assert.Equal(t, "owner/repo/path/to/definition.md@trunk",
+		knownEngineImportWithCompilerRef(context.Background(), "owner/repo/path/to/definition.md"))
+}
+
 func TestKnownEngineImportsFile_MatchesSharedEngineFiles(t *testing.T) {
 	catalogPath := filepath.Join("..", "..", knownEngineImportsPath)
 	content, err := os.ReadFile(catalogPath)
