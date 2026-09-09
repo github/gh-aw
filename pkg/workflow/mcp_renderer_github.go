@@ -30,7 +30,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 	if len(explicitGuardPolicies) == 0 && githubBackendIsDynamicDelegationOnly(workflowData) {
 		explicitGuardPolicies = dynamicEnclaveGitHubGuardPolicies(workflowData)
 	}
-	if len(explicitGuardPolicies) == 0 && githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+	if githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
 		explicitGuardPolicies = staticEnclaveGitHubGuardPolicies(workflowData)
 	}
 	// Integrity reaction fields are only supported in proxy mode (DIFC/CLI proxy),
