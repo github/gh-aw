@@ -13,6 +13,7 @@ on:
   schedule: "15 9 1 * *"  # Monthly on the 1st at ~9 AM UTC (offset to avoid thundering herd)
 
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
@@ -21,8 +22,8 @@ permissions:
 concurrency:
   job-discriminator: ${{ inputs.organization || github.run_id }}
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 timeout-minutes: 45
 
