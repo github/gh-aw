@@ -81,6 +81,15 @@ func TestFindGemini37FlashPricing(t *testing.T) {
 	assert.InDelta(t, 0.000000075, pricing["cache_read"], 1e-12)
 }
 
+func TestFindGemini38FlashPricing(t *testing.T) {
+	t.Parallel()
+	pricing, ok := findModelPricing("github-copilot", "gemini-3.8-flash")
+	require.True(t, ok)
+	assert.InDelta(t, 0.00000075, pricing["input"], 1e-12)
+	assert.InDelta(t, 0.00000375, pricing["output"], 1e-12)
+	assert.InDelta(t, 0.000000075, pricing["cache_read"], 1e-12)
+}
+
 func TestComputeModelInferenceAIC(t *testing.T) {
 	t.Parallel()
 	aic := computeModelInferenceAIC("anthropic", "claude-sonnet-4.6", 1000, 200, 400, 50, 25)

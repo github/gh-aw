@@ -209,12 +209,6 @@ func (cm *CheckoutManager) SetSkipDefaultCheckout(skip bool) {
 	cm.skipDefaultCheckout = skip
 }
 
-// SetDefaultRefOverride forces the default workspace checkout to use ref.
-func (cm *CheckoutManager) SetDefaultRefOverride(ref string) {
-	checkoutManagerLog.Printf("Setting default checkout ref override: %q", ref)
-	cm.defaultRefOverride = ref
-}
-
 // NewCheckoutManager creates a new CheckoutManager pre-loaded with user-supplied
 // CheckoutConfig entries from the frontmatter.
 func NewCheckoutManager(userCheckouts []*CheckoutConfig) *CheckoutManager {

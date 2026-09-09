@@ -505,6 +505,7 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 				permissions.Merge(NewPermissionsContentsWritePRWrite())
 			} else {
 				permissions.Merge(NewPermissionsContentsWrite())
+				permissions.Set(PermissionPullRequests, PermissionRead)
 			}
 			if safeOutputs.PushToPullRequestBranch.AllowWorkflows {
 				permissions.Set(PermissionWorkflows, PermissionWrite)

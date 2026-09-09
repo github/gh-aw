@@ -1,0 +1,2946 @@
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total_runs": {
+              "type": "integer"
+            },
+            "total_duration": {
+              "type": "string"
+            },
+            "total_aic": {
+              "type": "number"
+            },
+            "total_tokens": {
+              "type": "integer"
+            },
+            "total_action_minutes": {
+              "type": "number"
+            },
+            "total_turns": {
+              "type": "integer"
+            },
+            "total_steering_events": {
+              "type": "integer"
+            },
+            "total_errors": {
+              "type": "integer"
+            },
+            "total_warnings": {
+              "type": "integer"
+            },
+            "total_missing_tools": {
+              "type": "integer"
+            },
+            "total_missing_data": {
+              "type": "integer"
+            },
+            "total_safe_items": {
+              "type": "integer"
+            },
+            "total_driver_exit_failures": {
+              "type": "integer"
+            },
+            "total_agent_logic_failures": {
+              "type": "integer"
+            },
+            "runs_with_temporary_id_chains": {
+              "type": "integer"
+            },
+            "runs_with_delegated_temp_targets": {
+              "type": "integer"
+            },
+            "runs_with_missing_temporary_id_map": {
+              "type": "integer"
+            },
+            "runs_with_invalid_temporary_id_map": {
+              "type": "integer"
+            },
+            "total_temporary_id_mappings": {
+              "type": "integer"
+            },
+            "total_chained_targets": {
+              "type": "integer"
+            },
+            "total_chained_followup_actions": {
+              "type": "integer"
+            },
+            "total_closed_temp_targets": {
+              "type": "integer"
+            },
+            "total_episodes": {
+              "type": "integer"
+            },
+            "high_confidence_episodes": {
+              "type": "integer"
+            },
+            "total_github_api_calls": {
+              "type": "integer"
+            },
+            "engine_counts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            },
+            "intentional_failure_runs": {
+              "type": "integer"
+            },
+            "outcome_accepted": {
+              "type": "integer"
+            },
+            "outcome_rejected": {
+              "type": "integer"
+            },
+            "outcome_ignored": {
+              "type": "integer"
+            },
+            "outcome_pending": {
+              "type": "integer"
+            },
+            "outcome_acceptance_rate": {
+              "type": "number"
+            },
+            "outcome_waste_rate": {
+              "type": "number"
+            },
+            "outcome_zero_touch_rate": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "total_runs",
+            "total_duration",
+            "total_action_minutes",
+            "total_turns",
+            "total_errors",
+            "total_warnings",
+            "total_missing_tools",
+            "total_missing_data",
+            "total_safe_items",
+            "total_driver_exit_failures",
+            "total_agent_logic_failures",
+            "total_episodes",
+            "high_confidence_episodes"
+          ],
+          "additionalProperties": false
+        },
+        "runs": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "number": {
+                "type": "integer"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "workflow_path": {
+                "type": "string"
+              },
+              "intentional_failure": {
+                "type": "boolean"
+              },
+              "agent": {
+                "type": "string"
+              },
+              "engine": {
+                "type": "string"
+              },
+              "engine_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "conclusion": {
+                "type": "string"
+              },
+              "classification": {
+                "type": "string"
+              },
+              "failure_kind": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "action_minutes": {
+                "type": "number"
+              },
+              "token_usage": {
+                "type": "integer"
+              },
+              "aic": {
+                "type": "number"
+              },
+              "ambient_context": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "input_tokens": {
+                    "type": "integer"
+                  },
+                  "cached_tokens": {
+                    "type": "integer"
+                  },
+                  "effective_tokens": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "input_tokens",
+                  "cached_tokens"
+                ],
+                "additionalProperties": false
+              },
+              "working_set": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "measurement_state": {
+                    "type": "string"
+                  },
+                  "rebuild_factor": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "cumulative_input_tokens": {
+                    "type": "integer"
+                  },
+                  "peak_input_tokens": {
+                    "type": "integer"
+                  },
+                  "rebuild_excess_tokens": {
+                    "type": "integer"
+                  },
+                  "invocations": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "measurement_state",
+                  "cumulative_input_tokens",
+                  "peak_input_tokens",
+                  "rebuild_excess_tokens",
+                  "invocations"
+                ],
+                "additionalProperties": false
+              },
+              "turns": {
+                "type": "integer"
+              },
+              "error_count": {
+                "type": "integer"
+              },
+              "warning_count": {
+                "type": "integer"
+              },
+              "missing_tool_count": {
+                "type": "integer"
+              },
+              "missing_data_count": {
+                "type": "integer"
+              },
+              "safe_items_count": {
+                "type": "integer"
+              },
+              "manifest_entry_count": {
+                "type": "integer"
+              },
+              "temporary_id_map_status": {
+                "type": "string"
+              },
+              "temporary_id_mappings": {
+                "type": "integer"
+              },
+              "chained_target_count": {
+                "type": "integer"
+              },
+              "chained_followup_action_count": {
+                "type": "integer"
+              },
+              "delegated_temp_target_count": {
+                "type": "integer"
+              },
+              "closed_temp_target_count": {
+                "type": "integer"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "logs_path": {
+                "type": "string"
+              },
+              "audit_path": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "head_sha": {
+                "type": "string"
+              },
+              "display_title": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "organization": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "actor": {
+                "type": "string"
+              },
+              "run_attempt": {
+                "type": "string"
+              },
+              "target_repo": {
+                "type": "string"
+              },
+              "event_name": {
+                "type": "string"
+              },
+              "comparison": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "baseline_found": {
+                    "type": "boolean"
+                  },
+                  "baseline": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "conclusion": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "selection": {
+                        "type": "string"
+                      },
+                      "matched_on": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "run_id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "delta": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "turns": {
+                        "type": "object",
+                        "properties": {
+                          "before": {
+                            "type": "integer"
+                          },
+                          "after": {
+                            "type": "integer"
+                          },
+                          "changed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "before",
+                          "after",
+                          "changed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "posture": {
+                        "type": "object",
+                        "properties": {
+                          "before": {
+                            "type": "string"
+                          },
+                          "after": {
+                            "type": "string"
+                          },
+                          "changed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "before",
+                          "after",
+                          "changed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "blocked_requests": {
+                        "type": "object",
+                        "properties": {
+                          "before": {
+                            "type": "integer"
+                          },
+                          "after": {
+                            "type": "integer"
+                          },
+                          "changed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "before",
+                          "after",
+                          "changed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "mcp_failure": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "before": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "after": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "newly_present": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "newly_present"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "turns",
+                      "posture",
+                      "blocked_requests"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "classification": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "reason_codes": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "recommendation": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "baseline_found"
+                ],
+                "additionalProperties": false
+              },
+              "task_domain": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              "behavior_fingerprint": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "execution_style": {
+                    "type": "string"
+                  },
+                  "tool_breadth": {
+                    "type": "string"
+                  },
+                  "actuation_style": {
+                    "type": "string"
+                  },
+                  "resource_profile": {
+                    "type": "string"
+                  },
+                  "dispatch_mode": {
+                    "type": "string"
+                  },
+                  "agentic_fraction": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "execution_style",
+                  "tool_breadth",
+                  "actuation_style",
+                  "resource_profile",
+                  "dispatch_mode",
+                  "agentic_fraction"
+                ],
+                "additionalProperties": false
+              },
+              "agentic_assessments": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "recommendation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "severity",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "context": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "repo": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "workflow_id": {
+                    "type": "string"
+                  },
+                  "workflow_call_id": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "actor": {
+                    "type": "string"
+                  },
+                  "event_type": {
+                    "type": "string"
+                  },
+                  "item_type": {
+                    "type": "string"
+                  },
+                  "item_number": {
+                    "type": "string"
+                  },
+                  "comment_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repo",
+                  "run_id",
+                  "workflow_id"
+                ],
+                "additionalProperties": false
+              },
+              "token_usage_summary": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "total_input_tokens": {
+                    "type": "integer"
+                  },
+                  "total_output_tokens": {
+                    "type": "integer"
+                  },
+                  "total_cache_read_tokens": {
+                    "type": "integer"
+                  },
+                  "total_cache_write_tokens": {
+                    "type": "integer"
+                  },
+                  "total_requests": {
+                    "type": "integer"
+                  },
+                  "total_steering_events": {
+                    "type": "integer"
+                  },
+                  "total_duration_ms": {
+                    "type": "integer"
+                  },
+                  "total_response_bytes": {
+                    "type": "integer"
+                  },
+                  "cache_efficiency": {
+                    "type": "number"
+                  },
+                  "total_effective_tokens": {
+                    "type": "integer"
+                  },
+                  "total_aic": {
+                    "type": "number"
+                  },
+                  "ambient_context": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "input_tokens": {
+                        "type": "integer"
+                      },
+                      "cached_tokens": {
+                        "type": "integer"
+                      },
+                      "effective_tokens": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "input_tokens",
+                      "cached_tokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "by_model": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "output_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_read_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_write_tokens": {
+                          "type": "integer"
+                        },
+                        "reasoning_tokens": {
+                          "type": "integer"
+                        },
+                        "effective_tokens": {
+                          "type": "integer"
+                        },
+                        "requests": {
+                          "type": "integer"
+                        },
+                        "duration_ms": {
+                          "type": "integer"
+                        },
+                        "response_bytes": {
+                          "type": "integer"
+                        },
+                        "aic": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "input_tokens",
+                        "output_tokens",
+                        "cache_read_tokens",
+                        "cache_write_tokens",
+                        "requests",
+                        "duration_ms",
+                        "response_bytes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "subagent_model_requests": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "agent_name": {
+                          "type": "string"
+                        },
+                        "requested_model": {
+                          "type": "string"
+                        },
+                        "invocation_count": {
+                          "type": "integer"
+                        },
+                        "effective_model": {
+                          "type": "string"
+                        },
+                        "reason_code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "agent_name",
+                        "requested_model",
+                        "invocation_count"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "subagent_model_actuals": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "provider": {
+                          "type": "string"
+                        },
+                        "requests": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "model",
+                        "requests"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "mismatch_count": {
+                    "type": "integer"
+                  },
+                  "warnings": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "total_input_tokens",
+                  "total_output_tokens",
+                  "total_cache_read_tokens",
+                  "total_cache_write_tokens",
+                  "total_requests",
+                  "total_duration_ms",
+                  "total_response_bytes",
+                  "cache_efficiency",
+                  "by_model"
+                ],
+                "additionalProperties": false
+              },
+              "github_api_calls": {
+                "type": "integer"
+              },
+              "avg_time_between_turns": {
+                "type": "string"
+              },
+              "experiments": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "assignments": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "cumulative_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "assignments"
+                ],
+                "additionalProperties": false
+              },
+              "graders": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer"
+                  },
+                  "results": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": [
+                            "null",
+                            "number"
+                          ]
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "type": [
+                            "null",
+                            "boolean"
+                          ]
+                        },
+                        "direction": {
+                          "type": "string"
+                        },
+                        "threshold": {
+                          "type": [
+                            "null",
+                            "number"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "total": {
+                    "type": "integer"
+                  },
+                  "passed": {
+                    "type": "integer"
+                  },
+                  "failed": {
+                    "type": "integer"
+                  },
+                  "error_count": {
+                    "type": "integer"
+                  },
+                  "unavailable_count": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "results",
+                  "total",
+                  "passed",
+                  "failed",
+                  "error_count",
+                  "unavailable_count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "run_id",
+              "number",
+              "workflow_name",
+              "workflow_path",
+              "status",
+              "classification",
+              "created_at",
+              "url",
+              "logs_path",
+              "event",
+              "branch"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "episodes": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "episode_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "string"
+              },
+              "reasons": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "root_run_id": {
+                "type": "integer"
+              },
+              "run_ids": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "workflow_names": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "primary_workflow": {
+                "type": "string"
+              },
+              "total_runs": {
+                "type": "integer"
+              },
+              "total_tokens": {
+                "type": "integer"
+              },
+              "total_aic": {
+                "type": "number"
+              },
+              "total_duration": {
+                "type": "string"
+              },
+              "risky_node_count": {
+                "type": "integer"
+              },
+              "changed_node_count": {
+                "type": "integer"
+              },
+              "write_capable_node_count": {
+                "type": "integer"
+              },
+              "missing_tool_count": {
+                "type": "integer"
+              },
+              "mcp_failure_count": {
+                "type": "integer"
+              },
+              "blocked_request_count": {
+                "type": "integer"
+              },
+              "latest_success_fallback_count": {
+                "type": "integer"
+              },
+              "new_mcp_failure_run_count": {
+                "type": "integer"
+              },
+              "blocked_request_increase_run_count": {
+                "type": "integer"
+              },
+              "blocked_request_at_cap": {
+                "type": "boolean"
+              },
+              "resource_heavy_node_count": {
+                "type": "integer"
+              },
+              "poor_control_node_count": {
+                "type": "integer"
+              },
+              "risk_distribution": {
+                "type": "string"
+              },
+              "escalation_eligible": {
+                "type": "boolean"
+              },
+              "escalation_reason": {
+                "type": "string"
+              },
+              "suggested_route": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "organization": {
+                "type": "string"
+              },
+              "manifest_entry_count": {
+                "type": "integer"
+              },
+              "temporary_id_mappings": {
+                "type": "integer"
+              },
+              "chained_target_count": {
+                "type": "integer"
+              },
+              "chained_followup_action_count": {
+                "type": "integer"
+              },
+              "delegated_temp_target_count": {
+                "type": "integer"
+              },
+              "closed_temp_target_count": {
+                "type": "integer"
+              },
+              "tool_calls": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "type": "string"
+                    },
+                    "server": {
+                      "type": "string"
+                    },
+                    "tokens": {
+                      "type": "integer"
+                    },
+                    "duration_ms": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "tool",
+                    "server",
+                    "tokens",
+                    "duration_ms",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "episode_id",
+              "kind",
+              "confidence",
+              "run_ids",
+              "workflow_names",
+              "total_runs",
+              "total_tokens",
+              "total_duration",
+              "risky_node_count",
+              "changed_node_count",
+              "write_capable_node_count",
+              "missing_tool_count",
+              "mcp_failure_count",
+              "blocked_request_count",
+              "latest_success_fallback_count",
+              "new_mcp_failure_run_count",
+              "blocked_request_increase_run_count",
+              "resource_heavy_node_count",
+              "poor_control_node_count",
+              "risk_distribution",
+              "escalation_eligible"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "edges": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_run_id": {
+                "type": "integer"
+              },
+              "target_run_id": {
+                "type": "integer"
+              },
+              "edge_type": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "string"
+              },
+              "reasons": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source_repo": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "event_type": {
+                "type": "string"
+              },
+              "episode_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_run_id",
+              "target_run_id",
+              "edge_type",
+              "confidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "tool_usage": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "total_calls": {
+                "type": "integer"
+              },
+              "runs": {
+                "type": "integer"
+              },
+              "max_output_size": {
+                "type": "integer"
+              },
+              "max_duration": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "total_calls",
+              "runs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "mcp_tool_usage": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "summary": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "server_name": {
+                    "type": "string"
+                  },
+                  "tool_name": {
+                    "type": "string"
+                  },
+                  "call_count": {
+                    "type": "integer"
+                  },
+                  "total_input_size": {
+                    "type": "integer"
+                  },
+                  "total_output_size": {
+                    "type": "integer"
+                  },
+                  "max_input_size": {
+                    "type": "integer"
+                  },
+                  "max_output_size": {
+                    "type": "integer"
+                  },
+                  "avg_duration": {
+                    "type": "string"
+                  },
+                  "max_duration": {
+                    "type": "string"
+                  },
+                  "error_count": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "server_name",
+                  "tool_name",
+                  "call_count",
+                  "total_input_size",
+                  "total_output_size",
+                  "max_input_size",
+                  "max_output_size"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "servers": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "server_name": {
+                    "type": "string"
+                  },
+                  "tool_call_count": {
+                    "type": "integer"
+                  },
+                  "error_count": {
+                    "type": "integer"
+                  },
+                  "request_count": {
+                    "type": "integer"
+                  },
+                  "total_input_size": {
+                    "type": "integer"
+                  },
+                  "total_output_size": {
+                    "type": "integer"
+                  },
+                  "avg_duration": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "server_name",
+                  "tool_call_count",
+                  "request_count",
+                  "total_input_size",
+                  "total_output_size"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "tool_calls": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "tool_call_id": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "string"
+                  },
+                  "server_name": {
+                    "type": "string"
+                  },
+                  "tool_name": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "input_size": {
+                    "type": "integer"
+                  },
+                  "output_size": {
+                    "type": "integer"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  },
+                  "effective_token_delta": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "timestamp",
+                  "server_name",
+                  "tool_name",
+                  "input_size",
+                  "output_size",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "filtered_events": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "timestamp": {
+                    "type": "string"
+                  },
+                  "server_id": {
+                    "type": "string"
+                  },
+                  "tool_name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "secrecy_tags": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "integrity_tags": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "author_association": {
+                    "type": "string"
+                  },
+                  "author_login": {
+                    "type": "string"
+                  },
+                  "html_url": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "timestamp",
+                  "server_id",
+                  "tool_name",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "integrity": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "total_filtered": {
+                  "type": "integer"
+                },
+                "runs_with_filtered_events": {
+                  "type": "integer"
+                },
+                "filtered_server_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                },
+                "filtered_tool_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                },
+                "filtered_reason_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "required": [
+                "total_filtered"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "summary",
+            "tool_calls"
+          ],
+          "additionalProperties": false
+        },
+        "observability_insights": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "severity",
+              "title",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "errors_and_warnings": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "engine": {
+                "type": "string"
+              },
+              "run_id": {
+                "type": "integer"
+              },
+              "run_url": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "pattern_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "message",
+              "count",
+              "run_id",
+              "run_url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "missing_tools": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "workflows": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "first_reason": {
+                "type": "string"
+              },
+              "run_ids": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "tool",
+              "count",
+              "workflows",
+              "first_reason",
+              "run_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "missing_data": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "data_type": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "workflows": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "first_reason": {
+                "type": "string"
+              },
+              "run_ids": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "data_type",
+              "count",
+              "workflows",
+              "first_reason",
+              "run_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "mcp_failures": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "server_name": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "workflows": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "run_ids": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "server_name",
+              "count",
+              "workflows",
+              "run_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "access_log": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "total_requests": {
+              "type": "integer"
+            },
+            "allowed_requests": {
+              "type": "integer"
+            },
+            "blocked_requests": {
+              "type": "integer"
+            },
+            "allowed_domains": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "blocked_domains": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "by_workflow": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "total_requests": {
+                    "type": "integer"
+                  },
+                  "allowed_count": {
+                    "type": "integer"
+                  },
+                  "blocked_count": {
+                    "type": "integer"
+                  },
+                  "allowed_domains": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "blocked_domains": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "total_requests",
+                  "allowed_count",
+                  "blocked_count"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "total_requests",
+            "allowed_requests",
+            "blocked_requests",
+            "allowed_domains",
+            "blocked_domains"
+          ],
+          "additionalProperties": false
+        },
+        "firewall_log": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "total_requests": {
+              "type": "integer"
+            },
+            "allowed_requests": {
+              "type": "integer"
+            },
+            "blocked_requests": {
+              "type": "integer"
+            },
+            "allowed_domains": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "blocked_domains": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "requests_by_domain": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "allowed": {
+                    "type": "integer"
+                  },
+                  "blocked": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "allowed",
+                  "blocked"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "by_workflow": {
+              "type": "object",
+              "additionalProperties": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "allowed_domains": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "blocked_domains": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "total_requests": {
+                    "type": "integer"
+                  },
+                  "allowed_requests": {
+                    "type": "integer"
+                  },
+                  "blocked_requests": {
+                    "type": "integer"
+                  },
+                  "requests_by_domain": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {
+                          "type": "integer"
+                        },
+                        "blocked": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "blocked"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "total_requests",
+                  "allowed_requests",
+                  "blocked_requests"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "total_requests",
+            "allowed_requests",
+            "blocked_requests",
+            "allowed_domains",
+            "blocked_domains"
+          ],
+          "additionalProperties": false
+        },
+        "redacted_domains": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "total_domains": {
+              "type": "integer"
+            },
+            "domains": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "by_workflow": {
+              "type": "object",
+              "additionalProperties": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "total_domains": {
+                    "type": "integer"
+                  },
+                  "domains": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "total_domains",
+                  "domains"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "total_domains",
+            "domains"
+          ],
+          "additionalProperties": false
+        },
+        "continuation": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "workflow_name": {
+              "type": "string"
+            },
+            "count": {
+              "type": "integer"
+            },
+            "start_date": {
+              "type": "string"
+            },
+            "end_date": {
+              "type": "string"
+            },
+            "engine": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "after_run_id": {
+              "type": "integer"
+            },
+            "before_run_id": {
+              "type": "integer"
+            },
+            "ignore_workflow_runs": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "integer"
+              }
+            },
+            "timeout": {
+              "type": "integer"
+            },
+            "max_github_api_rate_limit": {
+              "type": "integer"
+            },
+            "max_storage": {
+              "type": "integer"
+            },
+            "prune_older_runs": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "continuations": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "repository": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "start_date": {
+                "type": "string"
+              },
+              "end_date": {
+                "type": "string"
+              },
+              "engine": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "after_run_id": {
+                "type": "integer"
+              },
+              "before_run_id": {
+                "type": "integer"
+              },
+              "ignore_workflow_runs": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "timeout": {
+                "type": "integer"
+              },
+              "max_github_api_rate_limit": {
+                "type": "integer"
+              },
+              "max_storage": {
+                "type": "integer"
+              },
+              "prune_older_runs": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "logs_location": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "stale_warning": {
+          "type": "string"
+        },
+        "github_api_rate_limit": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "start": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "limit": {
+                  "type": "integer"
+                },
+                "remaining": {
+                  "type": "integer"
+                },
+                "reset": {
+                  "type": "integer"
+                },
+                "used": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "limit",
+                "remaining",
+                "reset",
+                "used"
+              ],
+              "additionalProperties": false
+            },
+            "end": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "limit": {
+                  "type": "integer"
+                },
+                "remaining": {
+                  "type": "integer"
+                },
+                "reset": {
+                  "type": "integer"
+                },
+                "used": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "limit",
+                "remaining",
+                "reset",
+                "used"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "additionalProperties": false
+        },
+        "github_api_rate_limits": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "start": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "remaining": {
+                    "type": "integer"
+                  },
+                  "reset": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "limit",
+                  "remaining",
+                  "reset",
+                  "used"
+                ],
+                "additionalProperties": false
+              },
+              "end": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "remaining": {
+                    "type": "integer"
+                  },
+                  "reset": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "limit",
+                  "remaining",
+                  "reset",
+                  "used"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "host"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "summary",
+        "runs",
+        "episodes",
+        "edges",
+        "logs_location"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "runs_analyzed": {
+          "type": "integer"
+        },
+        "runs_with_data": {
+          "type": "integer"
+        },
+        "runs_without_data": {
+          "type": "integer"
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total_requests": {
+              "type": "integer"
+            },
+            "total_allowed": {
+              "type": "integer"
+            },
+            "total_blocked": {
+              "type": "integer"
+            },
+            "overall_deny_rate": {
+              "type": "number"
+            },
+            "unique_domains": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_requests",
+            "total_allowed",
+            "total_blocked",
+            "overall_deny_rate",
+            "unique_domains"
+          ],
+          "additionalProperties": false
+        },
+        "metrics_trend": {
+          "type": "object",
+          "properties": {
+            "total_tokens": {
+              "type": "integer"
+            },
+            "avg_tokens": {
+              "type": "integer"
+            },
+            "median_tokens": {
+              "type": "number"
+            },
+            "stddev_tokens": {
+              "type": "number"
+            },
+            "min_tokens": {
+              "type": "integer"
+            },
+            "max_tokens": {
+              "type": "integer"
+            },
+            "total_turns": {
+              "type": "integer"
+            },
+            "avg_turns": {
+              "type": "number"
+            },
+            "median_turns": {
+              "type": "number"
+            },
+            "stddev_turns": {
+              "type": "number"
+            },
+            "max_turns": {
+              "type": "integer"
+            },
+            "avg_duration_ns": {
+              "type": "integer"
+            },
+            "median_duration_ns": {
+              "type": "integer"
+            },
+            "stddev_duration_ns": {
+              "type": "integer"
+            },
+            "min_duration_ns": {
+              "type": "integer"
+            },
+            "max_duration_ns": {
+              "type": "integer"
+            },
+            "token_spikes": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [
+            "total_tokens",
+            "avg_tokens",
+            "median_tokens",
+            "stddev_tokens",
+            "min_tokens",
+            "max_tokens",
+            "total_turns",
+            "avg_turns",
+            "median_turns",
+            "stddev_turns",
+            "max_turns",
+            "avg_duration_ns",
+            "median_duration_ns",
+            "stddev_duration_ns",
+            "min_duration_ns",
+            "max_duration_ns"
+          ],
+          "additionalProperties": false
+        },
+        "mcp_health": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "server_name": {
+                "type": "string"
+              },
+              "runs_connected": {
+                "type": "integer"
+              },
+              "total_runs": {
+                "type": "integer"
+              },
+              "total_calls": {
+                "type": "integer"
+              },
+              "total_errors": {
+                "type": "integer"
+              },
+              "error_rate": {
+                "type": "number"
+              },
+              "unreliable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "server_name",
+              "runs_connected",
+              "total_runs",
+              "total_calls",
+              "total_errors",
+              "error_rate",
+              "unreliable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "error_trend": {
+          "type": "object",
+          "properties": {
+            "runs_with_errors": {
+              "type": "integer"
+            },
+            "total_errors": {
+              "type": "integer"
+            },
+            "avg_errors_per_run": {
+              "type": "number"
+            },
+            "runs_with_warnings": {
+              "type": "integer"
+            },
+            "total_warnings": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "runs_with_errors",
+            "total_errors",
+            "avg_errors_per_run",
+            "runs_with_warnings",
+            "total_warnings"
+          ],
+          "additionalProperties": false
+        },
+        "domain_inventory": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string"
+              },
+              "seen_in_runs": {
+                "type": "integer"
+              },
+              "total_allowed": {
+                "type": "integer"
+              },
+              "total_blocked": {
+                "type": "integer"
+              },
+              "overall_status": {
+                "type": "string"
+              },
+              "per_run_status": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "run_id": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "allowed": {
+                      "type": "integer"
+                    },
+                    "blocked": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "run_id",
+                    "status",
+                    "allowed",
+                    "blocked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "domain",
+              "seen_in_runs",
+              "total_allowed",
+              "total_blocked",
+              "overall_status",
+              "per_run_status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "per_run_breakdown": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "workflow_name": {
+                "type": "string"
+              },
+              "conclusion": {
+                "type": "string"
+              },
+              "duration_ns": {
+                "type": "integer"
+              },
+              "total_requests": {
+                "type": "integer"
+              },
+              "allowed": {
+                "type": "integer"
+              },
+              "blocked": {
+                "type": "integer"
+              },
+              "deny_rate": {
+                "type": "number"
+              },
+              "unique_domains": {
+                "type": "integer"
+              },
+              "tokens": {
+                "type": "integer"
+              },
+              "turns": {
+                "type": "integer"
+              },
+              "mcp_errors": {
+                "type": "integer"
+              },
+              "error_count": {
+                "type": "integer"
+              },
+              "has_data": {
+                "type": "boolean"
+              },
+              "token_spike": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "run_id",
+              "workflow_name",
+              "conclusion",
+              "duration_ns",
+              "total_requests",
+              "allowed",
+              "blocked",
+              "deny_rate",
+              "unique_domains",
+              "tokens",
+              "turns",
+              "mcp_errors",
+              "error_count",
+              "has_data"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "drain3_insights": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "severity",
+              "title",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "cluster_analysis": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "clusters": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "dimension": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "run_ids": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "count": {
+                    "type": "integer"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "avg_tokens": {
+                        "type": "integer"
+                      },
+                      "median_tokens": {
+                        "type": "number"
+                      },
+                      "stddev_tokens": {
+                        "type": "number"
+                      },
+                      "avg_turns": {
+                        "type": "number"
+                      },
+                      "avg_duration_ns": {
+                        "type": "integer"
+                      },
+                      "avg_errors_per_run": {
+                        "type": "number"
+                      },
+                      "success_rate": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "avg_tokens",
+                      "median_tokens",
+                      "stddev_tokens",
+                      "avg_turns",
+                      "avg_duration_ns",
+                      "avg_errors_per_run",
+                      "success_rate"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "dimension",
+                  "value",
+                  "run_ids",
+                  "count",
+                  "metrics"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "patterns": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "severity",
+                  "title",
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "clusters",
+            "patterns"
+          ],
+          "additionalProperties": false
+        },
+        "github_api_rate_limit": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "start": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "limit": {
+                  "type": "integer"
+                },
+                "remaining": {
+                  "type": "integer"
+                },
+                "reset": {
+                  "type": "integer"
+                },
+                "used": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "limit",
+                "remaining",
+                "reset",
+                "used"
+              ],
+              "additionalProperties": false
+            },
+            "end": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "limit": {
+                  "type": "integer"
+                },
+                "remaining": {
+                  "type": "integer"
+                },
+                "reset": {
+                  "type": "integer"
+                },
+                "used": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "limit",
+                "remaining",
+                "reset",
+                "used"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "additionalProperties": false
+        },
+        "github_api_rate_limits": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "start": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "remaining": {
+                    "type": "integer"
+                  },
+                  "reset": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "limit",
+                  "remaining",
+                  "reset",
+                  "used"
+                ],
+                "additionalProperties": false
+              },
+              "end": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "remaining": {
+                    "type": "integer"
+                  },
+                  "reset": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "limit",
+                  "remaining",
+                  "reset",
+                  "used"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "host"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runs_analyzed",
+        "runs_with_data",
+        "runs_without_data",
+        "summary",
+        "metrics_trend",
+        "error_trend",
+        "domain_inventory",
+        "per_run_breakdown"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

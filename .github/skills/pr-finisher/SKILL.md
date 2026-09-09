@@ -38,6 +38,7 @@ Top-level PR comments and review bodies are useful feedback but **not** a merge 
 - **Do not post stand-alone PR comments.** Only reply on existing review threads / comments that need a response. Do not ping reviewers or CODEOWNERS.
 - **Always disable pagers** for `gh`: prefix with `GH_PAGER=""` or pipe through `cat`. Without this, commands hang in non-interactive shells.
 - **Read PR state once per pass and reuse it.** Cache the initial `gh pr view` payload in a local snapshot file and use `jq` against that file until you perform an action that can change PR state (for example: push, update branch, resolve conflicts). Do not re-run overlapping `gh pr view` calls within the same unchanged turn sequence.
+- **Ignore platform-managed bot PRs by default.** Stop without updating PRs authored by `dependabot[bot]`, `app/dependabot`, `renovate[bot]`, or another unrecognized bot unless the user explicitly asks to handle that bot. Continue for trusted GitHub automation such as `app/github-copilot` and `github-actions[bot]`.
 - **Never wait for CI to re-run.** No `bash sleep`, no `gh run watch`, no `gh pr checks --watch`, no re-check loop after push. The agent's pushes will not trigger workflows; waiting is futile.
 - **Local validation is non-negotiable before each push.** Because CI will not re-run, the only correctness gate the agent gets is `make ...` locally. Treat a green local run as the bar.
 - **Commit and push every iteration that produces file changes.** Unpushed changes are not visible to the user.
@@ -70,11 +71,11 @@ The agent runs this once. There is no monitoring loop.
 ```bash
 mkdir -p /tmp/gh-aw/pr-finisher
 PR_SNAPSHOT=/tmp/gh-aw/pr-finisher/pr-state.json
-GH_PAGER="" gh pr view <number> --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,reviews,reviewThreads,comments > "$PR_SNAPSHOT"
+GH_PAGER="" gh pr view <number> --json author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,reviews,reviewThreads,comments > "$PR_SNAPSHOT"
 GH_PAGER="" gh pr checks <number>
 ```
 
-If merged/closed, report and stop. Otherwise classify each condition as ✅ / ❌ / ⏳ / ❓ using the snapshot file plus `gh pr checks`. The CI snapshot here is your **only** view of CI for this run — capture which checks failed and why before changing anything, because after you push it will be stale.
+If merged/closed, report and stop. Also stop if the author is a platform-managed dependency bot or another unrecognized bot, unless the user explicitly requested handling that bot-authored PR. This author gate is independent of reviewer eligibility. Otherwise classify each condition as ✅ / ❌ / ⏳ / ❓ using the snapshot file plus `gh pr checks`. The CI snapshot here is your **only** view of CI for this run — capture which checks failed and why before changing anything, because after you push it will be stale.
 
 ### 2. Address Reviews
 
@@ -172,15 +173,17 @@ Status vocabulary:
 
 ## Stopping conditions
 
+- **Ignored bot-authored PR** — platform-managed dependency bot or another unrecognized bot, without an explicit user request to handle it. Report no action and stop.
 - **Ready for merge (pending human CI re-trigger)** — local validation green, Reviews resolved, Mergeable clean. Summarize and stop.
 - **Nothing actionable remains** — non-actionable blocker (human approval, external service). Summarize and stop.
 - **Truly stuck** — unresolvable conflicts, ambiguous feedback, irreproducible failures. `ask_user` with context.
 
 ## Completion standard
 
-The task is complete only when all are true:
+For eligible PRs, the task is complete only when all are true:
 
 - `make fmt`, `make lint`, `make test-unit` all pass (or unrelated pre-existing failures explicitly identified).
+- The PR author passed the bot eligibility check, or the user explicitly requested handling that bot-authored PR.
 - `make test` was run and fixed when it was part of the failing state; wasm goldens regenerated when required.
 - The `copilot-review` skill addressed all in-scope review threads, including GitHub Actions bot review comments/threads (`github-actions[bot]`) (reply + resolve succeeded for each).
 - Review threads where Copilot had already replied with a substantive answer were resolved (step 2a) before delegating unresolved threads to `copilot-review` (step 2b).

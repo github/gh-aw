@@ -1256,9 +1256,22 @@ sync-install-script-hashes:
 	@bash scripts/update-install-script-hashes.sh
 	@echo "✓ Install script hashes synced successfully"
 
+# Generate audit and logs JSON schemas
+.PHONY: schemas
+schemas: build
+	@set -eu; \
+	for schema in audit logs; do \
+		target="schemas/$$schema.schema.json"; \
+		tmp=$$(mktemp "$$target.tmp.XXXXXX"); \
+		trap 'rm -f "$$tmp"' EXIT HUP INT TERM; \
+		./$(BINARY_NAME) json-schema "$$schema" > "$$tmp"; \
+		mv "$$tmp" "$$target"; \
+		trap - EXIT HUP INT TERM; \
+	done
+
 # Recompile all workflow files
 .PHONY: recompile
-recompile: build
+recompile: schemas
 	./$(BINARY_NAME) init --codespaces ""
 	./$(BINARY_NAME) compile --validate --verbose --purge --schedule-seed github/gh-aw
 #	./$(BINARY_NAME) compile --dir pkg/cli/workflows --validate --verbose --purge
