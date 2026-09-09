@@ -314,6 +314,79 @@ Read the assigned repository's issues through the enclave.
 	assert.NotContains(t, lock, "stop_enclave_github_proxy")
 }
 
+// TestCompileEnclaveOnlyGitHubToolsGuardPolicy compiles a workflow that disables
+// primary-agent GitHub access and enables GitHub tools only for a static enclave agent.
+// The GitHub MCP server must not reference the determine-automatic-lockdown step outputs,
+// because that step is not generated when tools.github is false: the resulting empty
+// server-level guard policy makes mcpg exit during startup.
+func TestCompileEnclaveOnlyGitHubToolsGuardPolicy(t *testing.T) {
+	tmp := t.TempDir()
+	workflowPath := filepath.Join(tmp, "enclave-only-github.md")
+	content := `---
+on: workflow_dispatch
+strict: false
+network: defaults
+engine: copilot
+tools:
+  github: false
+enclaves:
+  - agent:
+      model: gpt-5
+      tools:
+        github:
+          allowed: [list_issues, issue_read]
+          allowed-repos: [octo-org/private-service]
+          min-integrity: none
+    repos:
+      - repo: octo-org/private-service
+        sensitivity: confidential
+---
+
+Read the private repository's issues through the enclave.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o600))
+	compiler := NewCompiler()
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+	lockBytes, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	lock := string(lockBytes)
+
+	var doc any
+	require.NoError(t, yaml.Unmarshal(lockBytes, &doc), "generated lock file must be valid YAML")
+
+	// The determine-automatic-lockdown step is not generated, so its outputs must not be
+	// referenced by the server-level guard policy or the gateway step environment.
+	assert.NotContains(t, lock, "Determine automatic lockdown mode")
+	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_MIN_INTEGRITY")
+	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_REPOS")
+	assert.NotContains(t, lock, "GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}")
+
+	// The server-level guard policy mirrors the enclave identity policy, so it never
+	// broadens access beyond what the enclave identity already allows.
+	assert.Contains(t, lock, `"min-integrity": "none"`)
+	assert.Contains(t, lock, `"octo-org/private-service"`)
+	assert.Contains(t, lock, `"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}":{"servers":["github"],"tools":{"github":["list_issues","issue_read"]},"allow-only":{"min-integrity":"none","repos":["octo-org/private-service"]}}`)
+	assert.NotContains(t, lock, `"${MCP_GATEWAY_AGENT_ID}":{"servers":["awf-enclave","github"`)
+}
+
+func TestGitHubGuardPoliciesFromStepSkipsEnclaveOnlyBackend(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	// applyDefaultTools removes the "github" key when tools.github is false; the explicit
+	// refusal survives in ExplicitlyDisabledTools.
+	delete(data.Tools, "github")
+	data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
+
+	assert.False(t, githubLockdownDetectionStepEnabled(data))
+	assert.False(t, githubGuardPoliciesFromStep(data, nil))
+	assert.True(t, githubBackendIsStaticEnclaveDelegationOnly(data))
+
+	data.Tools["github"] = map[string]any{}
+	assert.True(t, githubLockdownDetectionStepEnabled(data))
+	assert.True(t, githubGuardPoliciesFromStep(data, nil))
+	assert.False(t, githubBackendIsStaticEnclaveDelegationOnly(data))
+}
+
 func TestEnclaveGitHubMCPVersionGates(t *testing.T) {
 	data := enclaveGitHubIssuesWorkflowData()
 	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)

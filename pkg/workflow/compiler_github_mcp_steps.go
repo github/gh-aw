@@ -10,6 +10,55 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+// githubLockdownDetectionStepEnabled reports whether the determine-automatic-lockdown step
+// is generated for a workflow. Consumers that reference the step outputs (guard policies,
+// guard environment variables) must check this first: a GitHub MCP server can also be
+// rendered purely to serve an enclave identity, in which case the step is absent and its
+// outputs would expand to empty strings at runtime.
+// Dynamic enclaves also need the workflow repository's visibility for Safe Outputs.
+func githubLockdownDetectionStepEnabled(data *WorkflowData) bool {
+	if data == nil {
+		return false
+	}
+	if enclaveDynamicRepositoryPolicyEnabled(data) {
+		return true
+	}
+	if githubTool, hasGitHub := data.Tools["github"]; hasGitHub {
+		return githubTool != false
+	}
+	// Default-tool resolution removes the "github" key when tools.github is false, so an
+	// absent key is only a refusal when it was explicitly disabled in the frontmatter.
+	_, explicitlyDisabled := data.ExplicitlyDisabledTools["github"]
+	return !explicitlyDisabled
+}
+
+// githubLockdownStepConfiguredGuardValues extracts the guard policy configuration already
+// present in the GitHub tool config, so the determine-automatic-lockdown step can detect
+// which fields are configured and avoid overriding them.
+func githubLockdownStepConfiguredGuardValues(githubTool any) (minIntegrity string, repos string, privateToPublicFlowsAllow bool) {
+	toolConfig, ok := githubTool.(map[string]any)
+	if !ok {
+		return "", "", false
+	}
+	if v, exists := toolConfig["min-integrity"]; exists {
+		minIntegrity = serializeEnvStringValue(v)
+	}
+	// Support both 'allowed-repos' (preferred) and deprecated 'repos'
+	if v, exists := toolConfig["allowed-repos"]; exists {
+		repos = serializeEnvStringValue(v)
+	} else if v, exists := toolConfig["repos"]; exists {
+		repos = serializeEnvStringValue(v)
+	}
+	// Detect private-to-public-flows: allow to inform the default repos value.
+	// When set to "allow", the user has explicitly opted in to cross-visibility data
+	// flows, so the repos default should be "all" rather than "public" even for
+	// public repositories.
+	if ptpFlows, _ := toolConfig["private-to-public-flows"].(string); ptpFlows == "allow" {
+		privateToPublicFlowsAllow = true
+	}
+	return minIntegrity, repos, privateToPublicFlowsAllow
+}
+
 // generateGitHubMCPLockdownDetectionStep generates a step to determine the repository visibility
 // and automatic guard policy for the GitHub MCP server.
 // This step is added when GitHub tool is enabled. It always runs to:
@@ -21,9 +70,8 @@ import (
 // This applies regardless of whether a GitHub App token is configured, because repo-scoping
 // is not a substitute for author-integrity filtering inside a repository.
 func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
-	// Dynamic enclaves also need the workflow repository's visibility for Safe Outputs.
-	githubTool, hasGitHub := data.Tools["github"]
-	if (!hasGitHub || githubTool == false) && !enclaveDynamicRepositoryPolicyEnabled(data) {
+	githubTool := data.Tools["github"]
+	if !githubLockdownDetectionStepEnabled(data) {
 		githubConfigLog.Print("Skipping GitHub MCP lockdown detection step: GitHub tool not enabled")
 		return
 	}
@@ -47,29 +95,7 @@ func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder,
 		pinnedAction = fmt.Sprintf("%s@%s", actionRepo, actionVersion)
 	}
 
-	// Extract current guard policy configuration to pass as env vars so the step can
-	// detect whether each field is already configured and avoid overriding it.
-	configuredMinIntegrity := ""
-	configuredRepos := ""
-	privateToPublicFlowsAllow := false
-	if toolConfig, ok := githubTool.(map[string]any); ok {
-		if v, exists := toolConfig["min-integrity"]; exists {
-			configuredMinIntegrity = serializeEnvStringValue(v)
-		}
-		// Support both 'allowed-repos' (preferred) and deprecated 'repos'
-		if v, exists := toolConfig["allowed-repos"]; exists {
-			configuredRepos = serializeEnvStringValue(v)
-		} else if v, exists := toolConfig["repos"]; exists {
-			configuredRepos = serializeEnvStringValue(v)
-		}
-		// Detect private-to-public-flows: allow to inform the default repos value.
-		// When set to "allow", the user has explicitly opted in to cross-visibility data
-		// flows, so the repos default should be "all" rather than "public" even for
-		// public repositories.
-		if ptpFlows, _ := toolConfig["private-to-public-flows"].(string); ptpFlows == "allow" {
-			privateToPublicFlowsAllow = true
-		}
-	}
+	configuredMinIntegrity, configuredRepos, privateToPublicFlowsAllow := githubLockdownStepConfiguredGuardValues(githubTool)
 
 	// Generate the step using the determine_automatic_lockdown.cjs action
 	yaml.WriteString("      - name: Determine automatic lockdown mode for GitHub MCP Server\n")
@@ -198,6 +224,36 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 //   - Splits all inputs on commas and newlines, trims whitespace, removes empty entries.
 //   - Outputs `blocked_users`, `trusted_users`, and `approval_labels` as JSON arrays via $GITHUB_OUTPUT.
 //   - Fails the step if any item is invalid.
+//
+// parseGuardVarsStepExtraValues resolves the compile-time values of the integrity filter
+// lists. Static frontmatter lists are joined as comma-separated values, while user-provided
+// GitHub Actions expressions are passed verbatim so GitHub Actions evaluates them.
+func parseGuardVarsStepExtraValues(data *WorkflowData) (blockedUsers string, trustedUsers string, approvalLabels string) {
+	if data.ParsedTools == nil || data.ParsedTools.GitHub == nil {
+		return "", "", ""
+	}
+	gh := data.ParsedTools.GitHub
+	switch {
+	case len(gh.BlockedUsers) > 0:
+		blockedUsers = strings.Join(gh.BlockedUsers, ",")
+	case gh.BlockedUsersExpr != "":
+		blockedUsers = gh.BlockedUsersExpr
+	}
+	switch {
+	case len(gh.TrustedUsers) > 0:
+		trustedUsers = strings.Join(gh.TrustedUsers, ",")
+	case gh.TrustedUsersExpr != "":
+		trustedUsers = gh.TrustedUsersExpr
+	}
+	switch {
+	case len(gh.ApprovalLabels) > 0:
+		approvalLabels = strings.Join(gh.ApprovalLabels, ",")
+	case gh.ApprovalLabelsExpr != "":
+		approvalLabels = gh.ApprovalLabelsExpr
+	}
+	return blockedUsers, trustedUsers, approvalLabels
+}
+
 func (c *Compiler) generateParseGuardVarsStep(yaml *strings.Builder, data *WorkflowData) {
 	githubTool, hasGitHub := data.Tools["github"]
 	if !hasGitHub || githubTool == false {
@@ -216,31 +272,7 @@ func (c *Compiler) generateParseGuardVarsStep(yaml *strings.Builder, data *Workf
 
 	// Determine the compile-time static values (or user expression) for each field.
 	// These come from the parsed tools config so we don't lose data from the raw map.
-	var blockedUsersExtra, trustedUsersExtra, approvalLabelsExtra string
-
-	if data.ParsedTools != nil && data.ParsedTools.GitHub != nil {
-		gh := data.ParsedTools.GitHub
-		switch {
-		case len(gh.BlockedUsers) > 0:
-			// Static list from frontmatter — join as comma-separated for the env var.
-			blockedUsersExtra = strings.Join(gh.BlockedUsers, ",")
-		case gh.BlockedUsersExpr != "":
-			// User-provided GitHub Actions expression — passed verbatim; GHA evaluates it.
-			blockedUsersExtra = gh.BlockedUsersExpr
-		}
-		switch {
-		case len(gh.TrustedUsers) > 0:
-			trustedUsersExtra = strings.Join(gh.TrustedUsers, ",")
-		case gh.TrustedUsersExpr != "":
-			trustedUsersExtra = gh.TrustedUsersExpr
-		}
-		switch {
-		case len(gh.ApprovalLabels) > 0:
-			approvalLabelsExtra = strings.Join(gh.ApprovalLabels, ",")
-		case gh.ApprovalLabelsExpr != "":
-			approvalLabelsExtra = gh.ApprovalLabelsExpr
-		}
-	}
+	blockedUsersExtra, trustedUsersExtra, approvalLabelsExtra := parseGuardVarsStepExtraValues(data)
 
 	yaml.WriteString("      - name: Parse integrity filter lists\n")
 	yaml.WriteString("        id: parse-guard-vars\n")
