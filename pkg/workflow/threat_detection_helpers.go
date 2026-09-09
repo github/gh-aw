@@ -238,3 +238,18 @@ func engineCoreSecretVarNames(engineID string) []string {
 		return []string{}
 	}
 }
+
+// inheritedDetectionModel returns the main workflow model when the detection engine can
+// interpret it. Workflows using a custom engine run detection on a built-in engine that
+// does not understand the custom engine's model IDs, so their model is not inherited and
+// the detection engine's own default model is used instead.
+func inheritedDetectionModel(data *WorkflowData) string {
+	if data == nil {
+		return ""
+	}
+	engineID := ResolveEngineID(data)
+	if engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
+		return data.Model
+	}
+	return ""
+}

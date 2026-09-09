@@ -1,6 +1,7 @@
 ---
 engine:
   id: cursor
+  detection-engine: copilot
   display-name: Cursor
   description: Cursor Agent CLI with headless execution and native MCP support
   experimental: true

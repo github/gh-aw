@@ -59,6 +59,7 @@ import { noStringFallbackForNonStringMessageRule } from "./rules/no-string-fallb
 import { requireGetExecOutputExitCodeCheckRule } from "./rules/require-getexecoutput-exitcode-check";
 import { preferActionsExecOverChildProcessRule } from "./rules/prefer-actions-exec-over-child-process";
 import { noMisplacedErrorCodeDefinitionRule } from "./rules/no-misplaced-error-code-definition";
+import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
 const plugin = {
   meta: {
@@ -127,6 +128,7 @@ const plugin = {
     "require-getexecoutput-exitcode-check": requireGetExecOutputExitCodeCheckRule,
     "prefer-actions-exec-over-child-process": preferActionsExecOverChildProcessRule,
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
+    "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
   },
 };
 

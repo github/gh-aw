@@ -416,12 +416,16 @@ function getGatewayTool(gateway, serverName, toolName) {
  * @param {string} serverName
  * @param {string} toolName
  * @param {number} inputSize
+ * @param {string} timestamp
  */
-function recordGatewayToolCall(gateway, serverName, toolName, inputSize) {
+function recordGatewayToolCall(gateway, serverName, toolName, inputSize, timestamp) {
   const server = getGatewayServer(gateway, serverName);
   const tool = getGatewayTool(gateway, serverName, toolName);
   const call = {
     tool_call_id: `call-${gateway.tool_calls.length + 1}`,
+    timestamp,
+    server_name: serverName,
+    tool_name: toolName,
     request_size: inputSize,
     response_size: 0,
     duration_ms: 0,
@@ -539,7 +543,7 @@ function parseGatewayJSONL(activity, content) {
         .trim()
         .toLowerCase();
       const failed = status === "error" || String(entry.error || "").trim() !== "" || level === "error";
-      const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize);
+      const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize, String(entry.timestamp || ""));
       recordGatewayToolResult(activity.gateway, serverName, toolName, { failed, outputSize, durationMs }, call);
     } catch {
       continue;
@@ -579,7 +583,7 @@ function parseRPCMessagesJSONL(activity, content) {
           continue;
         }
         const inputSize = jsonByteLength(payload.params?.arguments ?? payload.params);
-        const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize);
+        const call = recordGatewayToolCall(activity.gateway, serverName, toolName, inputSize, String(entry.timestamp || ""));
         if (payload.id !== null && payload.id !== undefined) {
           const key = JSON.stringify([serverName, payload.id]);
           pending.set(key, {

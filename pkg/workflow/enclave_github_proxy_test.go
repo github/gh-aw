@@ -138,7 +138,7 @@ func TestGenerateMCPSetupDynamicEnclaveGitHubBackendWithoutPrimaryGitHub(t *test
 	require.NoError(t, compiler.generateMCPSetup(&yaml, workflowData.Tools, engine, workflowData))
 
 	setup := yaml.String()
-	assert.Contains(t, setup, `ghcr.io/github/gh-aw-mcpg:`+string(constants.MCPGDynamicRepositoryDelegationMinVersion))
+	assert.Contains(t, setup, `ghcr.io/github/gh-aw-mcpg:`+string(constants.DefaultMCPGatewayVersion))
 	assert.Contains(t, setup, `"min-integrity": "approved"`)
 	assert.Contains(t, setup, `"github/*"`)
 	assert.Contains(t, setup, `"accept": [`)
@@ -250,10 +250,11 @@ Test dynamic enclave delegation.
 	assert.Contains(t, lock, `GH_AW_ENCLAVE_DYNAMIC_JOB_EXPIRES_EPOCH=$(( $(date -u +%s) + (${GH_AW_TIMEOUT_MINUTES:-20} * 60) ))`)
 	assert.Contains(t, lock, `\"max_identity_ttl\":180`)
 
-	// 5. mcpg version is at least v0.4.19 and consistent across manifest, download, and runtime.
-	minVersion := string(constants.MCPGDynamicRepositoryDelegationMinVersion)
-	assert.True(t, versionAtLeast(minVersion, "v0.0.0", "v0.4.19"))
-	assert.Equal(t, strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"+minVersion), strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"))
+	// 5. mcpg uses the default version, which must meet the dynamic delegation minimum,
+	// and is consistent across manifest, download, and runtime.
+	defaultVersion := string(constants.DefaultMCPGatewayVersion)
+	assert.True(t, versionAtLeast(defaultVersion, "v0.0.0", string(constants.MCPGDynamicRepositoryDelegationMinVersion)))
+	assert.Equal(t, strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"+defaultVersion), strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"))
 }
 
 func TestCompileEnclaveGitHubSharedGateway(t *testing.T) {
@@ -329,7 +330,7 @@ func TestDynamicEnclaveMCPVersionGatesAndDefaults(t *testing.T) {
 	data.SandboxConfig.MCP.Version = ""
 	require.NoError(t, validateEnclavesConfig(data))
 	ensureDefaultMCPGatewayConfig(data)
-	assert.Equal(t, string(constants.MCPGDynamicRepositoryDelegationMinVersion), data.SandboxConfig.MCP.Version)
+	assert.Equal(t, string(constants.DefaultMCPGatewayVersion), data.SandboxConfig.MCP.Version)
 
 	data = dynamicEnclaveWorkflowData()
 	data.SandboxConfig.MCP.Version = "v0.4.18"

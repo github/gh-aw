@@ -649,6 +649,52 @@ func TestDailyCLIPerformanceUsesCodexCompatibleModel(t *testing.T) {
 	}
 }
 
+func TestCodexWorkflowsUseCodexModels(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatalf("Failed to find repo root: %v", err)
+	}
+
+	workflowDir := filepath.Join(repoRoot, ".github", "workflows")
+	err = filepath.WalkDir(workflowDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		parsed, err := parser.ExtractFrontmatterFromContent(string(content))
+		if err != nil {
+			return err
+		}
+
+		engineID := ""
+		switch engine := parsed.Frontmatter["engine"].(type) {
+		case string:
+			engineID = engine
+		case map[string]any:
+			engineID, _ = engine["id"].(string)
+		}
+		if engineID != "codex" {
+			return nil
+		}
+
+		model, _ := parsed.Frontmatter["model"].(string)
+		if !strings.Contains(strings.ToLower(model), "codex") {
+			t.Errorf("%s uses Codex with non-Codex model %q", path, model)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to inspect workflows: %v", err)
+	}
+}
+
 // ============================================================================
 // Playwright Prompt Tests
 // ============================================================================

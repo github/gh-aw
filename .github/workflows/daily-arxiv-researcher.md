@@ -11,7 +11,7 @@ permissions:
   copilot-requests: write
 
 engine: copilot
-model: claude-sonnet-4.5
+model: large
 
 timeout-minutes: 20
 max-ai-credits: 300

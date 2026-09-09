@@ -20,7 +20,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 	shellCodexConfigPath := constants.ShellMcpConfigDir + "/config.toml"
 	codexHomeConfigPath := constants.TmpMcpConfigDir + "/config.toml"
 	detectionData := buildExternalDetectorWorkflowData(data, "codex")
-	detectionData.Model = data.Model
+	detectionData.Model = inheritedDetectionModel(data)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		detectionData.Model = data.SafeOutputs.ThreatDetection.Model
 	}
@@ -195,7 +195,45 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 		return "copilot"
 	}
 
+	// Threat detection only supports the built-in engines: the external threat-detect
+	// binary rejects any other --engine value with a config_error. Custom engines are
+	// normalized to the engine declared by their definition (engine.detection-engine),
+	// falling back to the default built-in detection engine.
+	if !isThreatDetectionCapableEngineID(engineID) {
+		return c.resolveCustomEngineDetectionEngineID(engineID)
+	}
+
 	return engineID
+}
+
+// defaultThreatDetectionEngineID is the built-in engine used for threat detection when
+// the workflow engine is a custom engine that cannot run the detection analyzer and no
+// replacement is configured.
+const defaultThreatDetectionEngineID = "copilot"
+
+// isThreatDetectionCapableEngineID reports whether the threat detection analyzer can run
+// with the given engine ID.
+func isThreatDetectionCapableEngineID(engineID string) bool {
+	return slices.Contains(declarableDetectionEngineIDs, engineID)
+}
+
+// declarableDetectionEngineIDs are the engine IDs accepted for the engine definition's
+// `detection-engine` key. They match the engines the external threat-detect binary
+// accepts through its --engine flag.
+var declarableDetectionEngineIDs = []string{"copilot", "claude", "codex"}
+
+// resolveCustomEngineDetectionEngineID returns the built-in engine that runs threat
+// detection on behalf of a custom engine. Custom engine definitions can declare their
+// own detection engine via the `detection-engine` frontmatter key; unknown or
+// unsupported values fall back to the default built-in detection engine.
+func (c *Compiler) resolveCustomEngineDetectionEngineID(engineID string) string {
+	if def := c.engineCatalog.Get(engineID); def != nil && def.DetectionEngine != "" {
+		if slices.Contains(declarableDetectionEngineIDs, def.DetectionEngine) {
+			return def.DetectionEngine
+		}
+		threatLog.Printf("Engine definition %q declares an unsupported detection-engine %q; using %q instead", engineID, def.DetectionEngine, defaultThreatDetectionEngineID)
+	}
+	return defaultThreatDetectionEngineID
 }
 
 // getExternalThreatDetectionEngineID returns the engine used by the external
@@ -345,7 +383,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || ... || 'auto' }}, and when no org var
 	// is set COPILOT_MODEL is 'auto'. The AWF API proxy has no pricing for 'auto' and
 	// returns HTTP 400, causing every inference attempt to fail.
-	resolvedDetectionModel := data.Model
+	resolvedDetectionModel := inheritedDetectionModel(data)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		resolvedDetectionModel = data.SafeOutputs.ThreatDetection.Model
 	}
