@@ -368,18 +368,6 @@ func loadEvalObservationSetsForAnalysis(
 	return sets, guardrailSets, nil
 }
 
-func computeExperimentAnalysesWithObservations(
-	experiments []ExperimentVariantStats,
-	configs map[string]*workflow.ExperimentConfig,
-	evals *workflow.EvalsConfig,
-	metricEvalResults map[string]MetricEvalResults,
-	graderObservationSets map[string]*graderMetricObservationSet,
-) []ExperimentAnalysis {
-	return computeExperimentAnalysesWithObservationBundle(experiments, configs, evals, metricEvalResults, &experimentMetricObservationSets{
-		Primary: graderObservationSets,
-	})
-}
-
 func computeExperimentAnalysesWithObservationBundle(
 	experiments []ExperimentVariantStats,
 	configs map[string]*workflow.ExperimentConfig,
