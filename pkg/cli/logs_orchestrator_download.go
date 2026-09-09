@@ -61,6 +61,9 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
+	if !cachedJSONCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+		cachedRuns = nil
+	}
 	if err := prepareLogsDownloadOutput(ctx, opts); err != nil {
 		return logsDownloadRuntime{}, err
 	}
