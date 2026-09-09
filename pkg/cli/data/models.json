@@ -404,6 +404,15 @@
           "provider_type": "openai",
           "wire_api": "completions"
         },
+        "gemini-3.8-flash": {
+          "cost": {
+            "input": "7.5e-07",
+            "output": "3.75e-06",
+            "cache_read": "7.5e-08"
+          },
+          "provider_type": "openai",
+          "wire_api": "completions"
+        },
         "gpt-4.1": {
           "cost": {
             "input": "2e-06",
