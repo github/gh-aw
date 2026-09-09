@@ -70,14 +70,14 @@ func TestEnsureDefaultMCPGatewayConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "dynamic enclave uses delegation minimum when version is missing",
+			name: "dynamic enclave uses default version when it satisfies delegation minimum",
 			workflowData: func() *WorkflowData {
 				wd := dynamicEnclaveWorkflowData()
 				wd.SandboxConfig.MCP.Version = ""
 				return wd
 			}(),
 			validate: func(t *testing.T, wd *WorkflowData) {
-				assert.Equal(t, string(constants.MCPGDynamicRepositoryDelegationMinVersion), wd.SandboxConfig.MCP.Version, "Version should be elevated for dynamic GitHub delegation")
+				assert.Equal(t, string(constants.DefaultMCPGatewayVersion), wd.SandboxConfig.MCP.Version, "Version should use the default for dynamic GitHub delegation")
 			},
 		},
 		{

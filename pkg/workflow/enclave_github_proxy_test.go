@@ -138,7 +138,7 @@ func TestGenerateMCPSetupDynamicEnclaveGitHubBackendWithoutPrimaryGitHub(t *test
 	require.NoError(t, compiler.generateMCPSetup(&yaml, workflowData.Tools, engine, workflowData))
 
 	setup := yaml.String()
-	assert.Contains(t, setup, `ghcr.io/github/gh-aw-mcpg:`+string(constants.MCPGDynamicRepositoryDelegationMinVersion))
+	assert.Contains(t, setup, `ghcr.io/github/gh-aw-mcpg:`+string(constants.DefaultMCPGatewayVersion))
 	assert.Contains(t, setup, `"min-integrity": "approved"`)
 	assert.Contains(t, setup, `"github/*"`)
 	assert.Contains(t, setup, `"accept": [`)
@@ -330,7 +330,7 @@ func TestDynamicEnclaveMCPVersionGatesAndDefaults(t *testing.T) {
 	data.SandboxConfig.MCP.Version = ""
 	require.NoError(t, validateEnclavesConfig(data))
 	ensureDefaultMCPGatewayConfig(data)
-	assert.Equal(t, string(constants.MCPGDynamicRepositoryDelegationMinVersion), data.SandboxConfig.MCP.Version)
+	assert.Equal(t, string(constants.DefaultMCPGatewayVersion), data.SandboxConfig.MCP.Version)
 
 	data = dynamicEnclaveWorkflowData()
 	data.SandboxConfig.MCP.Version = "v0.4.18"
