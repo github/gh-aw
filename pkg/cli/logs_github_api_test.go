@@ -31,6 +31,15 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 "startedAt": "2026-01-01T00:00:01Z",
 "updatedAt": "2026-01-01T00:01:00Z"
 }
+
+func TestFilterIgnoredWorkflowRuns(t *testing.T) {
+	runs := []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}
+
+	filtered := filterIgnoredWorkflowRuns(runs, []int64{100, 300})
+
+	require.Len(t, filtered, 1)
+	assert.Equal(t, int64(200), filtered[0].DatabaseID)
+}
 ]`
 
 	var runs []WorkflowRun
