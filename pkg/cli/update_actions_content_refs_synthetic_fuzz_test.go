@@ -138,7 +138,8 @@ func buildSyntheticSkillWorkflow(shape uint32, comment string) (content, expecte
 		inlineComment = " # " + comment + " " + fuzzSkillRefValue(versions[0])
 	}
 	useFlowList := shape&(1<<8) != 0
-	useObjectEntries := !useFlowList && shape&(1<<9) != 0
+	// 0: plain scalar entries, 1: block map entries, 2: flow map entries
+	entryStyle := (shape >> 9) % 3
 
 	var original, updated strings.Builder
 	header := "---\n# " + comment + "\ntimeout-minutes: 5\n"
@@ -148,22 +149,18 @@ func buildSyntheticSkillWorkflow(shape uint32, comment string) (content, expecte
 	if useFlowList {
 		var oldItems, newItems []string
 		for _, version := range versions {
-			oldItems = append(oldItems, quote+fuzzSkillRefValue(version)+quote)
-			newItems = append(newItems, quote+fuzzSkillRefValue(bumpFuzzVersion(version))+quote)
+			oldItems = append(oldItems, fuzzSkillEntry(entryStyle, quote, version))
+			newItems = append(newItems, fuzzSkillEntry(entryStyle, quote, bumpFuzzVersion(version)))
 		}
 		original.WriteString(key + ": [" + strings.Join(oldItems, ", ") + "]" + inlineComment + "\n")
 		updated.WriteString(key + ": [" + strings.Join(newItems, ", ") + "]" + inlineComment + "\n")
 	} else {
 		original.WriteString(key + ":" + inlineComment + "\n")
 		updated.WriteString(key + ":" + inlineComment + "\n")
-		itemPrefix := "- "
-		if useObjectEntries {
-			itemPrefix = "- skill: "
-		}
 		for _, version := range versions {
 			suffix := inlineComment + "\n"
-			original.WriteString(indent + itemPrefix + quote + fuzzSkillRefValue(version) + quote + suffix)
-			updated.WriteString(indent + itemPrefix + quote + fuzzSkillRefValue(bumpFuzzVersion(version)) + quote + suffix)
+			original.WriteString(indent + "- " + fuzzSkillEntry(entryStyle, quote, version) + suffix)
+			updated.WriteString(indent + "- " + fuzzSkillEntry(entryStyle, quote, bumpFuzzVersion(version)) + suffix)
 			original.WriteString(indent + "# untouched: " + fuzzSkillRefValue(version) + "\n")
 			updated.WriteString(indent + "# untouched: " + fuzzSkillRefValue(version) + "\n")
 		}
@@ -177,4 +174,17 @@ func buildSyntheticSkillWorkflow(shape uint32, comment string) (content, expecte
 
 func fuzzSkillRefValue(version string) string {
 	return fuzzSkillRepo + "@" + version
+}
+
+// fuzzSkillEntry renders one list entry as a plain scalar, a block map value or a flow map.
+func fuzzSkillEntry(style uint32, quote, version string) string {
+	value := quote + fuzzSkillRefValue(version) + quote
+	switch style {
+	case 1:
+		return "skill: " + value
+	case 2:
+		return "{skill: " + value + "}"
+	default:
+		return value
+	}
 }

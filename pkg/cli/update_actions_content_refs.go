@@ -131,13 +131,14 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 	}
 
 	lines := slices.Clone(frontmatterLines)
+	candidates := frontmatterRefCandidates(updates)
 	inField := false
 	applied := make([]bool, len(updates))
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if getIndentation(line) == "" && isFrontmatterFieldLine(trimmed, fieldName) {
 			inField = true
-			lines[i] = replaceFrontmatterRefValues(line, updates, applied)
+			lines[i] = replaceFrontmatterRefValues(line, candidates, applied)
 			continue
 		}
 		if inField && isTopLevelKey(line) {
@@ -146,7 +147,7 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 		if !inField || !isFrontmatterRefValueLine(trimmed, objectKey) {
 			continue
 		}
-		lines[i] = replaceFrontmatterRefValues(line, updates, applied)
+		lines[i] = replaceFrontmatterRefValues(line, candidates, applied)
 	}
 
 	if slices.Contains(applied, false) {
@@ -157,55 +158,139 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 }
 
 func isFrontmatterFieldLine(trimmed, fieldName string) bool {
+	key, ok := parseFrontmatterKey(trimmed)
+	return ok && key == fieldName
+}
+
+// parseFrontmatterKey extracts the mapping key from a trimmed frontmatter line,
+// unquoting single- or double-quoted keys such as "skills" or 'plugins'.
+func parseFrontmatterKey(trimmed string) (string, bool) {
+	if trimmed == "" {
+		return "", false
+	}
+	if quote := trimmed[0]; quote == '\'' || quote == '"' {
+		key, rest, ok := cutQuotedYAMLScalar(trimmed)
+		if !ok || !strings.HasPrefix(strings.TrimLeft(rest, " \t"), ":") {
+			return "", false
+		}
+		return key, true
+	}
 	key, _, found := strings.Cut(trimmed, ":")
 	if !found {
+		return "", false
+	}
+	return strings.TrimSpace(key), true
+}
+
+// cutQuotedYAMLScalar decodes the quoted scalar starting at the beginning of value and
+// returns its unescaped content together with the remaining text after the closing quote.
+func cutQuotedYAMLScalar(value string) (string, string, bool) {
+	quote := value[0]
+	var body strings.Builder
+	for i := 1; i < len(value); i++ {
+		switch {
+		case quote == '\'' && value[i] == '\'':
+			if i+1 < len(value) && value[i+1] == '\'' {
+				body.WriteByte('\'')
+				i++
+				continue
+			}
+			return body.String(), value[i+1:], true
+		case quote == '"' && value[i] == '\\' && i+1 < len(value):
+			body.WriteByte(value[i+1])
+			i++
+			continue
+		case quote == '"' && value[i] == '"':
+			return body.String(), value[i+1:], true
+		}
+		body.WriteByte(value[i])
+	}
+	return "", "", false
+}
+
+// isFrontmatterRefValueLine reports whether a line inside the field block may carry a
+// reference value. Comments never do. Fields without an object form (for example
+// "plugins") additionally leave mapping entries, including flow maps, untouched.
+func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 		return false
 	}
-	return unquoteYAMLKey(strings.TrimSpace(key)) == fieldName
-}
-
-// unquoteYAMLKey strips matching surrounding quotes so quoted keys such as "skills"
-// or 'plugins' are recognized alongside their plain form.
-func unquoteYAMLKey(key string) string {
-	if len(key) < 2 {
-		return key
-	}
-	quote := key[0]
-	if (quote == '\'' || quote == '"') && key[len(key)-1] == quote {
-		return key[1 : len(key)-1]
-	}
-	return key
-}
-
-func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
-	if !strings.HasPrefix(trimmed, "- ") {
-		return objectKey != noObjectKey && strings.HasPrefix(trimmed, objectKey+":")
-	}
-	value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
-	if objectKey != noObjectKey && strings.HasPrefix(value, objectKey+":") {
+	if objectKey != noObjectKey {
 		return true
 	}
-	return !strings.Contains(value[:yamlValueEnd(value)], ":")
+	return !frontmatterLineHasMapping(trimmed)
+}
+
+func frontmatterLineHasMapping(trimmed string) bool {
+	value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+	value = strings.TrimPrefix(value, "{")
+	return strings.Contains(value[:yamlValueEnd(value)], ":")
+}
+
+// frontmatterRefCandidate is one raw YAML encoding of a parsed reference value, paired
+// with the matching encoding of its replacement. Parsed values are unescaped, so quoted
+// scalars are matched through their single- and double-quoted encodings as well.
+type frontmatterRefCandidate struct {
+	update      int
+	search      string
+	replacement string
+}
+
+func frontmatterRefCandidates(updates []frontmatterRefUpdate) []frontmatterRefCandidate {
+	encoders := []func(string) string{
+		func(value string) string { return value },
+		encodeSingleQuotedYAMLBody,
+		encodeDoubleQuotedYAMLBody,
+	}
+	var candidates []frontmatterRefCandidate
+	for i, update := range updates {
+		if update.old == "" {
+			continue
+		}
+		seen := make(map[string]struct{}, len(encoders))
+		for _, encode := range encoders {
+			search := encode(update.old)
+			if _, duplicate := seen[search]; duplicate {
+				continue
+			}
+			seen[search] = struct{}{}
+			candidates = append(candidates, frontmatterRefCandidate{
+				update:      i,
+				search:      search,
+				replacement: encode(update.replacement),
+			})
+		}
+	}
+	return candidates
+}
+
+func encodeSingleQuotedYAMLBody(value string) string {
+	return strings.ReplaceAll(value, "'", "''")
+}
+
+func encodeDoubleQuotedYAMLBody(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	return strings.ReplaceAll(escaped, `"`, `\"`)
 }
 
 // replaceFrontmatterRefValues rewrites reference values in a single frontmatter line.
 // Matches are located against the immutable original text and applied left to right,
 // preferring the longest match at each position so overlapping references (for example
 // "owner/repo@v1" inside "owner/repo@v10") are never corrupted by earlier replacements.
-func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, applied []bool) string {
+func replaceFrontmatterRefValues(line string, candidates []frontmatterRefCandidate, applied []bool) string {
 	valueEnd := yamlValueEnd(line)
 	prefix := line[:valueEnd]
 	var builder strings.Builder
 	for i := 0; i < len(prefix); {
 		best := -1
 		bestLen := 0
-		for j, update := range updates {
-			if applied[j] || update.old == "" || len(update.old) <= bestLen {
+		for j, candidate := range candidates {
+			if applied[candidate.update] || len(candidate.search) <= bestLen {
 				continue
 			}
-			if strings.HasPrefix(prefix[i:], update.old) {
+			if strings.HasPrefix(prefix[i:], candidate.search) {
 				best = j
-				bestLen = len(update.old)
+				bestLen = len(candidate.search)
 			}
 		}
 		if best < 0 {
@@ -213,8 +298,8 @@ func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, ap
 			i++
 			continue
 		}
-		builder.WriteString(updates[best].replacement)
-		applied[best] = true
+		builder.WriteString(candidates[best].replacement)
+		applied[candidates[best].update] = true
 		i += bestLen
 	}
 	return builder.String() + line[valueEnd:]

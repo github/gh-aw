@@ -425,3 +425,120 @@ func TestUpdateActionRefsInContent_CooldownFallback(t *testing.T) {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestUpdateFrontmatterRefsHandlesFlowMapsAndQuotedKeys(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldSHA = "1111111111111111111111111111111111111111"
+		newSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	resolver := func(_ context.Context, _, currentRef string, _, _ bool, _ time.Duration) (string, error) {
+		if currentRef != oldSHA {
+			return currentRef, nil
+		}
+		return newSHA, nil
+	}
+
+	tests := []struct {
+		name    string
+		update  func(string) (bool, string, error)
+		input   string
+		want    string
+		changed bool
+	}{
+		{
+			name: "skills flow map entries",
+			update: func(content string) (bool, string, error) {
+				return updateSkillRefsInContentWithResolver(context.Background(), content, true, false, 0, resolver)
+			},
+			input: "---\n\"skills\": # keep\n  - {skill: githubnext/skills/a@" + oldSHA + ", version: 1}\n---\nbody\n",
+			want:  "---\n\"skills\": # keep\n  - {skill: githubnext/skills/a@" + newSHA + ", version: 1}\n---\nbody\n",
+		},
+		{
+			name: "skills inline flow list of maps",
+			update: func(content string) (bool, string, error) {
+				return updateSkillRefsInContentWithResolver(context.Background(), content, true, false, 0, resolver)
+			},
+			input: "---\nskills: [{skill: githubnext/skills/a@" + oldSHA + "}]\n---\nbody\n",
+			want:  "---\nskills: [{skill: githubnext/skills/a@" + newSHA + "}]\n---\nbody\n",
+		},
+		{
+			name: "plugins quoted key with block list",
+			update: func(content string) (bool, string, error) {
+				return updatePluginRefsInContentWithResolver(context.Background(), content, true, false, 0, resolver)
+			},
+			input: "---\n'plugins':\n  - 'githubnext/plugins/a@" + oldSHA + "' # pin\n---\nbody\n",
+			want:  "---\n'plugins':\n  - 'githubnext/plugins/a@" + newSHA + "' # pin\n---\nbody\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			changed, got, err := tt.update(tt.input)
+			if err != nil {
+				t.Fatalf("update error = %v", err)
+			}
+			if !changed {
+				t.Fatalf("update changed = false, want true")
+			}
+			if got != tt.want {
+				t.Fatalf("update output mismatch\n--- got ---\n%s\n--- want ---\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdatePluginRefsInContentLeavesFlowMapEntriesUntouched(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldSHA = "1111111111111111111111111111111111111111"
+		newSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	input := "---\nplugins:\n  - githubnext/plugins/a@" + oldSHA + "\n  - {plugin: githubnext/plugins/b@" + oldSHA + "}\n---\nbody\n"
+	want := "---\nplugins:\n  - githubnext/plugins/a@" + newSHA + "\n  - {plugin: githubnext/plugins/b@" + oldSHA + "}\n---\nbody\n"
+
+	resolver := func(_ context.Context, _, currentRef string, _, _ bool, _ time.Duration) (string, error) {
+		if currentRef != oldSHA {
+			return currentRef, nil
+		}
+		return newSHA, nil
+	}
+	changed, got, err := updatePluginRefsInContentWithResolver(context.Background(), input, true, false, 0, resolver)
+	if err != nil {
+		t.Fatalf("updatePluginRefsInContentWithResolver() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("updatePluginRefsInContentWithResolver() changed = false, want true")
+	}
+	if got != want {
+		t.Fatalf("plugin update output mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+func TestParseFrontmatterKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		line string
+		want string
+		ok   bool
+	}{
+		{line: "skills:", want: "skills", ok: true},
+		{line: `"skills": []`, want: "skills", ok: true},
+		{line: `'plugins' :`, want: "plugins", ok: true},
+		{line: `"skills:extra":`, want: "skills:extra", ok: true},
+		{line: `""`, want: "", ok: false},
+		{line: `"unterminated`, want: "", ok: false},
+		{line: "no colon here", want: "", ok: false},
+		{line: "", want: "", ok: false},
+	}
+	for _, tt := range tests {
+		got, ok := parseFrontmatterKey(tt.line)
+		if ok != tt.ok || got != tt.want {
+			t.Fatalf("parseFrontmatterKey(%q) = (%q, %v), want (%q, %v)", tt.line, got, ok, tt.want, tt.ok)
+		}
+	}
+}
