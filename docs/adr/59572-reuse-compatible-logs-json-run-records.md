@@ -12,7 +12,7 @@ The `gh aw logs` command currently recomputes run records by downloading and pro
 
 ### Decision
 
-We will allow `gh aw logs` to reuse `--cached-jsonl` records when a cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSONL retains. Each newly processed run is appended immediately as one JSON Lines record so concurrent collectors do not overwrite one another and completed work survives interruption.
+We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSONL retains. Each newly processed run is appended immediately as one schema-versioned JSON Lines record so concurrent collectors do not overwrite one another and completed work survives interruption. Records with older or newer incompatible schema versions are ignored.
 
 ### Alternatives Considered
 

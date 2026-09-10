@@ -514,7 +514,7 @@ gh aw logs --runtime gvisor                              # Filter to runs using 
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. The `--last` flag is an alias for `--count/-c`.
 
-`--cached-jsonl` reuses compatible run records and appends each new result immediately as a JSON Lines record.
+`--cached-jsonl` reuses compatible, schema-versioned run records and appends each new result immediately as a JSON Lines record. Records from incompatible schema versions are ignored.
 
 #### `audit`
 

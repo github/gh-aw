@@ -17,6 +17,13 @@ import (
 
 type cachedLogsRuns map[int64]RunData
 
+const cachedLogsJSONLSchemaVersion = 1
+
+type cachedLogsJSONLRecord struct {
+	SchemaVersion int     `json:"schema_version"`
+	Run           RunData `json:"run"`
+}
+
 func loadCachedLogsJSONL(path string) (cachedLogsRuns, error) {
 	if path == "" {
 		return nil, nil
@@ -36,14 +43,19 @@ func loadCachedLogsJSONL(path string) (cachedLogsRuns, error) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		var run RunData
-		if err := json.Unmarshal(line, &run); err != nil {
+		var record cachedLogsJSONLRecord
+		if err := json.Unmarshal(line, &record); err != nil {
 			if index == len(lines)-1 {
 				logsCacheLog.Printf("Ignoring incomplete final cached logs JSONL record: %v", err)
 				break
 			}
 			return nil, fmt.Errorf("failed to parse cached logs JSONL record %d: %w", index+1, err)
 		}
+		if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+			logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", index+1, record.SchemaVersion)
+			continue
+		}
+		run := record.Run
 		if err := normalizeCachedLogRun(&run); err != nil {
 			return nil, err
 		}
@@ -75,7 +87,10 @@ func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
 	if len(logsData.Runs) != 1 {
 		return errors.New("failed to build cached logs JSONL record")
 	}
-	record, err := json.Marshal(logsData.Runs[0])
+	record, err := json.Marshal(cachedLogsJSONLRecord{
+		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Run:           logsData.Runs[0],
+	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal cached logs JSONL record: %w", err)
 	}

@@ -18,9 +18,15 @@ import (
 
 func TestLoadCachedLogsJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	first, err := json.Marshal(RunData{RunID: 42, WorkflowName: "cached-workflow"})
+	first, err := json.Marshal(cachedLogsJSONLRecord{
+		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Run:           RunData{RunID: 42, WorkflowName: "cached-workflow"},
+	})
 	require.NoError(t, err)
-	second, err := json.Marshal(RunData{RunID: 0, WorkflowName: "invalid"})
+	second, err := json.Marshal(cachedLogsJSONLRecord{
+		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Run:           RunData{RunID: 0, WorkflowName: "invalid"},
+	})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, append(append(first, '\n'), append(second, '\n')...), 0o600))
 
@@ -33,7 +39,7 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"run_id\":42}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":1,\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, stderr := captureOutput(t, func() error {
 		_, err := loadCachedLogsJSONL(path)
@@ -63,7 +69,7 @@ func TestLoadCachedLogsJSONReportsMissingFile(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"run_id\":42}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"schema_version\":1,\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -72,7 +78,7 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"run_id\":42,\"run_attempt\":\"bogus\"}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":1,\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -92,6 +98,50 @@ func TestCachedLogsJSONLWriterAppendsImmediately(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	data := "{\"schema_version\":0,\"run\":{\"run_id\":41}}\n" +
+		"{\"schema_version\":1,\"run\":{\"run_id\":42}}\n" +
+		"{\"schema_version\":2,\"run\":{\"run_id\":43}}\n"
+	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
+
+	runs, err := loadCachedLogsJSONL(path)
+
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Contains(t, runs, int64(42))
+}
+
+func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	writer := newCachedLogsJSONLWriter(path)
+	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, writer.Append(ProcessedRun{Run: WorkflowRun{
+		DatabaseID: 42, Repository: "github/gh-aw", Status: "completed",
+		Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt,
+	}}))
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	cached, err := loadCachedLogsJSONL(path)
+	require.NoError(t, err)
+	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{
+		DatabaseID: 42, Repository: "github/gh-aw", Status: "completed",
+		Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt,
+	}}, runArtifactsConcurrentOptions{
+		outputDir:    t.TempDir(),
+		maxRuns:      1,
+		cachedRuns:   cached,
+		storageLimit: newLogsStorageLimit(t.TempDir(), 0, false),
+	})
+
+	require.Len(t, results, 1)
+	require.NotNil(t, results[0].CachedRun)
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
 }
 
 func TestCachedLogsJSONLWriterSerializesConcurrentAppends(t *testing.T) {
