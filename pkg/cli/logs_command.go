@@ -547,30 +547,42 @@ func normalizeLogsWorkflowID(arg string) string {
 	return workflowID
 }
 
+// findLocalWorkflowName resolves a logs target against local workflow metadata,
+// first as given and then via its normalized workflow ID. The second strategy is
+// needed for full paths such as ".github/workflows/workflow.yml", which local
+// lookup cannot match directly.
+func findLocalWorkflowName(arg string) (string, bool) {
+	if resolved, err := workflow.FindWorkflowName(arg); err == nil {
+		logsCommandLog.Printf("Resolved workflow name via local lock files: %s -> %s", arg, resolved)
+		return resolved, true
+	}
+	workflowID := normalizeLogsWorkflowID(arg)
+	if workflowID == arg {
+		return "", false
+	}
+	if resolved, err := workflow.FindWorkflowName(workflowID); err == nil {
+		logsCommandLog.Printf("Resolved normalized workflow name via local lock files: %s -> %s", arg, resolved)
+		return resolved, true
+	}
+	return "", false
+}
+
 func resolveLogsWorkflowNameForRepo(arg, repoOverride string) string {
 	if !repoIsLocal(repoOverride) {
 		workflowName := normalizeLogsWorkflowID(arg)
 		logsCommandLog.Printf("Using normalized workflow name for remote repo: %s", workflowName)
 		return workflowName
 	}
-	if resolved, err := workflow.FindWorkflowName(arg); err == nil {
-		logsCommandLog.Printf("Resolved workflow name via local lock files: %s -> %s", arg, resolved)
+	if resolved, ok := findLocalWorkflowName(arg); ok {
 		return resolved
 	}
 	workflowName := normalizeLogsWorkflowID(arg)
-	if workflowName != arg {
-		if resolved, err := workflow.FindWorkflowName(workflowName); err == nil {
-			logsCommandLog.Printf("Resolved normalized workflow name via local lock files: %s -> %s", arg, resolved)
-			return resolved
-		}
-	}
 	logsCommandLog.Printf("Local resolution failed, using normalized workflow name: %s", workflowName)
 	return workflowName
 }
 
 func resolveLogsWorkflowNameLocally(arg string) (string, error) {
-	resolvedName, err := workflow.FindWorkflowName(arg)
-	if err == nil {
+	if resolvedName, ok := findLocalWorkflowName(arg); ok {
 		return resolvedName, nil
 	}
 	suggestions := []string{
