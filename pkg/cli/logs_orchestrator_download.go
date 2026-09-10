@@ -46,6 +46,7 @@ type processWorkflowRunBatchOptions struct {
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
 	cachedRuns             cachedLogsRuns
+	checkpoint             func([]ProcessedRun)
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -300,6 +301,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		storageLimit:           runtime.storageLimit,
 		maxGitHubAPIRateLimit:  opts.MaxGitHubAPIRateLimit,
 		cachedRuns:             runtime.cachedRuns,
+		checkpoint:             opts.checkpoint,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	// Only mark this batch as storage-limit-truncated when one of its own
@@ -558,6 +560,9 @@ func appendProcessedWorkflowRuns(
 		}
 		processedRuns = append(processedRuns, processedRun)
 		batchProcessed++
+	}
+	if batchProcessed > 0 && opts.checkpoint != nil {
+		opts.checkpoint(processedRuns)
 	}
 	return processedRuns, batchProcessed, storageLimitReached
 }

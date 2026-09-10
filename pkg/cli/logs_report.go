@@ -786,8 +786,8 @@ func writeSummaryFile(path string, data LogsData, verbose bool) error {
 		return fmt.Errorf("could not marshal logs data to JSON, expected all summary fields to be serializable: %w", err)
 	}
 
-	// Write to file
-	if err := os.WriteFile(path, jsonData, constants.FilePermPublic); err != nil {
+	// Replace the destination atomically so a crash cannot leave a truncated summary.
+	if err := writeFileAtomically(path, jsonData); err != nil {
 		return fmt.Errorf("could not write summary file %q, expected a writable path with sufficient disk space: %w", path, err)
 	}
 

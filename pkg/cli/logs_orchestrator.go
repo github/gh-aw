@@ -298,8 +298,21 @@ func buildContinuationIfNeeded(
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 	logsOrchestratorLog.Printf("Downloading workflow logs: workflow=%q, count=%d, outputDir=%q", opts.WorkflowName, opts.Count, opts.OutputDir)
+	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
+	if checkpoints != nil {
+		opts.checkpoint = checkpoints.Update
+		defer func() {
+			if checkpoints != nil {
+				checkpoints.Stop()
+			}
+		}()
+	}
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)
+	if checkpoints != nil {
+		checkpoints.Stop()
+		checkpoints = nil
+	}
 	if err != nil {
 		return err
 	}
