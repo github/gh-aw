@@ -35,6 +35,11 @@ func TestValidateArtifactSets(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:      "info is valid",
+			sets:      []string{"info"},
+			expectErr: false,
+		},
+		{
 			name:      "agent is valid",
 			sets:      []string{"agent"},
 			expectErr: false,
@@ -125,6 +130,11 @@ func TestResolveArtifactFilter(t *testing.T) {
 			name:     "activation resolves to activation artifact",
 			sets:     []string{"activation"},
 			expected: []string{"activation"},
+		},
+		{
+			name:     "info resolves to info artifact",
+			sets:     []string{"info"},
+			expected: []string{"info"},
 		},
 		{
 			name:     "agent resolves to agent artifact and output fallback",
@@ -270,7 +280,7 @@ func TestValidArtifactSetNames(t *testing.T) {
 	names := ValidArtifactSetNames()
 	require.NotEmpty(t, names, "ValidArtifactSetNames should return non-empty slice")
 
-	expected := []string{"all", "activation", "agent", "detection", "evals", "experiment", "firewall", "github-api", "graders", "mcp", "usage"}
+	expected := []string{"all", "activation", "agent", "detection", "evals", "experiment", "firewall", "github-api", "graders", "info", "mcp", "usage"}
 	assert.ElementsMatch(t, expected, names, "ValidArtifactSetNames should contain all known sets")
 }
 
@@ -385,6 +395,27 @@ func TestIsUsageOnlyArtifactFilter(t *testing.T) {
 	}
 }
 
+func TestIsInfoOnlyArtifactFilter(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		filter   []string
+		expected bool
+	}{
+		{name: "info only", filter: []string{"info"}, expected: true},
+		{name: "info plus another artifact", filter: []string{"info", "agent"}, expected: false},
+		{name: "non-info only", filter: []string{"agent"}, expected: false},
+		{name: "empty filter", filter: nil, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, isInfoOnlyArtifactFilter(tt.filter))
+		})
+	}
+}
+
 func TestShouldDownloadWorkflowRunLogs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -394,6 +425,7 @@ func TestShouldDownloadWorkflowRunLogs(t *testing.T) {
 	}{
 		{name: "all artifacts", filter: nil, expected: true},
 		{name: "usage only", filter: []string{"usage"}, expected: false},
+		{name: "info only", filter: []string{"info"}, expected: false},
 		{name: "activation and usage", filter: []string{"activation", "usage"}, expected: false},
 		{name: "agent", filter: []string{"agent"}, expected: true},
 		{name: "agent and usage", filter: []string{"agent", "usage"}, expected: true},

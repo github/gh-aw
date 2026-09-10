@@ -171,7 +171,7 @@ func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, val
 	logsSchema, err := generateSchemaWithDefaults[logsArgs](map[string]any{
 		"count":      defaultMCPLogsToolCount,
 		"max_tokens": 12000,
-		"artifacts":  []string{"usage"},
+		"artifacts":  []string{"info"},
 	})
 	if err != nil {
 		mcpLog.Printf("Failed to generate logs tool schema: %v", err)
