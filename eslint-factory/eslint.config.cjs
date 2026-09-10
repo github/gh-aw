@@ -33,6 +33,7 @@ module.exports = [
       "gh-aw-custom/require-mkdirsync-try-catch": "warn",
       "gh-aw-custom/require-mkdtempsync-try-catch": "warn",
       "gh-aw-custom/require-realpathsync-try-catch": "warn",
+      "gh-aw-custom/require-lstatsync-readlinksync-try-catch": "warn",
       "gh-aw-custom/require-rmsync-try-catch": "warn",
       "gh-aw-custom/require-parseInt-radix": "warn",
       "gh-aw-custom/require-return-after-core-setfailed": "warn",

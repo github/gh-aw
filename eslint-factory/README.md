@@ -53,6 +53,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
+| [`require-lstatsync-readlinksync-try-catch`](#require-lstatsync-readlinksync-try-catch) | Require try/catch around `fs.lstatSync` and `fs.readlinkSync` calls |
 | [`require-new-url-try-catch`](#require-new-url-try-catch) | Require try/catch around `new URL(variable)` calls |
 | [`require-parseInt-radix`](#require-parseInt-radix) | Require an explicit radix argument to `parseInt()` |
 | [`require-nan-check-after-env-numeric-parse`](#require-nan-check-after-env-numeric-parse) | Require NaN validation after parsing numeric values from `process.env` |
@@ -574,6 +575,36 @@ try {
   throw new Error("fs.realpathSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
+
+### `require-lstatsync-readlinksync-try-catch`
+
+Require `fs.lstatSync` and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: both throw synchronously when the target path is missing, permissions are denied, or (for `readlinkSync`) the entry is not actually a symlink. `actions/setup/js` uses these to inspect symlinks in security-sensitive contexts (symlink-traversal guards, staged-attachment validation, memory-directory digesting); an unguarded call crashes with a generic engine-level stack instead of a specific message that preserves the error as `{ cause }`.
+
+**Detected forms:**
+- `fs.lstatSync(path)` / `fs.readlinkSync(path)` — direct call on a known `require("fs")` result.
+- `fs["lstatSync"](path)` — computed string-literal property access.
+- `const { lstatSync } = require("fs"); lstatSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace imports: `import * as fs from "fs"; fs.lstatSync(path)`.
+- ESM named imports: `import { readlinkSync } from "fs"; readlinkSync(path)`.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- Calls already inside a `try` block with a `catch` clause.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Known limitation — no autofix for `VariableDeclaration`:** when the flagged call appears as a variable initializer, the rule reports the error but emits no autofix suggestion. Only `ExpressionStatement` and `ReturnStatement` positions receive an autofix suggestion.
+
+**Safe alternative:**
+```js
+try {
+  const stat = fs.lstatSync(path);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
 
 ### `require-new-url-try-catch`
 
