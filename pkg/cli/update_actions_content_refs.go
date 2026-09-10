@@ -194,6 +194,9 @@ func parseFrontmatterKey(trimmed string) (string, bool) {
 
 // cutQuotedYAMLScalar decodes the quoted scalar starting at the beginning of value and
 // returns its unescaped content together with the remaining text after the closing quote.
+// Only literal-character escapes (for example \" and \\) are decoded; control-character
+// and unicode escapes such as \n or \uXXXX are not, since frontmatter keys and repository
+// references never contain them.
 func cutQuotedYAMLScalar(value string) (string, string, bool) {
 	quote := value[0]
 	var body strings.Builder
