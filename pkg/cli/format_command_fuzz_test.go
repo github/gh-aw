@@ -50,7 +50,10 @@ func FuzzSplitFrontmatterForFormatting(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, frontmatter, suffix string) {
 		frontmatter = strings.ReplaceAll(frontmatter, "\r", "")
-		content := "---\n" + frontmatter + "\n---\n" + suffix
+		if frontmatter != "" && !strings.HasSuffix(frontmatter, "\n") {
+			frontmatter += "\n"
+		}
+		content := "---\n" + frontmatter + "---\n" + suffix
 		extracted, extractedSuffix, err := splitFrontmatterForFormatting(content)
 		if err != nil {
 			t.Fatalf("constructed frontmatter could not be split: %v", err)

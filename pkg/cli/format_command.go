@@ -20,6 +20,7 @@ import (
 
 var formatLog = logger.New("cli:format_command")
 
+// Re-encoding reaches a fixed point after YAML node styles and comments are normalized.
 const maxYAMLFormattingPasses = 10
 
 // FormatConfig contains configuration for the format command.
@@ -223,7 +224,7 @@ func normalizeFrontmatter(content string) (string, error) {
 		}
 		document = normalizedDocument
 	}
-	return "", errors.New("frontmatter formatting did not stabilize")
+	return "", fmt.Errorf("frontmatter formatting did not stabilize after %d passes", maxYAMLFormattingPasses)
 }
 
 func encodeYAMLDocument(document *yaml.Node) (string, error) {
