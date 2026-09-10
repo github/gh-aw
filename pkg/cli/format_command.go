@@ -23,18 +23,6 @@ var formatLog = logger.New("cli:format_command")
 // Re-encoding reaches a fixed point after YAML node styles and comments are normalized.
 const maxYAMLFormattingPasses = 10
 
-// FormatConfig contains configuration for the format command.
-type FormatConfig struct {
-	WorkflowIDs []string
-	WorkflowDir string
-	Verbose     bool
-}
-
-// RunFormat formats workflow frontmatter using the given configuration.
-func RunFormat(config FormatConfig) error {
-	return runFormatCommand(config.WorkflowIDs, config.WorkflowDir, config.Verbose)
-}
-
 // NewFormatCommand creates the format command.
 func NewFormatCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -132,11 +120,6 @@ func formatWorkflowFile(filePath string, codemods []Codemod, verbose bool) error
 	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(filepath.Base(filePath)))
 	return nil
-}
-
-func formatWorkflowContent(content, filePath string, codemods []Codemod) (string, error) {
-	formatted, _, err := formatWorkflowContentWithInfo(content, filePath, codemods)
-	return formatted, err
 }
 
 func formatWorkflowContentWithInfo(content, filePath string, codemods []Codemod) (string, []string, error) {

@@ -20,15 +20,6 @@ var drain3TrainLog = logger.New("cli:drain3_train")
 // drain3WeightsFilename is the output filename for the trained weights.
 const drain3WeightsFilename = "drain3_weights.json"
 
-// TrainDrain3Weights trains a Drain3 coordinator across all processed runs,
-// serialises the resulting weights to drain3_weights.json in outputDir, and
-// prints instructions on how to embed the file as default weights.
-//
-// This function is invoked when the user passes --train to the logs command.
-func TrainDrain3Weights(processedRuns []ProcessedRun, outputDir string, verbose bool) error {
-	return trainDrain3Weights(processedRuns, outputDir, "", verbose)
-}
-
 func trainDrain3Weights(processedRuns []ProcessedRun, outputDir, weightsPath string, verbose bool) error {
 	if len(processedRuns) == 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No processed runs available for log pattern training"))
