@@ -58,6 +58,7 @@ const LOGS_TOOL_MIN_TIMEOUT_MINUTES_NO_FILTER = 5;
 const LOGS_TOOL_MAX_EXPLICIT_TIMEOUT_MINUTES = 60;
 /** Extra time (ms) to allow response marshalling/transport after tool execution */
 const TOOL_CALL_TIMEOUT_BUFFER_MS = 15000;
+const ENCLAVE_BIT_BUDGET_HINT = "Hint: the enclave response schema exceeded the finite-disclosure bit budget. Retry only with a lower-cardinality response schema.";
 
 /** Timeout (ms) for the notifications/initialized handshake step */
 const NOTIFY_TIMEOUT_MS = 10000;
@@ -1449,7 +1450,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
       isSafeOutputsEmptyArgs && toolName
         ? `Hint: do not retry '${serverName} ${toolName}' with empty arguments. Run '${serverName} ${toolName} --help' to inspect the required options, or call 'noop' with a message if no action is needed.`
         : isEnclaveBitBudget
-          ? "Hint: the enclave response schema exceeded the finite-disclosure bit budget. Retry only with a lower-cardinality response schema."
+          ? ENCLAVE_BIT_BUDGET_HINT
           : "";
     const errText = code ? `Error [${code}]: ${message}` : `Error: ${message}`;
     process.stderr.write(errText + "\n");
@@ -1479,7 +1480,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
       if (isErrorResult) {
         process.stderr.write(output + "\n");
         if (/bit-budget-exhausted/i.test(output)) {
-          process.stderr.write("Hint: the enclave response schema exceeded the finite-disclosure bit budget. Retry only with a lower-cardinality response schema.\n");
+          process.stderr.write(ENCLAVE_BIT_BUDGET_HINT + "\n");
         }
         auditLog(serverName, { event: "tool_error", error: output });
         core.setFailed(`[${serverName}] Tool returned isError=true: ${output.length} chars`);
@@ -1495,7 +1496,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
     if (isErrorResult) {
       process.stderr.write(resultStr + "\n");
       if (/bit-budget-exhausted/i.test(resultStr)) {
-        process.stderr.write("Hint: the enclave response schema exceeded the finite-disclosure bit budget. Retry only with a lower-cardinality response schema.\n");
+        process.stderr.write(ENCLAVE_BIT_BUDGET_HINT + "\n");
       }
       auditLog(serverName, { event: "tool_error", error: resultStr });
       core.setFailed(`[${serverName}] Tool returned isError=true`);

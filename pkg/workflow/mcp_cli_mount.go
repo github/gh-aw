@@ -367,11 +367,12 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	// Using step outputs (e.g. steps.mount-mcp-clis.outputs.mcp-cli-servers-list) here
 	// would reference a step from the agent job in the activation job's env block, which
 	// is out of scope and triggers actionlint errors.
-	lines := make([]string, 0, len(servers)+4)
+	budgetLines := staticEnclaveInformationBudgetPromptLines(data)
+	lines := make([]string, 0, len(servers)+len(budgetLines))
 	for _, server := range servers {
 		lines = append(lines, fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server))
 	}
-	if budgetLines := staticEnclaveInformationBudgetPromptLines(data); len(budgetLines) > 0 {
+	if len(budgetLines) > 0 {
 		lines = append(lines, budgetLines...)
 	}
 
