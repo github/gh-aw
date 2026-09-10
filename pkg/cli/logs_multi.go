@@ -58,6 +58,35 @@ func newLogsCountLimit(count int) *logsCountLimit {
 
 var collectWorkflowLogsForTarget = collectWorkflowLogs
 
+// queuedLogsTargetResult builds the workflowLogsResult for a target that never
+// started downloading because the shared deadline or cancellation fired while
+// it was still waiting for a worker slot. It preserves the target's own options
+// (including any BeforeRunID cursor from a prior continuation) so a date-range
+// target that made no progress still resumes from the correct position instead
+// of silently disappearing from the report.
+func queuedLogsTargetResult(opts LogsDownloadOptions, ctx context.Context) workflowLogsResult {
+	timeoutReached := isDeadlineExceeded(ctx)
+	if !timeoutReached {
+		return workflowLogsResult{}
+	}
+	continuation := buildContinuationIfNeeded(nil, timeoutReached, false, false, continuationOptions{
+		workflowName:          opts.WorkflowName,
+		startDate:             opts.StartDate,
+		endDate:               opts.EndDate,
+		engine:                opts.Engine,
+		branch:                opts.Ref,
+		afterRunID:            opts.AfterRunID,
+		ignoreWorkflowRuns:    opts.IgnoreWorkflowRuns,
+		count:                 opts.Count,
+		timeoutMinutes:        opts.TimeoutMinutes,
+		maxGitHubAPIRateLimit: opts.MaxGitHubAPIRateLimit,
+		maxStorageMB:          opts.MaxStorageMB,
+		pruneOlderRuns:        opts.PruneOlderRuns,
+		previousBeforeRunID:   opts.BeforeRunID,
+	})
+	return workflowLogsResult{timeoutReached: true, continuation: continuation}
+}
+
 // DownloadWorkflowLogsForTargets downloads several workflow reports concurrently
 // and renders one combined report. Each target gets an isolated output directory
 // so run IDs from different repositories cannot collide in the local cache.
@@ -155,53 +184,23 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 	resultChannel := make(chan logsTargetResult, len(targets))
 	var wg sync.WaitGroup
 	workerCount := min(len(targets), getMaxConcurrentWorkflowDownloads())
-	sem := make(chan struct{}, workerCount)
-	perTargetDownloads := max(1, getMaxConcurrentDownloads()/workerCount)
-	cleanupErrors := make(map[string]error, len(targets))
+	shared := logsTargetSharedState{
+		sem:                make(chan struct{}, workerCount),
+		perTargetDownloads: max(1, getMaxConcurrentDownloads()/workerCount),
+		cleanupErrors:      make(map[string]error, len(targets)),
+		storageLimit:       newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns),
+		countLimit:         newLogsCountLimit(opts.Count),
+	}
 	for _, target := range targets {
 		cleanupOpts := opts
 		cleanupOpts.OutputDir = logsTargetOutputDir(opts.OutputDir, target)
 		if err := cleanupLogsOutputDir(cleanupOpts); err != nil {
-			cleanupErrors[target.displayName()] = err
+			shared.cleanupErrors[target.displayName()] = err
 		}
 	}
-	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
-	countLimit := newLogsCountLimit(opts.Count)
 	for _, target := range targets {
 		wg.Go(func() {
-			defer func() {
-				if recovered := recover(); recovered != nil {
-					resultChannel <- logsTargetResult{target: target, err: fmt.Errorf("workflow collector panicked: %v", recovered)}
-				}
-			}()
-			if err := cleanupErrors[target.displayName()]; err != nil {
-				resultChannel <- logsTargetResult{target: target, err: err}
-				return
-			}
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				resultChannel <- logsTargetResult{target: target, err: ctx.Err()}
-				return
-			}
-
-			targetOpts := opts
-			targetOpts.WorkflowName = target.workflowName
-			targetOpts.RepoOverride = target.repoOverride
-			targetOpts.OutputDir = logsTargetOutputDir(opts.OutputDir, target)
-			targetOpts.SummaryFile = ""
-			targetOpts.Train = false
-			targetOpts.SuppressRender = true
-			targetOpts.skipEnsureGitignore = true
-			targetOpts.rateLimitFirstRequest = true
-			targetOpts.maxConcurrentDownloads = perTargetDownloads
-			targetOpts.storageLimit = storageLimit
-			targetOpts.countLimit = countLimit
-			targetOpts.TimeoutMinutes = 0
-			targetOpts.TimeoutSeconds = 0
-			result, err := collectWorkflowLogsForTarget(ctx, targetOpts)
-			resultChannel <- logsTargetResult{target: target, result: result, err: err}
+			resultChannel <- collectSingleLogsTarget(ctx, opts, target, shared)
 		})
 	}
 	wg.Wait()
@@ -211,6 +210,64 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 		results = append(results, result)
 	}
 	return results
+}
+
+// logsTargetSharedState bundles the resources shared by every concurrent
+// target worker: the semaphore bounding parallel downloads, the per-target
+// download share, and the storage/count budgets shared across all targets.
+type logsTargetSharedState struct {
+	sem                chan struct{}
+	perTargetDownloads int
+	cleanupErrors      map[string]error
+	storageLimit       *logsStorageLimit
+	countLimit         *logsCountLimit
+}
+
+// collectSingleLogsTarget runs one workflow target's log collection, recovering
+// from panics and building a resumable continuation when the target is still
+// waiting for a worker slot when the shared deadline or cancellation fires.
+func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			targetResult = logsTargetResult{target: target, err: fmt.Errorf("workflow collector panicked: %v", recovered)}
+		}
+	}()
+	if err := shared.cleanupErrors[target.displayName()]; err != nil {
+		return logsTargetResult{target: target, err: err}
+	}
+
+	targetOpts := opts
+	targetOpts.WorkflowName = target.workflowName
+	targetOpts.RepoOverride = target.repoOverride
+	targetOpts.OutputDir = logsTargetOutputDir(opts.OutputDir, target)
+	targetOpts.SummaryFile = ""
+	targetOpts.Train = false
+	targetOpts.SuppressRender = true
+	targetOpts.skipEnsureGitignore = true
+	targetOpts.rateLimitFirstRequest = true
+	targetOpts.maxConcurrentDownloads = shared.perTargetDownloads
+	targetOpts.storageLimit = shared.storageLimit
+	targetOpts.countLimit = shared.countLimit
+	targetOpts.TimeoutMinutes = 0
+	targetOpts.TimeoutSeconds = 0
+
+	select {
+	case shared.sem <- struct{}{}:
+		defer func() { <-shared.sem }()
+	case <-ctx.Done():
+		// The target never started (e.g. it was still queued behind the
+		// semaphore when the shared deadline or cancellation fired). Build a
+		// continuation from its own options so a resumable date-range target
+		// is not silently dropped from the report.
+		return logsTargetResult{
+			target: target,
+			result: queuedLogsTargetResult(targetOpts, ctx),
+			err:    ctx.Err(),
+		}
+	}
+
+	result, err := collectWorkflowLogsForTarget(ctx, targetOpts)
+	return logsTargetResult{target: target, result: result, err: err}
 }
 
 func mergeLogsTargetResults(

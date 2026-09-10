@@ -175,6 +175,45 @@ func TestDownloadWorkflowLogsForTargetsUsesOneWallClockTimeout(t *testing.T) {
 	assert.Less(t, time.Since(start), 1500*time.Millisecond, "the timeout must bound the entire multi-target operation")
 }
 
+func TestCollectLogsTargetsEmitsContinuationForQueuedTarget(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+
+	// The running target blocks until the shared deadline fires so the queued
+	// target never gets a worker slot and must be canceled while still waiting
+	// on the semaphore.
+	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		<-ctx.Done()
+		return workflowLogsResult{timeoutReached: true}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	results := collectLogsTargets(ctx, LogsDownloadOptions{
+		Count:       5,
+		OutputDir:   t.TempDir(),
+		StartDate:   "2024-01-01",
+		BeforeRunID: 999,
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+	})
+
+	_, continuations, timeoutReached, _, _, errs := mergeLogsTargetResults(results, nil)
+	require.NotEmpty(t, errs, "the queued target should still surface a context error")
+	assert.True(t, timeoutReached)
+	// The mock only reports timeoutReached (no continuation) for the target that
+	// actually ran; the one still waiting on the semaphore when the deadline fires
+	// is the only one that goes through queuedLogsTargetResult, so exactly one
+	// continuation is expected, regardless of which target won the race for the
+	// worker slot.
+	require.Len(t, continuations, 1, "the queued target must produce a resumable continuation")
+	assert.Equal(t, int64(999), continuations[0].BeforeRunID, "the queued target's continuation must preserve its own resume cursor")
+	assert.Equal(t, "2024-01-01", continuations[0].StartDate)
+}
+
 func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
 	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "2")
 	original := collectWorkflowLogsForTarget

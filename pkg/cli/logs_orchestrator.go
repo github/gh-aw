@@ -245,9 +245,10 @@ func buildContinuationIfNeeded(
 	if !timeoutReached && !countLimitReached && !storageLimitReached {
 		return nil
 	}
-	if len(processedRuns) == 0 && !countLimitReached && !storageLimitReached {
-		return nil
-	}
+	// A target can make zero progress (e.g. a timeout, shared count limit, or
+	// storage limit is reached before it starts, such as a queued multi-target
+	// download whose semaphore wait is canceled) yet still need a resumable
+	// continuation; fall through so previousBeforeRunID is used as the cursor.
 	// Use the oldest processed run as the before_run_id cursor for the next page.
 	// When storage prevented any progress in this batch, fall back to the incoming
 	// before_run_id instead of resetting it to zero: a zero cursor re-scans from the
