@@ -92,6 +92,7 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		if record.Request == nil || len(record.Payload) == 0 {
 			return nil
 		}
+		// Validate the cached payload shape while retaining its complete raw JSON.
 		var runs []WorkflowRun
 		if err := json.Unmarshal(record.Payload, &runs); err != nil {
 			return fmt.Errorf("failed to parse cached workflow runs payload in record %d: %w", recordNumber, err)
