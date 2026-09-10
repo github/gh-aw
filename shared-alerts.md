@@ -82,3 +82,21 @@
 - **"Deprecation candidate" label for Matt Pocock Skills Reviewer, Impeccable Skills Reviewer, Design Decision Gate: closed out.** Direct prompt audit (source `.md` review, not just run metrics) found no deprecation-supporting evidence in any of the three — all have explicit Success Criteria/rubrics, noop-vs-act guidance, turn budgets. Design Decision Gate is the strongest-structured prompt of the set. Do not re-flag these three for deprecation without new concrete evidence.
 - **Data-quality caveat:** `metrics/latest.json` (2026-09-01) reports `active_workflows: 41` vs. 247 on 2026-08-22 (83% single-day swing), self-attributed to a "GitHub API fallback after paginated logs were truncated." Full agent ranking/scoring deferred this run rather than scoring off noisy data — recommend Metrics Collector add a >50% day-over-day swing guard.
 - **GitHub MCP read limitation (session-specific, unverified if recurring):** `search_issues`/`search_pull_requests`/`list_issues`/`list_pull_requests` returned empty due to "[Filtered]...lower integrity than agent requires"; only `list_tags` worked. No new issue filed for this — retest next run before escalating.
+
+## Correction + Escalation — 2026-09-10T12:58Z (Agent Performance Analyzer)
+- **P0 ESCALATION — Metrics Collector chronic failure:** Open **#59851** (created 2026-09-10T02:45Z)
+  is the 9th recurrence of "Metrics Collector produced no safe outputs/timed out" (prior: #59611,
+  #59344, #59105, #58848, #58701, #58367, #58133, #57830). `metrics/latest.json` has been stale
+  since 2026-09-01 (10 days) as a direct result. This blocks accurate scoring for all three
+  meta-orchestrators. DO NOT RE-FILE #59851, but this needs an actual engineering fix (timeout
+  increase / log pagination fix), not another auto-expiring issue cycle.
+- **STALE ROOT-CAUSE CORRECTED:** lint-monster / daily-go-test-parallelizer `model:` config
+  (`openai/gpt-5.3-codex` / `copilot/gpt-5.3-codex`) was flagged 2026-09-09/10 as a "permanent
+  misconfiguration needing a model/model-provider fix." Verified against `pkg/cli/data/models.json`
+  (both models are valid/listed) and live run history (daily-go-test-parallelizer 10/10 recent runs
+  successful; lint-monster's latest run succeeded) with the config unchanged throughout — this is
+  transient model-availability/policy flakiness, not a config defect. Do not prescribe a model
+  change based on this pattern without new concrete failure evidence.
+- GitHub MCP read access (search_issues/search_pull_requests/issue_read/actions_list) worked
+  cleanly this session — the 2026-09-09 "[Filtered]...lower integrity" limitation did not recur,
+  confirming it was session-specific, not a persistent tooling defect.
