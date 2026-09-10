@@ -228,7 +228,7 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 	// for that case: the primary agent has no GitHub read path at all here, and every
 	// write-sink guard policy emitted for this configuration carries an explicit
 	// sink-visibility, so safe-outputs enforcement is unaffected.
-	if githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+	if forcePublicRepos == nil && githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
 		falseVal := false
 		forcePublicRepos = &falseVal
 	}

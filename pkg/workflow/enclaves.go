@@ -366,9 +366,10 @@ func staticEnclaveGitHubScopeOverrideWarning(workflowData *WorkflowData) string 
 		return ""
 	}
 	return "enclaves: a static GitHub agent enclave is combined with primary 'tools.github'. In a public repository " +
-		"the MCP gateway forces the GitHub allow-only scope to repos=\"public\", so the enclave cannot read the " +
-		"private repositories declared in enclaves[].repos. Remove primary 'tools.github' (set 'github: false') " +
-		"so the GitHub MCP server serves the enclave identity only."
+		"the MCP gateway forces the GitHub allow-only scope to repos=\"public\", discarding the enclave scope from " +
+		"enclaves[].agent.tools.github.allowed-repos (or enclaves[].repos when it is omitted), so the enclave reads " +
+		"nothing. Remove primary 'tools.github' (set 'github: false') so the GitHub MCP server serves the enclave " +
+		"identity only."
 }
 
 func validateEnclaveEntry(index int, enclave *EnclaveConfig, seenTypes map[string]struct{}, repositorySensitivities map[string]string) error {
