@@ -8,13 +8,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/parser"
-	"github.com/goccy/go-yaml"
 )
 
 type skillRefUpdateResolver func(ctx context.Context, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error)
@@ -23,6 +23,11 @@ type skillRefUpdateResolver func(ctx context.Context, repo, currentRef string, a
 // being updated (e.g. "plugins") does not support the map[string]any object form with a
 // nested ref key, so object-form entries are left untouched.
 const noObjectKey = ""
+
+type frontmatterRefUpdate struct {
+	old string
+	new string
+}
 
 func updateSkillRefsInContent(ctx context.Context, content string, allowMajor, verbose bool, coolDown time.Duration) (bool, string, error) {
 	return updateSkillRefsInContentWithResolver(ctx, content, allowMajor, verbose, coolDown, resolveLatestRef)
@@ -78,7 +83,8 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 	}
 
 	changed := false
-	for i, rawRef := range rawRefs {
+	var updates []frontmatterRefUpdate
+	for _, rawRef := range rawRefs {
 		switch typed := rawRef.(type) {
 		case string:
 			updated, updatedRef, err := updateSkillRefValue(ctx, fieldName, typed, allowMajor, verbose, coolDown, resolver)
@@ -86,7 +92,7 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 				return false, content, err
 			}
 			if updated {
-				rawRefs[i] = updatedRef
+				updates = append(updates, frontmatterRefUpdate{old: typed, new: updatedRef})
 				changed = true
 			}
 		case map[string]any:
@@ -102,7 +108,7 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 				return false, content, err
 			}
 			if updated {
-				typed[objectKey] = updatedRef
+				updates = append(updates, frontmatterRefUpdate{old: skillRef, new: updatedRef})
 				changed = true
 			}
 		}
@@ -110,17 +116,86 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 	if !changed {
 		return false, content, nil
 	}
-	result.Frontmatter[fieldName] = rawRefs
 
-	updatedFrontmatter, err := yaml.Marshal(result.Frontmatter)
-	if err != nil {
-		return false, content, fmt.Errorf("unable to marshal updated frontmatter: %w", err)
-	}
-	updatedContent, err := parser.ReconstructWorkflowFile(parser.QuoteCronExpressions(string(updatedFrontmatter)), result.Markdown)
-	if err != nil {
-		return false, content, fmt.Errorf("unable to reconstruct workflow file: %w", err)
+	updatedContent, applied := applyFrontmatterRefUpdates(content, result.FrontmatterLines, fieldName, objectKey, updates)
+	if !applied {
+		return false, content, fmt.Errorf("unable to locate parsed %s references in frontmatter", fieldName)
 	}
 	return true, updatedContent, nil
+}
+
+func applyFrontmatterRefUpdates(content string, frontmatterLines []string, fieldName, objectKey string, updates []frontmatterRefUpdate) (string, bool) {
+	originalFrontmatter := strings.Join(frontmatterLines, "\n")
+	if originalFrontmatter == "" {
+		return content, false
+	}
+
+	lines := slices.Clone(frontmatterLines)
+	inField := false
+	remaining := len(updates)
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if getIndentation(line) == "" && strings.HasPrefix(trimmed, fieldName+":") {
+			inField = true
+			lines[i], remaining = replaceFrontmatterRefValues(line, updates, remaining)
+			continue
+		}
+		if inField && isTopLevelKey(line) {
+			break
+		}
+		if !inField || !isFrontmatterRefValueLine(trimmed, objectKey) {
+			continue
+		}
+		lines[i], remaining = replaceFrontmatterRefValues(line, updates, remaining)
+	}
+
+	if remaining != 0 {
+		return content, false
+	}
+	updatedFrontmatter := strings.Join(lines, "\n")
+	return strings.Replace(content, originalFrontmatter, updatedFrontmatter, 1), true
+}
+
+func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
+	if !strings.HasPrefix(trimmed, "- ") {
+		return objectKey != noObjectKey && strings.HasPrefix(trimmed, objectKey+":")
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+	if objectKey != noObjectKey && strings.HasPrefix(value, objectKey+":") {
+		return true
+	}
+	return !strings.Contains(strings.SplitN(value, "#", 2)[0], ":")
+}
+
+func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, remaining int) (string, int) {
+	valueEnd := yamlValueEnd(line)
+	prefix := line[:valueEnd]
+	for _, update := range updates {
+		if strings.Contains(prefix, update.old) {
+			prefix = strings.Replace(prefix, update.old, update.new, 1)
+			remaining--
+		}
+	}
+	return prefix + line[valueEnd:], remaining
+}
+
+func yamlValueEnd(line string) int {
+	var quote byte
+	for i := range len(line) {
+		switch line[i] {
+		case '\'', '"':
+			if quote == 0 {
+				quote = line[i]
+			} else if quote == line[i] && (i == 0 || line[i-1] != '\\') {
+				quote = 0
+			}
+		case '#':
+			if quote == 0 && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t') {
+				return i
+			}
+		}
+	}
+	return len(line)
 }
 
 func updateSkillRefValue(
@@ -159,6 +234,7 @@ func updateSkillRefValue(
 	return true, spec + "@" + latestRef, nil
 }
 
+//nolint:largefunc
 func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDeps, content string, cache map[string]latestReleaseResult, coolDownCache map[string]coolDownCheckResult, allowMajor, verbose bool, coolDown time.Duration) (bool, string, error) {
 	changed := false
 	lines := strings.Split(content, "\n")

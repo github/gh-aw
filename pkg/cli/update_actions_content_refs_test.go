@@ -4,6 +4,8 @@ package cli
 
 import (
 	"context"
+	"math/rand"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -272,6 +274,88 @@ body
 	}
 	if !strings.Contains(got, "- ${{ inputs.dynamic_plugin }}") {
 		t.Fatalf("updated content unexpectedly modified expression plugin ref:\n%s", got)
+	}
+}
+
+func TestUpgradeTransformsPreserveRandomizedFrontmatterFormatting(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldSHA = "1111111111111111111111111111111111111111"
+		newSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	resolver := func(_ context.Context, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error) {
+		if currentRef != oldSHA {
+			t.Fatalf("resolver called with ref %q, want %q", currentRef, oldSHA)
+		}
+		return newSHA, nil
+	}
+	rng := rand.New(rand.NewSource(42)) //nolint:gosec
+
+	for sample := range 100 {
+		indent := strings.Repeat(" ", 2+2*rng.Intn(2))
+		fieldName := "skills"
+		objectKey := "skill"
+		ref := "githubnext/skills/review/security@" + oldSHA
+		newRef := "githubnext/skills/review/security@" + newSHA
+		refBlock := []string{
+			"skills: # preserve list comment",
+			indent + `- skill: "` + ref + `" # update only this value`,
+			indent + "  github-token: ${{ secrets.SOME_TOKEN }}",
+			indent + "# keep mentioned ref " + ref,
+		}
+		if sample%2 == 1 {
+			fieldName = "plugins"
+			objectKey = noObjectKey
+			ref = "githubnext/plugins/review/security@" + oldSHA
+			newRef = "githubnext/plugins/review/security@" + newSHA
+			refBlock = []string{
+				"plugins: # preserve list comment",
+				indent + `- '` + ref + `' # update only this value`,
+				indent + "# keep mentioned ref " + ref,
+			}
+		}
+
+		blocks := [][]string{
+			{"# sample comment " + strconv.Itoa(sample), `description: "quoted # value"`},
+			{"timeout_minutes: 30 # deprecated spelling"},
+			{"permissions:", indent + "contents: read # preserve permission comment"},
+			refBlock,
+			{"engine: copilot"},
+		}
+		order := rng.Perm(len(blocks))
+		var frontmatter []string
+		for i, blockIndex := range order {
+			if i > 0 && rng.Intn(2) == 0 {
+				frontmatter = append(frontmatter, "")
+			}
+			frontmatter = append(frontmatter, blocks[blockIndex]...)
+		}
+
+		input := "---\n" + strings.Join(frontmatter, "\n") + "\n---\n\n# Generated workflow\n\nBody."
+		expected := strings.Replace(input, "timeout_minutes:", "timeout-minutes:", 1)
+		expected = strings.Replace(expected, ref, newRef, 1)
+
+		fixed, applied, err := getTimeoutMinutesCodemod().Apply(input, map[string]any{"timeout_minutes": 30})
+		if err != nil {
+			t.Fatalf("sample %d timeout codemod failed: %v", sample, err)
+		}
+		if !applied {
+			t.Fatalf("sample %d timeout codemod was not applied", sample)
+		}
+
+		changed, got, err := updateFrontmatterRepoRefsInContentWithResolver(
+			context.Background(), fixed, fieldName, objectKey, true, false, 0, resolver,
+		)
+		if err != nil {
+			t.Fatalf("sample %d ref update failed: %v", sample, err)
+		}
+		if !changed {
+			t.Fatalf("sample %d ref update was not applied", sample)
+		}
+		if got != expected {
+			t.Fatalf("sample %d reformatted frontmatter\n--- got ---\n%s\n--- want ---\n%s", sample, got, expected)
+		}
 	}
 }
 
