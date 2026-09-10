@@ -1,0 +1,95 @@
+{
+  "total_prs": 141,
+  "avg_sentiment": 0.0422,
+  "sentiment_counts": {
+    "positive": 65,
+    "neutral": 38,
+    "negative": 38
+  },
+  "top_keywords": [
+    [
+      "workflow",
+      271
+    ],
+    [
+      "run",
+      184
+    ],
+    [
+      "sub",
+      183
+    ],
+    [
+      "aic",
+      180
+    ],
+    [
+      "generated",
+      125
+    ],
+    [
+      "firewall",
+      122
+    ],
+    [
+      "blocked",
+      121
+    ],
+    [
+      "summary",
+      114
+    ],
+    [
+      "details",
+      112
+    ],
+    [
+      "add",
+      110
+    ],
+    [
+      "sous",
+      103
+    ],
+    [
+      "chef",
+      103
+    ],
+    [
+      "configuration",
+      97
+    ],
+    [
+      "comment",
+      93
+    ],
+    [
+      "gpt",
+      91
+    ]
+  ],
+  "clusters": {
+    "0": "model, codex, workflow, daily, compatible, codex model",
+    "1": "aic, sub, firewall, details, summary, blocked",
+    "2": "job, actions, actions job, failure, fix, failing",
+    "3": "policy, github, safe, linear, enclave, jira",
+    "4": "workflow, path, add, coverage, metadata, repository"
+  },
+  "cluster_counts": {
+    "4": 54,
+    "3": 22,
+    "2": 9,
+    "1": 37,
+    "0": 19
+  },
+  "most_positive": {
+    "pr_number": 56564,
+    "pr_title": "Document Copilot org-billing tip opt-out",
+    "sentiment_polarity": 0.4107142857142857
+  },
+  "most_negative": {
+    "pr_number": 58770,
+    "pr_title": "Use Codex-compatible model for CLI Version Checker",
+    "sentiment_polarity": -0.5
+  }
+}
