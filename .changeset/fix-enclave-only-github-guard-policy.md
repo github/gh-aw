@@ -2,4 +2,4 @@
 "gh-aw": patch
 ---
 
-Fix an invalid empty server-level GitHub guard policy when GitHub tools are enabled only for an enclave agent (`tools.github: false` with `enclaves[].agent.tools.github`). The generated MCP Gateway configuration referenced `determine-automatic-lockdown` step outputs even though that step is not generated, so both guard values expanded to empty strings and mcpg exited during startup with `min-integrity is required`. The GitHub server now gets a server-level guard policy mirroring the enclave identity policy, and the lockdown step outputs are only referenced when the step is generated.
+Fix static GitHub agent enclaves when primary GitHub tools are disabled (`tools.github: false` with `enclaves[].agent.tools.github`). The compiler now emits the enclave-scoped GitHub guard policy together with the matching safeoutputs `write-sink` policy, probes enclave-only GitHub with the enclave identity, refreshes deferred `awf-enclave` CLI tool schemas after late backend registration, and documents finite-disclosure response-schema bit budgets in the generated prompt.

@@ -363,6 +363,9 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 			yaml.WriteString("          AWF_ENCLAVE_GITHUB_MCP_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')\n")
 			yaml.WriteString("          echo \"::add-mask::${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}\"\n")
 			yaml.WriteString("          export AWF_ENCLAVE_GITHUB_MCP_AGENT_ID\n")
+			if githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+				yaml.WriteString("          export GH_AW_MCP_GITHUB_CHECK_AGENT_ID=\"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}\"\n")
+			}
 		}
 		yaml.WriteString("          # The eager checker runs inside start_mcp_gateway.cjs in this step.\n")
 		fmt.Fprintf(yaml, "          export %s=%q\n", enclaveMCPDeferredServersEnv, enclaveMCPServerName)

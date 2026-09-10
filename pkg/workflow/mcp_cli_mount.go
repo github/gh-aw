@@ -120,6 +120,9 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 	if IsMCPScriptsEnabled(data.MCPScripts) && !slices.Contains(servers, constants.MCPScriptsMCPServerID.String()) {
 		servers = append(servers, constants.MCPScriptsMCPServerID.String())
 	}
+	if enclavesEnabled(data) && !slices.Contains(servers, enclaveMCPServerName) {
+		servers = append(servers, enclaveMCPServerName)
+	}
 
 	// Copilot normally runs with --disable-builtin-mcps. When at least one CLI
 	// mount trigger is active (safeoutputs/mcpscripts or cli-proxy), the mount
@@ -364,9 +367,12 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	// Using step outputs (e.g. steps.mount-mcp-clis.outputs.mcp-cli-servers-list) here
 	// would reference a step from the agent job in the activation job's env block, which
 	// is out of scope and triggers actionlint errors.
-	lines := make([]string, len(servers))
-	for i, server := range servers {
-		lines[i] = fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server)
+	lines := make([]string, 0, len(servers)+4)
+	for _, server := range servers {
+		lines = append(lines, fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server))
+	}
+	if budgetLines := staticEnclaveInformationBudgetPromptLines(data); len(budgetLines) > 0 {
+		lines = append(lines, budgetLines...)
 	}
 
 	promptFile := mcpCLIToolsPromptFile
@@ -381,4 +387,34 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 			"GH_AW_MCP_CLI_SERVERS_LIST": strings.Join(lines, "\n"),
 		},
 	}
+}
+
+func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
+	enclave := enclaveStaticGitHubAgentConfig(data)
+	if enclave == nil {
+		return nil
+	}
+	repoLines := make([]string, 0, len(enclave.Repos))
+	for _, repo := range enclave.Repos {
+		if repo == nil {
+			continue
+		}
+		switch repo.Sensitivity {
+		case "confidential":
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an 8-bit per-run budget, so response schema cardinality must be at most 8.", repo.Repo))
+		case "internal", "sealed":
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
+		}
+	}
+	if len(repoLines) == 0 {
+		return nil
+	}
+	lines := []string{
+		"",
+		"For `awf-enclave enclave_run_agent`, response schemas are constrained by finite-disclosure information budgets, not just `max-output-bytes`.",
+		"The charge is 1 status bit + ceil(log2(response schema cardinality)) + 4 timing bits.",
+	}
+	lines = append(lines, repoLines...)
+	lines = append(lines, "Use small enums and booleans for finite schemas; a response can be under `max-output-bytes` and still fail with `bit-budget-exhausted` if its schema cardinality is too high.")
+	return lines
 }

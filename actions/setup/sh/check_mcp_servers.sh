@@ -173,6 +173,9 @@ while IFS= read -r SERVER_NAME; do
   if echo "$SERVER_CONFIG" | jq -e '.headers.Authorization' >/dev/null 2>&1; then
     AUTH_HEADER=$(echo "$SERVER_CONFIG" | jq -r '.headers.Authorization' 2>/dev/null)
   fi
+  if [ "$SERVER_NAME" = "github" ] && [ -n "${GH_AW_MCP_GITHUB_CHECK_AGENT_ID:-}" ]; then
+    AUTH_HEADER="$GH_AW_MCP_GITHUB_CHECK_AGENT_ID"
+  fi
   
   # MCP protocol sequence: ping → initialize → tools/list.
   # ping verifies basic connectivity (may be handled by the gateway proxy).

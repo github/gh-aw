@@ -182,6 +182,32 @@ func dynamicEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]a
 	}
 }
 
+// staticEnclaveWriteSinkGuardPolicy builds the write-sink policy required by
+// safeoutputs when the only guarded GitHub source is a static enclave agent.
+func staticEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]any {
+	if !githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+		return nil
+	}
+	enclave := enclaveStaticGitHubAgentConfig(workflowData)
+	if enclave == nil {
+		return nil
+	}
+	repos := enclaveGitHubAllowedRepos(enclave)
+	if len(repos) == 0 {
+		return nil
+	}
+	accept := make([]string, 0, len(repos))
+	for _, repo := range repos {
+		accept = append(accept, transformRepoPattern(repo))
+	}
+	return map[string]any{
+		"write-sink": map[string]any{
+			"accept":          accept,
+			"sink-visibility": sinkVisibilityRuntimeExpr,
+		},
+	}
+}
+
 // hasGitHubTool checks if the GitHub tool is configured (using ParsedTools)
 func hasGitHubTool(parsedTools *Tools) bool {
 	if parsedTools == nil {
@@ -660,6 +686,9 @@ func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[stri
 	}
 	rawGithubTool, hasGitHub := workflowData.Tools["github"]
 	if !hasGitHub {
+		if policy := staticEnclaveWriteSinkGuardPolicy(workflowData); policy != nil {
+			return policy
+		}
 		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 
@@ -702,6 +731,9 @@ func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[stri
 	}
 
 	if rawGithubTool == false {
+		if policy := staticEnclaveWriteSinkGuardPolicy(workflowData); policy != nil {
+			return policy
+		}
 		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 
