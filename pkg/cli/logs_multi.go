@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -24,6 +25,37 @@ type logsTargetResult struct {
 	err    error
 }
 
+type logsCountLimit struct {
+	max       int64
+	processed atomic.Int64
+}
+
+func (l *logsCountLimit) tryAdd() bool {
+	if l == nil {
+		return true
+	}
+	for {
+		processed := l.processed.Load()
+		if processed >= l.max {
+			return false
+		}
+		if l.processed.CompareAndSwap(processed, processed+1) {
+			return true
+		}
+	}
+}
+
+func (l *logsCountLimit) isReached() bool {
+	return l != nil && l.processed.Load() >= l.max
+}
+
+func newLogsCountLimit(count int) *logsCountLimit {
+	if count <= 0 {
+		return nil
+	}
+	return &logsCountLimit{max: int64(count)}
+}
+
 var collectWorkflowLogsForTarget = collectWorkflowLogs
 
 // DownloadWorkflowLogsForTargets downloads several workflow reports concurrently
@@ -38,6 +70,8 @@ func DownloadWorkflowLogsForTargets(
 	if len(targets) == 0 {
 		return errors.Join(initialErrors...)
 	}
+	activeCtx, timeoutCancel, _, _ := buildLogsDownloadContext(ctx, opts.TimeoutMinutes, opts.TimeoutSeconds, opts.Verbose)
+	defer cancelLogsDownload(timeoutCancel)
 	if err := ensureLogsGitignoreWithWarning(opts.Verbose); err != nil {
 		return err
 	}
@@ -45,8 +79,8 @@ func DownloadWorkflowLogsForTargets(
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
 		return err
 	}
-	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, logsTargetRateLimitHosts(targets))
-	results := collectLogsTargets(ctx, opts, targets)
+	allAPIRateLimits := startGitHubAPIRateLimitReports(activeCtx, logsTargetRateLimitHosts(targets))
+	results := collectLogsTargets(activeCtx, opts, targets)
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
 	for _, err := range allErrors {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))
@@ -65,9 +99,7 @@ func DownloadWorkflowLogsForTargets(
 		return err
 	}
 
-	slices.SortStableFunc(processedRuns, func(a, b ProcessedRun) int {
-		return b.Run.CreatedAt.Compare(a.Run.CreatedAt)
-	})
+	processedRuns = sortAndLimitLogsTargetRuns(processedRuns, opts.Count, opts.Verbose)
 	artifactFilter, err := resolveLogsArtifactFilter(opts.ArtifactSets, opts.Verbose)
 	if err != nil {
 		return err
@@ -93,6 +125,16 @@ func DownloadWorkflowLogsForTargets(
 		apiRateLimit:      apiRateLimit,
 		apiRateLimits:     apiRateLimits,
 	})
+}
+
+func sortAndLimitLogsTargetRuns(processedRuns []ProcessedRun, count int, verbose bool) []ProcessedRun {
+	slices.SortStableFunc(processedRuns, func(a, b ProcessedRun) int {
+		return b.Run.CreatedAt.Compare(a.Run.CreatedAt)
+	})
+	if count > 0 {
+		return limitProcessedRuns(processedRuns, count, verbose)
+	}
+	return processedRuns
 }
 
 func logsTargetRateLimitHosts(targets []logsWorkflowTarget) []string {
@@ -124,6 +166,7 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 		}
 	}
 	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
+	countLimit := newLogsCountLimit(opts.Count)
 	for _, target := range targets {
 		wg.Go(func() {
 			defer func() {
@@ -154,6 +197,9 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 			targetOpts.rateLimitFirstRequest = true
 			targetOpts.maxConcurrentDownloads = perTargetDownloads
 			targetOpts.storageLimit = storageLimit
+			targetOpts.countLimit = countLimit
+			targetOpts.TimeoutMinutes = 0
+			targetOpts.TimeoutSeconds = 0
 			result, err := collectWorkflowLogsForTarget(ctx, targetOpts)
 			resultChannel <- logsTargetResult{target: target, result: result, err: err}
 		})

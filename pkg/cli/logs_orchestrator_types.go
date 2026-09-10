@@ -61,6 +61,7 @@ type LogsDownloadOptions struct {
 	rateLimitFirstRequest  bool
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
+	countLimit             *logsCountLimit
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	cachedJSONLCache       *cachedLogsJSONLCache
 }

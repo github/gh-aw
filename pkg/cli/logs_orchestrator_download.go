@@ -48,6 +48,7 @@ type processWorkflowRunBatchOptions struct {
 	maxGitHubAPIRateLimit  int
 	cachedRuns             cachedLogsRuns
 	cachedJSONLWriter      *cachedLogsJSONLWriter
+	countLimit             *logsCountLimit
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -230,6 +231,9 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 			state.timeoutReached = state.timeoutReached || timedOut
 			break
 		}
+		if markSharedLogsCountReached(&state, runtime.fetchAllInRange, opts.countLimit) {
+			break
+		}
 		if len(state.processedRuns) >= opts.Count {
 			state.countLimitReached = runtime.fetchAllInRange
 			break
@@ -305,6 +309,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		maxGitHubAPIRateLimit:  opts.MaxGitHubAPIRateLimit,
 		cachedRuns:             runtime.cachedRuns,
 		cachedJSONLWriter:      opts.cachedJSONLWriter,
+		countLimit:             opts.countLimit,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	// Only mark this batch as storage-limit-truncated when one of its own
@@ -321,12 +326,23 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		// resumes within this batch after the oldest successfully processed run.
 		return true, nil
 	}
+	if markSharedLogsCountReached(state, runtime.fetchAllInRange, opts.countLimit) {
+		return true, nil
+	}
 	if allRunsConsumed {
 		if cursor, ok := selectPaginationCursorDate(batch.runs, batch.oldestFetchedCreatedAt); ok {
 			state.beforeDate = cursor
 		}
 	}
 	return shouldStopAfterWorkflowRunBatch(batch, opts.Verbose), nil
+}
+
+func markSharedLogsCountReached(state *logsCollectionState, fetchAllInRange bool, limit *logsCountLimit) bool {
+	if !limit.isReached() {
+		return false
+	}
+	state.countLimitReached = fetchAllInRange
+	return true
 }
 
 func handleLogsBatchError(state *logsCollectionState, ctx context.Context, err error) (bool, error) {
@@ -544,7 +560,7 @@ func appendProcessedWorkflowRuns(
 	var storageLimitReached bool
 	for _, result := range downloadResults {
 		if result.CachedRun != nil {
-			if len(processedRuns) < opts.count {
+			if len(processedRuns) < opts.count && opts.countLimit.tryAdd() {
 				processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
 				batchProcessed++
 			}
@@ -561,6 +577,9 @@ func appendProcessedWorkflowRuns(
 		parseWorkflowRunArtifacts(result, processedRun, opts.parse, opts.verbose)
 		finalizeLogsRunDownload(opts.storageLimit, result)
 		if len(processedRuns) >= opts.count {
+			continue
+		}
+		if !opts.countLimit.tryAdd() {
 			continue
 		}
 		processedRuns = append(processedRuns, processedRun)
