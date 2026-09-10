@@ -48,6 +48,26 @@
 - Reviewer/gate agents (Impeccable, Matt Pocock, PR Code Quality Reviewer, Test Quality Sentinel, Design Decision Gate) show 1/1 clean runs in the 2026-09-01 metrics snapshot — reclassified from "deprecation candidate" to "recovered — monitor" pending more sampled runs.
 - New (unverified pattern, single-run sample) failures observed 2026-09-01: daily-firewall-report, daily-go-test-parallelizer, lint-monster — flagged for WHM log check, not yet filed.
 
+## Resolution — 2026-09-10 (Workflow Health Manager)
+- Compilation clean: 299/299 workflows have lock files, no compile errors.
+- **lint-monster**: root cause identified — invalid/unsupported `model: openai/gpt-5.3-codex` for
+  the `codex` engine causes `model_not_supported_error` + no safe outputs. Recurs every few days
+  (issues auto-expire before anyone fixes the model config); latest occurrence tracked by open
+  **#59853** (created 2026-09-10). Prior tracker #59609 auto-expired/closed. DO NOT RE-FILE, but
+  this needs an actual config fix (change `model:` to a supported value for engine `codex`, e.g.
+  `openai/gpt-5.3-codex` may need `model-provider: openai` alignment — verify against
+  pkg/cli/data/models.json) to stop the recurring churn.
+- **daily-go-test-parallelizer**: mostly healthy (9/10 recent runs successful). Open trackers
+  #59879 (WIP), #59847, #59790. Prior #59631 auto-expired/closed. DO NOT RE-FILE.
+- **daily-firewall-report**: recovered, 2 consecutive successes. No open issue needed.
+- **cjs** (flagged in failing-workflows.json with 4 action_required): this is a plain
+  `.github/workflows/cjs.yml` GitHub Actions workflow, not an agentic `.md` workflow — out of
+  scope for `gh aw` compile/health tracking. Live run history shows 5/6 recent success; the
+  action_required figure is stale (2026-09-01 snapshot). No action needed.
+- `metrics/latest.json` / `failing-workflows.json` remains dated 2026-09-01 (over a week stale) —
+  recommend Metrics Collector refresh; all flagged items in this run were cross-checked live via
+  `gh run list` rather than trusted from the snapshot.
+
 ## Resolution — 2026-09-09 (Workflow Health Manager)
 - **lint-monster**: confirmed recurring (4/5 recent runs failed). Already tracked by open #59609
   "[aw] LintMonster failed" + backlog #58126. DO NOT RE-FILE.
