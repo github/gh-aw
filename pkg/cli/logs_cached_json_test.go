@@ -120,7 +120,7 @@ func TestDownloadWorkflowLogsFromEmptyStdinUpdatesCachedJSON(t *testing.T) {
 
 	err := DownloadWorkflowLogsFromStdin(context.Background(), StdinLogsOptions{
 		OutputDir:  t.TempDir(),
-		CachedLogs: path,
+		CachedJSON: path,
 	})
 	require.NoError(t, err)
 
@@ -144,7 +144,7 @@ func TestPrepareLogsDataUpdatesCachedJSON(t *testing.T) {
 		},
 	}}, renderLogsOutputOptions{
 		outputDir:  t.TempDir(),
-		cachedLogs: path,
+		cachedJSON: path,
 	})
 	require.NoError(t, err)
 

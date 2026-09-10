@@ -108,9 +108,9 @@ func TestNewLogsCommand(t *testing.T) {
 	require.NotNil(t, maxStorageFlag, "Should have 'max-storage' flag")
 	pruneOlderRunsFlag := flags.Lookup("prune-older-runs")
 	require.NotNil(t, pruneOlderRunsFlag, "Should have 'prune-older-runs' flag")
-	cachedLogsFlag := flags.Lookup("cached-logs")
-	require.NotNil(t, cachedLogsFlag, "Should have 'cached-logs' flag")
-	assert.Contains(t, cachedLogsFlag.Usage, "previous logs JSON")
+	cachedJSONFlag := flags.Lookup("cached-json")
+	require.NotNil(t, cachedJSONFlag, "Should have 'cached-json' flag")
+	assert.Contains(t, cachedJSONFlag.Usage, "previous logs JSON")
 	drain3WeightsFlag := flags.Lookup("drain3-weights")
 	require.NotNil(t, drain3WeightsFlag, "Should have 'drain3-weights' flag")
 	assert.Contains(t, drain3WeightsFlag.Usage, "existing Drain3 weights")
@@ -137,7 +137,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"max-github-api-rate-limit", "0"},
 		{"max-storage", "0"},
 		{"prune-older-runs", "false"},
-		{"cached-logs", ""},
+		{"cached-json", ""},
 		{"drain3-weights", ""},
 	}
 
@@ -164,14 +164,14 @@ func TestLogsCommandResourceBudgetFlags(t *testing.T) {
 	assert.True(t, opts.PruneOlderRuns)
 }
 
-func TestLogsCommandCachedLogsOption(t *testing.T) {
+func TestLogsCommandCachedJSONOption(t *testing.T) {
 	cmd := NewLogsCommand()
-	require.NoError(t, cmd.Flags().Set("cached-logs", "current.json"))
+	require.NoError(t, cmd.Flags().Set("cached-json", "current.json"))
 
 	opts, err := loadCommonLogsOptions(cmd)
 
 	require.NoError(t, err)
-	assert.Equal(t, "current.json", opts.CachedLogs)
+	assert.Equal(t, "current.json", opts.CachedJSON)
 }
 
 func TestLogsCommandDrain3WeightsOption(t *testing.T) {

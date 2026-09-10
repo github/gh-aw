@@ -58,7 +58,7 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
-	cachedRuns, err := loadCachedLogsJSON(opts.CachedLogs)
+	cachedRuns, err := loadCachedLogsJSON(opts.CachedJSON)
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
@@ -667,13 +667,13 @@ func handleEmptyProcessedRuns(
 	if len(processedRuns) > 0 {
 		return false, nil
 	}
-	if opts.JSONOutput || opts.CachedLogs != "" {
+	if opts.JSONOutput || opts.CachedJSON != "" {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, continuation)
 		logsData.Continuations = continuations
 		logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 		logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 		logsData.Message = noRunsMessage(opts.StartDate, timeoutReached, storageLimitReached)
-		if err := writeCachedLogsJSON(opts.CachedLogs, logsData, opts.Verbose); err != nil {
+		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
 			return true, err
 		}
 		if opts.JSONOutput {
