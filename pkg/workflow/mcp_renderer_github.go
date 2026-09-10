@@ -30,6 +30,9 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 	if len(explicitGuardPolicies) == 0 && githubBackendIsDynamicDelegationOnly(workflowData) {
 		explicitGuardPolicies = dynamicEnclaveGitHubGuardPolicies(workflowData)
 	}
+	if githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+		explicitGuardPolicies = staticEnclaveGitHubGuardPolicies(workflowData)
+	}
 	// Integrity reaction fields are only supported in proxy mode (DIFC/CLI proxy),
 	// not in gateway mode. The MCP gateway cannot identify reaction authors because
 	// the GitHub MCP server protocol does not expose that information. Warn if the

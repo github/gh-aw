@@ -63,6 +63,7 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -116,6 +117,30 @@ func dynamicEnclaveGitHubGuardPolicies(workflowData *WorkflowData) map[string]an
 	}
 }
 
+// staticEnclaveGitHubGuardPolicies builds a server-level guard policy for a GitHub MCP server
+// that exists only to serve a static enclave agent identity. It mirrors the enclave identity
+// policy exactly, so the server-level guard never broadens access beyond the identity policy
+// already enforced by the gateway.
+func staticEnclaveGitHubGuardPolicies(workflowData *WorkflowData) map[string]any {
+	if enclaveStaticGitHubAgentConfig(workflowData) == nil {
+		return nil
+	}
+	allowOnly := enclaveGitHubMCPAgentPolicy(workflowData).AllowOnly
+	repos, _ := allowOnly["repos"].([]string)
+	if len(repos) == 0 {
+		return nil
+	}
+	policy := make(map[string]any, len(allowOnly))
+	maps.Copy(policy, allowOnly)
+	return map[string]any{"allow-only": policy}
+}
+
+// githubBackendIsStaticEnclaveDelegationOnly reports whether the GitHub MCP server is rendered
+// solely to serve a static enclave agent identity (primary-agent GitHub access disabled).
+func githubBackendIsStaticEnclaveDelegationOnly(workflowData *WorkflowData) bool {
+	return enclaveGitHubIssuesEnabled(workflowData) && !primaryGitHubMCPEnabled(workflowData)
+}
+
 func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolicies map[string]any) bool {
 	if len(explicitGuardPolicies) > 0 {
 		return false
@@ -125,7 +150,10 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	}
 	githubTool, hasGitHub := workflowData.Tools["github"]
 	if !hasGitHub {
-		return true
+		// Default-tool resolution removes the "github" key when tools.github is false, so an
+		// absent key can still mean the GitHub MCP server is rendered for enclave delegation.
+		// Only reference the lockdown step outputs when that step is actually generated.
+		return githubLockdownDetectionStepEnabled(workflowData)
 	}
 	return githubTool != false
 }
