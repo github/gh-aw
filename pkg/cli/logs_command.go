@@ -304,7 +304,7 @@ func resolveLogsWorkflowTarget(cmd *cobra.Command, arg string) (logsWorkflowTarg
 	}
 	if repo, workflowName, ok := splitCrossRepoWorkflowTarget(arg); ok {
 		return logsWorkflowTarget{
-			workflowName: normalizeWorkflowID(workflowName),
+			workflowName: resolveLogsWorkflowNameForRepo(workflowName, repo),
 			repoOverride: repo,
 		}, nil
 	}
@@ -536,6 +536,12 @@ func resolveLogsWorkflowNameForRepo(arg, repoOverride string) string {
 		return resolved
 	}
 	workflowName := normalizeWorkflowID(arg)
+	if workflowName != arg {
+		if resolved, err := workflow.FindWorkflowName(workflowName); err == nil {
+			logsCommandLog.Printf("Resolved normalized workflow name via local lock files: %s -> %s", arg, resolved)
+			return resolved
+		}
+	}
 	logsCommandLog.Printf("Local resolution failed, using normalized workflow name: %s", workflowName)
 	return workflowName
 }
