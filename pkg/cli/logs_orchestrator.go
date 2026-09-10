@@ -306,6 +306,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)
 	if checkpoints != nil {
+		// Flush and stop checkpoints before the authoritative final render.
 		checkpoints.Stop()
 	}
 	if err != nil {

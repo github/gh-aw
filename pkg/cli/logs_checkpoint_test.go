@@ -50,19 +50,19 @@ func TestLogsCheckpointWriterPersistsAtInterval(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
-func TestLogsCheckpointWriterPersistsCachedJSONAtInterval(t *testing.T) {
+func TestLogsCheckpointWriterPersistsCachedLogsAtInterval(t *testing.T) {
 	outputDir := t.TempDir()
-	cachedJSON := filepath.Join(t.TempDir(), "cached.json")
+	cachedLogs := filepath.Join(t.TempDir(), "cached.json")
 	writer := startLogsCheckpointWriter(LogsDownloadOptions{
 		OutputDir:  outputDir,
-		CachedLogs: cachedJSON,
+		CachedLogs: cachedLogs,
 	}, 10*time.Millisecond)
 	require.NotNil(t, writer)
 	defer writer.Stop()
 
 	writer.Update([]ProcessedRun{{Run: WorkflowRun{DatabaseID: 789}}})
 	require.Eventually(t, func() bool {
-		data, err := os.ReadFile(cachedJSON)
+		data, err := os.ReadFile(cachedLogs)
 		if err != nil {
 			return false
 		}
@@ -74,15 +74,15 @@ func TestLogsCheckpointWriterPersistsCachedJSONAtInterval(t *testing.T) {
 }
 
 func TestLogsCheckpointWriterCombinesTargets(t *testing.T) {
-	cachedJSON := filepath.Join(t.TempDir(), "cached.json")
-	writer := startLogsCheckpointWriter(LogsDownloadOptions{CachedLogs: cachedJSON}, time.Hour)
+	cachedLogs := filepath.Join(t.TempDir(), "cached.json")
+	writer := startLogsCheckpointWriter(LogsDownloadOptions{CachedLogs: cachedLogs}, time.Hour)
 	require.NotNil(t, writer)
 
 	writer.UpdateTarget("first", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 1}}})
 	writer.UpdateTarget("second", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 2}}})
 	writer.Stop()
 
-	data, err := os.ReadFile(cachedJSON)
+	data, err := os.ReadFile(cachedLogs)
 	require.NoError(t, err)
 	var cached LogsData
 	require.NoError(t, json.Unmarshal(data, &cached))

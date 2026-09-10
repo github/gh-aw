@@ -68,7 +68,7 @@ func stopLogsCheckpointWriter(writer *logsCheckpointWriter) {
 	}
 }
 
-func (w *logsCheckpointWriter) run(summaryPath, cachedJSONPath, outputDir string, interval time.Duration, verbose bool) {
+func (w *logsCheckpointWriter) run(summaryPath, cachedLogsPath, outputDir string, interval time.Duration, verbose bool) {
 	defer close(w.done)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -86,8 +86,8 @@ func (w *logsCheckpointWriter) run(summaryPath, cachedJSONPath, outputDir string
 				logsOrchestratorLog.Printf("Failed to write intermediate logs summary: %v", err)
 			}
 		}
-		if cachedJSONPath != "" {
-			if err := writeCachedLogsJSON(cachedJSONPath, logsData, verbose); err != nil {
+		if cachedLogsPath != "" {
+			if err := writeCachedLogsJSON(cachedLogsPath, logsData, verbose); err != nil {
 				logsOrchestratorLog.Printf("Failed to write intermediate cached logs JSON: %v", err)
 			}
 		}
