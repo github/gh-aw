@@ -491,3 +491,13 @@ func TestStaticEnclaveGitHubScopeOverrideWarning(t *testing.T) {
 
 	assert.Empty(t, staticEnclaveGitHubScopeOverrideWarning(enclaveWorkflowData(true, false, 120, 0)))
 }
+
+func TestStaticEnclaveGitHubScopeOverrideWarningIncrementsWarningCount(t *testing.T) {
+	compiler := NewCompiler()
+	data := enclaveGitHubToolsWorkflowData()
+	data.Tools["github"] = map[string]any{}
+
+	require.NoError(t, compiler.validateCoreToolConfiguration(data, ""))
+
+	assert.Equal(t, 1, compiler.GetWarningCount())
+}

@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -347,9 +345,6 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 	}
 	if err := validateEnclaveGitHubIssuesVersions(workflowData); err != nil {
 		return err
-	}
-	if warning := staticEnclaveGitHubScopeOverrideWarning(workflowData); warning != "" {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
 	}
 	return nil
 }
