@@ -167,11 +167,14 @@ func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
 }
 
 func (request cachedWorkflowRunsRequest) key() string {
-	data, err := json.Marshal(request)
-	if err != nil {
-		return ""
+	var key strings.Builder
+	values := append([]string{request.Host, request.Repository}, request.Args...)
+	for _, value := range values {
+		key.WriteString(strconv.Itoa(len(value)))
+		key.WriteByte(':')
+		key.WriteString(value)
 	}
-	return string(data)
+	return key.String()
 }
 
 func (cache *cachedLogsJSONLCache) lookupWorkflowRuns(request cachedWorkflowRunsRequest) (json.RawMessage, bool) {
