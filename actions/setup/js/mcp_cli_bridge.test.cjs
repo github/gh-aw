@@ -522,6 +522,24 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("does not add enclave bit-budget hints for other servers", async () => {
+    await formatResponse(
+      {
+        result: {
+          isError: true,
+          content: [{ type: "text", text: '{"status":"error","reason":"bit-budget-exhausted"}' }],
+        },
+      },
+      "other-server",
+      "some_tool"
+    );
+
+    const stderr = stderrChunks.join("");
+    expect(stderr).toContain("bit-budget-exhausted");
+    expect(stderr).not.toContain("finite-disclosure bit budget");
+    expect(process.exitCode).toBe(1);
+  });
+
   it("omits non-retry hint when toolName is absent", async () => {
     await formatResponse(
       {

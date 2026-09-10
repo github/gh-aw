@@ -75,6 +75,7 @@ const TOOL_HELP_MAX_LINES = 30;
 const TOOL_DESC_MAX_LEN = 90;
 const COMPACT_NAME_LINE_TARGET_WIDTH = 110;
 const SAFEOUTPUTS_SERVER_NAME = "safeoutputs";
+const AWF_ENCLAVE_SERVER_NAME = "awf-enclave";
 const DEFERRED_SERVERS_ENV = "GH_AW_MCP_DEFERRED_SERVERS";
 
 // ---------------------------------------------------------------------------
@@ -1125,6 +1126,10 @@ function serverInCommaList(name, list) {
     .includes(name);
 }
 
+function isEnclaveBitBudgetExhausted(serverName, message) {
+  return serverName === AWF_ENCLAVE_SERVER_NAME && /bit-budget-exhausted/i.test(message);
+}
+
 /**
  * Fetch the live tools/list result for a server and persist it over an empty
  * cache. Deferred servers such as awf-enclave may register after the wrapper is
@@ -1445,7 +1450,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
     const message = "message" in errRecord ? String(errRecord.message || "Unknown error") : "Unknown error";
     const code = "code" in errRecord && errRecord.code != null ? String(errRecord.code) : "";
     const isSafeOutputsEmptyArgs = serverName === SAFEOUTPUTS_SERVER_NAME && code === "-32602" && /Empty arguments are not allowed/i.test(message);
-    const isEnclaveBitBudget = /bit-budget-exhausted/i.test(message);
+    const isEnclaveBitBudget = isEnclaveBitBudgetExhausted(serverName, message);
     const hint =
       isSafeOutputsEmptyArgs && toolName
         ? `Hint: do not retry '${serverName} ${toolName}' with empty arguments. Run '${serverName} ${toolName} --help' to inspect the required options, or call 'noop' with a message if no action is needed.`
@@ -1479,7 +1484,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
       const output = outputParts.join("\n");
       if (isErrorResult) {
         process.stderr.write(output + "\n");
-        if (/bit-budget-exhausted/i.test(output)) {
+        if (isEnclaveBitBudgetExhausted(serverName, output)) {
           process.stderr.write(ENCLAVE_BIT_BUDGET_HINT + "\n");
         }
         auditLog(serverName, { event: "tool_error", error: output });
@@ -1495,7 +1500,7 @@ async function formatResponse(responseBody, serverName, toolName = "") {
     const resultStr = typeof result === "string" ? result : JSON.stringify(result);
     if (isErrorResult) {
       process.stderr.write(resultStr + "\n");
-      if (/bit-budget-exhausted/i.test(resultStr)) {
+      if (isEnclaveBitBudgetExhausted(serverName, resultStr)) {
         process.stderr.write(ENCLAVE_BIT_BUDGET_HINT + "\n");
       }
       auditLog(serverName, { event: "tool_error", error: resultStr });
