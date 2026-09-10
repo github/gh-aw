@@ -312,6 +312,19 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		countLimit:             opts.countLimit,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
+	logProcessedWorkflowRunBatch(opts, runtime.fetchAllInRange, state.iteration, batchProcessed, len(state.processedRuns), opts.Verbose)
+	return finishLogsBatch(state, runtime, opts, batch, allRunsConsumed, batchStorageLimitReached), nil
+}
+
+// finishLogsBatch applies the outcome of one processed batch to the collection
+// state and decides whether the iteration loop should stop.
+func finishLogsBatch(
+	state *logsCollectionState,
+	runtime logsDownloadRuntime,
+	opts LogsDownloadOptions,
+	batch workflowRunBatch,
+	allRunsConsumed, batchStorageLimitReached bool,
+) bool {
 	// Only mark this batch as storage-limit-truncated when one of its own
 	// downloads was actually rejected with errLogsStorageLimitReached. Checking
 	// the shared limiter's global isReached() state here would produce a false
@@ -320,21 +333,27 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	// fully-completed target as partial just because another target tripped
 	// the shared threshold.
 	state.storageLimitReached = batchStorageLimitReached
-	logProcessedWorkflowRunBatch(opts, runtime.fetchAllInRange, state.iteration, batchProcessed, len(state.processedRuns), opts.Verbose)
 	if state.storageLimitReached {
 		// Keep the prior pagination boundary. The continuation's before_run_id
 		// resumes within this batch after the oldest successfully processed run.
-		return true, nil
+		return true
 	}
-	if markSharedLogsCountReached(state, runtime.fetchAllInRange, opts.countLimit) {
-		return true, nil
-	}
+	// Advance the pagination cursor before checking the shared count limit: a
+	// fully consumed batch has already been scanned in its entirety, so the
+	// continuation must resume after it even when the shared budget (possibly
+	// spent by another concurrent target) stops collection right here. Doing
+	// this after the count-limit return would leave the continuation pointing
+	// at the original end_date/before_run_id and cause a resumed request to
+	// re-fetch this same batch.
 	if allRunsConsumed {
 		if cursor, ok := selectPaginationCursorDate(batch.runs, batch.oldestFetchedCreatedAt); ok {
 			state.beforeDate = cursor
 		}
 	}
-	return shouldStopAfterWorkflowRunBatch(batch, opts.Verbose), nil
+	if markSharedLogsCountReached(state, runtime.fetchAllInRange, opts.countLimit) {
+		return true
+	}
+	return shouldStopAfterWorkflowRunBatch(batch, opts.Verbose)
 }
 
 func markSharedLogsCountReached(state *logsCollectionState, fetchAllInRange bool, limit *logsCountLimit) bool {

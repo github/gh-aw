@@ -466,6 +466,50 @@ func TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached(t *testing.T
 	assert.Equal(t, "previous-cursor", state.beforeDate)
 }
 
+// TestFetchAndProcessLogsBatchAdvancesCursorWhenSharedCountLimitReached verifies
+// that a continuation emitted when the shared multi-target count budget is
+// exhausted mid-batch still resumes after the fully-consumed batch, instead of
+// re-scanning it from the original cursor.
+func TestFetchAndProcessLogsBatchAdvancesCursorWhenSharedCountLimitReached(t *testing.T) {
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	oldestCreatedAt := time.Now().Add(-time.Hour)
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		return workflowRunBatch{
+			runs:                   []WorkflowRun{{DatabaseID: 10}, {DatabaseID: 9}},
+			totalFetched:           2,
+			batchSize:              2,
+			oldestFetchedCreatedAt: oldestCreatedAt,
+		}, nil
+	}
+	logsProcessWorkflowRunBatch = func(_ context.Context, _ workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+		// allRunsConsumed=true: the batch was fully processed even though the
+		// shared budget (spent by another concurrent target) stops collection here.
+		return append(processedRuns, ProcessedRun{Run: WorkflowRun{DatabaseID: 10}}), 1, true, false, false
+	}
+
+	countLimit := newLogsCountLimit(1)
+	countLimit.tryAdd() // exhaust the shared budget before this batch is evaluated
+
+	state := logsCollectionState{beforeDate: "previous-cursor"}
+	stop, err := fetchAndProcessLogsBatch(
+		&state,
+		logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
+		LogsDownloadOptions{Count: 10, countLimit: countLimit},
+	)
+
+	require.NoError(t, err)
+	assert.True(t, stop)
+	assert.True(t, state.countLimitReached)
+	assert.Equal(t, oldestCreatedAt.Format(time.RFC3339), state.beforeDate,
+		"cursor must advance past the fully-consumed batch even when the shared count limit stops collection")
+}
+
 // TestStaleLogsWarning verifies that a warning is only emitted when no explicit
 // start_date/end_date was requested and the newest run in the result set is older
 // than the staleness threshold. This guards against the "logs" tool silently
