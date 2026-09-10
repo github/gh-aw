@@ -43,10 +43,10 @@ func DownloadWorkflowLogsForTargets(
 	}
 
 	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
-	defer checkpoints.Stop()
+	defer stopLogsCheckpointWriter(checkpoints)
 	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, logsTargetRateLimitHosts(targets))
 	results := collectLogsTargets(ctx, opts, targets, checkpoints)
-	checkpoints.Stop()
+	stopLogsCheckpointWriter(checkpoints)
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
 	for _, err := range allErrors {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))

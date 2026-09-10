@@ -62,6 +62,12 @@ func (w *logsCheckpointWriter) Stop() {
 	<-w.done
 }
 
+func stopLogsCheckpointWriter(writer *logsCheckpointWriter) {
+	if writer != nil {
+		writer.Stop()
+	}
+}
+
 func (w *logsCheckpointWriter) run(summaryPath, cachedJSONPath, outputDir string, interval time.Duration, verbose bool) {
 	defer close(w.done)
 	ticker := time.NewTicker(interval)
