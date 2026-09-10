@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -346,7 +348,27 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 	if err := validateEnclaveGitHubIssuesVersions(workflowData); err != nil {
 		return err
 	}
+	if warning := staticEnclaveGitHubScopeOverrideWarning(workflowData); warning != "" {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+	}
 	return nil
+}
+
+// staticEnclaveGitHubScopeOverrideWarning returns a warning when a static GitHub agent
+// enclave shares the GitHub MCP server with a GitHub-enabled primary agent, and an empty
+// string otherwise. The gateway's forcePublicRepos safety net can only be disabled for the
+// whole gateway, so it must stay enabled to protect the primary agent's read path. In a
+// public repository that override rewrites the enclave's allow-only scope to repos="public",
+// which silently discards enclaves[].agent.tools.github.allowed-repos and leaves the enclave
+// unable to read the declared private repositories.
+func staticEnclaveGitHubScopeOverrideWarning(workflowData *WorkflowData) string {
+	if !enclaveGitHubIssuesEnabled(workflowData) || !primaryGitHubMCPEnabled(workflowData) {
+		return ""
+	}
+	return "enclaves: a static GitHub agent enclave is combined with primary 'tools.github'. In a public repository " +
+		"the MCP gateway forces the GitHub allow-only scope to repos=\"public\", so the enclave cannot read the " +
+		"private repositories declared in enclaves[].repos. Remove primary 'tools.github' (set 'github: false') " +
+		"so the GitHub MCP server serves the enclave identity only."
 }
 
 func validateEnclaveEntry(index int, enclave *EnclaveConfig, seenTypes map[string]struct{}, repositorySensitivities map[string]string) error {

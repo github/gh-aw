@@ -578,7 +578,7 @@ When `forcePublicRepos` is `true` (the default), the gateway overrides the compi
 - This override is **skipped** when `GITHUB_REPOSITORY` or the GitHub token is unavailable.
 - API errors during visibility detection result in a non-fatal warning; the gateway/proxy falls back to the compiled policy.
 
-**Opt-out**: Workflow authors who intentionally allow private→public data flows set `private-to-public-flows: allow` in frontmatter (Section 10.9). The compiler translates this to `gateway.forcePublicRepos: false` in the generated gateway JSON stdin config. For proxy mode, launchers should pass `--force-public-repos=false` when they need equivalent opt-out behavior.
+**Opt-out**: Workflow authors who intentionally allow private→public data flows set `private-to-public-flows: allow` in frontmatter (Section 10.9). The compiler translates this to `gateway.forcePublicRepos: false` in the generated gateway JSON stdin config. The compiler also emits `gateway.forcePublicRepos: false` when the GitHub MCP server is rendered solely to serve a static agent enclave identity (`tools.github: false` plus `enclaves[].agent.tools.github`), because the override would otherwise discard the enclave's configured `allowed-repos`. For proxy mode, launchers should pass `--force-public-repos=false` when they need equivalent opt-out behavior.
 
 **Environment variable override**: `MCP_GATEWAY_FORCE_PUBLIC_REPOS=false` disables the override without requiring a config change. The `--force-public-repos` flag defaults to the value of this environment variable (defaulting to `true` when unset).
 
