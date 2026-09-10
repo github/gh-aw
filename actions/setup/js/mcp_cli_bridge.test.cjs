@@ -365,6 +365,57 @@ describe("mcp_cli_bridge.cjs", () => {
     }
   });
 
+  it("skips repeated deferred retry loops after exhaustion in the same process", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-skip-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+    const serverName = "deferred-test-server";
+    const originalDeferred = process.env.GH_AW_MCP_DEFERRED_SERVERS;
+    process.env.GH_AW_MCP_DEFERRED_SERVERS = serverName;
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      await refreshDeferredToolsIfNeeded([], serverName, `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      await refreshDeferredToolsIfNeeded([], serverName, `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("already exhausted in this process"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      if (originalDeferred === undefined) {
+        delete process.env.GH_AW_MCP_DEFERRED_SERVERS;
+      } else {
+        process.env.GH_AW_MCP_DEFERRED_SERVERS = originalDeferred;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("allows zero-argument tools to proceed — only shows help when required fields are declared", () => {
     // Empty schema (zero-input custom tool) — must NOT show help; empty call is valid
     const emptySchemaTools = { inputSchema: { type: "object", properties: {}, additionalProperties: false } };

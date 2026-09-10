@@ -80,6 +80,8 @@ const AWF_ENCLAVE_SERVER_NAME = "awf-enclave";
 const DEFERRED_SERVERS_ENV = "GH_AW_MCP_DEFERRED_SERVERS";
 const DEFERRED_TOOLS_LIST_MAX_ATTEMPTS = 5;
 const DEFERRED_TOOLS_LIST_RETRY_DELAY_MS = 1000;
+/** @type {Set<string>} */
+const deferredToolsRefreshExhaustedServers = new Set();
 
 // ---------------------------------------------------------------------------
 // Audit logging
@@ -1139,7 +1141,8 @@ function isEnclaveBitBudgetExhausted(serverName, message) {
  * GH_AW_MCP_DEFERRED_SERVERS is also treated as deferred. These servers may
  * register after the wrapper is mounted, so their startup-time cache can
  * legitimately be empty. The refresh retries bounded attempts before falling
- * back to the cached tools.
+ * back to the cached tools. If retries are exhausted, a process-local marker
+ * avoids repeating the same bounded retry loop again in this invocation.
  *
  * @param {Array<{name: string, description?: string, inputSchema?: {properties?: Record<string, {description?: string, type?: string}>, required?: string[]}}>} tools
  * @param {string} serverName
@@ -1153,6 +1156,10 @@ function isEnclaveBitBudgetExhausted(serverName, message) {
 async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey, toolsFile, maxAttempts = DEFERRED_TOOLS_LIST_MAX_ATTEMPTS, retryDelayMs = DEFERRED_TOOLS_LIST_RETRY_DELAY_MS) {
   const isDeferredServer = serverName === AWF_ENCLAVE_SERVER_NAME || serverInCommaList(serverName, process.env[DEFERRED_SERVERS_ENV] || "");
   if (tools.length > 0 || !isDeferredServer) {
+    return tools;
+  }
+  if (deferredToolsRefreshExhaustedServers.has(serverName)) {
+    global.core.warning(`[${serverName}] deferred tools/list refresh already exhausted in this process; using cached schema`);
     return tools;
   }
   const core = global.core;
@@ -1177,6 +1184,7 @@ async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey
         } catch (err) {
           core.warning(`[${serverName}] failed to update refreshed tools cache ${toolsFile}: ${getErrorMessage(err)}`);
         }
+        deferredToolsRefreshExhaustedServers.delete(serverName);
         core.info(`[${serverName}] refreshed deferred tools cache with ${refreshed.length} tool(s)`);
         return refreshed;
       }
@@ -1188,6 +1196,7 @@ async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey
       await new Promise(resolve => setTimeout(resolve, retryDelayMs));
     }
   }
+  deferredToolsRefreshExhaustedServers.add(serverName);
   core.warning(`[${serverName}] deferred tools/list refresh exhausted retries; using cached empty schema`);
   return tools;
 }
