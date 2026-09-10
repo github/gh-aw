@@ -936,10 +936,7 @@
           "additionalProperties": false
         },
         "payload": {
-          "type": [
-            "null",
-            "array"
-          ],
+          "type": "array",
           "items": {
             "type": "object",
             "properties": {

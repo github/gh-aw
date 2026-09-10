@@ -126,6 +126,8 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	}
 	workflowRuns.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	workflowRuns.Properties["kind"].Enum = []any{cachedLogsJSONLKindWorkflowRuns}
+	workflowRuns.Properties["payload"].Types = nil
+	workflowRuns.Properties["payload"].Type = "array"
 	workflowRuns.Properties["payload"].Items.AdditionalProperties = &jsonschema.Schema{}
 	rateLimit, err := GenerateOutputSchema[cachedLogsJSONLRateLimitItemSchema]()
 	if err != nil {
