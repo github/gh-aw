@@ -89,6 +89,9 @@ func TestCachedLogsJSONLWriterAppendsImmediately(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, runs, int64(42))
 	assert.Equal(t, "updated-workflow", runs[42].WorkflowName)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestCachedLogsJSONLWriterSerializesConcurrentAppends(t *testing.T) {

@@ -86,7 +86,7 @@ func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
 	if err := os.MkdirAll(filepath.Dir(w.path), constants.DirPermPublic); err != nil {
 		return fmt.Errorf("failed to create cached logs JSONL directory: %w", err)
 	}
-	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, constants.FilePermPublic)
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, constants.FilePermSensitive)
 	if err != nil {
 		return fmt.Errorf("failed to open cached logs JSONL: %w", err)
 	}
