@@ -1135,24 +1135,29 @@ function isEnclaveBitBudgetExhausted(serverName, message) {
 
 /**
  * Fetch the live tools/list result for a server and persist it over an empty
- * cache. Deferred servers such as awf-enclave may register after the wrapper is
- * mounted, so their startup-time cache can legitimately be empty.
+ * cache. The awf-enclave server is always treated as deferred, and any server in
+ * GH_AW_MCP_DEFERRED_SERVERS is also treated as deferred. These servers may
+ * register after the wrapper is mounted, so their startup-time cache can
+ * legitimately be empty. The refresh retries bounded attempts before falling
+ * back to the cached tools.
  *
  * @param {Array<{name: string, description?: string, inputSchema?: {properties?: Record<string, {description?: string, type?: string}>, required?: string[]}}>} tools
  * @param {string} serverName
  * @param {string} serverUrl
  * @param {string} apiKey
  * @param {string} toolsFile
+ * @param {number} [maxAttempts]
+ * @param {number} [retryDelayMs]
  * @returns {Promise<Array<{name: string, description?: string, inputSchema?: {properties?: Record<string, {description?: string, type?: string}>, required?: string[]}}>>}
  */
-async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey, toolsFile) {
+async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey, toolsFile, maxAttempts = DEFERRED_TOOLS_LIST_MAX_ATTEMPTS, retryDelayMs = DEFERRED_TOOLS_LIST_RETRY_DELAY_MS) {
   const isDeferredServer = serverName === AWF_ENCLAVE_SERVER_NAME || serverInCommaList(serverName, process.env[DEFERRED_SERVERS_ENV] || "");
   if (tools.length > 0 || !isDeferredServer) {
     return tools;
   }
   const core = global.core;
   core.warning(`[${serverName}] cached tool schema is empty for deferred server; refreshing from live gateway`);
-  for (let attempt = 1; attempt <= DEFERRED_TOOLS_LIST_MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const sessionId = await mcpInitialize(serverUrl, apiKey, serverName);
       await mcpNotifyInitialized(serverUrl, apiKey, sessionId, serverName);
@@ -1175,12 +1180,12 @@ async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey
         core.info(`[${serverName}] refreshed deferred tools cache with ${refreshed.length} tool(s)`);
         return refreshed;
       }
-      core.warning(`[${serverName}] live tools/list attempt ${attempt}/${DEFERRED_TOOLS_LIST_MAX_ATTEMPTS} returned 0 tools for deferred server`);
+      core.warning(`[${serverName}] live tools/list attempt ${attempt}/${maxAttempts} returned 0 tools for deferred server`);
     } catch (err) {
-      core.warning(`[${serverName}] deferred tools/list attempt ${attempt}/${DEFERRED_TOOLS_LIST_MAX_ATTEMPTS} failed: ${getErrorMessage(err)}`);
+      core.warning(`[${serverName}] deferred tools/list attempt ${attempt}/${maxAttempts} failed: ${getErrorMessage(err)}`);
     }
-    if (attempt < DEFERRED_TOOLS_LIST_MAX_ATTEMPTS) {
-      await new Promise(resolve => setTimeout(resolve, DEFERRED_TOOLS_LIST_RETRY_DELAY_MS));
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
     }
   }
   core.warning(`[${serverName}] deferred tools/list refresh exhausted retries; using cached empty schema`);

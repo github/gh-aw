@@ -311,10 +311,54 @@ describe("mcp_cli_bridge.cjs", () => {
     const port = typeof address === "object" && address ? address.port : 0;
 
     try {
-      const refreshed = await refreshDeferredToolsIfNeeded([], "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile);
+      const refreshed = await refreshDeferredToolsIfNeeded([], "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
       expect(refreshed).toEqual([{ name: "enclave_run_agent" }]);
       expect(toolsListCalls).toBe(2);
-      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("attempt 1/5 returned 0 tools"));
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("attempt 1/2 returned 0 tools"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns cached tools after deferred refresh retries are exhausted", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-exhausted-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+    const cachedTools = [];
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const refreshed = await refreshDeferredToolsIfNeeded(cachedTools, "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      expect(refreshed).toBe(cachedTools);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("refresh exhausted retries"));
     } finally {
       await new Promise(resolve => server.close(resolve));
       fs.rmSync(tempDir, { recursive: true, force: true });
