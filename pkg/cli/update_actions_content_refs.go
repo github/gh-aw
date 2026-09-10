@@ -135,7 +135,7 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 	applied := make([]bool, len(updates))
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if getIndentation(line) == "" && strings.HasPrefix(trimmed, fieldName+":") {
+		if getIndentation(line) == "" && isFrontmatterFieldLine(trimmed, fieldName) {
 			inField = true
 			lines[i] = replaceFrontmatterRefValues(line, updates, applied)
 			continue
@@ -156,6 +156,27 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 	return strings.Replace(content, originalFrontmatter, updatedFrontmatter, 1), true
 }
 
+func isFrontmatterFieldLine(trimmed, fieldName string) bool {
+	key, _, found := strings.Cut(trimmed, ":")
+	if !found {
+		return false
+	}
+	return unquoteYAMLKey(strings.TrimSpace(key)) == fieldName
+}
+
+// unquoteYAMLKey strips matching surrounding quotes so quoted keys such as "skills"
+// or 'plugins' are recognized alongside their plain form.
+func unquoteYAMLKey(key string) string {
+	if len(key) < 2 {
+		return key
+	}
+	quote := key[0]
+	if (quote == '\'' || quote == '"') && key[len(key)-1] == quote {
+		return key[1 : len(key)-1]
+	}
+	return key
+}
+
 func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
 	if !strings.HasPrefix(trimmed, "- ") {
 		return objectKey != noObjectKey && strings.HasPrefix(trimmed, objectKey+":")
@@ -167,16 +188,36 @@ func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
 	return !strings.Contains(value[:yamlValueEnd(value)], ":")
 }
 
+// replaceFrontmatterRefValues rewrites reference values in a single frontmatter line.
+// Matches are located against the immutable original text and applied left to right,
+// preferring the longest match at each position so overlapping references (for example
+// "owner/repo@v1" inside "owner/repo@v10") are never corrupted by earlier replacements.
 func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, applied []bool) string {
 	valueEnd := yamlValueEnd(line)
 	prefix := line[:valueEnd]
-	for i, update := range updates {
-		if !applied[i] && strings.Contains(prefix, update.old) {
-			prefix = strings.Replace(prefix, update.old, update.replacement, 1)
-			applied[i] = true
+	var builder strings.Builder
+	for i := 0; i < len(prefix); {
+		best := -1
+		bestLen := 0
+		for j, update := range updates {
+			if applied[j] || update.old == "" || len(update.old) <= bestLen {
+				continue
+			}
+			if strings.HasPrefix(prefix[i:], update.old) {
+				best = j
+				bestLen = len(update.old)
+			}
 		}
+		if best < 0 {
+			builder.WriteByte(prefix[i])
+			i++
+			continue
+		}
+		builder.WriteString(updates[best].replacement)
+		applied[best] = true
+		i += bestLen
 	}
-	return prefix + line[valueEnd:]
+	return builder.String() + line[valueEnd:]
 }
 
 func yamlValueEnd(line string) int {
