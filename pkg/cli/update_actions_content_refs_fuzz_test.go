@@ -44,7 +44,7 @@ func FuzzUpgradePreservesMutatedExistingWorkflows(f *testing.F) {
 		if _, exists := mutatedFrontmatter.Frontmatter["timeout_minutes"]; !exists {
 			return
 		}
-		if _, exists := mutatedFrontmatter.Frontmatter[fieldName].([]any); !exists {
+		if _, ok := mutatedFrontmatter.Frontmatter[fieldName].([]any); !ok {
 			return
 		}
 		fixed, applied, err := getTimeoutMinutesCodemod().Apply(mutated, mutatedFrontmatter.Frontmatter)
