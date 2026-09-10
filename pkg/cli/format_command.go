@@ -20,6 +20,8 @@ import (
 
 var formatLog = logger.New("cli:format_command")
 
+const maxYAMLFormattingPasses = 10
+
 // FormatConfig contains configuration for the format command.
 type FormatConfig struct {
 	WorkflowIDs []string
@@ -205,10 +207,30 @@ func normalizeFrontmatter(content string) (string, error) {
 	}
 	orderYAMLMapping(root, constants.PriorityWorkflowFields)
 
+	formattedYAML := ""
+	for range maxYAMLFormattingPasses {
+		next, err := encodeYAMLDocument(&document)
+		if err != nil {
+			return "", err
+		}
+		if next == formattedYAML {
+			return "---\n" + formattedYAML + "---" + suffix, nil
+		}
+		formattedYAML = next
+		var normalizedDocument yaml.Node
+		if err := yaml.Unmarshal([]byte(formattedYAML), &normalizedDocument); err != nil {
+			return "", fmt.Errorf("failed to parse encoded frontmatter: %w", err)
+		}
+		document = normalizedDocument
+	}
+	return "", errors.New("frontmatter formatting did not stabilize")
+}
+
+func encodeYAMLDocument(document *yaml.Node) (string, error) {
 	var output bytes.Buffer
 	encoder := yaml.NewEncoder(&output)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(&document); err != nil {
+	if err := encoder.Encode(document); err != nil {
 		return "", fmt.Errorf("failed to encode frontmatter: %w", err)
 	}
 	if err := encoder.Close(); err != nil {
@@ -221,7 +243,7 @@ func normalizeFrontmatter(content string) (string, error) {
 	if formattedYAML != "" && !strings.HasSuffix(formattedYAML, "\n") {
 		formattedYAML += "\n"
 	}
-	return "---\n" + formattedYAML + "---" + suffix, nil
+	return formattedYAML, nil
 }
 
 func splitFrontmatterForFormatting(content string) (string, string, error) {
