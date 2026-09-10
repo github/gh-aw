@@ -64,13 +64,46 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 		schema, err = generateAuditOutputSchema()
 	case "logs":
 		schema, err = generateLogsOutputSchema()
+	case "logs-jsonl":
+		schema, err = generateLogsJSONLItemSchema()
 	default:
 		return nil, fmt.Errorf("unsupported schema: %s", name)
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
 	}
 	return MarshalOutputSchema(schema)
+}
+
+type cachedLogsJSONLRunItemSchema struct {
+	SchemaVersion int     `json:"schema_version"`
+	Kind          string  `json:"kind"`
+	Run           RunData `json:"run"`
+}
+
+type cachedLogsJSONLWorkflowRunsItemSchema struct {
+	SchemaVersion int                       `json:"schema_version"`
+	Kind          string                    `json:"kind"`
+	Request       cachedWorkflowRunsRequest `json:"request"`
+	Payload       []WorkflowRun             `json:"payload"`
+}
+
+func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
+	run, err := GenerateOutputSchema[cachedLogsJSONLRunItemSchema]()
+	if err != nil {
+		return nil, err
+	}
+	run.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
+	run.Properties["kind"].Enum = []any{cachedLogsJSONLKindRun}
+	workflowRuns, err := GenerateOutputSchema[cachedLogsJSONLWorkflowRunsItemSchema]()
+	if err != nil {
+		return nil, err
+	}
+	workflowRuns.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
+	workflowRuns.Properties["kind"].Enum = []any{cachedLogsJSONLKindWorkflowRuns}
+	workflowRuns.Properties["payload"].Items.AdditionalProperties = &jsonschema.Schema{}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns}}, nil
 }
 
 func generateAuditOutputSchema() (*jsonschema.Schema, error) {

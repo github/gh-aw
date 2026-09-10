@@ -12,7 +12,7 @@ The `gh aw logs` command currently recomputes run records by downloading and pro
 
 ### Decision
 
-We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSONL retains. Each newly processed run is appended immediately as one schema-versioned JSON Lines record so concurrent collectors do not overwrite one another and completed work survives interruption. Records with older or newer incompatible schema versions are ignored.
+We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current request. Processed runs require matching run ID, repository, attempt, conclusion, and update timestamp. Each complete `gh run list` response is also appended before filtering or artifact downloads and keyed by its host, repository, and command arguments. This preserves every field returned by `gh`, makes undispatched work observable after interruption, and allows an exact future request to reuse the payload. Records with older or newer incompatible schema versions are ignored, while schema version 1 processed-run records remain readable for compatibility.
 
 ### Alternatives Considered
 
@@ -35,16 +35,19 @@ The project could have created a separate opaque cache artifact tailored specifi
 - Cache reuse remains conservative because compatibility checks reject stale or insufficient cached records.
 - Rebuilt reports can combine cached and fresh records while preserving existing JSON output structure.
 - The cache file is ready for the next invocation without requiring separate output redirection.
+- Consumers can inspect every discovered run even when artifact processing stops early.
 
 #### Negative
 - The logs pipeline becomes more complex because download, stdin, filtering, and aggregation paths must all account for cached records.
 - Aggregate values may be approximate when compact cached JSON omits detailed evidence that richer artifact processing would have produced.
 - Users must understand when `--cached-jsonl` is ignored due to incompatible filters or analysis modes.
+- Reusing an exact discovery request returns the stored point-in-time payload.
 
 #### Neutral
 - `LogsDownloadOptions`, `StdinLogsOptions`, and related orchestration types carry a `CachedJSONL` field through multiple entry points.
 - Report aggregation now has a separate path for accumulating totals from cached `RunData` values.
 - The feature relies on previous JSON output remaining parseable and structurally compatible with the current `LogsData` schema.
+- `gh aw json-schema logs-jsonl` describes both processed-run and workflow-run discovery items.
 
 ---
 

@@ -92,6 +92,28 @@ func TestJSONSchemaCommand(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "logs-jsonl",
+			schemaName: "logs-jsonl",
+			oneOfCount: 2,
+			validOutput: []any{
+				cachedLogsJSONLRunItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindRun,
+					Run:           RunData{RunID: 42},
+				},
+				cachedLogsJSONLWorkflowRunsItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindWorkflowRuns,
+					Request: cachedWorkflowRunsRequest{
+						Host:       "github.com",
+						Repository: "github/gh-aw",
+						Args:       []string{"run", "list"},
+					},
+					Payload: []WorkflowRun{{DatabaseID: 42}},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -196,7 +218,7 @@ func TestJSONSchemaCommandRejectsInvalidArguments(t *testing.T) {
 func TestGeneratedOutputSchemasAreCurrent(t *testing.T) {
 	t.Parallel()
 
-	for _, schemaName := range []string{"audit", "logs"} {
+	for _, schemaName := range []string{"audit", "logs", "logs-jsonl"} {
 		t.Run(schemaName, func(t *testing.T) {
 			t.Parallel()
 

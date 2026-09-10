@@ -14,15 +14,16 @@ import (
 )
 
 type logsDownloadRuntime struct {
-	activeCtx       context.Context
-	startTime       time.Time
-	timeoutDuration time.Duration
-	timeoutCancel   context.CancelFunc
-	artifactFilter  []string
-	fetchAllInRange bool
-	filters         runFilterOpts
-	storageLimit    *logsStorageLimit
-	cachedRuns      cachedLogsRuns
+	activeCtx        context.Context
+	startTime        time.Time
+	timeoutDuration  time.Duration
+	timeoutCancel    context.CancelFunc
+	artifactFilter   []string
+	fetchAllInRange  bool
+	filters          runFilterOpts
+	storageLimit     *logsStorageLimit
+	cachedRuns       cachedLogsRuns
+	cachedJSONLCache *cachedLogsJSONLCache
 }
 
 type workflowRunBatch struct {
@@ -58,9 +59,13 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
-	cachedRuns, err := loadCachedLogsJSONL(opts.CachedJSONL)
+	cachedJSONLCache, err := loadCachedLogsJSONL(opts.CachedJSONL)
 	if err != nil {
 		return logsDownloadRuntime{}, err
+	}
+	var cachedRuns cachedLogsRuns
+	if cachedJSONLCache != nil {
+		cachedRuns = cachedJSONLCache.runs
 	}
 	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
@@ -74,14 +79,15 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 		storageLimit = newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
 	}
 	return logsDownloadRuntime{
-		activeCtx:       activeCtx,
-		startTime:       startTime,
-		timeoutDuration: timeoutDuration,
-		timeoutCancel:   timeoutCancel,
-		artifactFilter:  artifactFilter,
-		fetchAllInRange: opts.StartDate != "" || opts.EndDate != "",
-		storageLimit:    storageLimit,
-		cachedRuns:      cachedRuns,
+		activeCtx:        activeCtx,
+		startTime:        startTime,
+		timeoutDuration:  timeoutDuration,
+		timeoutCancel:    timeoutCancel,
+		artifactFilter:   artifactFilter,
+		fetchAllInRange:  opts.StartDate != "" || opts.EndDate != "",
+		storageLimit:     storageLimit,
+		cachedRuns:       cachedRuns,
+		cachedJSONLCache: cachedJSONLCache,
 		filters: runFilterOpts{
 			engine:            opts.Engine,
 			runtime:           opts.Runtime,
@@ -270,6 +276,7 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 
 func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRuntime, opts LogsDownloadOptions) (bool, error) {
 	logLogsIterationFetch(opts, runtime.fetchAllInRange, state.iteration, len(state.processedRuns))
+	opts.cachedJSONLCache = runtime.cachedJSONLCache
 	batch, err := logsFetchWorkflowRunBatch(runtime.activeCtx, opts, state.beforeDate, len(state.processedRuns), runtime.fetchAllInRange)
 	if err != nil {
 		return handleLogsBatchError(state, runtime.activeCtx, err)
@@ -416,6 +423,8 @@ func fetchWorkflowRunBatch(ctx context.Context, opts LogsDownloadOptions, before
 		ProcessedCount:         processedCount,
 		TargetCount:            opts.Count,
 		Verbose:                opts.Verbose,
+		CachedJSONLCache:       opts.cachedJSONLCache,
+		CachedJSONLWriter:      opts.cachedJSONLWriter,
 	})
 	return workflowRunBatch{runs: runs, totalFetched: totalFetched, batchSize: batchSize, oldestFetchedCreatedAt: oldestFetchedCreatedAt}, err
 }

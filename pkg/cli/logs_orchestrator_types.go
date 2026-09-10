@@ -62,6 +62,7 @@ type LogsDownloadOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	cachedJSONLWriter      *cachedLogsJSONLWriter
+	cachedJSONLCache       *cachedLogsJSONLCache
 }
 
 type workflowLogsResult struct {

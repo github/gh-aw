@@ -383,6 +383,8 @@ type ListWorkflowRunsOptions struct {
 	ProcessedCount         int  // number of runs already processed (for progress display)
 	TargetCount            int  // target number of runs to fetch (for progress display)
 	Verbose                bool // enable verbose logging
+	CachedJSONLCache       *cachedLogsJSONLCache
+	CachedJSONLWriter      *cachedLogsJSONLWriter
 }
 
 // listWorkflowRunsWithPagination fetches workflow runs from GitHub Actions using the GitHub CLI.
@@ -432,101 +434,88 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	if opts.RepoOverride != "" {
 		args = append(args, "--repo", opts.RepoOverride)
 	}
-
-	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executing: gh "+strings.Join(args, " ")))
+	request := cachedWorkflowRunsRequest{
+		Host:       normalizedGitHubAPIHost(logsRateLimitHost(opts.RepoOverride)),
+		Repository: workflowRunListRepository(opts.RepoOverride),
+		Args:       append([]string(nil), args...),
 	}
 
-	// Start spinner for network operation
-	spinnerMsg := workflowRunsSpinnerMessage(opts)
-	spinner := console.NewSpinner(spinnerMsg)
-	if !opts.Verbose {
-		spinner.Start()
-	}
+	var output []byte
+	_, cacheHit := opts.CachedJSONLCache.lookupWorkflowRuns(request)
+	if cached, ok := opts.CachedJSONLCache.lookupWorkflowRuns(request); ok {
+		output = append([]byte(nil), cached...)
+		logsGitHubAPILog.Printf("Using cached workflow runs payload: repository=%s", request.Repository)
+	} else {
+		if opts.Verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executing: gh "+strings.Join(args, " ")))
+		}
 
-	cmdCtx := opts.Context
-	if cmdCtx == nil {
-		cmdCtx = context.Background()
-	}
-	cmd := workflow.ExecGHContext(cmdCtx, args...)
-	output, err := cmd.CombinedOutput()
+		spinnerMsg := workflowRunsSpinnerMessage(opts)
+		spinner := console.NewSpinner(spinnerMsg)
+		if !opts.Verbose {
+			spinner.Start()
+		}
 
-	if err != nil {
-		// Stop spinner on error
+		cmdCtx := opts.Context
+		if cmdCtx == nil {
+			cmdCtx = context.Background()
+		}
+		cmd := workflow.ExecGHContext(cmdCtx, args...)
+		commandOutput, err := cmd.CombinedOutput()
+		output = commandOutput
 		if !opts.Verbose {
 			spinner.Stop()
 		}
 
-		// Extract detailed error information including exit code
-		var exitCode int
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			exitCode = exitErr.ExitCode()
-			logsGitHubAPILog.Printf("gh run list command failed with exit code %d. Command: gh %v", exitCode, args)
-			logsGitHubAPILog.Printf("combined output: %s", string(output))
-		} else {
-			logsGitHubAPILog.Printf("gh run list command failed (not ExitError): %v. Command: gh %v", err, args)
-		}
+		if err != nil {
+			var exitCode int
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				exitCode = exitErr.ExitCode()
+				logsGitHubAPILog.Printf("gh run list command failed with exit code %d. Command: gh %v", exitCode, args)
+				logsGitHubAPILog.Printf("combined output: %s", string(output))
+			} else {
+				logsGitHubAPILog.Printf("gh run list command failed (not ExitError): %v. Command: gh %v", err, args)
+			}
 
-		// When exec.CommandContext cancels the subprocess it returns an *exec.ExitError
-		// ("signal: killed") rather than the context error, so errors.Is checks in
-		// callers would not recognise it. Surface the context error directly so that
-		// errors.Is(err, context.DeadlineExceeded) / errors.Is(err, context.Canceled)
-		// work as expected.
-		if ctxErr := cmdCtx.Err(); ctxErr != nil {
-			logsGitHubAPILog.Printf("gh run list interrupted by context: %v", ctxErr)
-			return nil, 0, ctxErr
-		}
+			if ctxErr := cmdCtx.Err(); ctxErr != nil {
+				logsGitHubAPILog.Printf("gh run list interrupted by context: %v", ctxErr)
+				return nil, 0, ctxErr
+			}
 
-		// Check for different error types with heuristics
-		errMsg := err.Error()
-		outputMsg := string(output)
-		combinedMsg := errMsg + " " + outputMsg
-		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(outputMsg))
+			errMsg := err.Error()
+			outputMsg := string(output)
+			combinedMsg := errMsg + " " + outputMsg
+			if opts.Verbose {
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(outputMsg))
+			}
+			combinedMsgLower := strings.ToLower(combinedMsg)
+			if strings.Contains(combinedMsgLower, "invalid field") ||
+				strings.Contains(combinedMsgLower, "unknown field") ||
+				strings.Contains(combinedMsgLower, "unknown json field") ||
+				strings.Contains(combinedMsgLower, "unknown json") ||
+				strings.Contains(combinedMsgLower, "field not found") ||
+				strings.Contains(combinedMsgLower, "no such field") {
+				return nil, 0, fmt.Errorf("invalid field in JSON query (exit code %d): %s", exitCode, string(output))
+			}
+			if isPermissionErrorStr(combinedMsg) {
+				return nil, 0, errors.New("GitHub CLI authentication required. Run 'gh auth login' first")
+			}
+			if len(output) > 0 {
+				return nil, 0, fmt.Errorf("failed to list workflow runs (exit code %d): %s", exitCode, string(output))
+			}
+			return nil, 0, fmt.Errorf("failed to list workflow runs (exit code %d): %w", exitCode, err)
 		}
-
-		// Check for invalid field errors first (before auth errors).
-		// GitHub CLI may capitalise the message differently across versions, so
-		// use a case-insensitive comparison. Note that some gh versions emit
-		// "Unknown JSON field: ..." (with "JSON" between "Unknown" and "field"),
-		// so we also check for "unknown json field" and "unknown json" explicitly.
-		combinedMsgLower := strings.ToLower(combinedMsg)
-		if strings.Contains(combinedMsgLower, "invalid field") ||
-			strings.Contains(combinedMsgLower, "unknown field") ||
-			strings.Contains(combinedMsgLower, "unknown json field") ||
-			strings.Contains(combinedMsgLower, "unknown json") ||
-			strings.Contains(combinedMsgLower, "field not found") ||
-			strings.Contains(combinedMsgLower, "no such field") {
-			return nil, 0, fmt.Errorf("invalid field in JSON query (exit code %d): %s", exitCode, string(output))
-		}
-
-		// Check for authentication errors.
-		// "exit status 1" is intentionally omitted: gh exits 1 for many non-auth
-		// errors (e.g. unsupported JSON fields), so matching it caused misleading
-		// "authentication required" messages for unrelated failures.
-		if isPermissionErrorStr(combinedMsg) {
-			return nil, 0, errors.New("GitHub CLI authentication required. Run 'gh auth login' first")
-		}
-
-		if len(output) > 0 {
-			return nil, 0, fmt.Errorf("failed to list workflow runs (exit code %d): %s", exitCode, string(output))
-		}
-		return nil, 0, fmt.Errorf("failed to list workflow runs (exit code %d): %w", exitCode, err)
 	}
 
 	var runs []WorkflowRun
 	if err := json.Unmarshal(output, &runs); err != nil {
-		// Stop spinner on parse error
-		if !opts.Verbose {
-			spinner.Stop()
-		}
 		return nil, 0, fmt.Errorf("failed to parse workflow runs: %w", err)
 	}
-
-	// Stop spinner silently - don't show per-iteration messages
-	if !opts.Verbose {
-		spinner.Stop()
+	if !cacheHit {
+		if err := opts.CachedJSONLWriter.AppendWorkflowRuns(request, output); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+		}
 	}
 
 	applyWorkflowRunListRepository(runs, opts.RepoOverride)

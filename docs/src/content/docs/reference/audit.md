@@ -91,14 +91,15 @@ When artifacts are present, audit processing also persists extracted skill-activ
 
 ## JSON output schemas
 
-Use `gh aw json-schema` to generate a JSON Schema for structured audit or logs output. The `audit` schema describes `gh aw audit --json`, while the `logs` schema describes `gh aw logs --json`. The schema is written to stdout and can be redirected to a file:
+Use `gh aw json-schema` to generate a JSON Schema for structured audit or logs output. The `audit` schema describes `gh aw audit --json`, the `logs` schema describes `gh aw logs --json`, and `logs-jsonl` describes each item written by `gh aw logs --cached-jsonl`. The schema is written to stdout and can be redirected to a file:
 
 ```bash
 gh aw json-schema audit > audit.schema.json
 gh aw json-schema logs > logs.schema.json
+gh aw json-schema logs-jsonl > logs-jsonl.schema.json
 ```
 
-`make recompile` regenerates the checked-in `schemas/audit.schema.json` and `schemas/logs.schema.json` files. These schemas derive directly from the Go `AuditData` and `LogsData` types, so changes to either type may change its generated schema.
+`make recompile` regenerates the checked-in schemas, including `schemas/logs-jsonl.schema.json`. These schemas derive directly from the corresponding Go output types.
 
 ## `gh aw logs --format <fmt>`
 

@@ -94,6 +94,48 @@ func TestListWorkflowRunsPopulatesCacheIdentity(t *testing.T) {
 	assert.Contains(t, string(argsLog), "--repo github/gh-aw")
 }
 
+func TestListWorkflowRunsCachesAndReusesCompletePayload(t *testing.T) {
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGHScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
+		"cat <<'EOF'\n" +
+		`[{"databaseId":42,"workflowName":"Daily report","status":"completed","conclusion":"success","updatedAt":"2026-01-01T00:01:00Z","attempt":3,"futureField":{"nested":true}}]` + "\n" +
+		"EOF\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	cachePath := filepath.Join(t.TempDir(), "logs.jsonl")
+	opts := ListWorkflowRunsOptions{
+		Context:           context.Background(),
+		WorkflowName:      "daily-report",
+		Limit:             1,
+		RepoOverride:      "github/gh-aw",
+		CachedJSONLWriter: newCachedLogsJSONLWriter(cachePath),
+	}
+	runs, _, err := listWorkflowRunsWithPagination(opts)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+
+	cache, err := loadCachedLogsJSONL(cachePath)
+	require.NoError(t, err)
+	data, err := os.ReadFile(cachePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"futureField"`)
+
+	require.NoError(t, os.Remove(fakeGH))
+	opts.CachedJSONLCache = cache
+	opts.CachedJSONLWriter = nil
+	cachedRuns, _, err := listWorkflowRunsWithPagination(opts)
+	require.NoError(t, err)
+	assert.Equal(t, runs, cachedRuns)
+
+	argsLog, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(string(argsLog), "\n"), "cached payload should avoid a second gh invocation")
+}
+
 func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
 	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
 	outputDir := t.TempDir()

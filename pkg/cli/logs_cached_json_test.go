@@ -33,8 +33,8 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	runs, err := loadCachedLogsJSONL(path)
 
 	require.NoError(t, err)
-	require.Len(t, runs, 1)
-	assert.Equal(t, "cached-workflow", runs[42].WorkflowName)
+	require.Len(t, runs.runs, 1)
+	assert.Equal(t, "cached-workflow", runs.runs[42].WorkflowName)
 }
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
@@ -93,25 +93,45 @@ func TestCachedLogsJSONLWriterAppendsImmediately(t *testing.T) {
 
 	runs, err := loadCachedLogsJSONL(path)
 	require.NoError(t, err)
-	require.Contains(t, runs, int64(42))
-	assert.Equal(t, "updated-workflow", runs[42].WorkflowName)
+	require.Contains(t, runs.runs, int64(42))
+	assert.Equal(t, "updated-workflow", runs.runs[42].WorkflowName)
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	writer := newCachedLogsJSONLWriter(path)
+	request := cachedWorkflowRunsRequest{
+		Host:       "github.com",
+		Repository: "github/gh-aw",
+		Args:       []string{"run", "list", "--limit", "2"},
+	}
+	payload := []byte(`[{"databaseId":42,"futureField":{"nested":true}},{"databaseId":41}]`)
+
+	require.NoError(t, writer.AppendWorkflowRuns(request, payload))
+
+	cache, err := loadCachedLogsJSONL(path)
+	require.NoError(t, err)
+	cached, ok := cache.lookupWorkflowRuns(request)
+	require.True(t, ok)
+	assert.JSONEq(t, string(payload), string(cached))
+	assert.Contains(t, string(cached), `"futureField"`)
 }
 
 func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	data := "{\"schema_version\":0,\"run\":{\"run_id\":41}}\n" +
 		"{\"schema_version\":1,\"run\":{\"run_id\":42}}\n" +
-		"{\"schema_version\":2,\"run\":{\"run_id\":43}}\n"
+		"{\"schema_version\":3,\"run\":{\"run_id\":43}}\n"
 	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
 
 	runs, err := loadCachedLogsJSONL(path)
 
 	require.NoError(t, err)
-	require.Len(t, runs, 1)
-	assert.Contains(t, runs, int64(42))
+	require.Len(t, runs.runs, 1)
+	assert.Contains(t, runs.runs, int64(42))
 }
 
 func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {
@@ -133,7 +153,7 @@ func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {
 	}}, runArtifactsConcurrentOptions{
 		outputDir:    t.TempDir(),
 		maxRuns:      1,
-		cachedRuns:   cached,
+		cachedRuns:   cached.runs,
 		storageLimit: newLogsStorageLimit(t.TempDir(), 0, false),
 	})
 
@@ -162,7 +182,7 @@ func TestCachedLogsJSONLWriterSerializesConcurrentAppends(t *testing.T) {
 
 	runs, err := loadCachedLogsJSONL(path)
 	require.NoError(t, err)
-	assert.Len(t, runs, 20)
+	assert.Len(t, runs.runs, 20)
 }
 
 func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {

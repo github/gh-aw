@@ -14,6 +14,7 @@ build/
 *.lock.yml
 schemas/audit.schema.json
 schemas/logs.schema.json
+schemas/logs-jsonl.schema.json
 
 # DevContainer configuration (should not be reformatted)
 .devcontainer/devcontainer.json

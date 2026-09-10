@@ -38,9 +38,13 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
-	cachedRuns, err := loadCachedLogsJSONL(opts.CachedJSONL)
+	cachedJSONLCache, err := loadCachedLogsJSONL(opts.CachedJSONL)
 	if err != nil {
 		return err
+	}
+	var cachedRuns cachedLogsRuns
+	if cachedJSONLCache != nil {
+		cachedRuns = cachedJSONLCache.runs
 	}
 	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
