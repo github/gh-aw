@@ -162,7 +162,17 @@ func mutateExistingWorkflowForUpgrade(content string, mutation uint8) (mutated, 
 		blank
 
 	mutated = "---\n" + inserted + strings.TrimPrefix(content, "---\n")
-	expected = strings.Replace(mutated, "timeout_minutes:", "timeout-minutes:", 1)
-	expected = strings.Replace(expected, oldRef, newRef, 1)
+	expected = replaceFirstFrontmatterToken(mutated, "timeout_minutes:", "timeout-minutes:")
+	expected = replaceFirstFrontmatterToken(expected, oldRef, newRef)
 	return mutated, expected, fieldName, objectKey
+}
+
+func replaceFirstFrontmatterToken(content, oldValue, newValue string) string {
+	frontmatterStart := strings.IndexByte(content, '\n') + 1
+	offset := strings.Index(content[frontmatterStart:], oldValue)
+	if offset < 0 {
+		panic("frontmatter mutation token not found")
+	}
+	offset += frontmatterStart
+	return content[:offset] + newValue + content[offset+len(oldValue):]
 }

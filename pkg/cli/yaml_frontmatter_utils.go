@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -122,7 +123,11 @@ func applyFrontmatterLineTransform(content string, transform func([]string) ([]s
 	yamlUtilsLog.Print("Frontmatter transformation applied successfully")
 	originalFrontmatter := strings.Join(frontmatterLines, "\n")
 	updatedFrontmatter := strings.Join(result, "\n")
-	return strings.Replace(content, originalFrontmatter, updatedFrontmatter, 1), true, nil
+	frontmatterStart := strings.IndexByte(content, '\n') + 1
+	if frontmatterStart == 0 || !strings.HasPrefix(content[frontmatterStart:], originalFrontmatter) {
+		return content, false, errors.New("unable to locate frontmatter text in workflow content")
+	}
+	return content[:frontmatterStart] + updatedFrontmatter + content[frontmatterStart+len(originalFrontmatter):], true, nil
 }
 
 // removeParentBlockIfTrulyEmpty removes a bare "parentBlock:" header line only
