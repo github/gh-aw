@@ -2,15 +2,18 @@ package cli
 
 import (
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 const logsCheckpointInterval = 30 * time.Second
 
 type logsCheckpointWriter struct {
-	updates chan []ProcessedRun
-	stop    chan struct{}
-	done    chan struct{}
+	mu       sync.Mutex
+	latest   []ProcessedRun
+	stopOnce sync.Once
+	stop     chan struct{}
+	done     chan struct{}
 }
 
 func startLogsCheckpointWriter(opts LogsDownloadOptions, interval time.Duration) *logsCheckpointWriter {
@@ -18,29 +21,23 @@ func startLogsCheckpointWriter(opts LogsDownloadOptions, interval time.Duration)
 		return nil
 	}
 	writer := &logsCheckpointWriter{
-		updates: make(chan []ProcessedRun, 1),
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
 	}
 	go writer.run(filepath.Join(opts.OutputDir, opts.SummaryFile), opts.OutputDir, interval, opts.Verbose)
 	return writer
 }
 
 func (w *logsCheckpointWriter) Update(runs []ProcessedRun) {
-	snapshot := append([]ProcessedRun(nil), runs...)
-	select {
-	case w.updates <- snapshot:
-	default:
-		select {
-		case <-w.updates:
-		default:
-		}
-		w.updates <- snapshot
-	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.latest = append(w.latest[:0], runs...)
 }
 
 func (w *logsCheckpointWriter) Stop() {
-	close(w.stop)
+	w.stopOnce.Do(func() {
+		close(w.stop)
+	})
 	<-w.done
 }
 
@@ -49,8 +46,10 @@ func (w *logsCheckpointWriter) run(summaryPath, outputDir string, interval time.
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	var latest []ProcessedRun
 	writeLatest := func() {
+		w.mu.Lock()
+		latest := append([]ProcessedRun(nil), w.latest...)
+		w.mu.Unlock()
 		if len(latest) == 0 {
 			return
 		}
@@ -60,14 +59,9 @@ func (w *logsCheckpointWriter) run(summaryPath, outputDir string, interval time.
 	}
 	for {
 		select {
-		case latest = <-w.updates:
 		case <-ticker.C:
 			writeLatest()
 		case <-w.stop:
-			select {
-			case latest = <-w.updates:
-			default:
-			}
 			writeLatest()
 			return
 		}

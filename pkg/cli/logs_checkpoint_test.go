@@ -24,6 +24,7 @@ func TestLogsCheckpointWriterFlushesOnStop(t *testing.T) {
 
 	writer.Update([]ProcessedRun{{Run: WorkflowRun{DatabaseID: 123}}})
 	writer.Stop()
+	writer.Stop()
 
 	data, err := os.ReadFile(filepath.Join(outputDir, "summary.json"))
 	require.NoError(t, err)

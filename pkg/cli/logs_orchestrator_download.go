@@ -562,6 +562,7 @@ func appendProcessedWorkflowRuns(
 		batchProcessed++
 	}
 	if batchProcessed > 0 && opts.checkpoint != nil {
+		// Persist the complete collection so every checkpoint is independently useful.
 		opts.checkpoint(processedRuns)
 	}
 	return processedRuns, batchProcessed, storageLimitReached

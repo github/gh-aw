@@ -301,17 +301,12 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
 	if checkpoints != nil {
 		opts.checkpoint = checkpoints.Update
-		defer func() {
-			if checkpoints != nil {
-				checkpoints.Stop()
-			}
-		}()
+		defer checkpoints.Stop()
 	}
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)
 	if checkpoints != nil {
 		checkpoints.Stop()
-		checkpoints = nil
 	}
 	if err != nil {
 		return err
