@@ -132,12 +132,12 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 
 	lines := slices.Clone(frontmatterLines)
 	inField := false
-	remaining := len(updates)
+	applied := make([]bool, len(updates))
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if getIndentation(line) == "" && strings.HasPrefix(trimmed, fieldName+":") {
 			inField = true
-			lines[i], remaining = replaceFrontmatterRefValues(line, updates, remaining)
+			lines[i] = replaceFrontmatterRefValues(line, updates, applied)
 			continue
 		}
 		if inField && isTopLevelKey(line) {
@@ -146,10 +146,10 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 		if !inField || !isFrontmatterRefValueLine(trimmed, objectKey) {
 			continue
 		}
-		lines[i], remaining = replaceFrontmatterRefValues(line, updates, remaining)
+		lines[i] = replaceFrontmatterRefValues(line, updates, applied)
 	}
 
-	if remaining != 0 {
+	if slices.Contains(applied, false) {
 		return content, false
 	}
 	updatedFrontmatter := strings.Join(lines, "\n")
@@ -164,19 +164,19 @@ func isFrontmatterRefValueLine(trimmed, objectKey string) bool {
 	if objectKey != noObjectKey && strings.HasPrefix(value, objectKey+":") {
 		return true
 	}
-	return !strings.Contains(strings.SplitN(value, "#", 2)[0], ":")
+	return !strings.Contains(value[:yamlValueEnd(value)], ":")
 }
 
-func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, remaining int) (string, int) {
+func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, applied []bool) string {
 	valueEnd := yamlValueEnd(line)
 	prefix := line[:valueEnd]
-	for _, update := range updates {
-		if strings.Contains(prefix, update.old) {
+	for i, update := range updates {
+		if !applied[i] && strings.Contains(prefix, update.old) {
 			prefix = strings.Replace(prefix, update.old, update.replacement, 1)
-			remaining--
+			applied[i] = true
 		}
 	}
-	return prefix + line[valueEnd:], remaining
+	return prefix + line[valueEnd:]
 }
 
 func yamlValueEnd(line string) int {
