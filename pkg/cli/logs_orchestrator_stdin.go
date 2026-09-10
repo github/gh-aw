@@ -220,6 +220,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	for _, result := range downloadResults {
 		if result.CachedRun != nil {
 			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
+			if checkpoints != nil {
+				checkpoints.Update(processedRuns)
+			}
 			continue
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
@@ -268,10 +271,12 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		}
 
 		processedRuns = append(processedRuns, processedRun)
+		if checkpoints != nil {
+			checkpoints.Update(processedRuns)
+		}
 		finalizeLogsRunDownload(storageLimit, result)
 	}
 	if checkpoints != nil {
-		checkpoints.Update(processedRuns)
 		checkpoints.Stop()
 	}
 
