@@ -49,7 +49,7 @@ type LogsDownloadOptions struct {
 	ArtifactSets      []string
 	After             string
 	ReportFile        string
-	CachedJSON        string
+	CachedLogs        string
 	// SuppressRender downloads and processes runs (including writing the summary
 	// file) without emitting any report to stdout. Callers that only need the
 	// downloaded artifacts, and that own stdout themselves, set this so their own
@@ -100,7 +100,7 @@ type StdinLogsOptions struct {
 	Drain3Weights     string
 	Format            string
 	ReportFile        string
-	CachedJSON        string
+	CachedLogs        string
 	// ArtifactSets defaults to nil (download all artifacts) when this API is used
 	// programmatically. The CLI passes ["usage"] to match the logs command default.
 	ArtifactSets []string
@@ -168,5 +168,5 @@ type renderLogsOutputOptions struct {
 	suppressRender bool
 	apiRateLimit   *GitHubAPIRateLimitReport
 	apiRateLimits  []*GitHubAPIRateLimitReport
-	cachedJSON     string
+	cachedLogs     string
 }

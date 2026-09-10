@@ -55,7 +55,7 @@ func TestLogsCheckpointWriterPersistsCachedJSONAtInterval(t *testing.T) {
 	cachedJSON := filepath.Join(t.TempDir(), "cached.json")
 	writer := startLogsCheckpointWriter(LogsDownloadOptions{
 		OutputDir:  outputDir,
-		CachedJSON: cachedJSON,
+		CachedLogs: cachedJSON,
 	}, 10*time.Millisecond)
 	require.NotNil(t, writer)
 	defer writer.Stop()
@@ -75,7 +75,7 @@ func TestLogsCheckpointWriterPersistsCachedJSONAtInterval(t *testing.T) {
 
 func TestLogsCheckpointWriterCombinesTargets(t *testing.T) {
 	cachedJSON := filepath.Join(t.TempDir(), "cached.json")
-	writer := startLogsCheckpointWriter(LogsDownloadOptions{CachedJSON: cachedJSON}, time.Hour)
+	writer := startLogsCheckpointWriter(LogsDownloadOptions{CachedLogs: cachedJSON}, time.Hour)
 	require.NotNil(t, writer)
 
 	writer.UpdateTarget("first", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 1}}})

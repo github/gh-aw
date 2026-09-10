@@ -252,7 +252,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		Format:            values.Format,
 		ReportFile:        values.ReportFile,
 		ArtifactSets:      values.ArtifactSets,
-		CachedJSON:        values.CachedJSON,
+		CachedLogs:        values.CachedLogs,
 	}, nil
 }
 
@@ -396,10 +396,6 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 	if err != nil {
 		return LogsDownloadOptions{}, err
 	}
-	cachedJSON, err := resolveCachedLogsPath(cmd)
-	if err != nil {
-		return LogsDownloadOptions{}, err
-	}
 	options := LogsDownloadOptions{
 		Count:                 count,
 		StartDate:             startDate,
@@ -434,7 +430,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		Format:                getStringFlag(cmd, "format"),
 		ReportFile:            getStringFlag(cmd, "report-file"),
 		ArtifactSets:          getStringSliceFlag(cmd, "artifacts"),
-		CachedJSON:            cachedJSON,
+		CachedLogs:            getStringFlag(cmd, "cached-logs"),
 	}
 	options.IgnoreWorkflowRuns, err = parseIgnoredWorkflowRunIDs(getStringSliceFlag(cmd, "ignore-workflow-runs"))
 	if err != nil {
@@ -448,18 +444,6 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		options.ArtifactSets = applyGradersArtifact(options.ArtifactSets, options.GradersOnly)
 	}
 	return options, nil
-}
-
-func resolveCachedLogsPath(cmd *cobra.Command) (string, error) {
-	cachedLogs := getStringFlag(cmd, "cached-logs")
-	cachedJSON := getStringFlag(cmd, "cached-json")
-	if cachedLogs != "" && cachedJSON != "" && cachedLogs != cachedJSON {
-		return "", errors.New("--cached-logs and --cached-json must reference the same file when both are provided")
-	}
-	if cachedLogs != "" {
-		return cachedLogs, nil
-	}
-	return cachedJSON, nil
 }
 
 func parseIgnoredWorkflowRunIDs(values []string) ([]int64, error) {
@@ -651,7 +635,6 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
 	logsCmd.Flags().String("cached-logs", "", "Path to previous logs JSON output to reuse for matching runs and periodically overwrite with current results")
-	logsCmd.Flags().String("cached-json", "", "Alias for --cached-logs")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
 	logsCmd.Flags().StringSlice("artifacts", []string{"usage"}, "Artifact sets to download (default: usage — compact summary for faster downloads). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")

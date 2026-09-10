@@ -18,7 +18,7 @@ type logsCheckpointWriter struct {
 }
 
 func startLogsCheckpointWriter(opts LogsDownloadOptions, interval time.Duration) *logsCheckpointWriter {
-	if (opts.SummaryFile == "" && opts.CachedJSON == "") || interval <= 0 {
+	if (opts.SummaryFile == "" && opts.CachedLogs == "") || interval <= 0 {
 		return nil
 	}
 	writer := &logsCheckpointWriter{
@@ -29,7 +29,7 @@ func startLogsCheckpointWriter(opts LogsDownloadOptions, interval time.Duration)
 	if opts.SummaryFile != "" {
 		summaryPath = filepath.Join(opts.OutputDir, opts.SummaryFile)
 	}
-	go writer.run(summaryPath, opts.CachedJSON, opts.OutputDir, interval, opts.Verbose)
+	go writer.run(summaryPath, opts.CachedLogs, opts.OutputDir, interval, opts.Verbose)
 	return writer
 }
 
