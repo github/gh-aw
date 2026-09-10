@@ -32,7 +32,7 @@ permissions:
 Keep this Markdown exactly.
 `
 
-	formatted, err := formatWorkflowContent(input, "workflow.md", GetAllCodemods())
+	formatted, _, err := formatWorkflowContentWithInfo(input, "workflow.md", GetAllCodemods())
 	require.NoError(t, err)
 
 	assert.NotContains(t, formatted, "timeout_minutes:")
@@ -74,9 +74,9 @@ engine: copilot
 	for name, input := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			once, err := formatWorkflowContent(input, "workflow.md", nil)
+			once, _, err := formatWorkflowContentWithInfo(input, "workflow.md", nil)
 			require.NoError(t, err)
-			twice, err := formatWorkflowContent(once, "workflow.md", nil)
+			twice, _, err := formatWorkflowContentWithInfo(once, "workflow.md", nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, once, twice)
@@ -145,10 +145,7 @@ func TestRunFormatFormatsSelectedWorkflow(t *testing.T) {
 	input := "---\nengine: copilot\non:\n workflow_dispatch:\n---\n# Body"
 	require.NoError(t, os.WriteFile(workflowPath, []byte(input), 0o644))
 
-	err := RunFormat(FormatConfig{
-		WorkflowIDs: []string{workflowPath},
-		WorkflowDir: tempDir,
-	})
+	err := runFormatCommand([]string{workflowPath}, tempDir, false)
 	require.NoError(t, err)
 
 	formatted, err := os.ReadFile(workflowPath)
@@ -164,7 +161,7 @@ func TestRunFormatOnlyFormatsAgenticWorkflowsInDirectory(t *testing.T) {
 	require.NoError(t, os.WriteFile(workflowPath, []byte("---\nengine: copilot\non: push\n---\n# Body"), 0o644))
 	require.NoError(t, os.WriteFile(documentationPath, []byte("# Documentation\n"), 0o644))
 
-	err := RunFormat(FormatConfig{WorkflowDir: tempDir})
+	err := runFormatCommand(nil, tempDir, false)
 	require.NoError(t, err)
 
 	formatted, err := os.ReadFile(workflowPath)

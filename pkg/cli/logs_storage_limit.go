@@ -228,14 +228,6 @@ func initialLogsFolderSizes(path string) (map[string]int64, error) {
 	return folderSizes, nil
 }
 
-func (l *logsStorageLimit) runDownload(ctx context.Context, storagePath string, download func() error) error {
-	return l.runDownloadWithPruning(ctx, storagePath, download, true, false)
-}
-
-func (l *logsStorageLimit) runDownloadDeferred(ctx context.Context, storagePath string, download func() error) error {
-	return l.runDownloadWithPruning(ctx, storagePath, download, false, false)
-}
-
 func (l *logsStorageLimit) runDownloadDeferredReserved(ctx context.Context, storagePath string, download func() error) error {
 	return l.runDownloadWithPruning(ctx, storagePath, download, false, true)
 }

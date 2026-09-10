@@ -15,7 +15,7 @@ import (
 func TestTrainDrain3Weights_NoRuns(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	err := TrainDrain3Weights(nil, tmpDir, false)
+	err := trainDrain3Weights(nil, tmpDir, "", false)
 	require.NoError(t, err, "should not error when no runs provided")
 
 	// No weights file should be written.
@@ -49,7 +49,7 @@ func TestTrainDrain3Weights_WithRuns(t *testing.T) {
 		},
 	}
 
-	err := TrainDrain3Weights(runs, tmpDir, true)
+	err := trainDrain3Weights(runs, tmpDir, "", true)
 	require.NoError(t, err, "training should succeed with valid runs")
 
 	// Weights file should be written.
@@ -86,7 +86,7 @@ func TestTrainDrain3Weights_JSONStructure(t *testing.T) {
 		},
 	}
 
-	err := TrainDrain3Weights(runs, tmpDir, false)
+	err := trainDrain3Weights(runs, tmpDir, "", false)
 	require.NoError(t, err, "training should not error")
 
 	weightsPath := filepath.Join(tmpDir, drain3WeightsFilename)
@@ -116,7 +116,7 @@ func TestTrainDrain3Weights_LoadsExistingWeights(t *testing.T) {
 			Turns:      3,
 		},
 	}}
-	require.NoError(t, TrainDrain3Weights(runs, seedDir, false))
+	require.NoError(t, trainDrain3Weights(runs, seedDir, "", false))
 	weightsPath := filepath.Join(seedDir, drain3WeightsFilename)
 
 	outputDir := t.TempDir()
