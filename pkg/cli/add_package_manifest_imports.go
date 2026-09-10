@@ -151,10 +151,14 @@ func validateUniqueResolvedPackageFiles(
 	agentFiles []string,
 	manifestPath string,
 ) error {
+	addPackageManifestLog.Printf("Validating unique destinations: installables=%d resources=%d skillFiles=%d agentFiles=%d",
+		len(installables), len(resources), len(skillFiles), len(agentFiles))
+
 	seen := make(map[string]string)
 	add := func(destination, source string) error {
 		key := strings.ToLower(filepath.ToSlash(filepath.Clean(destination)))
 		if previous, exists := seen[key]; exists {
+			addPackageManifestLog.Printf("Duplicate install destination %q for %q and %q", destination, previous, source)
 			return fmt.Errorf("invalid Agentic Workflow manifest %q: files %q and %q both install to %q", manifestPath, previous, source, destination)
 		}
 		seen[key] = source
