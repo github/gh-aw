@@ -43,7 +43,6 @@ func DownloadWorkflowLogsForTargets(
 	}
 
 	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
-	defer stopLogsCheckpointWriter(checkpoints)
 	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, logsTargetRateLimitHosts(targets))
 	results := collectLogsTargets(ctx, opts, targets, checkpoints)
 	stopLogsCheckpointWriter(checkpoints)

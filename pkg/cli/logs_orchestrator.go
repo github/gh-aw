@@ -301,7 +301,6 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
 	if checkpoints != nil {
 		opts.checkpoint = checkpoints.Update
-		defer checkpoints.Stop()
 	}
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)

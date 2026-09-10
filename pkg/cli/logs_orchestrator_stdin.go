@@ -198,9 +198,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		CachedLogs:  opts.CachedLogs,
 		Verbose:     opts.Verbose,
 	}, logsCheckpointInterval)
-	if checkpoints != nil {
-		defer checkpoints.Stop()
-	}
 
 	// Download artifacts for all runs concurrently.
 	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
