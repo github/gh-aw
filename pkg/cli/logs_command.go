@@ -526,9 +526,30 @@ func validateLogsEngine(engine string) error {
 	return fmt.Errorf("invalid engine value '%s'. Must be one of: %s", engine, strings.Join(supportedEngines, ", "))
 }
 
+// logsWorkflowsPathSegment is the path segment shared by all documented
+// "[HOST/]owner/repo/.github/workflows/workflow.yml" logs targets.
+const logsWorkflowsPathSegment = constants.GithubDir + "workflows/"
+
+// normalizeLogsWorkflowID converts a logs target into a workflow ID. It extends
+// normalizeWorkflowID, which only strips ".md" and ".lock.yml", so that the
+// documented "[HOST/]owner/repo/.github/workflows/workflow.yml" form also reduces
+// to the bare workflow ID instead of leaving a trailing ".yml".
+func normalizeLogsWorkflowID(arg string) string {
+	workflowID := normalizeWorkflowID(arg)
+	if !strings.Contains(filepath.ToSlash(arg), logsWorkflowsPathSegment) {
+		return workflowID
+	}
+	for _, ext := range []string{".yaml", ".yml"} {
+		if trimmed, ok := strings.CutSuffix(workflowID, ext); ok {
+			return strings.TrimSuffix(trimmed, ".lock")
+		}
+	}
+	return workflowID
+}
+
 func resolveLogsWorkflowNameForRepo(arg, repoOverride string) string {
 	if !repoIsLocal(repoOverride) {
-		workflowName := normalizeWorkflowID(arg)
+		workflowName := normalizeLogsWorkflowID(arg)
 		logsCommandLog.Printf("Using normalized workflow name for remote repo: %s", workflowName)
 		return workflowName
 	}
@@ -536,7 +557,7 @@ func resolveLogsWorkflowNameForRepo(arg, repoOverride string) string {
 		logsCommandLog.Printf("Resolved workflow name via local lock files: %s -> %s", arg, resolved)
 		return resolved
 	}
-	workflowName := normalizeWorkflowID(arg)
+	workflowName := normalizeLogsWorkflowID(arg)
 	if workflowName != arg {
 		if resolved, err := workflow.FindWorkflowName(workflowName); err == nil {
 			logsCommandLog.Printf("Resolved normalized workflow name via local lock files: %s -> %s", arg, resolved)

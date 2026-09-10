@@ -471,7 +471,7 @@ func TestResolveLogsWorkflowTargetCrossRepo(t *testing.T) {
 	target, err := resolveLogsWorkflowTarget(cmd, "other-org/other-repo/.github/workflows/daily-report.yml")
 	require.NoError(t, err)
 	assert.Equal(t, "other-org/other-repo", target.repoOverride)
-	assert.Equal(t, "daily-report.yml", target.workflowName)
+	assert.Equal(t, "daily-report", target.workflowName)
 }
 
 func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
@@ -521,6 +521,12 @@ func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
 			expectedName: "SelfCare / Open Source Failures",
 		},
 		{
+			name:         "full workflow file path",
+			input:        "githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.yml",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
 			name:         "matching host full lock path",
 			input:        "github.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
 			expectedRepo: "github.com/githubnext/gh-aw-cao",
@@ -531,6 +537,12 @@ func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
 			// workflow display name.
 			name:         "other host full lock path",
 			input:        "github.example.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
+			expectedRepo: "github.example.com/githubnext/gh-aw-cao",
+			expectedName: "self-care-open-source-failures",
+		},
+		{
+			name:         "other host full workflow file path",
+			input:        "github.example.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.yml",
 			expectedRepo: "github.example.com/githubnext/gh-aw-cao",
 			expectedName: "self-care-open-source-failures",
 		},
