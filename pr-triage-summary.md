@@ -1,20 +1,12 @@
-# PR Triage Summary
+# PR triage summary
 
-- Run: 34389032306
-- Date: 2026-09-09T18:36:46Z
-- Eligible PRs: 6
+- Run: 2026-09-10T00:56:52Z
+- Eligible PRs: 1
 - Cooldown skipped: 0
-- Fast track: 2
-- Batch review: 4
+- Categories: bug 1
+- Risks: high 1
+- Priorities: high 1
+- Actions: batch_review 1
 
-## Eligible PRs
-- #59763 — bug / medium / 58 / batch_review
-- #59747 — bug / high / 70 / fast_track
-- #59745 — bug / high / 77 / fast_track
-- #59744 — feature / medium / 64 / batch_review
-- #59743 — bug / medium / 62 / batch_review
-- #56568 — bug / high / 60 / batch_review
-
-## Batches
-- workflow-auth: #59745, #59744, #59743
-- workflow-reliability: #59747
+## Top-priority PRs
+- #56568 — bug, high risk, score 71, action batch_review, batch workflow-reliability
