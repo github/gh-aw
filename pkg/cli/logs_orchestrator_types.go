@@ -63,7 +63,6 @@ type LogsDownloadOptions struct {
 	storageLimit           *logsStorageLimit
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	cachedJSONLCache       *cachedLogsJSONLCache
-	cachedJSONLLoaded      bool
 }
 
 type workflowLogsResult struct {
