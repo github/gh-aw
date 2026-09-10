@@ -134,6 +134,8 @@ func parseManifestIncludeMapping(mapping map[string]any, manifestPath string) (r
 		return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes destination %q is invalid: %w. Destinations must be repository-root-relative paths without '..' segments. Example:\nincludes:\n  - source: payload/workflows/reviewer.md\n    destination: %sreviewer.md", manifestPath, destination, err, constants.WorkflowsDirSlash)
 	}
 
+	addPackageManifestLog.Printf("Parsing includes mapping: source=%s destination=%s kind=%q wildcard=%t", cleanedSource, cleanedDestination, kind, wildcard)
+
 	if wildcard {
 		if cleanedDestination != constants.WorkflowsDir {
 			return repositoryPackageInclude{}, fmt.Errorf("invalid Agentic Workflow manifest %q: includes destination %q is invalid: wildcard destinations must be the %s folder", manifestPath, destination, constants.WorkflowsDir)

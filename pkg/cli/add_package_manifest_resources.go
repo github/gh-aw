@@ -62,6 +62,7 @@ func parseManifestResourceMapping(mapping map[string]any, manifestPath string) (
 	if err := validateManifestResourceDestination(cleanedDestination); err != nil {
 		return repositoryPackageResource{}, fmt.Errorf("invalid Agentic Workflow manifest %q: resources destination %q is invalid: %w", manifestPath, destination, err)
 	}
+	addPackageManifestLog.Printf("Parsed resource mapping: source=%s destination=%s", cleanedSource, cleanedDestination)
 	return repositoryPackageResource{Source: cleanedSource, Destination: cleanedDestination}, nil
 }
 
@@ -103,6 +104,7 @@ func normalizePackageResourcePaths(resources []repositoryPackageResource, packag
 		})
 	}
 
+	addPackageManifestLog.Printf("Normalized %d resource paths (package path=%q)", len(normalized), packagePath)
 	return normalized
 }
 

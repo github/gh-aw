@@ -44,6 +44,7 @@ type LogsDownloadOptions struct {
 	GradersOnly       bool
 	Audit             bool
 	Train             bool
+	Drain3Weights     string
 	Format            string
 	ArtifactSets      []string
 	After             string
@@ -95,6 +96,7 @@ type StdinLogsOptions struct {
 	GradersOnly       bool
 	Audit             bool
 	Train             bool
+	Drain3Weights     string
 	Format            string
 	ReportFile        string
 	CachedJSON        string
@@ -141,6 +143,7 @@ type renderLogsOutputOptions struct {
 	jsonOutput     bool
 	toolGraph      bool
 	train          bool
+	drain3Weights  string
 	audit          bool
 	continuation   *ContinuationData
 	message        string

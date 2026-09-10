@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 )
 
@@ -20,11 +21,13 @@ func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cached logs JSON file not found: "+path))
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached logs JSON: %w", err)
 	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found cached logs JSON file: "+path))
 	var logsData LogsData
 	if err := json.Unmarshal(data, &logsData); err != nil {
 		return nil, fmt.Errorf("failed to parse cached logs JSON: %w", err)
@@ -53,6 +56,7 @@ func writeCachedLogsJSON(path string, data LogsData, verbose bool) error {
 	if err := renderLogsJSONToWriter(&output, data, verbose); err != nil {
 		return fmt.Errorf("failed to render updated cached logs JSON: %w", err)
 	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Writing cached logs JSON file: "+path))
 	if err := os.WriteFile(path, output.Bytes(), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("failed to update cached logs JSON: %w", err)
 	}

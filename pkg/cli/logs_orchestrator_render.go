@@ -110,7 +110,7 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 
 	// Train drain3 weights if requested, or inline with audit generation.
 	if opts.train && !opts.audit {
-		if err := TrainDrain3Weights(processedRuns, opts.outputDir, opts.verbose); err != nil {
+		if err := trainDrain3Weights(processedRuns, opts.outputDir, opts.drain3Weights, opts.verbose); err != nil {
 			return logsData, fmt.Errorf("log pattern training: %w", err)
 		}
 	}
@@ -124,7 +124,7 @@ func writeLogsAuditsAndTrain(processedRuns []ProcessedRun, opts renderLogsOutput
 		return nil
 	})
 	group.Go(func() error {
-		return TrainDrain3Weights(processedRuns, opts.outputDir, opts.verbose)
+		return trainDrain3Weights(processedRuns, opts.outputDir, opts.drain3Weights, opts.verbose)
 	})
 	return group.Wait()
 }

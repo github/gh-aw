@@ -14,13 +14,13 @@ If no `network:` permission is specified, it defaults to `network: defaults`, wh
 
 ## Configuration
 
-Network permissions follow the principle of least privilege:
+Network permissions follow least privilege:
 
 - **Default** (`network: defaults`) allows basic infrastructure only.
-- **Selective** (`network: { allowed: [...] }`) allows only the listed domains or ecosystems.
+- **Selective** (`network: { allowed: [...] }`) allows only listed domains or ecosystems.
 - **No access** (`network: {}`) blocks all network access.
 
-Listed domains automatically match all subdomains; wildcard patterns (`*.example.com`) are also supported — see [Wildcard Domain Patterns](#wildcard-domain-patterns).
+Listed domains automatically match subdomains. Wildcards such as `*.example.com` are also supported; see [Wildcard Domain Patterns](#wildcard-domain-patterns).
 
 ```yaml wrap
 network:
@@ -33,7 +33,7 @@ network:
 
 ## Blocking Domains
 
-Use the `blocked` field to exclude specific domains or ecosystems from the allowed set. Blocked entries take precedence over allowed ones and include all subdomains — useful for privacy (block trackers), security (block known-bad domains), or compliance:
+Use `blocked` to exclude specific domains or ecosystems from the allowed set. Blocked entries take precedence and include subdomains, which is useful for privacy, security, or compliance:
 
 ```yaml wrap
 network:
@@ -48,7 +48,7 @@ network:
 
 ## Protocol-Specific Domain Filtering
 
-Restrict domains to a specific protocol (HTTP or HTTPS only) for legacy systems, strict HTTPS enforcement, or gradual migration. Currently supported by the Copilot and Claude engines with AWF firewall enabled; domains without a protocol prefix allow both HTTP and HTTPS.
+Restrict domains to HTTP-only or HTTPS-only access for legacy systems, strict HTTPS enforcement, or gradual migration. This is currently supported by Copilot and Claude when the AWF firewall is enabled. Domains without a protocol prefix allow both HTTP and HTTPS.
 
 ```yaml wrap
 engine: copilot
@@ -62,10 +62,10 @@ network:
 
 ## Content Sanitization
 
-The `network:` configuration also controls which domains are allowed in sanitized content. URLs from domains not in the allowed list are replaced with `(redacted)` to prevent potential data exfiltration through untrusted links.
+`network:` also controls which domains may appear in sanitized content. URLs from domains outside the allowlist are replaced with `(redacted)` to reduce exfiltration risk through untrusted links.
 
 > [!TIP]
-> If you see `(redacted)` in workflow outputs, add the domain to your `network.allowed` list. This applies the same domain allowlist to both network egress (when firewall is enabled) and content sanitization.
+> If you see `(redacted)` in workflow outputs, add the domain to `network.allowed`. The same allowlist applies to both network egress (when the firewall is enabled) and content sanitization.
 
 GitHub domains (`github.com`, `githubusercontent.com`, etc.) are always allowed by default.
 
@@ -125,11 +125,7 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 
 ## Engine Domain Sets
 
-Engine domain sets are named allow-list bundles for engine CLI authentication
-and direct provider transport. They are **not** added automatically. Add the
-matching identifier to `network.allowed` only when the agent needs direct
-egress to that engine's domains; agent inference normally runs through the AWF
-API proxy.
+Engine domain sets are named allowlist bundles for engine CLI authentication and direct provider transport. They are **not** added automatically. Add the matching identifier to `network.allowed` only when the agent needs direct egress to that engine's domains; agent inference normally runs through the AWF API proxy.
 
 | Engine set | Included domains |
 |---|---|
@@ -196,7 +192,7 @@ recommend using ecosystem identifiers instead of individual domain names for bet
 
 ## Implementation
 
-All engines (Copilot, Claude, Codex, Gemini) enforce network permissions through AWF (Agent Workflow Firewall) — a wrapper sourced from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that enforces domain-based access controls via `--allow-domains`. AWF automatically includes all subdomains (e.g., `github.com` allows `api.github.com`), supports wildcard patterns, and logs all network activity for audit.
+All engines (Copilot, Claude, Codex, Gemini) enforce network permissions through AWF (Agent Workflow Firewall), a wrapper from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that applies domain-based access controls via `--allow-domains`. AWF automatically includes subdomains (for example, `github.com` allows `api.github.com`), supports wildcard patterns, and logs network activity for audit.
 
 ```yaml wrap
 engine: copilot          # or claude, codex, gemini
@@ -207,13 +203,15 @@ network:
     - "api.example.com"   # Custom domain
 ```
 
-Each engine has a named domain set for its CLI authentication and model API transport. These sets expand only when explicitly listed in `network.allowed` and **never include the `node` or `python` ecosystem registries**: selecting an engine does not grant the agent access to `registry.npmjs.org`, `pypi.org`, or `files.pythonhosted.org`. Engine CLIs and SDKs are installed by workflow steps that run on the runner before the sandboxed agent starts, and containerized `npx`/`uvx` MCP servers are launched by the MCP gateway outside the agent firewall, so registry access inside the sandbox is not required for them.
+Each engine has a named domain set for CLI authentication and model API transport. These sets expand only when explicitly listed in `network.allowed` and **never include the `node` or `python` ecosystem registries**. Selecting an engine does not grant access to `registry.npmjs.org`, `pypi.org`, or `files.pythonhosted.org`.
 
-This guarantee is scoped to the `node` and `python` ecosystems. Some engine domain sets still include unrelated infrastructure domains used by the CLI itself (e.g., `ghcr.io`, `packagecloud.io`, `packages.microsoft.com` for OS-level package/container installation) — those are not language package registries.
+That is safe because engine CLIs and SDKs are installed by workflow steps on the runner before the sandboxed agent starts, and containerized `npx`/`uvx` MCP servers are launched by the MCP gateway outside the agent firewall. Registry access inside the sandbox is therefore unnecessary for those components.
 
-To let the agent itself reach engine domains or the `node`/`python` registries, opt in explicitly with the matching domain set or ecosystem identifier (`copilot`, `node`, `python`, …) in `network.allowed`, or declare the corresponding entry under `runtimes:` for language ecosystems. With `network: {}` or `network: { allowed: [defaults, github] }`, those domains stay blocked.
+This guarantee is scoped to the `node` and `python` ecosystems. Some engine domain sets still include unrelated infrastructure domains used by the CLI itself, such as `ghcr.io`, `packagecloud.io`, and `packages.microsoft.com` for OS-level package or container installation.
 
-See [`domains.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains.go) for the full lists. This invariant is enforced by `TestEngineDefaultDomainsDoNotOverlapEcosystems` in [`domains_package_registry_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains_package_registry_test.go), which fails the build if any engine's static default domain list overlaps with the full `node` or `python` ecosystem domain sets — including registry entries added after this was written.
+To let the agent reach engine domains or the `node`/`python` registries, opt in explicitly with the matching domain set or ecosystem identifier (`copilot`, `node`, `python`, …) in `network.allowed`, or declare the corresponding entry under `runtimes:` for language ecosystems. With `network: {}` or `network: { allowed: [defaults, github] }`, those domains remain blocked.
+
+See [`domains.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains.go) for the full lists. This invariant is enforced by `TestEngineDefaultDomainsDoNotOverlapEcosystems` in [`domains_package_registry_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/domains_package_registry_test.go), which fails the build if any engine's static default domain list overlaps with the full `node` or `python` ecosystem domain sets, including registry entries added later.
 
 ### Firewall Log Level
 
@@ -230,7 +228,7 @@ network:
 
 ### SSL Bump for HTTPS Inspection
 
-Enable SSL bump to filter HTTPS traffic by URL path patterns instead of just domain names — useful when you need to allow specific API endpoints while blocking others on the same domain. Use `allow-urls` to specify the permitted HTTPS patterns.
+Enable SSL bump to filter HTTPS traffic by URL path patterns instead of only domain names. Use it when you must allow specific API endpoints while blocking others on the same domain. Specify permitted HTTPS patterns with `allow-urls`.
 
 ```yaml wrap
 network:
@@ -243,17 +241,17 @@ network:
     - defaults
 ```
 
-**Security**: SSL bump intercepts and decrypts HTTPS as a man-in-the-middle — only enable when URL-level filtering is necessary, and craft `allow-urls` patterns carefully to avoid breaking legitimate connections. Requires AWF v0.9.0+ and does not apply to Sandbox Runtime (SRT). See [Sandbox Configuration](/gh-aw/reference/sandbox/) for full AWF options.
+**Security**: SSL bump intercepts and decrypts HTTPS as a man-in-the-middle. Enable it only when URL-level filtering is necessary, and craft `allow-urls` patterns carefully to avoid breaking legitimate connections. It requires AWF v0.9.0+ and does not apply to Sandbox Runtime (SRT). See [Sandbox Configuration](/gh-aw/reference/sandbox/) for full AWF options.
 
 ### Disabling the Firewall
 
-The firewall is enabled by default via `sandbox.agent: awf`. When disabled, network permissions still apply for content sanitization but the agent can make unrestricted network requests. Only disable during development or when AWF is incompatible with your workflow; keep it enabled in production.
+The firewall is enabled by default via `sandbox.agent: awf`. When disabled, network permissions still apply to content sanitization, but the agent can make unrestricted network requests. Disable it only during development or when AWF is incompatible with your workflow; keep it enabled in production.
 
 ## Caller-Extensible Allowlist (`network.allowed-input`)
 
-Reusable workflows compiled to `.lock.yml` bake their `network.allowed` into the lock file, so consumers normally can't extend it without forking. Set `network.allowed-input: true` to expose a `workflow_call` input named `network_allowed` that lets callers add domains or ecosystems at runtime.
+Reusable workflows compiled to `.lock.yml` bake `network.allowed` into the lock file, so consumers normally cannot extend it without forking. Set `network.allowed-input: true` to expose a `workflow_call` input named `network_allowed` so callers can add domains or ecosystems at runtime.
 
-The compiled `network.allowed` remains the baseline; the caller's value is unioned in before AWF starts, with ecosystem shorthands expanded to their concrete domain sets and the result deduplicated.
+The compiled `network.allowed` remains the baseline. The caller's value is unioned in before AWF starts, ecosystem shorthands are expanded to concrete domain sets, and the result is deduplicated.
 
 ```yaml wrap
 # source workflow (compiled to a reusable .lock.yml)
@@ -278,7 +276,7 @@ The `network_allowed` input is a string accepting comma-separated ecosystem iden
 
 ## Wildcard Domain Patterns
 
-Wildcard patterns (`*.example.com`) match the base domain and all subdomains at any depth, making subdomain intent explicit. Only a single leading wildcard is allowed (`*.*.example.com` is invalid), and it must be followed by a dot and domain. Both `example.com` and `*.example.com` match all subdomains.
+Wildcard patterns (`*.example.com`) match the base domain and all subdomains at any depth. Only a single leading wildcard is allowed (`*.*.example.com` is invalid), and it must be followed by a dot and domain. Both `example.com` and `*.example.com` match all subdomains.
 
 ```yaml wrap
 network:
@@ -290,7 +288,7 @@ network:
 
 ## Troubleshooting
 
-If network access is blocked, confirm the required domains or ecosystems are in `allowed`. Start with `network: defaults`, then add only what the workflow needs. Violations appear in workflow logs.
+If network access is blocked, confirm that the required domains or ecosystems are in `allowed`. Start with `network: defaults`, then add only what the workflow needs. Violations appear in workflow logs.
 
 Use `gh aw logs --run-id <run-id>` to identify blocked domains. For deeper analysis, run `gh aw audit <run-id>`; the **Firewall Analysis** section shows each domain request with its allow/deny status, request volume, and policy attribution. Pass two run IDs to compare runs:
 

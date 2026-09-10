@@ -26,6 +26,10 @@ const drain3WeightsFilename = "drain3_weights.json"
 //
 // This function is invoked when the user passes --train to the logs command.
 func TrainDrain3Weights(processedRuns []ProcessedRun, outputDir string, verbose bool) error {
+	return trainDrain3Weights(processedRuns, outputDir, "", verbose)
+}
+
+func trainDrain3Weights(processedRuns []ProcessedRun, outputDir, weightsPath string, verbose bool) error {
 	if len(processedRuns) == 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No processed runs available for log pattern training"))
 		return nil
@@ -37,6 +41,16 @@ func TrainDrain3Weights(processedRuns []ProcessedRun, outputDir string, verbose 
 	coordinator, err := agentdrain.NewCoordinator(cfg, defaultAgentDrainStages)
 	if err != nil {
 		return fmt.Errorf("log pattern training: create coordinator: %w", err)
+	}
+	if weightsPath != "" {
+		weightsData, err := os.ReadFile(weightsPath)
+		if err != nil {
+			return fmt.Errorf("log pattern training: read weights file: %w", err)
+		}
+		if err := coordinator.LoadWeightsJSON(weightsData); err != nil {
+			return fmt.Errorf("log pattern training: load weights file: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Loaded log pattern weights from: "+weightsPath))
 	}
 
 	var totalEvents atomic.Int64

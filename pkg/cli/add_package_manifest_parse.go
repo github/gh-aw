@@ -214,9 +214,11 @@ func extractRepositoryPackageManifestIcon(manifest *repositoryPackageManifest, r
 
 func validateRepositoryPackageVisibility(manifest *repositoryPackageManifest, packageID string) ([]string, error) {
 	if manifest.Private {
+		addPackageManifestLog.Printf("Rejecting package %s: manifest is private", packageID)
 		return nil, fmt.Errorf("package %q is private and cannot be added", packageID)
 	}
 	if manifest.Experimental {
+		addPackageManifestLog.Printf("Package %s is experimental", packageID)
 		return []string{fmt.Sprintf("Package %q is experimental and may change without notice.", packageID)}, nil
 	}
 	return nil, nil

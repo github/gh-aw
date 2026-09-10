@@ -12,6 +12,7 @@ import (
 
 // checkGHAuthStatus verifies the user is logged in to GitHub CLI
 func (c *AddInteractiveConfig) checkGHAuthStatus() error {
+	addInteractiveLog.Print("Checking gh auth status")
 	return checkGHAuthStatusShared(c.Verbose)
 }
 
@@ -74,6 +75,7 @@ func (c *AddInteractiveConfig) checkGitRepository() error {
 
 // checkActionsEnabled verifies that GitHub Actions is enabled for the repository
 func (c *AddInteractiveConfig) checkActionsEnabled() error {
+	addInteractiveLog.Printf("Checking Actions enabled for repo=%s", c.RepoOverride)
 	return checkActionsEnabledShared(c.RepoOverride, c.Verbose)
 }
 
@@ -83,6 +85,7 @@ func (c *AddInteractiveConfig) checkUserPermissions() error {
 	if err != nil {
 		return err
 	}
+	addInteractiveLog.Printf("User permission check complete: hasWriteAccess=%t", hasWrite)
 	c.hasWriteAccess = hasWrite
 	return nil
 }

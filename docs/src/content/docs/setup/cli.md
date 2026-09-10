@@ -465,6 +465,15 @@ gh aw logs --ref main --parse --json      # With markdown/JSON output for branch
 
 With `--json`, the output also includes deterministic lineage data under `.episodes[]` and `.edges[]`. Use these fields to group orchestrated runs into execution episodes instead of reconstructing relationships from `.runs[]` alone.
 
+> [!NOTE]
+> A downstream warning that a workflow file returned HTTP 404 does not mean `gh aw logs` failed to download the run. The command downloads run artifacts by run ID; workflow source lookup is a separate operation performed by the consumer. GitHub's workflows API can retain entries for deleted or renamed files. Live-inventory consumers should ignore non-active workflows and paths absent from the repository contents listing. Historical consumers should use each JSON run's `repository`, `workflow_path`, and `sha` fields instead of the current default branch, and treat missing source as unavailable metadata rather than a failed log download.
+
+To diagnose an actual download failure, enable the logs API and download debug namespaces:
+
+```bash wrap
+DEBUG=cli:logs_github_api,cli:logs_download gh aw logs --verbose --json
+```
+
 **Workflow name matching**: The logs command accepts both workflow IDs (kebab-case filename without `.md`, e.g., `ci-failure-doctor`) and display names (from frontmatter, e.g., `CI Failure Doctor`). Matching is case-insensitive for convenience:
 
 ```bash wrap
