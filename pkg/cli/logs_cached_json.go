@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -15,28 +17,45 @@ import (
 
 type cachedLogsRuns map[int64]RunData
 
-func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
+const cachedLogsJSONLSchemaVersion = 1
+
+type cachedLogsJSONLRecord struct {
+	SchemaVersion int     `json:"schema_version"`
+	Run           RunData `json:"run"`
+}
+
+func loadCachedLogsJSONL(path string) (cachedLogsRuns, error) {
 	if path == "" {
 		return nil, nil
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cached logs JSON file not found: "+path))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cached logs JSONL file not found: "+path))
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read cached logs JSON: %w", err)
+		return nil, fmt.Errorf("failed to read cached logs JSONL: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found cached logs JSON file: "+path))
-	var logsData LogsData
-	if err := json.Unmarshal(data, &logsData); err != nil {
-		return nil, fmt.Errorf("failed to parse cached logs JSON: %w", err)
-	}
-	if logsData.Runs == nil {
-		return nil, errors.New("failed to parse cached logs JSON: missing runs array")
-	}
-	runs := make(cachedLogsRuns, len(logsData.Runs))
-	for _, run := range logsData.Runs {
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found cached logs JSONL file: "+path))
+	lines := bytes.Split(data, []byte{'\n'})
+	runs := make(cachedLogsRuns, len(lines))
+	for index, line := range lines {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var record cachedLogsJSONLRecord
+		if err := json.Unmarshal(line, &record); err != nil {
+			if index == len(lines)-1 {
+				logsCacheLog.Printf("Ignoring incomplete final cached logs JSONL record: %v", err)
+				break
+			}
+			return nil, fmt.Errorf("failed to parse cached logs JSONL record %d: %w", index+1, err)
+		}
+		if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+			logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", index+1, record.SchemaVersion)
+			continue
+		}
+		run := record.Run
 		if err := normalizeCachedLogRun(&run); err != nil {
 			return nil, err
 		}
@@ -44,23 +63,52 @@ func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
 			runs[run.RunID] = run
 		}
 	}
-	logsCacheLog.Printf("Loaded %d run records from cached logs JSON", len(runs))
+	logsCacheLog.Printf("Loaded %d run records from cached logs JSONL", len(runs))
 	return runs, nil
 }
 
-func writeCachedLogsJSON(path string, data LogsData, verbose bool) error {
+type cachedLogsJSONLWriter struct {
+	path string
+	mu   sync.Mutex
+}
+
+func newCachedLogsJSONLWriter(path string) *cachedLogsJSONLWriter {
 	if path == "" {
 		return nil
 	}
-	var output bytes.Buffer
-	if err := renderLogsJSONToWriter(&output, data, verbose); err != nil {
-		return fmt.Errorf("failed to render updated cached logs JSON: %w", err)
+	return &cachedLogsJSONLWriter{path: path}
+}
+
+func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
+	if w == nil {
+		return nil
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Writing cached logs JSON file: "+path))
-	if err := os.WriteFile(path, output.Bytes(), constants.FilePermPublic); err != nil {
-		return fmt.Errorf("failed to update cached logs JSON: %w", err)
+	logsData := buildLogsData([]ProcessedRun{run}, "", nil)
+	if len(logsData.Runs) != 1 {
+		return errors.New("failed to build cached logs JSONL record")
 	}
-	logsCacheLog.Printf("Updated cached logs JSON: path=%s", path)
+	record, err := json.Marshal(cachedLogsJSONLRecord{
+		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Run:           logsData.Runs[0],
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal cached logs JSONL record: %w", err)
+	}
+	record = append(record, '\n')
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := os.MkdirAll(filepath.Dir(w.path), constants.DirPermPublic); err != nil {
+		return fmt.Errorf("failed to create cached logs JSONL directory: %w", err)
+	}
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, constants.FilePermSensitive)
+	if err != nil {
+		return fmt.Errorf("failed to open cached logs JSONL: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	if _, err := file.Write(record); err != nil {
+		return fmt.Errorf("failed to append cached logs JSONL: %w", err)
+	}
 	return nil
 }
 
@@ -102,13 +150,13 @@ func normalizeCachedLogRun(run *RunData) error {
 	}
 	attempt, err := strconv.Atoi(run.RunAttempt)
 	if err != nil || attempt <= 0 {
-		return fmt.Errorf("failed to parse cached logs JSON: invalid run_attempt for run %d", run.RunID)
+		return fmt.Errorf("failed to parse cached logs JSONL: invalid run_attempt for run %d", run.RunID)
 	}
 	run.RunAttempt = strconv.Itoa(attempt)
 	return nil
 }
 
-func cachedJSONCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
+func cachedJSONLCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
 	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !audit && !train && !toolGraph
 }
 

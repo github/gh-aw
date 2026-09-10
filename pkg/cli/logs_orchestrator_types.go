@@ -49,7 +49,7 @@ type LogsDownloadOptions struct {
 	ArtifactSets      []string
 	After             string
 	ReportFile        string
-	CachedJSON        string
+	CachedJSONL       string
 	// SuppressRender downloads and processes runs (including writing the summary
 	// file) without emitting any report to stdout. Callers that only need the
 	// downloaded artifacts, and that own stdout themselves, set this so their own
@@ -61,6 +61,7 @@ type LogsDownloadOptions struct {
 	rateLimitFirstRequest  bool
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
+	cachedJSONLWriter      *cachedLogsJSONLWriter
 }
 
 type workflowLogsResult struct {
@@ -99,7 +100,7 @@ type StdinLogsOptions struct {
 	Drain3Weights     string
 	Format            string
 	ReportFile        string
-	CachedJSON        string
+	CachedJSONL       string
 	// ArtifactSets defaults to nil (download all artifacts) when this API is used
 	// programmatically. The CLI passes ["usage"] to match the logs command default.
 	ArtifactSets []string
@@ -167,5 +168,4 @@ type renderLogsOutputOptions struct {
 	suppressRender bool
 	apiRateLimit   *GitHubAPIRateLimitReport
 	apiRateLimits  []*GitHubAPIRateLimitReport
-	cachedJSON     string
 }

@@ -20,7 +20,7 @@ const (
 	defaultMCPLogsToolCount            = 100
 	defaultMCPLogsTimeoutMinutes       = 1
 	mcpLogsRunsPerDefaultTimeoutMinute = 40
-	mcpLogsGatewayDeadlineMargin       = 5 * time.Second
+	mcpLogsGatewayDeadlineMargin       = time.Minute
 	// defaultMCPLogsMinTimeoutMinutesAllWorkflows is the minimum timeout (in minutes)
 	// used when no workflow_name filter is provided.  Querying all workflow runs at once
 	// requires a single GitHub API call rather than a workflow-scoped call, but for
@@ -156,7 +156,7 @@ func effectiveMCPLogsToolSoftTimeoutSeconds(ctx context.Context, timeoutMinutes 
 	}
 	softTimeout := time.Until(deadline) - mcpLogsGatewayDeadlineMargin
 	if softTimeout <= 0 {
-		return 0, false
+		return 1, true
 	}
 	if softTimeout >= time.Duration(timeoutMinutes)*time.Minute {
 		return 0, false

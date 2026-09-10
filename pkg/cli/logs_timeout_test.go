@@ -90,17 +90,28 @@ func TestEffectiveMCPLogsToolSoftTimeoutSeconds(t *testing.T) {
 		}
 	})
 
-	t.Run("gateway deadline below CLI timeout returns safety margin", func(t *testing.T) {
+	t.Run("gateway deadline below CLI timeout reserves one minute", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		got, ok := effectiveMCPLogsToolSoftTimeoutSeconds(ctx, 5)
+		got, ok := effectiveMCPLogsToolSoftTimeoutSeconds(ctx, 10)
 		if !ok {
 			t.Fatal("expected soft timeout when gateway deadline is shorter than CLI timeout")
 		}
-		if got < 50 || got > 54 {
-			t.Fatalf("soft timeout = %d seconds, want between 50 and 54 seconds", got)
+		if got < 238 || got > 240 {
+			t.Fatalf("soft timeout = %d seconds, want approximately 240 seconds", got)
+		}
+	})
+
+	t.Run("short gateway deadline stops immediately", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		got, ok := effectiveMCPLogsToolSoftTimeoutSeconds(ctx, 5)
+		if !ok || got != 1 {
+			t.Fatalf("soft timeout = (%d, %v), want (1, true)", got, ok)
 		}
 	})
 

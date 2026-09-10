@@ -46,6 +46,7 @@ type processWorkflowRunBatchOptions struct {
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
 	cachedRuns             cachedLogsRuns
+	cachedJSONLWriter      *cachedLogsJSONLWriter
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -57,11 +58,11 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
-	cachedRuns, err := loadCachedLogsJSON(opts.CachedJSON)
+	cachedRuns, err := loadCachedLogsJSONL(opts.CachedJSONL)
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
-	if !cachedJSONCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
 	if err := prepareLogsDownloadOutput(ctx, opts); err != nil {
@@ -300,6 +301,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		storageLimit:           runtime.storageLimit,
 		maxGitHubAPIRateLimit:  opts.MaxGitHubAPIRateLimit,
 		cachedRuns:             runtime.cachedRuns,
+		cachedJSONLWriter:      opts.cachedJSONLWriter,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	// Only mark this batch as storage-limit-truncated when one of its own
@@ -558,6 +560,9 @@ func appendProcessedWorkflowRuns(
 		}
 		processedRuns = append(processedRuns, processedRun)
 		batchProcessed++
+		if err := opts.cachedJSONLWriter.Append(processedRun); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+		}
 	}
 	return processedRuns, batchProcessed, storageLimitReached
 }
@@ -661,15 +666,12 @@ func handleEmptyProcessedRuns(
 	if len(processedRuns) > 0 {
 		return false, nil
 	}
-	if opts.JSONOutput || opts.CachedJSON != "" {
+	if opts.JSONOutput {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, continuation)
 		logsData.Continuations = continuations
 		logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 		logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 		logsData.Message = noRunsMessage(opts.StartDate, timeoutReached, storageLimitReached)
-		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
-			return true, err
-		}
 		if opts.JSONOutput {
 			if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 				return true, fmt.Errorf("failed to render JSON output: %w", err)

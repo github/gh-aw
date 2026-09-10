@@ -93,7 +93,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs -v                        # Verbose compact output (extra columns + sections)
   %[1]s logs --json                    # JSON format (compact by default, use -v for full)
   %[1]s logs --json -v                 # Full JSON with audit metadata
-  %[1]s logs --cached-json logs.json   # Reuse matching records and update the file in place
+  %[1]s logs --cached-jsonl logs.jsonl # Reuse matching records and append new results immediately
   %[1]s logs --format tsv              # Tab-separated (minimal, raw data)
   %[1]s logs --format console          # Decorated console tables (human-friendly)
   %[1]s logs --format markdown         # Cross-run security audit report (Markdown)
@@ -150,9 +150,8 @@ By default, only the compact usage artifact is downloaded (token usage, run meta
 Use --artifacts all to download all artifacts, or specify individual sets such as
 --artifacts agent,firewall to fetch only what you need.
 
-Use --cached-json with JSON output from an earlier logs command to reuse matching run
-records without downloading and processing their artifacts again. The file is overwritten
-with the updated logs JSON response. Aggregate analysis may be approximate when compact
+Use --cached-jsonl to reuse matching run records without downloading and processing their
+artifacts again. New results are appended immediately as JSON Lines. Aggregate analysis may be approximate when compact
 cached records omit detailed data.
 
 All available artifact sets: %s.
@@ -252,7 +251,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		Format:            values.Format,
 		ReportFile:        values.ReportFile,
 		ArtifactSets:      values.ArtifactSets,
-		CachedJSON:        values.CachedJSON,
+		CachedJSONL:       values.CachedJSONL,
 	}, nil
 }
 
@@ -392,9 +391,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 	if last, _ := cmd.Flags().GetInt("last"); last > 0 {
 		count = last
 	}
-	startDate, _ := cmd.Flags().GetString("start-date")
-	endDate, _ := cmd.Flags().GetString("end-date")
-	startDate, endDate, err := resolveLogsDateRange(startDate, endDate, time.Now())
+	startDate, endDate, err := resolveLogsDateRange(getStringFlag(cmd, "start-date"), getStringFlag(cmd, "end-date"), time.Now())
 	if err != nil {
 		return LogsDownloadOptions{}, err
 	}
@@ -432,7 +429,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		Format:                getStringFlag(cmd, "format"),
 		ReportFile:            getStringFlag(cmd, "report-file"),
 		ArtifactSets:          getStringSliceFlag(cmd, "artifacts"),
-		CachedJSON:            getStringFlag(cmd, "cached-json"),
+		CachedJSONL:           getStringFlag(cmd, "cached-jsonl"),
 	}
 	options.IgnoreWorkflowRuns, err = parseIgnoredWorkflowRunIDs(getStringSliceFlag(cmd, "ignore-workflow-runs"))
 	if err != nil {
@@ -636,7 +633,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("drain3-weights", "", "Path to existing Drain3 weights JSON used to seed log pattern training")
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
-	logsCmd.Flags().String("cached-json", "", "Path to previous logs JSON output to reuse for matching runs and overwrite with the updated response")
+	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse for matching runs and append new results immediately")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
 	logsCmd.Flags().StringSlice("artifacts", []string{"usage"}, "Artifact sets to download (default: usage — compact summary for faster downloads). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")

@@ -8,11 +8,11 @@
 
 ### Context
 
-The `gh aw logs` command currently recomputes run records by downloading and processing artifacts even when equivalent `logs --json` output from an earlier run already exists. This PR adds a new `--cached-json` input, threads it through both standard and stdin-based log collection flows, and rebuilds report output from a mix of reused cached records and newly processed runs. The diff shows strict cache-safety checks around run identity, completion state, attempt, repository, conclusion, and update time, plus explicit fallbacks when requested filters require artifact-level evidence not preserved in compact JSON. The repository needs a documented decision on whether prior JSON output is an acceptable cache source for logs analysis and reporting.
+The `gh aw logs` command currently recomputes run records by downloading and processing artifacts even when equivalent cached run data already exists. This PR adds a new `--cached-jsonl` input, threads it through both standard and stdin-based log collection flows, and rebuilds report output from a mix of reused cached records and newly processed runs. The diff shows strict cache-safety checks around run identity, completion state, attempt, repository, conclusion, and update time, plus explicit fallbacks when requested filters require artifact-level evidence not preserved in compact JSONL records. The repository needs a documented decision on whether prior JSONL output is an acceptable cache source for logs analysis and reporting.
 
 ### Decision
 
-We will allow `gh aw logs` to reuse prior `--json` output as a cache source when a cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSON retains. When reuse is valid, the command will preserve cached run records in rebuilt JSON output, recompute aggregate totals from the combined cached and newly processed data, and overwrite the file passed to `--cached-json` with the updated JSON response.
+We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current workflow run and requested analysis mode. The implementation will only reuse completed runs with matching run ID, repository, attempt, conclusion, and update timestamp, and it will disable cached reuse for artifact-dependent filters or analysis modes that require richer evidence than compact JSONL retains. Each newly processed run is appended immediately as one schema-versioned JSON Lines record so concurrent collectors do not overwrite one another and completed work survives interruption. Records with older or newer incompatible schema versions are ignored.
 
 ### Alternatives Considered
 
@@ -39,10 +39,10 @@ The project could have created a separate opaque cache artifact tailored specifi
 #### Negative
 - The logs pipeline becomes more complex because download, stdin, filtering, and aggregation paths must all account for cached records.
 - Aggregate values may be approximate when compact cached JSON omits detailed evidence that richer artifact processing would have produced.
-- Users must understand when `--cached-json` is ignored due to incompatible filters or analysis modes.
+- Users must understand when `--cached-jsonl` is ignored due to incompatible filters or analysis modes.
 
 #### Neutral
-- `LogsDownloadOptions`, `StdinLogsOptions`, and related orchestration types now carry a `CachedJSON` field through multiple entry points.
+- `LogsDownloadOptions`, `StdinLogsOptions`, and related orchestration types carry a `CachedJSONL` field through multiple entry points.
 - Report aggregation now has a separate path for accumulating totals from cached `RunData` values.
 - The feature relies on previous JSON output remaining parseable and structurally compatible with the current `LogsData` schema.
 
