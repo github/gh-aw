@@ -33,7 +33,7 @@ type cachedWorkflowRunsRequest struct {
 type cachedLogsJSONLRecord struct {
 	SchemaVersion int                        `json:"schema_version"`
 	Kind          string                     `json:"kind,omitempty"`
-	Run           RunData                    `json:"run,omitzero"`
+	Run           *RunData                   `json:"run,omitempty"`
 	Request       *cachedWorkflowRunsRequest `json:"request,omitempty"`
 	Payload       json.RawMessage            `json:"payload,omitempty"`
 }
@@ -73,31 +73,45 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 			}
 			return nil, fmt.Errorf("failed to parse cached logs JSONL record %d: %w", index+1, err)
 		}
-		if record.SchemaVersion != 1 && record.SchemaVersion != cachedLogsJSONLSchemaVersion {
-			logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", index+1, record.SchemaVersion)
-			continue
-		}
-		if record.Kind == cachedLogsJSONLKindWorkflowRuns {
-			if record.SchemaVersion != cachedLogsJSONLSchemaVersion || record.Request == nil || len(record.Payload) == 0 {
-				continue
-			}
-			var runs []WorkflowRun
-			if err := json.Unmarshal(record.Payload, &runs); err != nil {
-				return nil, fmt.Errorf("failed to parse cached workflow runs payload in record %d: %w", index+1, err)
-			}
-			cache.workflowRunLists[record.Request.key()] = append(json.RawMessage(nil), record.Payload...)
-			continue
-		}
-		run := record.Run
-		if err := normalizeCachedLogRun(&run); err != nil {
+		if err := cache.addRecord(record, index+1); err != nil {
 			return nil, err
-		}
-		if run.RunID != 0 {
-			cache.runs[run.RunID] = run
 		}
 	}
 	logsCacheLog.Printf("Loaded %d run records and %d workflow run lists from cached logs JSONL", len(cache.runs), len(cache.workflowRunLists))
 	return cache, nil
+}
+
+func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
+	if record.SchemaVersion != 1 && record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
+		return nil
+	}
+	if record.Kind == cachedLogsJSONLKindWorkflowRuns {
+		if record.SchemaVersion != cachedLogsJSONLSchemaVersion || record.Request == nil || len(record.Payload) == 0 {
+			return nil
+		}
+		var runs []WorkflowRun
+		if err := json.Unmarshal(record.Payload, &runs); err != nil {
+			return fmt.Errorf("failed to parse cached workflow runs payload in record %d: %w", recordNumber, err)
+		}
+		key, err := record.Request.key()
+		if err != nil {
+			return fmt.Errorf("failed to parse cached workflow runs request in record %d: %w", recordNumber, err)
+		}
+		cache.workflowRunLists[key] = append(json.RawMessage(nil), record.Payload...)
+		return nil
+	}
+	if record.Run == nil {
+		return nil
+	}
+	run := *record.Run
+	if err := normalizeCachedLogRun(&run); err != nil {
+		return err
+	}
+	if run.RunID != 0 {
+		cache.runs[run.RunID] = run
+	}
+	return nil
 }
 
 type cachedLogsJSONLWriter struct {
@@ -120,10 +134,11 @@ func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
 	if len(logsData.Runs) != 1 {
 		return errors.New("failed to build cached logs JSONL record")
 	}
+	runData := logsData.Runs[0]
 	record, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
 		Kind:          cachedLogsJSONLKindRun,
-		Run:           logsData.Runs[0],
+		Run:           &runData,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal cached logs JSONL record: %w", err)
@@ -166,22 +181,23 @@ func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
 	return nil
 }
 
-func (request cachedWorkflowRunsRequest) key() string {
-	var key strings.Builder
-	values := append([]string{request.Host, request.Repository}, request.Args...)
-	for _, value := range values {
-		key.WriteString(strconv.Itoa(len(value)))
-		key.WriteByte(':')
-		key.WriteString(value)
+func (request cachedWorkflowRunsRequest) key() (string, error) {
+	data, err := json.Marshal(request)
+	if err != nil {
+		return "", fmt.Errorf("failed to build cached workflow runs request key: %w", err)
 	}
-	return key.String()
+	return string(data), nil
 }
 
 func (cache *cachedLogsJSONLCache) lookupWorkflowRuns(request cachedWorkflowRunsRequest) (json.RawMessage, bool) {
 	if cache == nil {
 		return nil, false
 	}
-	payload, ok := cache.workflowRunLists[request.key()]
+	key, err := request.key()
+	if err != nil {
+		return nil, false
+	}
+	payload, ok := cache.workflowRunLists[key]
 	return payload, ok
 }
 
