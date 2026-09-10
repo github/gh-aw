@@ -412,6 +412,8 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 	lines := []string{
 		"",
 		"For `awf-enclave enclave_run_agent`, response schemas are constrained by finite-disclosure information budgets, not just `max-output-bytes`.",
+		// Keep these constants aligned with gh-aw-firewall's finite disclosure charge:
+		// RESULT_STATUS_BIT_COST=1 and TIMING_BUCKET_BITS=4.
 		"The charge is 1 status bit + ceil(log2(response schema cardinality)) + 4 timing bits.",
 	}
 	lines = append(lines, repoLines...)

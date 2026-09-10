@@ -169,17 +169,9 @@ func dynamicEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]a
 	accept := []string{"*"}
 	if enclave.Dynamic.Sensitivity != "public" {
 		repos := dynamicEnclaveGitHubGuardRepos(workflowData)
-		accept = make([]string, 0, len(repos))
-		for _, repo := range repos {
-			accept = append(accept, transformRepoPattern(repo))
-		}
+		accept = writeSinkAcceptLabelsForRepos(repos)
 	}
-	return map[string]any{
-		"write-sink": map[string]any{
-			"accept":          accept,
-			"sink-visibility": sinkVisibilityRuntimeExpr,
-		},
-	}
+	return writeSinkGuardPolicy(accept)
 }
 
 // staticEnclaveWriteSinkGuardPolicy builds the write-sink policy required by
@@ -196,10 +188,18 @@ func staticEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]an
 	if len(repos) == 0 {
 		return nil
 	}
+	return writeSinkGuardPolicy(writeSinkAcceptLabelsForRepos(repos))
+}
+
+func writeSinkAcceptLabelsForRepos(repos []string) []string {
 	accept := make([]string, 0, len(repos))
 	for _, repo := range repos {
 		accept = append(accept, transformRepoPattern(repo))
 	}
+	return accept
+}
+
+func writeSinkGuardPolicy(accept []string) map[string]any {
 	return map[string]any{
 		"write-sink": map[string]any{
 			"accept":          accept,
