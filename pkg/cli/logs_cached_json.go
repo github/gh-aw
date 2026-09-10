@@ -89,7 +89,7 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		return nil
 	}
 	if record.Kind == cachedLogsJSONLKindWorkflowRuns {
-		if record.SchemaVersion != cachedLogsJSONLSchemaVersion || record.Request == nil || len(record.Payload) == 0 {
+		if record.Request == nil || len(record.Payload) == 0 {
 			return nil
 		}
 		var runs []WorkflowRun
