@@ -1,6 +1,7 @@
 {
-  "run_date": "2026-09-10T06:41:58Z",
-  "run_id": "34445921179",
+  "run_date": "2026-09-10T12:35:54Z",
+  "run_id": "34477256213",
+  "source": "repo-memory-fallback",
   "summary": {
     "eligible_total": 1,
     "cooldown_skipped": 1,
@@ -52,9 +53,7 @@
   "batches": [
     {
       "id": "workflow-reliability",
-      "prs": [
-        56568
-      ],
+      "prs": [56568],
       "reason": "workflow reliability and PR-creation fallback behavior"
     }
   ],

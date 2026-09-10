@@ -1,6 +1,6 @@
 # PR triage summary
 
-- Run: 2026-09-10T06:41:58Z
+- Run: 2026-09-10T12:35:54Z
 - Eligible PRs: 1
 - Cooldown skipped: 1
 - Categories: bug 1
