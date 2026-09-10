@@ -91,7 +91,11 @@ func resolveFormatWorkflowFiles(workflowIDs []string, workflowDir string, verbos
 	}
 
 	if len(workflowIDs) == 0 {
-		return getMarkdownWorkflowFiles(workflowDir)
+		files, err := getMarkdownWorkflowFiles(workflowDir)
+		if err != nil {
+			return nil, err
+		}
+		return filterMarkdownFilesWithFrontmatter(files)
 	}
 
 	files := make([]string, 0, len(workflowIDs))

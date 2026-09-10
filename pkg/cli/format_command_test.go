@@ -156,6 +156,25 @@ func TestRunFormatFormatsSelectedWorkflow(t *testing.T) {
 	assert.Equal(t, "---\non:\n  workflow_dispatch:\nengine: copilot\n---\n# Body", string(formatted))
 }
 
+func TestRunFormatOnlyFormatsAgenticWorkflowsInDirectory(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	workflowPath := filepath.Join(tempDir, "workflow.md")
+	documentationPath := filepath.Join(tempDir, "documentation.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte("---\nengine: copilot\non: push\n---\n# Body"), 0o644))
+	require.NoError(t, os.WriteFile(documentationPath, []byte("# Documentation\n"), 0o644))
+
+	err := RunFormat(FormatConfig{WorkflowDir: tempDir})
+	require.NoError(t, err)
+
+	formatted, err := os.ReadFile(workflowPath)
+	require.NoError(t, err)
+	assert.Equal(t, "---\non: push\nengine: copilot\n---\n# Body", string(formatted))
+	documentation, err := os.ReadFile(documentationPath)
+	require.NoError(t, err)
+	assert.Equal(t, "# Documentation\n", string(documentation))
+}
+
 func TestNewFormatCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewFormatCommand()
