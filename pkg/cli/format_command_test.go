@@ -110,7 +110,7 @@ func TestNormalizeFrontmatterUsesLogicalThenAlphabeticalFieldOrder(t *testing.T)
 	input := `---
 zzz: last
 steps: []
-engine: copilot
+bbb: middle
 on: workflow_dispatch
 aaa: first
 permissions: read-all
@@ -127,7 +127,7 @@ network: defaults
 		"network:",
 		"steps:",
 		"aaa:",
-		"engine:",
+		"bbb:",
 		"zzz:",
 	}
 	previous := -1
