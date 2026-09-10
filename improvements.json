@@ -1,15 +1,11 @@
 {
-  "last_updated": "2026-09-09",
+  "last_updated": "2026-09-10",
   "pending_tasks": [
     {
-      "file": "pkg/workflow/engine_inline_definition_validation.go",
-      "created": "2026-09-09",
-      "status": "pending"
-    },
-    {
-      "file": ".github/workflows/craft.md",
-      "created": "2026-09-09",
-      "status": "pending"
+      "file": "docs/src/content/docs/reference/mcp-gateway.md",
+      "created": "2026-09-10",
+      "status": "pending",
+      "issue": "Label TOML config examples as mcpg CLI format vs gateway JSON stdin format"
     }
   ]
 }
