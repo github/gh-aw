@@ -48,6 +48,7 @@ const DEFAULT_HTTP_TIMEOUT_MS = 15000;
 
 /** Timeout (ms) for tool invocation calls (may be long-running) */
 const TOOL_CALL_TIMEOUT_MS = 120000;
+const TOOLS_LIST_REQUEST_ID = 3;
 /** Default run count for logs MCP calls when count is not provided (mirrors server default) */
 const LOGS_TOOL_DEFAULT_COUNT = 100;
 /** Number of runs per timeout minute for logs auto-scaling (mirrors server: ceil(count/40)) */
@@ -1155,7 +1156,7 @@ async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey
   if (sessionId) {
     headers["Mcp-Session-Id"] = sessionId;
   }
-  const resp = await httpPostJSON(serverUrl, headers, { jsonrpc: "2.0", id: 3, method: "tools/list" }, DEFAULT_HTTP_TIMEOUT_MS);
+  const resp = await httpPostJSON(serverUrl, headers, { jsonrpc: "2.0", id: TOOLS_LIST_REQUEST_ID, method: "tools/list" }, DEFAULT_HTTP_TIMEOUT_MS);
   const messages = extractJSONRPCMessages(resp.body);
   const resultMessage = messages.find(isResultMessage);
   const result = resultMessage && typeof resultMessage === "object" && "result" in resultMessage && resultMessage.result && typeof resultMessage.result === "object" ? resultMessage.result : null;
