@@ -494,31 +494,45 @@ func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
 		name         string
 		input        string
 		expectedRepo string
+		expectedName string
 	}{
 		{
 			name:         "workflow ID",
 			input:        "githubnext/gh-aw-cao/self-care-open-source-failures",
 			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
 		},
 		{
 			name:         "markdown filename",
 			input:        "githubnext/gh-aw-cao/self-care-open-source-failures.md",
 			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
 		},
 		{
 			name:         "lock filename",
 			input:        "githubnext/gh-aw-cao/self-care-open-source-failures.lock.yml",
 			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
 		},
 		{
 			name:         "full lock path",
 			input:        "githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
 			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
 		},
 		{
-			name:         "GHES full lock path",
+			name:         "matching host full lock path",
+			input:        "github.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
+			expectedRepo: "github.com/githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			// A same-named repository on another host must not inherit the local
+			// workflow display name.
+			name:         "other host full lock path",
 			input:        "github.example.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
 			expectedRepo: "github.example.com/githubnext/gh-aw-cao",
+			expectedName: "self-care-open-source-failures",
 		},
 	}
 
@@ -528,7 +542,7 @@ func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
 			target, err := resolveLogsWorkflowTarget(cmd, tt.input)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedRepo, target.repoOverride)
-			assert.Equal(t, "SelfCare / Open Source Failures", target.workflowName)
+			assert.Equal(t, tt.expectedName, target.workflowName)
 		})
 	}
 

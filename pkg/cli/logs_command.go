@@ -24,6 +24,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/repoutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -690,14 +691,24 @@ func getInt64Flag(cmd *cobra.Command, name string) int64 {
 // repository. It extracts the owner/repo portion (stripping an optional HOST/ prefix),
 // then compares against the GITHUB_REPOSITORY environment variable (set by the MCP
 // server container) and, if that is absent, against the repository detected from the
-// local git checkout via GetCurrentRepoSlug.
+// local git checkout via GetCurrentRepoSlug. When the value carries an explicit host,
+// that host must also match the currently configured GitHub host.
 //
 // This is used by the logs command to decide whether local lock files are authoritative
 // for resolving a workflow display name: they are authoritative only when --repo points
 // to the same repository that is checked out locally.
 func repoIsLocal(repo string) bool {
 	// Strip optional HOST/ prefix (e.g. "github.com/owner/repo" → "owner/repo")
-	ownerRepo, _ := repoutil.NormalizeRepoForAPI(repo)
+	ownerRepo, host := repoutil.NormalizeRepoForAPI(repo)
+
+	// An explicit host must match the host of the current checkout. Otherwise a
+	// same-named repository on another host (e.g. "ghe.example.com/owner/repo"
+	// from a github.com checkout) would incorrectly resolve its workflow display
+	// name from the local lock files.
+	if host != "" && !hostMatchesCurrentGitHubHost(host, ownerRepo) {
+		logsCommandLog.Printf("Explicit host %s does not match the current GitHub host, treating repo as remote: %s", host, repo)
+		return false
+	}
 
 	// Fast path: GITHUB_REPOSITORY is always the current repo in MCP server containers.
 	if envRepo := os.Getenv("GITHUB_REPOSITORY"); envRepo != "" { //nolint:osgetenvlibrary
@@ -711,6 +722,16 @@ func repoIsLocal(repo string) bool {
 		return false
 	}
 	return strings.EqualFold(ownerRepo, currentRepo)
+}
+
+// hostMatchesCurrentGitHubHost reports whether an explicit host from a
+// "HOST/owner/repo" target refers to the same GitHub host the CLI is currently
+// configured for. Hosts are compared by domain so that "github.com" and
+// "https://github.com/" are treated as equal.
+func hostMatchesCurrentGitHubHost(host, ownerRepo string) bool {
+	targetDomain := stringutil.ExtractDomainFromURL(host)
+	currentDomain := stringutil.ExtractDomainFromURL(getGitHubHostForRepo(ownerRepo))
+	return targetDomain != "" && strings.EqualFold(targetDomain, currentDomain)
 }
 
 // validateReportFileFlags returns an error if --report-file is combined with an
