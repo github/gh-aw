@@ -42,8 +42,11 @@ func DownloadWorkflowLogsForTargets(
 		return err
 	}
 
+	checkpoints := startLogsCheckpointWriter(opts, logsCheckpointInterval)
+	defer checkpoints.Stop()
 	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, logsTargetRateLimitHosts(targets))
-	results := collectLogsTargets(ctx, opts, targets)
+	results := collectLogsTargets(ctx, opts, targets, checkpoints)
+	checkpoints.Stop()
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
 	for _, err := range allErrors {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))
@@ -106,7 +109,7 @@ func logsTargetRateLimitHosts(targets []logsWorkflowTarget) []string {
 	return hosts
 }
 
-func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets []logsWorkflowTarget) []logsTargetResult {
+func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets []logsWorkflowTarget, checkpoints *logsCheckpointWriter) []logsTargetResult {
 	resultChannel := make(chan logsTargetResult, len(targets))
 	var wg sync.WaitGroup
 	workerCount := min(len(targets), getMaxConcurrentWorkflowDownloads())
@@ -151,6 +154,11 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 			targetOpts.rateLimitFirstRequest = true
 			targetOpts.maxConcurrentDownloads = perTargetDownloads
 			targetOpts.storageLimit = storageLimit
+			if checkpoints != nil {
+				targetOpts.checkpoint = func(runs []ProcessedRun) {
+					checkpoints.UpdateTarget(target.displayName(), runs)
+				}
+			}
 			result, err := collectWorkflowLogsForTarget(ctx, targetOpts)
 			resultChannel <- logsTargetResult{target: target, result: result, err: err}
 		})

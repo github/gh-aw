@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/constants"
 )
 
 type cachedLogsRuns map[int64]RunData
@@ -57,7 +56,7 @@ func writeCachedLogsJSON(path string, data LogsData, verbose bool) error {
 		return fmt.Errorf("failed to render updated cached logs JSON: %w", err)
 	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Writing cached logs JSON file: "+path))
-	if err := os.WriteFile(path, output.Bytes(), constants.FilePermPublic); err != nil {
+	if err := writeFileAtomically(path, output.Bytes()); err != nil {
 		return fmt.Errorf("failed to update cached logs JSON: %w", err)
 	}
 	logsCacheLog.Printf("Updated cached logs JSON: path=%s", path)

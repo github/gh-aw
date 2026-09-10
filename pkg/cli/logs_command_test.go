@@ -110,6 +110,8 @@ func TestNewLogsCommand(t *testing.T) {
 	require.NotNil(t, pruneOlderRunsFlag, "Should have 'prune-older-runs' flag")
 	cachedJSONFlag := flags.Lookup("cached-json")
 	require.NotNil(t, cachedJSONFlag, "Should have 'cached-json' flag")
+	cachedLogsFlag := flags.Lookup("cached-logs")
+	require.NotNil(t, cachedLogsFlag, "Should have 'cached-logs' flag")
 	assert.Contains(t, cachedJSONFlag.Usage, "previous logs JSON")
 	drain3WeightsFlag := flags.Lookup("drain3-weights")
 	require.NotNil(t, drain3WeightsFlag, "Should have 'drain3-weights' flag")
@@ -138,6 +140,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"max-storage", "0"},
 		{"prune-older-runs", "false"},
 		{"cached-json", ""},
+		{"cached-logs", ""},
 		{"drain3-weights", ""},
 	}
 
@@ -172,6 +175,26 @@ func TestLogsCommandCachedJSONOption(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "previous.json", opts.CachedJSON)
+}
+
+func TestLogsCommandCachedLogsOption(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("cached-logs", "current.json"))
+
+	opts, err := loadCommonLogsOptions(cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, "current.json", opts.CachedJSON)
+}
+
+func TestLogsCommandRejectsConflictingCachedLogsOptions(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("cached-logs", "current.json"))
+	require.NoError(t, cmd.Flags().Set("cached-json", "previous.json"))
+
+	_, err := loadCommonLogsOptions(cmd)
+
+	require.ErrorContains(t, err, "must reference the same file")
 }
 
 func TestLogsCommandDrain3WeightsOption(t *testing.T) {
