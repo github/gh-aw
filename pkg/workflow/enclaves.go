@@ -349,7 +349,7 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 		return err
 	}
 	if warning := staticEnclaveGitHubScopeOverrideWarning(workflowData); warning != "" {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
 	}
 	return nil
 }
