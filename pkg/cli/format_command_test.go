@@ -105,6 +105,39 @@ engine: copilot
 	assert.True(t, strings.HasSuffix(formatted, "\n# Body"))
 }
 
+func TestNormalizeFrontmatterUsesLogicalThenAlphabeticalFieldOrder(t *testing.T) {
+	t.Parallel()
+	input := `---
+zzz: last
+steps: []
+engine: copilot
+on: workflow_dispatch
+aaa: first
+permissions: read-all
+network: defaults
+---
+`
+
+	formatted, err := normalizeFrontmatter(input)
+	require.NoError(t, err)
+
+	expectedOrder := []string{
+		"on:",
+		"permissions:",
+		"network:",
+		"steps:",
+		"aaa:",
+		"engine:",
+		"zzz:",
+	}
+	previous := -1
+	for _, field := range expectedOrder {
+		index := strings.Index(formatted, field)
+		require.Greater(t, index, previous, "%s was not in logical/alphabetical order:\n%s", field, formatted)
+		previous = index
+	}
+}
+
 func TestRunFormatFormatsSelectedWorkflow(t *testing.T) {
 	t.Parallel()
 	tempDir := t.TempDir()

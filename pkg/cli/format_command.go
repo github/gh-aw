@@ -203,7 +203,7 @@ func normalizeFrontmatter(content string) (string, error) {
 	if root.Kind != yaml.MappingNode {
 		return "", errors.New("frontmatter must be a YAML mapping")
 	}
-	orderYAMLMapping(root, true)
+	orderYAMLMapping(root, constants.PriorityWorkflowFields)
 
 	var output bytes.Buffer
 	encoder := yaml.NewEncoder(&output)
@@ -249,7 +249,7 @@ func splitFrontmatterForFormatting(content string) (string, string, error) {
 	return "", "", errors.New("frontmatter not properly closed")
 }
 
-func orderYAMLMapping(node *yaml.Node, topLevel bool) {
+func orderYAMLMapping(node *yaml.Node, priorityFields []string) {
 	if node.Kind == yaml.MappingNode {
 		type pair struct {
 			key   *yaml.Node
@@ -260,7 +260,7 @@ func orderYAMLMapping(node *yaml.Node, topLevel bool) {
 			pairs = append(pairs, pair{key: node.Content[i], value: node.Content[i+1]})
 		}
 		slices.SortStableFunc(pairs, func(a, b pair) int {
-			return compareYAMLKeys(a.key.Value, b.key.Value, topLevel)
+			return compareYAMLKeys(a.key.Value, b.key.Value, priorityFields)
 		})
 		node.Content = node.Content[:0]
 		for _, item := range pairs {
@@ -269,14 +269,14 @@ func orderYAMLMapping(node *yaml.Node, topLevel bool) {
 	}
 
 	for _, child := range node.Content {
-		orderYAMLMapping(child, false)
+		orderYAMLMapping(child, nil)
 	}
 }
 
-func compareYAMLKeys(a, b string, topLevel bool) int {
-	if topLevel {
-		aIndex := slices.Index(constants.PriorityWorkflowFields, a)
-		bIndex := slices.Index(constants.PriorityWorkflowFields, b)
+func compareYAMLKeys(a, b string, priorityFields []string) int {
+	if len(priorityFields) > 0 {
+		aIndex := slices.Index(priorityFields, a)
+		bIndex := slices.Index(priorityFields, b)
 		switch {
 		case aIndex >= 0 && bIndex >= 0:
 			return aIndex - bIndex
