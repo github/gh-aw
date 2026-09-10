@@ -25,8 +25,8 @@ type skillRefUpdateResolver func(ctx context.Context, repo, currentRef string, a
 const noObjectKey = ""
 
 type frontmatterRefUpdate struct {
-	old string
-	new string
+	old         string
+	replacement string
 }
 
 func updateSkillRefsInContent(ctx context.Context, content string, allowMajor, verbose bool, coolDown time.Duration) (bool, string, error) {
@@ -92,7 +92,7 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 				return false, content, err
 			}
 			if updated {
-				updates = append(updates, frontmatterRefUpdate{old: typed, new: updatedRef})
+				updates = append(updates, frontmatterRefUpdate{old: typed, replacement: updatedRef})
 				changed = true
 			}
 		case map[string]any:
@@ -108,7 +108,7 @@ func updateFrontmatterRepoRefsInContentWithResolver(
 				return false, content, err
 			}
 			if updated {
-				updates = append(updates, frontmatterRefUpdate{old: skillRef, new: updatedRef})
+				updates = append(updates, frontmatterRefUpdate{old: skillRef, replacement: updatedRef})
 				changed = true
 			}
 		}
@@ -172,7 +172,7 @@ func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, re
 	prefix := line[:valueEnd]
 	for _, update := range updates {
 		if strings.Contains(prefix, update.old) {
-			prefix = strings.Replace(prefix, update.old, update.new, 1)
+			prefix = strings.Replace(prefix, update.old, update.replacement, 1)
 			remaining--
 		}
 	}
@@ -181,21 +181,40 @@ func replaceFrontmatterRefValues(line string, updates []frontmatterRefUpdate, re
 
 func yamlValueEnd(line string) int {
 	var quote byte
-	for i := range len(line) {
-		switch line[i] {
-		case '\'', '"':
-			if quote == 0 {
-				quote = line[i]
-			} else if quote == line[i] && (i == 0 || line[i-1] != '\\') {
-				quote = 0
+	for i := 0; i < len(line); {
+		current := line[i]
+		if quote == 0 {
+			switch current {
+			case '\'', '"':
+				quote = current
+			case '#':
+				if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
+					return i
+				}
 			}
-		case '#':
-			if quote == 0 && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t') {
-				return i
-			}
+			i++
+			continue
 		}
+		if quote == '\'' && current == '\'' {
+			if i+1 < len(line) && line[i+1] == '\'' {
+				i += 2
+				continue
+			}
+			quote = 0
+		} else if quote == '"' && current == '"' && !isBackslashEscaped(line, i) {
+			quote = 0
+		}
+		i++
 	}
 	return len(line)
+}
+
+func isBackslashEscaped(value string, index int) bool {
+	backslashes := 0
+	for index--; index >= 0 && value[index] == '\\'; index-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
 }
 
 func updateSkillRefValue(

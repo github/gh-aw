@@ -359,6 +359,21 @@ func TestUpgradeTransformsPreserveRandomizedFrontmatterFormatting(t *testing.T) 
 	}
 }
 
+func TestYAMLValueEndHandlesQuotedCommentMarkers(t *testing.T) {
+	t.Parallel()
+
+	for _, line := range []string{
+		`key: 'it''s # still a value' # comment`,
+		`key: "escaped \"# still a value" # comment`,
+		`key: "escaped backslash \\" # comment`,
+	} {
+		comment := strings.LastIndex(line, "# comment")
+		if got := yamlValueEnd(line); got != comment {
+			t.Errorf("yamlValueEnd(%q) = %d, want %d", line, got, comment)
+		}
+	}
+}
+
 // TestUpdateActionRefsInContent_CooldownFallback verifies that
 // updateActionRefsInContentWithDeps falls back to an older cooled-down release
 // when the newest candidate is still within the cooldown window.
