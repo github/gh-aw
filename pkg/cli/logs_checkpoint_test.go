@@ -78,8 +78,9 @@ func TestLogsCheckpointWriterCombinesTargets(t *testing.T) {
 	writer := startLogsCheckpointWriter(LogsDownloadOptions{CachedJSON: cachedJSON}, time.Hour)
 	require.NotNil(t, writer)
 
-	writer.UpdateTarget("first", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 1}}})
-	writer.UpdateTarget("second", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 2}}})
+	createdAt := time.Now()
+	writer.UpdateTarget("first", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 1, CreatedAt: createdAt}}})
+	writer.UpdateTarget("second", []ProcessedRun{{Run: WorkflowRun{DatabaseID: 2, CreatedAt: createdAt.Add(time.Minute)}}})
 	writer.Stop()
 
 	data, err := os.ReadFile(cachedJSON)
@@ -87,6 +88,5 @@ func TestLogsCheckpointWriterCombinesTargets(t *testing.T) {
 	var cached LogsData
 	require.NoError(t, json.Unmarshal(data, &cached))
 	require.Len(t, cached.Runs, 2)
-	runIDs := []int64{cached.Runs[0].RunID, cached.Runs[1].RunID}
-	assert.ElementsMatch(t, []int64{1, 2}, runIDs)
+	assert.Equal(t, []int64{2, 1}, []int64{cached.Runs[0].RunID, cached.Runs[1].RunID})
 }

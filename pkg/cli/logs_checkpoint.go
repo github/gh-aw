@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"cmp"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 )
@@ -50,6 +52,12 @@ func (w *logsCheckpointWriter) UpdateTarget(target string, runs []ProcessedRun) 
 	for _, targetRuns := range w.targets {
 		w.latest = append(w.latest, targetRuns...)
 	}
+	slices.SortStableFunc(w.latest, func(a, b ProcessedRun) int {
+		if order := b.Run.CreatedAt.Compare(a.Run.CreatedAt); order != 0 {
+			return order
+		}
+		return cmp.Compare(b.Run.DatabaseID, a.Run.DatabaseID)
+	})
 }
 
 func (w *logsCheckpointWriter) Stop() {
@@ -60,12 +68,6 @@ func (w *logsCheckpointWriter) Stop() {
 		close(w.stop)
 	})
 	<-w.done
-}
-
-func stopLogsCheckpointWriter(writer *logsCheckpointWriter) {
-	if writer != nil {
-		writer.Stop()
-	}
 }
 
 func (w *logsCheckpointWriter) run(summaryPath, cachedJSONPath, outputDir string, interval time.Duration, verbose bool) {
