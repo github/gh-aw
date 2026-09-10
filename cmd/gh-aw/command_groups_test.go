@@ -34,6 +34,7 @@ func TestCommandGroupAssignments(t *testing.T) {
 		{name: "validate command in development group", commandName: "validate", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "mcp command in development group", commandName: "mcp", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "fix command in development group", commandName: "fix", expectedGroup: "development", shouldHaveGroup: true},
+		{name: "format command in development group", commandName: "format", expectedGroup: "development", shouldHaveGroup: true},
 		{name: "domains command in development group", commandName: "domains", expectedGroup: "development", shouldHaveGroup: true},
 
 		// Execution Commands
