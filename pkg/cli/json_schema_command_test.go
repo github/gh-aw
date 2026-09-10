@@ -95,22 +95,34 @@ func TestJSONSchemaCommand(t *testing.T) {
 		{
 			name:       "logs-jsonl",
 			schemaName: "logs-jsonl",
-			oneOfCount: 2,
+			oneOfCount: 3,
 			validOutput: []any{
+				cachedLogsJSONLLegacyRunItemSchema{
+					SchemaVersion: 1,
+					Run:           RunData{RunID: 41},
+				},
 				cachedLogsJSONLRunItemSchema{
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
 					Kind:          cachedLogsJSONLKindRun,
 					Run:           RunData{RunID: 42},
 				},
-				cachedLogsJSONLWorkflowRunsItemSchema{
-					SchemaVersion: cachedLogsJSONLSchemaVersion,
-					Kind:          cachedLogsJSONLKindWorkflowRuns,
-					Request: cachedWorkflowRunsRequest{
+				map[string]any{
+					"schema_version": cachedLogsJSONLSchemaVersion,
+					"kind":           cachedLogsJSONLKindWorkflowRuns,
+					"request": cachedWorkflowRunsRequest{
 						Host:       "github.com",
 						Repository: "github/gh-aw",
 						Args:       []string{"run", "list"},
 					},
-					Payload: []WorkflowRun{{DatabaseID: 42}},
+					"payload": []any{map[string]any{
+						"databaseId": 42, "number": 7,
+						"url":    "https://github.com/github/gh-aw/actions/runs/42",
+						"status": "completed", "conclusion": "success", "workflowName": "Daily report",
+						"createdAt": "2026-09-01T10:00:00Z", "startedAt": "2026-09-01T10:00:01Z",
+						"updatedAt": "2026-09-01T10:02:00Z", "event": "schedule", "headBranch": "main",
+						"headSha": "abc123", "displayTitle": "Daily report", "attempt": 1,
+						"futureField": map[string]any{"nested": true},
+					}},
 				},
 			},
 		},

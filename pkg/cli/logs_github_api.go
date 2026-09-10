@@ -441,8 +441,8 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	}
 
 	var output []byte
-	_, cacheHit := opts.CachedJSONLCache.lookupWorkflowRuns(request)
-	if cached, ok := opts.CachedJSONLCache.lookupWorkflowRuns(request); ok {
+	cached, cacheHit := opts.CachedJSONLCache.lookupWorkflowRuns(request)
+	if cacheHit {
 		output = append([]byte(nil), cached...)
 		logsGitHubAPILog.Printf("Using cached workflow runs payload: repository=%s", request.Repository)
 	} else {

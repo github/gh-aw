@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -82,14 +83,41 @@ type cachedLogsJSONLRunItemSchema struct {
 	Run           RunData `json:"run"`
 }
 
+type cachedLogsJSONLLegacyRunItemSchema struct {
+	SchemaVersion int     `json:"schema_version"`
+	Run           RunData `json:"run"`
+}
+
+type cachedWorkflowRunListItemSchema struct {
+	DatabaseID   int64     `json:"databaseId"`
+	Number       int       `json:"number"`
+	URL          string    `json:"url"`
+	Status       string    `json:"status"`
+	Conclusion   string    `json:"conclusion"`
+	WorkflowName string    `json:"workflowName"`
+	CreatedAt    time.Time `json:"createdAt"`
+	StartedAt    time.Time `json:"startedAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	Event        string    `json:"event"`
+	HeadBranch   string    `json:"headBranch"`
+	HeadSha      string    `json:"headSha"`
+	DisplayTitle string    `json:"displayTitle"`
+	Attempt      int       `json:"attempt"`
+}
+
 type cachedLogsJSONLWorkflowRunsItemSchema struct {
-	SchemaVersion int                       `json:"schema_version"`
-	Kind          string                    `json:"kind"`
-	Request       cachedWorkflowRunsRequest `json:"request"`
-	Payload       []WorkflowRun             `json:"payload"`
+	SchemaVersion int                               `json:"schema_version"`
+	Kind          string                            `json:"kind"`
+	Request       cachedWorkflowRunsRequest         `json:"request"`
+	Payload       []cachedWorkflowRunListItemSchema `json:"payload"`
 }
 
 func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
+	legacyRun, err := GenerateOutputSchema[cachedLogsJSONLLegacyRunItemSchema]()
+	if err != nil {
+		return nil, err
+	}
+	legacyRun.Properties["schema_version"].Enum = []any{1}
 	run, err := GenerateOutputSchema[cachedLogsJSONLRunItemSchema]()
 	if err != nil {
 		return nil, err
@@ -103,7 +131,7 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	workflowRuns.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	workflowRuns.Properties["kind"].Enum = []any{cachedLogsJSONLKindWorkflowRuns}
 	workflowRuns.Properties["payload"].Items.AdditionalProperties = &jsonschema.Schema{}
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns}}, nil
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{legacyRun, run, workflowRuns}}, nil
 }
 
 func generateAuditOutputSchema() (*jsonschema.Schema, error) {
