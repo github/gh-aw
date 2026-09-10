@@ -88,7 +88,8 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}
-	if record.Kind == cachedLogsJSONLKindWorkflowRuns {
+	switch record.Kind {
+	case cachedLogsJSONLKindWorkflowRuns:
 		if record.Request == nil || len(record.Payload) == 0 {
 			return nil
 		}
@@ -102,6 +103,11 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 			return fmt.Errorf("failed to parse cached workflow runs request in record %d: %w", recordNumber, err)
 		}
 		cache.workflowRunLists[key] = append(json.RawMessage(nil), record.Payload...)
+		return nil
+	case cachedLogsJSONLKindRateLimit:
+		return nil
+	case cachedLogsJSONLKindRun:
+	default:
 		return nil
 	}
 	if record.Run == nil {

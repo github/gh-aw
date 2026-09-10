@@ -21,11 +21,13 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	first, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Kind:          cachedLogsJSONLKindRun,
 		Run:           &RunData{RunID: 42, WorkflowName: "cached-workflow"},
 	})
 	require.NoError(t, err)
 	second, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Kind:          cachedLogsJSONLKindRun,
 		Run:           &RunData{RunID: 0, WorkflowName: "invalid"},
 	})
 	require.NoError(t, err)
