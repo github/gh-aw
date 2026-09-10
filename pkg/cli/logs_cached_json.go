@@ -98,6 +98,9 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		if err := json.Unmarshal(record.Payload, &runs); err != nil {
 			return fmt.Errorf("failed to parse cached workflow runs payload in record %d: %w", recordNumber, err)
 		}
+		if runs == nil {
+			return fmt.Errorf("failed to parse cached workflow runs payload in record %d: expected an array", recordNumber)
+		}
 		key, err := record.Request.key()
 		if err != nil {
 			return fmt.Errorf("failed to parse cached workflow runs request in record %d: %w", recordNumber, err)
