@@ -333,7 +333,7 @@
         },
         "forcePublicRepos": {
           "type": "boolean",
-          "description": "When true (default), forces the allow-only policy to repos=\"public\" at runtime if the gateway detects it is running in a public repository. Set to false by the compiler when private-to-public-flows: allow is declared in workflow frontmatter, or via MCP_GATEWAY_FORCE_PUBLIC_REPOS=false environment variable. See MCP Gateway Specification section 4.1.3.8.",
+          "description": "When true (default), forces the allow-only policy to repos=\"public\" at runtime if the gateway detects it is running in a public repository. Set to false by the compiler when private-to-public-flows: allow is declared in workflow frontmatter or when the GitHub MCP backend serves only a static agent enclave, or via MCP_GATEWAY_FORCE_PUBLIC_REPOS=false environment variable. See MCP Gateway Specification section 4.1.3.8.",
           "default": true
         },
         "sinkVisibilityExemptServers": {

@@ -61,6 +61,10 @@ enclaves:
 - GraphQL, search, writes, and every other GitHub tool remain denied.
 - The minimum supported versions are AWF `v0.28.9` (or `v0.28.14` when using `trusted`) and mcpg `v0.4.15`.
 
+Set `tools.github: false` so the GitHub MCP server is rendered for the enclave identity only. When primary-agent GitHub access is disabled, the compiler emits `"forcePublicRepos": false` in the gateway config: the gateway's runtime public-repos override would otherwise rewrite the enclave's allow-only scope to `repos: "public"` in a public repository, silently discarding `allowed-repos` and leaving the enclave with nothing to read. Disclosure stays bounded by the enclave's sensitivity ledger, `max-output-bytes`, and `max-invocations`, and safe outputs keep their explicit `sink-visibility` enforcement.
+
+If the primary agent also enables GitHub MCP access (`tools.github` other than `gh-proxy`), the override must stay on to protect the primary read path, and the compiler warns that the enclave cannot read the declared private repositories in a public repository.
+
 ## Dynamic agent repository policies
 
 Agent enclaves can admit one repository per invocation at runtime without listing every repository in frontmatter. Dynamic entries use the same `awf-enclave` MCP backend, but replace static `repos` with a closed compiler-owned policy envelope:

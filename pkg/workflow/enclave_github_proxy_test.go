@@ -375,6 +375,46 @@ Read the private repository's issues through the enclave.
 	assert.Contains(t, lock, `"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}":{"servers":["github"],"tools":{"github":["list_issues","issue_read"]},"allow-only":{"min-integrity":"none","repos":["octo-org/private-service"]}}`)
 	assert.Contains(t, lock, `export GH_AW_MCP_GITHUB_CHECK_AGENT_ID="${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"`)
 	assert.NotContains(t, lock, `"${MCP_GATEWAY_AGENT_ID}":{"servers":["awf-enclave","github"`)
+
+	// The gateway's runtime forcePublicRepos override would rewrite the enclave's
+	// allow-only scope to repos="public" in a public repository, discarding
+	// allowed-repos and leaving the enclave with nothing to read.
+	assert.Contains(t, lock, `"forcePublicRepos": false`)
+}
+
+// TestBuildMCPGatewayConfigForcePublicReposForStaticEnclave verifies that the gateway's
+// runtime public-repos override is disabled when the GitHub MCP server exists solely to
+// serve a static enclave agent identity, and left at its default when the primary agent
+// also has GitHub MCP access.
+func TestBuildMCPGatewayConfigForcePublicReposForStaticEnclave(t *testing.T) {
+	t.Run("enclave-only GitHub backend disables the override", func(t *testing.T) {
+		data := enclaveGitHubToolsWorkflowData()
+		delete(data.Tools, "github")
+		data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
+
+		cfg := buildMCPGatewayConfig(data)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.ForcePublicRepos, "ForcePublicRepos must be set for an enclave-only GitHub backend")
+		assert.False(t, *cfg.ForcePublicRepos)
+	})
+
+	t.Run("primary GitHub access keeps the override enabled", func(t *testing.T) {
+		data := enclaveGitHubToolsWorkflowData()
+		data.Tools["github"] = map[string]any{}
+
+		cfg := buildMCPGatewayConfig(data)
+		require.NotNil(t, cfg)
+		assert.Nil(t, cfg.ForcePublicRepos, "ForcePublicRepos must stay at the gateway default when the primary agent reads GitHub")
+	})
+
+	t.Run("workflows without enclaves keep the override enabled", func(t *testing.T) {
+		data := enclaveWorkflowData(true, false, 120, 0)
+		data.Tools["github"] = map[string]any{}
+
+		cfg := buildMCPGatewayConfig(data)
+		require.NotNil(t, cfg)
+		assert.Nil(t, cfg.ForcePublicRepos)
+	})
 }
 
 func TestGitHubGuardPoliciesFromStepSkipsEnclaveOnlyBackend(t *testing.T) {
@@ -435,4 +475,29 @@ func TestEnclaveGitHubToolsVersionGates(t *testing.T) {
 	err = validateEnclavesConfig(data)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), string(constants.MCPGEnclaveAgentToolsMinVersion))
+}
+
+// TestStaticEnclaveGitHubScopeOverrideWarning verifies that combining a static GitHub agent
+// enclave with primary-agent GitHub access is reported at compile time, because the gateway's
+// forcePublicRepos override cannot be disabled without also relaxing the primary read path.
+func TestStaticEnclaveGitHubScopeOverrideWarning(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	delete(data.Tools, "github")
+	data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
+	assert.Empty(t, staticEnclaveGitHubScopeOverrideWarning(data))
+
+	data.Tools["github"] = map[string]any{}
+	assert.Contains(t, staticEnclaveGitHubScopeOverrideWarning(data), "static GitHub agent enclave is combined with primary 'tools.github'")
+
+	assert.Empty(t, staticEnclaveGitHubScopeOverrideWarning(enclaveWorkflowData(true, false, 120, 0)))
+}
+
+func TestStaticEnclaveGitHubScopeOverrideWarningIncrementsWarningCount(t *testing.T) {
+	compiler := NewCompiler()
+	data := enclaveGitHubToolsWorkflowData()
+	data.Tools["github"] = map[string]any{}
+
+	require.NoError(t, compiler.validateCoreToolConfiguration(data, ""))
+
+	assert.Equal(t, 1, compiler.GetWarningCount())
 }

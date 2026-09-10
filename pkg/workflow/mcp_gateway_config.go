@@ -218,6 +218,21 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 		}
 	}
 
+	// A static GitHub agent enclave is the mechanism that makes private-to-public
+	// disclosure safe: reads happen inside an isolated executor and are bounded by the
+	// sensitivity ledger, max-output-bytes and max-invocations. When the GitHub MCP
+	// server is rendered solely to serve that enclave identity, the gateway's runtime
+	// forcePublicRepos override would rewrite the enclave's allow-only scope to
+	// repos="public" in a public repository, silently discarding the configured
+	// allowed-repos and leaving the enclave with nothing to read. Disable the override
+	// for that case: the primary agent has no GitHub read path at all here, and every
+	// write-sink guard policy emitted for this configuration carries an explicit
+	// sink-visibility, so safe-outputs enforcement is unaffected.
+	if forcePublicRepos == nil && githubBackendIsStaticEnclaveDelegationOnly(workflowData) {
+		falseVal := false
+		forcePublicRepos = &falseVal
+	}
+
 	config := &MCPGatewayRuntimeConfig{
 		Port:                        int(DefaultMCPGatewayPort),                       // Will be formatted as "${MCP_GATEWAY_PORT}" in renderer
 		Domain:                      "${MCP_GATEWAY_DOMAIN}",                          // Gateway variable expression

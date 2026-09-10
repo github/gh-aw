@@ -255,7 +255,7 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `keepaliveInterval` | integer | No | Keepalive ping interval in seconds for HTTP MCP backends. Prevents session expiry during long-running tasks. Use `-1` to disable, `0` or unset for gateway default (1500s = 25 min), or a positive integer for a custom interval. |
 | `sessionTimeout` | string | No | Session timeout for MCP gateway sessions as a Go duration string (e.g. `"30m"`, `"4h"`, `"24h"`). Empty or omitted uses the gateway default (6h). Must be at least 5m when set by the workflow compiler (no upper bound; infrastructure operators may override via `MCP_GATEWAY_SESSION_TIMEOUT` env var). |
 | `opentelemetry` | object | No | OpenTelemetry configuration for emitting distributed tracing events for MCP calls. See Section 4.1.3.7 for details. |
-| `forcePublicRepos` | boolean | No | When `true` (default), forces the allow-only policy to `repos="public"` at runtime if the gateway detects it is running in a public repository. When `false`, disables this override — set by the compiler when `private-to-public-flows: allow` is declared in workflow frontmatter. See Section 4.1.3.8 for details. |
+| `forcePublicRepos` | boolean | No | When `true` (default), forces the allow-only policy to `repos="public"` at runtime if the gateway detects it is running in a public repository. When `false`, disables this override — set by the compiler for `private-to-public-flows: allow` or an enclave-only static GitHub agent backend. See Section 4.1.3.8 for details. |
 | `sinkVisibilityExemptServers` | array[string] | No | List of server IDs exempt from the default `sink-visibility="public"` enforcement. Use `["*"]` to exempt all servers. Set by the compiler when `private-to-public-flows` lists specific server IDs in workflow frontmatter. See Section 10.9 for details. |
 
 *Exactly one of `agentId` or `agentIds` MUST be specified; the two fields are mutually exclusive. See Section 4.1.3.9.
@@ -578,7 +578,7 @@ When `forcePublicRepos` is `true` (the default), the gateway overrides the compi
 - This override is **skipped** when `GITHUB_REPOSITORY` or the GitHub token is unavailable.
 - API errors during visibility detection result in a non-fatal warning; the gateway/proxy falls back to the compiled policy.
 
-**Opt-out**: Workflow authors who intentionally allow private→public data flows set `private-to-public-flows: allow` in frontmatter (Section 10.9). The compiler translates this to `gateway.forcePublicRepos: false` in the generated gateway JSON stdin config. For proxy mode, launchers should pass `--force-public-repos=false` when they need equivalent opt-out behavior.
+**Opt-out**: Workflow authors who intentionally allow private→public data flows set `private-to-public-flows: allow` in frontmatter (Section 10.9). The compiler translates this to `gateway.forcePublicRepos: false` in the generated gateway JSON stdin config. The compiler also emits `gateway.forcePublicRepos: false` when the GitHub MCP server is rendered solely to serve a static agent enclave identity (`tools.github: false` plus `enclaves[].agent.tools.github`), because the override would otherwise discard the enclave's configured `allowed-repos`. For proxy mode, launchers should pass `--force-public-repos=false` when they need equivalent opt-out behavior.
 
 **Environment variable override**: `MCP_GATEWAY_FORCE_PUBLIC_REPOS=false` disables the override without requiring a config change. The `--force-public-repos` flag defaults to the value of this environment variable (defaulting to `true` when unset).
 
@@ -2331,7 +2331,7 @@ Content-Type: application/json
 - **Added**: Section 4.1.3.8 — `forcePublicRepos` Configuration
   - New optional boolean gateway config field (default: `true`) that forces the allow-only policy to `repos="public"` at runtime when the gateway detects it is running in a public repository
   - Prevents agents from accumulating private-data secrecy tags by restricting repository access at the input side
-  - Set to `false` by the compiler when `private-to-public-flows: allow` is declared in workflow frontmatter
+  - Set to `false` by the compiler when `private-to-public-flows: allow` is declared in workflow frontmatter or when the GitHub MCP backend serves only a static agent enclave
   - Can also be overridden via `MCP_GATEWAY_FORCE_PUBLIC_REPOS=false` environment variable
 - **Added**: `forcePublicRepos` field to the gateway configuration fields table (Section 4.1.3)
 - **Added**: Section 10.8 — Write-Sink Guard Policy (`sink-visibility`)

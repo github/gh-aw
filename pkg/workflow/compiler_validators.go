@@ -269,7 +269,15 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 			return formatCompilerError(markdownPath, "error", err.Error(), err)
 		}
 	}
+	c.validateStaticEnclaveGitHubScopeOverrideWarning(workflowData)
 	return nil
+}
+
+func (c *Compiler) validateStaticEnclaveGitHubScopeOverrideWarning(workflowData *WorkflowData) {
+	if warning := staticEnclaveGitHubScopeOverrideWarning(workflowData); warning != "" {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
+		c.IncrementWarningCount()
+	}
 }
 
 func validateGitHubCLIProxyVersion(workflowData *WorkflowData) error {
