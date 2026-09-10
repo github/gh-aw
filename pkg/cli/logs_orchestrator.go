@@ -298,7 +298,9 @@ func buildContinuationIfNeeded(
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) error {
 	logsOrchestratorLog.Printf("Downloading workflow logs: workflow=%q, count=%d, outputDir=%q", opts.WorkflowName, opts.Count, opts.OutputDir)
-	opts.cachedJSONLWriter = newCachedLogsJSONLWriter(opts.CachedJSONL)
+	if err := prepareCachedLogsJSONL(&opts); err != nil {
+		return err
+	}
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)
 	if err != nil {

@@ -43,10 +43,12 @@ func TestDownloadWorkflowLogsForTargetsConcurrentAndResilient(t *testing.T) {
 	var mu sync.Mutex
 	outputDirs := make(map[string]string)
 	concurrencyLimits := make(map[string]int)
+	cachePointers := make(map[string]*cachedLogsJSONLCache)
 	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
 		mu.Lock()
 		outputDirs[opts.WorkflowName] = opts.OutputDir
 		concurrencyLimits[opts.WorkflowName] = opts.maxConcurrentDownloads
+		cachePointers[opts.WorkflowName] = opts.cachedJSONLCache
 		mu.Unlock()
 		started <- struct{}{}
 		<-release
@@ -70,6 +72,8 @@ func TestDownloadWorkflowLogsForTargetsConcurrentAndResilient(t *testing.T) {
 		}, nil
 	}
 
+	cachedJSONL := filepath.Join(tempDir, "logs.jsonl")
+	require.NoError(t, os.WriteFile(cachedJSONL, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
 	done := make(chan error, 1)
 	go func() {
 		done <- DownloadWorkflowLogsForTargets(context.Background(), LogsDownloadOptions{
@@ -77,6 +81,7 @@ func TestDownloadWorkflowLogsForTargetsConcurrentAndResilient(t *testing.T) {
 			SummaryFile:    "summary.json",
 			ArtifactSets:   []string{"usage"},
 			SuppressRender: true,
+			CachedJSONL:    cachedJSONL,
 		}, []logsWorkflowTarget{
 			{workflowName: "available", repoOverride: "org/repo-a"},
 			{workflowName: "missing", repoOverride: "org/repo-b"},
@@ -98,6 +103,8 @@ func TestDownloadWorkflowLogsForTargetsConcurrentAndResilient(t *testing.T) {
 	assert.Equal(t, filepath.Join(tempDir, "logs", "repo-org-repo-b", "workflow-missing"), outputDirs["missing"])
 	assert.Equal(t, 5, concurrencyLimits["available"], "total download concurrency should be shared across targets")
 	assert.Equal(t, 5, concurrencyLimits["missing"], "total download concurrency should be shared across targets")
+	require.NotNil(t, cachePointers["available"])
+	assert.Same(t, cachePointers["available"], cachePointers["missing"], "targets should share one in-memory JSONL cache")
 	mu.Unlock()
 
 	data, err := os.ReadFile(filepath.Join(tempDir, "logs", "summary.json"))

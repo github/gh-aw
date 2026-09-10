@@ -42,7 +42,9 @@ func DownloadWorkflowLogsForTargets(
 		return err
 	}
 
-	opts.cachedJSONLWriter = newCachedLogsJSONLWriter(opts.CachedJSONL)
+	if err := prepareCachedLogsJSONL(&opts); err != nil {
+		return err
+	}
 	allAPIRateLimits := startGitHubAPIRateLimitReports(ctx, logsTargetRateLimitHosts(targets))
 	results := collectLogsTargets(ctx, opts, targets)
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)

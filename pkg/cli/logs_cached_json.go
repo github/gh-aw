@@ -57,16 +57,17 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached logs JSONL: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found cached logs JSONL file: "+path))
 	lines := bytes.Split(data, []byte{'\n'})
 	cache := &cachedLogsJSONLCache{
 		runs:             make(cachedLogsRuns, len(lines)),
 		workflowRunLists: make(map[string]json.RawMessage),
 	}
+	recordCount := 0
 	for index, line := range lines {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
+		recordCount++
 		var record cachedLogsJSONLRecord
 		if err := json.Unmarshal(line, &record); err != nil {
 			if index == len(lines)-1 {
@@ -79,8 +80,26 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 			return nil, err
 		}
 	}
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf(
+		"Found cached logs JSONL file: %s (lines=%d, runs=%d, workflow_run_lists=%d)",
+		path, recordCount, len(cache.runs), len(cache.workflowRunLists),
+	)))
 	logsCacheLog.Printf("Loaded %d run records and %d workflow run lists from cached logs JSONL", len(cache.runs), len(cache.workflowRunLists))
 	return cache, nil
+}
+
+func prepareCachedLogsJSONL(opts *LogsDownloadOptions) error {
+	if opts.cachedJSONLLoaded {
+		return nil
+	}
+	cache, err := loadCachedLogsJSONL(opts.CachedJSONL)
+	if err != nil {
+		return err
+	}
+	opts.cachedJSONLCache = cache
+	opts.cachedJSONLWriter = newCachedLogsJSONLWriter(opts.CachedJSONL)
+	opts.cachedJSONLLoaded = true
+	return nil
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {

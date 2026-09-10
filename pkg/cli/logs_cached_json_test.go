@@ -50,6 +50,7 @@ func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	})
 
 	assert.Contains(t, stderr, "Found cached logs JSONL file: "+path)
+	assert.Contains(t, stderr, "lines=1, runs=1, workflow_run_lists=0")
 }
 
 func TestLoadCachedLogsJSONIgnoresMissingFile(t *testing.T) {
@@ -101,6 +102,27 @@ func TestCachedLogsJSONLWriterAppendsImmediately(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	first := []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n")
+	require.NoError(t, os.WriteFile(path, first, 0o600))
+	opts := LogsDownloadOptions{CachedJSONL: path}
+
+	require.NoError(t, prepareCachedLogsJSONL(&opts))
+	cache := opts.cachedJSONLCache
+	require.Contains(t, cache.runs, int64(42))
+
+	require.NoError(t, opts.cachedJSONLWriter.Append(ProcessedRun{Run: WorkflowRun{DatabaseID: 43}}))
+	require.NoError(t, prepareCachedLogsJSONL(&opts))
+
+	assert.Same(t, cache, opts.cachedJSONLCache)
+	assert.NotContains(t, opts.cachedJSONLCache.runs, int64(43))
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.True(t, bytes.HasPrefix(data, first))
+	assert.Equal(t, 2, bytes.Count(bytes.TrimSpace(data), []byte{'\n'})+1)
 }
 
 func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {

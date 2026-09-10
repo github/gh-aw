@@ -59,13 +59,9 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if err != nil {
 		return logsDownloadRuntime{}, err
 	}
-	cachedJSONLCache, err := loadCachedLogsJSONL(opts.CachedJSONL)
-	if err != nil {
-		return logsDownloadRuntime{}, err
-	}
 	var cachedRuns cachedLogsRuns
-	if cachedJSONLCache != nil {
-		cachedRuns = cachedJSONLCache.runs
+	if opts.cachedJSONLCache != nil {
+		cachedRuns = opts.cachedJSONLCache.runs
 	}
 	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
@@ -87,7 +83,7 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 		fetchAllInRange:  opts.StartDate != "" || opts.EndDate != "",
 		storageLimit:     storageLimit,
 		cachedRuns:       cachedRuns,
-		cachedJSONLCache: cachedJSONLCache,
+		cachedJSONLCache: opts.cachedJSONLCache,
 		filters: runFilterOpts{
 			engine:            opts.Engine,
 			runtime:           opts.Runtime,
