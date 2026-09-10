@@ -154,7 +154,17 @@ func applyFrontmatterRefUpdates(content string, frontmatterLines []string, field
 		return content, false
 	}
 	updatedFrontmatter := strings.Join(lines, "\n")
-	return strings.Replace(content, originalFrontmatter, updatedFrontmatter, 1), true
+	// Anchor the rewrite to the frontmatter block so identical text in the Markdown body
+	// (for example a documented frontmatter snippet) can never be rewritten instead.
+	firstNewline := strings.IndexByte(content, '\n')
+	if firstNewline < 0 {
+		return content, false
+	}
+	frontmatterStart := firstNewline + 1
+	if !strings.HasPrefix(content[frontmatterStart:], originalFrontmatter) {
+		return content, false
+	}
+	return content[:frontmatterStart] + updatedFrontmatter + content[frontmatterStart+len(originalFrontmatter):], true
 }
 
 func isFrontmatterFieldLine(trimmed, fieldName string) bool {

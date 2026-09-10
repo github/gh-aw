@@ -542,3 +542,32 @@ func TestParseFrontmatterKey(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateSkillRefsInContentOnlyRewritesFrontmatterBlock(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldSHA = "1111111111111111111111111111111111111111"
+		newSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	block := "skills:\n  - githubnext/skills/a@" + oldSHA + "\n"
+	input := "---\n" + block + "---\n\nExample frontmatter:\n\n```yaml\n" + block + "```\n"
+	want := "---\nskills:\n  - githubnext/skills/a@" + newSHA + "\n---\n\nExample frontmatter:\n\n```yaml\n" + block + "```\n"
+
+	resolver := func(_ context.Context, _, currentRef string, _, _ bool, _ time.Duration) (string, error) {
+		if currentRef != oldSHA {
+			return currentRef, nil
+		}
+		return newSHA, nil
+	}
+	changed, got, err := updateSkillRefsInContentWithResolver(context.Background(), input, true, false, 0, resolver)
+	if err != nil {
+		t.Fatalf("updateSkillRefsInContentWithResolver() error = %v", err)
+	}
+	if !changed {
+		t.Fatal("updateSkillRefsInContentWithResolver() changed = false, want true")
+	}
+	if got != want {
+		t.Fatalf("markdown body was rewritten instead of frontmatter\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
