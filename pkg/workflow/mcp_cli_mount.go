@@ -13,6 +13,13 @@ import (
 
 var mcpCLIMountLog = logger.New("workflow:mcp_cli_mount")
 
+const (
+	// Keep these aligned with gh-aw-firewall's finite disclosure charge constants.
+	enclaveResultStatusBitCost = 1
+	enclaveTimingBucketBits    = 4
+	enclaveConfidentialRunBits = 8
+)
+
 // mcp_cli_mount.go generates a workflow step that mounts MCP servers as local CLI tools
 // and produces the prompt section that informs the agent about these tools.
 //
@@ -402,7 +409,9 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 		}
 		switch repo.Sensitivity {
 		case "confidential":
-			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an 8-bit per-run budget, so response schema cardinality must be at most 8.", repo.Repo))
+			payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
+			maxCardinality := 1 << payloadBits
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", repo.Repo, enclaveConfidentialRunBits, maxCardinality))
 		case "internal", "sealed":
 			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
 		}
