@@ -279,18 +279,19 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 		assert.Nil(t, c, "expected nil when neither timeout nor count limit was reached")
 	})
 
-	t.Run("empty processedRuns returns nil even when count limit reached", func(t *testing.T) {
+	t.Run("empty processedRuns returns current cursor when count limit stops a queued target", func(t *testing.T) {
 		c := buildContinuationIfNeeded(nil, false, true, false, continuationOptions{
-			workflowName:   "my-workflow",
-			startDate:      "2026-06-01",
-			endDate:        "",
-			engine:         "claude",
-			branch:         "",
-			afterRunID:     0,
-			count:          100,
-			timeoutMinutes: 3,
+			workflowName:        "my-workflow",
+			startDate:           "2026-06-01",
+			endDate:             "",
+			engine:              "claude",
+			count:               100,
+			timeoutMinutes:      3,
+			previousBeforeRunID: 1234,
 		})
-		assert.Nil(t, c, "expected nil when no runs were processed")
+		require.NotNil(t, c)
+		assert.Equal(t, int64(1234), c.BeforeRunID)
+		assert.Contains(t, c.Message, "Count limit reached")
 	})
 
 	t.Run("empty processedRuns returns current cursor when storage blocks progress", func(t *testing.T) {

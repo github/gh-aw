@@ -229,3 +229,17 @@ func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 	assert.True(t, countLimitReached)
 	assert.Empty(t, errs)
 }
+
+func TestMergeLogsTargetResultsPreservesPartialRunsFromFailedTarget(t *testing.T) {
+	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42}}
+	processedRuns, _, _, _, _, errs := mergeLogsTargetResults([]logsTargetResult{{
+		target: logsWorkflowTarget{workflowName: "partial"},
+		result: workflowLogsResult{processedRuns: []ProcessedRun{run}},
+		err:    errors.New("pagination failed"),
+	}}, nil)
+
+	require.Len(t, processedRuns, 1)
+	assert.Equal(t, int64(42), processedRuns[0].Run.DatabaseID)
+	require.Len(t, errs, 1)
+	assert.ErrorContains(t, errs[0], "pagination failed")
+}

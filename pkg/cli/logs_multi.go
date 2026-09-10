@@ -88,7 +88,7 @@ func DownloadWorkflowLogsForTargets(
 	if ctx.Err() != nil {
 		return context.Cause(ctx)
 	}
-	finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+	finishGitHubAPIRateLimitReports(activeCtx, allAPIRateLimits, opts.JSONOutput)
 	cacheGitHubAPIRateLimitReports(opts.cachedJSONLWriter, allAPIRateLimits...)
 	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 	if len(processedRuns) == 0 {
@@ -226,7 +226,6 @@ func mergeLogsTargetResults(
 	for _, targetResult := range results {
 		if targetResult.err != nil {
 			allErrors = append(allErrors, fmt.Errorf("%s: %w", targetResult.target.displayName(), targetResult.err))
-			continue
 		}
 		processedRuns = append(processedRuns, targetResult.result.processedRuns...)
 		timeoutReached = timeoutReached || targetResult.result.timeoutReached

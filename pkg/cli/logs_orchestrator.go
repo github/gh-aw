@@ -245,7 +245,7 @@ func buildContinuationIfNeeded(
 	if !timeoutReached && !countLimitReached && !storageLimitReached {
 		return nil
 	}
-	if len(processedRuns) == 0 && !storageLimitReached {
+	if len(processedRuns) == 0 && !countLimitReached && !storageLimitReached {
 		return nil
 	}
 	// Use the oldest processed run as the before_run_id cursor for the next page.
@@ -344,7 +344,13 @@ func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflo
 
 	processedRuns, timeoutReached, countLimitReached, storageLimitReached, lastFetchedBeforeDate, err := collectProcessedWorkflowRuns(runtime, opts)
 	if err != nil {
-		return workflowLogsResult{}, err
+		return workflowLogsResult{
+			processedRuns:       processedRuns,
+			artifactFilter:      runtime.artifactFilter,
+			countLimitReached:   countLimitReached,
+			timeoutReached:      timeoutReached,
+			storageLimitReached: storageLimitReached,
+		}, err
 	}
 	processedRuns = limitProcessedRuns(processedRuns, opts.Count, opts.Verbose)
 	logsOrchestratorLog.Printf("Collected %d processed runs (timeoutReached=%v, countLimitReached=%v)", len(processedRuns), timeoutReached, countLimitReached)
