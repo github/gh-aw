@@ -412,8 +412,10 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 			payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
 			maxCardinality := 1 << payloadBits
 			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", repo.Repo, enclaveConfidentialRunBits, maxCardinality))
-		case "internal", "sealed":
+		case "internal":
 			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
+		case "sealed":
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", repo.Repo))
 		}
 	}
 	if len(repoLines) == 0 {

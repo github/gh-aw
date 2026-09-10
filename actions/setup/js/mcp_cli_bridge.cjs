@@ -78,6 +78,8 @@ const COMPACT_NAME_LINE_TARGET_WIDTH = 110;
 const SAFEOUTPUTS_SERVER_NAME = "safeoutputs";
 const AWF_ENCLAVE_SERVER_NAME = "awf-enclave";
 const DEFERRED_SERVERS_ENV = "GH_AW_MCP_DEFERRED_SERVERS";
+const DEFERRED_TOOLS_LIST_MAX_ATTEMPTS = 5;
+const DEFERRED_TOOLS_LIST_RETRY_DELAY_MS = 1000;
 
 // ---------------------------------------------------------------------------
 // Audit logging
@@ -1144,34 +1146,45 @@ function isEnclaveBitBudgetExhausted(serverName, message) {
  * @returns {Promise<Array<{name: string, description?: string, inputSchema?: {properties?: Record<string, {description?: string, type?: string}>, required?: string[]}}>>}
  */
 async function refreshDeferredToolsIfNeeded(tools, serverName, serverUrl, apiKey, toolsFile) {
-  if (tools.length > 0 || !serverInCommaList(serverName, process.env[DEFERRED_SERVERS_ENV] || "")) {
+  const isDeferredServer = serverName === AWF_ENCLAVE_SERVER_NAME || serverInCommaList(serverName, process.env[DEFERRED_SERVERS_ENV] || "");
+  if (tools.length > 0 || !isDeferredServer) {
     return tools;
   }
   const core = global.core;
   core.warning(`[${serverName}] cached tool schema is empty for deferred server; refreshing from live gateway`);
-  const sessionId = await mcpInitialize(serverUrl, apiKey, serverName);
-  await mcpNotifyInitialized(serverUrl, apiKey, sessionId, serverName);
-  /** @type {Record<string, string>} */
-  const headers = { Authorization: apiKey };
-  if (sessionId) {
-    headers["Mcp-Session-Id"] = sessionId;
+  for (let attempt = 1; attempt <= DEFERRED_TOOLS_LIST_MAX_ATTEMPTS; attempt++) {
+    try {
+      const sessionId = await mcpInitialize(serverUrl, apiKey, serverName);
+      await mcpNotifyInitialized(serverUrl, apiKey, sessionId, serverName);
+      /** @type {Record<string, string>} */
+      const headers = { Authorization: apiKey };
+      if (sessionId) {
+        headers["Mcp-Session-Id"] = sessionId;
+      }
+      const resp = await httpPostJSON(serverUrl, headers, { jsonrpc: "2.0", id: TOOLS_LIST_REQUEST_ID, method: "tools/list" }, DEFAULT_HTTP_TIMEOUT_MS);
+      const messages = extractJSONRPCMessages(resp.body);
+      const resultMessage = messages.find(isResultMessage);
+      const result = resultMessage && typeof resultMessage === "object" && "result" in resultMessage && resultMessage.result && typeof resultMessage.result === "object" ? resultMessage.result : null;
+      const refreshed = result && "tools" in result && Array.isArray(result.tools) ? result.tools : [];
+      if (refreshed.length > 0) {
+        try {
+          fs.writeFileSync(toolsFile, JSON.stringify(refreshed, null, 2), { mode: 0o644 });
+        } catch (err) {
+          core.warning(`[${serverName}] failed to update refreshed tools cache ${toolsFile}: ${getErrorMessage(err)}`);
+        }
+        core.info(`[${serverName}] refreshed deferred tools cache with ${refreshed.length} tool(s)`);
+        return refreshed;
+      }
+      core.warning(`[${serverName}] live tools/list attempt ${attempt}/${DEFERRED_TOOLS_LIST_MAX_ATTEMPTS} returned 0 tools for deferred server`);
+    } catch (err) {
+      core.warning(`[${serverName}] deferred tools/list attempt ${attempt}/${DEFERRED_TOOLS_LIST_MAX_ATTEMPTS} failed: ${getErrorMessage(err)}`);
+    }
+    if (attempt < DEFERRED_TOOLS_LIST_MAX_ATTEMPTS) {
+      await new Promise(resolve => setTimeout(resolve, DEFERRED_TOOLS_LIST_RETRY_DELAY_MS));
+    }
   }
-  const resp = await httpPostJSON(serverUrl, headers, { jsonrpc: "2.0", id: TOOLS_LIST_REQUEST_ID, method: "tools/list" }, DEFAULT_HTTP_TIMEOUT_MS);
-  const messages = extractJSONRPCMessages(resp.body);
-  const resultMessage = messages.find(isResultMessage);
-  const result = resultMessage && typeof resultMessage === "object" && "result" in resultMessage && resultMessage.result && typeof resultMessage.result === "object" ? resultMessage.result : null;
-  const refreshed = result && "tools" in result && Array.isArray(result.tools) ? result.tools : [];
-  if (refreshed.length === 0) {
-    core.warning(`[${serverName}] live tools/list still returned 0 tools for deferred server`);
-    return tools;
-  }
-  try {
-    fs.writeFileSync(toolsFile, JSON.stringify(refreshed, null, 2), { mode: 0o644 });
-  } catch (err) {
-    core.warning(`[${serverName}] failed to update refreshed tools cache ${toolsFile}: ${getErrorMessage(err)}`);
-  }
-  core.info(`[${serverName}] refreshed deferred tools cache with ${refreshed.length} tool(s)`);
-  return refreshed;
+  core.warning(`[${serverName}] deferred tools/list refresh exhausted retries; using cached empty schema`);
+  return tools;
 }
 
 /**

@@ -226,12 +226,12 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(serverInCommaList("awf", "awf-enclave")).toBe(false);
   });
 
-  it("refreshes an empty deferred server tool cache from the live gateway", async () => {
+  it("refreshes an empty awf-enclave tool cache from the live gateway without deferred marker", async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-tools-"));
     const toolsFile = path.join(tempDir, "awf-enclave.json");
     fs.writeFileSync(toolsFile, "[]", "utf8");
     const originalDeferred = process.env.GH_AW_MCP_DEFERRED_SERVERS;
-    process.env.GH_AW_MCP_DEFERRED_SERVERS = "awf-enclave";
+    delete process.env.GH_AW_MCP_DEFERRED_SERVERS;
 
     const server = http.createServer((req, res) => {
       let data = "";
@@ -270,6 +270,53 @@ describe("mcp_cli_bridge.cjs", () => {
       } else {
         process.env.GH_AW_MCP_DEFERRED_SERVERS = originalDeferred;
       }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("retries deferred tools refresh until tools become available", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-retry-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          if (toolsListCalls < 2) {
+            res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          } else {
+            res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [{ name: "enclave_run_agent" }] } }));
+          }
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const refreshed = await refreshDeferredToolsIfNeeded([], "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile);
+      expect(refreshed).toEqual([{ name: "enclave_run_agent" }]);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("attempt 1/5 returned 0 tools"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
