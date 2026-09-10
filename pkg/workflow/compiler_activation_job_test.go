@@ -56,6 +56,7 @@ func TestActivationInfoArtifactUpload(t *testing.T) {
 		assert.Contains(t, uploadStep, "if-no-files-found: ignore")
 		assert.NotContains(t, uploadStep, "skip-archive")
 		assert.NotContains(t, uploadStep, "unarchived-artifact")
+		assert.NotContains(t, uploadStep, "retention-days")
 	})
 
 	t.Run("uses GHES-compatible upload action", func(t *testing.T) {

@@ -211,7 +211,6 @@ func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildCo
 		fmt.Sprintf("          name: %s\n", infoArtifactName),
 		"          path: /tmp/gh-aw/aw_info.json\n",
 		"          if-no-files-found: ignore\n",
-		"          retention-days: 1\n",
 	)
 }
 

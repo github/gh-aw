@@ -352,7 +352,6 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
-          retention-days: 1
       - name: Detect existing Squad installation
         id: squad-installation
         run: |
