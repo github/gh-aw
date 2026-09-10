@@ -557,10 +557,10 @@ func runCompileCmd(cmd *cobra.Command, args []string) error {
 }
 
 type commandSet struct {
-	addCmd, addWizardCmd, editCmd, updateCmd, deployCmd, trialCmd, initCmd, statusCmd, listCmd         *cobra.Command
-	mcpCmd, logsCmd, auditCmd, viewCmd, healthCmd, outcomesCmd, mcpServerCmd, prCmd, secretsCmd        *cobra.Command
-	fixCmd, upgradeCmd, completionCmd, hashCmd, projectCmd, doctorCmd, checksCmd, validateCmd, lintCmd *cobra.Command
-	domainsCmd, experimentsCmd, forecastCmd, gradersCmd, modelsCmd, envCmd, jsonSchemaCmd              *cobra.Command
+	addCmd, addWizardCmd, editCmd, updateCmd, deployCmd, trialCmd, initCmd, statusCmd, listCmd                    *cobra.Command
+	mcpCmd, logsCmd, auditCmd, viewCmd, healthCmd, outcomesCmd, mcpServerCmd, prCmd, secretsCmd                   *cobra.Command
+	fixCmd, formatCmd, upgradeCmd, completionCmd, hashCmd, projectCmd, doctorCmd, checksCmd, validateCmd, lintCmd *cobra.Command
+	domainsCmd, experimentsCmd, forecastCmd, gradersCmd, modelsCmd, envCmd, jsonSchemaCmd                         *cobra.Command
 }
 
 func fixPathForCommand(s string) string {
@@ -729,6 +729,7 @@ func createCommandSet() commandSet {
 		prCmd:          cli.NewPRCommand(),
 		secretsCmd:     cli.NewSecretsCommand(),
 		fixCmd:         cli.NewFixCommand(),
+		formatCmd:      cli.NewFormatCommand(),
 		upgradeCmd:     cli.NewUpgradeCommand(validateEngine),
 		completionCmd:  cli.NewCompletionCommand(),
 		hashCmd:        cli.NewHashCommand(),
@@ -855,7 +856,7 @@ func assignCommandGroups(cmds commandSet) {
 	removeCmd.GroupID, cmds.editCmd.GroupID, cmds.updateCmd.GroupID, cmds.deployCmd.GroupID, cmds.upgradeCmd.GroupID = "setup", "setup", "setup", "setup", "setup"
 	cmds.secretsCmd.GroupID, cmds.envCmd.GroupID, cmds.doctorCmd.GroupID = "setup", "setup", "setup"
 	compileCmd.GroupID, cmds.validateCmd.GroupID, cmds.lintCmd.GroupID = "development", "development", "development"
-	cmds.mcpCmd.GroupID, cmds.fixCmd.GroupID, cmds.domainsCmd.GroupID = "development", "development", "development"
+	cmds.mcpCmd.GroupID, cmds.fixCmd.GroupID, cmds.formatCmd.GroupID, cmds.domainsCmd.GroupID = "development", "development", "development", "development"
 	runCmd.GroupID, enableCmd.GroupID, disableCmd.GroupID, cmds.trialCmd.GroupID = "execution", "execution", "execution", "execution"
 	cmds.logsCmd.GroupID, cmds.auditCmd.GroupID, cmds.viewCmd.GroupID = "analysis", "analysis", "analysis"
 	cmds.healthCmd.GroupID, cmds.outcomesCmd.GroupID, cmds.checksCmd.GroupID = "analysis", "analysis", "analysis"
@@ -870,7 +871,7 @@ func addCommandsToRoot(cmds commandSet) {
 		compileCmd, cmds.addCmd, cmds.addWizardCmd, cmds.editCmd, cmds.updateCmd, cmds.deployCmd, cmds.upgradeCmd, cmds.trialCmd, newCmd, cmds.initCmd,
 		runCmd, removeCmd, cmds.statusCmd, cmds.listCmd, enableCmd, disableCmd, cmds.logsCmd, cmds.auditCmd, cmds.viewCmd,
 		cmds.healthCmd, cmds.outcomesCmd, cmds.checksCmd, cmds.mcpCmd, cmds.mcpServerCmd, cmds.prCmd, versionCmd, cmds.secretsCmd,
-		cmds.fixCmd, cmds.validateCmd, cmds.lintCmd, cmds.completionCmd, cmds.hashCmd, cmds.projectCmd, cmds.doctorCmd,
+		cmds.fixCmd, cmds.formatCmd, cmds.validateCmd, cmds.lintCmd, cmds.completionCmd, cmds.hashCmd, cmds.projectCmd, cmds.doctorCmd,
 		cmds.domainsCmd, cmds.experimentsCmd, cmds.forecastCmd, cmds.gradersCmd, cmds.modelsCmd, cmds.envCmd, cmds.jsonSchemaCmd,
 	)
 }
