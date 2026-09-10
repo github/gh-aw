@@ -235,5 +235,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 30
+  },
+  {
+    "date": "2026-09-10",
+    "workflow_name": "PR Code Quality Reviewer",
+    "workflow_file": "pr-code-quality-reviewer",
+    "total_aic_analyzed": 253.725685,
+    "runs_audited": 4,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
   }
 ]
