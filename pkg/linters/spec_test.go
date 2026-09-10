@@ -13,6 +13,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters"
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
+	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
 	"github.com/github/gh-aw/pkg/linters/bytescomparestring"
 	"github.com/github/gh-aw/pkg/linters/contextcancelnotdeferred"
@@ -93,13 +94,13 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 67 analyzers
+// "Public API > Subpackages" table. The README documents 68 analyzers
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
 // Spec (README "Public API > Subpackages"):
 //
-//	appendbytestring, appendoneelement, bytesbufferstring, bytescomparestring, contextcancelnotdeferred, ctxbackground, deferinloop, errorfwrapv, excessivefuncparams, errormessage,
+//	appendbytestring, appendoneelement, bufferresetbeforereuse, bytesbufferstring, bytescomparestring, contextcancelnotdeferred, ctxbackground, deferinloop, errorfwrapv, excessivefuncparams, errormessage,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
@@ -110,6 +111,7 @@ func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
 		{"appendbytestring", appendbytestring.Analyzer},
 		{"appendoneelement", appendoneelement.Analyzer},
+		{"bufferresetbeforereuse", bufferresetbeforereuse.Analyzer},
 		{"bytesbufferstring", bytesbufferstring.Analyzer},
 		{"bytescomparestring", bytescomparestring.Analyzer},
 		{"contextcancelnotdeferred", contextcancelnotdeferred.Analyzer},

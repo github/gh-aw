@@ -64,6 +64,7 @@ func checkBufferReuse(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 // event represents a write, read, or reset operation on a buffer/builder
 type event struct {
 	varName string
+	obj     types.Object
 	typ     string // "write", "read", or "reset"
 	pos     token.Pos
 	node    ast.Node
@@ -71,18 +72,30 @@ type event struct {
 
 // analyzeBlockForBufferReuse examines a block statement for improper buffer reuse
 func analyzeBlockForBufferReuse(pass *analysis.Pass, block *ast.BlockStmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
+	ast.Inspect(block, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.BlockStmt:
+			analyzeStraightLineBlock(pass, node, generatedFiles, noLintIndex)
+		}
+		return true
+	})
+}
+
+func analyzeStraightLineBlock(pass *analysis.Pass, block *ast.BlockStmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	// Collect all events (writes, reads, resets) in order
 	var events []*event
 	collectEvents(pass, block, &events)
 
 	// For each variable, check if writes follow reads without Reset
-	written := make(map[string]bool) // has this variable been written?
-	read := make(map[string]bool)    // has this variable been read?
+	written := make(map[types.Object]bool) // has this variable been written?
+	read := make(map[types.Object]bool)    // has this variable been read?
 
 	for _, e := range events {
 		switch e.typ {
 		case "write":
-			if read[e.varName] {
+			if read[e.obj] {
 				// This is a write after the buffer has been read, without Reset
 				pkgLog.Printf("flagging %s reuse at line %d", e.varName, pass.Fset.Position(e.pos).Line)
 
@@ -102,16 +115,16 @@ func analyzeBlockForBufferReuse(pass *analysis.Pass, block *ast.BlockStmt, gener
 					e.varName,
 				)
 			}
-			written[e.varName] = true
+			written[e.obj] = true
 
 		case "read":
-			if written[e.varName] {
-				read[e.varName] = true
+			if written[e.obj] {
+				read[e.obj] = true
 			}
 
 		case "reset":
-			read[e.varName] = false
-			written[e.varName] = false
+			read[e.obj] = false
+			written[e.obj] = false
 		}
 	}
 }
@@ -119,69 +132,81 @@ func analyzeBlockForBufferReuse(pass *analysis.Pass, block *ast.BlockStmt, gener
 // collectEvents collects all write, read, and reset operations on buffers in order
 func collectEvents(pass *analysis.Pass, block *ast.BlockStmt, events *[]*event) {
 	ast.Inspect(block, func(n ast.Node) bool {
+		if n != block {
+			switch n.(type) {
+			case *ast.BlockStmt, *ast.FuncLit, *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt:
+				return false
+			}
+		}
+
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
 
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok {
-			return true
-		}
-
-		// Check if this is a buffer/builder variable
-		if !isBufferOrBuilderVar(pass, ident) {
-			return true
-		}
-
-		varName := ident.Name
-		methodName := sel.Sel.Name
-
-		if methodName == "Reset" {
-			*events = append(*events, &event{
-				varName: varName,
-				typ:     "reset",
-				pos:     call.Pos(),
-				node:    call,
-			})
-			pkgLog.Printf("found reset on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
-		} else if isWriteMethod(methodName) {
-			*events = append(*events, &event{
-				varName: varName,
-				typ:     "write",
-				pos:     call.Pos(),
-				node:    call,
-			})
-			pkgLog.Printf("found write on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
-		} else if isReadMethod(methodName) {
-			*events = append(*events, &event{
-				varName: varName,
-				typ:     "read",
-				pos:     call.Pos(),
-				node:    call,
-			})
-			pkgLog.Printf("found read on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
-		}
+		appendCallEvent(pass, call, events)
 
 		return true
 	})
 }
 
-// isBufferOrBuilderVar checks if an identifier refers to a bytes.Buffer or strings.Builder variable
-func isBufferOrBuilderVar(pass *analysis.Pass, ident *ast.Ident) bool {
+func appendCallEvent(pass *analysis.Pass, call *ast.CallExpr, events *[]*event) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return
+	}
+
+	obj := bufferOrBuilderObject(pass, ident)
+	if obj == nil {
+		return
+	}
+
+	appendMethodEvent(pass, call, ident.Name, obj, sel.Sel.Name, events)
+}
+
+func appendMethodEvent(pass *analysis.Pass, call *ast.CallExpr, varName string, obj types.Object, methodName string, events *[]*event) {
+	switch {
+	case methodName == "Reset":
+		*events = append(*events, newEvent(varName, obj, "reset", call))
+		pkgLog.Printf("found reset on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
+	case isWriteMethod(methodName):
+		*events = append(*events, newEvent(varName, obj, "write", call))
+		pkgLog.Printf("found write on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
+	case isReadMethod(methodName):
+		*events = append(*events, newEvent(varName, obj, "read", call))
+		pkgLog.Printf("found read on %s at line %d", varName, pass.Fset.Position(call.Pos()).Line)
+	}
+}
+
+func newEvent(varName string, obj types.Object, typ string, call *ast.CallExpr) *event {
+	return &event{
+		varName: varName,
+		obj:     obj,
+		typ:     typ,
+		pos:     call.Pos(),
+		node:    call,
+	}
+}
+
+// bufferOrBuilderObject returns the object for identifiers that refer to a bytes.Buffer or strings.Builder variable.
+func bufferOrBuilderObject(pass *analysis.Pass, ident *ast.Ident) types.Object {
 	obj := pass.TypesInfo.ObjectOf(ident)
 	if obj == nil {
-		return false
+		return nil
 	}
 
 	t := obj.Type()
 	if t == nil {
-		return false
+		return nil
 	}
 
 	// Handle pointer types
@@ -190,7 +215,10 @@ func isBufferOrBuilderVar(pass *analysis.Pass, ident *ast.Ident) bool {
 	}
 
 	// Check if it's bytes.Buffer or strings.Builder
-	return isNamedType(t, "bytes", "Buffer") || isNamedType(t, "strings", "Builder")
+	if isNamedType(t, "bytes", "Buffer") || isNamedType(t, "strings", "Builder") {
+		return obj
+	}
+	return nil
 }
 
 // isNamedType checks if a type is named type from specified package and name

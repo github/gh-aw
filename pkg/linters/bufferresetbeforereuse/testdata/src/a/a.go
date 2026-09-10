@@ -27,7 +27,7 @@ func okResetBetweenWrites() {
 // notOkReuseWithoutReset is NOT OK - reused without Reset
 func notOkReuseWithoutReset() {
 	var buf bytes.Buffer
-	buf.WriteString("first")  // First write (OK)
+	buf.WriteString("first") // First write (OK)
 	_ = buf.String()
 	buf.WriteString("second") // want "buf is reused without calling Reset"
 	_ = buf.String()
@@ -56,9 +56,9 @@ func okBuilderWithReset() {
 // notOkBuilderReuseWithoutReset is NOT OK - builder reused without Reset
 func notOkBuilderReuseWithoutReset() {
 	var sb strings.Builder
-	sb.WriteString("first")   // First write (OK)
+	sb.WriteString("first") // First write (OK)
 	_ = sb.String()
-	sb.WriteString("second")  // want "sb is reused without calling Reset"
+	sb.WriteString("second") // want "sb is reused without calling Reset"
 	_ = sb.String()
 }
 
@@ -78,10 +78,10 @@ func okMultipleWritesAfterReset() {
 // notOkMultipleWritesWithoutReset is NOT OK - multiple writes without reset
 func notOkMultipleWritesWithoutReset() {
 	var buf bytes.Buffer
-	buf.WriteByte('a')        // First write (OK)
+	buf.WriteByte('a') // First write (OK)
 	_ = buf.String()
-	buf.WriteByte('b')        // want "buf is reused without calling Reset"
-	buf.WriteRune('c')        // want "buf is reused without calling Reset"
+	buf.WriteByte('b') // want "buf is reused without calling Reset"
+	buf.WriteRune('c') // want "buf is reused without calling Reset"
 	_ = buf.String()
 }
 
@@ -109,8 +109,42 @@ func okPointerBuffer() {
 // notOkPointerBufferReuseWithoutReset is NOT OK - pointer buffer reused without Reset
 func notOkPointerBufferReuseWithoutReset() {
 	buf := &bytes.Buffer{}
-	buf.WriteString("first")  // First write (OK)
+	buf.WriteString("first") // First write (OK)
 	_ = buf.String()
 	buf.WriteString("second") // want "buf is reused without calling Reset"
 	_ = buf.String()
+}
+
+// okShadowedBuffer is OK - inner buf is a distinct object.
+func okShadowedBuffer() {
+	var buf bytes.Buffer
+	buf.WriteString("outer")
+	_ = buf.String()
+
+	{
+		var buf bytes.Buffer
+		buf.WriteString("inner")
+		_ = buf.String()
+	}
+}
+
+// notOkFuncLiteralReuseWithoutReset is reported once for the function literal.
+func notOkFuncLiteralReuseWithoutReset() {
+	func() {
+		var buf bytes.Buffer
+		buf.WriteString("first")
+		_ = buf.String()
+		buf.WriteString("second") // want "buf is reused without calling Reset"
+	}()
+}
+
+// okMutuallyExclusiveBranches is OK - the read returns before the later write path.
+func okMutuallyExclusiveBranches(cond bool) string {
+	var buf bytes.Buffer
+	buf.WriteString("init")
+	if cond {
+		return buf.String()
+	}
+	buf.WriteString("more")
+	return buf.String()
 }
