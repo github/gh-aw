@@ -49,6 +49,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
+	cachedJSONLWriter := newCachedLogsJSONLWriter(opts.CachedJSONL)
 
 	if err := ensureLogsGitignore(); err != nil {
 		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)
@@ -174,6 +175,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 
 	if len(runs) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+		cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
 		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
@@ -189,8 +191,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No valid runs could be loaded from stdin"))
 		return nil
 	}
-
-	cachedJSONLWriter := newCachedLogsJSONLWriter(opts.CachedJSONL)
 
 	// Download artifacts for all runs concurrently.
 	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
@@ -269,6 +269,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+		cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
 		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
@@ -295,6 +296,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	}
 	finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
+	cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
 	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
 	return renderLogsOutput(processedRuns, renderLogsOutputOptions{
 		outputDir:      opts.OutputDir,

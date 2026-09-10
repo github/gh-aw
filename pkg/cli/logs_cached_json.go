@@ -22,6 +22,7 @@ const cachedLogsJSONLSchemaVersion = 2
 const (
 	cachedLogsJSONLKindRun          = "run"
 	cachedLogsJSONLKindWorkflowRuns = "workflow_runs"
+	cachedLogsJSONLKindRateLimit    = "github_api_rate_limit"
 )
 
 type cachedWorkflowRunsRequest struct {
@@ -36,6 +37,7 @@ type cachedLogsJSONLRecord struct {
 	Run           *RunData                   `json:"run,omitempty"`
 	Request       *cachedWorkflowRunsRequest `json:"request,omitempty"`
 	Payload       json.RawMessage            `json:"payload,omitempty"`
+	RateLimit     *GitHubAPIRateLimitReport  `json:"rate_limit,omitempty"`
 }
 
 type cachedLogsJSONLCache struct {
@@ -82,7 +84,7 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {
-	if record.SchemaVersion != 1 && record.SchemaVersion != cachedLogsJSONLSchemaVersion {
+	if record.SchemaVersion != cachedLogsJSONLSchemaVersion {
 		logsCacheLog.Printf("Ignoring incompatible cached logs JSONL record: record=%d, schema_version=%d", recordNumber, record.SchemaVersion)
 		return nil
 	}
@@ -162,8 +164,27 @@ func (w *cachedLogsJSONLWriter) AppendWorkflowRuns(request cachedWorkflowRunsReq
 	return w.appendRecord(record)
 }
 
+func (w *cachedLogsJSONLWriter) AppendRateLimit(report GitHubAPIRateLimitReport) error {
+	if w == nil || (report.Start == nil && report.End == nil) {
+		return nil
+	}
+	record, err := json.Marshal(cachedLogsJSONLRecord{
+		SchemaVersion: cachedLogsJSONLSchemaVersion,
+		Kind:          cachedLogsJSONLKindRateLimit,
+		RateLimit:     &report,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal cached GitHub API rate limit JSONL record: %w", err)
+	}
+	return w.appendRecord(record)
+}
+
 func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
-	record = append(record, '\n')
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, record); err != nil {
+		return fmt.Errorf("failed to encode cached logs JSONL record: %w", err)
+	}
+	record = append(compact.Bytes(), '\n')
 
 	w.mu.Lock()
 	defer w.mu.Unlock()

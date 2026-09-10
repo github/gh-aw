@@ -97,10 +97,6 @@ func TestJSONSchemaCommand(t *testing.T) {
 			schemaName: "logs-jsonl",
 			oneOfCount: 3,
 			validOutput: []any{
-				cachedLogsJSONLLegacyRunItemSchema{
-					SchemaVersion: 1,
-					Run:           RunData{RunID: 41},
-				},
 				cachedLogsJSONLRunItemSchema{
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
 					Kind:          cachedLogsJSONLKindRun,
@@ -123,6 +119,14 @@ func TestJSONSchemaCommand(t *testing.T) {
 						"headSha": "abc123", "displayTitle": "Daily report", "attempt": 1,
 						"futureField": map[string]any{"nested": true},
 					}},
+				},
+				cachedLogsJSONLRateLimitItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindRateLimit,
+					RateLimit: GitHubAPIRateLimitReport{
+						Host:  "github.com",
+						Start: &GitHubAPIRateLimitState{Limit: 5000, Remaining: 4999},
+					},
 				},
 			},
 		},

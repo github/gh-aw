@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -39,7 +40,7 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":1,\"run\":{\"run_id\":42}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, stderr := captureOutput(t, func() error {
 		_, err := loadCachedLogsJSONL(path)
@@ -69,7 +70,7 @@ func TestLoadCachedLogsJSONReportsMissingFile(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"schema_version\":1,\"run\":{\"run_id\":42}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{invalid}\n{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -78,7 +79,7 @@ func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 
 func TestLoadCachedLogsJSONRejectsInvalidRunAttempt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
-	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":1,\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42,\"run_attempt\":\"bogus\"}}\n"), 0o600))
 
 	_, err := loadCachedLogsJSONL(path)
 
@@ -108,7 +109,7 @@ func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {
 		Repository: "github/gh-aw",
 		Args:       []string{"run", "list", "--limit", "2"},
 	}
-	payload := []byte(`[{"databaseId":42,"futureField":{"nested":true}},{"databaseId":41}]`)
+	payload := []byte("[\n  {\"databaseId\":42,\"futureField\":{\"nested\":true}},\n  {\"databaseId\":41}\n]")
 
 	require.NoError(t, writer.AppendWorkflowRuns(request, payload))
 
@@ -118,20 +119,46 @@ func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {
 	require.True(t, ok)
 	assert.JSONEq(t, string(payload), string(cached))
 	assert.Contains(t, string(cached), `"futureField"`)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.Len(t, lines, 1)
+	assert.True(t, json.Valid(lines[0]))
 }
 
 func TestLoadCachedLogsJSONLIgnoresIncompatibleSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	data := "{\"schema_version\":0,\"run\":{\"run_id\":41}}\n" +
 		"{\"schema_version\":1,\"run\":{\"run_id\":42}}\n" +
-		"{\"schema_version\":3,\"run\":{\"run_id\":43}}\n"
+		"{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":43}}\n"
 	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
 
 	runs, err := loadCachedLogsJSONL(path)
 
 	require.NoError(t, err)
 	require.Len(t, runs.runs, 1)
-	assert.Contains(t, runs.runs, int64(42))
+	assert.Contains(t, runs.runs, int64(43))
+	assert.NotContains(t, runs.runs, int64(42))
+}
+
+func TestCachedLogsJSONLStoresRateLimitAsOneLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	writer := newCachedLogsJSONLWriter(path)
+	report := GitHubAPIRateLimitReport{
+		Host:  "github.com",
+		Start: &GitHubAPIRateLimitState{Limit: 5000, Remaining: 4999, Used: 1, Reset: 123},
+		End:   &GitHubAPIRateLimitState{Limit: 5000, Remaining: 4990, Used: 10, Reset: 123},
+	}
+
+	require.NoError(t, writer.AppendRateLimit(report))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.Len(t, lines, 1)
+	assert.True(t, json.Valid(lines[0]))
+	assert.Contains(t, string(lines[0]), `"kind":"github_api_rate_limit"`)
+	assert.Contains(t, string(lines[0]), `"remaining":4990`)
 }
 
 func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {

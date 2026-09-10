@@ -138,6 +138,17 @@ func finishGitHubAPIRateLimitReports(ctx context.Context, reports []*GitHubAPIRa
 	}
 }
 
+func cacheGitHubAPIRateLimitReports(writer *cachedLogsJSONLWriter, reports ...*GitHubAPIRateLimitReport) {
+	for _, report := range reports {
+		if report == nil {
+			continue
+		}
+		if err := writer.AppendRateLimit(*report); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+		}
+	}
+}
+
 func normalizedGitHubAPIHost(host string) string {
 	if host == "" {
 		return "github.com"

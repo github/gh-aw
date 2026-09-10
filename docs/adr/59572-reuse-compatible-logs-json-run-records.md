@@ -12,7 +12,7 @@ The `gh aw logs` command currently recomputes run records by downloading and pro
 
 ### Decision
 
-We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current request. Processed runs require matching run ID, repository, attempt, conclusion, and update timestamp. Each complete `gh run list` response is also appended before filtering or artifact downloads and keyed by its host, repository, and command arguments. This preserves every field returned by `gh`, makes undispatched work observable after interruption, and allows an exact future request to reuse the payload. Records with older or newer incompatible schema versions are ignored, while schema version 1 processed-run records remain readable for compatibility.
+We will allow `gh aw logs` to reuse `--cached-jsonl` records when the record schema version is supported and the cached record can be proven compatible with the current request. Processed runs require matching run ID, repository, attempt, conclusion, and update timestamp. Each complete `gh run list` response is also appended before filtering or artifact downloads and keyed by its host, repository, and command arguments. Available GitHub API rate-limit reports are appended as separate records. Every record is compacted to exactly one JSON value per line. This preserves every field returned by `gh`, makes undispatched work observable after interruption, and allows an exact future request to reuse the payload. Records from incompatible schema versions are ignored.
 
 ### Alternatives Considered
 
