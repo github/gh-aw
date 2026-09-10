@@ -1,0 +1,18 @@
+{
+  "run_id": "34438422510",
+  "date": "2026-09-10",
+  "outcome": "SECURE",
+  "anomaly": "allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid CONNECT and DNS SERVFAIL this run, consistent with prior anomaly runs 33150215669 through 34312212861 - flagged for maintainers, not a vulnerability",
+  "techniques": [
+    {"name":"Percent-encoded dot in CONNECT hostname (example%2Ecom)","category":"Encoding trick","result":"failure"},
+    {"name":"HTTP/2 h2c preface direct to Squid CONNECT port","category":"Protocol-level","result":"failure"},
+    {"name":"wget as alternate HTTP client for CONNECT tunnel","category":"Alternative tool","result":"failure"},
+    {"name":"DNS AXFR zone transfer attempt for example.com","category":"DNS-based","result":"failure"},
+    {"name":"getent ahostsv4 alternate NSS lookup","category":"DNS-based","result":"failure"},
+    {"name":"0x20 DNS case-randomization query","category":"Encoding trick","result":"failure"},
+    {"name":"TLS SNI-swap pivot inside allowed-host CONNECT tunnel","category":"Protocol-level/TLS SNI confusion","result":"failure"},
+    {"name":"QUIC/HTTP3 UDP port 443 direct datagram","category":"Protocol-level/Alternative protocol","result":"failure"},
+    {"name":"Squid cache_object:// manager protocol probe","category":"Protocol-level/Squid-specific","result":"failure"}
+  ],
+  "novelty_pct": 100
+}

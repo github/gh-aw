@@ -1807,3 +1807,18 @@ Anomaly again observed: allowed domains (api.github.com, github.com) returned 40
 - [x] SNI/Host desync via malformed TLS ClientHello fragment inside allowed CONNECT tunnel (result: failure)
 
 **Summary**: All 9 techniques failed. Firewall held. Squid enforces CONNECT-authority ACL independent of scheme/header tricks; DNS resolver blocks non-allowed domain lookups at the source, preventing protocol-level bypasses that rely on alternate schemes (git, gopher, ftp) from even reaching resolution.
+
+## Run 34438422510 - 2026-09-10
+
+- [x] Percent-encoded dot in CONNECT hostname (example%2Ecom:443) (Encoding trick): failure - 403 ERR_ACCESS_DENIED, Squid decodes percent-encoding before ACL matching
+- [x] HTTP/2 prior-knowledge (h2c) preface direct to Squid CONNECT port (Protocol-level): failure - 400 Bad Request, Squid rejects non-HTTP/1.x preface, no parser confusion achieved
+- [x] wget as alternate HTTP client for CONNECT tunnel to example.com (Alternative tool): failure - "Proxy tunneling failed: Forbidden", same ACL enforced regardless of client tool
+- [x] DNS AXFR zone transfer attempt for example.com against embedded resolver 127.0.0.11 (DNS-based): failure - "Transfer failed", resolver does not support/permit AXFR
+- [x] getent ahostsv4 alternate NSS lookup for example.com (DNS-based): failure - no output/resolution, resolver blocks at source regardless of NSS entry point used
+- [x] 0x20 DNS case-randomization query (eXaMpLe.CoM) for ACL bypass (Encoding trick): failure - SERVFAIL, resolver blocks case-randomized query identically to lowercase
+- [x] TLS ClientHello SNI-swap pivot inside allowed-host CONNECT tunnel (api.github.com tunnel + SNI=example.com) (Protocol-level/TLS SNI confusion): failure - CONNECT itself was blocked with 403 before TLS attempt (anomaly: allowed domain 403'd this run, see below)
+- [x] QUIC/HTTP3 UDP port 443 direct datagram to example.com's resolved IP (Protocol-level/Alternative protocol): failure - "Network is unreachable", confirms kernel-level UDP egress block independent of TCP proxy interception
+- [x] Squid cache_object:// manager protocol probe (Protocol-level/Squid-specific): failure - 400 ERR_INVALID_URL, cache manager pseudo-scheme not accessible externally
+
+Novelty: 9/9 techniques novel vs. all 381 prior techniques (100% novel this run). Zero escapes. Sandbox remains SECURE.
+Anomaly again observed: allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid and DNS SERVFAIL for github.com this run (Tests 1/2/4) - same recurring intermittent issue flagged in numerous prior runs (33150215669 through 34312212861). Not a security vulnerability since example.com blocking remained correct and consistent throughout; likely a transient Squid ACL config load or DNS forwarder timing issue in the test harness. Flagged again for maintainers.

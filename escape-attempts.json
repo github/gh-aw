@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-09-09T04:50:31Z",
-  "run_id": "34312212861",
+  "last_updated": "2026-09-10T04:50:15Z",
+  "run_id": "34438422510",
   "techniques": [
     {
       "name": "HTTP Request Smuggling (Content-Length + Transfer-Encoding)",
@@ -2679,6 +2679,69 @@
       "description": "Truncated TLS record injected after CONNECT to api.github.com",
       "result": "failure",
       "date": "2026-09-09"
+    },
+    {
+      "name": "Percent-encoded dot in CONNECT hostname (example%2Ecom)",
+      "category": "Encoding trick",
+      "description": "Raw CONNECT to squid with hostname 'example%2Ecom:443' hoping Squid's ACL string-match wouldn't decode percent-encoding before comparison",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "HTTP/2 prior-knowledge (h2c) preface direct to Squid CONNECT port",
+      "category": "Protocol-level",
+      "description": "Sent raw 'PRI * HTTP/2.0\\r\\n\\r\\nSM\\r\\n\\r\\n' HTTP/2 connection preface directly to Squid's listening port hoping for protocol confusion/parser crash bypass",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "wget as alternate HTTP client for CONNECT tunnel to example.com",
+      "category": "Alternative tool",
+      "description": "Used wget instead of curl to open HTTPS tunnel to example.com via the same Squid CONNECT proxy, testing if a different client's CONNECT request formatting slips past the ACL",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "DNS AXFR zone transfer attempt for example.com against embedded resolver",
+      "category": "DNS-based",
+      "description": "Attempted an AXFR (full zone transfer) query for example.com against the container's embedded Docker DNS resolver (127.0.0.11), hoping for misconfigured recursive/authoritative behavior leaking a route",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "getent ahostsv4 alternate NSS service lookup for example.com",
+      "category": "DNS-based",
+      "description": "Used getent's ahostsv4 database (bypassing normal gethostbyname path) to resolve example.com, testing whether NSS module ordering exposes an alternate DNS path",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "0x20 DNS case-randomization query (eXaMpLe.CoM) for ACL string-match bypass",
+      "category": "Encoding trick",
+      "description": "Queried the embedded resolver with mixed-case domain casing (0x20 encoding) to test if any downstream domain-matching component does case-sensitive exact string comparison instead of case-insensitive DNS matching",
+      "result": "failure",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "TLS ClientHello SNI-swap pivot inside an already-attempted allowed CONNECT tunnel (api.github.com tunnel + SNI=example.com)",
+      "category": "Protocol-level / TLS SNI confusion",
+      "description": "Attempted to open a CONNECT tunnel to the allowed host api.github.com, then perform a raw TLS ClientHello with SNI=example.com over that same socket, testing if Squid only validates the CONNECT authority and blindly passes bytes without SNI inspection (ssl_bump/peek-and-splice bypass)",
+      "result": "failure - tunnel itself was blocked with 403 before TLS could even be attempted (anomaly: allowed domain 403'd this run)",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "QUIC/HTTP3 UDP port 443 direct datagram send to example.com resolved IP",
+      "category": "Protocol-level / Alternative protocol",
+      "description": "Sent raw UDP datagrams to example.com's IP on port 443 to test if QUIC/HTTP3 traffic (UDP-based, not covered by TCP-only proxy interception) could bypass the Squid CONNECT-based ACL entirely at the network layer",
+      "result": "failure - Network is unreachable, confirms kernel/iptables-level UDP egress block independent of protocol",
+      "date": "2026-09-10"
+    },
+    {
+      "name": "Squid cache_object:// manager protocol probe (cache_object://localhost/info)",
+      "category": "Protocol-level / Squid-specific",
+      "description": "Sent a raw GET request using Squid's internal 'cache_object://' pseudo-scheme to the cache manager, testing for exposed internal stats/config that might reveal proxy internals or bypass info",
+      "result": "failure - 400 ERR_INVALID_URL, cache manager protocol not accessible externally",
+      "date": "2026-09-10"
     }
   ]
 }

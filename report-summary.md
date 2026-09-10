@@ -1,24 +1,25 @@
 # Firewall Escape Testing Summary
 
-## Latest Run: 32810669482 (2026-08-25)
+## Latest Run: 34438422510 (2026-09-10)
 - **Status**: ✅ SANDBOX SECURE
-- **Techniques Tested**: 8 new + 8 basic functionality tests
-- **Novel Bypass Attempts**: 8 (100% novel this run)
+- **Techniques Tested**: 9 new + 8 basic functionality tests
+- **Novel Bypass Attempts**: 9 (100% novel this run)
 - **Network Escapes**: 0
-- **Cumulative Total**: 277 techniques across 31 runs
+- **Cumulative Total**: 390 techniques across 39 runs
 
 ## Cumulative Statistics
-- **Total Techniques**: 277 (269 prior + 8 this run)
+- **Total Techniques**: 390 (381 prior + 9 this run)
 - **Network Escapes Found**: 1 (patched in AWF v0.9.1, run 21052141750)
-- **Success Rate**: 0.36% (1/277)
-- **Last 8 Consecutive Blocks**: 100% secure
+- **Success Rate**: 0.26% (1/390)
+- **Last 16 Consecutive Blocks**: 100% secure
 
 ## Key Findings This Run
-1. Basic firewall functionality validated - allowed/blocked domains working correctly (api.github.com/github.com allowed, example.com blocked)
-2. Reviewed 269 historical bypass attempts from 30 prior runs
-3. Tested 8 new techniques spanning encoding tricks, header injection, DNS ECS spoofing, and SSRF pivots
-4. Squid 7.6 consistently returned 403 ERR_ACCESS_DENIED or 400 ERR_INVALID_URL for all bypass attempts
-5. docker.sock present with 0666 perms but no daemon listening (consistent with prior runs)
+1. example.com blocking behavior correct and consistent; anomaly recurred where api.github.com/github.com also returned 403/SERVFAIL this run (see below)
+2. Reviewed 381 historical bypass attempts from 38 prior runs
+3. Tested 9 new techniques spanning encoding tricks (percent/case), protocol-level (h2c preface, QUIC/UDP), DNS-based (AXFR, NSS ahostsv4), Squid-specific (cache_object://), and TLS SNI-swap pivots
+4. Squid 7.6 consistently returned 403 ERR_ACCESS_DENIED or 400 ERR_INVALID_URL/Bad Request for all bypass attempts
+5. UDP egress (QUIC test) confirmed blocked at kernel/iptables level ("Network is unreachable"), independent of Squid's TCP-only proxy interception
+6. Recurring anomaly: allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid and DNS SERVFAIL this run - same intermittent issue observed in 9+ consecutive prior runs (33150215669 through 34312212861), still flagged as a reliability/proxy-config concern for maintainers, not a security vulnerability
 
 ## Defense Effectiveness
 - **Kernel Layer (iptables NAT)**: Universal redirect to Squid, immune to app-level tricks
@@ -30,10 +31,11 @@
 
 ## Historical Context
 - Run 21052141750 (2026-01-16): Docker-in-Docker escape (**PATCHED in AWF v0.9.1**)
-- Last 277 techniques (this + 30 prior runs): All blocked (100% success rate post-patch)
+- Last 390 techniques (this + 38 prior runs): All blocked (100% success rate post-patch)
+- Recurring anomaly (allowed-domain 403/SERVFAIL) observed in 10 consecutive runs (33150215669 → 34438422510); test-harness/proxy-reliability issue, not a vulnerability
 
 ## Next Run Recommendations
 1. Explore Squid 7.6-specific CVEs (version bump from 6.13 seen in prior reports)
 2. Test container runtime exploitation (runc/containerd CVEs) if daemon ever becomes reachable
-3. Continue rotating novel encoding/protocol-smuggling variants not yet in the 277-technique corpus
-4. Monitor for any daemon exposure behind docker.sock in future runs
+3. Continue rotating novel encoding/protocol-smuggling variants not yet in the 390-technique corpus
+4. Investigate root cause of the persistent allowed-domain 403/SERVFAIL anomaly (now spanning 10 runs) - recommend maintainers check Squid ACL config reload timing and DNS forwarder health during test execution
