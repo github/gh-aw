@@ -114,7 +114,7 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 			return logsData, fmt.Errorf("log pattern training: %w", err)
 		}
 	}
-	return logsData, writeCachedLogsJSON(opts.cachedJSON, logsData, opts.verbose)
+	return logsData, nil
 }
 
 func writeLogsAuditsAndTrain(processedRuns []ProcessedRun, opts renderLogsOutputOptions) error {

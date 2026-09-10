@@ -38,11 +38,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
-	cachedRuns, err := loadCachedLogsJSON(opts.CachedJSON)
+	cachedRuns, err := loadCachedLogsJSONL(opts.CachedJSONL)
 	if err != nil {
 		return err
 	}
-	if !cachedJSONCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
 
@@ -63,9 +63,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	if len(opts.RunURLs) == 0 {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
 		logsData.Message = "No runs found. No run IDs or URLs were provided on stdin."
-		if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
-			return err
-		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
 		return nil
 	}
@@ -174,14 +171,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	if len(runs) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
-		if opts.JSONOutput || opts.CachedJSON != "" {
+		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
 			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 			logsData.Message = "No runs found. No valid runs could be loaded from the provided input."
-			if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
-				return err
-			}
 			if opts.JSONOutput {
 				if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 					return fmt.Errorf("failed to render JSON output: %w", err)
@@ -192,12 +186,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		return nil
 	}
 
-	checkpoints := startLogsCheckpointWriter(LogsDownloadOptions{
-		OutputDir:   opts.OutputDir,
-		SummaryFile: opts.SummaryFile,
-		CachedJSON:  opts.CachedJSON,
-		Verbose:     opts.Verbose,
-	}, logsCheckpointInterval)
+	cachedJSONLWriter := newCachedLogsJSONLWriter(opts.CachedJSONL)
 
 	// Download artifacts for all runs concurrently.
 	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
@@ -220,9 +209,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 	for _, result := range downloadResults {
 		if result.CachedRun != nil {
 			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
-			if checkpoints != nil {
-				checkpoints.Update(processedRuns)
-			}
 			continue
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
@@ -271,26 +257,20 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		}
 
 		processedRuns = append(processedRuns, processedRun)
-		if checkpoints != nil {
-			checkpoints.Update(processedRuns)
+		if err := cachedJSONLWriter.Append(processedRun); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 		finalizeLogsRunDownload(storageLimit, result)
-	}
-	if checkpoints != nil {
-		checkpoints.Stop()
 	}
 
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
-		if opts.JSONOutput || opts.CachedJSON != "" {
+		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
 			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
 			logsData.GitHubAPIRateLimits = populatedGitHubAPIRateLimitReports(apiRateLimits)
 			logsData.Message = noRunsMessage("", false, storageLimitReached)
-			if err := writeCachedLogsJSON(opts.CachedJSON, logsData, opts.Verbose); err != nil {
-				return err
-			}
 			if opts.JSONOutput {
 				if err := renderLogsJSON(logsData, opts.Verbose); err != nil {
 					return fmt.Errorf("failed to render JSON output: %w", err)
@@ -327,6 +307,5 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		artifactFilter: artifactFilter,
 		apiRateLimit:   apiRateLimit,
 		apiRateLimits:  apiRateLimits,
-		cachedJSON:     opts.CachedJSON,
 	})
 }
