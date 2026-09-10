@@ -245,6 +245,37 @@ func TestBuildMCPCLIPromptSection_UsesBaseTemplateWithoutSafeOutputs(t *testing.
 	assert.Equal(t, mcpCLIToolsPromptFile, section.Content)
 }
 
+func TestBuildMCPCLIPromptSection_StaticEnclaveBudgetGuidance(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	data.EngineConfig = &EngineConfig{ID: string(constants.CopilotEngine)}
+	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/private-service", Sensitivity: "confidential"}}
+
+	section := buildMCPCLIPromptSection(data)
+	require.NotNil(t, section)
+
+	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
+	assert.Contains(t, serversList, "awf-enclave")
+	assert.Contains(t, serversList, "8-bit per-run budget")
+	assert.Contains(t, serversList, "response schema cardinality must be at most 8")
+	assert.Contains(t, serversList, "bit-budget-exhausted")
+	assert.Contains(t, serversList, "not just `max-output-bytes`")
+}
+
+func TestBuildMCPCLIPromptSection_SealedRepoGuidance(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	data.EngineConfig = &EngineConfig{ID: string(constants.CopilotEngine)}
+	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/sealed-service", Sensitivity: "sealed"}}
+
+	section := buildMCPCLIPromptSection(data)
+	require.NotNil(t, section)
+
+	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
+	assert.Contains(t, serversList, "0-bit per-run budget and never launches an enclave")
+	assert.Contains(t, serversList, "do not invoke `awf-enclave enclave_run_agent`")
+}
+
 func TestGetMCPCLIServerNames_CopilotIncludesManifestServersInPromptList(t *testing.T) {
 	t.Run("copilot adds github and custom MCP servers when CLI mounts are active", func(t *testing.T) {
 		data := &WorkflowData{

@@ -42,6 +42,7 @@ const fs = require("fs");
 const http = require("http");
 
 const portFile = process.argv[2];
+const expectedGithubAuth = process.env.EXPECT_GITHUB_AUTH || "";
 
 const send = (res, code, payload, sessionId) => {
   const body = JSON.stringify(payload);
@@ -70,6 +71,10 @@ const server = http.createServer((req, res) => {
     const reqId = data.id ?? 1;
 
     if (req.url.endsWith("/github")) {
+      if (expectedGithubAuth && req.headers.authorization !== expectedGithubAuth) {
+        send(res, 400, { error: "wrong authorization header" });
+        return;
+      }
       if (method === "initialize") {
         send(res, 200, { jsonrpc: "2.0", id: reqId, result: { protocolVersion: "2024-11-05", capabilities: {}, serverInfo: { name: "github", version: "1.0.0" } } }, "s1");
       } else if (method === "tools/list") {
@@ -899,6 +904,54 @@ EOF
   rm -rf "$tmpdir"
 }
 
+# Test 20: Enclave-only GitHub can be probed with its dedicated identity
+test_github_uses_enclave_check_identity_when_configured() {
+  echo ""
+  echo "Test 20: GitHub checker uses enclave identity when configured"
+
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  local port_file="$tmpdir/port"
+  local config_file="$tmpdir/config.json"
+
+  local server_pid
+  export EXPECT_GITHUB_AUTH="enclave-key"
+  if ! server_pid=$(start_and_validate_mock_server "$port_file" "$tmpdir/mock.log"); then
+    unset EXPECT_GITHUB_AUTH
+    print_result "Mock MCP server failed to start (check $tmpdir/mock.log)" "FAIL"
+    return
+  fi
+  unset EXPECT_GITHUB_AUTH
+
+  local port
+  port=$(cat "$port_file")
+
+  cat > "$config_file" <<EOF
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "http://127.0.0.1:${port}/mcp/github",
+      "headers": {
+        "Authorization": "primary-key"
+      }
+    }
+  }
+}
+EOF
+
+  if GH_AW_MCP_GITHUB_CHECK_AGENT_ID="enclave-key" \
+    bash "$SCRIPT_PATH" "$config_file" "http://127.0.0.1:${port}" "primary-key" >/dev/null 2>&1; then
+    print_result "GitHub checker used enclave identity" "PASS"
+  else
+    print_result "GitHub checker should use enclave identity" "FAIL"
+  fi
+
+  kill "$server_pid" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+  rm -rf "$tmpdir"
+}
+
 # Run all tests
 echo "=== Testing check_mcp_servers.sh ==="
 echo "Script: $SCRIPT_PATH"
@@ -922,6 +975,7 @@ test_deferred_enclave_server_is_not_probed
 test_deferred_enclave_with_healthy_required_server
 test_unclassified_enclave_server_is_fatal
 test_arbitrary_deferred_server_name_is_fatal
+test_github_uses_enclave_check_identity_when_configured
 
 # Print summary
 echo ""

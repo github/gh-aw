@@ -14,6 +14,8 @@ import {
   main,
   parseToolArgs,
   readStdinSync,
+  refreshDeferredToolsIfNeeded,
+  serverInCommaList,
   shouldShowToolHelpForEmptyArgs,
   showHelp,
   showToolHelp,
@@ -213,6 +215,202 @@ describe("mcp_cli_bridge.cjs", () => {
         delete process.env.RUNNER_TEMP;
       } else {
         process.env.RUNNER_TEMP = originalRunnerTemp;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("detects exact names in comma-delimited deferred server lists", () => {
+    expect(serverInCommaList("awf-enclave", "safeoutputs, awf-enclave")).toBe(true);
+    expect(serverInCommaList("github", "awf-enclave")).toBe(false);
+    expect(serverInCommaList("awf", "awf-enclave")).toBe(false);
+  });
+
+  it("refreshes an empty awf-enclave tool cache from the live gateway without deferred marker", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-tools-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    const originalDeferred = process.env.GH_AW_MCP_DEFERRED_SERVERS;
+    delete process.env.GH_AW_MCP_DEFERRED_SERVERS;
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [{ name: "enclave_run_agent" }] } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const refreshed = await refreshDeferredToolsIfNeeded([], "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile);
+      expect(refreshed).toEqual([{ name: "enclave_run_agent" }]);
+      expect(JSON.parse(fs.readFileSync(toolsFile, "utf8"))).toEqual([{ name: "enclave_run_agent" }]);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("refreshing from live gateway"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      if (originalDeferred === undefined) {
+        delete process.env.GH_AW_MCP_DEFERRED_SERVERS;
+      } else {
+        process.env.GH_AW_MCP_DEFERRED_SERVERS = originalDeferred;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("retries deferred tools refresh until tools become available", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-retry-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          if (toolsListCalls < 2) {
+            res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          } else {
+            res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [{ name: "enclave_run_agent" }] } }));
+          }
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const refreshed = await refreshDeferredToolsIfNeeded([], "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      expect(refreshed).toEqual([{ name: "enclave_run_agent" }]);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("attempt 1/2 returned 0 tools"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns cached tools after deferred refresh retries are exhausted", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-exhausted-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+    const cachedTools = [];
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const refreshed = await refreshDeferredToolsIfNeeded(cachedTools, "awf-enclave", `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      expect(refreshed).toBe(cachedTools);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("refresh exhausted retries"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips repeated deferred retry loops after exhaustion in the same process", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-deferred-skip-"));
+    const toolsFile = path.join(tempDir, "awf-enclave.json");
+    fs.writeFileSync(toolsFile, "[]", "utf8");
+    let toolsListCalls = 0;
+    const serverName = "deferred-test-server";
+    const originalDeferred = process.env.GH_AW_MCP_DEFERRED_SERVERS;
+    process.env.GH_AW_MCP_DEFERRED_SERVERS = serverName;
+
+    const server = http.createServer((req, res) => {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(data || "{}");
+        if (parsed.method === "initialize") {
+          res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": "s1" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: {} }));
+          return;
+        }
+        if (parsed.method === "tools/list") {
+          toolsListCalls += 1;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, result: { tools: [] } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", result: {} }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      await refreshDeferredToolsIfNeeded([], serverName, `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      await refreshDeferredToolsIfNeeded([], serverName, `http://127.0.0.1:${port}/mcp/awf-enclave`, "key", toolsFile, 2, 0);
+      expect(toolsListCalls).toBe(2);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("already exhausted in this process"));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      if (originalDeferred === undefined) {
+        delete process.env.GH_AW_MCP_DEFERRED_SERVERS;
+      } else {
+        process.env.GH_AW_MCP_DEFERRED_SERVERS = originalDeferred;
       }
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -445,6 +643,42 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(stderr).toContain("Error [-32602]: Empty arguments are not allowed");
     expect(stderr).toContain("do not retry 'safeoutputs create_issue' with empty arguments");
     expect(stderr).toContain("safeoutputs create_issue --help");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("adds a distinguishable hint for enclave bit-budget exhaustion", async () => {
+    await formatResponse(
+      {
+        result: {
+          isError: true,
+          content: [{ type: "text", text: '{"status":"error","reason":"bit-budget-exhausted"}' }],
+        },
+      },
+      "awf-enclave",
+      "enclave_run_agent"
+    );
+
+    const stderr = stderrChunks.join("");
+    expect(stderr).toContain("bit-budget-exhausted");
+    expect(stderr).toContain("finite-disclosure bit budget");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("does not add enclave bit-budget hints for other servers", async () => {
+    await formatResponse(
+      {
+        result: {
+          isError: true,
+          content: [{ type: "text", text: '{"status":"error","reason":"bit-budget-exhausted"}' }],
+        },
+      },
+      "other-server",
+      "some_tool"
+    );
+
+    const stderr = stderrChunks.join("");
+    expect(stderr).toContain("bit-budget-exhausted");
+    expect(stderr).not.toContain("finite-disclosure bit budget");
     expect(process.exitCode).toBe(1);
   });
 

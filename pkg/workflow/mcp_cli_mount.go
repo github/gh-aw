@@ -13,6 +13,13 @@ import (
 
 var mcpCLIMountLog = logger.New("workflow:mcp_cli_mount")
 
+const (
+	// Keep these aligned with gh-aw-firewall's finite disclosure charge constants.
+	enclaveResultStatusBitCost = 1
+	enclaveTimingBucketBits    = 4
+	enclaveConfidentialRunBits = 8
+)
+
 // mcp_cli_mount.go generates a workflow step that mounts MCP servers as local CLI tools
 // and produces the prompt section that informs the agent about these tools.
 //
@@ -119,6 +126,9 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 	}
 	if IsMCPScriptsEnabled(data.MCPScripts) && !slices.Contains(servers, constants.MCPScriptsMCPServerID.String()) {
 		servers = append(servers, constants.MCPScriptsMCPServerID.String())
+	}
+	if enclavesEnabled(data) && !slices.Contains(servers, enclaveMCPServerName) {
+		servers = append(servers, enclaveMCPServerName)
 	}
 
 	// Copilot normally runs with --disable-builtin-mcps. When at least one CLI
@@ -364,9 +374,13 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	// Using step outputs (e.g. steps.mount-mcp-clis.outputs.mcp-cli-servers-list) here
 	// would reference a step from the agent job in the activation job's env block, which
 	// is out of scope and triggers actionlint errors.
-	lines := make([]string, len(servers))
-	for i, server := range servers {
-		lines[i] = fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server)
+	budgetLines := staticEnclaveInformationBudgetPromptLines(data)
+	lines := make([]string, 0, len(servers)+len(budgetLines))
+	for _, server := range servers {
+		lines = append(lines, fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server))
+	}
+	if len(budgetLines) > 0 {
+		lines = append(lines, budgetLines...)
 	}
 
 	promptFile := mcpCLIToolsPromptFile
@@ -381,4 +395,41 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 			"GH_AW_MCP_CLI_SERVERS_LIST": strings.Join(lines, "\n"),
 		},
 	}
+}
+
+func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
+	enclave := enclaveStaticGitHubAgentConfig(data)
+	if enclave == nil {
+		return nil
+	}
+	repoLines := make([]string, 0, len(enclave.Repos))
+	for _, repo := range enclave.Repos {
+		if repo == nil {
+			continue
+		}
+		switch repo.Sensitivity {
+		case "confidential":
+			payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
+			maxCardinality := 1 << payloadBits
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", repo.Repo, enclaveConfidentialRunBits, maxCardinality))
+		case "internal":
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
+		case "sealed":
+			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", repo.Repo))
+		}
+	}
+	if len(repoLines) == 0 {
+		return nil
+	}
+	lines := []string{
+		"",
+		"For `awf-enclave enclave_run_agent`, response schemas are constrained by finite-disclosure information budgets, not just `max-output-bytes`.",
+		// Keep these constants aligned with gh-aw-firewall's finite disclosure charge:
+		// RESULT_STATUS_BIT_COST=1, TIMING_BUCKET_BITS=4, and
+		// ENCLAVE_SENSITIVITY_RUN_BITS.confidential=8.
+		"The charge is 1 status bit + ceil(log2(response schema cardinality)) + 4 timing bits.",
+	}
+	lines = append(lines, repoLines...)
+	lines = append(lines, "Use small enums and booleans for finite schemas; a response can be under `max-output-bytes` and still fail with `bit-budget-exhausted` if its schema cardinality is too high.")
+	return lines
 }

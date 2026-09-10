@@ -340,6 +340,9 @@ enclaves:
     repos:
       - repo: octo-org/private-service
         sensitivity: confidential
+safe-outputs:
+  add-comment:
+    max: 1
 ---
 
 Read the private repository's issues through the enclave.
@@ -366,7 +369,11 @@ Read the private repository's issues through the enclave.
 	// broadens access beyond what the enclave identity already allows.
 	assert.Contains(t, lock, `"min-integrity": "none"`)
 	assert.Contains(t, lock, `"octo-org/private-service"`)
+	assert.Contains(t, lock, `"write-sink"`)
+	assert.Contains(t, lock, `"private:octo-org/private-service"`)
+	assert.Contains(t, lock, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
 	assert.Contains(t, lock, `"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}":{"servers":["github"],"tools":{"github":["list_issues","issue_read"]},"allow-only":{"min-integrity":"none","repos":["octo-org/private-service"]}}`)
+	assert.Contains(t, lock, `export GH_AW_MCP_GITHUB_CHECK_AGENT_ID="${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"`)
 	assert.NotContains(t, lock, `"${MCP_GATEWAY_AGENT_ID}":{"servers":["awf-enclave","github"`)
 }
 
