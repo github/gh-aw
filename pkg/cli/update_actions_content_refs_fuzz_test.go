@@ -168,7 +168,11 @@ func mutateExistingWorkflowForUpgrade(content string, mutation uint8) (mutated, 
 }
 
 func replaceFirstFrontmatterToken(content, oldValue, newValue string) string {
-	frontmatterStart := strings.IndexByte(content, '\n') + 1
+	firstNewline := strings.IndexByte(content, '\n')
+	if firstNewline < 0 {
+		panic("frontmatter opening line not found")
+	}
+	frontmatterStart := firstNewline + 1
 	offset := strings.Index(content[frontmatterStart:], oldValue)
 	if offset < 0 {
 		panic("frontmatter mutation token not found")
