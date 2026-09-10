@@ -76,6 +76,9 @@ func ValidateGitPath(path string) error {
 	if strings.HasPrefix(path, "-") {
 		return fmt.Errorf("invalid git path %q: paths must not start with '-' to prevent argument injection", path)
 	}
+	if strings.ContainsRune(path, '\x00') {
+		return fmt.Errorf("invalid git path %q: paths must not contain NUL bytes", path)
+	}
 	if stdpath.IsAbs(path) {
 		return fmt.Errorf("invalid git path %q: paths must not be absolute", path)
 	}
