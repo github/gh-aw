@@ -95,23 +95,13 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'generate_aw_info.cjs'));
             await main(core, context);
-      - name: Restore daily AIC usage cache
-        id: restore-daily-aic-cache
-        if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
-        continue-on-error: true
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: agentic-workflow-usage-workflow-${{ github.run_id }}
-          restore-keys: agentic-workflow-usage-workflow-
-          path: /tmp/gh-aw/agentic-workflow-usage-cache.jsonl
-      - name: Restore daily AIC usage cache (artifact fallback)
+      - name: Restore daily AIC scan observations
         id: restore-daily-aic-cache-fallback
         if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
-        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_RESTORE_DAILY_AIC_CACHE_HIT: ${{ steps.restore-daily-aic-cache.outputs.cache-hit }}
-          GH_AW_RESTORE_DAILY_AIC_CACHE_MATCHED_KEY: ${{ steps.restore-daily-aic-cache.outputs.cache-matched-key }}
+          GH_AW_HAS_SLASH_COMMAND: "false"
+          GH_AW_HAS_LABEL_COMMAND: "false"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -119,7 +109,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'restore_aic_usage_cache_fallback.cjs'));
+            const { main } = require(path.join(actionsDir, 'restore_aic_scan_cache.cjs'));
             await main();
       - name: Check daily workflow token guardrail
         id: daily-effective-workflow-guardrail
@@ -143,6 +133,16 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'check_daily_aic_workflow_guardrail.cjs'));
             await main();
+      - name: Publish daily AIC scan observations
+        if: always() && env.GH_AW_MAX_DAILY_AI_CREDITS != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aic-usage-scan-v2
+          path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
+          overwrite: true
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
         run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" COPILOT_GITHUB_TOKEN Pi https://github.github.com/gh-aw/reference/engines/#pi
