@@ -1,0 +1,81 @@
+{
+  "date": "2026-09-11",
+  "pr_count": 140,
+  "avg_sentiment": 0.0245,
+  "sentiment_counts": {
+    "positive": 65,
+    "negative": 47,
+    "neutral": 28
+  },
+  "cluster_labels": {
+    "0": "issue, run, job, failure, issues, jira",
+    "1": "codex, model, copilot, openai, gpt, openai gpt",
+    "2": "enclave, github, path, playwright, workflow, runtime",
+    "3": "logs, targets, runs, target, metadata, audit",
+    "4": "em, sub, firewall, details, aic, network"
+  },
+  "cluster_counts": {
+    "2": 43,
+    "4": 33,
+    "3": 22,
+    "1": 21,
+    "0": 21
+  },
+  "top_keywords": [
+    [
+      "workflow",
+      43.95089736726058
+    ],
+    [
+      "github",
+      32.483349839036094
+    ],
+    [
+      "run",
+      28.20651943411531
+    ],
+    [
+      "add",
+      20.679586264589425
+    ],
+    [
+      "gpt",
+      17.4236967842076
+    ],
+    [
+      "generated",
+      16.493210038706376
+    ],
+    [
+      "sub",
+      16.365050523467072
+    ],
+    [
+      "aic",
+      15.486691329209707
+    ],
+    [
+      "em",
+      15.316144442101479
+    ],
+    [
+      "summary",
+      14.557908752972383
+    ]
+  ],
+  "most_positive": {
+    "pr_number": 58724,
+    "pr_title": "Use a compatible runtime for Documentation Noob Tester",
+    "sentiment_polarity": 0.5
+  },
+  "most_negative": {
+    "pr_number": 58861,
+    "pr_title": "Increase Code Scanning Fixer execution budget",
+    "sentiment_polarity": -0.9375
+  },
+  "most_discussed": {
+    "pr_number": 58120,
+    "pr_title": "repo-memory: filter disallowed files before validation/upload instead of failing downstream in push",
+    "text_length": 16371
+  }
+}
