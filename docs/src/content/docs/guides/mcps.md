@@ -11,7 +11,7 @@ sidebar:
 
 Get your first MCP integration running in a few minutes.
 
-### Step 1: Add GitHub Tools
+### 1. Add GitHub Tools
 
 Create a workflow file at `.github/workflows/my-workflow.md`:
 
@@ -37,7 +37,7 @@ Analyze the issue and provide a summary of similar existing issues.
 
 The `toolsets: [default]` configuration gives your agentic workflow access to repository, issue, and pull request tools.
 
-### Step 2: Compile and Test
+### 2. Compile and Test
 
 ```bash
 gh aw compile my-workflow
@@ -46,12 +46,12 @@ gh aw mcp inspect my-workflow
 
 ## GitHub MCP Server
 
-The GitHub MCP server is built into agentic workflows and provides comprehensive access to GitHub's API.
+The GitHub MCP server is built into agentic workflows and provides read-only access to GitHub's API. Write actions still go through [safe outputs](/gh-aw/reference/safe-outputs/).
 
 ### Available Toolsets
 
-| Toolset | Description | Tools |
-|---------|-------------|-------|
+| Toolset | Purpose | Example tools |
+|---------|---------|---------------|
 | `context` | User and team information | `get_teams`, `get_team_members` |
 | `repos` | Repository operations | `get_repository`, `get_file_contents`, `list_commits` |
 | `issues` | Issue management | `list_issues`, `create_issue`, `update_issue` |
@@ -61,15 +61,13 @@ The GitHub MCP server is built into agentic workflows and provides comprehensive
 | `code_security` | Security alerts | `list_code_scanning_alerts` |
 | `users` | User profiles | `get_me` ⚠️, `get_user`, `list_users` |
 
-When calling `list_code_scanning_alerts` from workflow prompts, always bound the request with `state: open` and `severity: critical,high`.
+The `default` toolset includes `context`, `repos`, `issues`, and `pull_requests`. It expands to the toolsets supported by GitHub Actions tokens, so `users` is excluded.
 
-The `default` toolset includes `context`, `repos`, `issues`, and `pull_requests`. In workflows, `[default]` expands to toolsets that work with GitHub Actions tokens. The `users` toolset is excluded because those tokens do not support user operations.
+When calling `list_code_scanning_alerts` from workflow prompts, always bound the request with `state: open` and `severity: critical,high`.
 
 ### Operating Modes
 
-Remote mode (`mode: remote`) connects to a hosted server with no Docker required. Local mode (`mode: local`) runs in Docker, enabling version pinning for offline or restricted environments. See [Remote vs Local Mode](/gh-aw/reference/github-tools/#github-tools-access-modes).
-
-The GitHub MCP server always operates read-only. Write operations are handled through [safe outputs](/gh-aw/reference/safe-outputs/), which run in a separate permission-controlled job.
+Use `mode: remote` to connect to the hosted server with no Docker requirement. Use `mode: local` to run in Docker when you need local version pinning or support for restricted environments. See [Remote vs Local Mode](/gh-aw/reference/github-tools/#github-tools-access-modes).
 
 ## Manually Configuring a Custom MCP Server
 
@@ -105,7 +103,12 @@ Custom MCP servers should be **read-only**. Write operations must go through [sa
 
 ## Custom MCP Server Types
 
-Choose the transport that matches how the server runs: stdio for local commands, containers for packaged local servers, HTTP for remote endpoints, and `registry` when you want to attach registry metadata to a server definition.
+Choose the transport that matches how the server runs:
+
+- `command` for local executables over stdio
+- `container` for packaged local servers
+- `url` for remote HTTP endpoints
+- `registry` when you want to attach registry metadata to a server definition
 
 ### Stdio MCP Servers
 
@@ -332,14 +335,24 @@ Review code scanning alerts and create weekly security discussions with findings
 
 ## Debugging and Troubleshooting
 
-Inspect MCP configurations with `gh aw mcp inspect my-workflow` (add `--server <name> --verbose` for details) or `gh aw mcp list-tools <server> my-workflow`.
+Inspect MCP configurations with `gh aw mcp inspect my-workflow` or `gh aw mcp list-tools <server> my-workflow`. Add `--server <name> --verbose` when you need per-server details.
 
-For advanced debugging, import `shared/mcp-debug.md` to access diagnostic tools and the `report_diagnostics_to_pull_request` custom safe-output.
+For deeper diagnostics, import `shared/mcp-debug.md` to access diagnostic tools and the `report_diagnostics_to_pull_request` custom safe-output.
 
-Common issues are usually connection failures, which point to syntax, environment variable, or network problems, or missing tools, which usually mean the toolsets configuration or `allowed` list needs to be checked with `gh aw mcp inspect`.
+Most failures fall into two buckets:
+
+- connection problems caused by syntax, environment variable, or network issues
+- missing tools caused by the configured toolsets or `allowed` list
+
+In both cases, `gh aw mcp inspect` is the fastest way to confirm what the workflow exposes.
 
 ## Learn More
 
-See [MCP Scripts](/gh-aw/reference/mcp-scripts/) for inline tools without external MCP servers, [Tools](/gh-aw/reference/tools/) for the full tools reference, [CLI Commands](/gh-aw/setup/cli/) for commands such as `mcp inspect`, [Imports](/gh-aw/reference/imports/) for modular workflow composition, [Frontmatter](/gh-aw/reference/frontmatter/) for configuration details, and [Workflow Structure](/gh-aw/reference/workflow-structure/) for directory layout.
-
-For upstream references, see the [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification) and the [GitHub MCP Server](https://github.com/github/github-mcp-server).
+- [MCP Scripts](/gh-aw/reference/mcp-scripts/) for inline tools without external MCP servers
+- [Tools](/gh-aw/reference/tools/) for the full tools reference
+- [CLI Commands](/gh-aw/setup/cli/) for commands such as `mcp inspect`
+- [Imports](/gh-aw/reference/imports/) for modular workflow composition
+- [Frontmatter](/gh-aw/reference/frontmatter/) for configuration details
+- [Workflow Structure](/gh-aw/reference/workflow-structure/) for directory layout
+- [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification)
+- [GitHub MCP Server](https://github.com/github/github-mcp-server)
