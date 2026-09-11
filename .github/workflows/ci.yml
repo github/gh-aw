@@ -32,7 +32,7 @@ jobs:
       contents: read
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         fetch-depth: 2
     - name: Detect recent changes
@@ -49,7 +49,7 @@ jobs:
       contents: read
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
     - name: Check container images against actions pins
@@ -153,10 +153,10 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -184,12 +184,12 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       with:
         persist-credentials: false
 
     - name: Set up Node.js
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f   # v6
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v6
       with:
         node-version: "24"
 
@@ -296,11 +296,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -430,7 +430,7 @@ jobs:
 
     - name: Upload integration test results
       if: always()    # Upload even if tests fail so canary_go can track coverage
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-${{ matrix.test-group.name }}
         path: test-result-integration-*.json
@@ -438,7 +438,7 @@ jobs:
 
     - name: Upload integration coverage artifacts
       if: always() && hashFiles(format('coverage-integration-{0}.out', steps.run-tests.outputs.safe_name)) != ''
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: ci-integration-coverage-${{ steps.run-tests.outputs.safe_name }}
         path: |
@@ -474,11 +474,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -522,7 +522,7 @@ jobs:
       run: make build
 
     - name: Upload gh-aw binary artifact
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: gh-aw-linux-amd64
         path: gh-aw
@@ -553,7 +553,7 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Download gh-aw binary artifact
       uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16   # v4
@@ -582,7 +582,7 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Download gh-aw binary artifact
       uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16   # v4
@@ -609,11 +609,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Node.js
       id: setup-node
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f   # v6
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v6
       with:
         node-version: "24"
         cache: npm
@@ -662,11 +662,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -740,7 +740,7 @@ jobs:
         echo "- v0.x exposure: ${V0_PERCENT}%" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload audit results
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: dependency-audit
         path: |
@@ -762,11 +762,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -822,11 +822,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1022,7 +1022,7 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Download gh-aw binary artifact
       uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16   # v4
@@ -1086,11 +1086,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1253,11 +1253,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1299,11 +1299,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1341,7 +1341,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-unauthenticated
         path: test-result-integration-unauthenticated.json
@@ -1378,11 +1378,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1416,7 +1416,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-add-dispatch-workflow
         path: test-result-integration-add-dispatch-workflow.json
@@ -1453,7 +1453,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Extract versions from constants.go
       id: versions
@@ -1557,7 +1557,7 @@ jobs:
       DIFC_PROXY_IMAGE: ghcr.io/github/gh-aw-mcpg:v0.2.8
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Log in to GitHub Container Registry
         # SECURITY: token moved to env mapping to prevent shell interpretation
@@ -1693,7 +1693,7 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Start local proxy
       run: |
@@ -1788,11 +1788,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true
@@ -1936,11 +1936,11 @@ jobs:
       cancel-in-progress: true
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Set up Go
       id: setup-go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
       with:
         go-version-file: go.mod
         cache: true

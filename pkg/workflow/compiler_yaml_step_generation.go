@@ -138,7 +138,7 @@ const (
 	otlpWIFExchangeStepID = "exchange-otlp-workload-identity-token"
 )
 
-func (c *Compiler) generateOTLPOIDCMintStep(data *WorkflowData) []string {
+func (c *Compiler) generateOTLPOIDCMintStep(data *WorkflowData) []string { //nolint:largefunc // Existing step assembly is intentionally centralized.
 	if data == nil {
 		return nil
 	}
@@ -216,7 +216,7 @@ func (c *Compiler) generateSetupStep(data *WorkflowData, setupActionRef string, 
 	return c.generateSetupStepWithArtifactClientCondition(data, setupActionRef, destination, enableArtifactClient, traceID, parentSpanID, "")
 }
 
-func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string {
+func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string { //nolint:largefunc // Existing setup-step emission is intentionally centralized.
 	lines := c.generateOTLPOIDCMintStep(data)
 	hasOTLPOIDC := len(lines) > 0
 	otlpAuthTokenStepID := getOTLPAuthTokenStepID(data)
@@ -341,7 +341,7 @@ func (c *Compiler) generateSetRuntimePathsStep() []string {
 		"        id: set-runtime-paths\n",
 		"        env:\n",
 		"          GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}\n",
-		"        run: |\n",
+		"        run: | # zizmor: ignore[github-env] - runner.tool_cache is set by GitHub Actions, not user input.\n",
 		"          if [ -z \"${RUNNER_TOOL_CACHE:-}\" ]; then\n",
 		"            echo \"RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}\" >> \"$GITHUB_ENV\"\n",
 		"          fi\n",

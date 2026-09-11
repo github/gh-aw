@@ -54,6 +54,15 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 			continue
 		}
 
+		if rawSetupSteps, ok := configMap["setup-steps"].([]any); ok && setupStepsRequireContentsRead(rawSetupSteps) {
+			permissions := NewPermissionsParser(job.Permissions).ToPermissions()
+			if _, exists := permissions.Get(PermissionContents); !exists {
+				permissions.Set(PermissionContents, PermissionRead)
+				job.Permissions = permissions.RenderToYAML()
+				compilerJobsLog.Printf("Granted contents: read to built-in job '%s' for checkout setup-step", targetJobName)
+			}
+		}
+
 		job.Steps = insertActivationStepsBeforeArtifactStaging(targetJobName, job.Steps, regularSteps)
 		job.Steps = insertPreStepsAtEarliestBoundary(job.Steps, preSteps)
 		job.Steps = insertSetupStepsAtStart(job.Steps, setupSteps)
@@ -61,6 +70,20 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	return nil
+}
+
+func setupStepsRequireContentsRead(steps []any) bool {
+	for _, step := range steps {
+		stepMap, ok := step.(map[string]any)
+		if !ok {
+			continue
+		}
+		uses, ok := stepMap["uses"].(string)
+		if ok && isCheckoutAction(uses) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Compiler) extractBuiltinJobPreSteps(jobName, targetJobName string, configMap map[string]any, data *WorkflowData, hasSetupSteps, hasPreSteps, hasSteps bool) ([]string, []string, []string, error) {

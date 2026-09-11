@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const fs = require("fs");
+const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
@@ -22,6 +23,8 @@ const TOKEN_USAGE_PATH = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-
 const TOKEN_USAGE_AWF_AUDIT_PATH = "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl";
 const TOKEN_USAGE_PATHS = [TOKEN_USAGE_AUDIT_PATH, TOKEN_USAGE_AWF_AUDIT_PATH, TOKEN_USAGE_PATH];
 const AGENT_USAGE_PATH = "/tmp/gh-aw/agent_usage.json";
+const AGENT_USAGE_JSONL_PATH = "/tmp/gh-aw/agent_usage.jsonl";
+const COPILOT_SESSION_STATE_DIR = "/tmp/gh-aw/sandbox/agent/logs/copilot-session-state";
 const DEFAULT_SUMMARY_TITLE = "Token Usage";
 
 /**
@@ -105,6 +108,90 @@ function readDedupedTokenUsage(paths) {
 function getSummaryTitle() {
   const title = process.env.GH_AW_TOKEN_USAGE_SUMMARY_TITLE;
   return title && title.trim() ? title.trim() : DEFAULT_SUMMARY_TITLE;
+}
+
+/**
+ * Finds the latest valid Copilot session usage checkpoint.
+ * @param {string} sessionStateDir
+ * @returns {{aiCredits: number, premiumRequests: number} | null}
+ */
+function findCopilotUsageCheckpoint(sessionStateDir = COPILOT_SESSION_STATE_DIR) {
+  if (!fs.existsSync(sessionStateDir)) return null;
+
+  /** @type {string[]} */
+  const eventPaths = [];
+  try {
+    for (const entry of fs.readdirSync(sessionStateDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name === "events.jsonl") {
+        eventPaths.push(path.join(sessionStateDir, entry.name));
+      } else if (entry.isDirectory()) {
+        const eventsPath = path.join(sessionStateDir, entry.name, "events.jsonl");
+        if (fs.existsSync(eventsPath)) eventPaths.push(eventsPath);
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  /** @type {{aiCredits: number, premiumRequests: number} | null} */
+  let latest = null;
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+  let sequence = 0;
+  for (const eventsPath of eventPaths.sort()) {
+    let content;
+    try {
+      content = fs.readFileSync(eventsPath, "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of content.split("\n")) {
+      sequence++;
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        if (event?.type !== "session.usage_checkpoint") continue;
+        const totalNanoAiu = Number(event?.data?.totalNanoAiu);
+        if (!Number.isFinite(totalNanoAiu) || totalNanoAiu < 0) continue;
+        const parsedTimestamp = Date.parse(event.timestamp);
+        const timestamp = Number.isFinite(parsedTimestamp) ? parsedTimestamp : sequence;
+        if (latest && timestamp < latestTimestamp) continue;
+        const premiumRequests = Number(event?.data?.totalPremiumRequests);
+        latest = {
+          aiCredits: totalNanoAiu / 1e9,
+          premiumRequests: Number.isFinite(premiumRequests) && premiumRequests >= 0 ? premiumRequests : 0,
+        };
+        latestTimestamp = timestamp;
+      } catch {
+        // Ignore malformed session events.
+      }
+    }
+  }
+  return latest;
+}
+
+/**
+ * Writes and reports authoritative usage from a Copilot session checkpoint.
+ * @param {{aiCredits: number, premiumRequests: number}} checkpoint
+ * @returns {Promise<void>}
+ */
+async function reportCopilotUsageCheckpoint(checkpoint) {
+  const agentUsage = {
+    ai_credits: checkpoint.aiCredits,
+    premium_requests: checkpoint.premiumRequests,
+  };
+  try {
+    fs.writeFileSync(AGENT_USAGE_PATH, JSON.stringify(agentUsage) + "\n");
+    fs.writeFileSync(AGENT_USAGE_JSONL_PATH, JSON.stringify({ provider: "copilot", ai_credits: checkpoint.aiCredits, premium_requests: checkpoint.premiumRequests }) + "\n");
+  } catch (error) {
+    throw new Error(`${ERR_PARSE}: Failed to write Copilot usage files: ${getErrorMessage(error)}`, { cause: error });
+  }
+
+  const aic = formatAICForOutput(checkpoint.aiCredits, "awf_reported");
+  core.exportVariable("GH_AW_AIC", aic);
+  core.setOutput("aic", aic);
+  const markdown = ["| AI Credits | Premium Requests |", "| ---: | ---: |", `| ${aic} | ${checkpoint.premiumRequests.toLocaleString()} |`, ""].join("\n");
+  core.info(`Copilot session usage: ${aic} AI Credits, ${checkpoint.premiumRequests} premium request(s)`);
+  await appendStepSummarySection(getSummaryTitle(), markdown);
 }
 
 /**
@@ -200,10 +287,15 @@ async function appendStepSummarySection(title, markdown, workingSet = null) {
 /**
  * Main function to parse token usage and write the step summary.
  */
-async function main() {
+async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
   try {
     const tokenUsagePaths = getReadableTokenUsagePaths(TOKEN_USAGE_PATHS);
     if (tokenUsagePaths.length === 0) {
+      const checkpoint = findCopilotUsageCheckpoint(copilotSessionStateDir);
+      if (checkpoint) {
+        await reportCopilotUsageCheckpoint(checkpoint);
+        return;
+      }
       core.info("No token usage data found, skipping summary");
       return;
     }
@@ -213,6 +305,11 @@ async function main() {
 
     const summary = parseTokenUsageJsonl(content);
     if (!summary || summary.totalRequests === 0) {
+      const checkpoint = findCopilotUsageCheckpoint(copilotSessionStateDir);
+      if (checkpoint) {
+        await reportCopilotUsageCheckpoint(checkpoint);
+        return;
+      }
       core.info("Token usage file contained no valid entries");
       return;
     }
@@ -293,7 +390,11 @@ if (typeof module !== "undefined" && module.exports) {
     TOKEN_USAGE_AWF_AUDIT_PATH,
     TOKEN_USAGE_PATHS,
     AGENT_USAGE_PATH,
+    AGENT_USAGE_JSONL_PATH,
+    COPILOT_SESSION_STATE_DIR,
     DEFAULT_SUMMARY_TITLE,
+    findCopilotUsageCheckpoint,
+    reportCopilotUsageCheckpoint,
   };
 }
 

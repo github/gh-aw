@@ -869,6 +869,123 @@
                 "unavailable_count"
               ],
               "additionalProperties": false
+            },
+            "engine_version": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "gh_aw_version": {
+              "type": "string"
+            },
+            "agent_runtime": {
+              "type": "string"
+            },
+            "firewall_version": {
+              "type": "string"
+            },
+            "gateway_version": {
+              "type": "string"
+            },
+            "job_details": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "run_attempt": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "conclusion": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "started_at": {
+                    "type": "string"
+                  },
+                  "completed_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "mcp_tool_usage": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "tool_calls": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tool_call_id": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "server_name": {
+                        "type": "string"
+                      },
+                      "tool_name": {
+                        "type": "string"
+                      },
+                      "method": {
+                        "type": "string"
+                      },
+                      "input_size": {
+                        "type": "integer"
+                      },
+                      "output_size": {
+                        "type": "integer"
+                      },
+                      "duration": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "effective_token_delta": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "timestamp",
+                      "server_name",
+                      "tool_name",
+                      "input_size",
+                      "output_size",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
             }
           },
           "required": [

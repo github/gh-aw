@@ -22,13 +22,13 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	first, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
 		Kind:          cachedLogsJSONLKindRun,
-		Run:           &RunData{RunID: 42, WorkflowName: "cached-workflow"},
+		Run:           &cachedLogsJSONLRunData{RunData: RunData{RunID: 42, WorkflowName: "cached-workflow"}},
 	})
 	require.NoError(t, err)
 	second, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
 		Kind:          cachedLogsJSONLKindRun,
-		Run:           &RunData{RunID: 0, WorkflowName: "invalid"},
+		Run:           &cachedLogsJSONLRunData{RunData: RunData{RunID: 0, WorkflowName: "invalid"}},
 	})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, append(append(first, '\n'), append(second, '\n')...), 0o600))
@@ -102,6 +102,104 @@ func TestCachedLogsJSONLWriterAppendsImmediately(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestCachedLogsJSONLWriterIncludesSafeDashboardEvidence(t *testing.T) {
+	runDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{
+		"engine_id": "copilot",
+		"engine_name": "Copilot",
+		"model": "gpt-5",
+		"version": "1.2.3",
+		"cli_version": "0.99.0",
+		"awf_version": "0.20.0",
+		"awmg_version": "0.30.0",
+		"agent_runtime": "gvisor"
+	}`), 0o600))
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	writer := newCachedLogsJSONLWriter(path)
+	startedAt := time.Date(2026, time.September, 9, 4, 0, 1, 0, time.UTC)
+	completedAt := startedAt.Add(time.Minute)
+	const sensitiveError = "******"
+
+	require.NoError(t, writer.Append(ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID:   303,
+			Repository:   "githubnext/gh-aw-cao",
+			WorkflowName: "Dashboard",
+			WorkflowPath: ".github/workflows/dashboard.md",
+			Status:       "completed",
+			Conclusion:   "success",
+			Attempt:      1,
+			CreatedAt:    startedAt,
+			UpdatedAt:    completedAt,
+			LogsPath:     runDir,
+		},
+		JobDetails: []JobInfoWithDuration{{
+			JobInfo: JobInfo{
+				ID:          404,
+				RunAttempt:  1,
+				Name:        "agent",
+				Status:      "completed",
+				Conclusion:  "success",
+				StartedAt:   startedAt,
+				CompletedAt: completedAt,
+				RunnerName:  "sensitive-runner-name",
+			},
+		}},
+		MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{
+			ToolCallID: "call-7",
+			Timestamp:  "2026-09-09T04:00:15Z",
+			ServerName: "github",
+			ToolName:   "get_file",
+			InputSize:  128,
+			OutputSize: 1024,
+			Status:     "success",
+			Error:      sensitiveError,
+		}}},
+	}))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), sensitiveError)
+	assert.NotContains(t, string(data), "sensitive-runner-name")
+
+	var record cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &record))
+	require.NotNil(t, record.Run)
+	assert.Equal(t, "1.2.3", record.Run.EngineVersion)
+	assert.Equal(t, "gpt-5", record.Run.Model)
+	assert.Equal(t, "0.99.0", record.Run.GhAwVersion)
+	assert.Equal(t, "gvisor", record.Run.AgentRuntime)
+	assert.Equal(t, "0.20.0", record.Run.FirewallVersion)
+	assert.Equal(t, "0.30.0", record.Run.GatewayVersion)
+	require.Len(t, record.Run.JobDetails, 1)
+	assert.Equal(t, int64(404), record.Run.JobDetails[0].ID)
+	assert.Equal(t, "agent", record.Run.JobDetails[0].Name)
+	require.NotNil(t, record.Run.MCPToolUsage)
+	require.Len(t, record.Run.MCPToolUsage.ToolCalls, 1)
+	assert.Equal(t, "call-7", record.Run.MCPToolUsage.ToolCalls[0].ToolCallID)
+	assert.Equal(t, "github", record.Run.MCPToolUsage.ToolCalls[0].ServerName)
+	assert.Equal(t, "get_file", record.Run.MCPToolUsage.ToolCalls[0].ToolName)
+}
+
+func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
+	jobs := projectCachedLogsJSONLJobs([]JobInfoWithDuration{
+		{JobInfo: JobInfo{ID: 0, Name: "missing-id"}},
+		{JobInfo: JobInfo{ID: 1}},
+		{JobInfo: JobInfo{ID: 2, Name: "agent"}},
+	})
+	require.Len(t, jobs, 1)
+	assert.Equal(t, int64(2), jobs[0].ID)
+
+	usage := projectCachedLogsJSONLMCPToolUsage(&MCPToolUsageData{ToolCalls: []MCPToolCall{
+		{ServerName: "github", ToolName: "missing-timestamp"},
+		{Timestamp: "2026-09-09T04:00:15Z"},
+		{Timestamp: "2026-09-09T04:00:16Z", ServerName: "github", ToolName: "get_file"},
+	}})
+	require.NotNil(t, usage)
+	require.Len(t, usage.ToolCalls, 1)
+	assert.Equal(t, "get_file", usage.ToolCalls[0].ToolName)
 }
 
 func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
@@ -239,7 +337,7 @@ func TestCachedLogsJSONLWriterSerializesConcurrentAppends(t *testing.T) {
 func TestCachedLogsLookupHonorsRepositoryAndFilters(t *testing.T) {
 	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
 	runs := cachedLogsRuns{
-		42: {RunID: 42, Repository: "github/gh-aw", EngineID: "copilot", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt},
+		42: {RunData: RunData{RunID: 42, Repository: "github/gh-aw", EngineID: "copilot", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt}},
 	}
 	run := WorkflowRun{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt}
 
@@ -257,11 +355,13 @@ func TestCachedLogsLookupRejectsChangedRun(t *testing.T) {
 	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
 	runs := cachedLogsRuns{
 		42: {
-			RunID:      42,
-			Status:     "completed",
-			Conclusion: "success",
-			RunAttempt: "1",
-			UpdatedAt:  updatedAt,
+			RunData: RunData{
+				RunID:      42,
+				Status:     "completed",
+				Conclusion: "success",
+				RunAttempt: "1",
+				UpdatedAt:  updatedAt,
+			},
 		},
 	}
 
@@ -280,8 +380,8 @@ func TestCachedLogsLookupRejectsChangedRun(t *testing.T) {
 func TestCachedLogsLookupRejectsUnknownIdentity(t *testing.T) {
 	updatedAt := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
 	runs := cachedLogsRuns{
-		42: {RunID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt},
-		43: {RunID: 43, Status: "completed", Conclusion: "success", UpdatedAt: updatedAt},
+		42: {RunData: RunData{RunID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", RunAttempt: "1", UpdatedAt: updatedAt}},
+		43: {RunData: RunData{RunID: 43, Status: "completed", Conclusion: "success", UpdatedAt: updatedAt}},
 	}
 
 	tests := []WorkflowRun{
@@ -320,7 +420,7 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: cached.UpdatedAt}}, runArtifactsConcurrentOptions{
 		outputDir:    t.TempDir(),
 		maxRuns:      1,
-		cachedRuns:   cachedLogsRuns{42: cached},
+		cachedRuns:   cachedLogsRuns{42: {RunData: cached}},
 		storageLimit: newLogsStorageLimit(t.TempDir(), 0, false),
 	})
 

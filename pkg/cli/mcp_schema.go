@@ -78,9 +78,9 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 }
 
 type cachedLogsJSONLRunItemSchema struct {
-	SchemaVersion int     `json:"schema_version"`
-	Kind          string  `json:"kind"`
-	Run           RunData `json:"run"`
+	SchemaVersion int                    `json:"schema_version"`
+	Kind          string                 `json:"kind"`
+	Run           cachedLogsJSONLRunData `json:"run"`
 }
 
 type cachedWorkflowRunListItemSchema struct {

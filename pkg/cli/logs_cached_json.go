@@ -10,12 +10,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-type cachedLogsRuns map[int64]RunData
+type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
 const cachedLogsJSONLSchemaVersion = 2
 
@@ -31,10 +32,54 @@ type cachedWorkflowRunsRequest struct {
 	Args       []string `json:"args"`
 }
 
+// cachedLogsJSONLRunData extends the reusable run summary with the safe,
+// per-run evidence needed by dashboard adapters to derive Jobs, Sessions,
+// and Events. Raw tool errors, arguments, responses, and artifact bodies are
+// deliberately excluded from these projections.
+type cachedLogsJSONLRunData struct {
+	RunData
+	EngineVersion   string                           `json:"engine_version,omitempty"`
+	Model           string                           `json:"model,omitempty"`
+	GhAwVersion     string                           `json:"gh_aw_version,omitempty"`
+	AgentRuntime    string                           `json:"agent_runtime,omitempty"`
+	FirewallVersion string                           `json:"firewall_version,omitempty"`
+	GatewayVersion  string                           `json:"gateway_version,omitempty"`
+	JobDetails      []cachedLogsJSONLJobData         `json:"job_details,omitempty"`
+	MCPToolUsage    *cachedLogsJSONLMCPToolUsageData `json:"mcp_tool_usage,omitempty"`
+}
+
+type cachedLogsJSONLJobData struct {
+	ID          int64     `json:"id"`
+	RunAttempt  int       `json:"run_attempt,omitempty"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status,omitempty"`
+	Conclusion  string    `json:"conclusion,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitzero"`
+	StartedAt   time.Time `json:"started_at,omitzero"`
+	CompletedAt time.Time `json:"completed_at,omitzero"`
+}
+
+type cachedLogsJSONLMCPToolUsageData struct {
+	ToolCalls []cachedLogsJSONLMCPToolCall `json:"tool_calls,omitempty"`
+}
+
+type cachedLogsJSONLMCPToolCall struct {
+	ToolCallID          string `json:"tool_call_id,omitempty"`
+	Timestamp           string `json:"timestamp"`
+	ServerName          string `json:"server_name"`
+	ToolName            string `json:"tool_name"`
+	Method              string `json:"method,omitempty"`
+	InputSize           int    `json:"input_size"`
+	OutputSize          int    `json:"output_size"`
+	Duration            string `json:"duration,omitempty"`
+	Status              string `json:"status"`
+	EffectiveTokenDelta int    `json:"effective_token_delta,omitempty"`
+}
+
 type cachedLogsJSONLRecord struct {
 	SchemaVersion int                        `json:"schema_version"`
 	Kind          string                     `json:"kind,omitempty"`
-	Run           *RunData                   `json:"run,omitempty"`
+	Run           *cachedLogsJSONLRunData    `json:"run,omitempty"`
 	Request       *cachedWorkflowRunsRequest `json:"request,omitempty"`
 	Payload       json.RawMessage            `json:"payload,omitempty"`
 	RateLimit     *GitHubAPIRateLimitReport  `json:"rate_limit,omitempty"`
@@ -135,7 +180,7 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		return nil
 	}
 	run := *record.Run
-	if err := normalizeCachedLogRun(&run); err != nil {
+	if err := normalizeCachedLogRun(&run.RunData); err != nil {
 		return err
 	}
 	if run.RunID != 0 {
@@ -164,16 +209,85 @@ func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
 	if len(logsData.Runs) != 1 {
 		return errors.New("failed to build cached logs JSONL record")
 	}
-	runData := logsData.Runs[0]
+	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0])
 	record, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
 		Kind:          cachedLogsJSONLKindRun,
-		Run:           &runData,
+		Run:           runData,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal cached logs JSONL record: %w", err)
 	}
 	return w.appendRecord(record)
+}
+
+func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJSONLRunData {
+	data := &cachedLogsJSONLRunData{
+		RunData:      runData,
+		JobDetails:   projectCachedLogsJSONLJobs(run.JobDetails),
+		MCPToolUsage: projectCachedLogsJSONLMCPToolUsage(run.MCPToolUsage),
+	}
+	if info := runData.awInfo; info != nil {
+		data.EngineVersion = info.Version
+		data.Model = info.Model
+		data.GhAwVersion = info.CLIVersion
+		data.AgentRuntime = info.AgentRuntime
+		data.FirewallVersion = info.GetFirewallVersion()
+		data.GatewayVersion = info.AwmgVersion
+	}
+	return data
+}
+
+func projectCachedLogsJSONLJobs(jobs []JobInfoWithDuration) []cachedLogsJSONLJobData {
+	projected := make([]cachedLogsJSONLJobData, 0, len(jobs))
+	for _, job := range jobs {
+		if job.ID <= 0 || job.Name == "" {
+			continue
+		}
+		projected = append(projected, cachedLogsJSONLJobData{
+			ID:          job.ID,
+			RunAttempt:  job.RunAttempt,
+			Name:        job.Name,
+			Status:      job.Status,
+			Conclusion:  job.Conclusion,
+			CreatedAt:   job.CreatedAt,
+			StartedAt:   job.StartedAt,
+			CompletedAt: job.CompletedAt,
+		})
+	}
+	return projected
+}
+
+func projectCachedLogsJSONLMCPToolUsage(usage *MCPToolUsageData) *cachedLogsJSONLMCPToolUsageData {
+	if usage == nil || len(usage.ToolCalls) == 0 {
+		return nil
+	}
+	toolCalls := make([]cachedLogsJSONLMCPToolCall, 0, len(usage.ToolCalls))
+	for _, call := range usage.ToolCalls {
+		if call.Timestamp == "" || (call.ServerName == "" && call.ToolName == "") {
+			continue
+		}
+		toolCalls = append(toolCalls, call.cachedLogsJSONLProjection())
+	}
+	if len(toolCalls) == 0 {
+		return nil
+	}
+	return &cachedLogsJSONLMCPToolUsageData{ToolCalls: toolCalls}
+}
+
+func (call MCPToolCall) cachedLogsJSONLProjection() cachedLogsJSONLMCPToolCall {
+	return cachedLogsJSONLMCPToolCall{
+		ToolCallID:          call.ToolCallID,
+		Timestamp:           call.Timestamp,
+		ServerName:          call.ServerName,
+		ToolName:            call.ToolName,
+		Method:              call.Method,
+		InputSize:           call.InputSize,
+		OutputSize:          call.OutputSize,
+		Duration:            call.Duration,
+		Status:              call.Status,
+		EffectiveTokenDelta: call.EffectiveTokenDelta,
+	}
 }
 
 func (w *cachedLogsJSONLWriter) AppendWorkflowRuns(request cachedWorkflowRunsRequest, payload []byte) error {
@@ -279,7 +393,7 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 		filters.safeOutputType != "" || filters.filteredIntegrity || filters.evalsOnly || filters.gradersOnly {
 		return RunData{}, false
 	}
-	return cached, true
+	return cached.RunData, true
 }
 
 func normalizeCachedLogRun(run *RunData) error {
