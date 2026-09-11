@@ -1850,6 +1850,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
+      pull-requests: read
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:

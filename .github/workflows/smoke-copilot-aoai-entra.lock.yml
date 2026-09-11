@@ -3525,6 +3525,7 @@ jobs:
     environment: aoai-model
     permissions:
       contents: read
+      pull-requests: read
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
