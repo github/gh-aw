@@ -133,6 +133,7 @@ function findCopilotUsageCheckpoint(sessionStateDir = COPILOT_SESSION_STATE_DIR)
     return null;
   }
 
+  /** @type {{aiCredits: number, premiumRequests: number} | null} */
   let latest = null;
   let latestTimestamp = Number.NEGATIVE_INFINITY;
   let sequence = 0;
