@@ -3135,7 +3135,7 @@ jobs:
           AWF_REFLECT_ENABLED: 1
           COPILOT_AGENT_RUNNER_TYPE: STANDALONE
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
-          COPILOT_MODEL: o4-mini-aw
+          COPILOT_MODEL: detection
           COPILOT_PROVIDER_BASE_URL: ${{ secrets.FOUNDRY_OPENAI_ENDPOINT }}
           COPILOT_PROVIDER_WIRE_API: responses
           GH_AW_HARNESS_MAX_RETRIES: 0

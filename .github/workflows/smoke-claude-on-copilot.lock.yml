@@ -1648,7 +1648,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           ANTHROPIC_BASE_URL: http://host.docker.internal:10002
-          ANTHROPIC_MODEL: claude-haiku-4.5
+          ANTHROPIC_MODEL: detection
           BASH_DEFAULT_TIMEOUT_MS: 60000
           BASH_MAX_TIMEOUT_MS: 60000
           CLAUDE_CODE_DISABLE_FAST_MODE: 1

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
 func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data *WorkflowData) []string {
@@ -20,10 +19,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 	shellCodexConfigPath := constants.ShellMcpConfigDir + "/config.toml"
 	codexHomeConfigPath := constants.TmpMcpConfigDir + "/config.toml"
 	detectionData := buildExternalDetectorWorkflowData(data, "codex")
-	detectionData.Model = inheritedDetectionModel(data)
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
-		detectionData.Model = data.SafeOutputs.ThreatDetection.Model
-	}
+	detectionData.Model = resolveDetectionModel(data, NewCodexEngine())
 	// Reuse the agent job's provider endpoint resolution so detection never pins
 	// Codex at a non-OpenAI api-proxy ingress (e.g. the Anthropic port 10001,
 	// which rejects Codex requests with 403 "Credentials for Anthropic ... are
@@ -378,25 +374,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// detection_result.json from inside the AWF container to the host filesystem.
 	threatDetectionData := buildExternalDetectorWorkflowData(data, engineID)
 
-	// Resolve the detection model, mirroring buildDetectionEngineExecutionStep on the
-	// inline path. Without this, the engine env block falls back to
-	// ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || ... || 'auto' }}, and when no org var
-	// is set COPILOT_MODEL is 'auto'. The AWF API proxy has no pricing for 'auto' and
-	// returns HTTP 400, causing every inference attempt to fail.
-	resolvedDetectionModel := inheritedDetectionModel(data)
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
-		resolvedDetectionModel = data.SafeOutputs.ThreatDetection.Model
-	}
-	if resolvedDetectionModel == "" {
-		if defaultModel := compilerenv.ResolveDefaultDetectionModel(""); defaultModel != "" {
-			resolvedDetectionModel = defaultModel
-		} else if defaultModel := engine.GetDefaultDetectionModel(); defaultModel != "" {
-			resolvedDetectionModel = defaultModel
-		}
-	}
-	if resolvedDetectionModel == "" {
-		resolvedDetectionModel = "detection"
-	}
+	resolvedDetectionModel := resolveDetectionModel(data, engine)
 	// Pi workflows normalise to Copilot; strip the provider prefix so the Copilot CLI
 	// receives a bare model ID rather than a "pi/model-name" string.
 	// Precedence mirrors the inline path: explicit threat-detection.engine.id overrides

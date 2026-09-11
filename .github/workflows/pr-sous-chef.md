@@ -309,10 +309,6 @@ jobs:
           echo "eligible_pull_request_numbers=$eligible_pull_request_numbers" >> "$GITHUB_OUTPUT"
 safe-outputs:
   needs: [approval_allowlist]
-  threat-detection:
-    engine:
-      id: copilot
-      model: detection
   add-comment:
     max: 4
     target: "*"

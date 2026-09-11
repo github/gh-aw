@@ -354,7 +354,7 @@ func TestCopilotDetectionDefaultModel(t *testing.T) {
 			expectedModel:      "gpt-5.5-mini",
 		},
 		{
-			name: "copilot engine with custom model uses specified model",
+			name: "copilot engine with custom main model uses detection alias default",
 			data: &WorkflowData{
 				AI:    "copilot",
 				Model: "gpt-4",
@@ -366,10 +366,10 @@ func TestCopilotDetectionDefaultModel(t *testing.T) {
 				},
 			},
 			shouldContainModel: true,
-			expectedModel:      "gpt-4",
+			expectedModel:      "detection",
 		},
 		{
-			name: "pi engine threat detection normalizes provider-scoped model for copilot fallback",
+			name: "pi engine with provider-scoped main model uses detection alias default",
 			data: &WorkflowData{
 				AI:    "pi",
 				Model: "copilot/gpt-5.4",
@@ -381,7 +381,7 @@ func TestCopilotDetectionDefaultModel(t *testing.T) {
 				},
 			},
 			shouldContainModel: true,
-			expectedModel:      "gpt-5.4",
+			expectedModel:      "detection",
 		},
 		{
 			name: "copilot engine with threat detection engine config with custom model",
