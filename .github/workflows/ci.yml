@@ -430,7 +430,7 @@ jobs:
 
     - name: Upload integration test results
       if: always()    # Upload even if tests fail so canary_go can track coverage
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-${{ matrix.test-group.name }}
         path: test-result-integration-*.json
@@ -438,7 +438,7 @@ jobs:
 
     - name: Upload integration coverage artifacts
       if: always() && hashFiles(format('coverage-integration-{0}.out', steps.run-tests.outputs.safe_name)) != ''
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: ci-integration-coverage-${{ steps.run-tests.outputs.safe_name }}
         path: |
@@ -522,7 +522,7 @@ jobs:
       run: make build
 
     - name: Upload gh-aw binary artifact
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: gh-aw-linux-amd64
         path: gh-aw
@@ -740,7 +740,7 @@ jobs:
         echo "- v0.x exposure: ${V0_PERCENT}%" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload audit results
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: dependency-audit
         path: |
@@ -1341,7 +1341,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-unauthenticated
         path: test-result-integration-unauthenticated.json
@@ -1416,7 +1416,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-integration-add-dispatch-workflow
         path: test-result-integration-add-dispatch-workflow.json

@@ -297,7 +297,7 @@ jobs:
 
       # Coverage reports for recent builds only - 7 days is sufficient for debugging recent changes
     - name: Upload coverage report
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: coverage-report-${{ matrix.shard }}
         path: coverage-${{ matrix.shard }}.html
@@ -305,7 +305,7 @@ jobs:
 
     - name: Upload unit test results
       if: always()    # Upload even if tests fail so canary-go can track coverage
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-result-cgo-unit-${{ matrix.shard }}
         path: test-result-unit-${{ matrix.shard }}.json
@@ -387,7 +387,7 @@ jobs:
 
     - name: Upload test coverage report
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: test-coverage-analysis-cgo
         path: |
@@ -473,7 +473,7 @@ jobs:
       run: make build
 
     - name: Upload Linux binary
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: gh-aw-linux-amd64
         path: gh-aw
@@ -1235,7 +1235,7 @@ jobs:
 
       # Benchmark results for performance trend analysis - 14 days allows comparison across multiple runs
     - name: Save benchmark results
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: benchmark-results
         path: bench_results.txt
@@ -1727,7 +1727,7 @@ jobs:
 
     - name: Upload fuzz test results
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: fuzz-results-${{ matrix.group }}
         path: fuzz-results/
@@ -2330,7 +2330,7 @@ jobs:
 
     - name: Upload Defender scan logs
       if: always() && runner.os == 'Windows'
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: defender-scan-log-${{ github.run_id }}-${{ github.run_attempt }}
         path: ${{ runner.temp }}/defender-scan-log.txt
@@ -2593,7 +2593,7 @@ jobs:
 
     - name: Upload conformance report
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
       with:
         name: safe-outputs-conformance-report
         path: conformance-output.txt
