@@ -258,6 +258,51 @@ func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
 	assert.True(t, sharedLimit.isReached())
 }
 
+func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+
+	var calls atomic.Int64
+	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		calls.Add(1)
+		if !opts.countLimit.tryAdd() {
+			return workflowLogsResult{}, errors.New("shared count reached before first target added a run")
+		}
+		return workflowLogsResult{processedRuns: []ProcessedRun{{
+			Run: WorkflowRun{DatabaseID: 1, WorkflowName: opts.WorkflowName},
+		}}}, nil
+	}
+
+	results := collectLogsTargets(context.Background(), LogsDownloadOptions{
+		Count:     1,
+		OutputDir: t.TempDir(),
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+		{workflowName: "third"},
+	})
+	processedRuns, _, _, _, _, errs := mergeLogsTargetResults(results, nil)
+
+	assert.Empty(t, errs)
+	assert.Len(t, processedRuns, 1)
+	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared count is reached")
+}
+
+func TestCountLimitedLogsTargetResultPreservesDateRangeContinuation(t *testing.T) {
+	result := countLimitedLogsTargetResult(LogsDownloadOptions{
+		WorkflowName: "queued",
+		Count:        1,
+		StartDate:    "2026-09-01",
+		BeforeRunID:  123,
+	})
+
+	assert.True(t, result.countLimitReached)
+	require.NotNil(t, result.continuation)
+	assert.Equal(t, "queued", result.continuation.WorkflowName)
+	assert.Equal(t, int64(123), result.continuation.BeforeRunID)
+}
+
 func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 	processedRuns, _, _, countLimitReached, _, errs := mergeLogsTargetResults([]logsTargetResult{
 		{target: logsWorkflowTarget{workflowName: "limited"}, result: workflowLogsResult{countLimitReached: true}},

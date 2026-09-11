@@ -34,16 +34,35 @@ func (c *Compiler) addActivationReactionStep(ctx *activationJobBuildContext) {
 }
 
 func (c *Compiler) addActivationSecretValidationStep(ctx *activationJobBuildContext) {
-	secretValidationStep := ctx.engine.GetSecretValidationStep(ctx.data)
-	if len(secretValidationStep) == 0 {
-		compilerActivationJobLog.Printf("Skipped validate-secret step (engine does not require secret validation)")
+	var stepIDs []string
+	if secretValidationStep := ctx.engine.GetSecretValidationStep(ctx.data); len(secretValidationStep) > 0 {
+		for _, line := range secretValidationStep {
+			ctx.steps = append(ctx.steps, line+"\n")
+		}
+		stepIDs = append(stepIDs, "validate-secret")
+	}
+	for i, secretValidationStep := range buildSafeOutputSecretValidationSteps(ctx.data) {
+		for _, line := range secretValidationStep {
+			ctx.steps = append(ctx.steps, line+"\n")
+		}
+		stepIDs = append(stepIDs, safeOutputSecretValidationStepID(i))
+	}
+	if len(stepIDs) == 0 {
+		compilerActivationJobLog.Printf("Skipped secret validation steps (no required secrets)")
 		return
 	}
-	for _, line := range secretValidationStep {
-		ctx.steps = append(ctx.steps, line+"\n")
+	if len(stepIDs) == 1 && stepIDs[0] == "validate-secret" {
+		ctx.outputs["secret_verification_result"] = "${{ steps.validate-secret.outputs.verification_result }}"
+		compilerActivationJobLog.Printf("Added engine secret validation step to activation job")
+		return
 	}
-	ctx.outputs["secret_verification_result"] = "${{ steps.validate-secret.outputs.verification_result }}"
-	compilerActivationJobLog.Printf("Added validate-secret step to activation job")
+
+	failureChecks := make([]string, 0, len(stepIDs))
+	for _, stepID := range stepIDs {
+		failureChecks = append(failureChecks, fmt.Sprintf("steps.%s.outcome == 'failure'", stepID))
+	}
+	ctx.outputs["secret_verification_result"] = fmt.Sprintf("${{ (%s) && 'failed' || 'success' }}", strings.Join(failureChecks, " || "))
+	compilerActivationJobLog.Printf("Added %d secret validation step(s) to activation job", len(stepIDs))
 }
 
 func (c *Compiler) addActivationDockerSbxSecretsCheckStep(ctx *activationJobBuildContext) {

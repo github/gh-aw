@@ -188,7 +188,7 @@ func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filter
 	if !ok {
 		return DownloadResult{}, false
 	}
-	logsOrchestratorLog.Printf("Reusing run %d from cached logs JSON", run.DatabaseID)
+	logsOrchestratorLog.Printf("Cache hit for run %d from cached JSONL; skipping artifact download and processing", run.DatabaseID)
 	return DownloadResult{
 		RunAnalysis: RunAnalysis{Run: run},
 		Cached:      true,

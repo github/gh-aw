@@ -74,13 +74,13 @@ for secret_name in "${SECRET_NAMES[@]}"; do
       {
         echo "Error: $error_msg"
         echo ""
-        echo "Regenerate or reconfigure the secret before running the $ENGINE_NAME engine."
+        echo "Regenerate or reconfigure the secret required by $ENGINE_NAME."
         echo ""
         echo "Documentation: $DOCS_URL"
       } >> "$GITHUB_STEP_SUMMARY"
 
       echo "Error: $error_msg" >&2
-      echo "Regenerate or reconfigure the secret before running the $ENGINE_NAME engine." >&2
+      echo "Regenerate or reconfigure the secret required by $ENGINE_NAME." >&2
       echo "" >&2
       echo "Documentation: $DOCS_URL" >&2
 
@@ -118,11 +118,11 @@ if [ "$all_empty" = true ]; then
   # Build requirement message
   # Join secret names with " or "
   secret_or_list=$(IFS=" or "; echo "${SECRET_NAMES[*]}")
-  requirement_msg="The $ENGINE_NAME engine requires either $secret_or_list secret to be configured."
+  requirement_msg="$secret_or_list is required by $ENGINE_NAME."
   
   # Print to GitHub step summary with troubleshooting tips
   {
-    echo "❌ Error: $error_msg"
+    echo "Error: $error_msg"
     echo ""
     echo "$requirement_msg"
     echo ""

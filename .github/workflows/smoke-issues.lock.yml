@@ -99,7 +99,7 @@ jobs:
       lockdown_check_failed: ${{ steps.generate_aw_info.outputs.lockdown_check_failed == 'true' }}
       model: ${{ steps.generate_aw_info.outputs.model }}
       oauth_token_check_failed: ${{ steps.check-oauth-tokens.outputs.oauth_token_check_failed == 'true' }}
-      secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}
+      secret_verification_result: ${{ (steps.validate-secret.outcome == 'failure' || steps.validate-safe-output-secret-1.outcome == 'failure' || steps.validate-safe-output-secret-2.outcome == 'failure' || steps.validate-safe-output-secret-3.outcome == 'failure') && 'failed' || 'success' }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -210,6 +210,21 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      - name: Validate JIRA_USER_EMAIL secret
+        id: validate-safe-output-secret-1
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" JIRA_USER_EMAIL 'Jira safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#jira-safe-outputs
+        env:
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+      - name: Validate JIRA_API_TOKEN secret
+        id: validate-safe-output-secret-2
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" JIRA_API_TOKEN 'Jira safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#jira-safe-outputs
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      - name: Validate LINEAR_API_KEY secret
+        id: validate-safe-output-secret-3
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" LINEAR_API_KEY 'Linear safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#linear-safe-outputs
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"

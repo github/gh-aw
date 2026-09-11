@@ -224,10 +224,12 @@ func (c *Compiler) buildAgentFailureCoreVars(data *WorkflowData, mainJobName str
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not resolve agentic engine from workflow AI configuration; ensure a supported engine or model is configured: %w", err)
 	}
-	if EngineHasValidateSecretStep(engine, data) {
+	if hasSecretValidationStep(engine, data) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.%s.outputs.secret_verification_result }}\n", constants.ActivationJobName))
-		if msg := engine.GetSecretFailureMessage(data); msg != "" {
-			envVars = append(envVars, fmt.Sprintf("          GH_AW_ENGINE_SECRET_FAILURE_MESSAGE: %q\n", msg))
+		if EngineHasValidateSecretStep(engine, data) {
+			if msg := engine.GetSecretFailureMessage(data); msg != "" {
+				envVars = append(envVars, fmt.Sprintf("          GH_AW_ENGINE_SECRET_FAILURE_MESSAGE: %q\n", msg))
+			}
 		}
 	}
 	if isDockerSbxRuntime(data) {
@@ -497,11 +499,11 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	staleLockFileFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.stale_lock_file_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
 	activationGuardrailsFailed := BuildOr(lockdownCheckFailed, BuildOr(oauthTokenCheckFailed, staleLockFileFailed))
 	// Only reference the secret_verification_result output when the activation job
-	// actually declares it. The output is emitted only when the engine provides a
-	// validate-secret step (see addActivationSecretValidationStep); referencing it
+	// actually declares it. The output is emitted only when the engine or safe outputs
+	// require a secret validation step (see addActivationSecretValidationStep); referencing it
 	// unconditionally produces a dangling needs.*.outputs.* expression that fails
 	// actionlint in generated lock files.
-	if engine, err := c.getAgenticEngine(data.AI); err == nil && EngineHasValidateSecretStep(engine, data) {
+	if engine, err := c.getAgenticEngine(data.AI); err == nil && hasSecretValidationStep(engine, data) {
 		secretVerificationFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.secret_verification_result", constants.ActivationJobName)), BuildStringLiteral("failed"))
 		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, secretVerificationFailed)
 	}

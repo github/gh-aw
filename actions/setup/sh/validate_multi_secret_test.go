@@ -114,3 +114,17 @@ func TestValidateMultiSecretRejectsInvalidSecretBeforeFallback(t *testing.T) {
 	}
 	assertSecretValueNotLogged(t, stdout, stderr, "valid-fallback-token")
 }
+
+func TestValidateMultiSecretExplainsRequirement(t *testing.T) {
+	t.Parallel()
+	stdout, stderr, err := runValidateMultiSecret(t, nil, "JIRA_API_TOKEN")
+	if err == nil {
+		t.Fatalf("expected validation to fail; stdout:\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "JIRA_API_TOKEN is required by TestEngine.") {
+		t.Fatalf("expected requirement explanation, got:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "❌") {
+		t.Fatalf("expected error message without emoji, got:\n%s", stderr)
+	}
+}
