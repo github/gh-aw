@@ -403,7 +403,7 @@ engine: claude
 	}
 	visited := map[string]struct{}{builtinPath: {}}
 
-	err = acc.extractAllImportFields(content, item, visited)
+	err = acc.extractImportFields(content, item, visited, true)
 	require.NoError(t, err, "extractAllImportFields should succeed for builtin file without inputs")
 
 	// Verify engine was extracted from the cached frontmatter
@@ -441,7 +441,7 @@ engine: copilot
 	}
 	visited := map[string]struct{}{builtinPath: {}}
 
-	err = acc.extractAllImportFields(content, item, visited)
+	err = acc.extractImportFields(content, item, visited, true)
 	require.NoError(t, err, "extractAllImportFields should succeed for builtin file with inputs")
 
 	// Verify engine was still extracted (from direct parse, not cache)

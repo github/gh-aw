@@ -10,55 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReconstructContent(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name              string
-		frontmatterLines  []string
-		markdown          string
-		expectedInContent []string
-	}{
-		{
-			name: "basic reconstruction",
-			frontmatterLines: []string{
-				"on: workflow_dispatch",
-				"permissions:",
-				"  contents: read",
-			},
-			markdown: "# Test\n\nContent",
-			expectedInContent: []string{
-				"---",
-				"on: workflow_dispatch",
-				"permissions:",
-				"  contents: read",
-				"---",
-				"# Test",
-			},
-		},
-		{
-			name: "no markdown body",
-			frontmatterLines: []string{
-				"on: workflow_dispatch",
-			},
-			markdown: "",
-			expectedInContent: []string{
-				"---",
-				"on: workflow_dispatch",
-				"---",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := reconstructContent(tt.frontmatterLines, tt.markdown)
-			for _, expected := range tt.expectedInContent {
-				assert.Contains(t, result, expected, "Expected content to contain %q", expected)
-			}
-		})
-	}
-}
-
 func TestParseFrontmatterLines(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -124,15 +124,6 @@ func newImportAccumulator() *importAccumulator {
 	}
 }
 
-// extractAllImportFields extracts all frontmatter fields from a single imported file
-// and accumulates the results. Handles tools, engines, mcp-servers, safe-outputs,
-// mcp-scripts, steps, runtimes, services, network, permissions, secret-masking, bots,
-// skip-roles, skip-bots, pre-steps, pre-agent-steps, post-steps, labels, cache, and features.
-// The work is delegated to focused helper methods, each handling one logical phase.
-func (acc *importAccumulator) extractAllImportFields(content []byte, item importQueueItem, visited map[string]struct{}) error {
-	return acc.extractImportFields(content, item, visited, true)
-}
-
 func (acc *importAccumulator) extractImportFields(content []byte, item importQueueItem, visited map[string]struct{}, includeOrderedSteps bool) error {
 	parserLog.Printf("Extracting all import fields: path=%s, section=%s, inputs=%d, content_size=%d bytes", item.fullPath, item.sectionName, len(item.inputs), len(content))
 

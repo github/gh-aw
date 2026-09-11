@@ -175,7 +175,6 @@ func TestLogsStorageLimitPrunesNonEssentialAgentData(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(runDir, downloadedArtifactsMarkerDir, string(ArtifactSetAll)))
 	assert.NoFileExists(t, filepath.Join(runDir, downloadedArtifactsMarkerDir, constants.AgentArtifactName.String()))
 	assert.NoFileExists(t, filepath.Join(runDir, downloadedArtifactsMarkerDir, constants.AgentOutputFallbackArtifactName.String()))
-	assert.False(t, limit.isReached())
 }
 
 func TestLogsStorageLimitPrunesEarlierCompletedRuns(t *testing.T) {
@@ -195,7 +194,6 @@ func TestLogsStorageLimitPrunesEarlierCompletedRuns(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(firstRunDir, "sandbox", "agent", "logs", "events.jsonl"))
 	assert.FileExists(t, filepath.Join(secondRunDir, runSummaryFileName))
-	assert.False(t, limit.isReached())
 }
 
 func TestLogsStorageLimitPrunesCompletedDownloadToBudget(t *testing.T) {
@@ -212,7 +210,6 @@ func TestLogsStorageLimitPrunesCompletedDownloadToBudget(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(runDir, "mcp-logs", "large.log"))
 	assert.FileExists(t, filepath.Join(runDir, runSummaryFileName))
-	assert.False(t, limit.isReached())
 	size, sizeErr := logsDirectorySize(outputDir)
 	require.NoError(t, sizeErr)
 	assert.Less(t, size, bytesPerMegabyte)
@@ -236,7 +233,6 @@ func TestLogsStorageLimitDeferredDownloadPrunesExistingCacheAtLimit(t *testing.T
 	require.NoError(t, err)
 	assert.NoFileExists(t, existingCache)
 	assert.FileExists(t, freshCache, "fresh run data must remain available for parsing")
-	assert.False(t, limit.isReached())
 }
 
 func TestLogsStorageLimitStopsNewDownloadsAtExistingLimit(t *testing.T) {
@@ -252,7 +248,6 @@ func TestLogsStorageLimitStopsNewDownloadsAtExistingLimit(t *testing.T) {
 
 	require.ErrorIs(t, err, errLogsStorageLimitReached)
 	assert.False(t, called)
-	assert.True(t, limit.isReached())
 }
 
 func TestLogsStorageLimitAllowsFinalDownloadThenStops(t *testing.T) {
@@ -266,7 +261,6 @@ func TestLogsStorageLimitAllowsFinalDownloadThenStops(t *testing.T) {
 	}, true, false)
 
 	require.NoError(t, err)
-	assert.True(t, limit.isReached())
 	secondCalled := false
 	err = limit.runDownloadWithPruning(context.Background(), filepath.Join(outputDir, "run-2"), func() error {
 		secondCalled = true
@@ -296,7 +290,6 @@ func TestLogsStorageLimitPrunesOldestRunAfterCachePruningIsExhausted(t *testing.
 	assert.NoDirExists(t, oldestRunDir)
 	assert.DirExists(t, newerCachedRunDir)
 	assert.DirExists(t, newestRunDir)
-	assert.False(t, limit.isReached())
 }
 
 func TestLogsStorageLimitPrunesOldestRunByRunID(t *testing.T) {
@@ -370,7 +363,6 @@ func TestLogsStorageLimitDisabled(t *testing.T) {
 	}, true, false)
 
 	require.ErrorIs(t, err, expected)
-	assert.False(t, limit.isReached())
 }
 
 func TestValidateMaxStorageMB(t *testing.T) {
@@ -468,7 +460,6 @@ func TestLogsStorageLimitConcurrentDeferredDownloadsProtectFreshRuns(t *testing.
 	for i := range numDownloads {
 		require.NoError(t, limit.finalizeDownload(filepath.Join(outputDir, fmt.Sprintf("run-%d", i))))
 	}
-	assert.False(t, limit.isReached())
 
 	subsequentRun := filepath.Join(outputDir, "run-subsequent")
 	called := false

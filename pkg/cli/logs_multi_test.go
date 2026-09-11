@@ -255,7 +255,6 @@ func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
 	assert.Empty(t, errs)
 	assert.Len(t, processedRuns, 3, "count must be shared across all targets")
 	require.NotNil(t, sharedLimit)
-	assert.True(t, sharedLimit.isReached())
 }
 
 func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *testing.T) {

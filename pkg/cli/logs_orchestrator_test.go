@@ -486,5 +486,4 @@ func TestDownloadRunArtifactsConcurrent_StorageLimitPreservesSubmissionOrder(t *
 		assert.Equal(t, runs[i].DatabaseID, result.Run.DatabaseID,
 			"result at index %d should correspond to the run submitted at that index", i)
 	}
-	assert.False(t, storageLimit.isReached(), "budget is large enough that it should not be reached")
 }

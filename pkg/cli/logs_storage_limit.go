@@ -669,7 +669,3 @@ func (l *logsStorageLimit) markReached(size int64) {
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	logsOrchestratorLog.Printf("Logs storage limit reached: used=%d, maximum=%d", size, l.maxBytes)
 }
-
-func (l *logsStorageLimit) isReached() bool {
-	return l != nil && l.reached.Load()
-}

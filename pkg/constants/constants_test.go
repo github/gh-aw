@@ -357,7 +357,6 @@ func TestHelperMethods(t *testing.T) {
 		{"JobName", JobName("agent"), JobName(""), "agent"},
 		{"StepID", StepID("check_membership"), StepID(""), "check_membership"},
 		{"CommandPrefix", CommandPrefix("gh aw"), CommandPrefix(""), "gh aw"},
-		{"WorkflowID", WorkflowID("ci-doctor"), WorkflowID(""), "ci-doctor"},
 		{"ArtifactName", ArtifactName("agent-output"), ArtifactName(""), "agent-output"},
 		{"Filename", Filename("agent_output.json"), Filename(""), "agent_output.json"},
 		{"FilePath", FilePath("/tmp/file"), FilePath(""), "/tmp/file"},

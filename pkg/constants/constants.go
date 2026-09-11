@@ -64,16 +64,6 @@ func (c CommandPrefix) IsValid() bool {
 //	func CompileWorkflow(id WorkflowID) error { ... }
 type WorkflowID string
 
-// String returns the string representation of the workflow ID
-func (w WorkflowID) String() string {
-	return string(w)
-}
-
-// IsValid returns true if the workflow ID is non-empty
-func (w WorkflowID) IsValid() bool {
-	return w != ""
-}
-
 // ArtifactName represents the name of a GitHub Actions artifact (as passed to
 // actions/upload-artifact and actions/download-artifact).
 // This semantic type distinguishes artifact names from arbitrary strings,

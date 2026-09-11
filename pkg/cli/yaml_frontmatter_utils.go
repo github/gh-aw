@@ -23,19 +23,6 @@ func isFrontmatterStrictFalse(frontmatter map[string]any) bool {
 	return ok && !strictBool
 }
 
-// reconstructContent rebuilds the full markdown content from frontmatter lines and body
-func reconstructContent(frontmatterLines []string, markdown string) string {
-	var lines []string
-	lines = append(lines, "---")
-	lines = append(lines, frontmatterLines...)
-	lines = append(lines, "---")
-	if markdown != "" {
-		lines = append(lines, "")
-		lines = append(lines, markdown)
-	}
-	return strings.Join(lines, "\n")
-}
-
 // parseFrontmatterLines extracts frontmatter lines from content
 func parseFrontmatterLines(content string) ([]string, string, error) {
 	result, err := parser.ExtractFrontmatterFromContent(content)
