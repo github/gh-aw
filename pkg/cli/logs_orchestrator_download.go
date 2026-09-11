@@ -100,7 +100,11 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 }
 
 func logLogsDownloadStart(opts LogsDownloadOptions) {
-	logsOrchestratorLog.Printf("Starting workflow log download: workflow=%s, count=%d, startDate=%s, endDate=%s, outputDir=%s, summaryFile=%s, safeOutputType=%s, filteredIntegrity=%v, evalsOnly=%v, gradersOnly=%v, train=%v, format=%s, artifactSets=%v, after=%s", opts.WorkflowName, opts.Count, opts.StartDate, opts.EndDate, opts.OutputDir, opts.SummaryFile, opts.SafeOutputType, opts.FilteredIntegrity, opts.EvalsOnly, opts.GradersOnly, opts.Train, opts.Format, opts.ArtifactSets, opts.After)
+	maxConcurrentDownloads := opts.maxConcurrentDownloads
+	if maxConcurrentDownloads == 0 {
+		maxConcurrentDownloads = getMaxConcurrentDownloads()
+	}
+	logsOrchestratorLog.Printf("Starting workflow log download: workflow=%s, count=%d, maxIterations=%d, maxConcurrentDownloads=%d, maxGitHubAPIRateLimit=%d, maxStorageMB=%d, startDate=%s, endDate=%s, outputDir=%s, summaryFile=%s, safeOutputType=%s, filteredIntegrity=%v, evalsOnly=%v, gradersOnly=%v, train=%v, format=%s, artifactSets=%v, after=%s", opts.WorkflowName, opts.Count, MaxIterations, maxConcurrentDownloads, opts.MaxGitHubAPIRateLimit, opts.MaxStorageMB, opts.StartDate, opts.EndDate, opts.OutputDir, opts.SummaryFile, opts.SafeOutputType, opts.FilteredIntegrity, opts.EvalsOnly, opts.GradersOnly, opts.Train, opts.Format, opts.ArtifactSets, opts.After)
 }
 
 func resolveLogsArtifactFilter(artifactSets []string, verbose bool) ([]string, error) {

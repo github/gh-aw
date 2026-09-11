@@ -69,7 +69,18 @@ func queuedLogsTargetResult(opts LogsDownloadOptions, ctx context.Context) workf
 	if !timeoutReached {
 		return workflowLogsResult{}
 	}
-	continuation := buildContinuationIfNeeded(nil, timeoutReached, false, false, continuationOptions{
+	continuation := buildContinuationIfNeeded(nil, timeoutReached, false, false, logsTargetContinuationOptions(opts))
+	return workflowLogsResult{timeoutReached: true, continuation: continuation}
+}
+
+func countLimitedLogsTargetResult(opts LogsDownloadOptions) workflowLogsResult {
+	fetchAllInRange := opts.StartDate != "" || opts.EndDate != ""
+	continuation := buildContinuationIfNeeded(nil, false, fetchAllInRange, false, logsTargetContinuationOptions(opts))
+	return workflowLogsResult{countLimitReached: fetchAllInRange, continuation: continuation}
+}
+
+func logsTargetContinuationOptions(opts LogsDownloadOptions) continuationOptions {
+	return continuationOptions{
 		workflowName:          opts.WorkflowName,
 		startDate:             opts.StartDate,
 		endDate:               opts.EndDate,
@@ -83,8 +94,7 @@ func queuedLogsTargetResult(opts LogsDownloadOptions, ctx context.Context) workf
 		maxStorageMB:          opts.MaxStorageMB,
 		pruneOlderRuns:        opts.PruneOlderRuns,
 		previousBeforeRunID:   opts.BeforeRunID,
-	})
-	return workflowLogsResult{timeoutReached: true, continuation: continuation}
+	}
 }
 
 // DownloadWorkflowLogsForTargets downloads several workflow reports concurrently
@@ -99,6 +109,7 @@ func DownloadWorkflowLogsForTargets(
 	if len(targets) == 0 {
 		return errors.Join(initialErrors...)
 	}
+	logLogsMultiTargetDownloadStart(opts, len(targets))
 	activeCtx, timeoutCancel, _, _ := buildLogsDownloadContext(ctx, opts.TimeoutMinutes, opts.TimeoutSeconds, opts.Verbose)
 	defer cancelLogsDownload(timeoutCancel)
 	if err := ensureLogsGitignoreWithWarning(opts.Verbose); err != nil {
@@ -155,6 +166,11 @@ func DownloadWorkflowLogsForTargets(
 		apiRateLimits:     apiRateLimits,
 		cachedJSONLWriter: opts.cachedJSONLWriter,
 	})
+}
+
+func logLogsMultiTargetDownloadStart(opts LogsDownloadOptions, targetCount int) {
+	logsOrchestratorLog.Printf("Starting multi-target workflow log download: targets=%d", targetCount)
+	logLogsDownloadStart(opts)
 }
 
 func sortAndLimitLogsTargetRuns(processedRuns []ProcessedRun, count int, verbose bool) []ProcessedRun {
@@ -252,6 +268,10 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	targetOpts.TimeoutMinutes = 0
 	targetOpts.TimeoutSeconds = 0
 
+	if shared.countLimit.isReached() {
+		logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached", target.displayName())
+		return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
+	}
 	select {
 	case shared.sem <- struct{}{}:
 		defer func() { <-shared.sem }()
@@ -265,6 +285,10 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 			result: queuedLogsTargetResult(targetOpts, ctx),
 			err:    ctx.Err(),
 		}
+	}
+	if shared.countLimit.isReached() {
+		logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
+		return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
 	}
 
 	result, err := collectWorkflowLogsForTarget(ctx, targetOpts)
