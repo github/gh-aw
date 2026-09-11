@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -243,6 +244,14 @@ func applyContainerPinMappingFromData(image string, data *WorkflowData) string {
 // delegating to pkg/actionpins with a PinContext built from WorkflowData.
 func getActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
 	return actionpins.ResolveActionPin(actionRepo, version, data.PinContext())
+}
+
+func resolveStrictActionPin(ctx context.Context, actionRepo, version string) (string, error) {
+	return actionpins.ResolveActionPin(actionRepo, version, &actionpins.PinContext{
+		Ctx:           ctx,
+		StrictMode:    true,
+		EnforcePinned: true,
+	})
 }
 
 // getCachedActionPin returns the pinned action reference for a given repository,

@@ -132,7 +132,7 @@ func resolveRequiredActionModePin(ctx context.Context, resolver SHAResolver, act
 	if ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode"); ref != "" {
 		return ref
 	}
-	ref, err := getActionPinWithData(actionRepo, tag, actionModePinData(&WorkflowData{Ctx: ctx}))
+	ref, err := resolveStrictActionPin(ctx, actionRepo, tag)
 	if err != nil {
 		actionRefLog.Printf("Action mode: failed to pin action %s@%s: %v", actionRepo, tag, err)
 		return ""
@@ -148,17 +148,18 @@ func resolveRequiredActionModePin(ctx context.Context, resolver SHAResolver, act
 }
 
 func isFullSHAPinnedActionRef(ref string) bool {
-	_, after, ok := strings.Cut(ref, "@")
-	if !ok {
+	at := strings.LastIndex(ref, "@")
+	if at < 0 {
 		return false
 	}
-	actionRef := strings.TrimSpace(after)
-	if before, _, ok := strings.Cut(actionRef, " "); ok {
-		actionRef = before
+	actionRef := strings.TrimSpace(ref[at+1:])
+	cut := len(actionRef)
+	for _, sep := range []string{" ", "\t", "#"} {
+		if idx := strings.Index(actionRef, sep); idx >= 0 && idx < cut {
+			cut = idx
+		}
 	}
-	if before, _, ok := strings.Cut(actionRef, "#"); ok {
-		actionRef = before
-	}
+	actionRef = strings.TrimSpace(actionRef[:cut])
 	return gitutil.IsValidFullSHA(actionRef)
 }
 
