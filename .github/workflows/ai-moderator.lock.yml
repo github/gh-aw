@@ -528,7 +528,7 @@ jobs:
         id: set-runtime-paths
         env:
           GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
-        run: |
+        run: | # zizmor: ignore[github-env] - runner.tool_cache is set by GitHub Actions, not user input.
           if [ -z "${RUNNER_TOOL_CACHE:-}" ]; then
             echo "RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}" >> "$GITHUB_ENV"
           fi

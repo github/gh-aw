@@ -515,7 +515,7 @@ gh aw logs --runtime gvisor                              # Filter to runs using 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. The `--last` flag is an alias for `--count/-c`.
 When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets.
 
-`--cached-jsonl` reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for each JSON Lines item.
+`--cached-jsonl` reuses compatible, schema-versioned run records and workflow-run discovery responses. It writes exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for each JSON Lines item.
 
 #### `audit`
 

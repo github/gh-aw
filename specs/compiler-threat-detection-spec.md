@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.32
+**Version**: 1.0.33
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.33` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.32` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.31` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.30` | `v0.87.9` | CTR-001 status-function guard mapping update only. |
@@ -150,6 +151,12 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-025 Framework Self-Prompt Misattribution | `actions/setup/js/setup_threat_detection.cjs` | `setup_threat_detection.test.cjs` |
 | CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
 
+### 7.3 Mapping Audit (2026-09-11)
+
+Issue #59894 (`[sighthound] Security findings in github/gh-aw`) reported a Critical CWE-78 command-injection finding claiming untrusted `commentBody`/`params` reach `exec` in `actions/setup/js/close_issue.cjs` (and a `pkg/workflow/js/close_issue.cjs` mirror) around lines 5 and 1110. Verification against conformance scope found this to be a false positive: `close_issue.cjs` is 402 lines total (no line 1110 exists), contains no `exec`/`child_process`/`spawn` call anywhere, and `pkg/workflow/js/close_issue.cjs` does not exist in the repository. `commentBody` in `close_entity_helpers.cjs` flows only into the authenticated GitHub API client (`callbacks.addComment`), never into a shell or subprocess argument, so CTR-006 (Template Injection) and CTR-013 (Argument Injection via Package/Image Names) triggers do not apply and no new `CTR-*` rule is warranted. No `threat-detection-suppress` annotation was added because the finding does not correspond to any real code path the compiler needs to suppress — it is an inapplicable external scan result about nonexistent code, not an active false-positive-prone compiler rule.
+
+Open high/critical code-scanning alerts (#675–#677 `go/allocation-size-overflow`) remain unchanged from the 2026-09-10 audit disposition: in-process, schema-validated capacity-hint computations, not exploitable by untrusted input. No live `threat-detection-suppress` annotation exists in any workflow frontmatter. No compiler/parser source diff exists beyond the single squashed commit state, so no candidate threat surfaced from source changes.
+
 ### 7.2 Mapping Audit (2026-09-10)
 
 CTR-001–026 have implementation and test references with no `TODO` placeholders. The available repository history is a single squashed commit (`099efdd`, dated 2026-09-09 17:19 -0700); no additional compiler/parser diff exists beyond that state, so no new candidate threat surfaced from source changes. No live `threat-detection-suppress` annotation exists in any workflow frontmatter (only illustrative documentation examples in `.github/aw/syntax-agentic.md` and reference docs), so no `SLA_BREACH` applies.
@@ -216,6 +223,7 @@ A test ID that is deprecated under Section 5.4 MUST remain listed in Section 8.1
 
 | Version | Change |
 |---|---|
+| 1.0.33 | Audit-only review; issue #59894's `close_issue.cjs` command-injection claim is a false positive (no `exec`/subprocess call exists in the file). |
 | 1.0.32 | Audit-only review; #675–677 and #667–669/#674 are not new threat classes. |
 | 1.0.31 | Audit-only review; #672 is not a new threat class. |
 | 1.0.30–1.0.27 | CTR-001, CTR-004, and CTR-006 mapping synchronization. |

@@ -100,7 +100,7 @@ func TestJSONSchemaCommand(t *testing.T) {
 				cachedLogsJSONLRunItemSchema{
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
 					Kind:          cachedLogsJSONLKindRun,
-					Run:           RunData{RunID: 42},
+					Run:           cachedLogsJSONLRunData{RunData: RunData{RunID: 42}},
 				},
 				map[string]any{
 					"schema_version": cachedLogsJSONLSchemaVersion,

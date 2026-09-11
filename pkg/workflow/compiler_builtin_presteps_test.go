@@ -177,6 +177,69 @@ jobs:
 	)
 }
 
+func TestBuiltinJobSetupCheckoutAddsContentsReadPermission(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "builtin-setup-steps-checkout-permission")
+
+	workflowContent := `---
+on:
+  issues:
+    types: [opened]
+engine: claude
+strict: false
+safe-outputs:
+  add-comment:
+jobs:
+  safe_outputs:
+    permissions:
+      id-token: write
+    setup-steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/get-app-credentials
+  conclusion:
+    permissions:
+      id-token: write
+    setup-steps:
+      - uses: ACTIONS/CHECKOUT@V4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/get-app-credentials
+---
+
+# Builtin checkout permissions
+`
+
+	workflowFile := filepath.Join(tmpDir, "builtin-checkout-permissions.md")
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowFile); err != nil {
+		t.Fatalf("CompileWorkflow() returned error: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(filepath.Join(tmpDir, "builtin-checkout-permissions.lock.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	lockYAML := string(lockContent)
+
+	for _, jobName := range []string{"safe_outputs", "conclusion"} {
+		jobSection := extractJobSection(lockYAML, jobName)
+		if jobSection == "" {
+			t.Fatalf("Expected %s job section", jobName)
+		}
+		if !strings.Contains(jobSection, "contents: read") {
+			t.Errorf("Expected %s setup checkout to add contents: read, got:\n%s", jobName, jobSection)
+		}
+		if !strings.Contains(jobSection, "id-token: write") {
+			t.Errorf("Expected %s to preserve id-token: write, got:\n%s", jobName, jobSection)
+		}
+	}
+}
+
 func TestBuiltinJobsPreStepsRunBeforeTokenMinting(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "builtin-pre-steps-token-order")
 
