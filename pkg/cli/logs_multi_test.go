@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -137,6 +138,126 @@ func TestDownloadWorkflowLogsForTargetsReturnsErrorWhenAllFail(t *testing.T) {
 	require.ErrorContains(t, err, "access denied")
 }
 
+func TestDownloadWorkflowLogsForTargetsUsesOneWallClockTimeout(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+
+	var calls atomic.Int64
+	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		calls.Add(1)
+		assert.Zero(t, opts.TimeoutMinutes)
+		assert.Zero(t, opts.TimeoutSeconds)
+		<-ctx.Done()
+		return workflowLogsResult{timeoutReached: true}, nil
+	}
+
+	tempDir := t.TempDir()
+	originalDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	start := time.Now()
+	err = DownloadWorkflowLogsForTargets(context.Background(), LogsDownloadOptions{
+		Count:          1,
+		OutputDir:      filepath.Join(tempDir, "logs"),
+		TimeoutMinutes: 1,
+		TimeoutSeconds: 1,
+		SuppressRender: true,
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+	}, nil)
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, int64(1), calls.Load(), "queued targets must not receive a fresh timeout")
+	assert.Less(t, time.Since(start), 1500*time.Millisecond, "the timeout must bound the entire multi-target operation")
+}
+
+func TestCollectLogsTargetsEmitsContinuationForQueuedTarget(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+
+	// The running target blocks until the shared deadline fires so the queued
+	// target never gets a worker slot and must be canceled while still waiting
+	// on the semaphore.
+	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		<-ctx.Done()
+		return workflowLogsResult{timeoutReached: true}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	results := collectLogsTargets(ctx, LogsDownloadOptions{
+		Count:       5,
+		OutputDir:   t.TempDir(),
+		StartDate:   "2024-01-01",
+		BeforeRunID: 999,
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+	})
+
+	_, continuations, timeoutReached, _, _, errs := mergeLogsTargetResults(results, nil)
+	require.NotEmpty(t, errs, "the queued target should still surface a context error")
+	assert.True(t, timeoutReached)
+	// The mock only reports timeoutReached (no continuation) for the target that
+	// actually ran; the one still waiting on the semaphore when the deadline fires
+	// is the only one that goes through queuedLogsTargetResult, so exactly one
+	// continuation is expected, regardless of which target won the race for the
+	// worker slot.
+	require.Len(t, continuations, 1, "the queued target must produce a resumable continuation")
+	assert.Equal(t, int64(999), continuations[0].BeforeRunID, "the queued target's continuation must preserve its own resume cursor")
+	assert.Equal(t, "2024-01-01", continuations[0].StartDate)
+}
+
+func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "2")
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+
+	var mu sync.Mutex
+	var sharedLimit *logsCountLimit
+	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		mu.Lock()
+		if sharedLimit == nil {
+			sharedLimit = opts.countLimit
+		} else {
+			assert.Same(t, sharedLimit, opts.countLimit)
+		}
+		mu.Unlock()
+
+		var runs []ProcessedRun
+		for range opts.Count {
+			if !opts.countLimit.tryAdd() {
+				break
+			}
+			runs = append(runs, ProcessedRun{Run: WorkflowRun{
+				DatabaseID:   int64(len(runs) + 1),
+				WorkflowName: opts.WorkflowName,
+			}})
+		}
+		return workflowLogsResult{processedRuns: runs}, nil
+	}
+
+	results := collectLogsTargets(context.Background(), LogsDownloadOptions{
+		Count:     3,
+		OutputDir: t.TempDir(),
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+	})
+	processedRuns, _, _, _, _, errs := mergeLogsTargetResults(results, nil)
+
+	assert.Empty(t, errs)
+	assert.Len(t, processedRuns, 3, "count must be shared across all targets")
+	require.NotNil(t, sharedLimit)
+	assert.True(t, sharedLimit.isReached())
+}
+
 func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 	processedRuns, _, _, countLimitReached, _, errs := mergeLogsTargetResults([]logsTargetResult{
 		{target: logsWorkflowTarget{workflowName: "limited"}, result: workflowLogsResult{countLimitReached: true}},
@@ -146,4 +267,18 @@ func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 	assert.Empty(t, processedRuns)
 	assert.True(t, countLimitReached)
 	assert.Empty(t, errs)
+}
+
+func TestMergeLogsTargetResultsPreservesPartialRunsFromFailedTarget(t *testing.T) {
+	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42}}
+	processedRuns, _, _, _, _, errs := mergeLogsTargetResults([]logsTargetResult{{
+		target: logsWorkflowTarget{workflowName: "partial"},
+		result: workflowLogsResult{processedRuns: []ProcessedRun{run}},
+		err:    errors.New("pagination failed"),
+	}}, nil)
+
+	require.Len(t, processedRuns, 1)
+	assert.Equal(t, int64(42), processedRuns[0].Run.DatabaseID)
+	require.Len(t, errs, 1)
+	assert.ErrorContains(t, errs[0], "pagination failed")
 }

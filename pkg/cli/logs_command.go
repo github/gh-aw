@@ -144,7 +144,8 @@ metrics including duration, token usage, and cost information.
 
 Pass multiple workflow arguments to download them concurrently and produce one combined
 report. Cross-repository targets accept owner/repo/workflow or
-[HOST/]owner/repo/.github/workflows/workflow.yml paths. The count limit applies per workflow.
+[HOST/]owner/repo/.github/workflows/workflow.yml paths. Count and timeout limits apply to the
+combined operation across all targets.
 
 By default, only the compact usage artifact is downloaded (token usage, run metadata).
 Use --artifacts all to download all artifacts, or specify individual sets such as
@@ -600,7 +601,7 @@ func resolveLogsWorkflowNameLocally(arg string) (string, error) {
 }
 
 func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
-	logsCmd.Flags().IntP("count", "c", 10, "Maximum matching workflow runs to return per workflow (after applying filters)")
+	logsCmd.Flags().IntP("count", "c", 10, "Maximum matching workflow runs to return across all targets (after applying filters)")
 	logsCmd.Flags().String("start-date", "", "Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")
 	logsCmd.Flags().String("end-date", "", "Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")
 	addOutputFlag(logsCmd, defaultLogsOutputDir)
@@ -622,7 +623,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	logsCmd.Flags().Bool("audit", false, "Generate audit.json in each workflow run cache directory (comparisons use downloaded runs only)")
 	addJSONFlag(logsCmd)
-	logsCmd.Flags().Int("timeout", 0, "Download timeout in minutes (0 = no timeout)")
+	logsCmd.Flags().Int("timeout", 0, "Total download timeout in minutes across all targets (0 = no timeout)")
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")
 	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before waiting for reset (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")
