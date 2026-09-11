@@ -15,6 +15,7 @@ const COMPONENT_FILES = {
 async function loadBillableJobs({ github, budget }, owner, repo, run) {
   const components = new Map();
   let complete = false;
+  let sawAnyJob = false;
   for (let page = 1; page <= 10; page++) {
     const response = await github.rest.actions.listJobsForWorkflowRun({
       owner,
@@ -27,6 +28,7 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
     budget.observe(response);
     const jobs = response.data.jobs;
     if (!Array.isArray(jobs)) throw new Error("Incomplete daily AIC job metadata");
+    if (jobs.length > 0) sawAnyJob = true;
     for (const job of jobs) {
       if (!Object.hasOwn(COMPONENT_FILES, job.name)) continue;
       if (!Number.isSafeInteger(job.run_attempt) || job.run_attempt < 1 || job.run_attempt > run.run_attempt || job.status !== "completed" || !job.conclusion) {
@@ -45,7 +47,13 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
       break;
     }
   }
-  if (!complete || !components.has("agent")) throw new Error("Cannot prove complete billable-component coverage");
+  if (!complete) throw new Error(`Could not enumerate all jobs for run ${owner}/${repo}#${run.id} (pagination limit reached)`);
+  // A run that never started any job (for example, blocked on `action_required`
+  // approval for a first-time contributor, or cancelled before job creation) has
+  // no possible billable component. Zero jobs proves zero AIC rather than leaving
+  // coverage "unknown"; only a run with jobs but no "agent" job is ambiguous.
+  if (!sawAnyJob) return components;
+  if (!components.has("agent")) throw new Error(`Run ${owner}/${repo}#${run.id} has jobs but no billable agent job`);
   return components;
 }
 

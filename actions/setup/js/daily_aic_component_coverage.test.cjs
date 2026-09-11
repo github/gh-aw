@@ -85,6 +85,16 @@ it.each(["detection", "evals"])("rejects executed %s with missing accounting des
   expect(f.list).toHaveBeenCalledOnce();
 });
 
+it("accepts a run with zero jobs (blocked on approval) as zero AIC", async () => {
+  const f = evaluate({}, []);
+  await expect(f.result).resolves.toBe(0);
+});
+
+it("rejects a run with jobs present but missing the billable agent job", async () => {
+  const f = evaluate({}, [job("detection")]);
+  await expect(f.result).rejects.toThrow("has jobs but no billable agent job");
+});
+
 it.each(["skipped", "not-configured"])("accepts %s detection without requiring placeholder data", async state => {
   const jobs = state === "skipped" ? [job("agent"), job("detection", { conclusion: "skipped" })] : [job("agent")];
   const f = evaluate(
