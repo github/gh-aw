@@ -53,7 +53,7 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
   // no possible billable component. Zero jobs proves zero AIC rather than leaving
   // coverage "unknown"; only a run with jobs but no "agent" job is ambiguous.
   if (!sawAnyJob) return components;
-  if (!components.has("agent")) throw new Error(`Run ${owner}/${repo}#${run.id} has jobs but no billable agent job`);
+  if (!components.has("agent")) throw new Error(`Run ${owner}/${repo}#${run.id} has no completed billable agent job (missing or incomplete job metadata)`);
   return components;
 }
 

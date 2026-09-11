@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
 const { getRunAIC } = require("./check_daily_aic_workflow_guardrail.cjs");
+const { loadBillableJobs } = require("./daily_aic_component_coverage.cjs");
 const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { createAPIBudget } = require("./daily_aic_api_budget.cjs");
 const time = "2025-01-01T12:00:00Z";
@@ -92,7 +93,16 @@ it("accepts a run with zero jobs (blocked on approval) as zero AIC", async () =>
 
 it("rejects a run with jobs present but missing the billable agent job", async () => {
   const f = evaluate({}, [job("detection")]);
-  await expect(f.result).rejects.toThrow("has jobs but no billable agent job");
+  await expect(f.result).rejects.toThrow("has no completed billable agent job");
+});
+
+it("rejects a run whose job pages never terminate within the pagination limit", async () => {
+  const fullPage = Array.from({ length: 100 }, (_, i) => ({ id: 1000 + i, name: `filler-${i}`, status: "completed", conclusion: "success", run_attempt: 1 }));
+  const list = vi.fn(async () => ({ status: 200, headers: {}, data: { jobs: fullPage } }));
+  await expect(loadBillableJobs({ github: { rest: { actions: { listJobsForWorkflowRun: list } } }, budget: createAPIBudget() }, "example", "project", { id: 1, run_attempt: 1 })).rejects.toThrow(
+    "Could not enumerate all jobs for run example/project#1 (pagination limit reached)"
+  );
+  expect(list).toHaveBeenCalledTimes(10);
 });
 
 it.each(["skipped", "not-configured"])("accepts %s detection without requiring placeholder data", async state => {
