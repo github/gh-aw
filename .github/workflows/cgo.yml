@@ -441,7 +441,7 @@ jobs:
         fail-on-cache-miss: true
     - name: Set up Node.js
       id: setup-node
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f   # v6
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v6
       with:
         node-version: "24"
         cache: npm
@@ -610,7 +610,7 @@ jobs:
       run: make test-wasm-golden
 
     - name: Set up Node.js
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f   # v6
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v6
       with:
         node-version: '24'
 
