@@ -203,11 +203,17 @@ async function main() {
     return;
   }
 
-  // Allow trusted bots other than Dependabot to synchronize PRs they did not open.
-  // Dependabot must still pass the confused-deputy guard because @dependabot recreate
-  // can make it appear as the actor on an attacker's PR.
+  // Allow trusted bots other than Dependabot to synchronize same-repository PRs they
+  // did not open. Cross-repository PRs still require provenance validation because an
+  // attacker may induce an allowlisted bot to update code from their fork.
   const isPullRequestSynchronization = (eventName === "pull_request" || eventName === "pull_request_target") && context.payload?.action === "synchronize";
-  const canAuthorizeBotBeforeConfusedDeputyCheck = isPullRequestSynchronization && actorToValidate !== "dependabot[bot]";
+  const pullRequestHeadRepository = context.payload?.pull_request?.head?.repo;
+  const pullRequestBaseRepository = context.payload?.pull_request?.base?.repo;
+  const hasRepositoryIds = Number.isInteger(pullRequestHeadRepository?.id) && Number.isInteger(pullRequestBaseRepository?.id);
+  const isSameRepositoryPullRequest = hasRepositoryIds
+    ? pullRequestHeadRepository.id === pullRequestBaseRepository.id
+    : typeof pullRequestHeadRepository?.full_name === "string" && pullRequestHeadRepository.full_name.toLowerCase() === `${owner}/${repo}`.toLowerCase();
+  const canAuthorizeBotBeforeConfusedDeputyCheck = isPullRequestSynchronization && isSameRepositoryPullRequest && actorToValidate !== "dependabot[bot]";
   if (canAuthorizeBotBeforeConfusedDeputyCheck) {
     const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
     if (botResult.handled) {

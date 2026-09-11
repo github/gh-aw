@@ -468,7 +468,14 @@ describe("check_membership.cjs", () => {
       process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
       mockContext.actor = "my-fixup-bot[bot]";
       mockContext.eventName = eventName;
-      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "human-author" } } };
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
       mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
 
       await runScript();
@@ -476,6 +483,65 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
+    });
+
+    it.each(["pull_request", "pull_request_target"])("should deny an active allowlisted bot when synchronizing a cross-repository PR (%s event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = eventName;
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "attacker" },
+          head: { repo: { id: 456, full_name: "attacker/fork" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should deny an active allowlisted bot when the PR head repository is unavailable", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "attacker" },
+          head: { repo: null },
+        },
+      };
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should compare same-repository PR names case-insensitively", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { full_name: "TestOrg/TestRepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
     });
 
     it.each(["pull_request", "pull_request_target"])("should deny allowlisted dependabot when actor differs from PR author (%s synchronize event)", async eventName => {
@@ -495,7 +561,14 @@ describe("check_membership.cjs", () => {
       process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
       mockContext.actor = "my-fixup-bot[bot]";
       mockContext.eventName = "pull_request_target";
-      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "human-author" } } };
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
       mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue({ status: 404, message: "Not Found" });
 
       await runScript();
