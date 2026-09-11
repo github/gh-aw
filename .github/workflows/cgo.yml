@@ -1362,6 +1362,33 @@ jobs:
           echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
         fi
 
+      # Ensure the module cache is fully populated before linting.
+      # golangci-lint type-checks packages and would otherwise fetch missing
+      # modules inline, where a transient proxy.golang.org error surfaces as a
+      # confusing "could not import ... (typecheck)" lint failure.
+      # Runs unconditionally because a restored Go cache can still be incomplete.
+    - name: Download dependencies with retry
+      run: |
+        set -e
+        MAX_RETRIES=3
+        RETRY_DELAY=5
+
+        for i in $(seq 1 $MAX_RETRIES); do
+          echo "Attempt $i of $MAX_RETRIES: Downloading Go modules..."
+          if go mod download; then
+            echo "✅ Successfully downloaded Go modules"
+            break
+          else
+            if [ $i -eq $MAX_RETRIES ]; then
+              echo "❌ Failed to download Go modules after $MAX_RETRIES attempts"
+              echo "This may indicate that proxy.golang.org is unreachable"
+              exit 1
+            fi
+            echo "⚠️ Download failed, retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          fi
+        done
+
       # Install golangci-lint binary (avoiding GPL dependencies)
       # Downloads pre-built binary from GitHub releases instead of using go install
     - name: Install golangci-lint
