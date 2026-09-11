@@ -183,6 +183,25 @@ func TestCachedLogsJSONLWriterIncludesSafeDashboardEvidence(t *testing.T) {
 	assert.Equal(t, "get_file", record.Run.MCPToolUsage.ToolCalls[0].ToolName)
 }
 
+func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
+	jobs := projectCachedLogsJSONLJobs([]JobInfoWithDuration{
+		{JobInfo: JobInfo{ID: 0, Name: "missing-id"}},
+		{JobInfo: JobInfo{ID: 1}},
+		{JobInfo: JobInfo{ID: 2, Name: "agent"}},
+	})
+	require.Len(t, jobs, 1)
+	assert.Equal(t, int64(2), jobs[0].ID)
+
+	usage := projectCachedLogsJSONLMCPToolUsage(&MCPToolUsageData{ToolCalls: []MCPToolCall{
+		{ServerName: "github", ToolName: "missing-timestamp"},
+		{Timestamp: "2026-09-09T04:00:15Z"},
+		{Timestamp: "2026-09-09T04:00:16Z", ServerName: "github", ToolName: "get_file"},
+	}})
+	require.NotNil(t, usage)
+	require.Len(t, usage.ToolCalls, 1)
+	assert.Equal(t, "get_file", usage.ToolCalls[0].ToolName)
+}
+
 func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	first := []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n")

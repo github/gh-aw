@@ -227,7 +227,7 @@ func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJ
 		JobDetails:   projectCachedLogsJSONLJobs(run.JobDetails),
 		MCPToolUsage: projectCachedLogsJSONLMCPToolUsage(run.MCPToolUsage),
 	}
-	if info := extractRunEngineInfo(run).awInfo; info != nil {
+	if info := runData.awInfo; info != nil {
 		data.EngineVersion = info.Version
 		data.Model = info.Model
 		data.GhAwVersion = info.CLIVersion
@@ -267,23 +267,27 @@ func projectCachedLogsJSONLMCPToolUsage(usage *MCPToolUsageData) *cachedLogsJSON
 		if call.Timestamp == "" || (call.ServerName == "" && call.ToolName == "") {
 			continue
 		}
-		toolCalls = append(toolCalls, cachedLogsJSONLMCPToolCall{
-			ToolCallID:          call.ToolCallID,
-			Timestamp:           call.Timestamp,
-			ServerName:          call.ServerName,
-			ToolName:            call.ToolName,
-			Method:              call.Method,
-			InputSize:           call.InputSize,
-			OutputSize:          call.OutputSize,
-			Duration:            call.Duration,
-			Status:              call.Status,
-			EffectiveTokenDelta: call.EffectiveTokenDelta,
-		})
+		toolCalls = append(toolCalls, call.cachedLogsJSONLProjection())
 	}
 	if len(toolCalls) == 0 {
 		return nil
 	}
 	return &cachedLogsJSONLMCPToolUsageData{ToolCalls: toolCalls}
+}
+
+func (call MCPToolCall) cachedLogsJSONLProjection() cachedLogsJSONLMCPToolCall {
+	return cachedLogsJSONLMCPToolCall{
+		ToolCallID:          call.ToolCallID,
+		Timestamp:           call.Timestamp,
+		ServerName:          call.ServerName,
+		ToolName:            call.ToolName,
+		Method:              call.Method,
+		InputSize:           call.InputSize,
+		OutputSize:          call.OutputSize,
+		Duration:            call.Duration,
+		Status:              call.Status,
+		EffectiveTokenDelta: call.EffectiveTokenDelta,
+	}
 }
 
 func (w *cachedLogsJSONLWriter) AppendWorkflowRuns(request cachedWorkflowRunsRequest, payload []byte) error {
