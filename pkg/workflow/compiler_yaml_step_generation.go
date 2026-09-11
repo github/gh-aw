@@ -341,7 +341,7 @@ func (c *Compiler) generateSetRuntimePathsStep() []string {
 		"        id: set-runtime-paths\n",
 		"        env:\n",
 		"          GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}\n",
-		"        run: |\n",
+		"        run: | # zizmor: ignore[github-env] - runner.tool_cache is set by GitHub Actions, not user input.\n",
 		"          if [ -z \"${RUNNER_TOOL_CACHE:-}\" ]; then\n",
 		"            echo \"RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}\" >> \"$GITHUB_ENV\"\n",
 		"          fi\n",

@@ -72,9 +72,10 @@ This workflow tests the agentic output collection functionality.
 	if !strings.Contains(lockContent, "GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}") {
 		t.Error("Expected runner.tool_cache to be passed through the step environment")
 	}
-	runStart := strings.Index(lockContent, "        run: |\n")
+	const runtimePathsRun = "        run: | # zizmor: ignore[github-env] - runner.tool_cache is set by GitHub Actions, not user input.\n"
+	runStart := strings.Index(lockContent, runtimePathsRun)
 	if runStart < 0 {
-		t.Fatal("Expected 'Set runtime paths' step to contain a run script")
+		t.Fatal("Expected 'Set runtime paths' step to contain a run script with a github-env suppression")
 	}
 	runEnd := strings.Index(lockContent[runStart:], "\n      - ")
 	if runEnd < 0 {
