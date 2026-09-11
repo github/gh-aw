@@ -141,6 +141,15 @@ func githubBackendIsStaticEnclaveDelegationOnly(workflowData *WorkflowData) bool
 	return enclaveGitHubIssuesEnabled(workflowData) && !primaryGitHubMCPEnabled(workflowData)
 }
 
+// githubBackendIsEnclaveOnly reports whether the GitHub MCP server is rendered solely to
+// serve an enclave agent identity (static or dynamic), with no primary-agent GitHub access.
+// Backends in this state always derive their guard/write-sink policies statically from the
+// enclave declaration, never from the determine-automatic-lockdown step outputs, even though
+// that step may still be generated for them solely to supply GH_AW_SINK_VISIBILITY.
+func githubBackendIsEnclaveOnly(workflowData *WorkflowData) bool {
+	return githubBackendIsStaticEnclaveDelegationOnly(workflowData) || githubBackendIsDynamicDelegationOnly(workflowData)
+}
+
 func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolicies map[string]any) bool {
 	if len(explicitGuardPolicies) > 0 {
 		return false
@@ -148,11 +157,7 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	if workflowData == nil {
 		return true
 	}
-	// Enclave-only GitHub backends (static or dynamic) always derive their guard policy
-	// statically from the enclave declaration, never from the determine-automatic-lockdown
-	// step outputs — even though that step may still be generated for such backends solely
-	// to supply GH_AW_SINK_VISIBILITY for the write-sink policy.
-	if githubBackendIsStaticEnclaveDelegationOnly(workflowData) || githubBackendIsDynamicDelegationOnly(workflowData) {
+	if githubBackendIsEnclaveOnly(workflowData) {
 		return false
 	}
 	githubTool, hasGitHub := workflowData.Tools["github"]
