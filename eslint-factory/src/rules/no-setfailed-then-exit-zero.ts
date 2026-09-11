@@ -124,6 +124,14 @@ function canContinueNormally(stmt: TSESTree.Statement): boolean {
     if (!stmt.alternate) return true;
     return canContinueNormally(stmt.consequent) || canContinueNormally(stmt.alternate);
   }
+  if (stmt.type === AST_NODE_TYPES.TryStatement) {
+    // If a finally block never continues normally (e.g. it always returns/throws/exits),
+    // the whole try statement can't continue normally either, regardless of try/catch.
+    if (stmt.finalizer && !canStatementsContinueNormally(stmt.finalizer.body)) return false;
+    const blockContinues = canStatementsContinueNormally(stmt.block.body);
+    const handlerContinues = stmt.handler ? canStatementsContinueNormally(stmt.handler.body.body) : true;
+    return blockContinues || handlerContinues;
+  }
   return true;
 }
 
@@ -141,6 +149,19 @@ function statementCanSetFailedAndContinue(stmt: TSESTree.Statement, sourceCode: 
   }
   if (stmt.type === AST_NODE_TYPES.IfStatement) {
     return statementCanSetFailedAndContinue(stmt.consequent, sourceCode) || (stmt.alternate ? statementCanSetFailedAndContinue(stmt.alternate, sourceCode) : false);
+  }
+  if (stmt.type === AST_NODE_TYPES.TryStatement) {
+    // A finalizer that itself sets failed-and-continues re-activates the path
+    // regardless of what the try/catch arms did.
+    if (stmt.finalizer && statementsCanSetFailedAndContinue(stmt.finalizer.body, sourceCode)) return true;
+    // Otherwise the path is active if either the try block or the catch handler
+    // sets failed and continues, AND the finalizer (if present) doesn't itself
+    // definitively transfer control away (return/throw/exit) — a finalizer that
+    // always exits/returns/throws overrides the try/catch outcome entirely.
+    if (stmt.finalizer && !canStatementsContinueNormally(stmt.finalizer.body)) return false;
+    const blockActivates = statementsCanSetFailedAndContinue(stmt.block.body, sourceCode);
+    const handlerActivates = stmt.handler ? statementsCanSetFailedAndContinue(stmt.handler.body.body, sourceCode) : false;
+    return blockActivates || handlerActivates;
   }
   return false;
 }
@@ -235,6 +256,39 @@ export const noSetFailedThenExitZeroRule = createRule({
       }
     }
 
+    // Handles `try { core.setFailed(...) } finally { process.exit(0); }` (and the
+    // catch-block equivalent): the `setFailed` call and the exit-zero statement live
+    // in different BlockStatement bodies (try/catch vs finally), so the sibling scan
+    // in checkStatements never sees them side by side. Check the finalizer directly.
+    function checkTryFinallyExitZero(node: TSESTree.TryStatement): void {
+      if (!node.finalizer) return;
+      const setFailedInTryOrCatch = statementsCanSetFailedAndContinue(node.block.body, sourceCode) || (node.handler ? statementsCanSetFailedAndContinue(node.handler.body.body, sourceCode) : false);
+      if (!setFailedInTryOrCatch) return;
+
+      for (const candidate of node.finalizer.body) {
+        if (isProcessExitZero(candidate)) {
+          context.report({ node: candidate, messageId: "noSetFailedThenExitZero", suggest: [] });
+          break;
+        }
+        if (isProcessExitCodeZero(candidate)) {
+          context.report({
+            node: candidate,
+            messageId: "noSetFailedThenExitCodeZero",
+            suggest: [
+              {
+                messageId: "removeExitCodeZero",
+                fix(fixer: TSESLint.RuleFixer) {
+                  return fixer.remove(candidate);
+                },
+              },
+            ],
+          });
+          continue;
+        }
+        if (isControlTransferStatement(candidate)) break;
+      }
+    }
+
     return {
       BlockStatement(node: TSESTree.BlockStatement) {
         checkStatements(node.body);
@@ -244,6 +298,9 @@ export const noSetFailedThenExitZeroRule = createRule({
       },
       Program(node: TSESTree.Program) {
         checkStatements(node.body.filter((s): s is TSESTree.Statement => s.type !== AST_NODE_TYPES.ImportDeclaration && s.type !== AST_NODE_TYPES.ExportAllDeclaration));
+      },
+      TryStatement(node: TSESTree.TryStatement) {
+        checkTryFinallyExitZero(node);
       },
     };
   },

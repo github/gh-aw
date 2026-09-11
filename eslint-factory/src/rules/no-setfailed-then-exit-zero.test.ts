@@ -59,6 +59,12 @@ describe("no-setfailed-then-exit-zero", () => {
         `function f() { core.setFailed("bad"); return; process.exitCode = 0; }`,
         // process.exitCode = "0" (string, not the number literal) — not matched
         `core.setFailed("bad"); process.exitCode = "0";`,
+        // try/finally where setFailed is NOT called — no false positive
+        `function f() { try { doWork(); } finally { process.exit(0); } }`,
+        // try/catch that does not call setFailed, followed by sibling exit(0) — no false positive
+        `function f() { try { doWork(); } catch (err) { core.info("x"); } process.exit(0); }`,
+        // setFailed inside try, followed by non-zero exit in finally — fine
+        `function f() { try { core.setFailed("bad"); } finally { process.exit(1); } }`,
       ],
       invalid: [
         // Adjacent: core.setFailed immediately followed by process.exit(0)
@@ -145,6 +151,22 @@ describe("no-setfailed-then-exit-zero", () => {
         {
           code: `core.setFailed("bad"); process["exitCode"] = 0;`,
           errors: [{ messageId: "noSetFailedThenExitCodeZero", suggestions: [{ messageId: "removeExitCodeZero", output: `core.setFailed("bad"); ` }] }],
+        },
+        // try { setFailed } finally { process.exit(0) } — the two live in different
+        // BlockStatement bodies, so this exercises the dedicated TryStatement handler.
+        {
+          code: `function f() { try { core.setFailed("bad"); } finally { process.exit(0); } }`,
+          errors: [{ messageId: "noSetFailedThenExitZero", suggestions: [] }],
+        },
+        // setFailed inside catch, sibling process.exit(0) after the whole try statement
+        {
+          code: `function f() { try { doWork(); } catch (err) { core.setFailed(getErrorMessage(err)); } process.exit(0); }`,
+          errors: [{ messageId: "noSetFailedThenExitZero", suggestions: [] }],
+        },
+        // setFailed inside try, process.exitCode = 0 in finally
+        {
+          code: `function f() { try { core.setFailed("bad"); } finally { process.exitCode = 0; } }`,
+          errors: [{ messageId: "noSetFailedThenExitCodeZero", suggestions: [{ messageId: "removeExitCodeZero", output: `function f() { try { core.setFailed("bad"); } finally {  } }` }] }],
         },
       ],
     });
