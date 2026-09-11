@@ -245,5 +245,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-09-11",
+    "workflow_name": "Instructions Janitor",
+    "workflow_file": "instructions-janitor",
+    "total_aic_analyzed": 1378.6,
+    "runs_audited": 3,
+    "recommendations_count": 3,
+    "subagent_candidates": 1,
+    "estimated_aic_savings_per_run": 180
   }
 ]
