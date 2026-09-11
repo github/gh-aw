@@ -294,10 +294,12 @@ func (c *Compiler) generateCommentMemoryEarlyConfigStep(yaml *strings.Builder, d
 // comment-memory files before the full safe-outputs config exists.
 func (c *Compiler) generateCommentMemoryEarlyConfigLines(data *WorkflowData) ([]string, bool) {
 	var globalFooter *bool
+	var globalBodyFooter string
 	if data.SafeOutputs != nil {
 		globalFooter = data.SafeOutputs.Footer
+		globalBodyFooter = data.SafeOutputs.BodyFooter
 	}
-	cfg := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, globalFooter)
+	cfg := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, globalFooter, globalBodyFooter)
 	if cfg == nil {
 		return nil, false
 	}

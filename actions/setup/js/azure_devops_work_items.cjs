@@ -233,9 +233,11 @@ async function handleCreateWorkItem(message, config, resolvedTemporaryIds) {
 
   try {
     const title = String(message.title || "").trim();
-    const description = String(message.description || "").trim();
+    const rawDescription = String(message.description || "").trim();
     if (title.length < 6 || title.length > 255) throw new Error("title must contain 6 to 255 characters");
-    if (description.length < 31 || description.length > 65000) throw new Error("description must contain 31 to 65000 characters");
+    if (rawDescription.length < 31) throw new Error("description must contain 31 to 65000 characters");
+    const description = appendConfiguredBodyFooter(rawDescription, config.body_footer);
+    if (description.length > 65000) throw new Error("description must contain 31 to 65000 characters");
     const agentTags = validateTags(message.tags || []);
     validateAllowedTags(agentTags, config.allowed_tags);
     const staticTags = validateTags(config.tags || []);

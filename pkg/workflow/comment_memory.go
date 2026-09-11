@@ -15,7 +15,7 @@ type CommentMemoryConfig struct {
 
 const commentMemoryHandlerKey = "comment_memory"
 
-func buildCommentMemoryHandlerConfig(config *CommentMemoryConfig, globalFooter *bool) map[string]any {
+func buildCommentMemoryHandlerConfig(config *CommentMemoryConfig, globalFooter *bool, globalBodyFooter string) map[string]any {
 	if config == nil {
 		return nil
 	}
@@ -25,6 +25,7 @@ func buildCommentMemoryHandlerConfig(config *CommentMemoryConfig, globalFooter *
 		AddIfNotEmpty("target-repo", config.TargetRepoSlug).
 		AddStringSlice("allowed_repos", config.AllowedRepos).
 		AddIfNotEmpty("memory_id", config.MemoryID).
+		AddIfNotEmpty("body_footer", appendBodyFooters(config.BodyFooter, globalBodyFooter)).
 		AddTemplatableBool("footer", getEffectiveFooterForTemplatable(config.Footer, globalFooter)).
 		AddIfNotEmpty("github-token", resolveHandlerGitHubTokenWithStepID(config.GitHubApp, "comment-memory-app-token", config.GitHubToken)).
 		AddTemplatableBool("staged", templatableBoolPtrToStringPtr(config.Staged)).

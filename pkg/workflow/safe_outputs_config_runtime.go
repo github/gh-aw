@@ -96,7 +96,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 			config[handlerName] = handlerConfig
 		}
 	}
-	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, safeOutputs.Footer); handlerConfig != nil {
+	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, safeOutputs.Footer, safeOutputs.BodyFooter); handlerConfig != nil {
 		config[commentMemoryHandlerKey] = handlerConfig
 	}
 

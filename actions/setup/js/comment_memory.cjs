@@ -15,6 +15,7 @@ const { getTrackerID } = require("./get_tracker_id.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
 const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, COMMENT_MEMORY_CODE_FENCE, buildCodeFenceOpener } = require("./comment_memory_helpers.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
 // Require provenance marker to avoid accidentally updating user-authored comments
 // that happen to contain a matching comment-memory tag.
 const MANAGED_COMMENT_PROVENANCE_MARKER = "<!-- gh-aw-agentic-workflow:";
@@ -36,7 +37,7 @@ function sanitizeMemoryID(memoryID) {
 }
 
 function buildManagedMemoryBody(rawBody, memoryID, options) {
-  const { includeFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber } = options;
+  const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
@@ -76,6 +77,10 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
   } else {
     core.info(`comment_memory: footer disabled for memory_id='${memoryID}', adding provenance marker only`);
     body += "\n\n" + markdownParts.noFooterMarker;
+  }
+  const renderedBodyFooter = getBodyFooterMessage(bodyFooter, { workflowName, runUrl });
+  if (renderedBodyFooter) {
+    body += "\n\n" + renderedBodyFooter.trimEnd();
   }
 
   core.info(`comment_memory: built body length=${body.length} for memory_id='${memoryID}'`);
@@ -206,6 +211,7 @@ async function main(config = {}) {
       historyUrl,
       triggeringIssueNumber,
       triggeringPRNumber,
+      bodyFooter: config.body_footer,
     });
     try {
       enforceCommentLimits(managedBody);

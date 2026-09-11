@@ -46,11 +46,12 @@ function jiraHandler(handlerType, handle) {
   });
 }
 
-const createIssue = jiraHandler("jira_create_issue", async (message, client, isStaged) => {
+const createIssue = jiraHandler("jira_create_issue", async (message, client, isStaged, config) => {
   const projectKey = requiredString(message.project_key, "project_key");
   const issueType = requiredString(message.issue_type, "issue_type");
   const summary = requiredString(message.summary, "summary");
-  const description = optionalString(message.description, "description");
+  const rawDescription = optionalString(message.description, "description");
+  const description = rawDescription === undefined ? undefined : requiredString(appendConfiguredBodyFooter(rawDescription, config.body_footer), "description", 32767);
 
   if (isStaged) {
     logStagedPreviewInfo(`Jira create issue — Project: ${projectKey}; Type: ${issueType}; Summary: ${summary}${description ? `; Description: ${description}` : ""}`);
@@ -76,10 +77,11 @@ const createIssue = jiraHandler("jira_create_issue", async (message, client, isS
   };
 });
 
-const updateIssue = jiraHandler("jira_update_issue", async (message, client, isStaged) => {
+const updateIssue = jiraHandler("jira_update_issue", async (message, client, isStaged, config) => {
   const issueKey = requiredString(message.issue_key, "issue_key");
   const summary = optionalString(message.summary, "summary", 255);
-  const description = optionalString(message.description, "description");
+  const rawDescription = optionalString(message.description, "description");
+  const description = rawDescription === undefined ? undefined : requiredString(appendConfiguredBodyFooter(rawDescription, config.body_footer), "description", 32767);
   if (summary === undefined && description === undefined) {
     throw new Error("jira_update_issue requires summary or description");
   }
@@ -103,7 +105,7 @@ const updateIssue = jiraHandler("jira_update_issue", async (message, client, isS
 
 const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged, config) => {
   const issueKey = requiredString(message.issue_key, "issue_key");
-  const body = appendConfiguredBodyFooter(requiredString(message.body, "body", 32767), config.body_footer);
+  const body = requiredString(appendConfiguredBodyFooter(requiredString(message.body, "body", 32767), config.body_footer), "body", 32767);
 
   if (isStaged) {
     logStagedPreviewInfo(`Jira add comment — Issue: ${issueKey}; Body: ${body}`);

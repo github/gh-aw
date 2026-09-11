@@ -41,7 +41,7 @@ describe("Jira safe-output handlers", () => {
   });
 
   it("creates Jira issues with issue type name and ADF description", async () => {
-    const handler = await createIssueMain({ max: 1 });
+    const handler = await createIssueMain({ max: 1, body_footer: "Configured footer" });
     const result = await handler({
       project_key: "ENG",
       issue_type: "Task",
@@ -64,7 +64,7 @@ describe("Jira safe-output handlers", () => {
         },
       },
     });
-    expect(requests[0].body.fields.description.content).toHaveLength(2);
+    expect(requests[0].body.fields.description.content.at(-1).content[0].text).toBe("Configured footer");
     expect(global.core.debug).toHaveBeenCalledWith("jira_create_issue: processing request");
     expect(global.core.debug).toHaveBeenCalledWith("jira_create_issue: request completed successfully");
   });
@@ -84,6 +84,13 @@ describe("Jira safe-output handlers", () => {
     expect(requests[0].url).toBe("https://example.atlassian.net/rest/api/3/issue/ENG-123");
     expect(requests[0].body.fields).toMatchObject(expectedFields);
     expect(Object.keys(requests[0].body.fields)).toEqual(Object.keys(updates));
+  });
+
+  it("appends a configured body footer to Jira issue updates", async () => {
+    const handler = await updateIssueMain({ max: 1, body_footer: "Configured footer" });
+    await handler({ issue_key: "ENG-123", description: "Updated description" });
+
+    expect(requests[0].body.fields.description.content.at(-1).content[0].text).toBe("Configured footer");
   });
 
   it("rejects a Jira update with no changed fields", async () => {

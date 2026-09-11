@@ -38,7 +38,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 
 	safeOutputsConfig := make(map[string]any)
 	addStandardHandlerConfigs(safeOutputsConfig, data)
-	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, data.SafeOutputs.Footer); handlerConfig != nil {
+	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, data.SafeOutputs.Footer, data.SafeOutputs.BodyFooter); handlerConfig != nil {
 		safeOutputsConfig[commentMemoryHandlerKey] = handlerConfig
 	}
 

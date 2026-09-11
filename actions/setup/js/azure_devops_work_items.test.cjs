@@ -17,7 +17,6 @@ describe("azure_devops_work_items", () => {
     process.env.GITHUB_RUN_ATTEMPT = "1";
     global.fetch = vi.fn();
   });
-
   afterEach(() => {
     delete process.env.SYSTEM_ACCESSTOKEN;
     delete process.env.AZURE_DEVOPS_ORG_URL;
@@ -39,6 +38,7 @@ describe("azure_devops_work_items", () => {
       work_item_type: "Task",
       area_path: "test-project\\Platform",
       max: 1,
+      body_footer: "Configured footer",
     })(
       {
         temporary_id: "#aw_item",
@@ -63,6 +63,8 @@ describe("azure_devops_work_items", () => {
         "Content-Type": "application/json-patch+json",
       },
     });
+    const patch = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(patch.find(operation => operation.path === "/fields/System.Description").value).toBe("Detailed description of the build failure.\n\nConfigured footer");
     expect(core.debug).toHaveBeenNthCalledWith(1, "Azure DevOps API request started: POST");
     expect(core.debug).toHaveBeenNthCalledWith(2, "Azure DevOps API request completed: POST HTTP 200");
     expect(core.debug.mock.calls.flat().join(" ")).not.toContain("test-token");
