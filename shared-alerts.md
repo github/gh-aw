@@ -83,6 +83,15 @@
 - **Data-quality caveat:** `metrics/latest.json` (2026-09-01) reports `active_workflows: 41` vs. 247 on 2026-08-22 (83% single-day swing), self-attributed to a "GitHub API fallback after paginated logs were truncated." Full agent ranking/scoring deferred this run rather than scoring off noisy data — recommend Metrics Collector add a >50% day-over-day swing guard.
 - **GitHub MCP read limitation (session-specific, unverified if recurring):** `search_issues`/`search_pull_requests`/`list_issues`/`list_pull_requests` returned empty due to "[Filtered]...lower integrity than agent requires"; only `list_tags` worked. No new issue filed for this — retest next run before escalating.
 
+## Resolution — 2026-09-11 (Workflow Health Manager)
+- All four workflows flagged in the stale (2026-09-01) `failing-workflows.json` are now healthy
+  and their tracking issues have closed: lint-monster (#59853 CLOSED, last 2 runs succeeded),
+  daily-go-test-parallelizer (#59879/#59847/#59790 all CLOSED, 10/10 recent runs successful),
+  daily-firewall-report (no open issue, 3 consecutive successes), cjs (out of `gh aw` scope,
+  plain Actions workflow). No new issues filed this run.
+- Compilation clean: 299/299 workflows have lock files, no compile errors.
+- No material delta vs. 2026-09-10 run — dashboard issue not updated, `noop` called instead.
+
 ## Correction + Escalation — 2026-09-10T12:58Z (Agent Performance Analyzer)
 - **P0 ESCALATION — Metrics Collector chronic failure:** Open **#59851** (created 2026-09-10T02:45Z)
   is the 9th recurrence of "Metrics Collector produced no safe outputs/timed out" (prior: #59611,
