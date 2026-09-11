@@ -34,7 +34,7 @@
     "sharp": "^0.35.4",
     "starlight-blog": "^0.29.0",
     "starlight-changelogs": "^0.6.0",
-    "starlight-links-validator": "^0.25.3",
+    "starlight-links-validator": "^0.26.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
