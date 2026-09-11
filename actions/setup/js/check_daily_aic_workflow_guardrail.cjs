@@ -612,12 +612,12 @@ async function main(options = {}) {
       countedRunIds: countedRuns.map(run => run.id),
       currentAIC: totalAIC,
       threshold,
-      exceeded: totalAIC > threshold,
+      exceeded: totalAIC >= threshold,
     });
 
     logDailyGuardrail("Daily AIC business API requests", { requests: rateLimit.requests, cacheHits });
 
-    if (totalAIC <= threshold) {
+    if (totalAIC < threshold) {
       core.setOutput("daily_ai_credits_guardrail_status", "under_budget");
       await appendDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, summaryMeta);
       core.info(`Daily workflow AIC guardrail not exceeded (${totalAIC}/${threshold}).`);
