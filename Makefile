@@ -143,7 +143,11 @@ test-integration-mcp-other:
 
 .PHONY: test-integration-logs
 test-integration-logs:
-	go test -v -timeout=3m -tags 'integration' -run 'TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow' ./pkg/cli
+	go test -v -timeout=3m -tags 'integration' -run 'TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow' -skip 'TestLogsMultiTarget' ./pkg/cli
+
+.PHONY: test-integration-logs-multi-target-count
+test-integration-logs-multi-target-count:
+	go test -v -timeout=3m -tags 'integration' -run 'TestLogsMultiTarget' ./pkg/cli
 
 .PHONY: test-integration-workflow
 test-integration-workflow:

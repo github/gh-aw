@@ -230,6 +230,10 @@ jobs:
         - name: "CLI Audit Logs & Firewall"
           packages: "./pkg/cli"
           pattern: "TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow|^TestAudit|^TestInspect"
+          skip_pattern: "TestLogsMultiTarget"
+        - name: "CLI Logs Multi-Target Count"    # Dedicated job: --count must be a shared max across targets, not per-target, and siblings must be cancelled promptly once it is reached
+          packages: "./pkg/cli"
+          pattern: "TestLogsMultiTarget"
         - name: "CLI Progress Flag"    # Isolate slow test (~65s for TestProgressFlagSignature)
           packages: "./pkg/cli"
           pattern: "TestProgressFlagSignature"
@@ -403,6 +407,9 @@ jobs:
           else
             go test -v -parallel=8 -timeout=10m -tags 'integration' -coverprofile="coverage-integration-${SAFE_NAME}.out" -json ${{ matrix.test-group.packages }} | tee "test-result-integration-${SAFE_NAME}.json"
           fi
+        elif [ -n "${{ matrix.test-group.skip_pattern || '' }}" ]; then
+          # Pattern group with an explicit skip_pattern: exclude tests matched by another dedicated group.
+          go test -v -parallel=8 -timeout=10m -tags 'integration' -coverprofile="coverage-integration-${SAFE_NAME}.out" -run '${{ matrix.test-group.pattern }}' -skip '${{ matrix.test-group.skip_pattern }}' -json ${{ matrix.test-group.packages }} | tee "test-result-integration-${SAFE_NAME}.json"
         else
           go test -v -parallel=8 -timeout=10m -tags 'integration' -coverprofile="coverage-integration-${SAFE_NAME}.out" -run '${{ matrix.test-group.pattern }}' -json ${{ matrix.test-group.packages }} | tee "test-result-integration-${SAFE_NAME}.json"
         fi

@@ -28,6 +28,13 @@ type logsTargetResult struct {
 type logsCountLimit struct {
 	max       int64
 	processed atomic.Int64
+	// cancel, when set, is invoked exactly once as soon as the shared budget is
+	// exhausted, so every other concurrent target's context is canceled instead
+	// of running to the end of its current batch/iteration before next noticing
+	// the shared limit was reached. See collectLogsTargets, which wires this to
+	// a context derived from the multi-target download's own context.
+	cancel     context.CancelFunc
+	cancelOnce sync.Once
 }
 
 func (l *logsCountLimit) tryAdd() bool {
@@ -40,9 +47,28 @@ func (l *logsCountLimit) tryAdd() bool {
 			return false
 		}
 		if l.processed.CompareAndSwap(processed, processed+1) {
+			if processed+1 >= l.max {
+				l.cancelRemainingTargets()
+			}
 			return true
 		}
 	}
+}
+
+// cancelRemainingTargets cancels the context shared by every concurrent
+// target as soon as the budget is exhausted, so targets that are already
+// running (mid-batch or mid-download) stop at their next cooperative
+// cancellation checkpoint instead of finishing their current, possibly
+// oversized, batch first.
+func (l *logsCountLimit) cancelRemainingTargets() {
+	if l == nil {
+		return
+	}
+	l.cancelOnce.Do(func() {
+		if l.cancel != nil {
+			l.cancel()
+		}
+	})
 }
 
 func (l *logsCountLimit) isReached() bool {
@@ -215,12 +241,25 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 	resultChannel := make(chan logsTargetResult, len(targets))
 	var wg sync.WaitGroup
 	workerCount := min(len(targets), getMaxConcurrentWorkflowDownloads())
+	countLimit := newLogsCountLimit(opts.Count)
+	// targetsCtx is canceled the instant the shared run-count budget is
+	// exhausted (see logsCountLimit.cancelRemainingTargets), so every target
+	// still running or queued observes it at its next cooperative
+	// cancellation checkpoint instead of only checking countLimit.isReached()
+	// between its own batches/iterations.
+	targetsCtx := ctx
+	if countLimit != nil {
+		var cancel context.CancelFunc
+		targetsCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		countLimit.cancel = cancel
+	}
 	shared := logsTargetSharedState{
 		sem:                make(chan struct{}, workerCount),
 		perTargetDownloads: max(1, getMaxConcurrentDownloads()/workerCount),
 		cleanupErrors:      make(map[string]error, len(targets)),
 		storageLimit:       newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns),
-		countLimit:         newLogsCountLimit(opts.Count),
+		countLimit:         countLimit,
 	}
 	for _, target := range targets {
 		cleanupOpts := opts
@@ -231,7 +270,7 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 	}
 	for _, target := range targets {
 		wg.Go(func() {
-			resultChannel <- collectSingleLogsTarget(ctx, opts, target, shared)
+			resultChannel <- collectSingleLogsTarget(targetsCtx, opts, target, shared)
 		})
 	}
 	wg.Wait()
@@ -294,6 +333,13 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	case shared.sem <- struct{}{}:
 		defer func() { <-shared.sem }()
 	case <-ctx.Done():
+		if shared.countLimit.isReached() {
+			// ctx was canceled because another target already filled the
+			// shared budget, not because of a real timeout/cancellation;
+			// treat this exactly like the ordinary pre-start check above.
+			logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
+			return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
+		}
 		// The target never started (e.g. it was still queued behind the
 		// semaphore when the shared deadline or cancellation fired). Build a
 		// continuation from its own options so a resumable date-range target
@@ -305,6 +351,10 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 		}
 	}
 	if err := ctx.Err(); err != nil {
+		if shared.countLimit.isReached() {
+			logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
+			return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
+		}
 		return logsTargetResult{
 			target: target,
 			result: queuedLogsTargetResult(targetOpts, ctx),

@@ -255,6 +255,14 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 				break
 			}
 			if errors.Is(err, context.Canceled) {
+				if opts.countLimit.isReached() {
+					// Another target already filled the shared budget while
+					// this one was waiting on the rate limiter; stop cleanly
+					// and keep whatever this target already processed instead
+					// of discarding it behind a spurious cancellation error.
+					markSharedLogsCountReached(&state, runtime.fetchAllInRange, opts.countLimit)
+					break
+				}
 				return nil, false, false, false, "", err
 			}
 			if errors.Is(err, errInvalidMaxGitHubAPIRateLimit) {
@@ -295,7 +303,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	opts.cachedJSONLCache = runtime.cachedJSONLCache
 	batch, err := logsFetchWorkflowRunBatch(runtime.activeCtx, opts, state.beforeDate, len(state.processedRuns), runtime.fetchAllInRange)
 	if err != nil {
-		return handleLogsBatchError(state, runtime.activeCtx, err)
+		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, err)
 	}
 	if len(batch.runs) == 0 {
 		cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(batch, opts.Verbose)
@@ -394,12 +402,18 @@ func effectiveLogsBatchCount(count, processedCount int, limit *logsCountLimit) i
 	return min(count, processedCount+remaining)
 }
 
-func handleLogsBatchError(state *logsCollectionState, ctx context.Context, err error) (bool, error) {
+func handleLogsBatchError(state *logsCollectionState, fetchAllInRange bool, countLimit *logsCountLimit, err error) (bool, error) {
 	if errors.Is(err, context.DeadlineExceeded) {
 		state.timeoutReached = true
 		return true, nil
 	}
 	if errors.Is(err, context.Canceled) {
+		if countLimit.isReached() {
+			// Another concurrent target already filled the shared budget;
+			// stop cleanly instead of surfacing a spurious cancellation error.
+			markSharedLogsCountReached(state, fetchAllInRange, countLimit)
+			return true, nil
+		}
 		return true, err
 	}
 	return false, err
@@ -413,6 +427,15 @@ func shouldStopLogsIteration(runtime logsDownloadRuntime, opts LogsDownloadOptio
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Timeout reached, stopping download"))
 			}
 			return true, true, nil
+		}
+		if opts.countLimit.isReached() {
+			// Another concurrent target already filled the shared budget and
+			// canceled the context every target shares; this is an expected,
+			// successful stop, not a real cancellation. Report "not stopped"
+			// so the caller falls through to its ordinary shared-count-limit
+			// check just below, which applies the correct fetchAllInRange
+			// semantics and avoids surfacing a spurious cancellation error.
+			return false, false, nil
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return true, false, runtime.activeCtx.Err()
