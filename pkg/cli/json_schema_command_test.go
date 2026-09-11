@@ -100,7 +100,21 @@ func TestJSONSchemaCommand(t *testing.T) {
 				cachedLogsJSONLRunItemSchema{
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
 					Kind:          cachedLogsJSONLKindRun,
-					Run:           cachedLogsJSONLRunData{RunData: RunData{RunID: 42}},
+					Run: cachedLogsJSONLRunData{
+						RunData: RunData{RunID: 42},
+						Audit: &AuditData{
+							MCPServerHealth: &MCPServerHealth{
+								Servers: []MCPServerHealthDetail{{
+									MCPServerStatsBase: MCPServerStatsBase{
+										ServerName:    "github",
+										ToolCallCount: 3,
+										ErrorCount:    1,
+									},
+									RequestCount: 3,
+								}},
+							},
+						},
+					},
 				},
 				map[string]any{
 					"schema_version": cachedLogsJSONLSchemaVersion,
