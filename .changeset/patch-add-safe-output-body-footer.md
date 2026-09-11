@@ -2,4 +2,4 @@
 "gh-aw": patch
 ---
 
-Add deterministic `body-footer` templates to issue and pull request creation safe outputs.
+Add additive global and handler-specific `body-footer` templates to body-producing safe outputs.

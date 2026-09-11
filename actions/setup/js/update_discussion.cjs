@@ -16,6 +16,8 @@ const { MAX_LABELS } = require("./constants.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { logGraphQLError, fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 
 /** @type {import('./github_api_helpers.cjs').GraphQLErrorHints} */
 const DISCUSSION_GRAPHQL_HINTS = {
@@ -148,6 +150,14 @@ async function executeDiscussionUpdate(github, context, discussionNumber, update
 
   const hasTitleUpdate = updateData.title !== undefined;
   const hasBodyUpdate = updateData.body !== undefined;
+  if (hasBodyUpdate) {
+    const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+    const runUrl = buildWorkflowRunUrl(context, updateData._workflowRepo || context.repo);
+    const bodyFooter = getBodyFooterMessage(updateData._bodyFooter, { workflowName, runUrl });
+    if (bodyFooter) {
+      updateData.body = updateData.body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
+    }
+  }
   const hasLabelsUpdate = updateData.labels !== undefined;
 
   let updatedDiscussion = discussion;
@@ -302,6 +312,7 @@ function buildDiscussionUpdateData(item, config) {
 
   // Pass footer config to executeUpdate (default to true)
   updateData._includeFooter = parseBoolTemplatable(config.footer, true);
+  updateData._bodyFooter = config.body_footer;
 
   return { success: true, data: updateData };
 }

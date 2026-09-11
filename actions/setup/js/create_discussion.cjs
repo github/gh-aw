@@ -18,6 +18,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { createExpirationLine, generateFooterWithExpiration, addExpirationToFooter } = require("./ephemerals.cjs");
 const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
@@ -589,6 +590,10 @@ async function main(config = {}) {
     if (includeFooter) {
       const footer = addExpirationToFooter(markdownParts.footer, expiresHours, "Discussion");
       bodyLines.push(``, footer);
+    }
+    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
+    if (bodyFooter) {
+      bodyLines.push(``, bodyFooter.trimEnd());
     }
 
     // Add standalone workflow-id marker for searchability (consistent with comments)

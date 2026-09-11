@@ -4,6 +4,7 @@ interface SafeOutputConfig {
   max?: number;
   min?: number;
   "github-token"?: string;
+  "body-footer"?: string;
 }
 
 // === Specific Safe Output Configuration Interfaces ===

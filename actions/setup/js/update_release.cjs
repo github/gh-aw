@@ -121,6 +121,7 @@ async function main(config = {}) {
         runUrl,
         workflowId,
         includeFooter,
+        bodyFooter: config.body_footer,
       });
 
       const { data: updatedRelease } = await githubClient.rest.repos.updateRelease({

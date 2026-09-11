@@ -19,7 +19,7 @@
  *   await buffer.submitReview();
  */
 
-const { generateFooterWithMessages, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateWorkflowCallIdMarker, matchesWorkflowId } = require("./generate_footer.cjs");
@@ -369,6 +369,12 @@ function createReviewBuffer() {
       const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
       if (callerWorkflowId) {
         body += "\n" + generateWorkflowCallIdMarker(callerWorkflowId);
+      }
+    }
+    if (footerContext) {
+      const bodyFooter = getBodyFooterMessage(footerContext.bodyFooter, footerContext);
+      if (bodyFooter) {
+        body = body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
     }
 

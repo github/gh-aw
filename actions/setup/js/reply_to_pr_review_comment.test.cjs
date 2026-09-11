@@ -354,6 +354,25 @@ describe("reply_to_pr_review_comment", () => {
     });
   });
 
+  it("should append body footer when generated footer is disabled", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    const { main } = require("./reply_to_pr_review_comment.cjs");
+    const handler = await main({ max: 10, footer: false, body_footer: "Policy for {workflow_name}" });
+
+    const result = await handler(
+      {
+        type: "reply_to_pull_request_review_comment",
+        comment_id: 123,
+        body: "Acknowledged.",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockCreateReplyForReviewComment.mock.calls[0][0].body).toBe("Acknowledged.\n\nPolicy for Test Workflow");
+    delete process.env.GH_AW_WORKFLOW_NAME;
+  });
+
   it("should handle API errors gracefully", async () => {
     mockCreateReplyForReviewComment.mockRejectedValue(new Error("Not Found"));
 

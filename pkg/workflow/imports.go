@@ -180,6 +180,8 @@ func getSafeOutputTypeKeys() ([]string, error) {
 // configurations for types the user never explicitly configured.
 // When nil, the processed topSafeOutputs config fields are used to determine defined types
 // (legacy behavior used by unit tests that construct configs directly).
+//
+//nolint:largefunc // Existing import merge flow remains sequential to preserve conflict and precedence semantics.
 func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedSafeOutputsJSON []string, topRawSafeOutputs map[string]any) (*SafeOutputsConfig, error) {
 	importsLog.Print("Merging safe-outputs from imports")
 
@@ -352,6 +354,8 @@ func hasSafeOutputType(config *SafeOutputsConfig, key string) bool {
 }
 
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
+//
+//nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
 func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
 	importsLog.Printf("Merging imported safe-output config: key_count=%d", len(config))
 	// Create a frontmatter-like structure for extractSafeOutputsConfig
@@ -487,9 +491,11 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	if result.Footer == nil && importedConfig.Footer != nil {
 		result.Footer = importedConfig.Footer
 	}
+	result.BodyFooter = appendBodyFooters(result.BodyFooter, importedConfig.BodyFooter)
 	if len(result.AllowGitHubReferences) == 0 && len(importedConfig.AllowGitHubReferences) > 0 {
 		result.AllowGitHubReferences = importedConfig.AllowGitHubReferences
 	}
+
 	if !result.GroupReports && importedConfig.GroupReports {
 		result.GroupReports = true
 	}
@@ -520,6 +526,16 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 
 	importsLog.Print("Safe-output config merge completed")
 	return result, nil
+}
+
+func appendBodyFooters(bodyFooters ...string) string {
+	var nonEmpty []string
+	for _, bodyFooter := range bodyFooters {
+		if bodyFooter != "" {
+			nonEmpty = append(nonEmpty, bodyFooter)
+		}
+	}
+	return strings.Join(nonEmpty, "\n\n")
 }
 
 // mergeMessagesConfig merges two SafeOutputMessagesConfig structs at the field level.

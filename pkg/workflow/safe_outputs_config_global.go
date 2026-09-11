@@ -157,6 +157,11 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 			safeOutputsConfigLog.Printf("Global footer control: %t", footerBool)
 		}
 	}
+	if bodyFooter, exists := outputMap["body-footer"]; exists {
+		if bodyFooterString, ok := bodyFooter.(string); ok {
+			config.BodyFooter = bodyFooterString
+		}
+	}
 
 	// Handle group-reports flag
 	if groupReports, exists := outputMap["group-reports"]; exists {

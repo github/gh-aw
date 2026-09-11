@@ -6,6 +6,7 @@ const { LINEAR_ISSUE_PATTERN, linearGraphQL } = require("./linear_graphql.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 const LINEAR_COMMENT_CREATE = `mutation LinearAddComment($input: CommentCreateInput!) {
   commentCreate(input: $input) {
@@ -30,7 +31,7 @@ async function main(config = {}) {
     if (item.body.length > 65000) {
       throw new Error(`${ERR_VALIDATION}: linear_add_comment body exceeds 65000 characters`);
     }
-    const body = sanitizeContent(item.body);
+    const body = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
     if (!body.trim()) {
       throw new Error(`${ERR_VALIDATION}: linear_add_comment body is empty after sanitization`);
     }

@@ -299,7 +299,7 @@ async function main(config = {}) {
       buildCommentBody(sanitizedBody) {
         const triggeringIssueNumber = context.payload?.issue?.number;
         const triggeringPRNumber = context.payload?.pull_request?.number;
-        return buildCommentBody(sanitizedBody, triggeringIssueNumber, triggeringPRNumber);
+        return buildCommentBody(sanitizedBody, triggeringIssueNumber, triggeringPRNumber, config.body_footer);
       },
 
       addComment: addIssueComment,

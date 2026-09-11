@@ -7,6 +7,7 @@ const { linearGraphQL } = require("./linear_graphql.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 const LINEAR_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LINEAR_PROJECT_ID_PATTERN = /^(?:[0-9a-f]{12}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
@@ -52,7 +53,7 @@ async function main(config = {}) {
     }
 
     const title = sanitizeTitle(item.title);
-    const description = sanitizeContent(item.body);
+    const description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
     if (!title) {
       throw new Error(`${ERR_VALIDATION}: linear_create_issue title is empty after sanitization`);
     }

@@ -10,6 +10,7 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_help
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { isTemplatableTrue, isStagedMode, logStagedPreviewInfo, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
@@ -120,6 +121,7 @@ async function main(config = {}) {
     triggeringIssueNumber,
     triggeringPRNumber,
     triggeringDiscussionNumber,
+    bodyFooter: config.body_footer,
   };
 
   // For legacy single-buffer mode, set footer context once at init (unchanged behavior).
@@ -375,10 +377,15 @@ async function main(config = {}) {
 
     // Buffer the comment instead of posting it individually
     /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
+    let body = sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions });
+    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
+    if (bodyFooter) {
+      body += "\n\n" + bodyFooter.trimEnd();
+    }
     const bufferedComment = {
       path: commentItem.path,
       line: line,
-      body: sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions }),
+      body,
       side: side,
     };
 

@@ -2,7 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
-const { generateFooterWithMessages, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -45,9 +45,10 @@ const { ERR_API } = require("./error_codes.cjs");
  * @param {string} body - The original comment body
  * @param {number|undefined} triggeringIssueNumber - Issue number that triggered this workflow
  * @param {number|undefined} triggeringPRNumber - PR number that triggered this workflow
+ * @param {string} [bodyFooterTemplate] - Deterministic body footer template
  * @returns {string} The complete comment body with tracker ID and footer
  */
-function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber) {
+function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber, bodyFooterTemplate) {
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
   const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
   const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
@@ -57,9 +58,13 @@ function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber) {
   // Caller is responsible for sanitizing body before passing it here.
   const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
   const bodyWithCaution = detectionCaution ? detectionCaution + "\n\n" + body.trim() : body.trim();
-  return (
-    bodyWithCaution + getTrackerID("markdown") + "\n\n" + generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, undefined, undefined, { skipDetectionCaution: true })
-  );
+  let finalBody =
+    bodyWithCaution + getTrackerID("markdown") + "\n\n" + generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, undefined, undefined, { skipDetectionCaution: true });
+  const bodyFooter = getBodyFooterMessage(bodyFooterTemplate, { workflowName, runUrl });
+  if (bodyFooter) {
+    finalBody += "\n\n" + bodyFooter.trimEnd();
+  }
+  return finalBody;
 }
 
 /**

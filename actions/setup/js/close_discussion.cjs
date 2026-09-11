@@ -7,6 +7,8 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -309,7 +311,13 @@ async function main(config = {}) {
           core.info("close_discussion: allow-body is false — closing without a comment");
         }
       } else if (item.body) {
-        const sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases, maxMentions });
+        let sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases, maxMentions });
+        const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+        const runUrl = buildWorkflowRunUrl(context, context.repo);
+        const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
+        if (bodyFooter) {
+          sanitizedBody += "\n\n" + bodyFooter.trimEnd();
+        }
         const comment = await addDiscussionComment(githubClient, discussion.id, sanitizedBody);
         core.info(`Added comment to discussion #${discussionNumber}: ${comment.url}`);
         commentUrl = comment.url;

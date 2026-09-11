@@ -6,6 +6,7 @@
  */
 
 const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { generateWorkflowCallIdMarker, matchesWorkflowId } = require("./generate_footer.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
 const { replaceTemporaryIdReferences, resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
@@ -879,6 +880,10 @@ async function main(config = {}) {
     } else {
       // When footer is disabled, only add XML marker for searchability (no visible attribution text)
       processedBody += "\n\n" + markdownParts.noFooterMarker;
+    }
+    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
+    if (bodyFooter) {
+      processedBody += "\n\n" + bodyFooter.trimEnd();
     }
 
     // Add workflow-call-id marker when available to allow close-older-comments to

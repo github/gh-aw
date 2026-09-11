@@ -31,6 +31,8 @@ func TestBodyFooterConfiguration(t *testing.T) {
 	frontmatter := map[string]any{
 		"name": "Test",
 		"safe-outputs": map[string]any{
+			"body-footer": "Global footer from {workflow_name}",
+			"add-comment": nil,
 			"create-issue": map[string]any{
 				"body-footer": "Issue footer from {workflow_name}",
 			},
@@ -44,6 +46,7 @@ func TestBodyFooterConfiguration(t *testing.T) {
 	require.NotNil(t, config)
 	require.NotNil(t, config.CreateIssues)
 	require.NotNil(t, config.CreatePullRequests)
+	assert.Equal(t, "Global footer from {workflow_name}", config.BodyFooter)
 	assert.Equal(t, "Issue footer from {workflow_name}", config.CreateIssues.BodyFooter)
 	assert.Equal(t, "Pull request footer from {workflow_name}", config.CreatePullRequests.BodyFooter)
 
@@ -52,6 +55,29 @@ func TestBodyFooterConfiguration(t *testing.T) {
 
 	pullRequestConfig := pullRequestHandlerRegistry["create_pull_request"](config)
 	assert.Equal(t, "Pull request footer from {workflow_name}", pullRequestConfig["body_footer"])
+
+	workflowData := &WorkflowData{Name: "Test", SafeOutputs: config}
+	var steps []string
+	compiler.addHandlerManagerConfigEnvVar(&steps, workflowData)
+	require.Len(t, steps, 1)
+	assert.Contains(t, steps[0], `Issue footer from {workflow_name}\\n\\nGlobal footer from {workflow_name}`)
+	assert.Contains(t, steps[0], `Pull request footer from {workflow_name}\\n\\nGlobal footer from {workflow_name}`)
+	assert.GreaterOrEqual(t, strings.Count(steps[0], "Global footer from {workflow_name}"), 3)
+}
+
+func TestBodyFooterImportsAreAdditive(t *testing.T) {
+	compiler := NewCompiler()
+	result, err := compiler.MergeSafeOutputs(
+		&SafeOutputsConfig{BodyFooter: "Main footer"},
+		[]string{
+			`{"body-footer":"First imported footer"}`,
+			`{"body-footer":"Second imported footer"}`,
+		},
+		map[string]any{"body-footer": "Main footer"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "Main footer\n\nFirst imported footer\n\nSecond imported footer", result.BodyFooter)
 }
 
 func TestAddCommentFooterConfiguration(t *testing.T) {

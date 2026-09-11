@@ -34,13 +34,14 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
   const operation = updateData._operation || "append";
   let rawBody = updateData._rawBody;
   const includeFooter = updateData._includeFooter !== false; // Default to true
+  const bodyFooter = updateData._bodyFooter;
   const titlePrefix = updateData._titlePrefix || "";
   const labelsWereProvided = updateData.labels !== undefined;
   const labelSpecs = labelsWereProvided ? normalizeIssueIntentLabelSpecs(updateData.labels) : undefined;
   const useIssueIntentLabels = Boolean(labelSpecs);
 
   // Remove internal fields
-  const { _operation, _rawBody, _includeFooter, _titlePrefix, _workflowRepo, ...apiData } = updateData;
+  const { _operation, _rawBody, _includeFooter, _bodyFooter, _titlePrefix, _workflowRepo, ...apiData } = updateData;
   if (labelSpecs) {
     apiData.labels = getIssueIntentLabelNames(labelSpecs);
   }
@@ -86,6 +87,7 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
         newContent: rawBody,
         operation,
         includeFooter,
+        bodyFooter,
         workflowRepo: _workflowRepo,
         itemType: "issue",
       });

@@ -11,6 +11,7 @@ const { ERR_CONFIG, ERR_NOT_FOUND, ERR_PARSE, ERR_VALIDATION } = require("./erro
 const { logGraphQLError } = require("./github_api_helpers.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -369,7 +370,7 @@ async function main(config = {}, githubClient = null) {
       const status = validateStatus(output.status);
       const startDate = formatDate(output.start_date);
       const targetDate = formatDate(output.target_date);
-      const body = sanitizeContent(String(output.body), { allowedAliases: allowedMentionAliases, maxMentions });
+      const body = appendConfiguredBodyFooter(sanitizeContent(String(output.body), { allowedAliases: allowedMentionAliases, maxMentions }), config.body_footer);
 
       core.info(`Creating status update: ${status} (${startDate} → ${targetDate})`);
       core.info(`Body preview: ${body.substring(0, 100)}${body.length > 100 ? "..." : ""}`);

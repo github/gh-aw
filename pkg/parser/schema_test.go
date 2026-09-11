@@ -1764,6 +1764,8 @@ func TestGetSafeOutputTypeKeys(t *testing.T) {
 	// Should NOT include meta-configuration fields
 	metaFields := []string{
 		"allowed-domains",
+		"body-footer",
+		"footer",
 		"staged",
 		"env",
 		"github-token",
@@ -1809,12 +1811,13 @@ func TestMainWorkflowSchema_CreateDiscussionRequiredCategoryAllowed(t *testing.T
 	}
 }
 
-func TestMainWorkflowSchema_CreateBodyFootersAllowed(t *testing.T) {
+func TestMainWorkflowSchema_BodyFootersAllowed(t *testing.T) {
 	t.Parallel()
 
 	frontmatter := map[string]any{
 		"on": "daily",
 		"safe-outputs": map[string]any{
+			"body-footer": "Global footer from {workflow_name}",
 			"create-issue": map[string]any{
 				"body-footer": "Issue footer from {workflow_name}",
 			},
@@ -1825,7 +1828,7 @@ func TestMainWorkflowSchema_CreateBodyFootersAllowed(t *testing.T) {
 	}
 
 	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
-		t.Fatalf("expected create body footers to pass schema validation, got: %v", err)
+		t.Fatalf("expected body footers to pass schema validation, got: %v", err)
 	}
 }
 

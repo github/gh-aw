@@ -10,6 +10,7 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_help
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
+const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "submit_pull_request_review";
@@ -43,6 +44,18 @@ async function main(config = {}) {
   const supersedeOlderReviews = parseBoolTemplatable(config.supersede_older_reviews, false);
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const githubClient = await createAuthenticatedGitHubClient(config);
+  const footerContext = {
+    workflowName: process.env.GH_AW_WORKFLOW_NAME || "Workflow",
+    runUrl: buildWorkflowRunUrl(context, context.repo),
+    workflowSource: process.env.GH_AW_WORKFLOW_SOURCE || "",
+    workflowSourceURL: process.env.GH_AW_WORKFLOW_SOURCE_URL || "",
+    triggeringIssueNumber: context.payload?.issue?.number && !context.payload?.issue?.pull_request ? context.payload.issue.number : undefined,
+    triggeringPRNumber: context.payload?.pull_request?.number || (context.payload?.issue?.pull_request ? context.payload.issue.number : undefined),
+    triggeringDiscussionNumber: context.payload?.discussion?.number,
+    bodyFooter: config.body_footer,
+  };
+  if (registry) registry.setDefaultFooterContext(footerContext);
+  else if (legacyBuffer) legacyBuffer.setFooterContext(footerContext);
 
   const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
   const requiredTitlePrefix = config.required_title_prefix || "";

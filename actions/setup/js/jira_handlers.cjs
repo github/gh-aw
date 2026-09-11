@@ -3,6 +3,7 @@
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createJiraClient, textToADF } = require("./jira_client.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 function requiredString(value, field, maxLength = 255) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -25,13 +26,13 @@ function optionalString(value, field, maxLength = 32767) {
 function jiraHandler(handlerType, handle) {
   return createCountGatedHandler({
     handlerType,
-    setup: async (_config, _maxCount, isStaged) => {
+    setup: async (config, _maxCount, isStaged) => {
       core.debug(`${handlerType}: initializing handler (staged=${isStaged})`);
       const client = isStaged ? null : createJiraClient();
       return async message => {
         core.debug(`${handlerType}: processing request`);
         try {
-          const result = await handle(message || {}, client, isStaged);
+          const result = await handle(message || {}, client, isStaged, config);
           core.debug(`${handlerType}: request completed successfully`);
           return result;
         } catch (error) {
@@ -100,9 +101,9 @@ const updateIssue = jiraHandler("jira_update_issue", async (message, client, isS
   return { success: true, issue_key: issueKey, metadata: { issue_key: issueKey } };
 });
 
-const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged) => {
+const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged, config) => {
   const issueKey = requiredString(message.issue_key, "issue_key");
-  const body = requiredString(message.body, "body", 32767);
+  const body = appendConfiguredBodyFooter(requiredString(message.body, "body", 32767), config.body_footer);
 
   if (isStaged) {
     logStagedPreviewInfo(`Jira add comment — Issue: ${issueKey}; Body: ${body}`);

@@ -153,9 +153,10 @@ async function executePRUpdate(github, context, prNumber, updateData) {
   const operation = updateData._operation || "replace";
   const rawBody = updateData._rawBody;
   const includeFooter = updateData._includeFooter !== false; // Default to true
+  const bodyFooter = updateData._bodyFooter;
 
   // Remove internal fields (including update_branch which is handled separately below)
-  const { _operation, _rawBody, _includeFooter, _workflowRepo, _update_branch_stacks, update_branch, ...apiData } = updateData;
+  const { _operation, _rawBody, _includeFooter, _bodyFooter, _workflowRepo, _update_branch_stacks, update_branch, ...apiData } = updateData;
   const updateBranch = update_branch === true;
   const updateBranchStacksEnabled = _update_branch_stacks !== false;
 
@@ -218,6 +219,7 @@ async function executePRUpdate(github, context, prNumber, updateData) {
       newContent: rawBody,
       operation,
       includeFooter,
+      bodyFooter,
       workflowRepo: _workflowRepo,
       itemType: "pull_request",
     });

@@ -7,6 +7,7 @@ const { LINEAR_ISSUE_PATTERN, linearGraphQL } = require("./linear_graphql.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 const LINEAR_UPDATE_ISSUE = `mutation LinearUpdateIssue($id: String!, $input: IssueUpdateInput!) {
   issueUpdate(id: $id, input: $input) {
@@ -53,7 +54,7 @@ async function main(config = {}) {
       }
     }
     if (item.body !== undefined) {
-      input.description = sanitizeContent(item.body);
+      input.description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
     }
 
     if (isStagedMode(config)) {

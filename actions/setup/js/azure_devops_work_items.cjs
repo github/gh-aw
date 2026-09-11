@@ -7,6 +7,7 @@ const { normalizeTemporaryId, isTemporaryId } = require("./temporary_id.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { matchesSimpleGlob } = require("./glob_pattern_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 const WORK_ITEM_RELATIONS = {
   parent: "System.LinkTypes.Hierarchy-Reverse",
@@ -310,6 +311,9 @@ async function handleCreateWorkItem(message, config, resolvedTemporaryIds) {
 
 async function handleUpdateWorkItem(message, config, resolvedTemporaryIds) {
   try {
+    if (message.body !== undefined) {
+      message.body = appendConfiguredBodyFooter(String(message.body), config.body_footer);
+    }
     const preview = isStagedMode(config);
     const resolved = resolveWorkItemReference(message.id, resolvedTemporaryIds, preview);
     const fields = [
@@ -368,6 +372,7 @@ async function handleUpdateWorkItem(message, config, resolvedTemporaryIds) {
 
 async function handleCommentOnWorkItem(message, config, resolvedTemporaryIds) {
   try {
+    message.body = appendConfiguredBodyFooter(String(message.body || ""), config.body_footer);
     const preview = isStagedMode(config);
     const resolved = resolveWorkItemReference(message.work_item_id, resolvedTemporaryIds, preview);
     if (preview) return staged(`Would comment on Azure DevOps work item ${message.work_item_id}`);

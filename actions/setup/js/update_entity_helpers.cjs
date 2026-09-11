@@ -9,11 +9,11 @@ const { parseBoolTemplatable } = require("./templatable.cjs");
  */
 
 /**
- * @typedef {{ allow_body?: boolean, footer?: boolean | string }} EntityUpdateConfig
+ * @typedef {{ allow_body?: boolean, footer?: boolean | string, body_footer?: string }} EntityUpdateConfig
  */
 
 /**
- * @typedef {{ _includeFooter: boolean, title?: string, _operation?: string, _rawBody?: string, body?: string }} EntityUpdateDataBase
+ * @typedef {{ _includeFooter: boolean, _bodyFooter?: string, title?: string, _operation?: string, _rawBody?: string, body?: string }} EntityUpdateDataBase
  */
 
 /**
@@ -71,6 +71,7 @@ function buildCommonEntityUpdateData(item, config, options = {}) {
   // Always populate _includeFooter: downstream executeUpdate reads it regardless of
   // whether title/body changed, matching pre-refactor behavior in both callers.
   updateData._includeFooter = parseBoolTemplatable(config.footer, true);
+  updateData._bodyFooter = config.body_footer;
 
   return { updateData, hasCommonUpdates };
 }

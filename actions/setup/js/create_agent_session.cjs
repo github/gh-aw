@@ -7,6 +7,7 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_help
 const { getBaseBranch } = require("./get_base_branch.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateStagedPreview } = require("./staged_preview.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 /**
  * Create a dedicated GitHub client for create-agent-session operations.
@@ -67,13 +68,12 @@ async function main(config = {}) {
    * @returns {Promise<{success: boolean, id?: string, url?: string, error?: string, skipped?: boolean}>}
    */
   const handleMessage = async function (message) {
-    const taskDescription = message.body;
-
-    if (!taskDescription || taskDescription.trim() === "") {
+    if (!message.body || message.body.trim() === "") {
       core.warning("Agent task description is empty, skipping");
       allResults.push({ id: "", url: "", success: false, error: "Empty task description" });
       return { success: false, error: "Empty task description" };
     }
+    const taskDescription = appendConfiguredBodyFooter(message.body, config.body_footer);
 
     // Resolve and validate target repository for this message
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "agent session");

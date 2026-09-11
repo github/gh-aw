@@ -24,6 +24,7 @@ type SafeOutputStepConfig struct {
 	ContinueOnError            bool              // Whether to continue the job even if this step fails (continue-on-error: true)
 }
 
+//nolint:largefunc // Existing handler configuration assembly remains centralized and sequential.
 func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs == nil {
 		safeOutputsConfigLog.Print("No safe-outputs configuration, skipping handler manager config")
@@ -65,6 +66,10 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 		// 1. It returns a non-nil config (explicitly enabled, even if empty)
 		// 2. For auto-enabled handlers, include even with empty config
 		if handlerConfig != nil {
+			if safeOutputs.BodyFooter != "" {
+				handlerBodyFooter, _ := handlerConfig["body_footer"].(string)
+				handlerConfig["body_footer"] = appendBodyFooters(handlerBodyFooter, safeOutputs.BodyFooter)
+			}
 			injectCurrentCheckoutPatchWorkspacePath(handlerName, handlerConfig, data)
 			injectCheckoutMapping(handlerName, handlerConfig, data)
 			// Augment protected-files protection with engine-specific files for handlers that use it.

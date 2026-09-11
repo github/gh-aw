@@ -7,7 +7,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { generateFooterWithMessages, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getPRNumber } = require("./update_context_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
@@ -185,6 +185,10 @@ async function main(config = {}) {
       if (includeFooter) {
         const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, undefined, triggeringPRNumber, undefined, undefined, { skipDetectionCaution: true });
         finalBody = finalBody.trimEnd() + "\n\n" + footer;
+      }
+      const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
+      if (bodyFooter) {
+        finalBody = finalBody.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
 
       core.info(`Replying to review comment ${numericCommentId} on PR #${targetPRNumber} (${owner}/${repo})`);
