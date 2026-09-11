@@ -478,6 +478,19 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
     });
 
+    it.each(["pull_request", "pull_request_target"])("should deny allowlisted dependabot when actor differs from PR author (%s synchronize event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "dependabot[bot]";
+      mockContext.actor = "dependabot[bot]";
+      mockContext.eventName = eventName;
+      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "attacker" } } };
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
     it("should deny an inactive allowlisted bot when actor differs from PR author", async () => {
       process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
       mockContext.actor = "my-fixup-bot[bot]";
@@ -508,6 +521,7 @@ describe("check_membership.cjs", () => {
     });
 
     it("should deny access when actor differs from comment author (issue_comment event)", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "dependabot[bot]";
       mockContext.actor = "dependabot[bot]";
       mockContext.eventName = "issue_comment";
       mockContext.payload = { comment: { user: { login: "attacker" } } };
