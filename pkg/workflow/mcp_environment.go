@@ -116,9 +116,12 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	// template injection. The value is the raw step output (no toJSON), and the surrounding
 	// JSON double-quotes in the heredoc produce a valid JSON string at runtime:
 	//   "sink-visibility": "${GH_AW_SINK_VISIBILITY}"  →  "sink-visibility": "public"
+	// The static-enclave check here uses staticEnclaveWriteSinkGuardPolicy directly — the same
+	// predicate generateGitHubMCPLockdownDetectionStep's caller (githubLockdownDetectionStepEnabled)
+	// uses to decide whether to generate the step — so the two can never drift out of sync.
 	// Gating on githubLockdownDetectionStepEnabled ensures this never references a step that
 	// isn't actually generated (a dangling steps.<id>.outputs.* reference).
-	sinkVisibilityRelevant := githubToolEnabledInTools || enclaveDynamicRepositoryPolicyEnabled(workflowData) || githubBackendIsStaticEnclaveDelegationOnly(workflowData)
+	sinkVisibilityRelevant := githubToolEnabledInTools || enclaveDynamicRepositoryPolicyEnabled(workflowData) || staticEnclaveWriteSinkGuardPolicy(workflowData) != nil
 	if sinkVisibilityRelevant && githubLockdownDetectionStepEnabled(workflowData) {
 		envVars[sinkVisibilityEnvVar] = "${{ steps.determine-automatic-lockdown.outputs.visibility }}"
 	}
