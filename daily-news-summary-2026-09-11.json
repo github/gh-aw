@@ -1,0 +1,340 @@
+{
+  "date_range": {
+    "start": "2026-08-13",
+    "end": "2026-09-11"
+  },
+  "counts": {
+    "issues_open": 100,
+    "issues_closed": 100,
+    "prs_open": 11,
+    "prs_merged": 50,
+    "prs_closed": 30,
+    "commits_analyzed": 100,
+    "discussions": 50,
+    "releases": 30
+  },
+  "top_open_prs": [
+    {
+      "number": 60135,
+      "title": "Honor bot allowlists before confused-deputy checks",
+      "author": "copilot-swe-agent",
+      "reviews": 7,
+      "changedFiles": 6
+    },
+    {
+      "number": 60057,
+      "title": "Upload activation run info as a GHE-compatible artifact",
+      "author": "copilot-swe-agent",
+      "reviews": 7,
+      "changedFiles": 322
+    },
+    {
+      "number": 60136,
+      "title": "Fix daily AIC snapshot completeness and quota handling",
+      "author": "copilot-swe-agent",
+      "reviews": 3,
+      "changedFiles": 331
+    },
+    {
+      "number": 60217,
+      "title": "[actions] Update GitHub Actions versions - 2026-09-11",
+      "author": "github-actions",
+      "reviews": 0,
+      "changedFiles": 1
+    },
+    {
+      "number": 60199,
+      "title": "Prevent Jira smoke workflow failures when credentials are unavailable",
+      "author": "copilot-swe-agent",
+      "reviews": 0,
+      "changedFiles": 2
+    }
+  ],
+  "top_merged_prs": [
+    {
+      "number": 60218,
+      "title": "Revert GitHub App token minting for release tags",
+      "author": "mnkiefer",
+      "mergedAt": "2026-09-11T07:17:40Z",
+      "additions": 4,
+      "deletions": 27
+    },
+    {
+      "number": 60214,
+      "title": "Add GitHub App token minting for release workflow",
+      "author": "mnkiefer",
+      "mergedAt": "2026-09-11T06:56:21Z",
+      "additions": 76,
+      "deletions": 112
+    },
+    {
+      "number": 60183,
+      "title": "Cache audit results in logs JSONL",
+      "author": "copilot-swe-agent",
+      "mergedAt": "2026-09-11T05:51:43Z",
+      "additions": 2903,
+      "deletions": 22
+    },
+    {
+      "number": 60123,
+      "title": "build(deps): Bump golang.org/x/mod from 0.40.0 to 0.41.0",
+      "author": "dependabot",
+      "mergedAt": "2026-09-11T04:58:37Z",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "number": 60134,
+      "title": "Restore Copilot usage accounting without the agent sandbox",
+      "author": "copilot-swe-agent",
+      "mergedAt": "2026-09-11T04:50:44Z",
+      "additions": 1329,
+      "deletions": 630
+    },
+    {
+      "number": 60124,
+      "title": "build(deps): Bump golang.org/x/sync from 0.22.0 to 0.23.0",
+      "author": "dependabot",
+      "mergedAt": "2026-09-11T04:25:31Z",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "number": 60131,
+      "title": "build(deps): Bump actions/deploy-pages from 4.0.5 to 5.0.1",
+      "author": "dependabot",
+      "mergedAt": "2026-09-11T04:25:05Z",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "number": 60130,
+      "title": "build(deps-dev): Bump @playwright/test from 1.62.1 to 1.63.0 in /docs",
+      "author": "dependabot",
+      "mergedAt": "2026-09-11T04:24:22Z",
+      "additions": 13,
+      "deletions": 31
+    }
+  ],
+  "top_open_issues": [
+    {
+      "number": 60230,
+      "title": "[WIP] Daily Go Test Parallelizer: work in progress",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T08:38:28Z"
+    },
+    {
+      "number": 60229,
+      "title": "[WIP] Instructions Janitor: work in progress",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T08:37:36Z"
+    },
+    {
+      "number": 60070,
+      "title": "[pr-sous-chef] PR Sous Chef run report",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T00:02:39Z"
+    },
+    {
+      "number": 60141,
+      "title": "[aw] Issue Monster hit engine rate limit (HTTP 429)",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T01:33:57Z"
+    },
+    {
+      "number": 60207,
+      "title": "[aw] Auto-Triage Issues produced no safe outputs",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T06:43:58Z"
+    },
+    {
+      "number": 60208,
+      "title": "[aw] AI Moderator reported incomplete result",
+      "author": "github-actions",
+      "createdAt": "2026-09-11T06:45:28Z"
+    },
+    {
+      "number": 60228,
+      "title": "Feature Request: Support GH_AW_DEFAULT_OTLP_ENDPOINT as a Secret",
+      "author": "v1v",
+      "createdAt": "2026-09-11T08:19:03Z"
+    },
+    {
+      "number": 60226,
+      "title": "Fix the compiler and workflow sources",
+      "author": "mnkiefer",
+      "createdAt": "2026-09-11T08:11:25Z"
+    }
+  ],
+  "recent_discussions": [
+    {
+      "number": 59671,
+      "title": "[storify] Storify Daily Entry (2026-09-09)",
+      "category": "Audits",
+      "comments": 1,
+      "url": "https://github.com/github/gh-aw/discussions/59671"
+    },
+    {
+      "number": 60224,
+      "title": "[storify] Storify Daily Entry 2026-09-11",
+      "category": "Audits",
+      "comments": 0,
+      "url": "https://github.com/github/gh-aw/discussions/60224"
+    },
+    {
+      "number": 59921,
+      "title": "[experiments] Daily Experiment Report \u2014 2026-09-10",
+      "category": "Audits",
+      "comments": 1,
+      "url": "https://github.com/github/gh-aw/discussions/59921"
+    },
+    {
+      "number": 60223,
+      "title": "[experiments] Daily Experiment Report \u2014 2026-09-11",
+      "category": "Audits",
+      "comments": 0,
+      "url": "https://github.com/github/gh-aw/discussions/60223"
+    },
+    {
+      "number": 59915,
+      "title": "[copilot-session-insights] Daily Copilot Agent Session Analysis \u2014 2026-09-10",
+      "category": "Audits",
+      "comments": 1,
+      "url": "https://github.com/github/gh-aw/discussions/59915"
+    },
+    {
+      "number": 60220,
+      "title": "[copilot-session-insights] Daily Copilot Agent Session Analysis \u2014 2026-09-11",
+      "category": "Audits",
+      "comments": 0,
+      "url": "https://github.com/github/gh-aw/discussions/60220"
+    },
+    {
+      "number": 60035,
+      "title": "DeepReport Intelligence Briefing - 2026-09-10 (cycle 3)",
+      "category": "Audits",
+      "comments": 1,
+      "url": "https://github.com/github/gh-aw/discussions/60035"
+    },
+    {
+      "number": 60213,
+      "title": "DeepReport Intelligence Briefing - 2026-09-11",
+      "category": "Audits",
+      "comments": 0,
+      "url": "https://github.com/github/gh-aw/discussions/60213"
+    }
+  ],
+  "recent_releases": [
+    {
+      "name": "v0.89.3",
+      "publishedAt": "2026-09-11T01:34:25Z",
+      "url": "https://github.com/github/gh-aw/releases/tag/v0.89.3"
+    },
+    {
+      "name": "v0.89.2",
+      "publishedAt": "2026-09-10T15:54:50Z",
+      "url": "https://github.com/github/gh-aw/releases/tag/v0.89.2"
+    },
+    {
+      "name": "v0.89.1",
+      "publishedAt": "2026-09-10T04:45:55Z",
+      "url": "https://github.com/github/gh-aw/releases/tag/v0.89.1"
+    },
+    {
+      "name": "v0.89.0",
+      "publishedAt": "2026-09-09T12:42:29Z",
+      "url": "https://github.com/github/gh-aw/releases/tag/v0.89.0"
+    },
+    {
+      "name": "v0.88.8",
+      "publishedAt": "2026-09-08T23:36:40Z",
+      "url": "https://github.com/github/gh-aw/releases/tag/v0.88.8"
+    }
+  ],
+  "top_commits": [
+    {
+      "sha": "e06f6fd4",
+      "message": "Revert \"Add GitHub App token minting for release workflow\" (#60218)",
+      "author": "Mara Nikola Kiefer",
+      "date": "2026-09-11T07:17:39Z",
+      "url": "https://github.com/github/gh-aw/commit/e06f6fd4bf5c4d84aa8d1c3a1064c4c38d766eb6"
+    },
+    {
+      "sha": "44d03e96",
+      "message": "Add GitHub App token minting for release workflow (#60214)",
+      "author": "Mara Nikola Kiefer",
+      "date": "2026-09-11T06:56:20Z",
+      "url": "https://github.com/github/gh-aw/commit/44d03e96bd794c5118efec3c23654fd943a012cb"
+    },
+    {
+      "sha": "0333d5d5",
+      "message": "Cache audit results in logs JSONL (#60183)",
+      "author": "Copilot",
+      "date": "2026-09-11T05:51:43Z",
+      "url": "https://github.com/github/gh-aw/commit/0333d5d5b9fa9e2e46102dc3153c80b3208a59fc"
+    },
+    {
+      "sha": "ae9d79c3",
+      "message": "build(deps): Bump golang.org/x/mod from 0.40.0 to 0.41.0 (#60123)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:58:36Z",
+      "url": "https://github.com/github/gh-aw/commit/ae9d79c3a17a1ed84632694c0513a438f680573d"
+    },
+    {
+      "sha": "1faa2e3a",
+      "message": "Restore Copilot usage accounting without the agent sandbox (#60134)",
+      "author": "Copilot",
+      "date": "2026-09-11T04:50:44Z",
+      "url": "https://github.com/github/gh-aw/commit/1faa2e3a632dbcf903ec905b66d1d2a21431df96"
+    },
+    {
+      "sha": "25b70b10",
+      "message": "build(deps): Bump golang.org/x/sync from 0.22.0 to 0.23.0 (#60124)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:25:30Z",
+      "url": "https://github.com/github/gh-aw/commit/25b70b10b316b2f1b38b5d7be0624214030079dd"
+    },
+    {
+      "sha": "e61f0f83",
+      "message": "build(deps): Bump actions/deploy-pages from 4.0.5 to 5.0.1 (#60131)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:25:05Z",
+      "url": "https://github.com/github/gh-aw/commit/e61f0f837c6338275d7dcca735742a8247391a47"
+    },
+    {
+      "sha": "59ecc6a3",
+      "message": "build(deps-dev): Bump @playwright/test from 1.62.1 to 1.63.0 in /docs (#60130)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:24:22Z",
+      "url": "https://github.com/github/gh-aw/commit/59ecc6a32c01c478e271dc544b851580e53a5930"
+    },
+    {
+      "sha": "ed26d464",
+      "message": "build(deps): Bump actions/checkout from 4.2.2 to 7.0.1 (#60132)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:24:06Z",
+      "url": "https://github.com/github/gh-aw/commit/ed26d464175599571a5cdde0331c90e21c674aff"
+    },
+    {
+      "sha": "2466c08c",
+      "message": "build(deps): Bump actions/cache from 5.0.4 to 6.1.0 (#60133)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:23:50Z",
+      "url": "https://github.com/github/gh-aw/commit/2466c08c5fb5e7236f309c72340a2e8a005bc079"
+    },
+    {
+      "sha": "f40571cc",
+      "message": "Preserve contents permission for built-in job setup checkouts (#60137)",
+      "author": "Copilot",
+      "date": "2026-09-11T04:22:22Z",
+      "url": "https://github.com/github/gh-aw/commit/f40571cc86e4a5313ba7ea300795b139718e37e5"
+    },
+    {
+      "sha": "d67b0063",
+      "message": "build(deps): Bump actions/setup-node from 4.1.0 to 7.0.0 (#60144)",
+      "author": "dependabot[bot]",
+      "date": "2026-09-11T04:21:58Z",
+      "url": "https://github.com/github/gh-aw/commit/d67b00636e596819fee33be7f12388b8c6579345"
+    }
+  ]
+}
