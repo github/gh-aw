@@ -46,6 +46,9 @@ type cachedLogsJSONLRunData struct {
 	GatewayVersion  string                           `json:"gateway_version,omitempty"`
 	JobDetails      []cachedLogsJSONLJobData         `json:"job_details,omitempty"`
 	MCPToolUsage    *cachedLogsJSONLMCPToolUsageData `json:"mcp_tool_usage,omitempty"`
+	Audit           *AuditData                       `json:"audit,omitempty"`
+	AwInfo          *AwInfo                          `json:"aw_info,omitempty"`
+	SafeOutputs     []CreatedItemReport              `json:"safe_outputs,omitempty"`
 }
 
 type cachedLogsJSONLJobData struct {
@@ -202,6 +205,14 @@ func newCachedLogsJSONLWriter(path string) *cachedLogsJSONLWriter {
 }
 
 func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
+	return w.appendRun(run, false)
+}
+
+func (w *cachedLogsJSONLWriter) AppendAudit(run ProcessedRun) error {
+	return w.appendRun(run, true)
+}
+
+func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) error {
 	if w == nil {
 		return nil
 	}
@@ -210,6 +221,15 @@ func (w *cachedLogsJSONLWriter) Append(run ProcessedRun) error {
 		return errors.New("failed to build cached logs JSONL record")
 	}
 	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0])
+	if includeAudit {
+		if audit, ok := loadCachedAuditData(run.Run.LogsPath, run.Run, auditCacheSourceLogs); ok {
+			runData.Audit = &audit
+			runData.SafeOutputs = audit.CreatedItems
+		}
+		if awInfo, err := parseAwInfo(filepath.Join(run.Run.LogsPath, "aw_info.json"), false); err == nil {
+			runData.AwInfo = awInfo
+		}
+	}
 	record, err := json.Marshal(cachedLogsJSONLRecord{
 		SchemaVersion: cachedLogsJSONLSchemaVersion,
 		Kind:          cachedLogsJSONLKindRun,

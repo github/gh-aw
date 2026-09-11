@@ -629,7 +629,7 @@ func buildMaintenanceCompileWorkflowsJob(ctx context.Context, opts buildMaintena
       issues: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: ` + getActionPin("actions/checkout") + `
         with:
           persist-credentials: false
 
