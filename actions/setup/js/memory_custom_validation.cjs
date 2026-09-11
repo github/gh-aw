@@ -50,7 +50,7 @@ function readDirectory(targetPath) {
  */
 function readFile(targetPath, encoding) {
   try {
-    return fs.readFileSync(targetPath, encoding);
+    return encoding === undefined ? fs.readFileSync(targetPath) : fs.readFileSync(targetPath, encoding);
   } catch (error) {
     throw new Error(`Failed to read ${targetPath}: ${getErrorMessage(error)}`, { cause: error });
   }
