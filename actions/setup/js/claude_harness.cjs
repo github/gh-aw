@@ -170,6 +170,27 @@ function isRateLimitError(output) {
 }
 
 /**
+ * Remove stream-JSON user events, which contain tool results, from output used
+ * by failure classifiers.
+ *
+ * @param {string} output - Collected stdout+stderr from the process
+ * @returns {string}
+ */
+function classifiableOutput(output) {
+  return output
+    .split("\n")
+    .filter(line => {
+      if (!line.startsWith("{")) return true;
+      try {
+        return JSON.parse(line).type !== "user";
+      } catch {
+        return true;
+      }
+    })
+    .join("\n");
+}
+
+/**
  * Determines if the collected output signals a clean max-turns exit.
  * When Claude Code hits its turn limit it emits a result object with
  * "subtype":"error_max_turns".  This is not a transient error — retrying
@@ -490,9 +511,10 @@ async function main() {
       return runProcess({ command, args: currentArgs, attempt, log, logArgs, env: childEnv });
     },
     handleFailure: ({ attempt, result }) => {
-      const isOverloaded = isOverloadedError(result.output);
-      const isRateLimit = isRateLimitError(result.output);
-      const isAuthenticationFailed = isAuthenticationFailedError(result.output);
+      const classifierOutput = classifiableOutput(result.output);
+      const isOverloaded = isOverloadedError(classifierOutput);
+      const isRateLimit = isRateLimitError(classifierOutput);
+      const isAuthenticationFailed = isAuthenticationFailedError(classifierOutput);
       const isMaxTurns = isMaxTurnsExit(result.output);
       const isNoDeferredMarker = isNoDeferredMarkerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
@@ -502,8 +524,8 @@ async function main() {
       // observed, it stays true for the remainder of this session's --continue attempts, even
       // if a later attempt's own output contains nothing but startup/transport errors.
       sessionHasProgress = sessionHasProgress || hasClaudeSessionProgress(result.output);
-      const permissionDeniedCount = countPermissionDeniedIssues(result.output);
-      const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
+      const permissionDeniedCount = countPermissionDeniedIssues(classifierOutput);
+      const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(classifierOutput);
       const crashSignalName = crashSignalNameForExitCode(result.exitCode);
       log(
         `attempt ${attempt + 1} failed:` +
@@ -528,7 +550,7 @@ async function main() {
         return { action: "stop", exitCode: 0 };
       }
 
-      const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
+      const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
       const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
       if (proxyAICreditsRejection) {
         log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
@@ -556,6 +578,18 @@ async function main() {
           return { action: "stop", exitCode: 0 };
         }
         return { action: "stop" };
+      }
+
+      const isSignalTermination = isSignalTerminationExitCode(result.exitCode);
+      const isCrashSignal = isCrashSignalExitCode(result.exitCode);
+      if (attempt < maxRetries && result.hasOutput && (isSignalTermination || isCrashSignal)) {
+        continueDisabledPermanently = true;
+        useContinueOnRetry = false;
+        const reason = isCrashSignal
+          ? `fatal-signal crash exitCode=${result.exitCode} (signal=${crashSignalName}, failure_reason=sandbox_runtime_crash)`
+          : `signal-style termination exitCode=${result.exitCode} (failure_reason=cancelled_or_timed_out)`;
+        log(`attempt ${attempt + 1}: ${reason} — will retry with fresh run (--continue disabled permanently) (attempt ${attempt + 2}/${maxRetries + 1})`);
+        return { action: "retry" };
       }
 
       if (attempt === 0 && isAuthenticationFailed) {
@@ -627,9 +661,6 @@ async function main() {
       }
 
       if (attempt < maxRetries && result.hasOutput) {
-        const isSignalTermination = isSignalTerminationExitCode(result.exitCode);
-        const isCrashSignal = isCrashSignalExitCode(result.exitCode);
-        const crashSignalName = crashSignalNameForExitCode(result.exitCode);
         const retryWithContinue = shouldRetryWithContinue({
           attempt,
           maxRetries,
@@ -638,18 +669,7 @@ async function main() {
           isNoDeferredMarker,
           continueDisabledPermanently,
         });
-        if (isSignalTermination || isCrashSignal) {
-          continueDisabledPermanently = true;
-        }
-        const reason = isCrashSignal
-          ? `fatal-signal crash exitCode=${result.exitCode} (signal=${crashSignalName}, failure_reason=sandbox_runtime_crash)`
-          : isSignalTermination
-            ? `signal-style termination exitCode=${result.exitCode} (failure_reason=cancelled_or_timed_out)`
-            : isOverloaded
-              ? "overloaded_error (transient)"
-              : isRateLimit
-                ? "rate_limit_error (transient)"
-                : "partial execution";
+        const reason = isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
         useContinueOnRetry = retryWithContinue;
         const retryMode = retryWithContinue ? "--continue" : "fresh run (--continue disabled permanently)";
         log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})`);
@@ -688,6 +708,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     resolveClaudePromptFileArgs,
     stripPromptFileArgs,
+    classifiableOutput,
     isRateLimitError,
     isAuthenticationFailedError,
     isMaxTurnsExit,
