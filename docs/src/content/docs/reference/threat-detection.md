@@ -198,7 +198,7 @@ safe-outputs:
   threat-detection:
     engine:
       id: copilot
-      model: gpt-4.1-mini
+      model: gpt-5-mini
       max-turns: 3
 ```
 

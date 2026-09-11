@@ -28,7 +28,7 @@ safe-outputs:
   threat-detection:
     engine:
       id: copilot
-      model: gpt-4.1-mini
+      model: gpt-5-mini
 ---
 
 Review the issue and create a tracking issue when action is required.
