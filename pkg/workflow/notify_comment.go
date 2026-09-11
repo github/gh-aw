@@ -114,12 +114,6 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 	}
-	// The daily-AIC usage cache save step must not run with a fully read-only GITHUB_TOKEN.
-	// If safe-outputs already granted some writable scope (for example issues: write for
-	// comment updates), reuse that existing write access instead of broadening the job.
-	if needsDailyAICCachePermission(data) && !conclusionPerms.HasAnyWriteScope() {
-		conclusionPerms.Set(PermissionActions, PermissionWrite)
-	}
 	// The report-failed-jobs step lists workflow run jobs (actions: read) when the
 	// feature is enabled (default: true).
 	if conclusionReportFailedJobsEnabled(data) {
@@ -255,67 +249,11 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"            /tmp/gh-aw/usage/github_rate_limits.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
+		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
 		"          if-no-files-found: ignore\n",
 	)
 	return steps
-}
-
-// buildDailyAICUsageCacheSteps creates steps that compute AIC for the current run and persist
-// it to a per-workflow JSONL cache via actions/cache/save.  The cache is restored by the
-// activation job so that subsequent guardrail checks can skip artifact downloads for known runs.
-//
-// The sequence is: restore latest snapshot → append current run entry → save updated snapshot.
-// The restore step uses a prefix restore-key so it picks up the most recent snapshot even when
-// the exact key (which includes the current run ID) does not exist yet.
-func buildDailyAICUsageCacheSteps(data *WorkflowData, pinAction func(string) string) []string {
-	sanitized := SanitizeWorkflowIDForCacheKey(data.WorkflowID)
-	cacheKeyPrefix := fmt.Sprintf("agentic-workflow-usage-%s-", sanitized)
-	cacheKey := cacheKeyPrefix + "${{ github.run_id }}"
-	return []string{
-		"      - name: Restore daily AIC usage cache\n",
-		"        id: restore-daily-aic-cache-conclusion\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", pinAction("actions/cache/restore")),
-		"        with:\n",
-		fmt.Sprintf("          key: %s\n", cacheKey),
-		fmt.Sprintf("          restore-keys: %s\n", cacheKeyPrefix),
-		"          path: /tmp/gh-aw/agentic-workflow-usage-cache.jsonl\n",
-		"      - name: Write daily AIC usage cache entry\n",
-		"        id: write-daily-aic-cache\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
-		"        with:\n",
-		"          github-token: ${{ github.token }}\n",
-		"          script: |\n",
-		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
-		"            setupGlobals(core, github, context);\n",
-		"            const { main } = require('" + SetupActionDestination + "/write_daily_aic_usage_cache.cjs');\n",
-		"            await main();\n",
-		"      - name: Save daily AIC usage cache\n",
-		"        id: save-daily-aic-cache\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", pinAction("actions/cache/save")),
-		"        with:\n",
-		fmt.Sprintf("          key: %s\n", cacheKey),
-		"          path: /tmp/gh-aw/agentic-workflow-usage-cache.jsonl\n",
-		// Upload the cache file as an artifact so the activation job's artifact-based
-		// fallback can retrieve it on a different PR branch where actions/cache is
-		// branch-scoped and would otherwise always miss.
-		"      - name: Upload daily AIC usage cache artifact\n",
-		"        id: upload-daily-aic-cache\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", pinAction("actions/upload-artifact")),
-		"        with:\n",
-		"          name: aic-usage-cache\n",
-		"          path: /tmp/gh-aw/agentic-workflow-usage-cache.jsonl\n",
-		"          if-no-files-found: ignore\n",
-		"          retention-days: 7\n",
-	}
 }
 
 // isGroupConcurrencyQueueEnabled reports whether compiler-generated concurrency groups

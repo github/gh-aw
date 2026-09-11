@@ -252,12 +252,18 @@ Use `max-daily-ai-credits` to set a 24-hour AI Credits cap for one workflow. The
 max-daily-ai-credits: 15M
 ```
 
-When the total from the past 24 hours already meets or exceeds this threshold, the activation job warns, creates an issue, skips the agent job, and lets the conclusion job report the failure context.
+When the total from the past 24 hours exceeds this threshold, activation reports the exceeded budget, skips the agent job, and lets the conclusion job report the failure context.
 
-The guardrail is disabled by default when omitted. Positive values accept plain integers or `K`/`M` suffixes such as `100M`.
+When omitted, the guardrail inherits the default daily limit (5000 AI Credits unless overridden). Positive values accept plain integers or `K`/`M` suffixes such as `100M`.
 
 > [!CAUTION]
-> Enabling `max-daily-ai-credits` is expensive in GitHub API units. Every activation checks the 24-hour window by calling `listWorkflowRuns` (up to 10 pages × 100 runs) plus additional artifact-lookup API calls per inspected run.
+> Every activation lists the current 24-hour window (up to 10 pages of 100 completed runs). A cold scan also reads usage artifacts. Activation publishes all resolved observations, including nonzero usage, so later scans can reuse them without reading each historical artifact again.
+
+Scan snapshots are optional accelerators, not authoritative daily totals. Each record must match the repository, workflow, run attempt, and completed-run timestamps. Missing, expired, and incomplete snapshots require resolving the missing records. The artifact fallback accepts the same workflow's `pull_request_target` runs and default-branch `push`, `schedule`, or `workflow_dispatch` runs; contributor-controlled `pull_request` snapshots are not trusted. This storage path does not require writable Actions cache scopes.
+
+An API failure or incomplete history stops activation rather than reporting an under-budget result from partial data. Quota decisions use business-response headers, including artifact requests; inspection does not continue to the next run after a failure. Respect any logged reset or `Retry-After` deadline before retrying. A missing usage artifact is not zero usage unless the completed attempt's job metadata confirms that the generated billable jobs were skipped.
+
+Cold scans check the compiler-owned `agent`, `detection`, and `evals` jobs independently. Every executed component needs valid accounting; empty collector placeholders and evaluation results alone do not prove zero usage. Raw token usage takes precedence over overlapping summaries. Invalid numeric fields make the accounting unknown. Failed-only reruns retain successful components from earlier attempts, but a rerun component needs a producer artifact from its own job execution. Missing carried-forward usage remains unknown. Older snapshots without component-coverage validation are not reused.
 
 To disable the guardrail explicitly, set `-1`:
 
@@ -287,8 +293,8 @@ EOF
 
 > [!NOTE]
 > The daily guardrail is skipped for `workflow_call`,
-> `repository_dispatch`, and `workflow_dispatch` runs carrying internal
-> `aw_context` dispatch metadata.
+> `repository_dispatch`, and `workflow_dispatch` runs, including dispatches carrying internal
+> `aw_context` metadata.
 
 ### Roll out org/repo defaults with enterprise controls
 

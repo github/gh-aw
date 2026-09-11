@@ -164,8 +164,8 @@ Guardrail test workflow`
 	if !strings.Contains(activationSection, "safe-output-artifact-client: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}") {
 		t.Fatal("expected frontmatter-configured guardrail to gate artifact client installation dynamically")
 	}
-	if !strings.Contains(activationSection, "restore_aic_usage_cache_fallback.cjs") {
-		t.Fatal("expected activation job to call restore_aic_usage_cache_fallback.cjs for cross-branch cache fallback")
+	if !strings.Contains(activationSection, "restore_aic_scan_cache.cjs") {
+		t.Fatal("expected activation job to restore verified scan observations")
 	}
 	if !strings.Contains(activationSection, "id: restore-daily-aic-cache-fallback") {
 		t.Fatal("expected activation job to include the artifact-based AIC cache fallback step")
@@ -177,17 +177,21 @@ Guardrail test workflow`
 	if !strings.Contains(activationSection, wantFallbackIf) {
 		t.Fatalf("expected artifact fallback step to use the standard AIC guard if: condition, want %q", wantFallbackIf)
 	}
-	if !strings.Contains(activationSection, "GH_AW_RESTORE_DAILY_AIC_CACHE_HIT: ${{ steps.restore-daily-aic-cache.outputs.cache-hit }}") {
-		t.Fatal("expected fallback step to forward cache-hit output via env for template-injection safety")
+	if strings.Contains(activationSection, "cache-matched-key") || strings.Contains(lockStr, "write_daily_aic_usage_cache.cjs") {
+		t.Fatal("scan observations must not depend on a prefix cache or conclusion-only records")
 	}
-	if !strings.Contains(activationSection, "GH_AW_RESTORE_DAILY_AIC_CACHE_MATCHED_KEY: ${{ steps.restore-daily-aic-cache.outputs.cache-matched-key }}") {
-		t.Fatal("expected fallback step to forward cache-matched-key output via env")
+	if !strings.Contains(activationSection, "name: aic-usage-scan-v2") ||
+		!strings.Contains(activationSection, "path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl") {
+		t.Fatal("expected activation to publish its complete set of resolved observations")
 	}
-	if !strings.Contains(lockStr, "id: upload-daily-aic-cache") {
-		t.Fatal("expected conclusion job to include the AIC usage cache artifact upload step")
+	restoreStart := strings.Index(activationSection, "name: Restore daily AIC scan observations")
+	scanStart := strings.Index(activationSection, "name: Check daily workflow token guardrail")
+	publishStart := strings.Index(activationSection, "name: Publish daily AIC scan observations")
+	if restoreStart < 0 || scanStart <= restoreStart || publishStart <= scanStart {
+		t.Fatal("expected restore, scan, then publication in the same activation job")
 	}
-	if !strings.Contains(lockStr, "name: aic-usage-cache") {
-		t.Fatal("expected conclusion job to upload artifact named aic-usage-cache")
+	if strings.Contains(activationSection[restoreStart:scanStart], "continue-on-error: true") {
+		t.Fatal("restore API failure must stop activation before another scan")
 	}
 }
 

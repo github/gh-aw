@@ -1631,14 +1631,12 @@ func TestConclusionJobNeedsPreActivationFromMessages(t *testing.T) {
 	}
 }
 
-// TestConclusionJobActionsWritePermissionForDailyAICCache verifies that the conclusion job
-// adds actions: write only when daily-AIC cache steps are included and the job would
-// otherwise have no writable scope. Existing writable scopes (for example issues: write
-// from add-comments) should be reused instead of broadening permissions.
+// TestConclusionJobActionsWritePermissionForDailyAICCache verifies that scan
+// artifacts do not require extra writable GITHUB_TOKEN scopes in conclusion.
 func TestConclusionJobActionsWritePermissionForDailyAICCache(t *testing.T) {
 	compiler := NewCompiler()
 
-	t.Run("has actions: write when WorkflowID set and no other writable scope exists", func(t *testing.T) {
+	t.Run("does not add actions: write for daily AIC observations", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name:        "Test Workflow",
 			WorkflowID:  "my-workflow",
@@ -1651,8 +1649,8 @@ func TestConclusionJobActionsWritePermissionForDailyAICCache(t *testing.T) {
 		if job == nil {
 			t.Fatal("Expected conclusion job to be non-nil")
 		}
-		if !strings.Contains(job.Permissions, "actions: write") {
-			t.Errorf("conclusion job must have 'actions: write' when daily-AIC cache is active, got: %q", job.Permissions)
+		if strings.Contains(job.Permissions, "actions: write") {
+			t.Errorf("daily-AIC observations must not require 'actions: write', got: %q", job.Permissions)
 		}
 	})
 
