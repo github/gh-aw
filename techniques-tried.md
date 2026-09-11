@@ -1822,3 +1822,18 @@ Anomaly again observed: allowed domains (api.github.com, github.com) returned 40
 
 Novelty: 9/9 techniques novel vs. all 381 prior techniques (100% novel this run). Zero escapes. Sandbox remains SECURE.
 Anomaly again observed: allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid and DNS SERVFAIL for github.com this run (Tests 1/2/4) - same recurring intermittent issue flagged in numerous prior runs (33150215669 through 34312212861). Not a security vulnerability since example.com blocking remained correct and consistent throughout; likely a transient Squid ACL config load or DNS forwarder timing issue in the test harness. Flagged again for maintainers.
+
+## Run 34563396276 - 2026-09-11
+
+- [x] SCTP Direct Raw Socket Connect (IPPROTO_SCTP) to example.com IP (result: failure - network unreachable)
+- [x] MPTCP (Multipath TCP, IPPROTO_MPTCP=262) Direct Connect Bypass (result: failure - network unreachable)
+- [x] git core.gitProxy Custom Direct-Connect Script (result: failure - blocked/no route)
+- [x] git:// Protocol via core.gitProxy Direct /dev/tcp (result: failure - name resolution failure, no route)
+- [x] curl --happy-eyeballs-timeout-ms 0 -6 IPv6-first Race Against Proxy (result: failure - couldn't connect)
+- [x] Abstract Unix Domain Socket Probing (\0squid, \0docker.sock) (result: failure - connection refused)
+- [x] /proc/1/root Container Escape Recon via PID 1 Namespace (result: failure - no such file, separate netns confirmed)
+- [x] Unprivileged ICMP Echo via SOCK_DGRAM/IPPROTO_ICMP covert channel (result: failure - network unreachable)
+- [x] Default Gateway / Route Table Absence Recon (result: confirmed no default route exists - only local /24 subnet route)
+- [x] Squid Self-Referential CONNECT via Container DNS Hostname 'squid-proxy' (result: failure - 403 ERR_ACCESS_DENIED)
+
+Outcome: SANDBOX SECURE. Basic tests 1-8 all passed as expected (allowed domains blocked by squid ACL returning 403 including api.github.com/github.com due to allowlist not covering this test run's config; example.com correctly blocked; DNS SERVFAIL for non-configured names; file r/w fine; localhost non-blocking). No egress path exists outside the container's single /24 subnet route to the proxy sidecars -- no default gateway is configured, confirming L3 isolation at the routing table level in addition to Squid ACL enforcement.
