@@ -2197,3 +2197,6 @@
 {"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T02:26:06.247Z","runid":"34554203509"}
 {"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T02:26:06.247Z","runid":"34554203509"}
 {"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T02:26:06.247Z","runid":"34554203509"}
+{"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T05:34:45.919Z","runid":"34565677282"}
+{"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T05:34:45.919Z","runid":"34565677282"}
+{"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"openai/gpt-5.4","timestamp":"2026-09-11T05:34:45.919Z","runid":"34565677282"}
