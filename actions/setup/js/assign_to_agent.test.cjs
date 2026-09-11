@@ -833,11 +833,10 @@ describe("assign_to_agent", () => {
     expect(summaryCall).toContain("Permission Requirements");
   });
 
-  it.skip("should handle pull_number parameter", async () => {
-    // TODO: Fix test mocking - the code works but the test setup has issues with GraphQL mocking for PR queries
-    // The functionality is identical to issue_number (just uses pullRequest instead of issue in the GraphQL query)
-    // and the schema/validation changes have been tested via the other validation tests
+  it("should forward reasoning effort for pull request assignments", async () => {
     process.env.GH_AW_AGENT_DEFAULT = "copilot";
+    process.env.GH_AW_AGENT_MODEL = "o3";
+    process.env.GH_AW_AGENT_REASONING_EFFORT = "high";
     setAgentOutput({
       items: [
         {
@@ -863,6 +862,15 @@ describe("assign_to_agent", () => {
     }
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Successfully assigned copilot coding agent to pull request #123"));
+    expect(mockGithub.request).toHaveBeenLastCalledWith(
+      "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+      expect.objectContaining({
+        agent_assignment: expect.objectContaining({
+          model: "o3",
+          reasoning_effort: "high",
+        }),
+      })
+    );
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
