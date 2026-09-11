@@ -587,7 +587,7 @@
             "cache_read": "5e-07"
           },
           "provider_type": "openai",
-          "wire_api": "completions"
+          "wire_api": "responses"
         },
         "grok-4.6": {
           "cost": {
@@ -596,7 +596,7 @@
             "cache_read": "5e-07"
           },
           "provider_type": "openai",
-          "wire_api": "completions"
+          "wire_api": "responses"
         }
       }
     },

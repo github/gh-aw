@@ -392,6 +392,22 @@ describe("parse_copilot_log.cjs", () => {
       expect(result.markdown).toContain("375,000");
     });
 
+    it("extracts million-scale tokens from the current Copilot CLI footer", () => {
+      const prettyLog = ["● Bash", "    └ ok", "The work is done.", "", "Tokens     ↑ 17.7m (17.5m cached, 216.2k written) • ↓ 46.5k (20.0k reasoning)"].join("\n");
+
+      const result = parseCopilotLog(prettyLog);
+      const resultEntry = getSessionResultData(result.logEntries);
+
+      expect(resultEntry.usage).toEqual(
+        expect.objectContaining({
+          input_tokens: 17700000,
+          output_tokens: 46500,
+          cache_read_input_tokens: 17500000,
+          cache_creation_input_tokens: 216200,
+        })
+      );
+    });
+
     it("strips the columnar 'Resume' footer hint from rendered pretty-print output", () => {
       // Copilot CLI footer includes a "Resume   copilot --resume=<id>" line aligned in the
       // same column block as Changes/Duration/Tokens. It is CLI chrome, not agent reasoning,

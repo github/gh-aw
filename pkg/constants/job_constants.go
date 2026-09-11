@@ -279,6 +279,9 @@ const PreActivationAppTokenStepID StepID = "pre-activation-app-token"
 // can pass the value as GH_AW_EFFECTIVE_TOKENS to the footer template renderer.
 const ParseMCPGatewayStepID StepID = "parse-mcp-gateway"
 
+// ParseTokenUsageStepID is the step ID for the token usage summary step in the agent job.
+const ParseTokenUsageStepID StepID = "parse-token-usage"
+
 // DetectAgentErrorsStepID is the step ID for the post-execution error detection step in the
 // agent job. It runs on the host runner (outside the AWF sandbox container) so that it can
 // write to GITHUB_OUTPUT, which is not accessible from inside the container. Any engine that

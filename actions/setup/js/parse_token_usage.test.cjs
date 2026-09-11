@@ -15,11 +15,14 @@ const {
   buildStepSummarySection,
   buildWorkingSetDetailsSection,
   renderTokenTableAsPlainText,
+  findCopilotUsageCheckpoint,
   TOKEN_USAGE_AUDIT_PATH,
   TOKEN_USAGE_PATH,
   TOKEN_USAGE_AWF_AUDIT_PATH,
   TOKEN_USAGE_PATHS,
   AGENT_USAGE_PATH,
+  AGENT_USAGE_JSONL_PATH,
+  COPILOT_SESSION_STATE_DIR,
   DEFAULT_SUMMARY_TITLE,
 } = require("./parse_token_usage.cjs");
 
@@ -58,6 +61,11 @@ describe("parse_token_usage", () => {
 
     test("AGENT_USAGE_PATH points to agent_usage.json", () => {
       expect(AGENT_USAGE_PATH).toBe("/tmp/gh-aw/agent_usage.json");
+    });
+
+    test("Copilot fallback paths point to the session state and JSONL usage files", () => {
+      expect(AGENT_USAGE_JSONL_PATH).toBe("/tmp/gh-aw/agent_usage.jsonl");
+      expect(COPILOT_SESSION_STATE_DIR).toBe("/tmp/gh-aw/sandbox/agent/logs/copilot-session-state");
     });
 
     test("DEFAULT_SUMMARY_TITLE points to Token Usage", () => {
@@ -149,6 +157,48 @@ describe("parse_token_usage", () => {
       expect(mockCore.summary.write).not.toHaveBeenCalled();
     });
 
+    test("writes authoritative Copilot checkpoint usage when proxy usage is unavailable", async () => {
+      const sessionStateDir = path.join(tmpDir, "copilot-session-state");
+      const sessionDir = path.join(sessionStateDir, "session-1");
+      const agentUsageFile = path.join(tmpDir, "agent_usage.json");
+      const agentUsageJSONLFile = path.join(tmpDir, "agent_usage.jsonl");
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sessionDir, "events.jsonl"),
+        JSON.stringify({
+          type: "session.usage_checkpoint",
+          data: {
+            totalNanoAiu: 451090000000,
+            totalPremiumRequests: 1,
+            modelCacheState: [{ modelId: "claude-sonnet-5" }],
+          },
+          timestamp: "2026-09-11T01:00:00Z",
+        })
+      );
+      fs.writeFileSync = vi.fn((p, data) => {
+        if (p === AGENT_USAGE_PATH) return originalWriteFileSync(agentUsageFile, data);
+        if (p === AGENT_USAGE_JSONL_PATH) return originalWriteFileSync(agentUsageJSONLFile, data);
+        return originalWriteFileSync(p, data);
+      });
+
+      await main(sessionStateDir);
+
+      expect(JSON.parse(originalReadFileSync(agentUsageFile, "utf8"))).toEqual(
+        expect.objectContaining({
+          ai_credits: 451.09,
+          premium_requests: 1,
+        })
+      );
+      expect(JSON.parse(originalReadFileSync(agentUsageFile, "utf8"))).not.toHaveProperty("input_tokens");
+      expect(JSON.parse(originalReadFileSync(agentUsageJSONLFile, "utf8"))).toEqual({
+        provider: "copilot",
+        ai_credits: 451.09,
+        premium_requests: 1,
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aic", "451.09");
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Premium Requests"), true);
+    });
+
     test("skips summary when token usage file is empty", async () => {
       const emptyFile = path.join(tmpDir, "token-usage.jsonl");
       fs.writeFileSync(emptyFile, "");
@@ -158,6 +208,7 @@ describe("parse_token_usage", () => {
         if (p === TOKEN_USAGE_AUDIT_PATH) return false;
         return originalExistsSync(p);
       });
+
       fs.statSync = vi.fn(p => {
         if (p === TOKEN_USAGE_PATH) return { size: 0 };
         if (p === TOKEN_USAGE_AUDIT_PATH) return { size: 0 };
@@ -168,6 +219,73 @@ describe("parse_token_usage", () => {
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No token usage data found"));
       expect(mockCore.summary.addDetails).not.toHaveBeenCalled();
+    });
+
+    test("uses the Copilot checkpoint when proxy usage has no valid entries", async () => {
+      const sessionStateDir = path.join(tmpDir, "copilot-session-state");
+      const sessionDir = path.join(sessionStateDir, "session-1");
+      const agentUsageFile = path.join(tmpDir, "agent_usage.json");
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sessionDir, "events.jsonl"),
+        JSON.stringify({
+          type: "session.usage_checkpoint",
+          data: { totalNanoAiu: 1000000000, totalPremiumRequests: 2 },
+          timestamp: "2026-09-11T01:00:00Z",
+        })
+      );
+      fs.existsSync = vi.fn(p => p === TOKEN_USAGE_PATH || originalExistsSync(p));
+      fs.statSync = vi.fn(p => (p === TOKEN_USAGE_PATH ? { size: 1 } : originalStatSync(p)));
+      fs.readFileSync = vi.fn((p, enc) => (p === TOKEN_USAGE_PATH ? "malformed" : originalReadFileSync(p, enc)));
+      fs.writeFileSync = vi.fn((p, data) => {
+        if (p === AGENT_USAGE_PATH) return originalWriteFileSync(agentUsageFile, data);
+        return originalWriteFileSync(p, data);
+      });
+
+      await main(sessionStateDir);
+
+      expect(JSON.parse(originalReadFileSync(agentUsageFile, "utf8"))).toMatchObject({ ai_credits: 1, premium_requests: 2 });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aic", "1");
+    });
+
+    test("returns the latest valid checkpoint across Copilot sessions", () => {
+      const sessionStateDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-usage-checkpoint-test-"));
+      try {
+        const firstSession = path.join(sessionStateDir, "session-1");
+        const secondSession = path.join(sessionStateDir, "session-2");
+        fs.mkdirSync(firstSession);
+        fs.mkdirSync(secondSession);
+        fs.writeFileSync(
+          path.join(firstSession, "events.jsonl"),
+          [
+            "not-json",
+            JSON.stringify({
+              type: "session.usage_checkpoint",
+              data: { totalNanoAiu: 1000000000, totalPremiumRequests: 1 },
+              timestamp: "2026-09-11T00:00:00Z",
+            }),
+          ].join("\n")
+        );
+        fs.writeFileSync(
+          path.join(secondSession, "events.jsonl"),
+          JSON.stringify({
+            type: "session.usage_checkpoint",
+            data: {
+              totalNanoAiu: 451090000000,
+              totalPremiumRequests: 2,
+              modelCacheState: [{ modelId: "claude-sonnet-5" }],
+            },
+            timestamp: "2026-09-11T01:00:00Z",
+          })
+        );
+
+        expect(findCopilotUsageCheckpoint(sessionStateDir)).toEqual({
+          aiCredits: 451.09,
+          premiumRequests: 2,
+        });
+      } finally {
+        fs.rmSync(sessionStateDir, { recursive: true, force: true });
+      }
     });
 
     test("writes token usage details section to summary", async () => {

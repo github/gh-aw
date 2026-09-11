@@ -237,8 +237,10 @@ function parsePrettyPrintFormat(logContent) {
   const USAGE_LINES_RE = /^(?:Total usage est:|API time spent:|Total session time:|Total code changes:|Changes\s+[+-]?\d|Duration\s+\d|Tokens\s+[↑↓]|Resume\s{2,}copilot\s+--resume=)/;
 
   const parseTokenCount = s => {
-    const n = parseFloat(s);
-    return s.endsWith("k") ? Math.round(n * 1000) : n;
+    const normalized = s.toLowerCase();
+    const n = parseFloat(normalized);
+    if (normalized.endsWith("m")) return Math.round(n * 1000000);
+    return normalized.endsWith("k") ? Math.round(n * 1000) : n;
   };
 
   const lines = logContent.split("\n").filter(line => !INFRA_LINE_RE.test(line));
@@ -248,6 +250,7 @@ function parsePrettyPrintFormat(logContent) {
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheReadTokens = 0;
+  let cacheWriteTokens = 0;
   let modelName = "unknown";
   let inModelBreakdown = false;
   let i = 0;
@@ -298,7 +301,7 @@ function parsePrettyPrintFormat(logContent) {
       // The arrow + (cached) form has no "Breakdown by AI model" section, so this
       // is the only place token totals appear. Capture them when present so they
       // surface in the Information section.
-      const tokenMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+k?)\s*[•·]\s*↓\s*([\d.]+k?)(?:\s*[•·]\s*([\d.]+k?)\s*\(cached\))?/);
+      const tokenMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+[km]?)\s*[•·]\s*↓\s*([\d.]+[km]?)(?:\s*[•·]\s*([\d.]+[km]?)\s*\(cached\))?/i);
       if (tokenMatch) {
         if (inputTokens === 0) inputTokens = parseTokenCount(tokenMatch[1]);
         if (outputTokens === 0) outputTokens = parseTokenCount(tokenMatch[2]);
@@ -310,11 +313,12 @@ function parsePrettyPrintFormat(logContent) {
         // (emitted by Copilot CLI 1.0.55). The trailing-cached regex above does
         // not match this ordering, so handle it explicitly to avoid dropping the
         // token totals from the Information section.
-        const inlineCachedMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+k?)\s*\(\s*([\d.]+k?)\s+cached\s*\)\s*[•·]\s*↓\s*([\d.]+k?)/);
+        const inlineCachedMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+[km]?)\s*\(\s*([\d.]+[km]?)\s+cached(?:\s*,\s*([\d.]+[km]?)\s+written)?\s*\)\s*[•·]\s*↓\s*([\d.]+[km]?)(?:\s*\([^)]*\))?/i);
         if (inlineCachedMatch) {
           if (inputTokens === 0) inputTokens = parseTokenCount(inlineCachedMatch[1]);
           if (cacheReadTokens === 0) cacheReadTokens = parseTokenCount(inlineCachedMatch[2]);
-          if (outputTokens === 0) outputTokens = parseTokenCount(inlineCachedMatch[3]);
+          if (inlineCachedMatch[3] && cacheWriteTokens === 0) cacheWriteTokens = parseTokenCount(inlineCachedMatch[3]);
+          if (outputTokens === 0) outputTokens = parseTokenCount(inlineCachedMatch[4]);
         }
       }
       i++;
@@ -413,6 +417,7 @@ function parsePrettyPrintFormat(logContent) {
   if (inputTokens > 0) usage.input_tokens = inputTokens;
   if (outputTokens > 0) usage.output_tokens = outputTokens;
   if (cacheReadTokens > 0) usage.cache_read_input_tokens = cacheReadTokens;
+  if (cacheWriteTokens > 0) usage.cache_creation_input_tokens = cacheWriteTokens;
   entries.push({
     type: "result",
     num_turns: numTurns,

@@ -199,6 +199,7 @@ type RunData struct {
 	AvgTimeBetweenTurns        string                 `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
 	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
+	awInfo                     *AwInfo
 }
 
 // logsAggregate accumulates cross-run totals while runs are converted to RunData.
@@ -488,6 +489,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	comparison := buildAuditComparisonForProcessedRuns(pr, processedRuns)
 
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
+	runData.awInfo = engineInfo.awInfo
 	if engineInfo.awInfo != nil {
 		applyAwInfoToRunData(&runData, engineInfo.awInfo)
 	}
