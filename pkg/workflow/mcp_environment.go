@@ -110,19 +110,17 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	}
 
 	// Emit GH_AW_SINK_VISIBILITY for all workflows where the determine-automatic-lockdown step
-	// runs (i.e., any workflow with a GitHub tool, a dynamic enclave, or a static enclave-only
-	// GitHub backend whose write-sink policy needs the destination visibility). This avoids
+	// runs (i.e., any workflow with a GitHub tool, or an enclave-only GitHub backend — static
+	// or dynamic — whose write-sink policy needs the destination visibility). This avoids
 	// embedding a ${{ }} expression directly in the run: heredoc, which zizmor flags as
 	// template injection. The value is the raw step output (no toJSON), and the surrounding
 	// JSON double-quotes in the heredoc produce a valid JSON string at runtime:
 	//   "sink-visibility": "${GH_AW_SINK_VISIBILITY}"  →  "sink-visibility": "public"
-	// The static-enclave check here uses staticEnclaveWriteSinkGuardPolicy directly — the same
-	// predicate generateGitHubMCPLockdownDetectionStep's caller (githubLockdownDetectionStepEnabled)
-	// uses to decide whether to generate the step — so the two can never drift out of sync.
+	// githubBackendIsEnclaveOnly is the same shared helper used to decide whether the primary
+	// agent's automatic guard-policy env vars apply, keeping both decisions in sync.
 	// Gating on githubLockdownDetectionStepEnabled ensures this never references a step that
 	// isn't actually generated (a dangling steps.<id>.outputs.* reference).
-	sinkVisibilityRelevant := githubToolEnabledInTools || enclaveDynamicRepositoryPolicyEnabled(workflowData) || staticEnclaveWriteSinkGuardPolicy(workflowData) != nil
-	if sinkVisibilityRelevant && githubLockdownDetectionStepEnabled(workflowData) {
+	if (githubToolEnabledInTools || githubBackendIsEnclaveOnly(workflowData)) && githubLockdownDetectionStepEnabled(workflowData) {
 		envVars[sinkVisibilityEnvVar] = "${{ steps.determine-automatic-lockdown.outputs.visibility }}"
 	}
 	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
