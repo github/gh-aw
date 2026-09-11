@@ -986,6 +986,2702 @@
                 }
               },
               "additionalProperties": false
+            },
+            "audit": {
+              "type": "object",
+              "properties": {
+                "cache_source": {
+                  "type": "string"
+                },
+                "overview": {
+                  "type": "object",
+                  "properties": {
+                    "run_id": {
+                      "type": "integer"
+                    },
+                    "workflow_name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "conclusion": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "logs_path": {
+                      "type": "string"
+                    },
+                    "experiment": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "repo": {
+                          "type": "string"
+                        },
+                        "run_id": {
+                          "type": "string"
+                        },
+                        "workflow_id": {
+                          "type": "string"
+                        },
+                        "workflow_call_id": {
+                          "type": "string"
+                        },
+                        "time": {
+                          "type": "string"
+                        },
+                        "actor": {
+                          "type": "string"
+                        },
+                        "event_type": {
+                          "type": "string"
+                        },
+                        "item_type": {
+                          "type": "string"
+                        },
+                        "item_number": {
+                          "type": "string"
+                        },
+                        "comment_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "repo",
+                        "run_id",
+                        "workflow_id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "run_id",
+                    "workflow_name",
+                    "status",
+                    "created_at",
+                    "event",
+                    "branch",
+                    "url"
+                  ],
+                  "additionalProperties": false
+                },
+                "comparison": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "baseline_found": {
+                      "type": "boolean"
+                    },
+                    "baseline": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "run_id": {
+                          "type": "integer"
+                        },
+                        "workflow_name": {
+                          "type": "string"
+                        },
+                        "conclusion": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "selection": {
+                          "type": "string"
+                        },
+                        "matched_on": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "run_id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "delta": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "turns": {
+                          "type": "object",
+                          "properties": {
+                            "before": {
+                              "type": "integer"
+                            },
+                            "after": {
+                              "type": "integer"
+                            },
+                            "changed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "before",
+                            "after",
+                            "changed"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "posture": {
+                          "type": "object",
+                          "properties": {
+                            "before": {
+                              "type": "string"
+                            },
+                            "after": {
+                              "type": "string"
+                            },
+                            "changed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "before",
+                            "after",
+                            "changed"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "blocked_requests": {
+                          "type": "object",
+                          "properties": {
+                            "before": {
+                              "type": "integer"
+                            },
+                            "after": {
+                              "type": "integer"
+                            },
+                            "changed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "before",
+                            "after",
+                            "changed"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "mcp_failure": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "before": {
+                              "type": [
+                                "null",
+                                "array"
+                              ],
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "after": {
+                              "type": [
+                                "null",
+                                "array"
+                              ],
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "newly_present": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "newly_present"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "turns",
+                        "posture",
+                        "blocked_requests"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "classification": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "reason_codes": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "recommendation": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "action"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "baseline_found"
+                  ],
+                  "additionalProperties": false
+                },
+                "task_domain": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                },
+                "behavior_fingerprint": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "execution_style": {
+                      "type": "string"
+                    },
+                    "tool_breadth": {
+                      "type": "string"
+                    },
+                    "actuation_style": {
+                      "type": "string"
+                    },
+                    "resource_profile": {
+                      "type": "string"
+                    },
+                    "dispatch_mode": {
+                      "type": "string"
+                    },
+                    "agentic_fraction": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "execution_style",
+                    "tool_breadth",
+                    "actuation_style",
+                    "resource_profile",
+                    "dispatch_mode",
+                    "agentic_fraction"
+                  ],
+                  "additionalProperties": false
+                },
+                "agentic_assessments": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string"
+                      },
+                      "recommendation": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "severity",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "metrics": {
+                  "type": "object",
+                  "properties": {
+                    "token_usage": {
+                      "type": "integer"
+                    },
+                    "aic": {
+                      "type": "number"
+                    },
+                    "ambient_context": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "cached_tokens": {
+                          "type": "integer"
+                        },
+                        "effective_tokens": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "cached_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "working_set": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "measurement_state": {
+                          "type": "string"
+                        },
+                        "rebuild_factor": {
+                          "type": [
+                            "null",
+                            "number"
+                          ]
+                        },
+                        "cumulative_input_tokens": {
+                          "type": "integer"
+                        },
+                        "peak_input_tokens": {
+                          "type": "integer"
+                        },
+                        "rebuild_excess_tokens": {
+                          "type": "integer"
+                        },
+                        "invocations": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "measurement_state",
+                        "cumulative_input_tokens",
+                        "peak_input_tokens",
+                        "rebuild_excess_tokens",
+                        "invocations"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "action_minutes": {
+                      "type": "number"
+                    },
+                    "turns": {
+                      "type": "integer"
+                    },
+                    "error_count": {
+                      "type": "integer"
+                    },
+                    "warning_count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "error_count",
+                    "warning_count"
+                  ],
+                  "additionalProperties": false
+                },
+                "key_findings": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "category",
+                      "severity",
+                      "title",
+                      "description"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "recommendations": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "priority": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "example": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "priority",
+                      "action",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "observability_insights": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "category",
+                      "severity",
+                      "title",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "performance_metrics": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "tokens_per_minute": {
+                      "type": "number"
+                    },
+                    "avg_tool_duration": {
+                      "type": "string"
+                    },
+                    "most_used_tool": {
+                      "type": "string"
+                    },
+                    "network_requests": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "engine_config": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "engine_id": {
+                      "type": "string"
+                    },
+                    "engine_name": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "cli_version": {
+                      "type": "string"
+                    },
+                    "firewall_version": {
+                      "type": "string"
+                    },
+                    "mcp_servers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "trigger_event": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "engine_id"
+                  ],
+                  "additionalProperties": false
+                },
+                "prompt_analysis": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "prompt_size": {
+                      "type": "integer"
+                    },
+                    "prompt_file": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "prompt_size"
+                  ],
+                  "additionalProperties": false
+                },
+                "session_analysis": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "wall_time": {
+                      "type": "string"
+                    },
+                    "turn_count": {
+                      "type": "integer"
+                    },
+                    "avg_turn_duration": {
+                      "type": "string"
+                    },
+                    "avg_time_between_turns": {
+                      "type": "string"
+                    },
+                    "max_time_between_turns": {
+                      "type": "string"
+                    },
+                    "tokens_per_minute": {
+                      "type": "number"
+                    },
+                    "timeout_detected": {
+                      "type": "boolean"
+                    },
+                    "noop_count": {
+                      "type": "integer"
+                    },
+                    "agent_active_ratio": {
+                      "type": "number"
+                    },
+                    "cache_warning": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "timeout_detected"
+                  ],
+                  "additionalProperties": false
+                },
+                "safe_output_summary": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total_items": {
+                      "type": "integer"
+                    },
+                    "items_by_type": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "temporary_id_map_status": {
+                      "type": "string"
+                    },
+                    "temporary_id_mappings": {
+                      "type": "integer"
+                    },
+                    "chained_target_count": {
+                      "type": "integer"
+                    },
+                    "chained_followup_action_count": {
+                      "type": "integer"
+                    },
+                    "delegated_temp_target_count": {
+                      "type": "integer"
+                    },
+                    "closed_temp_target_count": {
+                      "type": "integer"
+                    },
+                    "type_details": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_items",
+                    "items_by_type",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                },
+                "mcp_server_health": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total_servers": {
+                      "type": "integer"
+                    },
+                    "healthy_servers": {
+                      "type": "integer"
+                    },
+                    "degraded_servers": {
+                      "type": "integer"
+                    },
+                    "failed_servers": {
+                      "type": "integer"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "total_requests": {
+                      "type": "integer"
+                    },
+                    "total_errors": {
+                      "type": "integer"
+                    },
+                    "error_rate": {
+                      "type": "number"
+                    },
+                    "servers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "server_name": {
+                            "type": "string"
+                          },
+                          "request_count": {
+                            "type": "integer"
+                          },
+                          "tool_calls": {
+                            "type": "integer"
+                          },
+                          "error_count": {
+                            "type": "integer"
+                          },
+                          "error_rate": {
+                            "type": "number"
+                          },
+                          "error_rate_str": {
+                            "type": "string"
+                          },
+                          "avg_latency": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "server_name",
+                          "request_count",
+                          "tool_calls",
+                          "error_count",
+                          "error_rate",
+                          "error_rate_str",
+                          "avg_latency",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "slowest_calls": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "server_name": {
+                            "type": "string"
+                          },
+                          "tool_name": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "server_name",
+                          "tool_name",
+                          "duration"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_servers",
+                    "healthy_servers",
+                    "degraded_servers",
+                    "failed_servers",
+                    "summary",
+                    "total_requests",
+                    "total_errors",
+                    "error_rate"
+                  ],
+                  "additionalProperties": false
+                },
+                "jobs": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "conclusion": {
+                        "type": "string"
+                      },
+                      "duration": {
+                        "type": "string"
+                      },
+                      "steps": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "conclusion": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer"
+                            },
+                            "started_at": {
+                              "type": "string"
+                            },
+                            "completed_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "downloaded_files": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "integer"
+                      },
+                      "description": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "size",
+                      "description"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "missing_tools": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tool": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "alternatives": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "tool",
+                      "reason",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "missing_data": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "data_type": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "type": "string"
+                      },
+                      "alternatives": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "data_type",
+                      "reason",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "noops": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mcp_failures": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "server_name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "server_name",
+                      "status",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "skill_activations": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "type": "string"
+                      },
+                      "run_id": {
+                        "type": "integer"
+                      },
+                      "experiment_name": {
+                        "type": "string"
+                      },
+                      "variant": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "firewall_token_usage": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total_input_tokens": {
+                      "type": "integer"
+                    },
+                    "total_output_tokens": {
+                      "type": "integer"
+                    },
+                    "total_cache_read_tokens": {
+                      "type": "integer"
+                    },
+                    "total_cache_write_tokens": {
+                      "type": "integer"
+                    },
+                    "total_requests": {
+                      "type": "integer"
+                    },
+                    "total_steering_events": {
+                      "type": "integer"
+                    },
+                    "total_duration_ms": {
+                      "type": "integer"
+                    },
+                    "total_response_bytes": {
+                      "type": "integer"
+                    },
+                    "cache_efficiency": {
+                      "type": "number"
+                    },
+                    "total_effective_tokens": {
+                      "type": "integer"
+                    },
+                    "total_aic": {
+                      "type": "number"
+                    },
+                    "ambient_context": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "cached_tokens": {
+                          "type": "integer"
+                        },
+                        "effective_tokens": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "cached_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "by_model": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "provider": {
+                            "type": "string"
+                          },
+                          "input_tokens": {
+                            "type": "integer"
+                          },
+                          "output_tokens": {
+                            "type": "integer"
+                          },
+                          "cache_read_tokens": {
+                            "type": "integer"
+                          },
+                          "cache_write_tokens": {
+                            "type": "integer"
+                          },
+                          "reasoning_tokens": {
+                            "type": "integer"
+                          },
+                          "effective_tokens": {
+                            "type": "integer"
+                          },
+                          "requests": {
+                            "type": "integer"
+                          },
+                          "duration_ms": {
+                            "type": "integer"
+                          },
+                          "response_bytes": {
+                            "type": "integer"
+                          },
+                          "aic": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "input_tokens",
+                          "output_tokens",
+                          "cache_read_tokens",
+                          "cache_write_tokens",
+                          "requests",
+                          "duration_ms",
+                          "response_bytes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subagent_model_requests": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "agent_name": {
+                            "type": "string"
+                          },
+                          "requested_model": {
+                            "type": "string"
+                          },
+                          "invocation_count": {
+                            "type": "integer"
+                          },
+                          "effective_model": {
+                            "type": "string"
+                          },
+                          "reason_code": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "agent_name",
+                          "requested_model",
+                          "invocation_count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subagent_model_actuals": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "requests": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "requests"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "mismatch_count": {
+                      "type": "integer"
+                    },
+                    "warnings": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_input_tokens",
+                    "total_output_tokens",
+                    "total_cache_read_tokens",
+                    "total_cache_write_tokens",
+                    "total_requests",
+                    "total_duration_ms",
+                    "total_response_bytes",
+                    "cache_efficiency",
+                    "by_model"
+                  ],
+                  "additionalProperties": false
+                },
+                "github_rate_limit_usage": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total_requests_made": {
+                      "type": "integer"
+                    },
+                    "core_consumed": {
+                      "type": "integer"
+                    },
+                    "core_consumed_source": {
+                      "type": "string"
+                    },
+                    "core_remaining": {
+                      "type": "integer"
+                    },
+                    "core_limit": {
+                      "type": "integer"
+                    },
+                    "resources": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "resource": {
+                            "type": "string"
+                          },
+                          "requests_made": {
+                            "type": "integer"
+                          },
+                          "quota_consumed": {
+                            "type": "integer"
+                          },
+                          "final_remaining": {
+                            "type": "integer"
+                          },
+                          "limit": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "requests_made",
+                          "quota_consumed",
+                          "final_remaining",
+                          "limit"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_requests_made",
+                    "core_consumed",
+                    "core_remaining",
+                    "core_limit"
+                  ],
+                  "additionalProperties": false
+                },
+                "firewall_analysis": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "allowed_domains": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blocked_domains": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "total_requests": {
+                      "type": "integer"
+                    },
+                    "allowed_requests": {
+                      "type": "integer"
+                    },
+                    "blocked_requests": {
+                      "type": "integer"
+                    },
+                    "requests_by_domain": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "allowed": {
+                            "type": "integer"
+                          },
+                          "blocked": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "allowed",
+                          "blocked"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_requests",
+                    "allowed_requests",
+                    "blocked_requests"
+                  ],
+                  "additionalProperties": false
+                },
+                "policy_analysis": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "policy_summary": {
+                      "type": "string"
+                    },
+                    "rule_hits": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rule": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "order": {
+                                "type": "integer"
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "aclName": {
+                                "type": "string"
+                              },
+                              "protocol": {
+                                "type": "string"
+                              },
+                              "domains": {
+                                "type": [
+                                  "null",
+                                  "array"
+                                ],
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "description": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "order",
+                              "action",
+                              "aclName",
+                              "protocol",
+                              "domains",
+                              "description"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "hits": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "rule",
+                          "hits"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "denied_requests": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ts": {
+                            "type": "number"
+                          },
+                          "host": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "integer"
+                          },
+                          "rule_id": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "ts",
+                          "host",
+                          "status",
+                          "rule_id",
+                          "action"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_requests": {
+                      "type": "integer"
+                    },
+                    "allowed_count": {
+                      "type": "integer"
+                    },
+                    "denied_count": {
+                      "type": "integer"
+                    },
+                    "unique_domains": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "policy_summary",
+                    "rule_hits",
+                    "total_requests",
+                    "allowed_count",
+                    "denied_count",
+                    "unique_domains"
+                  ],
+                  "additionalProperties": false
+                },
+                "redacted_domains_analysis": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total_domains": {
+                      "type": "integer"
+                    },
+                    "domains": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_domains",
+                    "domains"
+                  ],
+                  "additionalProperties": false
+                },
+                "errors": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "line": {
+                        "type": "integer"
+                      },
+                      "file": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "warnings": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "line": {
+                        "type": "integer"
+                      },
+                      "file": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tool_usage": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "call_count": {
+                        "type": "integer"
+                      },
+                      "max_input_size": {
+                        "type": "integer"
+                      },
+                      "max_output_size": {
+                        "type": "integer"
+                      },
+                      "max_duration": {
+                        "type": "string"
+                      },
+                      "output_sample": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "call_count"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mcp_tool_usage": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "summary": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "server_name": {
+                            "type": "string"
+                          },
+                          "tool_name": {
+                            "type": "string"
+                          },
+                          "call_count": {
+                            "type": "integer"
+                          },
+                          "total_input_size": {
+                            "type": "integer"
+                          },
+                          "total_output_size": {
+                            "type": "integer"
+                          },
+                          "max_input_size": {
+                            "type": "integer"
+                          },
+                          "max_output_size": {
+                            "type": "integer"
+                          },
+                          "avg_duration": {
+                            "type": "string"
+                          },
+                          "max_duration": {
+                            "type": "string"
+                          },
+                          "error_count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "server_name",
+                          "tool_name",
+                          "call_count",
+                          "total_input_size",
+                          "total_output_size",
+                          "max_input_size",
+                          "max_output_size"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "tool_calls": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tool_call_id": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "server_name": {
+                            "type": "string"
+                          },
+                          "tool_name": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "input_size": {
+                            "type": "integer"
+                          },
+                          "output_size": {
+                            "type": "integer"
+                          },
+                          "duration": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          },
+                          "effective_token_delta": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "server_name",
+                          "tool_name",
+                          "input_size",
+                          "output_size",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "servers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "server_name": {
+                            "type": "string"
+                          },
+                          "tool_call_count": {
+                            "type": "integer"
+                          },
+                          "error_count": {
+                            "type": "integer"
+                          },
+                          "request_count": {
+                            "type": "integer"
+                          },
+                          "total_input_size": {
+                            "type": "integer"
+                          },
+                          "total_output_size": {
+                            "type": "integer"
+                          },
+                          "avg_duration": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "server_name",
+                          "tool_call_count",
+                          "request_count",
+                          "total_input_size",
+                          "total_output_size"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "filtered_events": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "server_id": {
+                            "type": "string"
+                          },
+                          "tool_name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "secrecy_tags": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "integrity_tags": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "author_association": {
+                            "type": "string"
+                          },
+                          "author_login": {
+                            "type": "string"
+                          },
+                          "html_url": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "server_id",
+                          "tool_name",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "integrity": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "total_filtered": {
+                          "type": "integer"
+                        },
+                        "runs_with_filtered_events": {
+                          "type": "integer"
+                        },
+                        "filtered_server_counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "filtered_tool_counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "filtered_reason_counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "required": [
+                        "total_filtered"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "guard_policy_summary": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "total_blocked": {
+                          "type": "integer"
+                        },
+                        "integrity_blocked": {
+                          "type": "integer"
+                        },
+                        "repo_scope_blocked": {
+                          "type": "integer"
+                        },
+                        "access_denied": {
+                          "type": "integer"
+                        },
+                        "blocked_user_denied": {
+                          "type": "integer"
+                        },
+                        "permission_denied": {
+                          "type": "integer"
+                        },
+                        "private_repo_denied": {
+                          "type": "integer"
+                        },
+                        "events": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "timestamp": {
+                                "type": "string"
+                              },
+                              "server_id": {
+                                "type": "string"
+                              },
+                              "tool_name": {
+                                "type": "string"
+                              },
+                              "error_code": {
+                                "type": "integer"
+                              },
+                              "reason": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "details": {
+                                "type": "string"
+                              },
+                              "repository": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "timestamp",
+                              "server_id",
+                              "tool_name",
+                              "error_code",
+                              "reason",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "blocked_tool_counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "blocked_server_counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "required": [
+                        "total_blocked",
+                        "integrity_blocked",
+                        "repo_scope_blocked",
+                        "access_denied",
+                        "events"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "tool_calls"
+                  ],
+                  "additionalProperties": false
+                },
+                "created_items": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "number": {
+                        "type": "integer"
+                      },
+                      "repo": {
+                        "type": "string"
+                      },
+                      "temporaryId": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "before_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "after_state": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "outcomes": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "outcome_status": {
+                        "type": "string"
+                      },
+                      "evidence_strength": {
+                        "type": "string"
+                      },
+                      "signal": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "object_url": {
+                        "type": "string"
+                      },
+                      "object_number": {
+                        "type": "integer"
+                      },
+                      "traced_root_url": {
+                        "type": "string"
+                      },
+                      "attribution_status": {
+                        "type": "string"
+                      },
+                      "attribution_source": {
+                        "type": "string"
+                      },
+                      "repo": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "time_to_outcome_hours": {
+                        "type": "number"
+                      },
+                      "human_comments": {
+                        "type": "integer"
+                      },
+                      "human_edits": {
+                        "type": "integer"
+                      },
+                      "human_reviews": {
+                        "type": "integer"
+                      },
+                      "zero_touch": {
+                        "type": "boolean"
+                      },
+                      "objective_value": {
+                        "type": "integer"
+                      },
+                      "objective_labels": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "checked_at": {
+                        "type": "string"
+                      },
+                      "eval_error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "outcome_status",
+                      "evidence_strength",
+                      "type",
+                      "created_at",
+                      "checked_at"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "outcome_summary": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "accepted": {
+                      "type": "integer"
+                    },
+                    "rejected": {
+                      "type": "integer"
+                    },
+                    "ignored": {
+                      "type": "integer"
+                    },
+                    "pending": {
+                      "type": "integer"
+                    },
+                    "accepted_strong": {
+                      "type": "integer"
+                    },
+                    "accepted_medium": {
+                      "type": "integer"
+                    },
+                    "accepted_weak": {
+                      "type": "integer"
+                    },
+                    "fallback_exists_only_count": {
+                      "type": "integer"
+                    },
+                    "lifecycle": {
+                      "type": "integer"
+                    },
+                    "errors": {
+                      "type": "integer"
+                    },
+                    "zero_touch": {
+                      "type": "integer"
+                    },
+                    "acceptance_rate": {
+                      "type": "number"
+                    },
+                    "waste_rate": {
+                      "type": "number"
+                    },
+                    "zero_touch_rate": {
+                      "type": "number"
+                    },
+                    "median_time_to_outcome_hours": {
+                      "type": "number"
+                    },
+                    "cost_per_accepted_outcome": {
+                      "type": "number"
+                    },
+                    "total_objective_value": {
+                      "type": "integer"
+                    },
+                    "accepted_objective_value": {
+                      "type": "integer"
+                    },
+                    "objective_efficiency": {
+                      "type": "number"
+                    },
+                    "domain_breakdowns": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "attempted": {
+                            "type": "integer"
+                          },
+                          "accepted": {
+                            "type": "integer"
+                          },
+                          "rejected": {
+                            "type": "integer"
+                          },
+                          "pending": {
+                            "type": "integer"
+                          },
+                          "total_objective_value": {
+                            "type": "integer"
+                          },
+                          "accepted_objective_value": {
+                            "type": "integer"
+                          },
+                          "objective_efficiency": {
+                            "type": "number"
+                          },
+                          "acceptance_rate": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "attempted",
+                          "accepted",
+                          "rejected",
+                          "pending",
+                          "total_objective_value",
+                          "accepted_objective_value"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "accepted",
+                    "rejected",
+                    "ignored",
+                    "pending",
+                    "lifecycle",
+                    "errors",
+                    "zero_touch",
+                    "acceptance_rate",
+                    "waste_rate",
+                    "zero_touch_rate"
+                  ],
+                  "additionalProperties": false
+                },
+                "experiments": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "assignments": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "cumulative_counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "assignments"
+                  ],
+                  "additionalProperties": false
+                },
+                "graders": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "unit": {
+                            "type": "string"
+                          },
+                          "passed": {
+                            "type": [
+                              "null",
+                              "boolean"
+                            ]
+                          },
+                          "direction": {
+                            "type": "string"
+                          },
+                          "threshold": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "passed": {
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "type": "integer"
+                    },
+                    "error_count": {
+                      "type": "integer"
+                    },
+                    "unavailable_count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total",
+                    "passed",
+                    "failed",
+                    "error_count",
+                    "unavailable_count"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "overview",
+                "metrics",
+                "downloaded_files"
+              ],
+              "additionalProperties": false
+            },
+            "aw_info": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "engine_id": {
+                  "type": "string"
+                },
+                "engine_name": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "cli_version": {
+                  "type": "string"
+                },
+                "workflow_name": {
+                  "type": "string"
+                },
+                "staged": {
+                  "type": "boolean"
+                },
+                "awf_version": {
+                  "type": "string"
+                },
+                "firewall_version": {
+                  "type": "string"
+                },
+                "awmg_version": {
+                  "type": "string"
+                },
+                "agent_runtime": {
+                  "type": "string"
+                },
+                "cache_memory": {
+                  "type": "boolean"
+                },
+                "steps": {
+                  "type": "object",
+                  "properties": {
+                    "firewall": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "repo": {
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "type": "string"
+                    },
+                    "workflow_id": {
+                      "type": "string"
+                    },
+                    "workflow_call_id": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "string"
+                    },
+                    "actor": {
+                      "type": "string"
+                    },
+                    "event_type": {
+                      "type": "string"
+                    },
+                    "item_type": {
+                      "type": "string"
+                    },
+                    "item_number": {
+                      "type": "string"
+                    },
+                    "comment_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "repo",
+                    "run_id",
+                    "workflow_id"
+                  ],
+                  "additionalProperties": false
+                },
+                "token_weights": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "multipliers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "token-class-weights": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "input": {
+                          "type": "number"
+                        },
+                        "cached_input": {
+                          "type": "number"
+                        },
+                        "output": {
+                          "type": "number"
+                        },
+                        "reasoning": {
+                          "type": "number"
+                        },
+                        "cache_write": {
+                          "type": "number"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "run_id": {
+                  "type": "integer"
+                },
+                "run_number": {
+                  "type": "integer"
+                },
+                "run_attempt": {
+                  "type": "string"
+                },
+                "repository": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "sha": {
+                  "type": "string"
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "event_name": {
+                  "type": "string"
+                },
+                "target_repo": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "engine_id",
+                "engine_name",
+                "model",
+                "version",
+                "workflow_name",
+                "staged",
+                "cache_memory",
+                "created_at"
+              ],
+              "additionalProperties": false
+            },
+            "safe_outputs": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "integer"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "temporaryId": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "before_state": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "after_state": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "timestamp": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "timestamp"
+                ],
+                "additionalProperties": false
+              }
             }
           },
           "required": [

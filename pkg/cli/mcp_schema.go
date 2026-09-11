@@ -120,6 +120,13 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	}
 	run.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	run.Properties["kind"].Enum = []any{cachedLogsJSONLKindRun}
+	auditData, err := generateAuditDataOutputSchema()
+	if err != nil {
+		return nil, err
+	}
+	if err := replacePropertySchema(run, []string{"run", "audit"}, auditData); err != nil {
+		return nil, err
+	}
 	workflowRuns, err := GenerateOutputSchema[cachedLogsJSONLWorkflowRunsItemSchema]()
 	if err != nil {
 		return nil, err
@@ -283,6 +290,23 @@ func replaceArrayItemSchema(schema *jsonschema.Schema, path []string, replacemen
 		return fmt.Errorf("schema property %q is not an array", path[len(path)-1])
 	}
 	target.Items = replacement
+	return nil
+}
+
+func replacePropertySchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	target := schema
+	for _, property := range path[:len(path)-1] {
+		var ok bool
+		target, ok = target.Properties[property]
+		if !ok {
+			return fmt.Errorf("schema property %q not found", property)
+		}
+	}
+	property := path[len(path)-1]
+	if _, ok := target.Properties[property]; !ok {
+		return fmt.Errorf("schema property %q not found", property)
+	}
+	target.Properties[property] = replacement
 	return nil
 }
 

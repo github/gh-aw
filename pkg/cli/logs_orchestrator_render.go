@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"golang.org/x/sync/errgroup"
 )
@@ -67,6 +68,7 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 		if err := writeLogsAuditsAndTrain(processedRuns, opts); err != nil {
 			return LogsData{}, fmt.Errorf("audit log pattern training: %w", err)
 		}
+		cacheLogsAuditData(processedRuns, opts.cachedJSONLWriter)
 	}
 
 	// Build structured logs data
@@ -115,6 +117,15 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 		}
 	}
 	return logsData, nil
+}
+
+func cacheLogsAuditData(processedRuns []ProcessedRun, writer *cachedLogsJSONLWriter) {
+	for _, processedRun := range processedRuns {
+		if err := writer.AppendAudit(processedRun); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Sprintf("Failed to cache audit data for run %d: %v", processedRun.Run.DatabaseID, err)))
+		}
+	}
 }
 
 func writeLogsAuditsAndTrain(processedRuns []ProcessedRun, opts renderLogsOutputOptions) error {
