@@ -69,10 +69,10 @@ type cachedLogsJSONLMCPToolCall struct {
 	ServerName          string `json:"server_name"`
 	ToolName            string `json:"tool_name"`
 	Method              string `json:"method,omitempty"`
-	InputSize           int    `json:"input_size,omitempty"`
-	OutputSize          int    `json:"output_size,omitempty"`
+	InputSize           int    `json:"input_size"`
+	OutputSize          int    `json:"output_size"`
 	Duration            string `json:"duration,omitempty"`
-	Status              string `json:"status,omitempty"`
+	Status              string `json:"status"`
 	EffectiveTokenDelta int    `json:"effective_token_delta,omitempty"`
 }
 

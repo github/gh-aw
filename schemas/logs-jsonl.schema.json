@@ -976,7 +976,10 @@
                     "required": [
                       "timestamp",
                       "server_name",
-                      "tool_name"
+                      "tool_name",
+                      "input_size",
+                      "output_size",
+                      "status"
                     ],
                     "additionalProperties": false
                   }
