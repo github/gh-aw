@@ -210,10 +210,11 @@ func (c *Compiler) applyBuiltinJobAugmentations(data *WorkflowData) error {
 }
 
 type builtinJobAugmentation struct {
-	needs          []string
-	ifCondition    string
-	hasPermissions bool
-	hasTimeout     bool
+	needs              []string
+	ifCondition        string
+	hasPermissions     bool
+	hasTimeout         bool
+	hasContinueOnError bool
 }
 
 func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (builtinJobAugmentation, map[string]any, error) {
@@ -231,10 +232,20 @@ func parseBuiltinJobAugmentation(jobName, targetJobName string, rawConfig any) (
 	}
 	_, hasPermissions := configMap["permissions"]
 	_, hasTimeout := configMap["timeout-minutes"]
+	_, hasContinueOnError := configMap["continue-on-error"]
 	if hasTimeout && targetJobName != string(constants.AgentJobName) && targetJobName != string(constants.DetectionJobName) {
 		return builtinJobAugmentation{}, nil, fmt.Errorf("jobs.%s.timeout-minutes is supported only for the generated agent and detection jobs", jobName)
 	}
-	return builtinJobAugmentation{needs, ifCondition, hasPermissions, hasTimeout}, configMap, nil
+	if hasContinueOnError && targetJobName != string(constants.AgentJobName) {
+		return builtinJobAugmentation{}, nil, fmt.Errorf("jobs.%s.continue-on-error is supported only for the generated agent job", jobName)
+	}
+	return builtinJobAugmentation{
+		needs:              needs,
+		ifCondition:        ifCondition,
+		hasPermissions:     hasPermissions,
+		hasTimeout:         hasTimeout,
+		hasContinueOnError: hasContinueOnError,
+	}, configMap, nil
 }
 
 func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, data *WorkflowData, allJobs map[string]*Job) error {
@@ -246,7 +257,7 @@ func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, da
 	if err != nil {
 		return err
 	}
-	if len(augmentation.needs) == 0 && augmentation.ifCondition == "" && !augmentation.hasPermissions && !augmentation.hasTimeout {
+	if len(augmentation.needs) == 0 && augmentation.ifCondition == "" && !augmentation.hasPermissions && !augmentation.hasTimeout && !augmentation.hasContinueOnError {
 		return nil
 	}
 	targetJob, exists := c.jobManager.GetJob(targetJobName)
@@ -263,11 +274,14 @@ func (c *Compiler) applyBuiltinJobAugmentation(jobName string, rawConfig any, da
 			return err
 		}
 	}
+	if augmentation.hasContinueOnError {
+		extractCustomJobContinueOnError(targetJob, configMap)
+	}
 	return c.applyBuiltinJobNeedsAndIf(jobName, targetJobName, targetJob, data.Jobs, allJobs, augmentation)
 }
 
 func augmentedBuiltinJobField(jobName, targetJobName string, augmentation builtinJobAugmentation) string {
-	if len(augmentation.needs) > 0 && (augmentation.ifCondition != "" || augmentation.hasPermissions || augmentation.hasTimeout) {
+	if len(augmentation.needs) > 0 && (augmentation.ifCondition != "" || augmentation.hasPermissions || augmentation.hasTimeout || augmentation.hasContinueOnError) {
 		return jobName
 	}
 	if len(augmentation.needs) > 0 {
@@ -278,6 +292,9 @@ func augmentedBuiltinJobField(jobName, targetJobName string, augmentation builti
 	}
 	if augmentation.hasTimeout {
 		return jobName + ".timeout-minutes"
+	}
+	if augmentation.hasContinueOnError {
+		return jobName + ".continue-on-error"
 	}
 	return targetJobName + ".permissions"
 }
