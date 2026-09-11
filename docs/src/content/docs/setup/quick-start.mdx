@@ -45,7 +45,6 @@ head:
 ---
 
 import Video from '../../../components/Video.astro';
-import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Adding an Automated Daily Status Workflow to Your Repo
 
@@ -119,43 +118,45 @@ This will take you through an interactive process to:
 
 #### Configuring authentication
 
-<Tabs>
-  <TabItem label="Copilot">
-    **Use organization billing:**
+**Copilot**
 
-    If organization billing is enabled in your organization, you can choose **Use copilot-requests** in the wizard. It adds `copilot-requests: write` to the workflow permissions and uses the per-run GitHub Actions token for inference. This path requires an organization Copilot subscription with centralized billing.
+**Use organization billing:**
 
-    **Use `COPILOT_GITHUB_TOKEN`:**
+If organization billing is enabled in your organization, you can choose **Use copilot-requests** in the wizard. It adds `copilot-requests: write` to the workflow permissions and uses the per-run GitHub Actions token for inference. This path requires an organization Copilot subscription with centralized billing.
 
-    1. [Create a fine-grained Personal Access Token (PAT)](https://github.com/settings/personal-access-tokens/new) under your user account.
-    2. Under **Permissions → Account permissions**, set **Copilot Requests** to **Read**, then generate the token.
-    3. Add it as a repository secret from your repository root with `gh secret set COPILOT_GITHUB_TOKEN < /path/to/token.txt`, or use the GitHub UI. See [Copilot authentication](/gh-aw/reference/auth/#copilot_github_token) for both paths.
-  </TabItem>
-  <TabItem label="Claude">
-    **Setting up `ANTHROPIC_API_KEY`:**
-    1. Create an API key in [Anthropic Console](https://console.anthropic.com/settings/keys).
-    2. Add it as a repository secret from your repository root with `gh secret set ANTHROPIC_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#anthropic_api_key) for more detail.
-  </TabItem>
-  <TabItem label="Codex">
-    **Setting up `OPENAI_API_KEY`:**
-    1. Create an API key in [OpenAI API keys](https://platform.openai.com/api-keys).
-    2. Add it as a repository secret from your repository root with `gh secret set OPENAI_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#openai_api_key) for more detail.
+**Use `COPILOT_GITHUB_TOKEN`:**
 
-    **Tip:** `CODEX_API_KEY` is also accepted and takes precedence over `OPENAI_API_KEY` — if you have already stored the key under that name, no action is needed. See [Authentication](/gh-aw/reference/auth/#openai_api_key) for details.
-  </TabItem>
-  <TabItem label="Gemini">
-    **Setting up `GEMINI_API_KEY`:**
-    1. Create an API key in [Google AI Studio](https://aistudio.google.com/api-keys).
-    2. Add it as a repository secret from your repository root with `gh secret set GEMINI_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#gemini_api_key) for more detail.
+1. [Create a fine-grained Personal Access Token (PAT)](https://github.com/settings/personal-access-tokens/new) under your user account.
+2. Under **Permissions → Account permissions**, set **Copilot Requests** to **Read**, then generate the token.
+3. Add it as a repository secret from your repository root with `gh secret set COPILOT_GITHUB_TOKEN < /path/to/token.txt`, or use the GitHub UI. See [Copilot authentication](/gh-aw/reference/auth/#copilot_github_token) for both paths.
 
-    To avoid a long-lived key, configure [Google Workload Identity Federation](/gh-aw/reference/auth/#google-workload-identity-federation-wif).
-  </TabItem>
-  <TabItem label="Pi">
-    Pi chooses authentication from the provider prefix in `model:`. It uses Copilot authentication by default, `ANTHROPIC_API_KEY` for `anthropic/...`, and `CODEX_API_KEY` or `OPENAI_API_KEY` for `openai/...` and `codex/...`. For example, use `model: copilot/gpt-5.4`, `model: anthropic/claude-sonnet-5`, or `model: openai/gpt-5`.
+**Claude**
 
-    Pi also requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. Follow [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) for the complete setup.
-  </TabItem>
-</Tabs>
+**Setting up `ANTHROPIC_API_KEY`:**
+1. Create an API key in [Anthropic Console](https://console.anthropic.com/settings/keys).
+2. Add it as a repository secret from your repository root with `gh secret set ANTHROPIC_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#anthropic_api_key) for more detail.
+
+**Codex**
+
+**Setting up `OPENAI_API_KEY`:**
+1. Create an API key in [OpenAI API keys](https://platform.openai.com/api-keys).
+2. Add it as a repository secret from your repository root with `gh secret set OPENAI_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#openai_api_key) for more detail.
+
+**Tip:** `CODEX_API_KEY` is also accepted and takes precedence over `OPENAI_API_KEY` — if you have already stored the key under that name, no action is needed. See [Authentication](/gh-aw/reference/auth/#openai_api_key) for details.
+
+**Gemini**
+
+**Setting up `GEMINI_API_KEY`:**
+1. Create an API key in [Google AI Studio](https://aistudio.google.com/api-keys).
+2. Add it as a repository secret from your repository root with `gh secret set GEMINI_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#gemini_api_key) for more detail.
+
+To avoid a long-lived key, configure [Google Workload Identity Federation](/gh-aw/reference/auth/#google-workload-identity-federation-wif).
+
+**Pi**
+
+Pi chooses authentication from the provider prefix in `model:`. It uses Copilot authentication by default, `ANTHROPIC_API_KEY` for `anthropic/...`, and `CODEX_API_KEY` or `OPENAI_API_KEY` for `openai/...` and `codex/...`. For example, use `model: copilot/gpt-5.4`, `model: anthropic/claude-sonnet-5`, or `model: openai/gpt-5`.
+
+Pi also requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. Follow [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) for the complete setup.
 
 ### Step 3 - Wait for the workflow to complete
 
