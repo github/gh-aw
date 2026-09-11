@@ -6,39 +6,39 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-- package-ecosystem: gomod
-  directory: /
-  schedule:
-    interval: weekly
-- package-ecosystem: npm
-  directory: /docs
-  schedule:
-    interval: weekly
-- package-ecosystem: npm
-  directory: /actions/setup/js
-  schedule:
-    interval: weekly
-- package-ecosystem: npm
-  directory: /.github/workflows
-  schedule:
-    interval: weekly
-- package-ecosystem: pip
-  directory: /.github/workflows
-  schedule:
-    interval: weekly
-- package-ecosystem: gomod
-  directory: /.github/workflows
-  schedule:
-    interval: weekly
-- package-ecosystem: docker
-  directory: /
-  schedule:
-    interval: weekly
-- package-ecosystem: docker
-  directory: /actions/setup/js
-  schedule:
-    interval: weekly
-- package-ecosystem: docker
-  directory: /.devcontainer
-  schedule:
-    interval: weekly
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /actions/setup/js
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /.github/workflows
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /actions/setup/js
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /.devcontainer
+    schedule:
+      interval: weekly
