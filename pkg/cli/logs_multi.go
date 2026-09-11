@@ -286,6 +286,13 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 			err:    ctx.Err(),
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return logsTargetResult{
+			target: target,
+			result: queuedLogsTargetResult(targetOpts, ctx),
+			err:    err,
+		}
+	}
 	if shared.countLimit.isReached() {
 		logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
 		return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
