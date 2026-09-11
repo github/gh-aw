@@ -23,6 +23,13 @@ func githubLockdownDetectionStepEnabled(data *WorkflowData) bool {
 	if enclaveDynamicRepositoryPolicyEnabled(data) {
 		return true
 	}
+	// A static enclave-only GitHub backend still needs the target repository's visibility
+	// for its safe-outputs write-sink policy, even when the primary agent has no GitHub
+	// MCP access at all (tools.github: false). Generate the step in that case too, so the
+	// write-sink policy's sink-visibility field always has a valid producer step.
+	if staticEnclaveWriteSinkGuardPolicy(data) != nil {
+		return true
+	}
 	if githubTool, hasGitHub := data.Tools["github"]; hasGitHub {
 		return githubTool != false
 	}

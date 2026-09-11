@@ -152,8 +152,14 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	if !hasGitHub {
 		// Default-tool resolution removes the "github" key when tools.github is false, so an
 		// absent key can still mean the GitHub MCP server is rendered for enclave delegation.
-		// Only reference the lockdown step outputs when that step is actually generated.
-		return githubLockdownDetectionStepEnabled(workflowData)
+		// The determine-automatic-lockdown step may still run in that case (to supply
+		// GH_AW_SINK_VISIBILITY for the write-sink policy), but its min_integrity/repos
+		// outputs must never drive an enclave-only backend's guard policy — that policy is
+		// always derived statically from the enclave declaration instead. Checking the
+		// explicit-disable marker directly (rather than githubLockdownDetectionStepEnabled)
+		// keeps this decision independent of whether the step happens to be generated.
+		_, explicitlyDisabled := workflowData.ExplicitlyDisabledTools["github"]
+		return !explicitlyDisabled
 	}
 	return githubTool != false
 }
