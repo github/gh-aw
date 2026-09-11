@@ -71,6 +71,11 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 		return logsDownloadRuntime{}, err
 	}
 	activeCtx, timeoutCancel, startTime, timeoutDuration := buildLogsDownloadContext(ctx, opts.TimeoutMinutes, opts.TimeoutSeconds, opts.Verbose)
+	if opts.inheritTimeoutContext {
+		// The shared deadline already lives on ctx; do not install a second one.
+		cancelLogsDownload(timeoutCancel)
+		activeCtx, timeoutCancel, startTime, timeoutDuration = ctx, nil, time.Time{}, 0
+	}
 	storageLimit := opts.storageLimit
 	if storageLimit == nil {
 		storageLimit = newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
@@ -190,6 +195,8 @@ func buildLogsDownloadContext(ctx context.Context, timeoutMinutes, timeoutSecond
 	}
 	timeoutDuration := time.Duration(timeoutMinutes) * time.Minute
 	timeoutLabel := fmt.Sprintf("%d minutes", timeoutMinutes)
+	// --timeout-seconds is a soft deadline derived from the caller's own budget;
+	// it narrows (never extends) the --timeout window.
 	if timeoutSeconds > 0 {
 		timeoutDuration = time.Duration(timeoutSeconds) * time.Second
 		timeoutLabel = fmt.Sprintf("%d seconds", timeoutSeconds)
@@ -279,6 +286,11 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 }
 
 func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRuntime, opts LogsDownloadOptions) (bool, error) {
+	// Bound this batch by what the shared multi-target budget still allows.
+	// Without this, every concurrent target fetches and downloads artifacts as
+	// if it alone had to satisfy the whole --count, and the surplus is only
+	// discarded after the artifacts have already been downloaded.
+	opts.Count = effectiveLogsBatchCount(opts.Count, len(state.processedRuns), opts.countLimit)
 	logLogsIterationFetch(opts, runtime.fetchAllInRange, state.iteration, len(state.processedRuns))
 	opts.cachedJSONLCache = runtime.cachedJSONLCache
 	batch, err := logsFetchWorkflowRunBatch(runtime.activeCtx, opts, state.beforeDate, len(state.processedRuns), runtime.fetchAllInRange)
@@ -366,6 +378,20 @@ func markSharedLogsCountReached(state *logsCollectionState, fetchAllInRange bool
 	}
 	state.countLimitReached = fetchAllInRange
 	return true
+}
+
+// effectiveLogsBatchCount caps the per-target run count by the runs the shared
+// multi-target budget still allows, so a target never fetches or downloads more
+// artifacts than the combined report can include. It returns count unchanged
+// when no shared limit is configured, and when the shared budget is already
+// exhausted (the collection loop stops on its own in that case, after the
+// pagination cursor has been advanced past the fully-consumed batch).
+func effectiveLogsBatchCount(count, processedCount int, limit *logsCountLimit) int {
+	remaining := limit.remaining()
+	if remaining <= 0 {
+		return count
+	}
+	return min(count, processedCount+remaining)
 }
 
 func handleLogsBatchError(state *logsCollectionState, ctx context.Context, err error) (bool, error) {

@@ -146,8 +146,11 @@ func TestDownloadWorkflowLogsForTargetsUsesOneWallClockTimeout(t *testing.T) {
 	var calls atomic.Int64
 	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
 		calls.Add(1)
-		assert.Zero(t, opts.TimeoutMinutes)
-		assert.Zero(t, opts.TimeoutSeconds)
+		// Targets inherit the shared deadline instead of building a second
+		// timeout context, but keep the caller's timeout values so the
+		// continuations they emit can be replayed with the same timeout.
+		assert.True(t, opts.inheritTimeoutContext)
+		assert.Equal(t, 1, opts.TimeoutMinutes)
 		<-ctx.Done()
 		return workflowLogsResult{timeoutReached: true}, nil
 	}
@@ -325,4 +328,46 @@ func TestMergeLogsTargetResultsPreservesPartialRunsFromFailedTarget(t *testing.T
 	assert.Equal(t, int64(42), processedRuns[0].Run.DatabaseID)
 	require.Len(t, errs, 1)
 	assert.ErrorContains(t, errs[0], "pagination failed")
+}
+
+func TestLogsCountLimitRemaining(t *testing.T) {
+	t.Parallel()
+
+	var unlimited *logsCountLimit
+	assert.Equal(t, -1, unlimited.remaining(), "no shared limit means unbounded")
+
+	limit := newLogsCountLimit(2)
+	assert.Equal(t, 2, limit.remaining())
+	require.True(t, limit.tryAdd())
+	assert.Equal(t, 1, limit.remaining())
+	require.True(t, limit.tryAdd())
+	assert.Equal(t, 0, limit.remaining())
+	assert.False(t, limit.tryAdd())
+	assert.Equal(t, 0, limit.remaining())
+}
+
+// TestLogsTargetContinuationPreservesTimeout guards against multi-target
+// continuations losing the caller's --timeout: targets inherit the shared
+// deadline instead of building their own, but the timeout value itself must
+// still be replayable from the emitted continuation parameters.
+func TestLogsTargetContinuationPreservesTimeout(t *testing.T) {
+	t.Parallel()
+
+	opts := LogsDownloadOptions{
+		WorkflowName:          "limited",
+		Count:                 5,
+		StartDate:             "2026-09-01",
+		TimeoutMinutes:        7,
+		inheritTimeoutContext: true,
+	}
+
+	countLimited := countLimitedLogsTargetResult(opts)
+	require.NotNil(t, countLimited.continuation)
+	assert.Equal(t, 7, countLimited.continuation.Timeout)
+
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	queued := queuedLogsTargetResult(opts, ctx)
+	require.NotNil(t, queued.continuation)
+	assert.Equal(t, 7, queued.continuation.Timeout)
 }

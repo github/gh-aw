@@ -62,8 +62,13 @@ type LogsDownloadOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	countLimit             *logsCountLimit
-	cachedJSONLWriter      *cachedLogsJSONLWriter
-	cachedJSONLCache       *cachedLogsJSONLCache
+	// inheritTimeoutContext suppresses building a per-download timeout context
+	// because the caller (multi-target orchestration) already installed the
+	// shared deadline on the context passed in. TimeoutMinutes/TimeoutSeconds
+	// remain set so continuations still report the caller's timeout.
+	inheritTimeoutContext bool
+	cachedJSONLWriter     *cachedLogsJSONLWriter
+	cachedJSONLCache      *cachedLogsJSONLCache
 }
 
 type workflowLogsResult struct {

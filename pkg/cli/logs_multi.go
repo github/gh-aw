@@ -49,6 +49,20 @@ func (l *logsCountLimit) isReached() bool {
 	return l != nil && l.processed.Load() >= l.max
 }
 
+// remaining reports how many runs the shared budget still allows. It returns -1
+// when no shared limit is configured (single-target downloads), so callers can
+// distinguish "unlimited" from "exhausted".
+func (l *logsCountLimit) remaining() int {
+	if l == nil {
+		return -1
+	}
+	remaining := l.max - l.processed.Load()
+	if remaining < 0 {
+		return 0
+	}
+	return int(remaining)
+}
+
 func newLogsCountLimit(count int) *logsCountLimit {
 	if count <= 0 {
 		return nil
@@ -265,8 +279,12 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	targetOpts.maxConcurrentDownloads = shared.perTargetDownloads
 	targetOpts.storageLimit = shared.storageLimit
 	targetOpts.countLimit = shared.countLimit
-	targetOpts.TimeoutMinutes = 0
-	targetOpts.TimeoutSeconds = 0
+	// The shared deadline is already installed on ctx by the caller, so the
+	// target must not build a second timeout context of its own. TimeoutMinutes
+	// and TimeoutSeconds are deliberately preserved (rather than zeroed) so the
+	// continuation this target emits still carries the caller's timeout and can
+	// be replayed as-is.
+	targetOpts.inheritTimeoutContext = true
 
 	if shared.countLimit.isReached() {
 		logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached", target.displayName())

@@ -723,3 +723,60 @@ func TestDeriveGradersClusterValue(t *testing.T) {
 		assert.Equal(t, "absent", deriveGradersClusterValue(t.TempDir()))
 	})
 }
+
+// TestFetchAndProcessLogsBatchCapsCountBySharedBudget verifies that a target
+// sharing a multi-target count budget only fetches and downloads as many runs as
+// the combined report can still include. Without this cap every concurrent
+// target paginates and downloads artifacts for the full --count, and the surplus
+// is discarded only after the artifacts have already been downloaded.
+func TestFetchAndProcessLogsBatchCapsCountBySharedBudget(t *testing.T) {
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	var fetchCount, processCount int
+	logsFetchWorkflowRunBatch = func(_ context.Context, opts LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		fetchCount = opts.Count
+		return workflowRunBatch{runs: []WorkflowRun{{DatabaseID: 10}}, totalFetched: 1, batchSize: 50}, nil
+	}
+	logsProcessWorkflowRunBatch = func(_ context.Context, _ workflowRunBatch, processedRuns []ProcessedRun, opts processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+		processCount = opts.count
+		return processedRuns, 0, true, false, false
+	}
+
+	countLimit := newLogsCountLimit(10)
+	for range 8 {
+		require.True(t, countLimit.tryAdd())
+	}
+
+	state := logsCollectionState{processedRuns: []ProcessedRun{{Run: WorkflowRun{DatabaseID: 11}}}}
+	_, err := fetchAndProcessLogsBatch(
+		&state,
+		logsDownloadRuntime{activeCtx: context.Background()},
+		LogsDownloadOptions{Count: 100, countLimit: countLimit},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, fetchCount, "count must be capped to already-processed runs plus the remaining shared budget")
+	assert.Equal(t, 3, processCount, "batch processing must honor the capped count")
+}
+
+func TestEffectiveLogsBatchCount(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 100, effectiveLogsBatchCount(100, 2, nil), "no shared limit leaves the count unchanged")
+
+	limit := newLogsCountLimit(5)
+	assert.Equal(t, 5, effectiveLogsBatchCount(100, 0, limit))
+	require.True(t, limit.tryAdd())
+	assert.Equal(t, 5, effectiveLogsBatchCount(100, 1, limit))
+	assert.Equal(t, 3, effectiveLogsBatchCount(3, 0, limit), "the cap never raises the requested count")
+
+	exhausted := newLogsCountLimit(1)
+	require.True(t, exhausted.tryAdd())
+	assert.Equal(t, 100, effectiveLogsBatchCount(100, 0, exhausted),
+		"an exhausted budget leaves the count alone so the collection loop can advance its cursor and stop")
+}
