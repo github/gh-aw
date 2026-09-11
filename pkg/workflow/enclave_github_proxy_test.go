@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -395,12 +396,18 @@ Read the private repository's issues through the enclave.
 // stepOutputRefPattern matches steps.<id>.outputs.<name> references, capturing the step id.
 var stepOutputRefPattern = regexp.MustCompile(`steps\.([A-Za-z0-9_-]+)\.outputs\.[A-Za-z0-9_]+`)
 
-// stepIDPattern matches `id: <value>` lines under a GitHub Actions step definition (emitted
-// with indentation deeper than top-level job/workflow keys, e.g.
-// "        id: determine-automatic-lockdown"), capturing the step id. The minimum indent
-// avoids false-positive matches from unrelated `id:` keys at the workflow/job level, while
-// tolerating reasonable indentation changes in the generator.
-var stepIDPattern = regexp.MustCompile(`(?m)^ {6,}id:\s*([A-Za-z0-9_-]+)\s*$`)
+// stepIDMinIndent is the minimum indentation (in spaces) of an `id:` key that belongs to a
+// GitHub Actions step definition rather than a top-level workflow/job/matrix key. Steps are
+// nested at "jobs: <job>: steps: - name: ...", which the compiler currently renders with 8
+// spaces of indentation for step-level keys (see e.g. the "        id: ..." lines written by
+// generateGitHubMCPLockdownDetectionStep). A lower floor is used here so the check still
+// matches if the generator's exact nesting depth changes slightly, while still excluding
+// unrelated `id:` keys declared at the workflow or job level (which use less indentation).
+const stepIDMinIndent = 6
+
+// stepIDPattern matches `id: <value>` lines under a GitHub Actions step definition (e.g.
+// "        id: determine-automatic-lockdown"), capturing the step id.
+var stepIDPattern = regexp.MustCompile(fmt.Sprintf(`(?m)^ {%d,}id:\s*([A-Za-z0-9_-]+)\s*$`, stepIDMinIndent))
 
 // assertNoDanglingStepOutputReferences verifies that every `steps.<id>.outputs.*` reference
 // in the generated lock file corresponds to a step id that is actually emitted somewhere in
