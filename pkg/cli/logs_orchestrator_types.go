@@ -167,7 +167,8 @@ type renderLogsOutputOptions struct {
 	continuations     []WorkflowContinuation
 	// suppressRender skips all report rendering after the summary file has been
 	// written, for callers that only want the downloaded artifacts.
-	suppressRender bool
-	apiRateLimit   *GitHubAPIRateLimitReport
-	apiRateLimits  []*GitHubAPIRateLimitReport
+	suppressRender    bool
+	apiRateLimit      *GitHubAPIRateLimitReport
+	apiRateLimits     []*GitHubAPIRateLimitReport
+	cachedJSONLWriter *cachedLogsJSONLWriter
 }

@@ -183,6 +183,50 @@ func TestCachedLogsJSONLWriterIncludesSafeDashboardEvidence(t *testing.T) {
 	assert.Equal(t, "get_file", record.Run.MCPToolUsage.ToolCalls[0].ToolName)
 }
 
+func TestCachedLogsJSONLWriterIncludesAuditArtifacts(t *testing.T) {
+	runDir := t.TempDir()
+	run := ProcessedRun{Run: WorkflowRun{
+		DatabaseID: 42,
+		Status:     "completed",
+		Conclusion: "success",
+		LogsPath:   runDir,
+	}}
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{
+		"engine_id": "copilot",
+		"engine_name": "Copilot",
+		"model": "gpt-5"
+	}`), 0o600))
+	audit := AuditData{
+		CacheSource: auditCacheSourceLogs,
+		Overview: OverviewData{
+			RunID:      run.Run.DatabaseID,
+			Status:     run.Run.Status,
+			Conclusion: run.Run.Conclusion,
+		},
+		CreatedItems: []CreatedItemReport{{
+			Type:      "create_issue",
+			URL:       "https://github.com/github/gh-aw/issues/1",
+			Timestamp: "2026-09-11T04:00:00Z",
+		}},
+	}
+	require.NoError(t, writeAuditData(runDir, audit))
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+
+	require.NoError(t, newCachedLogsJSONLWriter(path).AppendAudit(run))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var record cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &record))
+	require.NotNil(t, record.Run)
+	require.NotNil(t, record.Run.Audit)
+	assert.Equal(t, int64(42), record.Run.Audit.Overview.RunID)
+	require.NotNil(t, record.Run.AwInfo)
+	assert.Equal(t, "copilot", record.Run.AwInfo.EngineID)
+	require.Len(t, record.Run.SafeOutputs, 1)
+	assert.Equal(t, "create_issue", record.Run.SafeOutputs[0].Type)
+}
+
 func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
 	jobs := projectCachedLogsJSONLJobs([]JobInfoWithDuration{
 		{JobInfo: JobInfo{ID: 0, Name: "missing-id"}},

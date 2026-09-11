@@ -153,6 +153,7 @@ func DownloadWorkflowLogsForTargets(
 		continuations:     continuations,
 		apiRateLimit:      apiRateLimit,
 		apiRateLimits:     apiRateLimits,
+		cachedJSONLWriter: opts.cachedJSONLWriter,
 	})
 }
 
