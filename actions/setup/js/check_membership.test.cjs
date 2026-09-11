@@ -464,6 +464,34 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
     });
 
+    it.each(["pull_request", "pull_request_target"])("should authorize an active allowlisted bot when actor differs from PR author (%s synchronize event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = eventName;
+      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "human-author" } } };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
+    });
+
+    it("should deny an inactive allowlisted bot when actor differs from PR author", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "human-author" } } };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue({ status: 404, message: "Not Found" });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
     it("should allow access when actor matches PR author (genuine dependabot PR synchronize)", async () => {
       mockContext.actor = "dependabot[bot]";
       mockContext.eventName = "pull_request";

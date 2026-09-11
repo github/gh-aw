@@ -203,6 +203,16 @@ async function main() {
     return;
   }
 
+  // If the actor is in the bots allowlist, skip the roles check entirely and go straight
+  // to bot-status verification. A bot listed in on.bots: is an explicit grant; the roles
+  // mismatch (bots typically have "none" repo permission) is expected and not actionable.
+  // Checking bots first also allows explicitly trusted bots to push to PRs they did not
+  // open and avoids a spurious roles-mismatch warning before authorization succeeds.
+  const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
+  if (botResult.handled) {
+    return;
+  }
+
   // Guard against Dependabot Confused Deputy attacks.
   // An attacker can trigger @dependabot recreate (for pull_request events) or
   // @dependabot show (for issue_comment events) to make dependabot appear as the
@@ -215,16 +225,6 @@ async function main() {
     core.setOutput("result", "confused_deputy");
     core.setOutput("error_message", errorMessage);
     await writeDenialSummary(errorMessage, "This can occur when a bot command (e.g. @dependabot recreate) causes a bot to appear as the actor on a PR or comment that was originally authored by a different user.");
-    return;
-  }
-
-  // If the actor is in the bots allowlist, skip the roles check entirely and go straight
-  // to bot-status verification. A bot listed in on.bots: is an explicit grant; the roles
-  // mismatch (bots typically have "none" repo permission) is expected and not actionable.
-  // Checking bots first also avoids a spurious "permission does not meet requirements"
-  // warning that would otherwise be emitted by the roles check before authorization succeeds.
-  const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
-  if (botResult.handled) {
     return;
   }
 
