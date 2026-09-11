@@ -1,1 +1,68 @@
-{"last_updated": "2026-09-09", "daily_summary": [{"date": "2026-07-03", "total_prs": 1000, "merged": 801, "closed": 178, "open": 21, "success_rate": 0.818, "top_category": "bug_fix"}, {"date": "2026-07-04", "total_prs": 1000, "merged": 798, "closed": 186, "open": 16, "success_rate": 0.811, "top_category": "bug_fix"}, {"date": "2026-07-05", "total_prs": 1000, "merged": 805, "closed": 191, "open": 4, "success_rate": 0.808, "top_category": "bug_fix"}, {"date": "2026-07-06", "total_prs": 1000, "merged": 793, "closed": 193, "open": 14, "success_rate": 0.804, "top_category": "test"}, {"date": "2026-09-08", "total_prs": 1000, "merged": 808, "closed": 188, "open": 4, "success_rate": 0.811, "top_category": "bug_fix"}, {"date": "2026-09-09", "total_prs": 1000, "merged": 805, "closed": 188, "open": 7, "success_rate": 0.805, "top_category": "bug_fix"}]}
+{
+  "last_updated": "2026-09-11",
+  "daily_summary": [
+    {
+      "date": "2026-07-03",
+      "total_prs": 1000,
+      "merged": 801,
+      "closed": 178,
+      "open": 21,
+      "success_rate": 0.818,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-07-04",
+      "total_prs": 1000,
+      "merged": 798,
+      "closed": 186,
+      "open": 16,
+      "success_rate": 0.811,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-07-05",
+      "total_prs": 1000,
+      "merged": 805,
+      "closed": 191,
+      "open": 4,
+      "success_rate": 0.808,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-07-06",
+      "total_prs": 1000,
+      "merged": 793,
+      "closed": 193,
+      "open": 14,
+      "success_rate": 0.804,
+      "top_category": "test"
+    },
+    {
+      "date": "2026-09-08",
+      "total_prs": 1000,
+      "merged": 808,
+      "closed": 188,
+      "open": 4,
+      "success_rate": 0.811,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-09-09",
+      "total_prs": 1000,
+      "merged": 805,
+      "closed": 188,
+      "open": 7,
+      "success_rate": 0.805,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-09-11",
+      "total_prs": 1000,
+      "merged": 811,
+      "closed": 186,
+      "open": 3,
+      "success_rate": 0.811,
+      "top_category": "bug_fix"
+    }
+  ]
+}
