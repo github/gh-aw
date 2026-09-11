@@ -12,7 +12,7 @@ This pull request adds a new custom Go analyzer under `pkg/linters/` and registe
 
 ### Decision
 
-We will add a custom `slicemakezerolength` analyzer to the repository's shared linter registry to flag `make([]T, 0)` calls that omit a capacity argument. We decided to encode this performance recommendation as a reusable static-analysis rule, with support for existing repository conventions such as generated-file skipping, coverage gating, and `nolint` suppression. This favors consistent automated enforcement of a repeated code-review concern over relying on manual review comments.
+We will add a custom `slicemakezerolength` analyzer to the repository's shared linter registry. It flags `make([]T, 0)` only when the next statement is a range loop over a value with a known length and the loop appends exactly one element to that slice per iteration. This makes `len(rangeValue)` a useful capacity hint while avoiding diagnostics when the slice does not grow or its growth cannot be derived. The analyzer supports existing repository conventions such as generated-file skipping, coverage gating, and `nolint` suppression.
 
 ### Alternatives Considered
 
@@ -24,9 +24,9 @@ The team could continue treating `make([]T, 0)` without capacity as an informal 
 
 Another option would be to depend on an upstream linter or broader performance lint package instead of adding a repository-specific analyzer. This was considered because it could reduce local maintenance and reuse community tooling. It was not chosen because the PR implements the rule directly in `pkg/linters/`, integrates it with the local registry and helper utilities, and therefore indicates the repository wants targeted behavior aligned with its existing custom-linter framework.
 
-#### Alternative 3: Broaden the rule to infer final slice size before reporting
+#### Alternative 3: Flag every zero-length slice allocation without capacity
 
-The analyzer could attempt deeper data-flow analysis and only report cases where the final capacity can be proven from surrounding code. This was considered because the PR description frames the issue in terms of known or estimable final lengths. It was not chosen because the actual implementation intentionally uses a simpler syntactic rule—reporting `make([]T, 0)` without a capacity argument—trading precision for low complexity and predictable enforcement.
+The analyzer could report every `make([]T, 0)` without analyzing subsequent use. This simpler syntactic rule was not chosen because slices that never grow need no backing allocation, and slices with indeterminate growth have no defensible capacity hint. Restricting the rule to a direct, known-size append loop provides a precise optimization with predictable enforcement.
 
 ### Consequences
 
@@ -36,7 +36,7 @@ The analyzer could attempt deeper data-flow analysis and only report cases where
 - The analyzer fits the existing custom linter architecture, including registry-based activation, testdata-driven verification, coverage gating, and `nolint` support.
 
 #### Negative
-- The rule may report some cases where omitted capacity is harmless or where the final size is not actually inferable, creating false positives relative to the PR's stated motivation.
+- The deliberately narrow pattern leaves more complex growth patterns to manual performance analysis.
 - Maintaining another custom analyzer increases long-term cost for compatibility, testing, and linter-suite complexity.
 - Codifying this recommendation as a lint rule may push style and micro-optimization policy into CI, which can increase friction for contributors.
 

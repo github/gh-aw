@@ -1,30 +1,26 @@
 package slicemakezerolength
 
-func badZeroLengthNoCapacity() {
-	s := make([]string, 0) // want `make\(\[\]string, 0\) without capacity can be optimized`
-	_ = s
-}
-
-func badZeroLengthInt() {
-	s := make([]int, 0) // want `make\(\[\]int, 0\) without capacity can be optimized`
-	_ = s
-}
-
-func badZeroLengthByte() {
-	s := make([]byte, 0) // want `make\(\[\]byte, 0\) without capacity can be optimized`
-	_ = s
-}
-
-func badZeroLengthCustomType() {
-	type MyType struct {
-		name string
+func badZeroLengthNoCapacity(items []string) {
+	s := make([]string, 0) // want `make\(\[\]string, 0\) before this range loop can use capacity len\(items\)`
+	for _, item := range items {
+		s = append(s, item)
 	}
-	s := make([]MyType, 0) // want `make\(\[\]MyType, 0\) without capacity can be optimized`
 	_ = s
 }
 
-func goodWithCapacity() {
+func badEquivalentZero(items map[string]int) {
+	var s = make([]int, 0x0) // want `make\(\[\]int, 0x0\) before this range loop can use capacity len\(items\)`
+	for _, item := range items {
+		s = append(s, item)
+	}
+	_ = s
+}
+
+func goodWithCapacity(items []string) {
 	s := make([]string, 0, 10)
+	for _, item := range items {
+		s = append(s, item)
+	}
 	_ = s
 }
 
@@ -48,8 +44,50 @@ func goodArrayLiteral() {
 	_ = s
 }
 
-func suppressed() {
+func goodWithoutGrowth() {
+	s := make([]string, 0)
+	_ = s
+}
+
+func goodConditionalGrowth(items []string) {
+	s := make([]string, 0)
+	for _, item := range items {
+		if item != "" {
+			s = append(s, item)
+		}
+	}
+	_ = s
+}
+
+func goodIndeterminateRange(items <-chan string) {
+	s := make([]string, 0)
+	for item := range items {
+		s = append(s, item)
+	}
+	_ = s
+}
+
+func goodMultipleAppends(items []string) {
+	s := make([]string, 0)
+	for _, item := range items {
+		s = append(s, item, item)
+	}
+	_ = s
+}
+
+func goodRangesOverTarget() {
+	s := make([]string, 0)
+	for _, item := range s[:0] {
+		s = append(s, item)
+	}
+	_ = s
+}
+
+func suppressed(items []string) {
 	//nolint:slicemakezerolength
 	s := make([]string, 0)
+	for _, item := range items {
+		s = append(s, item)
+	}
 	_ = s
 }

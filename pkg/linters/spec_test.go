@@ -55,6 +55,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/regexpcompileinfunction"
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
+	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
@@ -94,7 +95,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 68 analyzers
+// "Public API > Subpackages" table. The README documents 69 analyzers
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -104,7 +105,7 @@ type docAnalyzer struct {
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
-//	regexpcompileinfunction, regexpdynamicpattern, seenmapbool, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
+//	regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, uncheckedflushreturn, uncheckedtypeassertion, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
@@ -153,6 +154,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"regexpcompileinfunction", regexpcompileinfunction.Analyzer},
 		{"regexpdynamicpattern", regexpdynamicpattern.Analyzer},
 		{"seenmapbool", seenmapbool.Analyzer},
+		{"slicemakezerolength", slicemakezerolength.Analyzer},
 		{"sortslice", sortslice.Analyzer},
 		{"sprintferrdot", sprintferrdot.Analyzer},
 		{"sprintferrorsnew", sprintferrorsnew.Analyzer},
