@@ -42,6 +42,37 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	assert.NotContains(t, uploadStep, "if: always()")
 }
 
+func TestActivationInfoArtifactUpload(t *testing.T) {
+	t.Run("uploads archived info artifact", func(t *testing.T) {
+		compiler := NewCompiler()
+		job, err := compiler.buildActivationJob(&WorkflowData{Name: "Test Workflow"}, false, "", "test.lock.yml")
+		require.NoError(t, err)
+		require.NotNil(t, job)
+
+		uploadStep := extractWorkflowStepByName(t, strings.Join(job.Steps, ""), "Upload info artifact")
+		assert.Contains(t, uploadStep, "if: success() || failure()")
+		assert.Contains(t, uploadStep, "name: info")
+		assert.Contains(t, uploadStep, "path: /tmp/gh-aw/aw_info.json")
+		assert.Contains(t, uploadStep, "if-no-files-found: ignore")
+		assert.NotContains(t, uploadStep, "skip-archive")
+		assert.NotContains(t, uploadStep, "unarchived-artifact")
+		assert.NotContains(t, uploadStep, "retention-days")
+	})
+
+	t.Run("uses GHES-compatible upload action", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.SetGHESCompat(true)
+		compiler.configureGHESCompatibility()
+		job, err := compiler.buildActivationJob(&WorkflowData{Name: "Test Workflow"}, false, "", "test.lock.yml")
+		require.NoError(t, err)
+		require.NotNil(t, job)
+
+		uploadStep := extractWorkflowStepByName(t, strings.Join(job.Steps, ""), "Upload info artifact")
+		assert.Contains(t, uploadStep, "actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2")
+		assert.NotContains(t, uploadStep, "unarchived-artifact")
+	})
+}
+
 func TestOperationalValueGraderScopesActionsReadToActivation(t *testing.T) {
 	compiler := NewCompiler()
 	data := operationalValueGraderWorkflowData(".github/graders/example-operational-value.sh")

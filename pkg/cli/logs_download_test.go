@@ -497,6 +497,84 @@ func TestDownloadRunArtifacts_CachedUsageFallbackToActivation(t *testing.T) {
 	assert.Contains(t, string(argsLog), "run download 12345 --name abc123-activation")
 }
 
+func TestDownloadRunArtifacts_InfoFallbackToActivation(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "info-fallback-*")
+
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGHScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
+		"if [ \"$1\" = \"api\" ]; then\n" +
+		"  printf '%s\\n' \"info\"\n" +
+		"  printf '%s\\n' \"abc123-activation\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"run\" ] && [ \"$2\" = \"download\" ]; then\n" +
+		"  name=\"\"\n" +
+		"  dir=\"\"\n" +
+		"  while [ $# -gt 0 ]; do\n" +
+		"    if [ \"$1\" = \"--name\" ]; then name=\"$2\"; shift 2; continue; fi\n" +
+		"    if [ \"$1\" = \"--dir\" ]; then dir=\"$2\"; shift 2; continue; fi\n" +
+		"    shift\n" +
+		"  done\n" +
+		"  if [ \"$name\" = \"info\" ]; then exit 1; fi\n" +
+		"  mkdir -p \"$dir\"\n" +
+		"  printf '%s' '{\"engine_id\":\"claude\"}' > \"$dir/aw_info.json\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 1\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	err := downloadRunArtifacts(context.Background(), downloadArtifactsOptions{runID: 12345, outputDir: tmpDir, owner: "github", repo: "gh-aw", artifactFilter: []string{"info"}})
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(tmpDir, "aw_info.json"))
+	assert.NoDirExists(t, filepath.Join(tmpDir, "abc123-activation"))
+	argsLog, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(argsLog), "run download 12345 --name info")
+	assert.Contains(t, string(argsLog), "run download 12345 --name abc123-activation")
+}
+
+func TestDownloadRunArtifacts_UsesInfoArtifact(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "info-artifact-*")
+
+	fakeBinDir := testutil.TempDir(t, "fake-gh-*")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGHScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" >> \"" + argsLogPath + "\"\n" +
+		"if [ \"$1\" = \"api\" ]; then\n" +
+		"  printf '%s\\n' \"info\"\n" +
+		"  printf '%s\\n' \"abc123-activation\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"run\" ] && [ \"$2\" = \"download\" ]; then\n" +
+		"  dir=\"\"\n" +
+		"  while [ $# -gt 0 ]; do\n" +
+		"    if [ \"$1\" = \"--dir\" ]; then dir=\"$2\"; shift 2; continue; fi\n" +
+		"    shift\n" +
+		"  done\n" +
+		"  mkdir -p \"$dir\"\n" +
+		"  printf '%s' '{\"engine_id\":\"claude\"}' > \"$dir/aw_info.json\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 1\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	err := downloadRunArtifacts(context.Background(), downloadArtifactsOptions{runID: 12345, outputDir: tmpDir, owner: "github", repo: "gh-aw", artifactFilter: []string{"info"}})
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(tmpDir, "aw_info.json"))
+	argsLog, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(argsLog), "run download 12345 --name info")
+	assert.NotContains(t, string(argsLog), "--name abc123-activation")
+}
+
 func TestDownloadRunArtifacts_CachedUsageSkipsDockerBuildOnlyRun(t *testing.T) {
 	outputDir := t.TempDir()
 	usageDir := filepath.Join(outputDir, "usage")

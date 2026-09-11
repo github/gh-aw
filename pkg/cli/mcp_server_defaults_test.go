@@ -91,7 +91,7 @@ func TestMCPToolElicitationDefaults(t *testing.T) {
 		if err := AddSchemaDefault(schema, "max_tokens", 12000); err != nil {
 			t.Fatalf("Failed to add max_tokens default: %v", err)
 		}
-		if err := AddSchemaDefault(schema, "artifacts", []string{"usage"}); err != nil {
+		if err := AddSchemaDefault(schema, "artifacts", []string{"info"}); err != nil {
 			t.Fatalf("Failed to add artifacts default: %v", err)
 		}
 
@@ -151,8 +151,8 @@ func TestMCPToolElicitationDefaults(t *testing.T) {
 		if err := json.Unmarshal(artifactsProp.Default, &artifactsDefault); err != nil {
 			t.Fatalf("Failed to unmarshal artifacts default: %v", err)
 		}
-		if len(artifactsDefault) != 1 || artifactsDefault[0] != "usage" {
-			t.Errorf("Expected artifacts default to be [usage], got %v", artifactsDefault)
+		if len(artifactsDefault) != 1 || artifactsDefault[0] != "info" {
+			t.Errorf("Expected artifacts default to be [info], got %v", artifactsDefault)
 		}
 	})
 

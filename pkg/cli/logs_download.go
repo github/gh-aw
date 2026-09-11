@@ -53,12 +53,16 @@ func isUsageOnlyArtifactFilter(artifactFilter []string) bool {
 	return len(artifactFilter) == 1 && artifactFilter[0] == constants.UsageArtifactName.String()
 }
 
+func isInfoOnlyArtifactFilter(artifactFilter []string) bool {
+	return len(artifactFilter) == 1 && artifactFilter[0] == constants.InfoArtifactName.String()
+}
+
 func shouldDownloadWorkflowRunLogs(artifactFilter []string) bool {
 	if len(artifactFilter) == 0 {
 		return true
 	}
 	for _, artifact := range artifactFilter {
-		if artifact != constants.ActivationArtifactName.String() && artifact != constants.UsageArtifactName.String() {
+		if artifact != constants.ActivationArtifactName.String() && artifact != constants.InfoArtifactName.String() && artifact != constants.UsageArtifactName.String() {
 			return true
 		}
 	}
@@ -171,6 +175,9 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 
 	downloadableNames, individualDownload, done, err := planArtifactDownload(ctx, opts, shouldLogProgress)
 	if done || err != nil {
+		if errors.Is(err, ErrNoArtifacts) && isInfoOnlyArtifactFilter(opts.artifactFilter) {
+			return downloadActivationAwInfoFallback(ctx, opts)
+		}
 		return err
 	}
 
@@ -185,6 +192,9 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 			spinner.Stop()
 		}
 		if err := downloadArtifactsIndividually(ctx, opts, downloadableNames); err != nil {
+			if errors.Is(err, ErrNoArtifacts) && isInfoOnlyArtifactFilter(opts.artifactFilter) {
+				return downloadActivationAwInfoFallback(ctx, opts)
+			}
 			return err
 		}
 	} else {
@@ -244,6 +254,12 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 		return err
 	}
 
+	if isInfoOnlyArtifactFilter(opts.artifactFilter) && !fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
+		if err := downloadActivationAwInfoFallback(ctx, opts); err != nil {
+			return err
+		}
+	}
+
 	// Download and unzip workflow run logs unless caller requested usage-only mode.
 	if shouldDownloadWorkflowRunLogs(opts.artifactFilter) {
 		if err := downloadWorkflowRunLogs(ctx, opts.runID, opts.outputDir, opts.verbose, opts.owner, opts.repo, opts.hostname); err != nil {
@@ -267,6 +283,9 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 // still missing (returned as the new artifact filter).
 func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, shouldLogProgress bool) ([]string, bool) {
 	if len(opts.artifactFilter) > 0 {
+		if isInfoOnlyArtifactFilter(opts.artifactFilter) && fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
+			return opts.artifactFilter, true
+		}
 		// A specific artifact set is requested. Check whether each requested
 		// artifact base name already has a matching directory on disk so we
 		// can avoid re-downloading artifacts that are already present and only
@@ -303,6 +322,23 @@ func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, 
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run folder for %d is missing the complete artifact marker; downloading all artifacts", opts.runID)))
 	}
 	return opts.artifactFilter, false
+}
+
+func downloadActivationAwInfoFallback(ctx context.Context, opts downloadArtifactsOptions) error {
+	logsDownloadLog.Printf("aw_info.json missing from info artifact, downloading activation artifact as fallback")
+	if opts.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("aw_info.json missing from info artifact; downloading activation artifact as fallback"))
+	}
+
+	activationNames := resolveActivationArtifactNames(ctx, opts)
+	if err := downloadArtifactsByName(ctx, opts, activationNames); err != nil {
+		return err
+	}
+	flattenActivationFallback(opts, activationNames)
+	if !fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
+		return ErrNoArtifacts
+	}
+	return nil
 }
 
 // enumerateDownloadableArtifacts lists the run artifacts and splits them into the names

@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -117,7 +118,6 @@ func (c *Compiler) configureActivationNeedsAndCondition(ctx *activationJobBuildC
 			compilerActivationJobLog.Printf("Added '%s' to activation dependencies: referenced in engine.env", jobName)
 		}
 	}
-
 	ctx.customJobsBeforeActivation = customJobsBeforeActivation
 
 	if ctx.preActivationJob {
@@ -155,6 +155,7 @@ func (c *Compiler) configureActivationNeedsAndCondition(ctx *activationJobBuildC
 // addActivationArtifactUploadStep appends the activation artifact upload step for downstream jobs.
 func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContext) {
 	compilerActivationJobLog.Print("Adding activation artifact upload step")
+	c.addActivationInfoArtifactUploadStep(ctx)
 	activationArtifactName := artifactPrefixExprForActivationJob(ctx.data) + constants.ActivationArtifactName.String()
 	ctx.steps = append(ctx.steps, generateStageAmbientFoldersStep(ctx.data)...)
 	ctx.steps = append(ctx.steps,
@@ -170,6 +171,8 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          name: %s\n", activationArtifactName))
 	ctx.steps = append(ctx.steps, "          include-hidden-files: true\n")
 	ctx.steps = append(ctx.steps, "          path: |\n")
+	// Keep aw_info.json in activation for fallback downloads from workflows created
+	// before the compact info artifact was available.
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw_info.json\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/models.json\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/prompt.txt\n")
@@ -183,17 +186,32 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	engineID := resolveActivationEngineID(ctx.data)
 	// Include the engine-specific sub-agent staging directory only when inline agents are enabled.
 	if isFeatureEnabled(constants.FeatureFlag("inline-agents"), ctx.data) {
-		subAgentDir := engineConfigBaseDirForRegistry(c.engineRegistry, engineID) + "/agents"
+		subAgentDir := path.Join(engineConfigBaseDirForRegistry(c.engineRegistry, engineID), "agents")
 		ctx.steps = append(ctx.steps, fmt.Sprintf("            /tmp/gh-aw/%s\n", subAgentDir))
 	}
 	// Always include the engine-specific skill directory when either inline skills are enabled
 	// or frontmatter skills are configured (via Skills or SkillReferences).
 	if isFeatureEnabled(constants.FeatureFlag("inline-agents"), ctx.data) || len(ctx.data.Skills) > 0 || len(ctx.data.SkillReferences) > 0 {
-		skillDir := engineConfigBaseDirForRegistry(c.engineRegistry, engineID) + "/skills"
+		skillDir := path.Join(engineConfigBaseDirForRegistry(c.engineRegistry, engineID), "skills")
 		ctx.steps = append(ctx.steps, fmt.Sprintf("            /tmp/gh-aw/%s\n", skillDir))
 	}
 	ctx.steps = append(ctx.steps, "          if-no-files-found: ignore\n")
 	ctx.steps = append(ctx.steps, "          retention-days: 1\n")
+}
+
+// addActivationInfoArtifactUploadStep appends an archived upload of aw_info.json.
+func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildContext) {
+	compilerActivationJobLog.Print("Adding info artifact upload step")
+	infoArtifactName := artifactPrefixExprForActivationJob(ctx.data) + constants.InfoArtifactName.String()
+	ctx.steps = append(ctx.steps,
+		"      - name: Upload info artifact\n",
+		"        if: success() || failure()\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		"        with:\n",
+		fmt.Sprintf("          name: %s\n", infoArtifactName),
+		"          path: /tmp/gh-aw/aw_info.json\n",
+		"          if-no-files-found: ignore\n",
+	)
 }
 
 // buildActivationEnvironment returns manual-approval environment YAML, with ANSI removed.

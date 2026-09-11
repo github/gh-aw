@@ -146,6 +146,7 @@ func TestConstantValues(t *testing.T) {
 		{"UnlockJobName", string(UnlockJobName), "unlock"},
 		{"SafeOutputArtifactName", string(SafeOutputArtifactName), "safe-output"},
 		{"AgentOutputArtifactName", string(AgentOutputArtifactName), "agent-output"},
+		{"InfoArtifactName", string(InfoArtifactName), "info"},
 		{"SafeOutputItemsArtifactName", string(SafeOutputItemsArtifactName), "safe-outputs-items"},
 		{"TemporaryIdMapFilename", string(TemporaryIdMapFilename), "temporary-id-map.json"},
 		{"SafeOutputsMCPServerID", string(SafeOutputsMCPServerID), "safeoutputs"},
