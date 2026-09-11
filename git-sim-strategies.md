@@ -957,3 +957,18 @@ if a human maintainer redesigns this workflow to target a disposable sandbox
 repo instead of github/gh-aw, the subagent-availability blocker will already
 be resolved (config-simulator.md exists and is ready to use) — only the
 target-repo redesign remains.
+
+## HALTED 2026-09-11 (22nd consecutive run) — no change, no re-litigation
+
+Independently reconfirmed the same structural blocker before touching any
+tooling: the outer safe-outputs policy forbids real writes used for
+probing/placeholder-content experiments, and this workflow's entire method
+(real create_pull_request/push_to_pull_request_branch/create_issue against
+github/gh-aw filled with synthetic stuff.md/history.md/probe content solely
+to observe safe-output enforcement) still matches that forbidden pattern
+exactly. Checked for a steering issue comment — none provided this run. No
+create_issue/create_pull_request/push_to_pull_request_branch calls attempted;
+next_index unchanged at 216. This is 22 consecutive identical halts (08-16
+through 09-11). Standing recommendation unchanged: a human maintainer should
+pause/retire/redesign this workflow (target a disposable sandbox repo, not
+github/gh-aw) rather than have it re-litigate the same conflict daily.
