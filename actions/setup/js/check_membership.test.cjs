@@ -476,7 +476,7 @@ describe("check_membership.cjs", () => {
           base: { repo: { id: 123, full_name: "testorg/testrepo" } },
         },
       };
-      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockResolvedValueOnce({ data: { permission: "none" } });
 
       await runScript();
 
@@ -487,7 +487,7 @@ describe("check_membership.cjs", () => {
 
     it.each(["pull_request", "pull_request_target"])("should deny an active allowlisted bot when synchronizing a cross-repository PR (%s event)", async eventName => {
       process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
-      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot";
       mockContext.eventName = eventName;
       mockContext.payload = {
         action: "synchronize",
@@ -497,7 +497,26 @@ describe("check_membership.cjs", () => {
           base: { repo: { id: 123, full_name: "testorg/testrepo" } },
         },
       };
-      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should deny an active allowlisted bot when the same-repository PR author lacks the required role", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "untrusted-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "read" } });
 
       await runScript();
 
@@ -536,7 +555,7 @@ describe("check_membership.cjs", () => {
           head: { repo: { full_name: "TestOrg/TestRepo" } },
         },
       };
-      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } });
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockResolvedValueOnce({ data: { permission: "none" } });
 
       await runScript();
 
@@ -569,7 +588,7 @@ describe("check_membership.cjs", () => {
           base: { repo: { id: 123, full_name: "testorg/testrepo" } },
         },
       };
-      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue({ status: 404, message: "Not Found" });
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockRejectedValue({ status: 404, message: "Not Found" });
 
       await runScript();
 

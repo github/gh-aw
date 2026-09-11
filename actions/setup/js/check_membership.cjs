@@ -213,11 +213,16 @@ async function main() {
   const isSameRepositoryPullRequest = hasRepositoryIds
     ? pullRequestHeadRepository.id === pullRequestBaseRepository.id
     : typeof pullRequestHeadRepository?.full_name === "string" && pullRequestHeadRepository.full_name.toLowerCase() === `${owner}/${repo}`.toLowerCase();
-  const canAuthorizeBotBeforeConfusedDeputyCheck = isPullRequestSynchronization && isSameRepositoryPullRequest && actorToValidate !== "dependabot[bot]";
+  const pullRequestAuthor = context.payload?.pull_request?.user?.login;
+  const isAllowlistedBotSynchronizationMismatch = isPullRequestSynchronization && typeof pullRequestAuthor === "string" && pullRequestAuthor !== actorToValidate && isAllowedBot(actorToValidate, allowedBots);
+  const canAuthorizeBotBeforeConfusedDeputyCheck = isAllowlistedBotSynchronizationMismatch && isSameRepositoryPullRequest && actorToValidate !== "dependabot[bot]";
   if (canAuthorizeBotBeforeConfusedDeputyCheck) {
-    const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
-    if (botResult.handled) {
-      return;
+    const authorPermission = await checkRepositoryPermission(pullRequestAuthor, owner, repo, requiredPermissions);
+    if (authorPermission.authorized) {
+      const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
+      if (botResult.handled) {
+        return;
+      }
     }
   }
 
@@ -226,7 +231,7 @@ async function main() {
   // @dependabot show (for issue_comment events) to make dependabot appear as the
   // actor, bypassing permission checks that rely solely on github.actor.
   // Reference: https://labs.boostsecurity.io/articles/weaponizing-dependabot-pwn-request-at-its-finest/
-  if (isConfusedDeputyAttack(actorToValidate, eventName, context.payload)) {
+  if (isConfusedDeputyAttack(actorToValidate, eventName, context.payload) || isAllowlistedBotSynchronizationMismatch) {
     const errorMessage = `Access denied: Potential confused deputy attack detected. Actor '${actorToValidate}' does not match the event author. The workflow may have been triggered indirectly via a bot command.`;
     core.warning(errorMessage);
     core.setOutput("is_team_member", "false");
