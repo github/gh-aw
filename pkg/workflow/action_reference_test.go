@@ -9,6 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type staticSHAResolver struct {
+	sha string
+	err error
+}
+
+func (r staticSHAResolver) ResolveSHA(context.Context, string, string) (string, error) {
+	return r.sha, r.err
+}
+
 func TestConvertToRemoteActionRef(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -148,31 +157,31 @@ func TestResolveActionReference(t *testing.T) {
 			description:   "Release mode with 'dev' version should return empty",
 		},
 		{
-			name:        "release mode with action-tag overrides version",
-			actionMode:  ActionModeRelease,
-			localPath:   "./actions/setup",
-			version:     "v1.0.0",
-			actionTag:   "latest",
-			expectedRef: "github/gh-aw-actions/setup@latest",
-			description: "Frontmatter action-tag should use action mode (gh-aw-actions) regardless of compiler mode",
+			name:          "release mode with unresolved action-tag fails closed",
+			actionMode:    ActionModeRelease,
+			localPath:     "./actions/setup",
+			version:       "v1.0.0",
+			actionTag:     "latest",
+			shouldBeEmpty: true,
+			description:   "Frontmatter action-tag should use strict action mode and fail closed when unresolved",
 		},
 		{
-			name:        "release mode with action-tag using SHA",
-			actionMode:  ActionModeRelease,
-			localPath:   "./actions/setup",
-			version:     "v1.0.0",
-			actionTag:   "abc123def456789",
-			expectedRef: "github/gh-aw-actions/setup@abc123def456789",
-			description: "Frontmatter action-tag SHA should use action mode (gh-aw-actions)",
+			name:          "release mode with short action-tag SHA fails closed",
+			actionMode:    ActionModeRelease,
+			localPath:     "./actions/setup",
+			version:       "v1.0.0",
+			actionTag:     "abc123def456789",
+			shouldBeEmpty: true,
+			description:   "Frontmatter action-tag SHA must be a full immutable commit SHA",
 		},
 		{
-			name:        "dev mode with action-tag uses external actions repo",
-			actionMode:  ActionModeDev,
-			localPath:   "./actions/setup",
-			version:     "v1.0.0",
-			actionTag:   "latest",
-			expectedRef: "github/gh-aw-actions/setup@latest",
-			description: "Dev mode with frontmatter action-tag should use action mode (gh-aw-actions)",
+			name:          "dev mode with unresolved action-tag fails closed",
+			actionMode:    ActionModeDev,
+			localPath:     "./actions/setup",
+			version:       "v1.0.0",
+			actionTag:     "latest",
+			shouldBeEmpty: true,
+			description:   "Dev mode with frontmatter action-tag should use strict action mode and fail closed when unresolved",
 		},
 	}
 
@@ -362,5 +371,29 @@ func TestResolveSetupActionReferenceWithData(t *testing.T) {
 	t.Run("release mode with nil resolver returns tag-based reference", func(t *testing.T) {
 		ref := ResolveSetupActionReference(context.Background(), ActionModeRelease, "v1.0.0", "", nil)
 		assert.Equal(t, "github/gh-aw/actions/setup@v1.0.0", ref, "should return tag-based reference when no resolver provided")
+	})
+}
+
+func TestResolveSetupActionReferenceActionModeRequiresFullSHA(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+
+	t.Run("resolver full SHA is accepted", func(t *testing.T) {
+		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", staticSHAResolver{sha: sha})
+		assert.Equal(t, "github/gh-aw-actions/setup@"+sha+" # v1.0.0", ref)
+	})
+
+	t.Run("resolver short SHA is rejected", func(t *testing.T) {
+		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", staticSHAResolver{sha: "abc123"})
+		assert.Empty(t, ref)
+	})
+
+	t.Run("nil resolver unresolved version is rejected", func(t *testing.T) {
+		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", nil)
+		assert.Empty(t, ref)
+	})
+
+	t.Run("full SHA tag is accepted without resolver", func(t *testing.T) {
+		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, sha, "", nil)
+		assert.Equal(t, "github/gh-aw-actions/setup@"+sha+" # "+sha, ref)
 	})
 }

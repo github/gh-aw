@@ -3,8 +3,10 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -32,8 +34,8 @@ const (
 //   - For dev mode: "./actions/setup" (local path)
 //   - For release mode with resolver: "github/gh-aw/actions/setup@<sha> # <version>" (SHA-pinned)
 //   - For release mode without resolver: "github/gh-aw/actions/setup@<version>" (tag-based, SHA resolved later)
-//   - For action mode with resolver: "github/gh-aw-actions/setup@<sha> # <version>" (SHA-pinned)
-//   - For action mode without resolver: "github/gh-aw-actions/setup@<version>" (tag-based, SHA resolved later)
+//   - For action mode with resolver or embedded pin: "github/gh-aw-actions/setup@<sha> # <version>" (SHA-pinned)
+//   - For action mode without a resolved pin: "" (fail closed rather than emitting a mutable reference)
 //   - Falls back to local path if version is invalid in release/action mode
 func ResolveSetupActionReference(ctx context.Context, actionMode ActionMode, version string, actionTag string, resolver SHAResolver) string {
 	return resolveSetupActionRef(ctx, actionMode, version, actionTag, resolver, "")
@@ -68,14 +70,14 @@ func resolveSetupActionModeRef(ctx context.Context, actionTag string, version st
 	if !ok {
 		return localPath
 	}
-	actionRepo := actionsOrgRepo + "/setup"
+	actionRepo := path.Join(actionsOrgRepo, "setup")
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
-	ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode")
+	ref := resolveRequiredActionModePin(ctx, resolver, actionRepo, tag, remoteRef)
 	if ref != "" {
 		return ref
 	}
-	actionRefLog.Printf("Action mode: using tag-based external actions repo reference: %s (SHA will be resolved later)", remoteRef)
-	return remoteRef
+	actionRefLog.Printf("Action mode: refusing to emit mutable external actions repo reference: %s", remoteRef)
+	return ""
 }
 
 func resolveSetupReleaseModeRef(ctx context.Context, actionTag string, version string, resolver SHAResolver, localPath string) string {
@@ -84,7 +86,7 @@ func resolveSetupReleaseModeRef(ctx context.Context, actionTag string, version s
 		return localPath
 	}
 	actionPath := strings.TrimPrefix(localPath, "./")
-	actionRepo := fmt.Sprintf("%s/%s", GitHubOrgRepo, actionPath)
+	actionRepo := path.Join(GitHubOrgRepo, actionPath)
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
 	ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Release mode")
 	if ref != "" {
@@ -112,6 +114,10 @@ func tryResolveSetupSHA(ctx context.Context, resolver SHAResolver, actionRepo, t
 	}
 	sha, err := resolver.ResolveSHA(ctx, actionRepo, tag)
 	if err == nil && sha != "" {
+		if !gitutil.IsValidFullSHA(sha) {
+			actionRefLog.Printf("Failed to resolve full SHA for %s@%s: resolver returned %q", actionRepo, tag, sha)
+			return ""
+		}
 		pinnedRef := formatActionReference(actionRepo, sha, tag)
 		actionRefLog.Printf("%s: resolved %s to SHA-pinned reference: %s", modeLabel, remoteRef, pinnedRef)
 		return pinnedRef
@@ -122,13 +128,47 @@ func tryResolveSetupSHA(ctx context.Context, resolver SHAResolver, actionRepo, t
 	return ""
 }
 
+func resolveRequiredActionModePin(ctx context.Context, resolver SHAResolver, actionRepo, tag, remoteRef string) string {
+	if ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode"); ref != "" {
+		return ref
+	}
+	ref, err := getActionPinWithData(actionRepo, tag, actionModePinData(&WorkflowData{Ctx: ctx}))
+	if err != nil {
+		actionRefLog.Printf("Action mode: failed to pin action %s@%s: %v", actionRepo, tag, err)
+		return ""
+	}
+	if isFullSHAPinnedActionRef(ref) {
+		actionRefLog.Printf("Action mode: resolved %s to SHA-pinned reference: %s", remoteRef, ref)
+		return ref
+	}
+	if ref != "" {
+		actionRefLog.Printf("Action mode: refusing non-full-SHA action reference: %s", ref)
+	}
+	return ""
+}
+
+func isFullSHAPinnedActionRef(ref string) bool {
+	_, after, ok := strings.Cut(ref, "@")
+	if !ok {
+		return false
+	}
+	actionRef := strings.TrimSpace(after)
+	if before, _, ok := strings.Cut(actionRef, " "); ok {
+		actionRef = before
+	}
+	if before, _, ok := strings.Cut(actionRef, "#"); ok {
+		actionRef = before
+	}
+	return gitutil.IsValidFullSHA(actionRef)
+}
+
 // resolveActionReference converts a local action path to the appropriate reference
 // based on the current action mode (dev vs release vs action).
 // If action-tag is specified in features, it overrides the mode check and enables action mode behavior
 // (using the github/gh-aw-actions external repository).
 // For dev mode: returns the local path as-is (e.g., "./actions/create-issue")
 // For release mode: converts to SHA-pinned remote reference (e.g., "github/gh-aw/actions/create-issue@SHA # tag")
-// For action mode: converts to SHA-pinned reference in external repo if possible (e.g., "github/gh-aw-actions/create-issue@SHA # version")
+// For action mode: converts to SHA-pinned reference in external repo, or "" when no full SHA is available
 func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) string {
 	hasActionTag, frontmatterActionTag := getFrontmatterActionTag(data)
 
@@ -260,8 +300,7 @@ func (c *Compiler) convertToRemoteActionRef(localPath string, data *WorkflowData
 // in the external github/gh-aw-actions repository.
 // Example: "./actions/create-issue" -> "github/gh-aw-actions/create-issue@<sha> # v1.0.0"
 //
-// If SHA resolution fails (no resolver or pin not available), falls back to version-tagged reference:
-// Example: "./actions/create-issue" -> "github/gh-aw-actions/create-issue@v1.0.0"
+// If SHA resolution fails (no resolver or pin not available), returns "" rather than a mutable tag reference.
 func (c *Compiler) convertToExternalActionsRef(localPath string, data *WorkflowData) string {
 	// Strip the leading "./" prefix
 	actionPath := strings.TrimPrefix(localPath, "./")
@@ -290,22 +329,35 @@ func (c *Compiler) convertToExternalActionsRef(localPath string, data *WorkflowD
 	}
 
 	// Construct the external actions reference: <actionsRepo>/action-name@tag
-	actionRepo := fmt.Sprintf("%s/%s", c.effectiveActionsRepo(), actionName)
+	actionRepo := path.Join(c.effectiveActionsRepo(), actionName)
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
 
 	// Try to resolve the SHA using action pins
-	if data != nil {
-		pinnedRef, err := getActionPinWithData(actionRepo, tag, data)
-		if err != nil {
-			// Log and fall through to tag-based reference (action mode is not strict)
-			actionRefLog.Printf("Failed to pin action %s@%s: %v, falling back to tag-based reference", actionRepo, tag, err)
-		} else if pinnedRef != "" {
-			actionRefLog.Printf("Action mode: resolved %s to SHA-pinned reference: %s", remoteRef, pinnedRef)
-			return pinnedRef
-		}
+	pinData := actionModePinData(data)
+	if pinData.Ctx == nil {
+		pinData.Ctx = c.ctx
 	}
+	pinnedRef, err := getActionPinWithData(actionRepo, tag, pinData)
+	if err != nil {
+		actionRefLog.Printf("Action mode: failed to pin action %s@%s: %v", actionRepo, tag, err)
+		return ""
+	}
+	if isFullSHAPinnedActionRef(pinnedRef) {
+		actionRefLog.Printf("Action mode: resolved %s to SHA-pinned reference: %s", remoteRef, pinnedRef)
+		return pinnedRef
+	}
+	if pinnedRef != "" {
+		actionRefLog.Printf("Action mode: refusing non-full-SHA action reference: %s", pinnedRef)
+	}
+	actionRefLog.Printf("Action mode: refusing to emit mutable external actions repo reference: %s", remoteRef)
+	return ""
+}
 
-	// If SHA resolution unavailable or pin not found, return tag-based reference
-	actionRefLog.Printf("Action mode: using tag-based external actions repo reference: %s (SHA will be resolved later)", remoteRef)
-	return remoteRef
+func actionModePinData(data *WorkflowData) *WorkflowData {
+	if data == nil {
+		return &WorkflowData{StrictMode: true}
+	}
+	pinData := *data
+	pinData.StrictMode = true
+	return &pinData
 }

@@ -1616,7 +1616,7 @@ func TestLockMetadataVersionInReleaseBuilds(t *testing.T) {
 		{
 			name:          "release build should include version",
 			isRelease:     true,
-			version:       "v0.1.2",
+			version:       "0123456789abcdef0123456789abcdef01234567",
 			actionTag:     "",
 			expectVersion: true,
 		},

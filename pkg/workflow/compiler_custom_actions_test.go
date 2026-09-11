@@ -398,17 +398,21 @@ func TestCheckoutActionsFolderDevModeAlwaysEmitsCheckout(t *testing.T) {
 
 // TestResolveSetupActionReferenceActionMode tests that action mode resolves to the external gh-aw-actions repo
 func TestResolveSetupActionReferenceActionMode(t *testing.T) {
-	ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.2.3", "", nil)
-	if ref != "github/gh-aw-actions/setup@v1.2.3" {
-		t.Errorf("Action mode should resolve to 'github/gh-aw-actions/setup@v1.2.3', got %q", ref)
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	ref := ResolveSetupActionReference(context.Background(), ActionModeAction, sha, "", nil)
+	expected := "github/gh-aw-actions/setup@" + sha + " # " + sha
+	if ref != expected {
+		t.Errorf("Action mode should resolve to %q, got %q", expected, ref)
 	}
 }
 
 // TestResolveSetupActionReferenceActionModeWithTag tests action mode with an explicit action tag
 func TestResolveSetupActionReferenceActionModeWithTag(t *testing.T) {
-	ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "v2.0.0", nil)
-	if ref != "github/gh-aw-actions/setup@v2.0.0" {
-		t.Errorf("Action mode with tag should resolve to 'github/gh-aw-actions/setup@v2.0.0', got %q", ref)
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", sha, nil)
+	expected := "github/gh-aw-actions/setup@" + sha + " # " + sha
+	if ref != expected {
+		t.Errorf("Action mode with tag should resolve to %q, got %q", expected, ref)
 	}
 }
 
@@ -451,9 +455,12 @@ Test workflow with action mode.
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
+	const sha = "0123456789abcdef0123456789abcdef01234567"
 	compiler := NewCompiler(WithVersion("v1.2.3"))
 	compiler.SetActionMode(ActionModeAction)
 	compiler.SetNoEmit(false)
+	cache := compiler.GetSharedActionCache()
+	cache.Set("github/gh-aw-actions/setup", "v1.2.3", sha)
 
 	if err := compiler.CompileWorkflow(workflowPath); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
@@ -468,8 +475,12 @@ Test workflow with action mode.
 	lockStr := string(lockContent)
 
 	// Verify it uses the external gh-aw-actions/setup action
-	if !strings.Contains(lockStr, "github/gh-aw-actions/setup@v1.2.3") {
-		t.Errorf("Action mode should use 'github/gh-aw-actions/setup@v1.2.3', lock file:\n%s", lockStr)
+	expected := "github/gh-aw-actions/setup@" + sha + " # v1.2.3"
+	if !strings.Contains(lockStr, expected) {
+		t.Errorf("Action mode should use %q, lock file:\n%s", expected, lockStr)
+	}
+	if strings.Contains(lockStr, "github/gh-aw-actions/setup@v1.2.3") {
+		t.Errorf("Action mode should not emit mutable gh-aw-actions setup reference, lock file:\n%s", lockStr)
 	}
 
 	// Verify it does NOT use the internal gh-aw/actions/setup path
@@ -490,20 +501,20 @@ func TestResolveSetupActionReferenceActionModeWithResolver(t *testing.T) {
 		cache := NewActionCache("")
 		resolver := NewActionResolver(cache)
 
-		// The resolver will fail to resolve github/gh-aw-actions/setup@v1.0.0
-		// since it's not a real tag, but it should fall back gracefully to tag-based reference
+		const sha = "0123456789abcdef0123456789abcdef01234567"
+		cache.Set("github/gh-aw-actions/setup", "v1.0.0", sha)
 		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", resolver)
 
-		// Without a valid pin or successful resolution, should return tag-based reference
-		if ref != "github/gh-aw-actions/setup@v1.0.0" {
-			t.Errorf("expected 'github/gh-aw-actions/setup@v1.0.0', got %q", ref)
+		expected := "github/gh-aw-actions/setup@" + sha + " # v1.0.0"
+		if ref != expected {
+			t.Errorf("expected %q, got %q", expected, ref)
 		}
 	})
 
-	t.Run("action mode with nil resolver returns tag-based reference", func(t *testing.T) {
+	t.Run("action mode with nil resolver fails closed when unresolved", func(t *testing.T) {
 		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", nil)
-		if ref != "github/gh-aw-actions/setup@v1.0.0" {
-			t.Errorf("expected 'github/gh-aw-actions/setup@v1.0.0', got %q", ref)
+		if ref != "" {
+			t.Errorf("expected empty ref, got %q", ref)
 		}
 	})
 }
