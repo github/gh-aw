@@ -464,6 +464,143 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
     });
 
+    it.each(["pull_request", "pull_request_target"])("should authorize an active allowlisted bot when actor differs from PR author (%s synchronize event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = eventName;
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockResolvedValueOnce({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith(`Evaluating allowlisted bot synchronization for actor 'my-fixup-bot[bot]' on ${eventName}: PR author 'human-author', same repository: true, Dependabot: false`);
+      expect(mockCore.info).toHaveBeenCalledWith("PR author 'human-author' is trusted; checking whether bot 'my-fixup-bot[bot]' is active");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
+    });
+
+    it.each(["pull_request", "pull_request_target"])("should deny an active allowlisted bot when synchronizing a cross-repository PR (%s event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot";
+      mockContext.eventName = eventName;
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "attacker" },
+          head: { repo: { id: 456, full_name: "attacker/fork" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith(`Evaluating allowlisted bot synchronization for actor 'my-fixup-bot' on ${eventName}: PR author 'attacker', same repository: false, Dependabot: false`);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should deny an active allowlisted bot when the same-repository PR author lacks the required role", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "untrusted-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "read" } });
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("PR author 'untrusted-author' is not trusted; continuing with confused-deputy validation");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should deny an active allowlisted bot when the PR head repository is unavailable", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "attacker" },
+          head: { repo: null },
+        },
+      };
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should compare same-repository PR names case-insensitively", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { full_name: "TestOrg/TestRepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockResolvedValueOnce({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it.each(["pull_request", "pull_request_target"])("should deny allowlisted dependabot when actor differs from PR author (%s synchronize event)", async eventName => {
+      process.env.GH_AW_ALLOWED_BOTS = "dependabot[bot]";
+      mockContext.actor = "dependabot[bot]";
+      mockContext.eventName = eventName;
+      mockContext.payload = { action: "synchronize", pull_request: { user: { login: "attacker" } } };
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
+    it("should deny an inactive allowlisted bot when actor differs from PR author", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
+      mockContext.actor = "my-fixup-bot[bot]";
+      mockContext.eventName = "pull_request_target";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } }).mockRejectedValue({ status: 404, message: "Not Found" });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+    });
+
     it("should allow access when actor matches PR author (genuine dependabot PR synchronize)", async () => {
       mockContext.actor = "dependabot[bot]";
       mockContext.eventName = "pull_request";
@@ -480,6 +617,7 @@ describe("check_membership.cjs", () => {
     });
 
     it("should deny access when actor differs from comment author (issue_comment event)", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "dependabot[bot]";
       mockContext.actor = "dependabot[bot]";
       mockContext.eventName = "issue_comment";
       mockContext.payload = { comment: { user: { login: "attacker" } } };

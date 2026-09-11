@@ -41,6 +41,10 @@ if [ -f /tmp/gh-aw/agent_usage.json ]; then cp /tmp/gh-aw/agent_usage.json /tmp/
 if [ -f /tmp/gh-aw/agent_usage.jsonl ]; then cp /tmp/gh-aw/agent_usage.jsonl /tmp/gh-aw/usage/agent_usage.jsonl || true; fi
 if [ -f /tmp/gh-aw/detection_usage.jsonl ]; then cp /tmp/gh-aw/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true; fi
 if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
+if [ -f /tmp/gh-aw/evals/evals_token_usage.jsonl ]; then
+  mkdir -p /tmp/gh-aw/usage/evals
+  cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl
+fi
 if [ -f /tmp/gh-aw/agent/graders/grader_manifest.json ]; then mkdir -p /tmp/gh-aw/usage/graders && cp /tmp/gh-aw/agent/graders/grader_manifest.json /tmp/gh-aw/usage/graders/grader_manifest.json || true; fi
 if [ -f /tmp/gh-aw/agent/graders/grader_results.json ]; then mkdir -p /tmp/gh-aw/usage/graders && cp /tmp/gh-aw/agent/graders/grader_results.json /tmp/gh-aw/usage/graders/grader_results.json || true; fi
 if [ -f /tmp/gh-aw/github_rate_limits.jsonl ]; then cp /tmp/gh-aw/github_rate_limits.jsonl /tmp/gh-aw/usage/github_rate_limits.jsonl || true; fi

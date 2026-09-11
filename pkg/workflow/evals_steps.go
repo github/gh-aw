@@ -425,13 +425,28 @@ await main();`
 // evals artifact for downstream consumption.
 func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
+	proxyLogsDir := constants.AWFProxyLogsDir.String()
+	auditDir := constants.AWFAuditDir.String()
+	if isArcDindTopology(data) {
+		proxyLogsDir = rewriteArcDindPath(proxyLogsDir)
+		auditDir = rewriteArcDindPath(auditDir)
+	}
 	return []string{
+		"      - name: Collect evals token usage\n",
+		"        if: always()\n",
+		"        run: |\n",
+		fmt.Sprintf("          for root in \"%s\" \"%s\"; do\n", auditDir, proxyLogsDir),
+		"            source=\"$root/api-proxy-logs/token-usage.jsonl\"\n",
+		"            if [ -s \"$source\" ]; then cp \"$source\" /tmp/gh-aw/evals_token_usage.jsonl; fi\n",
+		"          done\n",
 		"      - name: Upload evals results\n",
 		"        if: steps.redact_evals_results.outcome == 'success'\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		"          name: " + evalsArtifactName + "\n",
-		"          path: " + evalsResultsPath + "\n",
+		"          path: |\n",
+		"            " + evalsResultsPath + "\n",
+		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
 		"          if-no-files-found: ignore\n",
 	}
 }

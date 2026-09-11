@@ -101,6 +101,8 @@ The YAML frontmatter supports these fields:
     - When `false`, disables the hash check step; useful when workflow files are managed outside the default repository context (e.g., cross-repo org rulesets)
     - When `"full"`, checks both the frontmatter hash and body hash; use when prompt-body edits should also trigger recompilation detection
 
+  - **`report-blocked-version:`** - Whether the activation job creates/updates a notification issue when compiled with a blocked `gh-aw` version (boolean, default: `true`). Set `false` to suppress just the notification issue while keeping the blocked-version hard failure active; independent of `check-for-updates` (disables the whole check) and `safe-outputs.report-failure-as-issue`.
+
 - **`github-app:`** - Top-level GitHub App credentials, used as a fallback for every nested `github-app` token-minting operation (`on.github-app`, `safe-outputs.github-app`, `checkout.github-app`, `tools.github.github-app`, `dependencies.github-app`) that does not define its own. Same fields as `on.github-app` above (`client-id`/`app-id`, `private-key`, `owner`, `repositories`).
 
 - **`permissions:`** - GitHub token permissions

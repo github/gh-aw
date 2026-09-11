@@ -133,7 +133,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"after-run-id", "0"},
 		{"before-run-id", "0"},
 		{"repo", ""},
-		{"artifacts", "[usage]"},
+		{"artifacts", "[info]"},
 		{"max-github-api-rate-limit", "0"},
 		{"max-storage", "0"},
 		{"prune-older-runs", "false"},

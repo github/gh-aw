@@ -183,6 +183,10 @@ const ArtifactPrefixOutputName = "artifact_prefix"
 // (aw_info.json and prompt.txt).
 const ActivationArtifactName ArtifactName = "activation"
 
+// InfoArtifactName is the artifact name for the agentic workflow run information
+// uploaded by the activation job.
+const InfoArtifactName ArtifactName = "info"
+
 // ActivationStageAmbientFoldersStepName is the step name used to stage ambient
 // folders before the activation artifact is packaged. It is a stable anchor
 // used to determine the insertion point for jobs.activation.steps injected

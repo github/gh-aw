@@ -203,12 +203,43 @@ async function main() {
     return;
   }
 
+  // Allow trusted bots other than Dependabot to synchronize same-repository PRs they
+  // did not open. Cross-repository PRs still require provenance validation because an
+  // attacker may induce an allowlisted bot to update code from their fork.
+  const isPullRequestSynchronization = (eventName === "pull_request" || eventName === "pull_request_target") && context.payload?.action === "synchronize";
+  const pullRequestHeadRepository = context.payload?.pull_request?.head?.repo;
+  const pullRequestBaseRepository = context.payload?.pull_request?.base?.repo;
+  const hasRepositoryIds = Number.isInteger(pullRequestHeadRepository?.id) && Number.isInteger(pullRequestBaseRepository?.id);
+  const isSameRepositoryPullRequest = hasRepositoryIds
+    ? pullRequestHeadRepository.id === pullRequestBaseRepository.id
+    : typeof pullRequestHeadRepository?.full_name === "string" && pullRequestHeadRepository.full_name.toLowerCase() === `${owner}/${repo}`.toLowerCase();
+  const pullRequestAuthor = context.payload?.pull_request?.user?.login;
+  const isAllowlistedBotSynchronizationMismatch = isPullRequestSynchronization && typeof pullRequestAuthor === "string" && pullRequestAuthor !== actorToValidate && isAllowedBot(actorToValidate, allowedBots);
+  const canAuthorizeBotBeforeConfusedDeputyCheck = isAllowlistedBotSynchronizationMismatch && isSameRepositoryPullRequest && actorToValidate !== "dependabot[bot]";
+  if (isAllowlistedBotSynchronizationMismatch) {
+    core.info(
+      `Evaluating allowlisted bot synchronization for actor '${actorToValidate}' on ${eventName}: ` + `PR author '${pullRequestAuthor}', same repository: ${isSameRepositoryPullRequest}, Dependabot: ${actorToValidate === "dependabot[bot]"}`
+    );
+  }
+  if (canAuthorizeBotBeforeConfusedDeputyCheck) {
+    const authorPermission = await checkRepositoryPermission(pullRequestAuthor, owner, repo, requiredPermissions);
+    if (authorPermission.authorized) {
+      core.info(`PR author '${pullRequestAuthor}' is trusted; checking whether bot '${actorToValidate}' is active`);
+      const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
+      if (botResult.handled) {
+        return;
+      }
+    } else {
+      core.info(`PR author '${pullRequestAuthor}' is not trusted; continuing with confused-deputy validation`);
+    }
+  }
+
   // Guard against Dependabot Confused Deputy attacks.
   // An attacker can trigger @dependabot recreate (for pull_request events) or
   // @dependabot show (for issue_comment events) to make dependabot appear as the
   // actor, bypassing permission checks that rely solely on github.actor.
   // Reference: https://labs.boostsecurity.io/articles/weaponizing-dependabot-pwn-request-at-its-finest/
-  if (isConfusedDeputyAttack(actorToValidate, eventName, context.payload)) {
+  if (isConfusedDeputyAttack(actorToValidate, eventName, context.payload) || isAllowlistedBotSynchronizationMismatch) {
     const errorMessage = `Access denied: Potential confused deputy attack detected. Actor '${actorToValidate}' does not match the event author. The workflow may have been triggered indirectly via a bot command.`;
     core.warning(errorMessage);
     core.setOutput("is_team_member", "false");
@@ -218,11 +249,7 @@ async function main() {
     return;
   }
 
-  // If the actor is in the bots allowlist, skip the roles check entirely and go straight
-  // to bot-status verification. A bot listed in on.bots: is an explicit grant; the roles
-  // mismatch (bots typically have "none" repo permission) is expected and not actionable.
-  // Checking bots first also avoids a spurious "permission does not meet requirements"
-  // warning that would otherwise be emitted by the roles check before authorization succeeds.
+  // For all other events, preserve confused-deputy validation before bot authorization.
   const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
   if (botResult.handled) {
     return;

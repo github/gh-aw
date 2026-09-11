@@ -4,12 +4,80 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
+
+func TestDailyAICEvalsAccountingTransport(t *testing.T) {
+	compiler := NewCompiler()
+	steps := strings.Join(compiler.buildUploadEvalsArtifactStep(&WorkflowData{}), "")
+	for _, expected := range []string{
+		"name: Collect evals token usage",
+		"if: always()",
+		"/tmp/gh-aw/evals_token_usage.jsonl",
+		"/tmp/gh-aw/evals.jsonl",
+		"if: steps.redact_evals_results.outcome == 'success'",
+	} {
+		if !strings.Contains(steps, expected) {
+			t.Errorf("evals accounting transport missing %q", expected)
+		}
+	}
+	usage := strings.Join(buildUsageArtifactUploadSteps("", true, func(action string) string { return action }), "")
+	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/token_usage.jsonl") {
+		t.Fatal("conclusion must publish evals token usage")
+	}
+	script, err := os.ReadFile("../../actions/setup/sh/collect_usage_artifact_files.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl") {
+		t.Fatal("collector must retain evals accounting separately from evaluation results")
+	}
+}
+
+func TestDailyAICEvalsCollectorTopology(t *testing.T) {
+	for _, topology := range []string{"default", "arc-dind"} {
+		t.Run(topology, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: "copilot",
+				Evals: &EvalsConfig{
+					Questions: []EvalDefinition{{ID: "example", Question: "Is the result valid?"}},
+				},
+			}
+			root := "/tmp/gh-aw/sandbox/firewall"
+			if topology == "arc-dind" {
+				data.RunnerConfig = &RunnerConfig{Topology: RunnerTopologyArcDind}
+				root = "${RUNNER_TEMP}/gh-aw/sandbox/firewall"
+			}
+			compiler := NewCompiler()
+			for _, steps := range [][]string{
+				compiler.buildUploadEvalsArtifactStep(data),
+				compiler.buildEvalsJobSteps(data),
+			} {
+				text := strings.Join(steps, "")
+				start := strings.Index(text, "      - name: Collect evals token usage\n")
+				end := strings.Index(text, "      - name: Upload evals results\n")
+				if start < 0 || end <= start {
+					t.Fatal("missing evals collector or upload step")
+				}
+				collector := text[start:end]
+				for _, expected := range []string{root + "/audit", root + "/logs", "cp \"$source\" /tmp/gh-aw/evals_token_usage.jsonl"} {
+					if !strings.Contains(collector, expected) {
+						t.Errorf("collector missing %q:\n%s", expected, collector)
+					}
+				}
+				if strings.Contains(collector, "firewall-audit-logs") ||
+					(topology == "arc-dind" && strings.Contains(collector, "/tmp/gh-aw/sandbox/firewall")) {
+					t.Errorf("collector must not fall back to stale agent paths:\n%s", collector)
+				}
+			}
+		})
+	}
+}
 
 // TestBuildEvalsEngineStepsArcDindTopology verifies that the evals job
 // correctly propagates arc-dind runner topology from the main workflow data.

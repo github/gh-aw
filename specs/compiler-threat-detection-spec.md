@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.33
+**Version**: 1.0.34
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.34` | `v0.87.9` | Adds CTR-027; allowlisted bot synchronization requires trusted same-repository provenance. |
 | `1.0.33` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.32` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.31` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
@@ -83,6 +84,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-023 Bash Command Allowlist Illusion**: Reject explicit bash restrictions for engines that cannot enforce them.
 - **CTR-025 Framework Self-Prompt Misattribution**: Strip only a leading framework `<system>` block before analysis.
 - **CTR-026 Generated Job Timeout Expression Injection**: Reject non-positive or expression job timeout values.
+- **CTR-027 Allowlisted Bot Synchronization Provenance**: Deny bot-driven PR synchronization when the actor differs from the PR author unless the bot is explicitly allowlisted and active, the PR is from the base repository, the PR author satisfies the configured roles, and the actor is not Dependabot.
 
 ### 5.2 Compiler Response Requirements
 
@@ -150,12 +152,15 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-023 Bash Command Allowlist Illusion | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
 | CTR-025 Framework Self-Prompt Misattribution | `actions/setup/js/setup_threat_detection.cjs` | `setup_threat_detection.test.cjs` |
 | CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
+| CTR-027 Allowlisted Bot Synchronization Provenance | `actions/setup/js/check_membership.cjs`, `actions/setup/js/check_permissions_utils.cjs` | `actions/setup/js/check_membership.test.cjs`, `actions/setup/js/check_permissions_utils.test.cjs` |
 
 ### 7.3 Mapping Audit (2026-09-11)
 
 Issue #59894 (`[sighthound] Security findings in github/gh-aw`) reported a Critical CWE-78 command-injection finding claiming untrusted `commentBody`/`params` reach `exec` in `actions/setup/js/close_issue.cjs` (and a `pkg/workflow/js/close_issue.cjs` mirror) around lines 5 and 1110. Verification against conformance scope found this to be a false positive: `close_issue.cjs` is 402 lines total (no line 1110 exists), contains no `exec`/`child_process`/`spawn` call anywhere, and `pkg/workflow/js/close_issue.cjs` does not exist in the repository. `commentBody` in `close_entity_helpers.cjs` flows only into the authenticated GitHub API client (`callbacks.addComment`), never into a shell or subprocess argument, so CTR-006 (Template Injection) and CTR-013 (Argument Injection via Package/Image Names) triggers do not apply and no new `CTR-*` rule is warranted. No `threat-detection-suppress` annotation was added because the finding does not correspond to any real code path the compiler needs to suppress — it is an inapplicable external scan result about nonexistent code, not an active false-positive-prone compiler rule.
 
 Open high/critical code-scanning alerts (#675–#677 `go/allocation-size-overflow`) remain unchanged from the 2026-09-10 audit disposition: in-process, schema-validated capacity-hint computations, not exploitable by untrusted input. No live `threat-detection-suppress` annotation exists in any workflow frontmatter. No compiler/parser source diff exists beyond the single squashed commit state, so no candidate threat surfaced from source changes.
+
+CTR-027 records the runtime pre-activation control for allowlisted bots that synchronize PRs they did not open. The allowlist alone MUST NOT override confused-deputy protection. Authorization is permitted only for `pull_request` or `pull_request_target` `synchronize` events when repository IDs match (or the head repository name matches the base repository if IDs are unavailable), the original PR author satisfies `on.roles`, the bot is installed and active, and the actor is not `dependabot[bot]`. Missing provenance, fork PRs, untrusted authors, inactive bots, and Dependabot author mismatches fail closed. The implementation logs the decision inputs and trust outcome without logging credentials or event payload contents.
 
 ### 7.2 Mapping Audit (2026-09-10)
 
@@ -198,6 +203,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-023** | CTR-023 Bash Command Allowlist Illusion | Reject explicit bash restrictions for engines that cannot enforce them | Reject explicit bash restrictions for engines that cannot enforce them. | `CTR-023` |
 | **T-CTR-039** | CTR-025 Framework Self-Prompt Misattribution | Strip only a leading framework `<system>` block before analysis | Strip only a leading framework `<system>` block before analysis. | `CTR-025` |
 | **T-CTR-041** | CTR-026 Generated Job Timeout Expression Injection | Reject non-positive or expression job timeout values | Reject non-positive or expression job timeout values. | `CTR-026` |
+| **T-CTR-042** | CTR-027 Allowlisted Bot Synchronization Provenance | An allowlisted bot synchronizes a PR authored by another actor | Authorize only when the bot, repository provenance, and PR author satisfy all trust requirements; otherwise deny with `confused_deputy` or `bot_not_active`. | `CTR-027` |
 
 The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
 
@@ -223,6 +229,7 @@ A test ID that is deprecated under Section 5.4 MUST remain listed in Section 8.1
 
 | Version | Change |
 |---|---|
+| 1.0.34 | Added CTR-027 for trusted same-repository allowlisted bot synchronization and fail-closed confused-deputy handling. |
 | 1.0.33 | Audit-only review; issue #59894's `close_issue.cjs` command-injection claim is a false positive (no `exec`/subprocess call exists in the file). |
 | 1.0.32 | Audit-only review; #675–677 and #667–669/#674 are not new threat classes. |
 | 1.0.31 | Audit-only review; #672 is not a new threat class. |

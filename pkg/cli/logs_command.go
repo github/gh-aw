@@ -636,7 +636,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
 	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse for matching runs and append new results immediately")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
-	logsCmd.Flags().StringSlice("artifacts", []string{"usage"}, "Artifact sets to download (default: usage — compact summary for faster downloads). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
+	logsCmd.Flags().StringSlice("artifacts", []string{"info"}, "Artifact sets to download (default: info — compact workflow metadata). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")
 	logsCmd.Flags().String("after", "", "Alias for --cache-before")
 	_ = logsCmd.Flags().MarkHidden("after")

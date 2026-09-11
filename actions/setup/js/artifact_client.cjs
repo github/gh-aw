@@ -17,6 +17,7 @@ const { spawnSync } = require("child_process");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
+const { apiError } = require("./daily_aic_api_budget.cjs");
 
 const DEFAULT_RETRY_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 5000;
@@ -287,6 +288,10 @@ function formatRetentionTimestamp(retentionDays) {
 }
 
 class DefaultArtifactClient {
+  constructor(options = {}) {
+    this.onResponse = options.onResponse;
+  }
+
   async listArtifacts(options = {}) {
     const findBy = options.findBy;
     if (!findBy?.token || !findBy?.repositoryOwner || !findBy?.repositoryName || !findBy?.workflowRunId) {
@@ -294,7 +299,7 @@ class DefaultArtifactClient {
     }
 
     const serverUrl = process.env.GITHUB_API_URL || "https://api.github.com";
-    /** @type {Array<{id:number,name:string,size:number,createdAt?:Date,digest?:string}>} */
+    /** @type {Array<{id:number,name:string,size:number,createdAt?:Date,digest?:string,expired?:boolean}>} */
     const artifacts = [];
 
     let page = 1;
@@ -316,8 +321,9 @@ class DefaultArtifactClient {
       } catch (err) {
         throw new Error(`failed to list artifacts: ${getErrorMessage(err)}`, { cause: err });
       }
+      this.onResponse?.(response);
       if (!response.ok) {
-        throw new Error(`failed to list artifacts (${response.status}): ${await readResponseText(response, "list artifacts")}`);
+        throw apiError(response.status, response.headers, `failed to list artifacts (${response.status})`);
       }
       /** @type {any} */
       const payload = await readResponseJSON(response, "list artifacts");
@@ -329,6 +335,7 @@ class DefaultArtifactClient {
           size: Number(item.size_in_bytes || 0),
           createdAt: item.created_at ? new Date(item.created_at) : undefined,
           digest: typeof item.digest === "string" ? item.digest : undefined,
+          expired: item.expired === true,
         });
       }
       if (pageArtifacts.length < PAGE_SIZE) {
@@ -373,8 +380,9 @@ class DefaultArtifactClient {
     } catch (err) {
       throw new Error(`unable to download artifact: ${getErrorMessage(err)}`, { cause: err });
     }
+    this.onResponse?.(redirectResponse);
     if (![301, 302, 303, 307, 308].includes(redirectResponse.status)) {
-      throw new Error(`unable to download artifact: unexpected status ${redirectResponse.status}`);
+      throw apiError(redirectResponse.status, redirectResponse.headers, `unable to download artifact: unexpected status ${redirectResponse.status}`);
     }
     const location = redirectResponse.headers.get("location");
     if (!location) {

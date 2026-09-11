@@ -4,6 +4,8 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let exports;
+let scanCacheDirectory;
+const runMain = () => exports.main({ cachePath: path.join(scanCacheDirectory, "scan.jsonl") });
 
 function httpError(status, message) {
   const error = new Error(message);
@@ -14,6 +16,7 @@ function httpError(status, message) {
 
 describe("check_daily_aic_workflow_guardrail", () => {
   beforeEach(async () => {
+    scanCacheDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-main-test-"));
     vi.resetModules();
     process.env.GITHUB_EVENT_NAME = "";
     process.env.GH_AW_WORKFLOW_DISPATCH_AW_CONTEXT = "";
@@ -24,6 +27,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
   });
 
   afterEach(() => {
+    fs.rmSync(scanCacheDirectory, { recursive: true, force: true });
     delete process.env.GITHUB_EVENT_NAME;
     delete process.env.GH_AW_WORKFLOW_DISPATCH_AW_CONTEXT;
     delete process.env.GH_AW_HAS_SLASH_COMMAND;
@@ -236,9 +240,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
     expect(markdown).not.toContain("Guardrail issue:");
   });
 
-  it("main() does not fail the step when GitHub API calls throw", async () => {
+  it("main() fails the step when GitHub API calls leave accounting unknown", async () => {
     // Simulate a scenario where the GitHub API throws during workflow run lookup.
-    // The step should catch the error and NOT rethrow it, keeping daily_ai_credits_exceeded at "false".
+    // core.setFailed blocks activation without misreporting a budget exceedance.
     const coreOutputs = {};
     const coreWarnings = [];
     const mockCore = {
@@ -247,6 +251,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       },
       info: () => {},
       warning: msg => coreWarnings.push(msg),
+      setFailed: msg => coreWarnings.push(msg),
     };
 
     const mockGithub = {
@@ -281,13 +286,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GH_AW_GITHUB_TOKEN = "fake-token";
 
     try {
-      // Should resolve without throwing even though the API calls throw
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
       // The default "false" output must be set
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("transient_error");
-      // A warning must be emitted describing the error
-      expect(coreWarnings.some(w => /unexpected error.*skipped/i.test(w))).toBe(true);
+      // Unknown accounting is an activation failure, not a successful skip.
+      expect(coreWarnings.some(w => /AI Credits are unknown/i.test(w))).toBe(true);
     } finally {
       delete global.core;
       delete global.github;
@@ -297,9 +301,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("main() logs rate limit consumption delta when guardrail runs without candidate runs", async () => {
-    // Verify that fetchAndLogRateLimit is called at the start and end of the guardrail
-    // and that a consumption-delta diagnostic log is emitted.
+  it("main() counts business requests instead of unrelated rate-limit snapshots", async () => {
+    // The unrelated quota endpoint must not supply the business-request budget.
     const coreInfos = [];
     const coreOutputs = {};
     const mockCore = {
@@ -363,25 +366,20 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GH_AW_GITHUB_TOKEN = "fake-token";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
 
-      // A consumption-delta log must have been emitted.
-      const consumptionLog = coreInfos.find(msg => msg.includes("rate limit consumed by daily AIC guardrail"));
+      const consumptionLog = coreInfos.find(msg => msg.includes("Daily AIC business API requests"));
       expect(consumptionLog).toBeDefined();
-      expect(consumptionLog).toContain("rateLimitBeforeInspection");
-      expect(consumptionLog).toContain("rateLimitAfterInspection");
-      expect(consumptionLog).toContain("consumed");
-      const detailsPrefix = "[daily-workflow-aic] GitHub API rate limit consumed by daily AIC guardrail: ";
+      const detailsPrefix = "[daily-workflow-aic] Daily AIC business API requests: ";
       const details = JSON.parse(consumptionLog.slice(detailsPrefix.length));
       expect(details).toMatchObject({
-        rateLimitBeforeInspection: 4995,
-        rateLimitAfterInspection: 5000,
-        consumed: 0,
+        requests: 2,
+        cacheHits: 0,
       });
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
 
-      // fetchAndLogRateLimit must have been called at least twice (start + end).
-      expect(rateLimitCallCount).toBe(2);
+      // Only the authoritative run and history requests are needed.
+      expect(rateLimitCallCount).toBe(0);
     } finally {
       delete global.core;
       delete global.github;
@@ -421,7 +419,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
               return {
                 data: {
                   workflow_runs: [
-                    { id: 10, html_url: "https://example.test/runs/10", created_at: nowIso, conclusion: "success" },
+                    { id: 10, html_url: "https://example.test/runs/10", created_at: nowIso, updated_at: nowIso, run_attempt: 1, status: "completed", conclusion: "success" },
                     // A stale run: encountering this should immediately stop pagination.
                     { id: 9, html_url: "https://example.test/runs/9", created_at: staleIso, conclusion: "success" },
                   ],
@@ -464,7 +462,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
 
       // Only page 1 should have been fetched; the stale run should have
       // terminated pagination before page 2 was requested.
@@ -488,8 +486,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("main() does not mark the step failed when the daily AI Credits guardrail is exceeded", async () => {
-    const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockResolvedValue(200);
+  it("main() marks the guardrail exceeded when daily AI Credits equal the threshold", async () => {
+    const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockResolvedValue(100);
 
     const coreOutputs = {};
     const setFailed = vi.fn();
@@ -535,6 +533,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
               workflow_runs: [
                 {
                   id: 41,
+                  run_attempt: 1,
+                  updated_at: nowIso,
+                  status: "completed",
                   html_url: "https://example.test/runs/41",
                   created_at: nowIso,
                   conclusion: "success",
@@ -564,10 +565,10 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("true");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("exceeded");
-      expect(coreOutputs["daily_ai_credits_total_effective_tokens"]).toBe("200");
+      expect(coreOutputs["daily_ai_credits_total_effective_tokens"]).toBe("100");
       expect(coreOutputs["daily_ai_credits_threshold"]).toBe("100");
       expect(setFailed).not.toHaveBeenCalled();
     } finally {
@@ -584,14 +585,11 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("main() stops the inspection loop early when in-loop rate-limit re-check finds headroom exhausted", async () => {
-    // Set up 15 candidate runs (all within 24 h), no cache entries, and a rate-limit mock that
-    // returns plenty of budget on the first call (start snapshot) but drops below the reserve
-    // (RATE_LIMIT_RESERVE = 100) on the second call, which is the in-loop re-check triggered
-    // after RATE_LIMIT_RECHECK_INTERVAL = 10 consumed API operations.
-    // With ESTIMATED_API_OPERATIONS_PER_RUN = 2, 10 ops = 5 cache-miss runs processed before
-    // the 6th iteration triggers the re-check and breaks out of the loop.
-    const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockResolvedValue(10);
+  it("main() stops on business-response quota exhaustion without trusting rate_limit", async () => {
+    // A business-request rejection must stop before inspecting the second run.
+    const quotaError = httpError(403, "API quota exhausted");
+    quotaError.response.headers = { "x-ratelimit-remaining": "0" };
+    const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockRejectedValue(quotaError);
 
     let rateLimitGetCallCount = 0;
     const nowIso = new Date().toISOString();
@@ -601,8 +599,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
         rateLimit: {
           get: async () => {
             rateLimitGetCallCount++;
-            // First call (start snapshot): plenty of budget.
-            // Subsequent calls (in-loop re-check, end snapshot): below reserve.
+            // This endpoint must never be consulted by the scan.
             const remaining = rateLimitGetCallCount === 1 ? 5000 : 50;
             return {
               data: {
@@ -623,6 +620,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
             data: {
               workflow_runs: Array.from({ length: 15 }, (_, i) => ({
                 id: i + 100,
+                run_attempt: 1,
+                updated_at: nowIso,
+                status: "completed",
                 html_url: `https://example.test/runs/${i + 100}`,
                 created_at: nowIso,
                 conclusion: "success",
@@ -642,6 +642,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       },
       info: msg => coreInfos.push(msg),
       warning: () => {},
+      setFailed: msg => coreInfos.push(msg),
       summary: {
         addDetails: function () {
           return this;
@@ -661,19 +662,18 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
 
-      // 5 cache-miss runs are processed (10 consumed API ops) before iteration 6 triggers the
-      // in-loop re-check, finds remaining=50 <= RATE_LIMIT_RESERVE=100, and breaks the loop.
-      expect(getRunAICSpy).toHaveBeenCalledTimes(5);
+      expect(getRunAICSpy).toHaveBeenCalledTimes(1);
 
-      // The in-loop stop log must have been emitted.
-      const stopLog = coreInfos.find(msg => msg.includes("Stopping inspection: rate limit headroom exhausted during inspection loop"));
+      // The incomplete window is reported as a failure.
+      const stopLog = coreInfos.find(msg => msg.includes("AI Credits are unknown"));
       expect(stopLog).toBeDefined();
 
-      // Guardrail not exceeded (5 × 10 = 50 < 1000000).
+      // Unknown is neither an exceedance nor a verified under-budget result.
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
-      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
+      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("transient_error");
+      expect(rateLimitGetCallCount).toBe(0);
     } finally {
       delete global.core;
       delete global.github;
@@ -738,6 +738,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
                 workflow_runs: [
                   {
                     id: 41,
+                    run_attempt: 1,
+                    updated_at: nowIso,
+                    status: "completed",
                     name: workflowName,
                     html_url: "https://example.test/runs/41",
                     created_at: nowIso,
@@ -778,7 +781,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
 
       expect(listWorkflowRunsCalls).toBe(1);
       expect(listWorkflowRunsForRepoCalls).toBe(2);
@@ -808,6 +811,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       },
       info: () => {},
       warning: msg => coreWarnings.push(msg),
+      setFailed: msg => coreWarnings.push(msg),
     };
 
     const mockGithub = {
@@ -851,10 +855,10 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
-      expect(coreWarnings.some(w => /unexpected error.*skipped/i.test(w))).toBe(true);
+      expect(coreWarnings.some(w => /AI Credits are unknown/i.test(w))).toBe(true);
     } finally {
       delete global.core;
       delete global.github;
@@ -944,7 +948,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
       // page 1 has 100 unrelated runs → loop must continue; page 2 is empty →
       // sourceRunCount === 0 fast-exit fires, page 3 must never be queried.
       expect(listWorkflowRunsForRepoCalls).toBe(2);
@@ -1004,6 +1008,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       },
       info: () => {},
       warning: msg => coreWarnings.push(msg),
+      setFailed: msg => coreWarnings.push(msg),
     };
 
     global.core = mockCore;
@@ -1017,7 +1022,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
-      await expect(exports.main()).resolves.toBeUndefined();
+      await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
       expect(listWorkflowRunsForRepoCalls).toBe(0);

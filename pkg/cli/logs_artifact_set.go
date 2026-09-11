@@ -3,7 +3,7 @@
 // for filtering artifact downloads in the logs and audit commands.
 //
 // Key responsibilities:
-//   - Defining known artifact set names (all, agent, mcp, firewall, detection, github-api, activation)
+//   - Defining known artifact set names (all, info, agent, mcp, firewall, detection, github-api, activation)
 //   - Mapping sets to concrete artifact name patterns
 //   - Validating artifact set inputs from CLI flags and MCP arguments
 //   - Determining whether a given artifact name matches an active filter
@@ -38,6 +38,10 @@ const (
 	// ArtifactSetActivation downloads the activation artifact (aw_info.json, prompt.txt,
 	// and github_rate_limits.jsonl from the activation job).
 	ArtifactSetActivation ArtifactSet = "activation"
+
+	// ArtifactSetInfo downloads the compact aw_info.json artifact produced by the
+	// activation job.
+	ArtifactSetInfo ArtifactSet = "info"
 
 	// ArtifactSetAgent downloads the unified agent artifact containing agent logs,
 	// safe outputs, token usage, and agent-side github_rate_limits.jsonl, plus the
@@ -89,6 +93,7 @@ const (
 var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetAll:        nil, // no filtering – download all artifacts
 	ArtifactSetActivation: {constants.ActivationArtifactName.String()},
+	ArtifactSetInfo:       {constants.InfoArtifactName.String()},
 	ArtifactSetAgent:      {constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
 	ArtifactSetMCP:        {constants.AgentArtifactName.String()},
 	ArtifactSetFirewall:   {constants.AgentArtifactName.String()},

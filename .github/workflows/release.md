@@ -236,20 +236,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Mint release token
-        id: release-token
-        uses: actions/create-github-app-token@v3.2.0
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-workflows: write
-
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ steps.release-token.outputs.token }}
           persist-credentials: true
 
       - name: Create or update tag

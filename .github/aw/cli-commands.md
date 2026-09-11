@@ -97,6 +97,7 @@ gh aw logs --start-date -1w         # Last week's runs
 gh aw logs --start-date 2024-01-01 --end-date 2024-01-31
 gh aw logs -o ./workflow-logs       # Save to directory
 gh aw logs --repo owner/repo        # Query logs in another repository
+gh aw logs --ignore-workflow-runs 123,456  # Exclude specific run IDs from results
 ```
 
 **MCP equivalent**: `logs` tool
@@ -168,6 +169,20 @@ gh aw fix --write           # Apply changes
 ```
 
 **MCP equivalent**: `fix` tool
+
+---
+
+### `gh aw format`
+
+Apply all available codemods and normalize workflow frontmatter (two-space indentation, deterministic field ordering, comments and Markdown body preserved).
+
+```bash
+gh aw format                        # Format all workflows in .github/workflows
+gh aw format <workflow-name>        # Format a specific workflow
+gh aw format --dir custom/workflows # Format workflows in a custom directory
+```
+
+**MCP equivalent**: Not available — run from a local terminal.
 
 ---
 
@@ -276,6 +291,20 @@ gh aw mcp list                                   # List workflows with MCP serve
 
 ---
 
+### `gh aw json-schema`
+
+Generate the JSON Schema for `audit`, `logs` JSON output, or cached logs JSONL items.
+
+```bash
+gh aw json-schema audit
+gh aw json-schema logs
+gh aw json-schema logs-jsonl
+```
+
+**MCP equivalent**: Not available — run from a local terminal.
+
+---
+
 ## MCP Tool ↔ CLI Quick Reference
 
 | CLI command | MCP tool |
@@ -292,7 +321,9 @@ gh aw mcp list                                   # List workflows with MCP serve
 | `gh aw add` | `add` |
 | `gh aw update` | `update` |
 | `gh aw fix` | `fix` |
+| `gh aw format` | *(local only)* |
 | `gh aw upgrade` | `upgrade` |
 | `gh aw deploy` | *(local only)* |
 | `gh aw env` | *(local only)* |
 | `gh aw init` | *(local only)* |
+| `gh aw json-schema` | *(local only)* |
