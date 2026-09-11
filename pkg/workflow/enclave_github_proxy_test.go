@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -394,35 +393,64 @@ Read the private repository's issues through the enclave.
 }
 
 // stepOutputRefPattern matches steps.<id>.outputs.<name> references, capturing the step id.
-var stepOutputRefPattern = regexp.MustCompile(`steps\.([A-Za-z0-9_-]+)\.outputs\.[A-Za-z0-9_]+`)
-
-// stepIDMinIndent is the minimum indentation (in spaces) of an `id:` key that belongs to a
-// GitHub Actions step definition rather than a top-level workflow/job/matrix key. Steps are
-// nested at "jobs: <job>: steps: - name: ...", which the compiler currently renders with 8
-// spaces of indentation for step-level keys (see e.g. the "        id: ..." lines written by
-// generateGitHubMCPLockdownDetectionStep). A lower floor is used here so the check still
-// matches if the generator's exact nesting depth changes slightly, while still excluding
-// unrelated `id:` keys declared at the workflow or job level (which use less indentation).
-const stepIDMinIndent = 6
-
-// stepIDPattern matches `id: <value>` lines under a GitHub Actions step definition (e.g.
-// "        id: determine-automatic-lockdown"), capturing the step id.
-var stepIDPattern = regexp.MustCompile(fmt.Sprintf(`(?m)^ {%d,}id:\s*([A-Za-z0-9_-]+)\s*$`, stepIDMinIndent))
+var stepOutputRefPattern = regexp.MustCompile(`steps\.([A-Za-z0-9_-]+)\.outputs\.[A-Za-z0-9_-]+`)
 
 // assertNoDanglingStepOutputReferences verifies that every `steps.<id>.outputs.*` reference
-// in the generated lock file corresponds to a step id that is actually emitted somewhere in
-// the file. This guards against the class of bug described in gh-aw#60336, where a consumer
-// (e.g. an environment variable or guard policy) references a step's outputs even though the
-// producer step itself was never generated, expanding to an empty string at runtime.
+// in the generated lock file corresponds to a step id that is actually emitted in the same
+// job. For references made from a step field, the producer step must also appear earlier in
+// that job's step list. This guards against the class of bug described in gh-aw#60336, where a
+// consumer (e.g. an environment variable or guard policy) references a step's outputs even
+// though the producer step itself was never generated, expanding to an empty string at runtime.
 func assertNoDanglingStepOutputReferences(t *testing.T, lock string) {
 	t.Helper()
-	emittedIDs := make(map[string]bool)
-	for _, match := range stepIDPattern.FindAllStringSubmatch(lock, -1) {
-		emittedIDs[match[1]] = true
-	}
-	for _, match := range stepOutputRefPattern.FindAllStringSubmatch(lock, -1) {
-		stepID := match[1]
-		assert.True(t, emittedIDs[stepID], "reference %q has no corresponding emitted step id %q", match[0], stepID)
+
+	var workflow map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(lock), &workflow), "generated lock file must be valid YAML")
+
+	jobs, ok := workflow["jobs"].(map[string]any)
+	require.True(t, ok, "generated lock file must contain jobs")
+
+	for jobID, jobValue := range jobs {
+		job, ok := jobValue.(map[string]any)
+		require.True(t, ok, "job %q must be an object", jobID)
+
+		steps, _ := job["steps"].([]any)
+		allStepIDs := make(map[string]bool)
+		for _, stepValue := range steps {
+			step, ok := stepValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			if stepID, ok := step["id"].(string); ok {
+				allStepIDs[stepID] = true
+			}
+		}
+
+		jobBytes, err := yaml.Marshal(jobValue)
+		require.NoError(t, err, "job %q must marshal for step reference checks", jobID)
+		for _, match := range stepOutputRefPattern.FindAllStringSubmatch(string(jobBytes), -1) {
+			stepID := match[1]
+			assert.True(t, allStepIDs[stepID], "job %q reference %q has no corresponding emitted step id %q", jobID, match[0], stepID)
+		}
+
+		previousStepIDs := make(map[string]bool)
+		for stepIndex, stepValue := range steps {
+			step, ok := stepValue.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			stepBytes, err := yaml.Marshal(stepValue)
+			require.NoError(t, err, "job %q step %d must marshal for step reference checks", jobID, stepIndex)
+			for _, match := range stepOutputRefPattern.FindAllStringSubmatch(string(stepBytes), -1) {
+				stepID := match[1]
+				assert.True(t, previousStepIDs[stepID], "job %q step %d reference %q must refer to a previously emitted step id %q", jobID, stepIndex, match[0], stepID)
+			}
+
+			if stepID, ok := step["id"].(string); ok {
+				previousStepIDs[stepID] = true
+			}
+		}
 	}
 }
 
