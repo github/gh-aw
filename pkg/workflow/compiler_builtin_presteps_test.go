@@ -201,7 +201,7 @@ jobs:
     permissions:
       id-token: write
     setup-steps:
-      - uses: actions/checkout@v4
+      - uses: ACTIONS/CHECKOUT@V4
         with:
           persist-credentials: false
       - uses: ./.github/actions/get-app-credentials

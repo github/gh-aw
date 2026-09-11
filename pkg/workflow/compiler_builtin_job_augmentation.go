@@ -54,7 +54,7 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 			continue
 		}
 
-		if rawSetupSteps, ok := configMap["setup-steps"].([]any); ok && stepsRequireContentsRead(rawSetupSteps) {
+		if rawSetupSteps, ok := configMap["setup-steps"].([]any); ok && setupStepsRequireContentsRead(rawSetupSteps) {
 			permissions := NewPermissionsParser(job.Permissions).ToPermissions()
 			if _, exists := permissions.Get(PermissionContents); !exists {
 				permissions.Set(PermissionContents, PermissionRead)
@@ -70,6 +70,20 @@ func (c *Compiler) applyBuiltinJobPreSteps(data *WorkflowData) error {
 	}
 
 	return nil
+}
+
+func setupStepsRequireContentsRead(steps []any) bool {
+	for _, step := range steps {
+		stepMap, ok := step.(map[string]any)
+		if !ok {
+			continue
+		}
+		uses, ok := stepMap["uses"].(string)
+		if ok && isCheckoutAction(uses) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Compiler) extractBuiltinJobPreSteps(jobName, targetJobName string, configMap map[string]any, data *WorkflowData, hasSetupSteps, hasPreSteps, hasSteps bool) ([]string, []string, []string, error) {
