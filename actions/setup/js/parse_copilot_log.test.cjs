@@ -403,6 +403,7 @@ describe("parse_copilot_log.cjs", () => {
           input_tokens: 17700000,
           output_tokens: 46500,
           cache_read_input_tokens: 17500000,
+          cache_creation_input_tokens: 216200,
         })
       );
     });

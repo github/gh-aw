@@ -250,6 +250,7 @@ function parsePrettyPrintFormat(logContent) {
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheReadTokens = 0;
+  let cacheWriteTokens = 0;
   let modelName = "unknown";
   let inModelBreakdown = false;
   let i = 0;
@@ -312,11 +313,12 @@ function parsePrettyPrintFormat(logContent) {
         // (emitted by Copilot CLI 1.0.55). The trailing-cached regex above does
         // not match this ordering, so handle it explicitly to avoid dropping the
         // token totals from the Information section.
-        const inlineCachedMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+[km]?)\s*\(\s*([\d.]+[km]?)\s+cached(?:\s*,\s*[\d.]+[km]?\s+written)?\s*\)\s*[•·]\s*↓\s*([\d.]+[km]?)(?:\s*\([^)]*\))?/i);
+        const inlineCachedMatch = trimmed.match(/^Tokens\s+↑\s*([\d.]+[km]?)\s*\(\s*([\d.]+[km]?)\s+cached(?:\s*,\s*([\d.]+[km]?)\s+written)?\s*\)\s*[•·]\s*↓\s*([\d.]+[km]?)(?:\s*\([^)]*\))?/i);
         if (inlineCachedMatch) {
           if (inputTokens === 0) inputTokens = parseTokenCount(inlineCachedMatch[1]);
           if (cacheReadTokens === 0) cacheReadTokens = parseTokenCount(inlineCachedMatch[2]);
-          if (outputTokens === 0) outputTokens = parseTokenCount(inlineCachedMatch[3]);
+          if (inlineCachedMatch[3] && cacheWriteTokens === 0) cacheWriteTokens = parseTokenCount(inlineCachedMatch[3]);
+          if (outputTokens === 0) outputTokens = parseTokenCount(inlineCachedMatch[4]);
         }
       }
       i++;
@@ -415,6 +417,7 @@ function parsePrettyPrintFormat(logContent) {
   if (inputTokens > 0) usage.input_tokens = inputTokens;
   if (outputTokens > 0) usage.output_tokens = outputTokens;
   if (cacheReadTokens > 0) usage.cache_read_input_tokens = cacheReadTokens;
+  if (cacheWriteTokens > 0) usage.cache_creation_input_tokens = cacheWriteTokens;
   entries.push({
     type: "result",
     num_turns: numTurns,

@@ -176,11 +176,6 @@ function findCopilotUsageCheckpoint(sessionStateDir = COPILOT_SESSION_STATE_DIR)
  */
 async function reportCopilotUsageCheckpoint(checkpoint) {
   const agentUsage = {
-    input_tokens: 0,
-    output_tokens: 0,
-    cache_read_tokens: 0,
-    cache_write_tokens: 0,
-    ambient_context: 0,
     ai_credits: checkpoint.aiCredits,
     premium_requests: checkpoint.premiumRequests,
   };
@@ -310,6 +305,11 @@ async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
 
     const summary = parseTokenUsageJsonl(content);
     if (!summary || summary.totalRequests === 0) {
+      const checkpoint = findCopilotUsageCheckpoint(copilotSessionStateDir);
+      if (checkpoint) {
+        await reportCopilotUsageCheckpoint(checkpoint);
+        return;
+      }
       core.info("Token usage file contained no valid entries");
       return;
     }

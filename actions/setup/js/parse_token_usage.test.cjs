@@ -187,9 +187,9 @@ describe("parse_token_usage", () => {
         expect.objectContaining({
           ai_credits: 451.09,
           premium_requests: 1,
-          ambient_context: 0,
         })
       );
+      expect(JSON.parse(originalReadFileSync(agentUsageFile, "utf8"))).not.toHaveProperty("input_tokens");
       expect(JSON.parse(originalReadFileSync(agentUsageJSONLFile, "utf8"))).toEqual({
         provider: "copilot",
         ai_credits: 451.09,
@@ -219,6 +219,33 @@ describe("parse_token_usage", () => {
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No token usage data found"));
       expect(mockCore.summary.addDetails).not.toHaveBeenCalled();
+    });
+
+    test("uses the Copilot checkpoint when proxy usage has no valid entries", async () => {
+      const sessionStateDir = path.join(tmpDir, "copilot-session-state");
+      const sessionDir = path.join(sessionStateDir, "session-1");
+      const agentUsageFile = path.join(tmpDir, "agent_usage.json");
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sessionDir, "events.jsonl"),
+        JSON.stringify({
+          type: "session.usage_checkpoint",
+          data: { totalNanoAiu: 1000000000, totalPremiumRequests: 2 },
+          timestamp: "2026-09-11T01:00:00Z",
+        })
+      );
+      fs.existsSync = vi.fn(p => p === TOKEN_USAGE_PATH || originalExistsSync(p));
+      fs.statSync = vi.fn(p => (p === TOKEN_USAGE_PATH ? { size: 1 } : originalStatSync(p)));
+      fs.readFileSync = vi.fn((p, enc) => (p === TOKEN_USAGE_PATH ? "malformed" : originalReadFileSync(p, enc)));
+      fs.writeFileSync = vi.fn((p, data) => {
+        if (p === AGENT_USAGE_PATH) return originalWriteFileSync(agentUsageFile, data);
+        return originalWriteFileSync(p, data);
+      });
+
+      await main(sessionStateDir);
+
+      expect(JSON.parse(originalReadFileSync(agentUsageFile, "utf8"))).toMatchObject({ ai_credits: 1, premium_requests: 2 });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aic", "1");
     });
 
     test("returns the latest valid checkpoint across Copilot sessions", () => {
