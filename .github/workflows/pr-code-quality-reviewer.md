@@ -42,6 +42,22 @@ tools:
   cli-proxy: true
   github:
     mode: gh-proxy
+  bash:
+    - cat
+    - date
+    - echo
+    - find
+    - git:*
+    - grep
+    - head
+    - ls
+    - printf
+    - pwd
+    - sort
+    - tail
+    - uniq
+    - wc
+    - yq
   comment-memory:
     memory-id: pr-code-quality-reviewer
 cache:
