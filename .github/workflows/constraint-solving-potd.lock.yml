@@ -407,8 +407,8 @@ jobs:
     outputs:
       agentic_engine_timeout: ${{ steps.detect-agent-errors.outputs.agentic_engine_timeout || 'false' }}
       ai_credits_rate_limit_error: ${{ steps.parse-mcp-gateway.outputs.ai_credits_rate_limit_error || 'false' }}
-      aic: ${{ steps.parse-mcp-gateway.outputs.aic }}
-      ambient_context: ${{ steps.parse-mcp-gateway.outputs.ambient_context }}
+      aic: ${{ steps.parse-token-usage.outputs.aic }}
+      ambient_context: ${{ steps.parse-token-usage.outputs.ambient_context }}
       cache_memory_restore_0_cache_hit: ${{ steps.restore_cache_memory_0.outputs.cache-hit || 'false' }}
       cache_memory_restore_0_matched_key: ${{ steps.restore_cache_memory_0.outputs.cache-matched-key || '' }}
       effective_tokens: ${{ steps.parse-mcp-gateway.outputs.effective_tokens }}
@@ -1031,6 +1031,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/print_firewall_logs.sh"
       - name: Parse token usage for step summary
         if: always()
+        id: parse-token-usage
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -1112,6 +1113,7 @@ jobs:
             /tmp/gh-aw/redacted-urls.log
             /tmp/gh-aw/mcp-logs/
             /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent-stdio.log
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl

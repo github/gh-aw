@@ -32,8 +32,11 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Include the aggregated agent_usage.json in the agent artifact so third-party
 	// tools can consume structured token data without parsing the step summary.
 	// Requires AWF v0.25.8+
-	if isFirewallEnabled(data) {
+	if isFirewallEnabled(data) || engine.GetID() == string(constants.CopilotEngine) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.TokenUsageFilename.String())
+	}
+	if engine.GetID() == string(constants.CopilotEngine) {
+		paths = append(paths, constants.TmpGhAwDirSlash+"agent_usage.jsonl")
 	}
 
 	// Collect agent stdio logs path for unified upload
@@ -153,8 +156,9 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
-	// Parse token-usage.jsonl and append to step summary (requires AWF v0.25.8+)
-	if isFirewallEnabled(data) {
+	// Parse token usage and append to the step summary. Copilot can fall back to
+	// its session usage checkpoint when the firewall proxy is unavailable.
+	if isFirewallEnabled(data) || engine.GetID() == string(constants.CopilotEngine) {
 		c.generateTokenUsageSummary(yaml, data)
 	}
 

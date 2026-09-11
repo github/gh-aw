@@ -423,8 +423,8 @@ jobs:
       PLAYWRIGHT_MCP_SANDBOX: false
     outputs:
       ai_credits_rate_limit_error: ${{ steps.parse-mcp-gateway.outputs.ai_credits_rate_limit_error || 'false' }}
-      aic: ${{ steps.parse-mcp-gateway.outputs.aic }}
-      ambient_context: ${{ steps.parse-mcp-gateway.outputs.ambient_context }}
+      aic: ${{ steps.parse-token-usage.outputs.aic }}
+      ambient_context: ${{ steps.parse-token-usage.outputs.ambient_context }}
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
       effective_tokens: ${{ steps.parse-mcp-gateway.outputs.effective_tokens }}
       has_patch: ${{ steps.collect_output.outputs.has_patch }}
@@ -1112,6 +1112,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/print_firewall_logs.sh" --rootless
       - name: Parse token usage for step summary
         if: always()
+        id: parse-token-usage
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
