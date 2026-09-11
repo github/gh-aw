@@ -19,6 +19,7 @@ The package is designed to adapt to the execution environment. Native builds det
 | `FormField` | struct | Declarative form field description used by WASM-only `RunForm`, including type, labels, bound value, options, and validation callback. |
 | `ListItem` | struct | Interactive list item value created by `NewListItem`; its fields are intentionally unexported. |
 | `ProgressBar` | struct | Progress-bar controller returned by `NewProgressBar` and `NewIndeterminateProgressBar`, with `Update` for rendering determinate or indeterminate progress. |
+| `PromptForm` | struct | Wraps a `huh.Form` (embedded) so completed questions are cleared from the terminal before the caller prints the decision result; created by `NewForm`, `NewInputForm`, `NewSelectForm`, and `NewConfirmForm`. Native builds only. |
 | `SelectOption` | struct | Label/value pair used by select-oriented APIs. |
 | `SpinnerWrapper` | struct | Spinner controller with lifecycle methods `Start`, `Stop`, `StopWithMessage`, and `UpdateMessage`. |
 | `TableConfig` | struct | Table-rendering configuration including headers, rows, optional title/total row, and optional TTY override. |
@@ -89,6 +90,8 @@ The package is designed to adapt to the execution environment. Native builds det
 | `PromptMultiSelect` | `func PromptMultiSelect(title, description string, options []SelectOption, limit int) ([]string, error)` | Requests multiple selections in WASM builds, where it currently reports unsupported interactivity. |
 | `PromptSecretInput` | `func PromptSecretInput(title, description string) (string, error)` | Requests masked secret input in native TTY mode; unavailable in non-TTY and WASM environments. |
 | `PromptSelect` | `func PromptSelect(title, description string, options []SelectOption) (string, error)` | Requests a single selection in WASM builds, where it currently reports unsupported interactivity. |
+| `(*PromptForm).Run` | `func (f *PromptForm) Run() error` | Runs the wrapped form and clears its rendered question from the terminal when it exits (native builds only). |
+| `(*PromptForm).RunWithContext` | `func (f *PromptForm) RunWithContext(ctx context.Context) error` | Runs the wrapped form with a context and clears its rendered question from the terminal when it exits (native builds only). |
 | `RenderComposedSections` | `func RenderComposedSections(sections []string)` | Writes multiple rendered sections to stderr with spacing and terminal-aware composition. |
 | `RenderErrorBox` | `func RenderErrorBox(title string) []string` | Renders an error-emphasis box, with TTY and plain-text variants. |
 | `RenderInfoSection` | `func RenderInfoSection(content string) []string` | Renders an informational section with left-border emphasis or plain indentation. |

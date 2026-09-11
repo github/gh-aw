@@ -47,7 +47,6 @@ The public API is intentionally small: event flattening and tokenization helpers
 | `(*Miner).Clusters` | `func (m *Miner) Clusters() []Cluster` | Returns a snapshot of all known clusters. |
 | `(*Miner).LoadJSON` | `func (m *Miner) LoadJSON(data []byte) error` | Replaces miner state from a JSON snapshot and rebuilds the parse tree. |
 | `(*Miner).SaveJSON` | `func (m *Miner) SaveJSON() ([]byte, error)` | Serializes miner state to JSON. |
-| `(*Miner).Train` | `func (m *Miner) Train(line string) (*MatchResult, error)` | Trains the miner on a raw line after masking and tokenization. |
 | `(*Miner).TrainEvent` | `func (m *Miner) TrainEvent(evt AgentEvent) (*MatchResult, error)` | Flattens an `AgentEvent`, trains on it, and propagates the event stage onto the result and cluster. |
 | `DefaultConfig` | `func DefaultConfig() Config` | Returns the built-in production defaults, including masking rules and excluded fields. |
 | `FlattenEvent` | `func FlattenEvent(evt AgentEvent, excludeFields []string) string` | Converts an event into a deterministic space-separated `key=value` token string with `stage=` first when present. |

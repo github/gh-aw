@@ -108,8 +108,8 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `DependencyGraph` | struct | Tracks workflow file dependencies (imports) for efficient recompilation. |
 | `DependencyReport` | struct | Aggregated dependency health report including outdated modules and security advisories. |
 | `DockerImagesOptions` | struct | Selects which Docker-based static analysis tools (`Zizmor`, `Poutine`, `Actionlint`, etc.) are requested. |
-| `LogEntry` | interface | Shared shape implemented by every parsed log-line type (access, firewall, audit, gateway), exposing timestamp, source, level, and message. |
-| `LogEntrySource` | alias | Semantic string type identifying which log stream (`access`, `firewall`, `audit`, `gateway`) a `LogEntry` was parsed from. |
+| `LogAnalysis` | interface | Read-only interface for accessing domain analysis results; implemented by `DomainAnalysis` and `FirewallAnalysis`. |
+| `MutableLogAnalysis` | interface | Extends `LogAnalysis` with mutation methods (`SetAllowedDomains`, `SetBlockedDomains`, `AddMetrics`) used during log aggregation. |
 | `Metadata` | struct | Pagination metadata for MCP registry list responses. |
 | `OutdatedDependency` | struct | A Go module dependency with a newer version available, including current/latest versions and age. |
 | `SecurityAdvisory` | struct | A security vulnerability (GHSA/CVE) affecting a dependency, with severity and patched versions. |
@@ -197,12 +197,12 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `CheckStatePolicyBlocked` | `CheckState` | `"policy_blocked"` | Normalized CI state indicating policy or account gates blocked the PR. |
 | `CheckStateSuccess` | `CheckState` | `"success"` | Normalized CI state indicating all required checks passed. |
 | `CheckAndPrepareDockerImages` | `func(ctx context.Context, opts DockerImagesOptions) error` | Pre-pulls security-scanner Docker images |
-| `UpdateContainerPins` | `func(ctx, workflowDir string, verbose bool) error` | Updates container image SHA pins in workflow files |
+| `UpdateContainerPins` | `func(ctx context.Context, workflowDir string, verbose bool) (bool, error)` | Updates container image SHA pins in workflow files |
 | `CreatePRWithChanges` | `func(ctx context.Context, branchPrefix, commitMessage, prTitle, prBody string, verbose bool) (string, error)` | Creates a GitHub PR from uncommitted changes |
 | `AutoMergePullRequestsCreatedAfter` | `func(repoSlug string, createdAfter time.Time, verbose bool) error` | Auto-merges eligible PRs created after a given time |
 | `PreflightCheckForCreatePR` | `func(bool) error` | Validates prerequisites before creating a PR |
 | `DisableAllWorkflowsExcept` | `func(repoSlug string, exceptWorkflows []string, verbose bool) error` | Disables all workflows in a repo except the named ones |
-| `GetEngineSecretNameAndValue` | `func(engine string, existingSecrets map[string]bool) (string, string, bool, error)` | Prompts for and validates an engine API secret |
+| `GetEngineSecretNameAndValue` | `func(engine string, existingSecrets map[string]struct{}) (string, string, bool, error)` | Prompts for and validates an engine API secret |
 | `CheckForUpdatesAsync` | `func(ctx, noCheckUpdate, verbose bool) func()` | Checks for a newer `gh-aw` version in the background; returns a join function the caller must invoke before exit |
 | `FetchChecksResult` | `func(repoOverride, prNumber string) (*ChecksResult, error)` | Fetches CI check results for a pull request |
 | `ValidEngineNames` | `func() []string` | Returns the supported engine names for shell completion |
@@ -254,7 +254,6 @@ The `cli` package exports many types used across its command implementations. Th
 | `CombinedTrialResult` | struct | Combined results from multiple trial runs |
 | `ContinuationData` | struct | State for multi-turn agent continuations |
 | `CopilotCodingAgentDetector` | struct | Detector for Copilot coding-agent log patterns |
-| `CopilotWorkflowStep` | struct | A single step from a Copilot setup-steps YAML file |
 | `CreatedItemReport` | struct | Report of an item created by a safe-output action (type, URL, number, repo) |
 | `CrossRunSummary` | struct | Summary of cross-run metrics across multiple workflow runs |
 | `DependencyInfo` | struct | Metadata for a single dependency in `go.mod` or `package.json` |
@@ -276,7 +275,6 @@ The `cli` package exports many types used across its command implementations. Th
 | `ErrorSummary` | struct | Aggregated error summary for a workflow run |
 | `FetchedWorkflow` | struct | A workflow fetched from a remote or local source with metadata |
 | `FileInfo` | struct | File metadata captured during a workflow run |
-| `Finding` | struct | A finding from a security scanner (Zizmor/Poutine/Actionlint) |
 | `FirewallAnalysis` | struct | Analysis of AWF network firewall logs |
 | `FirewallDiff` | struct | Diff of firewall domain access between two audit runs |
 | `FirewallDiffSummary` | struct | Summary statistics for a firewall diff |
@@ -326,7 +324,7 @@ The `cli` package exports many types used across its command implementations. Th
 | `OverviewData` | struct | High-level overview data for a workflow run |
 | `OutcomeEvaluation` | struct | Evaluation state embedded in `OutcomeReport` (status, merge/close metadata) |
 | `OutcomeReport` | struct | Result of evaluating one safe output item — outcome, timing, human engagement, and objective value |
-| `OutcomeResult` | string alias | Outcome classification: `accepted`, `rejected`, `ignored`, `pending`, `unknown`, `lifecycle`, `error` |
+| `OutcomeStatus` | string alias | Outcome classification: `accepted`, `rejected`, `ignored`, `pending`, `skipped`, `unknown`, `lifecycle`, `lifecycle_close`, `error` |
 | `OutcomeSummary` | struct | Aggregated outcome statistics across multiple safe output items |
 | `OutcomesHistoryConfig` | struct | Configuration for `RunOutcomesHistory` |
 | `PRCheckRun` | struct | A single CI check run attached to a pull request |
@@ -380,19 +378,17 @@ The `cli` package exports many types used across its command implementations. Th
 | `ToolUsageStatsBase` | struct | Identity and metrics shared by tool usage summaries |
 | `ToolUsageSummary` | struct | Aggregated tool usage statistics |
 | `Transport` | struct | MCP server transport configuration |
-| `TrendDirection` | int alias | Direction of a metric trend (`Up`, `Down`, `Stable`) |
+| `TrendDirection` | int alias | Direction of a metric trend (`TrendImproving`, `TrendStable`, `TrendDegrading`) |
 | `TrialArtifacts` | struct | Artifacts generated during a trial run |
 | `TrialRepoContext` | struct | Repository context used during a trial run |
 | `VSCodeMCPServer` | struct | An MCP server entry in `.vscode/mcp.json` |
 | `VSCodeSettings` | struct | Parsed `.vscode/settings.json` |
 | `ValidationIssue` | struct | A validation error, warning, or audit issue entry |
 | `ValidationResult` | struct | Result of a workflow compilation validation pass |
-| `Workflow` | struct | Minimal workflow metadata used in list operations |
 | `WorkflowDomainsDetail` | struct | Detailed per-workflow domain information |
 | `WorkflowDomainsSummary` | struct | Summary of domains used across workflows |
 | `WorkflowFailure` | struct | A workflow failure record |
 | `WorkflowFileStatus` | struct | Status of a workflow file (exists, outdated, etc.) |
-| `WorkflowJob` | struct | A GitHub Actions job within a workflow run |
 | `WorkflowListItem` | struct | A single item in `gh aw list`; shared workflow metadata fields (name, engine, compiled status, labels, triggers) also embedded in `WorkflowStatus` |
 | `WorkflowMCPMetadata` | struct | MCP server metadata scanned from a workflow file |
 | `WorkflowNode` | struct | A node in the workflow dependency graph |
@@ -698,26 +694,19 @@ This appendix is generated from the current non-test Go source files in this pac
 | `docker_images.go` | `const` | `YamllintImage` | `const YamllintImage = "pipelinecomponents/yamllint:latest@sha256:..."` | YamllintImage is the pinned image used for yamllint checks. |
 | `flags.go` | `const` | `EngineFlagFilterUsage` | `const EngineFlagFilterUsage = "Filter logs by AI engine (...)"` | EngineFlagFilterUsage is the CLI help text for `--engine` log filtering. |
 | `flags.go` | `const` | `EngineFlagOverrideUsage` | `const EngineFlagOverrideUsage = "Override AI engine (...)"` | EngineFlagOverrideUsage is the CLI help text for `--engine-override`. |
-| `outcome_eval.go` | `const` | `OutcomeLifecycleClose` | `const OutcomeLifecycleClose OutcomeResult = "lifecycle_close"` | OutcomeLifecycleClose represents lifecycle close events in normalized outcome reporting. |
-| `outcome_eval.go` | `const` | `OutcomeAccepted` | `const OutcomeAccepted OutcomeResult = "accepted"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomeError` | `const OutcomeError OutcomeResult = "error"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomeIgnored` | `const OutcomeIgnored OutcomeResult = "ignored"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomeLifecycle` | `const OutcomeLifecycle OutcomeResult = "lifecycle"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomePending` | `const OutcomePending OutcomeResult = "pending"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomeRejected` | `const OutcomeRejected OutcomeResult = "rejected"` | Exported constant declared in `outcome_eval.go`. |
-| `outcome_eval.go` | `const` | `OutcomeUnknown` | `const OutcomeUnknown OutcomeResult = "unknown"` | Exported constant declared in `outcome_eval.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusLifecycleClose` | `const OutcomeStatusLifecycleClose OutcomeStatus = "lifecycle_close"` | OutcomeStatusLifecycleClose represents lifecycle close events in normalized outcome reporting. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusAccepted` | `const OutcomeStatusAccepted OutcomeStatus = "accepted"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusError` | `const OutcomeStatusError OutcomeStatus = "error"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusIgnored` | `const OutcomeStatusIgnored OutcomeStatus = "ignored"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusLifecycle` | `const OutcomeStatusLifecycle OutcomeStatus = "lifecycle"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusPending` | `const OutcomeStatusPending OutcomeStatus = "pending"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusRejected` | `const OutcomeStatusRejected OutcomeStatus = "rejected"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusSkipped` | `const OutcomeStatusSkipped OutcomeStatus = "skipped"` | Exported constant declared in `outcome_evaluation.go`. |
+| `outcome_evaluation.go` | `const` | `OutcomeStatusUnknown` | `const OutcomeStatusUnknown OutcomeStatus = "unknown"` | Exported constant declared in `outcome_evaluation.go`. |
 | `outcome_evaluation.go` | `const` | `EvidenceMedium` | `const EvidenceMedium EvidenceStrength = "medium"` | Exported constant declared in `outcome_evaluation.go`. |
 | `outcome_evaluation.go` | `const` | `EvidenceNone` | `const EvidenceNone EvidenceStrength = "none"` | Exported constant declared in `outcome_evaluation.go`. |
 | `outcome_evaluation.go` | `const` | `EvidenceStrong` | `const EvidenceStrong EvidenceStrength = "strong"` | Exported constant declared in `outcome_evaluation.go`. |
 | `outcome_evaluation.go` | `const` | `EvidenceWeak` | `const EvidenceWeak EvidenceStrength = "weak"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusAccepted` | `const OutcomeStatusAccepted OutcomeStatus = "accepted"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusIgnored` | `const OutcomeStatusIgnored OutcomeStatus = "ignored"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusPending` | `const OutcomeStatusPending OutcomeStatus = "pending"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusRejected` | `const OutcomeStatusRejected OutcomeStatus = "rejected"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusLifecycle` | `const OutcomeStatusLifecycle OutcomeStatus = "lifecycle"` | OutcomeStatusLifecycle marks lifecycle safe-output outcomes. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusLifecycleClose` | `const OutcomeStatusLifecycleClose OutcomeStatus = "lifecycle_close"` | OutcomeStatusLifecycleClose marks lifecycle-close safe-output outcomes. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusSkipped` | `const OutcomeStatusSkipped OutcomeStatus = "skipped"` | Exported constant declared in `outcome_evaluation.go`. |
-| `outcome_evaluation.go` | `const` | `OutcomeStatusUnknown` | `const OutcomeStatusUnknown OutcomeStatus = "unknown"` | Exported constant declared in `outcome_evaluation.go`. |
 | `shell_completion.go` | `const` | `ShellBash` | `const ShellBash ShellType = "bash"` | Exported constant declared in `shell_completion.go`. |
 | `shell_completion.go` | `const` | `ShellFish` | `const ShellFish ShellType = "fish"` | Exported constant declared in `shell_completion.go`. |
 | `shell_completion.go` | `const` | `ShellPowerShell` | `const ShellPowerShell ShellType = "powershell"` | Exported constant declared in `shell_completion.go`. |
@@ -783,7 +772,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `tool_graph.go` | `(*ToolGraph).AddSequence` | `func (*ToolGraph).AddSequence(tools []string)` | AddSequence adds a tool call sequence to the graph |
 | `tool_graph.go` | `(*ToolGraph).GenerateMermaidGraph` | `func (*ToolGraph).GenerateMermaidGraph() string` | GenerateMermaidGraph generates a Mermaid state diagram from the tool graph |
 | `tool_graph.go` | `NewToolGraph` | `func NewToolGraph() *ToolGraph` | NewToolGraph creates a new empty tool graph |
-| `update_actions_workflow_files.go` | `UpdateActionsInWorkflowFiles` | `func UpdateActionsInWorkflowFiles(ctx context.Context, workflowsDir, engineOverride string, verbose, disableReleaseBump bool, noCompile bool, coolDown time.Duration) error` | UpdateActionsInWorkflowFiles scans all workflow . |
 | `view_command.go` | `ViewWorkflowRun` | `func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error` | ViewWorkflowRun downloads artifacts for the given run (if not already cached) and renders the unified event timeline, safe outputs, and a link to the run page. |
 | `vscode_config.go` | `(*VSCodeSettings).UnmarshalJSON` | `func (*VSCodeSettings).UnmarshalJSON(data []byte) error` | UnmarshalJSON custom unmarshaler for VSCodeSettings to preserve unknown fields |
 | `vscode_config.go` | `(VSCodeSettings).MarshalJSON` | `func (VSCodeSettings).MarshalJSON() ([]byte, error)` | MarshalJSON custom marshaler for VSCodeSettings to include all fields |
@@ -802,7 +790,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `compile_external_tools.go` | `RunGrypeOnLockFiles` | `func RunGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error` | Runs Grype against pinned images referenced by lock files, deduplicated and cached per image. |
 | `compile_external_tools.go` | `RunPoutineOnDirectory` | `func RunPoutineOnDirectory(workflowDir string, verbose bool, strict bool) error` | Scans all workflows in a directory once with Poutine. |
 | `compile_external_tools.go` | `RunRunnerGuardOnDirectory` | `func RunRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) error` | Scans all workflows in a directory once with runner-guard. |
-| `compile_external_tools.go` | `RunShellcheckOnLockFiles` | `func RunShellcheckOnLockFiles(ctx context.Context, lockFiles []string, verbose bool, strict bool) error` | Runs shellcheck across lock files; returns nil when shellcheck is unavailable. |
+| `compile_external_tools.go` | `RunShellcheckOnLockFilesAndResources` | `func RunShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []string, resources []workflow.ShellScriptResource, verbose bool, strict bool) error` | Runs shellcheck across lock files and shell script resources; returns nil when shellcheck is unavailable. |
 | `compile_external_tools.go` | `RunSyftOnLockFiles` | `func RunSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error` | Generates SBOMs with Syft from images referenced by lock file manifests. |
 | `compile_external_tools.go` | `RunYamllintOnFiles` | `func RunYamllintOnFiles(lockFiles []string, verbose bool, strict bool) error` | Runs yamllint once across all provided lock files. |
 | `compile_external_tools.go` | `RunZizmorOnFiles` | `func RunZizmorOnFiles(lockFiles []string, verbose bool, strict bool) error` | Runs zizmor once across all provided lock files. |
@@ -813,7 +801,6 @@ This appendix is generated from the current non-test Go source files in this pac
 | `docker_images.go` | `StartDockerImageDownload` | `func StartDockerImageDownload(ctx context.Context, image string) (bool, func() error)` | Starts a background Docker image pull and returns a wait function for its result. |
 | `domains_command.go` | `RunListDomains` | `func RunListDomains(jsonOutput bool) error` | Lists all workflows with their domain configuration summary. |
 | `domains_command.go` | `RunWorkflowDomains` | `func RunWorkflowDomains(workflowArg string, jsonOutput bool) error` | Lists all effective domains for a specific workflow. |
-| `drain3_train.go` | `TrainDrain3Weights` | `func TrainDrain3Weights(processedRuns []ProcessedRun, outputDir string, verbose bool) error` | Trains Drain3 anomaly-detection weights from processed runs; invoked by `logs --train`. |
 | `enable.go` | `DisableWorkflowsByNames` | `func DisableWorkflowsByNames(ctx context.Context, workflowNames []string, repoOverride string) error` | Disables workflows by specific names, or all workflows if none are provided. |
 | `enable.go` | `EnableWorkflowsByNames` | `func EnableWorkflowsByNames(ctx context.Context, workflowNames []string, repoOverride string) error` | Enables workflows by specific names, or all workflows if none are provided. |
 | `fix_codemods.go` | `GetAllCodemods` | `func GetAllCodemods() []Codemod` | Returns all available codemods in the registry. |
