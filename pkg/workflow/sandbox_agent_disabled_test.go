@@ -124,6 +124,9 @@ Test workflow with agent sandbox disabled.
 		assert.Contains(t, result, "Start MCP Gateway", "MCP gateway should be present even when agent sandbox is disabled")
 		assert.Contains(t, result, "MCP_GATEWAY_PORT", "Gateway port should be set")
 		assert.Contains(t, result, "MCP_GATEWAY_AGENT_ID", "Gateway agent ID should be set")
+		assert.Contains(t, result, "parse_token_usage.cjs", "Copilot usage checkpoint fallback should be enabled")
+		assert.Contains(t, result, "/tmp/gh-aw/agent_usage.json", "Copilot usage should be included in the agent artifact")
+		assert.Contains(t, result, "/tmp/gh-aw/agent_usage.jsonl", "Copilot AIC usage should be included in the usage artifact")
 	})
 
 	t.Run("sandbox.agent: false is refused in strict mode", func(t *testing.T) {

@@ -165,6 +165,14 @@ func TestBuildMainJobOutputs(t *testing.T) {
 		assert.Contains(t, outputs, "invocation_cap_exceeded")
 	})
 
+	t.Run("firewall-disabled non-Copilot workflows use MCP gateway outputs", func(t *testing.T) {
+		c := NewCompiler()
+		data := &WorkflowData{AI: "claude", SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Disabled: true}}}
+		outputs := c.buildMainJobOutputs(data)
+		assert.Equal(t, "${{ steps.parse-mcp-gateway.outputs.aic }}", outputs["aic"])
+		assert.Equal(t, "${{ steps.parse-mcp-gateway.outputs.ambient_context }}", outputs["ambient_context"])
+	})
+
 	t.Run("safe-outputs fields added when SafeOutputs set", func(t *testing.T) {
 		c := NewCompiler()
 		data := &WorkflowData{
