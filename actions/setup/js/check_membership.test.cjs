@@ -480,6 +480,8 @@ describe("check_membership.cjs", () => {
 
       await runScript();
 
+      expect(mockCore.info).toHaveBeenCalledWith(`Evaluating allowlisted bot synchronization for actor 'my-fixup-bot[bot]' on ${eventName}: PR author 'human-author', same repository: true, Dependabot: false`);
+      expect(mockCore.info).toHaveBeenCalledWith("PR author 'human-author' is trusted; checking whether bot 'my-fixup-bot[bot]' is active");
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
@@ -499,6 +501,7 @@ describe("check_membership.cjs", () => {
       };
       await runScript();
 
+      expect(mockCore.info).toHaveBeenCalledWith(`Evaluating allowlisted bot synchronization for actor 'my-fixup-bot' on ${eventName}: PR author 'attacker', same repository: false, Dependabot: false`);
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
@@ -520,6 +523,7 @@ describe("check_membership.cjs", () => {
 
       await runScript();
 
+      expect(mockCore.info).toHaveBeenCalledWith("PR author 'untrusted-author' is not trusted; continuing with confused-deputy validation");
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");

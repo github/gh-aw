@@ -216,13 +216,21 @@ async function main() {
   const pullRequestAuthor = context.payload?.pull_request?.user?.login;
   const isAllowlistedBotSynchronizationMismatch = isPullRequestSynchronization && typeof pullRequestAuthor === "string" && pullRequestAuthor !== actorToValidate && isAllowedBot(actorToValidate, allowedBots);
   const canAuthorizeBotBeforeConfusedDeputyCheck = isAllowlistedBotSynchronizationMismatch && isSameRepositoryPullRequest && actorToValidate !== "dependabot[bot]";
+  if (isAllowlistedBotSynchronizationMismatch) {
+    core.info(
+      `Evaluating allowlisted bot synchronization for actor '${actorToValidate}' on ${eventName}: ` + `PR author '${pullRequestAuthor}', same repository: ${isSameRepositoryPullRequest}, Dependabot: ${actorToValidate === "dependabot[bot]"}`
+    );
+  }
   if (canAuthorizeBotBeforeConfusedDeputyCheck) {
     const authorPermission = await checkRepositoryPermission(pullRequestAuthor, owner, repo, requiredPermissions);
     if (authorPermission.authorized) {
+      core.info(`PR author '${pullRequestAuthor}' is trusted; checking whether bot '${actorToValidate}' is active`);
       const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
       if (botResult.handled) {
         return;
       }
+    } else {
+      core.info(`PR author '${pullRequestAuthor}' is not trusted; continuing with confused-deputy validation`);
     }
   }
 
