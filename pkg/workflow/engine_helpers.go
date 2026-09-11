@@ -237,10 +237,15 @@ func applyMCPScriptsSecretEnv(env map[string]string, workflowData *WorkflowData)
 // the overridden expression is used instead of the default "${{ secrets.KEY }}" so the
 // validation step checks the user-provided secret reference rather than the default one.
 func GenerateMultiSecretValidationStep(secretNames []string, engineName, docsURL string, envOverrides map[string]string) GitHubActionStep {
+	return GenerateMultiSecretValidationStepWithID(secretNames, engineName, docsURL, envOverrides, "validate-secret")
+}
+
+// GenerateMultiSecretValidationStepWithID creates a secret validation step with a caller-provided ID.
+func GenerateMultiSecretValidationStepWithID(secretNames []string, requirementName, docsURL string, envOverrides map[string]string, stepID string) GitHubActionStep {
 	if len(secretNames) == 0 {
 		// This is a programming error - engine configurations should always provide secrets
 		// Log the error and return empty step to avoid breaking compilation
-		engineHelpersLog.Printf("ERROR: GenerateMultiSecretValidationStep called with empty secretNames for engine %s", engineName)
+		engineHelpersLog.Printf("ERROR: GenerateMultiSecretValidationStep called with empty secretNames for %s", requirementName)
 		return GitHubActionStep{}
 	}
 
@@ -248,14 +253,14 @@ func GenerateMultiSecretValidationStep(secretNames []string, engineName, docsURL
 	stepName := fmt.Sprintf("      - name: Validate %s secret", strings.Join(secretNames, " or "))
 
 	// Build the command to call the validation script
-	// The script expects: SECRET_NAME1 [SECRET_NAME2 ...] ENGINE_NAME DOCS_URL
-	// Use shellJoinArgs to properly escape multi-word engine names and special characters
-	scriptArgs := append(secretNames, engineName, docsURL)
+	// The script expects: SECRET_NAME1 [SECRET_NAME2 ...] REQUIREMENT_NAME DOCS_URL
+	// Use shellJoinArgs to properly escape multi-word names and special characters
+	scriptArgs := append(secretNames, requirementName, docsURL)
 	scriptArgsStr := shellJoinArgs(scriptArgs)
 
 	stepLines := []string{
 		stepName,
-		"        id: validate-secret",
+		"        id: " + stepID,
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh\" " + scriptArgsStr,
 		"        env:",
 	}

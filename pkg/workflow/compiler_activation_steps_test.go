@@ -77,6 +77,34 @@ func TestActivationStepsAddSecretValidationStep(t *testing.T) {
 	assert.Equal(t, "${{ steps.validate-secret.outputs.verification_result }}", ctx.outputs["secret_verification_result"])
 }
 
+func TestActivationStepsAddSafeOutputSecretValidationSteps(t *testing.T) {
+	compiler := newActivationStepsTestCompiler("")
+	engine, err := compiler.getAgenticEngine("copilot")
+	require.NoError(t, err)
+
+	ctx := newActivationStepsTestContext(&WorkflowData{
+		AI: "copilot",
+		SafeOutputs: &SafeOutputsConfig{
+			JiraCreateIssue:   &JiraSafeOutputConfig{},
+			LinearCreateIssue: &LinearCreateIssueConfig{},
+			CreateWorkItems:   &CreateWorkItemConfig{},
+		},
+	})
+	ctx.engine = engine
+
+	compiler.addActivationSecretValidationStep(ctx)
+
+	steps := strings.Join(ctx.steps, "")
+	assert.Contains(t, steps, "JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}")
+	assert.Contains(t, steps, "JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}")
+	assert.Contains(t, steps, "LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}")
+	assert.Contains(t, steps, "AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}")
+	assert.Contains(t, steps, "'Jira safe outputs'")
+	assert.Contains(t, steps, "'Linear safe outputs'")
+	assert.Contains(t, steps, "'Azure DevOps safe outputs'")
+	assert.Contains(t, ctx.outputs["secret_verification_result"], "steps.validate-safe-output-secret-4.outcome == 'failure'")
+}
+
 func TestActivationStepsAddOAuthTokenCheckStep(t *testing.T) {
 	compiler := newActivationStepsTestCompiler("")
 

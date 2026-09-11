@@ -8,6 +8,8 @@ import (
 
 var azureDevOpsSafeOutputsLog = logger.New("workflow:safe_outputs_azure_devops")
 
+const azureDevOpsPATExpr = "${{ secrets.AZURE_DEVOPS_EXT_PAT }}"
+
 type AzureDevOpsArtifactLinkConfig struct {
 	Enabled    bool   `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	Repository string `yaml:"repository,omitempty" json:"repository,omitempty"`
@@ -79,6 +81,7 @@ func parseAzureDevOpsConfig[T any](c *Compiler, outputMap map[string]any, key st
 	if config == nil {
 		return nil
 	}
+
 	if configMap, ok := outputMap[key].(map[string]any); ok {
 		switch typed := any(config).(type) {
 		case *CreateWorkItemConfig:
@@ -99,6 +102,17 @@ func parseAzureDevOpsConfig[T any](c *Compiler, outputMap map[string]any, key st
 		postProcess(config)
 	}
 	return config
+}
+
+func injectAzureDevOpsCredentialsIntoProcessorStep(steps []string, config *SafeOutputsConfig) []string {
+	if !hasAzureDevOpsSafeOutputs(config) ||
+		config.Env["SYSTEM_ACCESSTOKEN"] != "" ||
+		config.Env["AZURE_DEVOPS_EXT_PAT"] != "" {
+		return steps
+	}
+	return injectProcessorStepEnv(steps, map[string]string{
+		"AZURE_DEVOPS_EXT_PAT": azureDevOpsPATExpr,
+	})
 }
 
 func (c *Compiler) parseCreateWorkItemConfig(outputMap map[string]any) *CreateWorkItemConfig {

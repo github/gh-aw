@@ -4,11 +4,41 @@ package workflow
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestInjectAzureDevOpsCredentialsIntoProcessorStep(t *testing.T) {
+	newSteps := func() []string {
+		return []string{
+			"      - name: Process Safe Outputs\n",
+			"        env:\n",
+			"        with:\n",
+		}
+	}
+
+	t.Run("injects default PAT secret", func(t *testing.T) {
+		config := &SafeOutputsConfig{CreateWorkItems: &CreateWorkItemConfig{}}
+		rendered := strings.Join(injectAzureDevOpsCredentialsIntoProcessorStep(newSteps(), config), "")
+
+		assert.Contains(t, rendered, "AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}")
+	})
+
+	t.Run("keeps frontmatter credential", func(t *testing.T) {
+		config := &SafeOutputsConfig{
+			CreateWorkItems: &CreateWorkItemConfig{},
+			Env: map[string]string{
+				"SYSTEM_ACCESSTOKEN": "${{ secrets.CUSTOM_ADO_TOKEN }}",
+			},
+		}
+		rendered := strings.Join(injectAzureDevOpsCredentialsIntoProcessorStep(newSteps(), config), "")
+
+		assert.NotContains(t, rendered, "AZURE_DEVOPS_EXT_PAT")
+	})
+}
 
 func TestExtractAzureDevOpsSafeOutputsConfig(t *testing.T) {
 	compiler := NewCompiler()
