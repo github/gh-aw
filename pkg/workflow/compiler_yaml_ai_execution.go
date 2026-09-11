@@ -215,6 +215,7 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 
 	yaml.WriteString("      - name: Parse token usage for step summary\n")
 	yaml.WriteString("        if: always()\n")
+	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID)
 	yaml.WriteString("        continue-on-error: true\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	yaml.WriteString("        with:\n")

@@ -149,7 +149,11 @@ func (c *Compiler) warnBuiltinJobEnvReferences(depends []string, engineEnvConten
 }
 
 // buildMainJobCoreOutputs returns the fixed output declarations that every main agent job exposes.
-func buildMainJobCoreOutputs() map[string]string {
+func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
+	usageStepID := constants.ParseMCPGatewayStepID
+	if isFirewallEnabled(data) || data.AI == string(constants.CopilotEngine) {
+		usageStepID = constants.ParseTokenUsageStepID
+	}
 	return map[string]string{
 		"model": fmt.Sprintf("${{ needs.%s.outputs.model }}", constants.ActivationJobName),
 		// effective_tokens is the total ET for the run, captured by the MCP gateway log parser step.
@@ -158,10 +162,10 @@ func buildMainJobCoreOutputs() map[string]string {
 		"effective_tokens": fmt.Sprintf("${{ steps.%s.outputs.effective_tokens }}", constants.ParseMCPGatewayStepID),
 		// aic is the total AI Credits cost for the run (1 AIC == 0.01 USD), captured by the
 		// MCP gateway log parser step and passed to downstream jobs for footer rendering.
-		"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", constants.ParseMCPGatewayStepID),
+		"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", usageStepID),
 		// ambient_context is the first-request context size metric:
 		// input_tokens + (cache_tokens / 10), where cache tokens are normalized as 10x cheaper.
-		"ambient_context": fmt.Sprintf("${{ steps.%s.outputs.ambient_context }}", constants.ParseMCPGatewayStepID),
+		"ambient_context": fmt.Sprintf("${{ steps.%s.outputs.ambient_context }}", usageStepID),
 		// ai_credits_rate_limit_error is true when MCP gateway logs indicate AI credits
 		// budget exhaustion or API rate limiting attributable to credit constraints.
 		"ai_credits_rate_limit_error": fmt.Sprintf("${{ steps.%s.outputs.ai_credits_rate_limit_error || 'false' }}", constants.ParseMCPGatewayStepID),
@@ -219,7 +223,7 @@ func (c *Compiler) addMainJobEngineErrorOutputs(outputs map[string]string, data 
 
 // buildMainJobOutputs builds the complete outputs map for the main agent job.
 func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
-	outputs := buildMainJobCoreOutputs()
+	outputs := buildMainJobCoreOutputs(data)
 
 	// Note: secret_verification_result is now an output of the activation job (not the agent job).
 	// The validate-secret step runs in the activation job, before context variable validation.
@@ -265,7 +269,7 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 }
 
 // buildMainJobEnv builds the job-level environment variable map for the main agent job.
-func (c *Compiler) buildMainJobEnv(data *WorkflowData) map[string]string {
+func (c *Compiler) buildMainJobEnv(data *WorkflowData) map[string]string { //nolint:largefunc // Existing environment assembly remains explicit.
 	var env map[string]string
 	if data != nil && data.EngineConfig != nil && data.EngineConfig.Version != "" {
 		env = make(map[string]string)
