@@ -5,6 +5,8 @@ package workflow
 import "testing"
 
 func TestCollectEngineVersionsForMetadata(t *testing.T) {
+	compiler := NewCompiler()
+
 	t.Run("only active main engine versions are included", func(t *testing.T) {
 		data := &WorkflowData{
 			AI: "copilot",
@@ -15,7 +17,7 @@ func TestCollectEngineVersionsForMetadata(t *testing.T) {
 			},
 		}
 
-		versions := collectEngineVersionsForMetadata(data, GetGlobalEngineRegistry())
+		versions := compiler.collectEngineVersionsForMetadata(data)
 		if versions["copilot"] != "1.2.3-custom" {
 			t.Fatalf("Expected copilot override version, got: %q", versions["copilot"])
 		}
@@ -43,12 +45,30 @@ func TestCollectEngineVersionsForMetadata(t *testing.T) {
 			},
 		}
 
-		versions := collectEngineVersionsForMetadata(data, GetGlobalEngineRegistry())
+		versions := compiler.collectEngineVersionsForMetadata(data)
 		if versions["copilot"] == "" {
 			t.Fatal("Expected active main engine version for copilot")
 		}
 		if versions["claude"] != "2.2.0-custom" {
 			t.Fatalf("Expected active detection engine override version, got: %q", versions["claude"])
+		}
+	})
+
+	t.Run("includes normalized detection engine version", func(t *testing.T) {
+		data := &WorkflowData{
+			AI:           "pi",
+			EngineConfig: &EngineConfig{ID: "pi"},
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{},
+			},
+		}
+
+		versions := compiler.collectEngineVersionsForMetadata(data)
+		if versions["pi"] == "" {
+			t.Fatal("Expected active main engine version for pi")
+		}
+		if versions["copilot"] == "" {
+			t.Fatal("Expected normalized detection engine version for copilot")
 		}
 	})
 }

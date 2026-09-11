@@ -23234,11 +23234,10 @@ github-app:
 import-schema:
   {}
 
-# Default LLM model, overridden by nested engine.model. Sets the default model
-# used by the agentic engine for this workflow. Acts as a fallback when an engine
-# instance does not specify its own 'model'; a nested 'engine.model' (e.g.
-# safe-outputs.threat-detection.engine.model) takes precedence over this field for
-# that engine instance. Supports full model IDs (e.g.
+# Default LLM model for the main agent, overridden by engine.model. This field
+# does not configure threat detection; use
+# safe-outputs.threat-detection.engine.model for a detection-specific model.
+# Supports full model IDs (e.g.
 # 'claude-3-5-sonnet-20241022', 'gpt-5.4') and model aliases (e.g. 'small',
 # 'large').
 # (optional)

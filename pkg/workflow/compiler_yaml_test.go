@@ -1885,6 +1885,66 @@ Test prompt.
 	}
 }
 
+func TestGenerateWorkflowHeaderIncludesEffectiveDetectionMetadata(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI:           "pi",
+		EngineConfig: &EngineConfig{ID: "pi"},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	var yaml strings.Builder
+	if err := compiler.generateWorkflowHeader(&yaml, data, "frontmatter-hash", "body-hash", nil, nil); err != nil {
+		t.Fatalf("Failed to generate workflow header: %v", err)
+	}
+
+	metadata, legacy, err := ExtractMetadataFromLockFile(yaml.String())
+	if err != nil {
+		t.Fatalf("Failed to extract lock metadata: %v", err)
+	}
+	if metadata == nil || legacy {
+		t.Fatal("Expected structured lock metadata")
+	}
+	if metadata.DetectionAgentID != "copilot" {
+		t.Fatalf("Expected normalized detection engine copilot, got %q", metadata.DetectionAgentID)
+	}
+	if metadata.DetectionAgentModel != "detection" {
+		t.Fatalf("Expected effective detection model alias, got %q", metadata.DetectionAgentModel)
+	}
+	if metadata.EngineVersions["copilot"] == "" {
+		t.Fatal("Expected normalized detection engine version in metadata")
+	}
+}
+
+func TestGenerateWorkflowHeaderOmitsDisabledDetectionEngineMetadata(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI:           "copilot",
+		EngineConfig: &EngineConfig{ID: "copilot"},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{
+				EngineDisabled: true,
+				Steps:          []any{map[string]any{"run": "echo custom detection"}},
+			},
+		},
+	}
+
+	var yaml strings.Builder
+	if err := compiler.generateWorkflowHeader(&yaml, data, "frontmatter-hash", "body-hash", nil, nil); err != nil {
+		t.Fatalf("Failed to generate workflow header: %v", err)
+	}
+
+	metadata, _, err := ExtractMetadataFromLockFile(yaml.String())
+	if err != nil {
+		t.Fatalf("Failed to extract lock metadata: %v", err)
+	}
+	if metadata.DetectionAgentID != "" || metadata.DetectionAgentModel != "" {
+		t.Fatalf("Expected disabled detection engine metadata to be omitted, got engine=%q model=%q", metadata.DetectionAgentID, metadata.DetectionAgentModel)
+	}
+}
+
 func TestCompileWorkflowMetadataMarksCopilotCustomConfig(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "lock-metadata-copilot-custom-config")
 

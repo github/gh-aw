@@ -17,6 +17,8 @@ var compilerYamlHeaderLog = logger.New("workflow:compiler_yaml:header")
 // for description, source, imports/includes, frontmatter-hash, stop-time, and manual-approval.
 // All ANSI escape codes are stripped from the output.
 // The gh-aw-metadata line is placed first for easy machine parsing.
+//
+//nolint:largefunc // Existing workflow header assembly preserves emitted section ordering.
 func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowData, frontmatterHash string, bodyHash string, secrets []string, actions []string) error {
 	// Skip the ASCII art banner in wasm/editor mode — it takes up too much space
 	if c.skipHeader {
@@ -40,12 +42,15 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 		if agentInfo.AgentID == "copilot" {
 			agentInfo.EngineBaseURLCustomized = isCopilotCustomConfig(data)
 		}
-		// Detection agent info: only if threat detection has its own engine config
-		if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.EngineConfig != nil {
-			agentInfo.DetectionAgentID = data.SafeOutputs.ThreatDetection.EngineConfig.ID
-			agentInfo.DetectionAgentModel = data.SafeOutputs.ThreatDetection.Model
+		// Detection agent info: report the effective engine and model used by the
+		// generated detection job, including compiler defaults and normalization.
+		if IsDetectionJobEnabled(data.SafeOutputs) && !data.SafeOutputs.ThreatDetection.EngineDisabled {
+			agentInfo.DetectionAgentID = c.getThreatDetectionEngineID(data)
+			if engine, err := c.getAgenticEngine(agentInfo.DetectionAgentID); err == nil {
+				agentInfo.DetectionAgentModel = resolveDetectionModel(data, engine)
+			}
 		}
-		agentInfo.EngineVersions = collectEngineVersionsForMetadata(data, c.engineRegistry)
+		agentInfo.EngineVersions = c.collectEngineVersionsForMetadata(data)
 		agentInfo.AgentImageRunner = resolveAgentImageRunnerIdentifier(data.RawFrontmatter)
 		metadata := GenerateLockMetadata(LockHashInfo{FrontmatterHash: frontmatterHash, BodyHash: bodyHash}, data.StopTime, c.effectiveStrictMode(data.RawFrontmatter), agentInfo)
 		metadata.Docs = data.Docs

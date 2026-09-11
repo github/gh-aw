@@ -400,13 +400,13 @@ flowchart TB
 **Detection Job Properties:**
 
 - **Isolated Execution**: The detection agent runs in a separate job with no write permissions and no access to the original agent's runtime state
-- **Prompted Analysis**: Detection uses the same AI engine as the workflow, but with a security-focused system prompt that instructs the agent to identify threats
+- **Prompted Analysis**: Detection uses a supported engine with the `detection` model alias by default and a security-focused system prompt that instructs the agent to identify threats
 - **Artifact-Based**: The detection agent only sees the buffered artifacts (outputs, patches, context), not live repository state
 - **Blocking Verdict**: The detection job must complete successfully and emit a "safe" verdict before any safe output jobs execute
 
 **Detection Mechanisms:**
 
-- **AI Detection**: Default AI-powered analysis using the workflow engine with a security-focused detection prompt
+- **AI Detection**: Default AI-powered analysis using a supported detection engine and the `detection` model alias
 - **Custom Steps**: Integration with security scanners (Semgrep, TruffleHog, LlamaGuard) via `threat-detection.steps` configuration
 - **Custom Prompts**: Domain-specific detection instructions for specialized threat models via `threat-detection.prompt` configuration
 

@@ -49,9 +49,8 @@ func TestCopilotEngine(t *testing.T) {
 func TestCopilotEngineDefaultDetectionModel(t *testing.T) {
 	engine := NewCopilotEngine()
 
-	// CopilotEngine does not hardcode a detection model - it falls through to the
-	// BaseEngine default (empty string), allowing the Copilot CLI to use its native
-	// default model (currently claude-sonnet-4.6), matching the main agent behavior.
+	// CopilotEngine does not hardcode a detection model. The shared detection model
+	// resolver supplies the detection alias after checking configured defaults.
 	defaultModel := engine.GetDefaultDetectionModel()
 	if defaultModel != "" {
 		t.Errorf("Expected empty default detection model (native CLI default), got '%s'", defaultModel)

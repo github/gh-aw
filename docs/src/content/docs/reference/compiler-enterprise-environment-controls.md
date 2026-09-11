@@ -136,6 +136,7 @@ For detection model selection, precedence is:
 1. `safe-outputs.threat-detection.engine.model` in workflow frontmatter
 2. `GH_AW_DEFAULT_DETECTION_MODEL`
 3. Engine-specific detection defaults
+4. The `detection` model alias
 
 For project timezone (rendered CLI timestamps), precedence is:
 

@@ -180,7 +180,7 @@ func versionToGitRef(version string) string {
 // collectEngineVersionsForMetadata returns engine version metadata for gh-aw lock files.
 // It includes only engines that are active in the current workflow, applies explicit version
 // overrides for those engines, and includes copilot-sdk only when enabled on an active copilot engine.
-func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegistry) map[string]string {
+func (c *Compiler) collectEngineVersionsForMetadata(data *WorkflowData) map[string]string {
 	if data == nil {
 		return map[string]string{}
 	}
@@ -200,12 +200,9 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 	activeEngineIDs := map[string]struct{}{mainEngineID: {}}
 
 	applyMetadataEngineVersionOverrides(versions, data.EngineConfig, mainEngineID)
-	if IsDetectionJobEnabled(data.SafeOutputs) && data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil {
+	if IsDetectionJobEnabled(data.SafeOutputs) && !data.SafeOutputs.ThreatDetection.EngineDisabled {
 		detectionConfig := data.SafeOutputs.ThreatDetection.EngineConfig
-		detectionEngineID := mainEngineID
-		if detectionConfig != nil && strings.TrimSpace(detectionConfig.ID) != "" {
-			detectionEngineID = strings.TrimSpace(detectionConfig.ID)
-		}
+		detectionEngineID := c.getThreatDetectionEngineID(data)
 		activeEngineIDs[detectionEngineID] = struct{}{}
 		applyMetadataEngineVersionOverrides(versions, detectionConfig, detectionEngineID)
 	}
@@ -215,7 +212,7 @@ func collectEngineVersionsForMetadata(data *WorkflowData, registry *EngineRegist
 		version := strings.TrimSpace(versions[engineID])
 		if version == "" {
 			// Behavior-defined engines declare their version in the engine definition.
-			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, registry))
+			version = strings.TrimSpace(behaviorEngineDefaultVersion(engineID, c.engineRegistry))
 		}
 		if version != "" {
 			filteredVersions[engineID] = version

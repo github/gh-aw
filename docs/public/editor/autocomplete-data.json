@@ -3677,7 +3677,7 @@
     },
     "model": {
       "type": "string",
-      "desc": "Default LLM model, overridden by nested engine.model.",
+      "desc": "Default LLM model for the main agent, overridden by engine.model.",
       "leaf": true
     },
     "graders": {

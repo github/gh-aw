@@ -125,7 +125,7 @@ Set the org-wide default with the [`GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`](/gh
 
 ## AI-Based Detection (Default)
 
-By default, threat detection uses the same AI engine as your main workflow to analyze output for security threats.
+By default, threat detection uses the same supported AI engine as the main workflow and selects the `detection` model alias. Engines that cannot run the detector, including Pi and custom engines without a `detection-engine`, are normalized to Copilot.
 
 **Example with Default AI Detection:**
 
@@ -134,7 +134,7 @@ By default, threat detection uses the same AI engine as your main workflow to an
 on: push
 safe-outputs:
   create-pull-request:
-  threat-detection: true  # Uses Claude for analysis
+  threat-detection: true  # Uses the detection model alias
 ---
 
 # Code Review Agent
@@ -179,7 +179,7 @@ The custom prompt is appended to the default threat detection instructions, prov
 
 ## Custom Engine Configuration
 
-Override the main workflow engine for threat detection:
+Override the detection engine or model:
 
 **String Format:**
 
@@ -198,6 +198,7 @@ safe-outputs:
   threat-detection:
     engine:
       id: copilot
+      model: gpt-4.1-mini
       max-turns: 3
 ```
 
