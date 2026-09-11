@@ -241,7 +241,7 @@ func TestEmitExperimentalFeatureWarningsGHAWDetection(t *testing.T) {
 	}
 }
 
-func TestEmitGeneralToolWarningsCloudHypervisorReviewTrigger(t *testing.T) {
+func TestEmitGeneralToolWarningsCloudHypervisorDoesNotWarn(t *testing.T) {
 	compiler := NewCompiler()
 	workflowData := &WorkflowData{
 		SandboxConfig: &SandboxConfig{
@@ -270,9 +270,8 @@ func TestEmitGeneralToolWarningsCloudHypervisorReviewTrigger(t *testing.T) {
 	require.NoError(t, err)
 	stderrOutput := buf.String()
 
-	assert.Contains(t, stderrOutput, "sandbox.agent.runtime: cloud-hypervisor uses a privileged KVM preview path")
-	assert.Contains(t, stderrOutput, "Require a human security review before merge or rollout")
-	assert.Equal(t, 1, compiler.GetWarningCount())
+	assert.NotContains(t, stderrOutput, "sandbox.agent.runtime: cloud-hypervisor")
+	assert.Zero(t, compiler.GetWarningCount())
 }
 
 func TestEmitGeneralToolWarningsDeprecatedSandboxRuntimes(t *testing.T) {

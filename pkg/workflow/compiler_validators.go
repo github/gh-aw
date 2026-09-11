@@ -359,8 +359,8 @@ func validateWorkflowConcurrency(workflowData *WorkflowData, markdownPath string
 	return nil
 }
 
-// emitSandboxRuntimeWarnings warns about sandbox runtime choices that need human
-// review or whose configuration the compiler cannot honour.
+// emitSandboxRuntimeWarnings warns about deprecated sandbox runtime choices or
+// configurations the compiler cannot honour.
 func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdownPath string) {
 	agentConfig := getAgentConfig(workflowData)
 	if agentConfig != nil {
@@ -371,12 +371,6 @@ func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdo
 					"Use sandbox.agent.runtime: docker instead.", agentConfig.Runtime)))
 			c.IncrementWarningCount()
 		}
-	}
-	if isCloudHypervisorRuntime(workflowData) {
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
-			"sandbox.agent.runtime: cloud-hypervisor uses a privileged KVM preview path with an attached MCP gateway topology. "+
-				"Require a human security review before merge or rollout, and record explicit approval in your change process."))
-		c.IncrementWarningCount()
 	}
 	if declaresIgnoredFilesystemAllowWrite(workflowData) {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
