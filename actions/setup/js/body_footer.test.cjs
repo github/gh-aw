@@ -19,4 +19,13 @@ describe("appendConfiguredBodyFooter", () => {
   it("preserves the body when no footer is configured", () => {
     expect(appendConfiguredBodyFooter("Body", undefined)).toBe("Body");
   });
+
+  it("omits the footer when appending would exceed the destination limit", () => {
+    const body = "x".repeat(100);
+    expect(appendConfiguredBodyFooter(body, "Footer", { maxLength: 100 })).toBe(body);
+  });
+
+  it("appends the footer when the composed body fits the destination limit", () => {
+    expect(appendConfiguredBodyFooter("Body", "Footer", { maxLength: 100 })).toBe("Body\n\nFooter");
+  });
 });

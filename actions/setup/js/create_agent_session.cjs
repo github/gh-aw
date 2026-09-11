@@ -97,7 +97,7 @@ async function main(config = {}) {
         items: [message],
         renderItem: item => {
           const parts = [];
-          parts.push(`**Description:**\n${item.body}`);
+          parts.push(`**Description:**\n${taskDescription}`);
           parts.push(`**Base Branch:** ${baseBranch}`);
           parts.push(`**Target Repository:** ${effectiveRepo}`);
           return parts.join("\n\n") + "\n\n";

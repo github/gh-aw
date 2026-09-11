@@ -6,6 +6,7 @@ const { renderTemplateFromFile } = require("./messages_core.cjs");
 const { generateFooterWithExpiration } = require("./ephemerals.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
+const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -97,7 +98,7 @@ function buildMissingIssueHandler(options) {
           commentLines.push(`> Workflow: [${workflowName}](${workflowSourceURL})`);
           commentLines.push(`> Run: ${runUrl}`);
 
-          const commentBody = sanitizeContent(commentLines.join("\n"));
+          const commentBody = appendConfiguredBodyFooter(sanitizeContent(commentLines.join("\n")), config.body_footer);
 
           await github.rest.issues.createComment({
             owner,
@@ -141,7 +142,7 @@ function buildMissingIssueHandler(options) {
             footerText: `> Workflow: [${workflowName}](${workflowSourceURL})`,
             expiresHours: 24 * 7, // 7 days
           });
-          const issueBody = sanitizeContent(`${issueBodyContent}\n\n${footer}`);
+          const issueBody = appendConfiguredBodyFooter(sanitizeContent(`${issueBodyContent}\n\n${footer}`), config.body_footer);
 
           const newIssue = await github.rest.issues.create({
             owner,

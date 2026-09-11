@@ -31,7 +31,7 @@ async function main(config = {}) {
     if (item.body.length > 65000) {
       throw new Error(`${ERR_VALIDATION}: linear_add_comment body exceeds 65000 characters`);
     }
-    const body = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
+    const body = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer, { maxLength: 65000 });
     if (!body.trim()) {
       throw new Error(`${ERR_VALIDATION}: linear_add_comment body is empty after sanitization`);
     }

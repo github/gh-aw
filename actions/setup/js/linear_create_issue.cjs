@@ -53,7 +53,7 @@ async function main(config = {}) {
     }
 
     const title = sanitizeTitle(item.title);
-    const description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
+    const description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer, { maxLength: 65000 });
     if (!title) {
       throw new Error(`${ERR_VALIDATION}: linear_create_issue title is empty after sanitization`);
     }

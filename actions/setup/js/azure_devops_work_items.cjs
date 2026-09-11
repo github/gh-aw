@@ -236,7 +236,7 @@ async function handleCreateWorkItem(message, config, resolvedTemporaryIds) {
     const rawDescription = String(message.description || "").trim();
     if (title.length < 6 || title.length > 255) throw new Error("title must contain 6 to 255 characters");
     if (rawDescription.length < 31) throw new Error("description must contain 31 to 65000 characters");
-    const description = appendConfiguredBodyFooter(rawDescription, config.body_footer);
+    const description = appendConfiguredBodyFooter(rawDescription, config.body_footer, { maxLength: 65000 });
     if (description.length > 65000) throw new Error("description must contain 31 to 65000 characters");
     const agentTags = validateTags(message.tags || []);
     validateAllowedTags(agentTags, config.allowed_tags);
@@ -314,7 +314,7 @@ async function handleCreateWorkItem(message, config, resolvedTemporaryIds) {
 async function handleUpdateWorkItem(message, config, resolvedTemporaryIds) {
   try {
     if (message.body !== undefined) {
-      message.body = appendConfiguredBodyFooter(String(message.body), config.body_footer);
+      message.body = appendConfiguredBodyFooter(String(message.body), config.body_footer, { maxLength: 65000 });
     }
     const preview = isStagedMode(config);
     const resolved = resolveWorkItemReference(message.id, resolvedTemporaryIds, preview);
@@ -374,7 +374,7 @@ async function handleUpdateWorkItem(message, config, resolvedTemporaryIds) {
 
 async function handleCommentOnWorkItem(message, config, resolvedTemporaryIds) {
   try {
-    message.body = appendConfiguredBodyFooter(String(message.body || ""), config.body_footer);
+    message.body = appendConfiguredBodyFooter(String(message.body || ""), config.body_footer, { maxLength: 65000 });
     const preview = isStagedMode(config);
     const resolved = resolveWorkItemReference(message.work_item_id, resolvedTemporaryIds, preview);
     if (preview) return staged(`Would comment on Azure DevOps work item ${message.work_item_id}`);

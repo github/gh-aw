@@ -460,4 +460,31 @@ describe("missing_issue_helpers.cjs - buildMissingIssueHandler", () => {
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to create or update issue"));
     });
   });
+  describe("configured body footer", () => {
+    it("appends the configured footer to the new issue body", async () => {
+      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+        data: { total_count: 0, items: [] },
+      });
+      mockGithub.rest.issues.create.mockResolvedValue({
+        data: { number: 90, html_url: "https://github.com/owner/repo/issues/90" },
+      });
+
+      const handler = await buildMissingIssueHandler(makeOptions())({ body_footer: "Configured footer" });
+      await handler(defaultMessage);
+
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("Configured footer") }));
+    });
+
+    it("appends the configured footer to the existing issue comment", async () => {
+      mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+        data: { total_count: 1, items: [{ number: 91, html_url: "https://github.com/owner/repo/issues/91" }] },
+      });
+      mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
+
+      const handler = await buildMissingIssueHandler(makeOptions())({ body_footer: "Configured footer" });
+      await handler(defaultMessage);
+
+      expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("Configured footer") }));
+    });
+  });
 });

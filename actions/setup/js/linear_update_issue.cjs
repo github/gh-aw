@@ -54,7 +54,7 @@ async function main(config = {}) {
       }
     }
     if (item.body !== undefined) {
-      input.description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer);
+      input.description = appendConfiguredBodyFooter(sanitizeContent(item.body), config.body_footer, { maxLength: 65000 });
     }
 
     if (isStagedMode(config)) {
