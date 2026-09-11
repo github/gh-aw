@@ -13862,6 +13862,12 @@ safe-outputs:
     # (optional)
     model: "example-value"
 
+    # Optional model-specific reasoning effort to forward to compatible agents and
+    # models. Supports literal values and GitHub Actions expressions. Invalid or
+    # unsupported runtime values are ignored with a warning.
+    # (optional)
+    reasoning_effort: "example-value"
+
     # Default custom agent ID to use when assigning custom agents. This is used for
     # specialized agent configurations beyond the standard Copilot agent.
     # (optional)

@@ -42,6 +42,7 @@ safe-outputs:
     max: 5
     name: copilot
     model: claude-sonnet-5  # Default model to use when not specified per-item
+    reasoning_effort: high  # Unsupported by this model and ignored with a runtime warning
     target: "triggering"     # Auto-resolves from workflow context (default)
     allowed: [copilot]       # Only allow copilot agent
 strict: false

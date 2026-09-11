@@ -36,6 +36,47 @@ function normalizeLogin(login) {
  */
 const AGENT_NAME_BY_LOGIN = Object.fromEntries(Object.entries(AGENT_LOGIN_NAMES).flatMap(([agentName, logins]) => logins.map(login => [normalizeLogin(login), agentName])));
 
+const REASONING_EFFORT_CAPABILITIES = {
+  copilot: [
+    { model: /^o(?:1|3)(?:-.+)?$/i, values: new Set(["low", "medium", "high"]) },
+    { model: /^o4-mini(?:-.+)?$/i, values: new Set(["low", "medium", "high"]) },
+    { model: /^gpt-5\.2(?:-|$)/i, values: new Set(["none", "low", "medium", "high", "xhigh"]) },
+    { model: /^gpt-5\.1(?:-|$)/i, values: new Set(["none", "low", "medium", "high"]) },
+    { model: /^gpt-5(?:-|$)/i, values: new Set(["minimal", "low", "medium", "high"]) },
+  ],
+};
+
+function resolveReasoningEffort(agentName, model, reasoningEffort) {
+  if (reasoningEffort == null) return null;
+  if (typeof reasoningEffort !== "string" || reasoningEffort.trim() === "") {
+    core.warning("Ignoring reasoning_effort: expected a non-empty string.");
+    return null;
+  }
+
+  const capabilities = REASONING_EFFORT_CAPABILITIES[agentName];
+  if (!capabilities) {
+    core.warning(`Ignoring reasoning_effort for agent "${agentName}": capability information is unavailable.`);
+    return null;
+  }
+  if (typeof model !== "string" || model.trim() === "") {
+    core.warning(`Ignoring reasoning_effort for agent "${agentName}": a supported model must be configured.`);
+    return null;
+  }
+
+  const capability = capabilities.find(entry => entry.model.test(model.trim()));
+  if (!capability) {
+    core.warning(`Ignoring reasoning_effort: model "${model}" does not support configurable reasoning effort.`);
+    return null;
+  }
+
+  const normalizedEffort = reasoningEffort.trim().toLowerCase();
+  if (!capability.values.has(normalizedEffort)) {
+    core.warning(`Ignoring reasoning_effort: the configured value is not supported by model "${model}".`);
+    return null;
+  }
+  return normalizedEffort;
+}
+
 /**
  * GitHub can surface bots either via type="Bot" or a [bot] login suffix.
  * Check both because assignee responses are not always consistent across endpoints.
@@ -335,6 +376,7 @@ async function getPullRequestDetails(owner, repo, pullNumber, githubClient = git
  * @param {string|null} [pullRequestRepoSlug] - Optional pull request repository slug (owner/repo) for REST path
  * @param {{rationale?: string, confidence?: "LOW"|"MEDIUM"|"HIGH", suggest?: boolean}} [intentMetadata] - Optional issue-intent metadata
  * @param {boolean} [useIssueIntent] - Whether to include issue-intent metadata/headers
+ * @param {string|null} [reasoningEffort] - Optional model-specific reasoning effort
  * @returns {Promise<boolean>} True if successful
  */
 async function assignAgentToIssue(
@@ -351,7 +393,8 @@ async function assignAgentToIssue(
   taskContext = null,
   pullRequestRepoSlug = null,
   intentMetadata = {},
-  useIssueIntent = true
+  useIssueIntent = true,
+  reasoningEffort = null
 ) {
   // SECURITY: pullRequestRepoSlug specifies a cross-repo target repository slug.
   // Callers MUST validate the corresponding repository slug against allowedRepos using
@@ -409,6 +452,8 @@ async function assignAgentToIssue(
     if (customInstructions != null) agentAssignment.custom_instructions = customInstructions;
     if (customAgent != null) agentAssignment.custom_agent = customAgent;
     if (model != null) agentAssignment.model = model;
+    const supportedReasoningEffort = resolveReasoningEffort(agentName, model, reasoningEffort);
+    if (supportedReasoningEffort != null) agentAssignment.reasoning_effort = supportedReasoningEffort;
     if (Object.keys(agentAssignment).length > 0) assignParams.agent_assignment = agentAssignment;
     await githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", assignParams);
     return true;
@@ -525,6 +570,7 @@ module.exports = {
   getIssueDetails,
   getPullRequestDetails,
   assignAgentToIssue,
+  resolveReasoningEffort,
   logPermissionError,
   generatePermissionErrorSummary,
   assignAgentToIssueByName,
