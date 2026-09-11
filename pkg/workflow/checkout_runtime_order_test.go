@@ -13,8 +13,9 @@ import (
 
 // otlpTelemetryStepNames are compiler-injected observability steps. They are emitted
 // for every workflow because the OTLP endpoint defaults to the enterprise
-// vars.GH_AW_DEFAULT_OTLP_ENDPOINT / secrets.GH_AW_DEFAULT_OTLP_HEADERS pair, so they
-// are not part of the checkout ordering contract exercised by these tests.
+// GH_AW_DEFAULT_OTLP_ENDPOINT secret or variable / GH_AW_DEFAULT_OTLP_HEADERS
+// secret pair, so they are not part of the checkout ordering contract exercised
+// by these tests.
 var otlpTelemetryStepNames = map[string]bool{
 	"Mask OTLP telemetry headers":        true,
 	"Mask OTLP custom attribute values":  true,

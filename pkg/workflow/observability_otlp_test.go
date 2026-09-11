@@ -354,7 +354,7 @@ func TestInjectOTLPConfig(t *testing.T) {
 		c.injectOTLPConfig(wd)
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil for expression endpoints")
 		assert.True(t, wd.OTLPUsesEnterpriseDefaults, "enterprise defaults should be flagged")
-		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}")
 		assert.Contains(t, wd.Env, "GH_AW_OTLP_IF_MISSING: ignore", "unset enterprise defaults must be a no-op")
 	})
@@ -365,7 +365,7 @@ func TestInjectOTLPConfig(t *testing.T) {
 		c.injectOTLPConfig(wd)
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil for expression endpoints")
 		assert.True(t, wd.OTLPUsesEnterpriseDefaults, "enterprise defaults should be flagged")
-		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 	})
 
 	t.Run("injects env vars when endpoint is a secret expression", func(t *testing.T) {
@@ -895,7 +895,7 @@ func TestInjectOTLPConfig_RawFrontmatterFallback(t *testing.T) {
 			RawFrontmatter:    map[string]any{"name": "my-workflow"},
 		}
 		c.injectOTLPConfig(wd)
-		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
+		assert.Contains(t, wd.Env, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}")
 		assert.Nil(t, wd.NetworkPermissions, "NetworkPermissions should remain nil")
 	})
 }
@@ -1141,7 +1141,7 @@ func TestInjectOTLPConfig_OTLPEndpointField(t *testing.T) {
 			RawFrontmatter: map[string]any{"name": "no-otlp"},
 		}
 		c.injectOTLPConfig(wd)
-		assert.Equal(t, "${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}", wd.OTLPEndpoint, "OTLPEndpoint should fall back to the enterprise default variable")
+		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}", wd.OTLPEndpoint, "OTLPEndpoint should prefer the enterprise default secret and fall back to the variable")
 		assert.Equal(t, "${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}", wd.OTLPHeaders, "OTLPHeaders should fall back to the enterprise default secret")
 	})
 

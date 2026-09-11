@@ -83,8 +83,8 @@ engine: copilot
 	if !strings.Contains(compiled, "- name: Generate observability summary") {
 		t.Fatal("Expected observability summary step when the enterprise default OTLP endpoint is used")
 	}
-	if !strings.Contains(compiled, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}") {
-		t.Fatal("Expected the enterprise default OTLP endpoint variable in the compiled workflow")
+	if !strings.Contains(compiled, "OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}") {
+		t.Fatal("Expected the enterprise default OTLP endpoint secret and variable fallback in the compiled workflow")
 	}
 }
 
