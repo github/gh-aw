@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/repoutil"
 	"github.com/github/gh-aw/pkg/stringutil"
-	"github.com/sourcegraph/conc/pool"
 )
 
 // concurrentRunDownloadParams holds parameters shared across all goroutines
@@ -67,7 +67,10 @@ type runArtifactsConcurrentOptions struct {
 	maxGitHubAPIRateLimit  int
 	cachedRuns             cachedLogsRuns
 	filters                runFilterOpts
+	onResult               func(int, DownloadResult)
 }
+
+var processConcurrentRunDownload = processSingleRunDownload
 
 // buildConcurrentDownloadParams constructs download parameters by parsing the optional
 // repoOverride ("owner/repo" or "HOST/owner/repo") once for the whole batch.
@@ -144,35 +147,7 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 	params.storageLimit = opts.storageLimit
 	params.maxGitHubAPIRateLimit = opts.maxGitHubAPIRateLimit
 
-	// Configure concurrent download pool with bounded parallelism and context cancellation.
-	// The conc pool automatically handles panic recovery and prevents goroutine leaks.
-	// Results are written into a slot pre-allocated per run rather than collected via
-	// pool.NewWithResults, whose completion order is not guaranteed to match submission
-	// order. Preserving submission (API) order lets storage/rate-limit continuation
-	// cursors rely on the position of the oldest run in the batch even though downloads
-	// still run concurrently (the storage limiter itself remains the throughput gate).
-	results := make([]DownloadResult, len(runs))
-	p := pool.New().
-		WithContext(ctx).
-		WithMaxGoroutines(maxConcurrent)
-
-	// Each download task runs concurrently with context awareness.
-	for i, run := range runs {
-		if cachedResult, ok := cachedJSONDownloadResult(run, opts.cachedRuns, opts.filters); ok {
-			results[i] = cachedResult
-			completedCount.Add(1)
-			continue
-		}
-		p.Go(func(ctx context.Context) error {
-			result, _ := processSingleRunDownload(ctx, run, params, &completedCount, progressBar)
-			results[i] = result
-			return nil
-		})
-	}
-
-	if err := p.Wait(); err != nil && opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Download interrupted: %v", err)))
-	}
+	results := runConcurrentArtifactDownloads(ctx, runs, opts, params, &completedCount, progressBar, maxConcurrent)
 	if progressBar != nil {
 		console.ClearLine()
 	}
@@ -181,6 +156,129 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 	}
 	logsOrchestratorLog.Printf("Concurrent download complete: total=%d, results=%d", totalRuns, len(results))
 	return results
+}
+
+type runDownloadJob struct {
+	index int
+	run   WorkflowRun
+}
+
+func runConcurrentArtifactDownloads(
+	ctx context.Context,
+	runs []WorkflowRun,
+	opts runArtifactsConcurrentOptions,
+	params concurrentRunDownloadParams,
+	completedCount *atomic.Int64,
+	progressBar *console.ProgressBar,
+	maxConcurrent int,
+) []DownloadResult {
+	results := make([]DownloadResult, len(runs))
+	completed := make([]bool, len(runs))
+	jobs := make(chan runDownloadJob)
+	var workers sync.WaitGroup
+	for range min(maxConcurrent, len(runs)) {
+		workers.Go(func() {
+			runArtifactDownloadWorker(ctx, jobs, results, completed, opts, params, completedCount, progressBar)
+		})
+	}
+	for i, run := range runs {
+		if cachedResult, ok := cachedJSONDownloadResult(run, opts.cachedRuns, opts.filters); ok {
+			recordConcurrentDownloadResult(i, cachedResult, results, completed, opts.onResult)
+			completedCount.Add(1)
+			continue
+		}
+		submitted := false
+		select {
+		case <-ctx.Done():
+		case jobs <- runDownloadJob{index: i, run: run}:
+			submitted = true
+		}
+		if !submitted {
+			break
+		}
+	}
+	close(jobs)
+	workers.Wait()
+	if err := ctx.Err(); err != nil {
+		fillCanceledDownloadResults(runs, results, completed, err)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Download interrupted: %v", err)))
+		}
+	}
+	return results
+}
+
+func runArtifactDownloadWorker(
+	ctx context.Context,
+	jobs <-chan runDownloadJob,
+	results []DownloadResult,
+	completed []bool,
+	opts runArtifactsConcurrentOptions,
+	params concurrentRunDownloadParams,
+	completedCount *atomic.Int64,
+	progressBar *console.ProgressBar,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job, ok := <-jobs:
+			if !ok {
+				return
+			}
+			result := canceledDownloadResult(job.run, ctx.Err())
+			if result.Error == nil {
+				result = executeConcurrentRunDownload(ctx, job.run, params, completedCount, progressBar)
+			}
+			recordConcurrentDownloadResult(job.index, result, results, completed, opts.onResult)
+			if result.Error != nil && errors.Is(result.Error, context.Canceled) {
+				return
+			}
+		}
+	}
+}
+
+func executeConcurrentRunDownload(
+	ctx context.Context,
+	run WorkflowRun,
+	params concurrentRunDownloadParams,
+	completedCount *atomic.Int64,
+	progressBar *console.ProgressBar,
+) (result DownloadResult) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = DownloadResult{
+				RunAnalysis: RunAnalysis{Run: run},
+				Skipped:     true,
+				Error:       fmt.Errorf("run download panicked: %v", recovered),
+			}
+		}
+	}()
+	result, _ = processConcurrentRunDownload(ctx, run, params, completedCount, progressBar)
+	return result
+}
+
+func canceledDownloadResult(run WorkflowRun, err error) DownloadResult {
+	if err == nil {
+		return DownloadResult{}
+	}
+	return DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true, Error: err}
+}
+
+func recordConcurrentDownloadResult(index int, result DownloadResult, results []DownloadResult, completed []bool, onResult func(int, DownloadResult)) {
+	results[index] = result
+	completed[index] = true
+	if onResult != nil {
+		onResult(index, result)
+	}
+}
+
+func fillCanceledDownloadResults(runs []WorkflowRun, results []DownloadResult, completed []bool, err error) {
+	for i, run := range runs {
+		if !completed[i] {
+			results[i] = canceledDownloadResult(run, err)
+		}
+	}
 }
 
 func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filters runFilterOpts) (DownloadResult, bool) {

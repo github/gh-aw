@@ -106,6 +106,15 @@ func validateMaxStorageMB(maxStorageMB int) error {
 	return nil
 }
 
+func (l *logsStorageLimit) usage() (used, maximum int64) {
+	if l == nil {
+		return 0, 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.usedBytes, l.maxBytes
+}
+
 func logsDirectorySize(path string) (int64, error) {
 	var total int64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, walkErr error) error {

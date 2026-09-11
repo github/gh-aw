@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -220,6 +221,7 @@ func cancelLogsDownload(cancel context.CancelFunc) {
 var (
 	logsFetchWorkflowRunBatch   = fetchWorkflowRunBatch
 	logsProcessWorkflowRunBatch = processWorkflowRunBatch
+	buildLogsProcessedRun       = buildProcessedRun
 )
 
 type logsCollectionState struct {
@@ -231,9 +233,59 @@ type logsCollectionState struct {
 	storageLimitReached bool
 }
 
+type logsGuardrailStatus struct {
+	countRemaining   int
+	countMaximum     int
+	storageRemaining int64
+	storageMaximum   int64
+	timeoutRemaining time.Duration
+}
+
+func currentLogsGuardrailStatus(runtime logsDownloadRuntime, opts LogsDownloadOptions, state logsCollectionState) logsGuardrailStatus {
+	countRemaining := opts.Count - len(state.processedRuns)
+	if sharedRemaining := opts.countLimit.remaining(); sharedRemaining >= 0 {
+		countRemaining = sharedRemaining
+	}
+	countRemaining = max(0, countRemaining)
+
+	storageUsed, storageMaximum := runtime.storageLimit.usage()
+	storageRemaining := int64(-1)
+	if storageMaximum > 0 {
+		storageRemaining = max(0, storageMaximum-storageUsed)
+	}
+
+	timeoutRemaining := time.Duration(-1)
+	if deadline, ok := runtime.activeCtx.Deadline(); ok {
+		timeoutRemaining = max(0, time.Until(deadline))
+	}
+	return logsGuardrailStatus{
+		countRemaining:   countRemaining,
+		countMaximum:     opts.Count,
+		storageRemaining: storageRemaining,
+		storageMaximum:   storageMaximum,
+		timeoutRemaining: timeoutRemaining,
+	}
+}
+
+func logLogsGuardrailStatus(runtime logsDownloadRuntime, opts LogsDownloadOptions, state logsCollectionState) {
+	status := currentLogsGuardrailStatus(runtime, opts, state)
+	logsOrchestratorLog.Printf(
+		"Logs download guardrails: iteration=%d count_remaining=%d count_maximum=%d storage_remaining_bytes=%d storage_maximum_bytes=%d timeout_remaining=%s",
+		state.iteration, status.countRemaining, status.countMaximum, status.storageRemaining, status.storageMaximum, status.timeoutRemaining,
+	)
+}
+
+func logLogsCollectionResult(runtime logsDownloadRuntime, opts LogsDownloadOptions, state logsCollectionState) {
+	logLogsIterationLimit(runtime.fetchAllInRange, state.iteration, len(state.processedRuns), opts.Count)
+	logLogsTimeoutResult(state.timeoutReached, len(state.processedRuns))
+	logLogsStorageLimitResult(state.storageLimitReached, len(state.processedRuns))
+	logLogsGuardrailStatus(runtime, opts, state)
+}
+
 func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownloadOptions) ([]ProcessedRun, bool, bool, bool, string, error) {
 	state := logsCollectionState{}
 	for state.iteration < MaxIterations {
+		logLogsGuardrailStatus(runtime, opts, state)
 		stop, timedOut, err := shouldStopLogsIteration(runtime, opts)
 		if err != nil {
 			return state.processedRuns, state.timeoutReached || timedOut, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
@@ -284,9 +336,7 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 			break
 		}
 	}
-	logLogsIterationLimit(runtime.fetchAllInRange, state.iteration, len(state.processedRuns), opts.Count)
-	logLogsTimeoutResult(state.timeoutReached, len(state.processedRuns))
-	logLogsStorageLimitResult(state.storageLimitReached, len(state.processedRuns))
+	logLogsCollectionResult(runtime, opts, state)
 	if runtime.fetchAllInRange && !state.timeoutReached && state.iteration >= MaxIterations {
 		state.countLimitReached = true
 	}
@@ -608,6 +658,103 @@ func nextWorkflowRunChunk(runsRemaining *[]WorkflowRun, remainingNeeded int) []W
 	return chunk
 }
 
+type orderedLogsRunCollector struct {
+	ctx                 context.Context
+	opts                processWorkflowRunBatchOptions
+	processedBase       int
+	candidates          []ProcessedRun
+	accepted            []bool
+	acceptedCount       int
+	pendingResults      []DownloadResult
+	resultReady         []bool
+	resultResolved      []chan struct{}
+	nextResult          int
+	storageLimitReached bool
+	mu                  sync.Mutex
+}
+
+func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, opts processWorkflowRunBatchOptions) *orderedLogsRunCollector {
+	collector := &orderedLogsRunCollector{
+		ctx:            ctx,
+		opts:           opts,
+		processedBase:  count,
+		candidates:     make([]ProcessedRun, chunkSize),
+		accepted:       make([]bool, chunkSize),
+		pendingResults: make([]DownloadResult, chunkSize),
+		resultReady:    make([]bool, chunkSize),
+		resultResolved: make([]chan struct{}, chunkSize),
+	}
+	for i := range collector.resultResolved {
+		collector.resultResolved[i] = make(chan struct{})
+	}
+	return collector
+}
+
+func (c *orderedLogsRunCollector) onResult(index int, result DownloadResult) {
+	resolved := c.recordResult(index, result)
+	// Later results retain their worker slots until earlier API results resolve.
+	// This bounds future work while preserving newest-first selection and cursors.
+	<-resolved
+}
+
+func (c *orderedLogsRunCollector) recordResult(index int, result DownloadResult) <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pendingResults[index] = result
+	c.resultReady[index] = true
+	for c.nextResult < len(c.pendingResults) && c.resultReady[c.nextResult] {
+		c.processReadyResult(c.nextResult)
+		close(c.resultResolved[c.nextResult])
+		c.nextResult++
+	}
+	return c.resultResolved[index]
+}
+
+func (c *orderedLogsRunCollector) processReadyResult(index int) {
+	result := c.pendingResults[index]
+	if c.processedBase+c.acceptedCount >= c.opts.count || c.opts.countLimit.isReached() {
+		finalizeLogsRunDownload(c.opts.storageLimit, result)
+		return
+	}
+	if result.CachedRun != nil {
+		if c.opts.countLimit.tryAdd() {
+			c.candidates[index] = processedRunFromCachedData(*result.CachedRun)
+			c.accepted[index] = true
+			c.acceptedCount++
+		}
+		return
+	}
+	if errors.Is(result.Error, errLogsStorageLimitReached) {
+		c.storageLimitReached = true
+	}
+	if shouldSkipProcessedWorkflowRun(result, c.opts.verbose) || applyRunFilters(c.ctx, result, c.opts.filters, c.opts.verbose) {
+		finalizeLogsRunDownload(c.opts.storageLimit, result)
+		return
+	}
+	processedRun := buildLogsProcessedRun(c.ctx, result, c.opts.verbose, true)
+	parseWorkflowRunArtifacts(result, processedRun, c.opts.parse, c.opts.verbose)
+	finalizeLogsRunDownload(c.opts.storageLimit, result)
+	if c.opts.countLimit.tryAdd() {
+		c.candidates[index] = processedRun
+		c.accepted[index] = true
+		c.acceptedCount++
+	}
+}
+
+func (c *orderedLogsRunCollector) appendAccepted(processedRuns []ProcessedRun, batchProcessed int, writer *cachedLogsJSONLWriter) ([]ProcessedRun, int) {
+	for i := range c.candidates {
+		if !c.accepted[i] {
+			continue
+		}
+		processedRuns = append(processedRuns, c.candidates[i])
+		batchProcessed++
+		if err := writer.Append(c.candidates[i]); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+		}
+	}
+	return processedRuns, batchProcessed
+}
+
 func appendProcessedWorkflowRuns(
 	activeCtx context.Context,
 	processedRuns []ProcessedRun,
@@ -615,7 +762,8 @@ func appendProcessedWorkflowRuns(
 	batchProcessed int,
 	opts processWorkflowRunBatchOptions,
 ) ([]ProcessedRun, int, bool) {
-	downloadResults := downloadRunArtifactsConcurrent(activeCtx, chunk, runArtifactsConcurrentOptions{
+	collector := newOrderedLogsRunCollector(activeCtx, len(processedRuns), len(chunk), opts)
+	downloadRunArtifactsConcurrent(activeCtx, chunk, runArtifactsConcurrentOptions{
 		outputDir:              opts.outputDir,
 		verbose:                opts.verbose,
 		maxRuns:                opts.count - len(processedRuns),
@@ -628,39 +776,10 @@ func appendProcessedWorkflowRuns(
 		maxGitHubAPIRateLimit:  opts.maxGitHubAPIRateLimit,
 		cachedRuns:             opts.cachedRuns,
 		filters:                opts.filters,
+		onResult:               collector.onResult,
 	})
-	var storageLimitReached bool
-	for _, result := range downloadResults {
-		if result.CachedRun != nil {
-			if len(processedRuns) < opts.count && opts.countLimit.tryAdd() {
-				processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
-				batchProcessed++
-			}
-			continue
-		}
-		if errors.Is(result.Error, errLogsStorageLimitReached) {
-			storageLimitReached = true
-		}
-		if shouldSkipProcessedWorkflowRun(result, opts.verbose) || applyRunFilters(activeCtx, result, opts.filters, opts.verbose) {
-			finalizeLogsRunDownload(opts.storageLimit, result)
-			continue
-		}
-		processedRun := buildProcessedRun(activeCtx, result, opts.verbose, true)
-		parseWorkflowRunArtifacts(result, processedRun, opts.parse, opts.verbose)
-		finalizeLogsRunDownload(opts.storageLimit, result)
-		if len(processedRuns) >= opts.count {
-			continue
-		}
-		if !opts.countLimit.tryAdd() {
-			continue
-		}
-		processedRuns = append(processedRuns, processedRun)
-		batchProcessed++
-		if err := opts.cachedJSONLWriter.Append(processedRun); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
-		}
-	}
-	return processedRuns, batchProcessed, storageLimitReached
+	processedRuns, batchProcessed = collector.appendAccepted(processedRuns, batchProcessed, opts.cachedJSONLWriter)
+	return processedRuns, batchProcessed, collector.storageLimitReached
 }
 
 func finalizeLogsRunDownload(storageLimit *logsStorageLimit, result DownloadResult) {

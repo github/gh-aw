@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -344,6 +345,127 @@ func TestLogsCountLimitRemaining(t *testing.T) {
 	assert.Equal(t, 0, limit.remaining())
 	assert.False(t, limit.tryAdd())
 	assert.Equal(t, 0, limit.remaining())
+}
+
+func TestConcurrentRunDownloadsCancelWorkersAndClearQueueAtSharedCount(t *testing.T) {
+	original := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = original })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	limit := newLogsCountLimit(1)
+	limit.cancel = cancel
+
+	secondStarted := make(chan struct{})
+	secondCanceled := make(chan struct{})
+	var started atomic.Int64
+	processConcurrentRunDownload = func(ctx context.Context, run WorkflowRun, _ concurrentRunDownloadParams, _ *atomic.Int64, _ *console.ProgressBar) (DownloadResult, error) {
+		started.Add(1)
+		if run.DatabaseID == 1 {
+			<-secondStarted
+			return DownloadResult{RunAnalysis: RunAnalysis{Run: run}}, nil
+		}
+		close(secondStarted)
+		<-ctx.Done()
+		close(secondCanceled)
+		return DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true, Error: ctx.Err()}, nil
+	}
+
+	runs := []WorkflowRun{
+		{DatabaseID: 1},
+		{DatabaseID: 2},
+		{DatabaseID: 3},
+		{DatabaseID: 4},
+	}
+	results := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{
+		outputDir:              t.TempDir(),
+		maxRuns:                1,
+		maxConcurrentDownloads: 2,
+		onResult: func(_ int, result DownloadResult) {
+			if !result.Skipped && result.Error == nil {
+				limit.tryAdd()
+			}
+		},
+	})
+
+	assert.Equal(t, int64(2), started.Load(), "queued runs must not start after the shared count is reached")
+	select {
+	case <-secondCanceled:
+	default:
+		t.Fatal("an in-flight worker did not observe shared count cancellation")
+	}
+	require.Len(t, results, len(runs))
+	require.NoError(t, results[0].Error)
+	for _, result := range results[1:] {
+		assert.True(t, result.Skipped)
+		assert.ErrorIs(t, result.Error, context.Canceled)
+	}
+}
+
+func TestAppendProcessedWorkflowRunsPreservesNewestPrefixOnCancellation(t *testing.T) {
+	originalProcess := processConcurrentRunDownload
+	originalBuild := buildLogsProcessedRun
+	t.Cleanup(func() {
+		processConcurrentRunDownload = originalProcess
+		buildLogsProcessedRun = originalBuild
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	limit := newLogsCountLimit(1)
+	limit.cancel = cancel
+
+	secondStarted := make(chan struct{})
+	var startedMu sync.Mutex
+	var started []int64
+	processConcurrentRunDownload = func(ctx context.Context, run WorkflowRun, _ concurrentRunDownloadParams, _ *atomic.Int64, _ *console.ProgressBar) (DownloadResult, error) {
+		startedMu.Lock()
+		started = append(started, run.DatabaseID)
+		startedMu.Unlock()
+		switch run.DatabaseID {
+		case 1:
+			<-secondStarted
+		case 2:
+			close(secondStarted)
+		}
+		return DownloadResult{RunAnalysis: RunAnalysis{Run: run}}, nil
+	}
+	buildLogsProcessedRun = func(_ context.Context, result DownloadResult, _, _ bool) ProcessedRun {
+		return ProcessedRun{Run: result.Run}
+	}
+
+	processed, count, _ := appendProcessedWorkflowRuns(ctx, nil, []WorkflowRun{
+		{DatabaseID: 1},
+		{DatabaseID: 2},
+		{DatabaseID: 3},
+	}, 0, processWorkflowRunBatchOptions{
+		count:                  1,
+		maxConcurrentDownloads: 2,
+		countLimit:             limit,
+	})
+
+	require.Len(t, processed, 1)
+	assert.Equal(t, int64(1), processed[0].Run.DatabaseID, "completion order must not replace the newest API result")
+	assert.Equal(t, 1, count)
+	startedMu.Lock()
+	assert.ElementsMatch(t, []int64{1, 2}, started, "the queued third run must be cleared when the prefix fills the count")
+	startedMu.Unlock()
+}
+
+func TestConcurrentRunDownloadsRecoverWorkerPanic(t *testing.T) {
+	original := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = original })
+	processConcurrentRunDownload = func(context.Context, WorkflowRun, concurrentRunDownloadParams, *atomic.Int64, *console.ProgressBar) (DownloadResult, error) {
+		panic("download failed")
+	}
+
+	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 1}}, runArtifactsConcurrentOptions{
+		outputDir:              t.TempDir(),
+		maxConcurrentDownloads: 1,
+	})
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Skipped)
+	require.ErrorContains(t, results[0].Error, "run download panicked: download failed")
 }
 
 // TestLogsTargetContinuationPreservesTimeout guards against multi-target

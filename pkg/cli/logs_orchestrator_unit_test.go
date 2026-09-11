@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -779,4 +780,28 @@ func TestEffectiveLogsBatchCount(t *testing.T) {
 	require.True(t, exhausted.tryAdd())
 	assert.Equal(t, 100, effectiveLogsBatchCount(100, 0, exhausted),
 		"an exhausted budget leaves the count alone so the collection loop can advance its cursor and stop")
+}
+
+func TestCurrentLogsGuardrailStatusReportsAllBoundaries(t *testing.T) {
+	outputDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(outputDir, "cached.log"), make([]byte, 128), 0o600))
+	storageLimit := newLogsStorageLimit(outputDir, 1, false)
+	countLimit := newLogsCountLimit(5)
+	require.True(t, countLimit.tryAdd())
+	require.True(t, countLimit.tryAdd())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	status := currentLogsGuardrailStatus(
+		logsDownloadRuntime{activeCtx: ctx, storageLimit: storageLimit},
+		LogsDownloadOptions{Count: 5, countLimit: countLimit},
+		logsCollectionState{iteration: 2},
+	)
+
+	assert.Equal(t, 3, status.countRemaining)
+	assert.Equal(t, 5, status.countMaximum)
+	assert.Equal(t, int64(128), status.storageMaximum-status.storageRemaining)
+	assert.Equal(t, bytesPerMegabyte, status.storageMaximum)
+	assert.Positive(t, status.timeoutRemaining)
+	assert.LessOrEqual(t, status.timeoutRemaining, time.Minute)
 }
