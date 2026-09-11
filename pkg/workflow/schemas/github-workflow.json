@@ -13,6 +13,12 @@
       "$ref": "#/definitions/globs",
       "description": "When using the push and pull_request events, you can configure a workflow to run on specific branches or tags. If you only define only tags or only branches, the workflow won't run for events affecting the undefined Git ref.\nThe branches, branches-ignore, tags, and tags-ignore keywords accept glob patterns that use the * and ** wildcard characters to match more than one branch or tag name. For more information, see https://help.github.com/en/github/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet.\nThe patterns defined in branches and tags are evaluated against the Git ref's name. For example, defining the pattern mona/octocat in branches will match the refs/heads/mona/octocat Git ref. The pattern releases/** will match the refs/heads/releases/10 Git ref.\nYou can use two types of filters to prevent a workflow from running on pushes and pull requests to tags and branches:\n- branches or branches-ignore - You cannot use both the branches and branches-ignore filters for the same event in a workflow. Use the branches filter when you need to filter branches for positive matches and exclude branches. Use the branches-ignore filter when you only need to exclude branch names.\n- tags or tags-ignore - You cannot use both the tags and tags-ignore filters for the same event in a workflow. Use the tags filter when you need to filter tags for positive matches and exclude tags. Use the tags-ignore filter when you only need to exclude tag names.\nYou can exclude tags and branches using the ! character. The order that you define patterns matters.\n- A matching negative pattern (prefixed with !) after a positive match will exclude the Git ref.\n- A matching positive pattern after a negative match will include the Git ref again."
     },
+    "cacheMode": {
+      "$comment": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#cache-mode",
+      "description": "Controls the level of GitHub Actions cache access granted to a workflow or job.",
+      "type": "string",
+      "enum": ["read", "write", "write-only", "none"]
+    },
     "concurrency": {
       "type": "object",
       "properties": {
@@ -778,6 +784,9 @@
         "permissions": {
           "$ref": "#/definitions/permissions"
         },
+        "cache-mode": {
+          "$ref": "#/definitions/cacheMode"
+        },
         "if": {
           "$comment": "https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idif",
           "description": "You can use the if conditional to prevent a job from running unless a condition is met. You can use any supported context and expression to create a conditional.\nExpressions in an if conditional do not require the ${{ }} syntax. For more information, see https://help.github.com/en/articles/contexts-and-expression-syntax-for-github-actions.",
@@ -888,6 +897,9 @@
         },
         "permissions": {
           "$ref": "#/definitions/permissions"
+        },
+        "cache-mode": {
+          "$ref": "#/definitions/cacheMode"
         },
         "runs-on": {
           "$comment": "https://help.github.com/en/github/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idruns-on",
@@ -2169,6 +2181,9 @@
           "$ref": "#/definitions/concurrency"
         }
       ]
+    },
+    "cache-mode": {
+      "$ref": "#/definitions/cacheMode"
     },
     "jobs": {
       "$comment": "https://help.github.com/en/github/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobs",
