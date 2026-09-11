@@ -148,18 +148,23 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	if workflowData == nil {
 		return true
 	}
+	// Enclave-only GitHub backends (static or dynamic) always derive their guard policy
+	// statically from the enclave declaration, never from the determine-automatic-lockdown
+	// step outputs — even though that step may still be generated for such backends solely
+	// to supply GH_AW_SINK_VISIBILITY for the write-sink policy.
+	if githubBackendIsStaticEnclaveDelegationOnly(workflowData) || githubBackendIsDynamicDelegationOnly(workflowData) {
+		return false
+	}
 	githubTool, hasGitHub := workflowData.Tools["github"]
 	if !hasGitHub {
-		// Default-tool resolution removes the "github" key when tools.github is false, so an
-		// absent key can still mean the GitHub MCP server is rendered for enclave delegation.
-		// The determine-automatic-lockdown step may still run in that case (to supply
-		// GH_AW_SINK_VISIBILITY for the write-sink policy), but its min_integrity/repos
-		// outputs must never drive an enclave-only backend's guard policy — that policy is
-		// always derived statically from the enclave declaration instead. Checking the
-		// explicit-disable marker directly (rather than githubLockdownDetectionStepEnabled)
-		// keeps this decision independent of whether the step happens to be generated.
-		_, explicitlyDisabled := workflowData.ExplicitlyDisabledTools["github"]
-		return !explicitlyDisabled
+		// Default-tool resolution removes the "github" key when tools.github is false. The
+		// static/dynamic enclave-only backends that could otherwise cause
+		// githubLockdownDetectionStepEnabled to return true here (via its own enclave checks)
+		// were already excluded above, so deferring to it below only covers the remaining
+		// case: a plain (non-enclave) GitHub MCP server whose "github" key was removed by
+		// default-tool resolution. This keeps the result in lockstep with whether the
+		// determine-automatic-lockdown step is actually generated.
+		return githubLockdownDetectionStepEnabled(workflowData)
 	}
 	return githubTool != false
 }

@@ -395,9 +395,12 @@ Read the private repository's issues through the enclave.
 // stepOutputRefPattern matches steps.<id>.outputs.<name> references, capturing the step id.
 var stepOutputRefPattern = regexp.MustCompile(`steps\.([A-Za-z0-9_-]+)\.outputs\.[A-Za-z0-9_]+`)
 
-// stepIDPattern matches `id: <value>` lines in a GitHub Actions step definition, capturing
-// the step id.
-var stepIDPattern = regexp.MustCompile(`(?m)^\s*id:\s*([A-Za-z0-9_-]+)\s*$`)
+// stepIDPattern matches `id: <value>` lines under a GitHub Actions step definition (emitted
+// with indentation deeper than top-level job/workflow keys, e.g.
+// "        id: determine-automatic-lockdown"), capturing the step id. The minimum indent
+// avoids false-positive matches from unrelated `id:` keys at the workflow/job level, while
+// tolerating reasonable indentation changes in the generator.
+var stepIDPattern = regexp.MustCompile(`(?m)^ {6,}id:\s*([A-Za-z0-9_-]+)\s*$`)
 
 // assertNoDanglingStepOutputReferences verifies that every `steps.<id>.outputs.*` reference
 // in the generated lock file corresponds to a step id that is actually emitted somewhere in
