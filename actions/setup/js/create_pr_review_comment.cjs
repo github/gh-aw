@@ -376,12 +376,12 @@ async function main(config = {}) {
     });
 
     // Buffer the comment instead of posting it individually
-    /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
     let body = sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions });
     const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
     if (bodyFooter) {
       body += "\n\n" + bodyFooter.trimEnd();
     }
+    /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
     const bufferedComment = {
       path: commentItem.path,
       line: line,

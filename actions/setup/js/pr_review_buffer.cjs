@@ -100,7 +100,7 @@ function createReviewBuffer() {
   /** @type {ReviewContext | null} */
   let reviewContext = null;
 
-  /** @type {{workflowName: string, runUrl: string, workflowSource: string, workflowSourceURL: string, triggeringIssueNumber: number|undefined, triggeringPRNumber: number|undefined, triggeringDiscussionNumber: number|undefined} | null} */
+  /** @type {{workflowName: string, runUrl: string, workflowSource: string, workflowSourceURL: string, triggeringIssueNumber: number|undefined, triggeringPRNumber: number|undefined, triggeringDiscussionNumber: number|undefined, bodyFooter?: string} | null} */
   let footerContext = null;
 
   /** @type {string} Footer mode: "always" (default), "none", or "if-body" */
