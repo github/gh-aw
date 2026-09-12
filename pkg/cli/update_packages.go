@@ -10,16 +10,36 @@ import (
 
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 type installedPackageUpdate struct {
-	record    packageOwnershipRecord
-	workflows []*workflowWithSource
+	record         packageOwnershipRecord
+	workflows      []*workflowWithSource
+	workflowsDir   string
+	engineOverride string
 }
 
 func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPackageUpdate, error) {
 	if len(targets) == 0 {
 		return nil, nil, nil
+	}
+
+	var workflowTargets []string
+	var packageTargets []string
+	for _, target := range targets {
+		packageLike, err := isPackageUpdateTarget(target)
+		if err != nil {
+			return nil, nil, err
+		}
+		if packageLike {
+			packageTargets = append(packageTargets, target)
+		} else {
+			workflowTargets = append(workflowTargets, target)
+		}
+	}
+	if len(packageTargets) == 0 {
+		return workflowTargets, nil, nil
 	}
 
 	gitRoot, err := gitutil.FindGitRoot()
@@ -31,20 +51,15 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 		return nil, nil, fmt.Errorf("failed to read installed package records: %w", err)
 	}
 
-	var workflowTargets []string
 	var packages []installedPackageUpdate
 	selectedPackages := make(map[string]struct{})
-	for _, target := range targets {
-		record, packageLike, err := findInstalledPackageRecord(records, target)
+	for _, target := range packageTargets {
+		record, _, err := findInstalledPackageRecord(records, target)
 		if err != nil {
 			return nil, nil, err
 		}
 		if record == nil {
-			if packageLike {
-				return nil, nil, fmt.Errorf("package %q is not installed in this repository", target)
-			}
-			workflowTargets = append(workflowTargets, target)
-			continue
+			return nil, nil, fmt.Errorf("package %q is not installed in this repository", target)
 		}
 		if _, selected := selectedPackages[strings.ToLower(record.Package)]; selected {
 			continue
@@ -53,10 +68,25 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 		if err != nil {
 			return nil, nil, err
 		}
-		packages = append(packages, installedPackageUpdate{record: *record, workflows: workflows})
+		workflowsDir, engineOverride := packageInstallContext(*record)
+		packages = append(packages, installedPackageUpdate{
+			record:         *record,
+			workflows:      workflows,
+			workflowsDir:   workflowsDir,
+			engineOverride: engineOverride,
+		})
 		selectedPackages[strings.ToLower(record.Package)] = struct{}{}
 	}
 	return workflowTargets, packages, nil
+}
+
+func isPackageUpdateTarget(target string) (bool, error) {
+	target = strings.TrimSpace(target)
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return true, nil
+	}
+	_, ok, err := parseRepositoryPackageSpec(target)
+	return ok, err
 }
 
 func findInstalledPackageRecord(records []packageOwnershipRecord, target string) (*packageOwnershipRecord, bool, error) {
@@ -172,4 +202,26 @@ func packageWorkflowsFromOwnershipRecord(gitRoot string, record packageOwnership
 		})
 	}
 	return workflows, nil
+}
+
+func packageInstallContext(record packageOwnershipRecord) (workflowsDir string, engineOverride string) {
+	for _, entry := range record.Files {
+		destination := filepath.ToSlash(filepath.Clean(entry.Destination))
+		if workflowsDir == "" && strings.HasSuffix(strings.ToLower(destination), ".md") &&
+			isSupportedPackageInstallablePath(entry.Source) {
+			workflowsDir = filepath.Dir(filepath.FromSlash(destination))
+		}
+		if engineOverride != "" {
+			continue
+		}
+		for _, engine := range ValidEngineNames() {
+			skillPrefix := strings.TrimSuffix(workflow.GetEngineSkillDir(engine), "/") + "/"
+			agentPrefix := strings.TrimSuffix(workflow.GetEngineSubAgentDir(engine), "/") + "/"
+			if strings.HasPrefix(destination, skillPrefix) || strings.HasPrefix(destination, agentPrefix) {
+				engineOverride = engine
+				break
+			}
+		}
+	}
+	return workflowsDir, engineOverride
 }

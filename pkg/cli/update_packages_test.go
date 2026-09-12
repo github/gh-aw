@@ -107,3 +107,17 @@ func TestPackageWorkflowsFromOwnershipRecord(t *testing.T) {
 	assert.Equal(t, workflowPath, workflows[0].Path)
 	assert.Equal(t, "owner/repo@main", workflows[0].SourceSpec)
 }
+
+func TestPackageInstallContext(t *testing.T) {
+	t.Parallel()
+	record := packageOwnershipRecord{
+		Files: []packageOwnershipFileEntry{
+			{Source: "workflows/review.md", Destination: "custom/workflows/review.md"},
+			{Source: "skills/reviewer/SKILL.md", Destination: ".claude/skills/reviewer/SKILL.md"},
+		},
+	}
+
+	workflowsDir, engineOverride := packageInstallContext(record)
+	assert.Equal(t, filepath.Join("custom", "workflows"), workflowsDir)
+	assert.Equal(t, "claude", engineOverride)
+}

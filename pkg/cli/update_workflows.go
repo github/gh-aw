@@ -138,6 +138,7 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 	var failedUpdates []updateFailure
 
 	manifestGroups := make(map[string][]*workflowWithSource)
+	packageGroupOptions := make(map[string]UpdateWorkflowsOptions)
 	var directWorkflows []*workflowWithSource
 	for _, wf := range workflows {
 		if _, ok, err := parseManifestSourceSpec(wf.SourceSpec); err != nil {
@@ -163,7 +164,16 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 			}
 			return fmt.Errorf("installed package %q has an invalid source: %w", pkg.record.Package, err)
 		}
-		manifestGroups[strings.TrimSpace(source)] = append(manifestGroups[strings.TrimSpace(source)], pkg.workflows...)
+		source = strings.TrimSpace(source)
+		manifestGroups[source] = append(manifestGroups[source], pkg.workflows...)
+		packageOpts := opts
+		if packageOpts.WorkflowsDir == "" {
+			packageOpts.WorkflowsDir = pkg.workflowsDir
+		}
+		if packageOpts.EngineOverride == "" {
+			packageOpts.EngineOverride = pkg.engineOverride
+		}
+		packageGroupOptions[source] = packageOpts
 	}
 
 	// Update each workflow
@@ -181,7 +191,11 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 		successfulUpdates = append(successfulUpdates, wf.Name)
 	}
 	for source, grouped := range manifestGroups {
-		groupSuccesses, groupFailures := updateManifestWorkflowGroup(ctx, source, grouped, opts)
+		groupOpts := opts
+		if packageOpts, ok := packageGroupOptions[source]; ok {
+			groupOpts = packageOpts
+		}
+		groupSuccesses, groupFailures := updateManifestWorkflowGroup(ctx, source, grouped, groupOpts)
 		successfulUpdates = append(successfulUpdates, groupSuccesses...)
 		failedUpdates = append(failedUpdates, groupFailures...)
 	}
