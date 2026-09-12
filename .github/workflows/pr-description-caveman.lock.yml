@@ -1528,6 +1528,8 @@ jobs:
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
           printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
+      - name: Clear inherited Copilot session state
+        run: rm -rf /tmp/gh-aw/sandbox/agent/logs/copilot-session-state
       - name: Clean stale firewall files from agent artifact
         run: |
           rm -rf /tmp/gh-aw/sandbox/firewall/logs

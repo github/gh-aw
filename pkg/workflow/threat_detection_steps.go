@@ -26,12 +26,15 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 	steps = append(steps, "      # --- Threat Detection ---\n")
 	steps = append(steps, generateComponentExecutionEvidenceStep("detection", "not_started", detectionExecutionEvidencePath, "")...)
 
-	// Step 0: Clean stale firewall files left by the agent artifact download.
+	// Step 0: Remove agent state that must not be attributed to detection.
+	steps = append(steps, c.buildClearInheritedCopilotSessionStateStep()...)
+
+	// Step 1: Clean stale firewall files left by the agent artifact download.
 	// The agent artifact populates sandbox/firewall/logs and sandbox/firewall/audit
 	// with files that cause the squid container to crash on start-up.
 	steps = append(steps, c.buildCleanFirewallDirsStep()...)
 
-	// Step 1: Pull AWF container images - the detection engine runs inside AWF (firewall),
+	// Step 2: Pull AWF container images - the detection engine runs inside AWF (firewall),
 	// so pre-pulling the containers speeds up execution and avoids on-demand pulls.
 	//
 	// For the inline Codex detection path (gh-aw-detection feature disabled), MCP setup
@@ -178,6 +181,13 @@ func (c *Compiler) buildClearMCPConfigStep() []string {
 		// or containerized runners where HOME differs from the GitHub-hosted default.
 		"          rm -f \"$HOME/.copilot/mcp-config.json\"\n",
 		"          rm -f \"$GITHUB_WORKSPACE/.gemini/settings.json\"\n",
+	}
+}
+
+func (c *Compiler) buildClearInheritedCopilotSessionStateStep() []string {
+	return []string{
+		"      - name: Clear inherited Copilot session state\n",
+		"        run: rm -rf " + shellEscapeArg(constants.TmpSandboxAgentLogsDir+"copilot-session-state") + "\n",
 	}
 }
 
@@ -516,6 +526,8 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 		"          path: |\n",
 		"            /tmp/gh-aw/threat-detection/detection.log\n",
 		"            " + detectionExecutionEvidencePath + "\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
 	}
 	if isFirewallEnabled(data) {
 		steps = append(steps,

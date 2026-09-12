@@ -71,6 +71,26 @@ Test workflow`
 	if !strings.Contains(detectionSection, "detection_conclusion") {
 		t.Error("Detection job should contain detection_conclusion step")
 	}
+	clearSessionState := strings.Index(detectionSection, "Clear inherited Copilot session state")
+	detectionExecution := strings.Index(detectionSection, "id: detection_agentic_execution")
+	if clearSessionState == -1 ||
+		!strings.Contains(detectionSection, "rm -rf /tmp/gh-aw/sandbox/agent/logs/copilot-session-state") ||
+		detectionExecution == -1 || clearSessionState > detectionExecution {
+		t.Error("Detection job should clear inherited agent checkpoints before detection")
+	}
+	uploadStepStart := strings.Index(detectionSection, "      - name: Upload threat detection log\n")
+	if uploadStepStart == -1 {
+		t.Error("Inline detection path must upload the threat detection artifact")
+	} else {
+		uploadStep := detectionSection[uploadStepStart:]
+		if uploadStepEnd := strings.Index(uploadStep[1:], "\n      - name: "); uploadStepEnd != -1 {
+			uploadStep = uploadStep[:uploadStepEnd+1]
+		}
+		if !strings.Contains(uploadStep, "            "+constants.TmpGhAwDir+"/threat-detection/detection_usage.json\n") ||
+			!strings.Contains(uploadStep, "            "+constants.TmpGhAwDir+"/threat-detection/detection_usage.jsonl\n") {
+			t.Error("Inline detection path must upload detection AI Credits accounting")
+		}
+	}
 
 	// Test 2: Detection engine step should use limited tools (no --allow-all-tools)
 	// The detection copilot invocation uses only shell tools for analysis
