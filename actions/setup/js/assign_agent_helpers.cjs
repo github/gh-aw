@@ -428,8 +428,8 @@ async function assignAgentToIssue(
     if (customInstructions != null) agentAssignment.custom_instructions = customInstructions;
     if (customAgent != null) agentAssignment.custom_agent = customAgent;
     if (model != null) agentAssignment.model = model;
-    const supportedReasoningEffort = resolveReasoningEffort(reasoningEffort);
-    if (supportedReasoningEffort != null) agentAssignment.reasoning_effort = supportedReasoningEffort;
+    const validReasoningEffort = resolveReasoningEffort(reasoningEffort);
+    if (validReasoningEffort != null) agentAssignment.reasoning_effort = validReasoningEffort;
     if (Object.keys(agentAssignment).length > 0) assignParams.agent_assignment = agentAssignment;
     await githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", assignParams);
     return true;
