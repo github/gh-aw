@@ -141,6 +141,15 @@ func githubBackendIsStaticEnclaveDelegationOnly(workflowData *WorkflowData) bool
 	return enclaveGitHubIssuesEnabled(workflowData) && !primaryGitHubMCPEnabled(workflowData)
 }
 
+// githubBackendIsEnclaveOnly reports whether the GitHub MCP server is rendered solely to
+// serve an enclave agent identity (static or dynamic), with no primary-agent GitHub access.
+// Backends in this state always derive their guard/write-sink policies statically from the
+// enclave declaration, never from the determine-automatic-lockdown step outputs, even though
+// that step may still be generated for them solely to supply GH_AW_SINK_VISIBILITY.
+func githubBackendIsEnclaveOnly(workflowData *WorkflowData) bool {
+	return githubBackendIsStaticEnclaveDelegationOnly(workflowData) || githubBackendIsDynamicDelegationOnly(workflowData)
+}
+
 func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolicies map[string]any) bool {
 	if len(explicitGuardPolicies) > 0 {
 		return false
@@ -148,11 +157,18 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	if workflowData == nil {
 		return true
 	}
+	if githubBackendIsEnclaveOnly(workflowData) {
+		return false
+	}
 	githubTool, hasGitHub := workflowData.Tools["github"]
 	if !hasGitHub {
-		// Default-tool resolution removes the "github" key when tools.github is false, so an
-		// absent key can still mean the GitHub MCP server is rendered for enclave delegation.
-		// Only reference the lockdown step outputs when that step is actually generated.
+		// Default-tool resolution removes the "github" key when tools.github is false. The
+		// static/dynamic enclave-only backends that could otherwise cause
+		// githubLockdownDetectionStepEnabled to return true here (via its own enclave checks)
+		// were already excluded above, so deferring to it below only covers the remaining
+		// case: a plain (non-enclave) GitHub MCP server whose "github" key was removed by
+		// default-tool resolution. This keeps the result in lockstep with whether the
+		// determine-automatic-lockdown step is actually generated.
 		return githubLockdownDetectionStepEnabled(workflowData)
 	}
 	return githubTool != false
