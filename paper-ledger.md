@@ -94,3 +94,28 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 | 2608.03644v1 | Is Inter-Seed Cross-Play Enough? (ZSC Robustness) | 2026-08-04 | Y | | |
 | 2608.03626v1 | A Security-Oriented Lifecycle Model for LLM Systems | 2026-08-04 | Y | security | Adopt the paper's lifecycle-stage security checklist (data provenance verification, artifact signing, agentic permission control, decommissioning) to structure gh-aw's network-firewall and safe-outputs permission configuration by workflow lifecycle stage |
 | 2608.03609v1 | Formal Verification of Agentic Systems over Operational Data | 2026-08-04 | Y | | |
+| 2609.11911v1 | Artificial Id: Drive and Persistent Alignment in Agentic AI | 2026-09-10 | N | | |
+| 2609.11900v1 | MindTopo: Can Foundation Models Reason in Topological Space? | 2026-09-10 | N | | |
+| 2609.11807v1 | Near-Optimal RL with Multi-Step Transition Lookahead | 2026-09-10 | N | | |
+| 2609.11737v1 | ORCH: Organizational Principles for Collective Intelligence | 2026-09-10 | N | | |
+| 2609.11728v1 | Reproducibility in the Age of Agentic AI | 2026-09-10 | Y | prompt-engineering | Treat repo instructions/tests/decision records as reusable context-engineering artifacts that lower the marginal cost of maintaining gh-aw workflow prompts and imports over time |
+| 2609.11709v1 | When Agents Disagree: Bayesian Backward Reasoning | 2026-09-10 | Y | multi-agent | Add a reverse-posterior (label-free) aggregation step for sub-agent fan-out results to reduce correlated-error voting bias beyond simple forward majority/LLM-judge aggregation |
+| 2609.11682v1 | COBRA-Skills: Contextual Bandit-Guided Skill Optimization | 2026-09-10 | Y | multi-agent | Use contextual-bandit-guided prioritization to select which cached skills/sub-agent prompts to refine next based on execution feedback, instead of exhaustively re-evaluating all skills |
+| 2609.11677v1 | Ecdysis: Efficient Training of Runtime Harnesses for LLM Agents | 2026-09-10 | Y | workflow-compilation | Add principled failure diagnosis (model-deficiency vs. harness-issue classification) before auto-revising workflow/agent configs, to avoid overfitting harness changes to observed failure noise |
+| 2609.11660v1 | Autonomy, Social Norms, and Alignment | 2026-09-10 | N | | |
+| 2609.11656v1 | Learnware and AI Model Management System | 2026-09-10 | N | | |
+| 2609.11636v1 | MAPLE: Memory-Augmented Planning with Language and Evolution | 2026-09-10 | N | | |
+| 2609.11607v1 | Making Alternative Data Work: Context-Augmented LLMs | 2026-09-10 | N | | |
+| 2609.11515v1 | ChurnBench: Refresh Scheduling Governs Staleness | 2026-09-10 | Y | other | Adopt an append-only ground-truth ledger and freshness-error detection to validate that cache-memory/repo-memory entries reflect current state, distinct from reasoning errors |
+| 2609.11493v1 | Multi-Layer Knowledge Graph for CMC Process Development | 2026-09-10 | N | | |
+| 2609.11489v1 | The Convention Gap: Implicit Communication in Cooperative AI | 2026-09-10 | N | | |
+| 2609.11390v1 | VikingRAG: Token-efficient RAG over Structured Documents | 2026-09-10 | Y | token-optimization | Materialize agentic multi-round retrieval traces as reusable "experience edges" in cache-memory/repo-memory so similar future workflow queries skip repeated multi-round exploration, cutting token cost |
+| 2609.11381v1 | Agent-Integrated Software: Interaction Contracts | 2026-09-10 | Y | safe-outputs | Formalize interaction contracts (task bindings, role-specific authority, control transitions, outcome evidence) as explicit schema constraints on safe-outputs writes, so mid-flight user goal changes can't silently invalidate in-progress delegated actions |
+| 2609.11319v1 | Magenta: Mathematical Reasoning and Lean Verification | 2026-09-10 | N | | |
+| 2609.11318v1 | Mr.LHDR: Long-Horizon Deep Research Benchmark | 2026-09-10 | N | | |
+| 2609.11308v1 | 2AM: Agent-Side Memory for Steerable Action Models | 2026-09-10 | N | | |
+| 2609.11294v1 | Memory Compression for High-Fanout Agent Sandboxes | 2026-09-10 | N | | |
+| 2609.11243v1 | Sci-MMR: Evidence-Grounded Scientific Reasoning Benchmark | 2026-09-10 | N | | |
+| 2609.11231v1 | Voice-Interactive Multi-Agent System for Smart ORs | 2026-09-10 | N | | |
+| 2609.11190v1 | Agentic Share-of-Search: Multi-Agent E-Commerce | 2026-09-10 | N | | |
+| 2609.11180v1 | SemVerBench: Version-Constraint Resolution Semantics | 2026-09-10 | N | | |
