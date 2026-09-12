@@ -95,10 +95,11 @@ type UpdateWorkflowsOptions struct {
 	NoRedirect             bool
 	CoolDown               time.Duration
 	Approve                bool
+	DraftPullRequest       bool
 }
 
 // UpdateWorkflows updates workflows from their source repositories
-func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
+func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { //nolint:largefunc // Existing workflow discovery and update flow remains centralized.
 	clearUpdateResolutionCaches()
 	updateLog.Printf("Scanning for workflows with source field: dir=%s, filter=%v, noMerge=%v, noCompile=%v, noRedirect=%v, disableSecurityScanner=%v, coolDown=%v", opts.WorkflowsDir, opts.WorkflowNames, opts.NoMerge, opts.NoCompile, opts.NoRedirect, opts.DisableSecurityScanner, opts.CoolDown)
 
@@ -194,7 +195,7 @@ func allFailuresAreRateLimited(failures []updateFailure) bool {
 }
 
 // findWorkflowsWithSource finds all workflows that have a source field
-func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose bool) ([]*workflowWithSource, error) {
+func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose bool) ([]*workflowWithSource, error) { //nolint:largefunc // Existing workflow discovery remains centralized.
 	updateLog.Printf("Finding workflows with source field in %s", workflowsDir)
 	var workflows []*workflowWithSource
 
@@ -576,7 +577,7 @@ func defaultWorkflowUpdateDeps() workflowUpdateDeps {
 	}
 }
 
-func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error) {
+func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error) { //nolint:largefunc // Existing release resolution remains centralized.
 	updateLog.Printf("Resolving latest release for repo %s (current: %s, allowMajor=%v)", repo, currentRef, allowMajor)
 
 	if verbose {
@@ -678,7 +679,7 @@ func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, 
 }
 
 // updateWorkflow updates a single workflow from its source
-func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) error {
+func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) error { //nolint:largefunc // Existing workflow update lifecycle remains centralized.
 	updateLog.Printf("Updating workflow: name=%s, source=%s, force=%v, noMerge=%v", wf.Name, wf.SourceSpec, opts.Force, opts.NoMerge)
 
 	if opts.Verbose {

@@ -30,6 +30,15 @@ func PreflightCheckForCreatePR(verbose bool) error {
 // branchPrefix is used as the prefix for the auto-generated branch name.
 // Returns the PR URL on success.
 func CreatePRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTitle, prBody string, verbose bool) (string, error) {
+	return createPRWithChanges(ctx, branchPrefix, commitMessage, prTitle, prBody, verbose, false)
+}
+
+// CreateDraftPRWithChanges creates a draft pull request containing all current changes.
+func CreateDraftPRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTitle, prBody string, verbose bool) (string, error) {
+	return createPRWithChanges(ctx, branchPrefix, commitMessage, prTitle, prBody, verbose, true)
+}
+
+func createPRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTitle, prBody string, verbose, draft bool) (string, error) {
 	prHelpersLog.Printf("Creating PR with branch prefix: %s", branchPrefix)
 
 	currentBranch, err := getCurrentBranch()
@@ -59,7 +68,11 @@ func CreatePRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTit
 		return "", err
 	}
 
-	_, prURL, err := createPR(ctx, branchName, prTitle, prBody, verbose)
+	createPRFn := createPR
+	if draft {
+		createPRFn = createDraftPR
+	}
+	_, prURL, err := createPRFn(ctx, branchName, prTitle, prBody, verbose)
 	if err != nil {
 		_ = switchBranch(currentBranch, verbose)
 		return "", fmt.Errorf("failed to create PR: %w", err)

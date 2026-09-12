@@ -768,17 +768,18 @@ gh aw update ci-doctor --no-merge         # Override local changes with upstream
 gh aw update ci-doctor --major --force    # Allow major version updates
 gh aw update --no-release-bump            # Update workflows; only force-update core actions/*
 gh aw update --repo owner/repo            # Update workflows in another repository
+gh aw update --repo owner/repo --pr       # Update and open a draft pull request in another repository
 gh aw update --create-pull-request        # Update and open a pull request
 gh aw update --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request`, `--create-issue`, `--org`, `--repos`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
+**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request`, `--pr`, `--create-issue`, `--org`, `--repos`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
 
 Org mode (`--org`) previews or creates workflow update pull requests across every repository in an organization. Use `--repos` to limit org mode to repositories matching one or more glob patterns, `--create-issue` to open an issue in each repository that has pending updates (requires `--org`), and `--yes/-y` to auto-accept per-repository confirmations (required in CI).
 
 The `--no-redirect` flag causes `update` to fail when the source workflow has a [`redirect`](/gh-aw/reference/frontmatter/) field, rather than following the redirect to its new location. Use this when you want explicit control over redirect handling.
 
-The `--repo/-r` flag runs the update against a different repository. The target repository is checked out in an isolated shallow clone under `.github/aw/updates/<sanitized-repo-id>`. When combined with `--create-pull-request`, the resulting PR is opened against the target repository instead of the current one.
+The `--repo/-r` flag runs the update against a different repository. The target repository is checked out in an isolated shallow clone under `.github/aw/updates/<sanitized-repo-id>`. When combined with `--create-pull-request`, the resulting PR is opened against the target repository instead of the current one. Use `--pr` to open that pull request as a draft. If the update produces no file changes, no pull request is created.
 
 #### `deploy`
 

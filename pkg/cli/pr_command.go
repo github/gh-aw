@@ -769,9 +769,17 @@ func createPR(ctx context.Context, branchName, title, body string, verbose bool)
 	return createPRForRepo(ctx, branchName, title, body, "", verbose)
 }
 
+func createDraftPR(ctx context.Context, branchName, title, body string, verbose bool) (int, string, error) {
+	return createPRForRepoWithDraft(ctx, branchName, title, body, "", verbose, true)
+}
+
 // createPRForRepo creates a pull request in repoSlug. When repoSlug is empty,
 // it resolves the current repository for compatibility with other PR callers.
 func createPRForRepo(ctx context.Context, branchName, title, body, repoSlug string, verbose bool) (int, string, error) {
+	return createPRForRepoWithDraft(ctx, branchName, title, body, repoSlug, verbose, false)
+}
+
+func createPRForRepoWithDraft(ctx context.Context, branchName, title, body, repoSlug string, verbose, draft bool) (int, string, error) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage("Creating PR: "+title))
 	}
@@ -806,6 +814,9 @@ func createPRForRepo(ctx context.Context, branchName, title, body, repoSlug stri
 	// current repo (not an upstream fork). Use GH_HOST env var instead of --hostname
 	// (which is only valid for gh api, not gh pr create).
 	prCreateArgs := []string{"pr", "create", "--repo", repoSpec, "--title", title, "--body", body, "--head", branchName}
+	if draft {
+		prCreateArgs = append(prCreateArgs, "--draft")
+	}
 	output, err := createPRRunGHContextWithHost(ctx, "Creating pull request...", remoteHost, prCreateArgs...)
 	if err != nil {
 		// Try to get stderr for better error reporting

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,25 @@ func TestCreatePRForRepoSkipsRepositoryLookup(t *testing.T) {
 	args := strings.Join(calls[0], " ")
 	if !strings.Contains(args, "pr create --repo owner/repo") {
 		t.Fatalf("gh args = %q, want explicit repository", args)
+	}
+}
+
+func TestCreatePRForRepoWithDraftAddsDraftFlag(t *testing.T) {
+	originalRunGH := createPRRunGHContextWithHost
+	t.Cleanup(func() { createPRRunGHContextWithHost = originalRunGH })
+
+	var args []string
+	createPRRunGHContextWithHost = func(_ context.Context, _ string, _ string, callArgs ...string) ([]byte, error) {
+		args = append([]string(nil), callArgs...)
+		return []byte("https://github.com/owner/repo/pull/42\n"), nil
+	}
+
+	_, _, err := createPRForRepoWithDraft(context.Background(), "feature", "Title", "Body", "owner/repo", false, true)
+	if err != nil {
+		t.Fatalf("createPRForRepoWithDraft() error = %v", err)
+	}
+	if !slices.Contains(args, "--draft") {
+		t.Fatalf("gh args = %q, want --draft", args)
 	}
 }
 

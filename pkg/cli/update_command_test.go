@@ -185,6 +185,16 @@ func TestNewUpdateCommand_HasApproveFlag(t *testing.T) {
 	assert.Contains(t, flag.Usage, "When strict mode is active", "--approve description should match compile/upgrade semantics")
 }
 
+func TestNewUpdateCommand_HasVisibleDraftPRFlag(t *testing.T) {
+	cmd := NewUpdateCommand(func(string) error { return nil })
+	require.NotNil(t, cmd)
+
+	flag := cmd.Flags().Lookup("pr")
+	require.NotNil(t, flag, "update command should register --pr")
+	assert.False(t, flag.Hidden, "--pr should be visible in update help")
+	assert.Contains(t, flag.Usage, "draft pull request")
+}
+
 // TestMergeWorkflowContent_WithConflicts tests a merge with conflicts
 func TestMergeWorkflowContent_WithConflicts(t *testing.T) {
 	base := `---

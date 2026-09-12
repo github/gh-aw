@@ -228,13 +228,13 @@ func TestUpdateCommand_HelpText(t *testing.T) {
 	assert.Contains(t, outputStr, "repo", "Help should document --repo flag")
 	assert.Contains(t, outputStr, "org", "Help should document --org flag")
 	assert.Contains(t, outputStr, "repos", "Help should document --repos flag")
+	assert.Contains(t, outputStr, "--pr", "Help should document the draft pull request flag")
 	assert.Contains(t, outputStr, "3-way merge", "Help should explain merge behavior")
 
 	// Should reference upgrade for other features
 	assert.Contains(t, outputStr, "upgrade", "Help should reference 'gh aw upgrade' for other features")
 
 	// Should NOT mention removed flags
-	assert.NotContains(t, outputStr, "--pr", "Help should not mention removed --pr flag")
 	assert.NotContains(t, outputStr, "--audit", "Help should not mention removed --audit flag")
 	assert.NotContains(t, outputStr, "--dry-run", "Help should not mention removed --dry-run flag")
 }

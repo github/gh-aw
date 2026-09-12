@@ -21,7 +21,7 @@ var updateLog = logger.New("cli:update_command")
 const updateTargetRepoCheckoutDir = ".github/aw/updates"
 
 // NewUpdateCommand creates the update command
-func NewUpdateCommand(validateEngine func(string) error) *cobra.Command {
+func NewUpdateCommand(validateEngine func(string) error) *cobra.Command { //nolint:largefunc // Existing command setup remains centralized.
 	cmd := &cobra.Command{
 		Use:   "update [workflow]...",
 		Short: "Update agentic workflows from their source repositories",
@@ -69,7 +69,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
   ` + string(constants.CLIExtensionPrefix) + ` update --create-pull-request   # Update and open a pull request
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 0           # Disable cooldown and apply all pending releases immediately
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 3d          # Apply a custom 3-day cooldown period`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error { //nolint:largefunc // Existing update option validation and routing remain centralized.
 			majorFlag, _ := cmd.Flags().GetBool("major")
 			forceFlag, _ := cmd.Flags().GetBool("force")
 			engineOverride, _ := cmd.Flags().GetString("engine")
@@ -137,6 +137,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 				DisableSecurityScanner: disableSecurityScanner,
 				CoolDown:               coolDown,
 				Approve:                approveFlag,
+				DraftPullRequest:       prFlagAlias,
 			}
 
 			if targetRepo != "" {
@@ -153,7 +154,11 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 
 			if createPR {
 				prBody := "This PR updates agentic workflows from their source repositories."
-				_, err := CreatePRWithChanges(cmd.Context(), "update-workflows", "chore: update workflows",
+				createPRFn := CreatePRWithChanges
+				if opts.DraftPullRequest {
+					createPRFn = CreateDraftPRWithChanges
+				}
+				_, err := createPRFn(cmd.Context(), "update-workflows", "chore: update workflows",
 					"Update workflows from source", prBody, verbose)
 				return err
 			}
@@ -179,12 +184,10 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 	cmd.Flags().StringSlice("repos", nil, "Limit --org mode to repositories matching one or more glob patterns")
 	addRepoFlag(cmd)
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request with the update changes")
-	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
+	cmd.Flags().Bool("pr", false, "Create a draft pull request with the update changes")
 	cmd.Flags().Bool("create-issue", false, "Open a GitHub issue in each org repository that has pending workflow updates (requires --org)")
 	cmd.Flags().BoolP("yes", "y", false, "Auto-accept org-mode update confirmations (required in CI)")
 	cmd.Flags().String("cool-down", "7d", coolDownFlagUsage)
-	_ = cmd.Flags().MarkHidden("pr") // Hide the short alias from help output
-
 	// Register completions for update command
 	cmd.ValidArgsFunction = CompleteWorkflowNames
 	RegisterEngineFlagCompletion(cmd)
@@ -195,7 +198,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 
 // RunUpdateWorkflows updates workflows from their source repositories.
 // Each workflow is compiled immediately after update.
-func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
+func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { //nolint:largefunc // Existing update stages remain centralized.
 	updateLog.Printf("Starting update process: workflows=%v, allowMajor=%v, force=%v, noMerge=%v, disableReleaseBump=%v, noCompile=%v, noRedirect=%v, coolDown=%v", opts.WorkflowNames, opts.AllowMajor, opts.Force, opts.NoMerge, opts.DisableReleaseBump, opts.NoCompile, opts.NoRedirect, opts.CoolDown)
 
 	var firstErr error
@@ -291,7 +294,7 @@ func recompileAllWorkflows(ctx context.Context, workflowsDir, engineOverride str
 	return compileWorkflowsForUpdate(ctx, nil, workflowsDir, engineOverride, verbose, approve)
 }
 
-func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error {
+func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error { //nolint:largefunc // Keeps the temporary checkout and PR lifecycle atomic.
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("--repo requires running inside a git repository: %w", err)
@@ -334,6 +337,18 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 	}
 
 	if createPR {
+		changed, err := hasPendingChanges()
+		if err != nil {
+			return err
+		}
+		if !changed {
+			updateLog.Printf("Skipping PR for %s: no pending changes after update", targetRepo)
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipping PR for "+targetRepo+": already up to date"))
+			}
+			return nil
+		}
+
 		releaseTag, releaseURL := getGhawReleaseInfo(ctx)
 		xmlMarker := buildOrgXMLMarker(ghawUpdateMarkerPrefix, releaseTag)
 
@@ -347,7 +362,11 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		prBody := "This PR updates agentic workflows from their source repositories." +
 			releaseLine + "\n" + xmlMarker
 
-		prURL, err := CreatePRWithChanges(ctx, "update-workflows", "chore: update workflows",
+		createPRFn := CreatePRWithChanges
+		if opts.DraftPullRequest {
+			createPRFn = CreateDraftPRWithChanges
+		}
+		prURL, err := createPRFn(ctx, "update-workflows", "chore: update workflows",
 			"Update workflows from source", prBody, verbose)
 		if err != nil {
 			return err
