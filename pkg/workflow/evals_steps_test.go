@@ -43,10 +43,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("collector must retain evals accounting separately from evaluation results")
 	}
-	if !strings.Contains(string(script), "mkdir -p /tmp/gh-aw/usage/agent /tmp/gh-aw/usage/detection /tmp/gh-aw/usage/evals") {
-		t.Fatal("collector must create evals usage directory before copying evals evidence")
-	}
-	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+	if !strings.Contains(string(script), "mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Fatal("collector must retain evals execution evidence")
 	}
 }
