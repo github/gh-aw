@@ -28,7 +28,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 	var workflowTargets []string
 	var packageTargets []string
 	for _, target := range targets {
-		if isPackageUpdateTarget(target) {
+		if isPackageURLTarget(target) {
 			packageTargets = append(packageTargets, target)
 		} else {
 			workflowTargets = append(workflowTargets, target)
@@ -74,10 +74,6 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 		selectedPackages[strings.ToLower(record.Package)] = struct{}{}
 	}
 	return workflowTargets, packages, nil
-}
-
-func isPackageUpdateTarget(target string) bool {
-	return isPackageURLTarget(target)
 }
 
 func findInstalledPackageRecord(records []packageOwnershipRecord, target string) (*packageOwnershipRecord, bool, error) {
