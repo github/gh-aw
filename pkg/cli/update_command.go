@@ -21,16 +21,18 @@ var updateLog = logger.New("cli:update_command")
 const updateTargetRepoCheckoutDir = ".github/aw/updates"
 
 // NewUpdateCommand creates the update command
-func NewUpdateCommand(validateEngine func(string) error) *cobra.Command {
+func NewUpdateCommand(validateEngine func(string) error) *cobra.Command { //nolint:largefunc
 	cmd := &cobra.Command{
-		Use:   "update [workflow]...",
+		Use:   "update [workflow-or-package]...",
 		Short: "Update agentic workflows from their source repositories",
 		Long: `Update one or more agentic workflows from their source repositories.
 
 The update command fetches the latest version of each workflow from its source
 repository, merges upstream changes with any local modifications, and recompiles.
 
-If no workflow names are specified, all workflows with a 'source' field are updated.
+Arguments may be workflow names or installed GitHub package URLs. Package URL
+arguments reapply every workflow and asset owned by that package. If no arguments
+are specified, all workflows with a 'source' field are updated.
 
 By default, the update performs a 3-way merge to preserve your local changes.
 Use --no-merge to override local changes with the upstream version.
@@ -53,6 +55,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` update                    # Update all workflows from source
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist        # Update a specific workflow
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist.md     # Same (alternative format)
+  ` + string(constants.CLIExtensionPrefix) + ` update https://github.com/owner/package  # Reapply an installed package
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org       # Preview workflow updates across an organization
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --repos '*-service'  # Limit org mode to matching repositories
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-issue  # Open issues in repos with pending updates
@@ -69,7 +72,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
   ` + string(constants.CLIExtensionPrefix) + ` update --create-pull-request   # Update and open a pull request
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 0           # Disable cooldown and apply all pending releases immediately
   ` + string(constants.CLIExtensionPrefix) + ` update --cool-down 3d          # Apply a custom 3-day cooldown period`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error { //nolint:largefunc
 			majorFlag, _ := cmd.Flags().GetBool("major")
 			forceFlag, _ := cmd.Flags().GetBool("force")
 			engineOverride, _ := cmd.Flags().GetString("engine")
@@ -195,7 +198,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 
 // RunUpdateWorkflows updates workflows from their source repositories.
 // Each workflow is compiled immediately after update.
-func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
+func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	updateLog.Printf("Starting update process: workflows=%v, allowMajor=%v, force=%v, noMerge=%v, disableReleaseBump=%v, noCompile=%v, noRedirect=%v, coolDown=%v", opts.WorkflowNames, opts.AllowMajor, opts.Force, opts.NoMerge, opts.DisableReleaseBump, opts.NoCompile, opts.NoRedirect, opts.CoolDown)
 
 	var firstErr error
@@ -291,7 +294,7 @@ func recompileAllWorkflows(ctx context.Context, workflowsDir, engineOverride str
 	return compileWorkflowsForUpdate(ctx, nil, workflowsDir, engineOverride, verbose, approve)
 }
 
-func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error {
+func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error { //nolint:largefunc
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("--repo requires running inside a git repository: %w", err)

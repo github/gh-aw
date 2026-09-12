@@ -167,6 +167,17 @@ func TestNewUpdateCommand_CoolDownFlagUsage(t *testing.T) {
 	assert.Equal(t, coolDownFlagUsage, coolDownFlag.Usage, "cool-down usage should stay consistent across commands")
 }
 
+func TestNewUpdateCommand_SupportsPackageTargets(t *testing.T) {
+	t.Parallel()
+	cmd := NewUpdateCommand(func(string) error { return nil })
+	require.NotNil(t, cmd)
+
+	assert.Equal(t, "update [workflow-or-package]...", cmd.Use)
+	assert.Contains(t, cmd.Long, "installed GitHub package URLs")
+	assert.NotContains(t, cmd.Example, "update owner/package")
+	assert.Contains(t, cmd.Example, "update https://github.com/owner/package")
+}
+
 func TestNewUpdateCommand_MentionsEnterpriseSourceResolution(t *testing.T) {
 	cmd := NewUpdateCommand(func(string) error { return nil })
 	require.NotNil(t, cmd)

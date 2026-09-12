@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -74,15 +75,11 @@ func manifestWorkflowPathByName(installables []resolvedPackageInstallable) map[s
 	return byName
 }
 
-func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*workflowWithSource, opts UpdateWorkflowsOptions) ([]string, []updateFailure) {
+func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*workflowWithSource, opts UpdateWorkflowsOptions) ([]string, []updateFailure) { //nolint:largefunc
 	updateManifestLog.Printf("updateManifestWorkflowGroup: source=%s, workflows=%d, force=%v, no_merge=%v", source, len(grouped), opts.Force, opts.NoMerge)
 	var successes []string
 	var failures []updateFailure
 	var groupedSuccesses []string
-
-	if len(grouped) == 0 {
-		return successes, failures
-	}
 
 	repoSpec, _, err := parseManifestSourceSpec(source)
 	if err != nil {
@@ -183,7 +180,14 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 		groupedSuccesses = append(groupedSuccesses, wf.Name)
 	}
 
-	targetDir := filepath.Dir(grouped[0].Path)
+	targetDir := opts.WorkflowsDir
+	if targetDir == "" {
+		targetDir = getWorkflowsDir()
+	}
+	if len(grouped) > 0 {
+		targetDir = filepath.Dir(grouped[0].Path)
+	}
+	opts.WorkflowsDir = targetDir
 	for name, latestPath := range latestByName {
 		if _, exists := existingByName[name]; exists {
 			continue
@@ -196,14 +200,28 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	}
 
 	if err := syncManifestManagedResources(ctx, repoSpec, latestPkg, latestRef, opts); err != nil {
+		if len(groupedSuccesses) == 0 {
+			failures = append(failures, updateFailure{Name: source, Error: err.Error()})
+			return successes, failures
+		}
 		for _, name := range groupedSuccesses {
 			failures = append(failures, updateFailure{Name: name, Error: err.Error()})
 		}
 		return successes, failures
 	}
 	assetEngine := resolveManifestAssetEngine(grouped, opts)
+	assetsReconciled := true
 	if err := reconcileManifestManagedAssets(ctx, repoSpec, currentPkg, latestPkg, assetEngine, opts); err != nil {
 		failures = append(failures, updateFailure{Name: source, Error: err.Error()})
+		assetsReconciled = false
+	}
+	if assetsReconciled {
+		if err := refreshManifestManagedOwnership(repoSpec, latestPkg, latestRef, assetEngine, opts); err != nil {
+			failures = append(failures, updateFailure{Name: source, Error: err.Error()})
+		}
+	}
+	if len(groupedSuccesses) == 0 && len(failures) == 0 {
+		groupedSuccesses = append(groupedSuccesses, repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath))
 	}
 	successes = append(successes, groupedSuccesses...)
 
@@ -216,10 +234,25 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 // under .github/aw/packages. Existing destinations are only overwritten when they are
 // tracked as owned by this package (and unmodified locally, or opts.Force is set);
 // otherwise the reconciliation fails rather than clobbering an unrelated file.
-func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, currentPkg *resolvedRepositoryPackage, latestPkg *resolvedRepositoryPackage, engineOverride string, opts UpdateWorkflowsOptions) error {
+func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, currentPkg *resolvedRepositoryPackage, latestPkg *resolvedRepositoryPackage, engineOverride string, opts UpdateWorkflowsOptions) (retErr error) { //nolint:largefunc
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("unable to find repository root for package assets: %w", err)
+	}
+	workflowsDir := absolutePackageWorkflowsDir(gitRoot, opts.WorkflowsDir)
+	var rollbacks []packageAssetRollback
+	defer func() {
+		if retErr != nil {
+			rollbackPackageAssets(rollbacks)
+		}
+	}()
+	captureRollback := func(destination string) error {
+		rollback, err := capturePackageAssetRollback(destination)
+		if err != nil {
+			return err
+		}
+		rollbacks = append(rollbacks, rollback)
+		return nil
 	}
 	owner, repository, err := splitRepositoryPackageSlug(repoSpec.RepoSlug)
 	if err != nil {
@@ -233,8 +266,15 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 		if !isActionWorkflowPath(installable.SourcePath) {
 			continue
 		}
-		destination := filepath.ToSlash(filepath.Clean(installable.DestinationPath))
-		destPath := filepath.Join(gitRoot, filepath.FromSlash(destination))
+		destPath := filepath.Join(workflowsDir, filepath.Base(installable.DestinationPath))
+		destination, err := filepath.Rel(gitRoot, destPath)
+		if err != nil {
+			return fmt.Errorf("unable to resolve package action workflow destination %s: %w", destPath, err)
+		}
+		destination = filepath.ToSlash(destination)
+		if err := fileutil.ValidatePathWithinBase(gitRoot, destPath); err != nil {
+			return fmt.Errorf("package action workflow %q escapes repository root: %w", destination, err)
+		}
 		fileExists := false
 		if _, err := os.Stat(destPath); err == nil {
 			fileExists = true
@@ -245,6 +285,9 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 			if err := ensurePackageAssetOverwriteAllowed(gitRoot, destination, packageBase, opts.Force); err != nil {
 				return err
 			}
+		}
+		if err := captureRollback(destPath); err != nil {
+			return err
 		}
 		content, err := downloadPackageFileFromGitHubForHost(ctx, owner, repository, installable.SourcePath, latestPkg.ResolvedRef, "")
 		if err != nil {
@@ -277,6 +320,9 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 				return err
 			}
 		}
+		if err := captureRollback(destPath); err != nil {
+			return err
+		}
 		content, err := downloadPackageFileFromGitHubForHost(ctx, owner, repository, skill.SourcePath, latestPkg.ResolvedRef, "")
 		if err != nil {
 			return fmt.Errorf("unable to download new package skill %s: %w", skill.SourcePath, err)
@@ -308,6 +354,9 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 				return err
 			}
 		}
+		if err := captureRollback(destPath); err != nil {
+			return err
+		}
 		content, err := downloadPackageFileFromGitHubForHost(ctx, owner, repository, agent, latestPkg.ResolvedRef, "")
 		if err != nil {
 			return fmt.Errorf("unable to download new package agent %s: %w", agent, err)
@@ -320,6 +369,52 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 	return nil
 }
 
+type packageAssetRollback struct {
+	path    string
+	existed bool
+	content []byte
+	mode    os.FileMode
+}
+
+func capturePackageAssetRollback(path string) (packageAssetRollback, error) {
+	rollback := packageAssetRollback{path: path}
+	stat, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return rollback, nil
+	}
+	if err != nil {
+		return rollback, fmt.Errorf("unable to inspect package asset %s before update: %w", path, err)
+	}
+	rollback.existed = true
+	rollback.mode = stat.Mode().Perm()
+	rollback.content, err = os.ReadFile(path)
+	if err != nil {
+		return rollback, fmt.Errorf("unable to read package asset %s before update: %w", path, err)
+	}
+	return rollback, nil
+}
+
+func rollbackPackageAssets(rollbacks []packageAssetRollback) {
+	for _, rollback := range slices.Backward(rollbacks) {
+		if rollback.existed {
+			_ = os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic)
+			_ = os.WriteFile(rollback.path, rollback.content, rollback.mode)
+			continue
+		}
+		_ = os.Remove(rollback.path)
+	}
+}
+
+func absolutePackageWorkflowsDir(gitRoot, workflowsDir string) string {
+	if workflowsDir == "" {
+		return filepath.Join(gitRoot, constants.WorkflowsDir)
+	}
+	if filepath.IsAbs(workflowsDir) {
+		return workflowsDir
+	}
+	return filepath.Join(gitRoot, workflowsDir)
+}
+
 // warnUpstreamRemovedSkillsAndAgents reports skill and agent files that were present in
 // the currently-installed package manifest but are no longer listed in the latest
 // manifest. These assets are intentionally left untouched (not deleted) since the
@@ -330,12 +425,12 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 		return
 	}
 
-	latestSkillSources := make(map[string]bool, len(latestPkg.SkillFiles))
+	latestSkillSources := make(map[string]struct{}, len(latestPkg.SkillFiles))
 	for _, skill := range latestPkg.SkillFiles {
-		latestSkillSources[skill.SourcePath] = true
+		latestSkillSources[skill.SourcePath] = struct{}{}
 	}
 	for _, skill := range currentPkg.SkillFiles {
-		if latestSkillSources[skill.SourcePath] {
+		if _, exists := latestSkillSources[skill.SourcePath]; exists {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
@@ -343,12 +438,12 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 			skill.SourcePath)))
 	}
 
-	latestAgentSources := make(map[string]bool, len(latestPkg.AgentFiles))
+	latestAgentSources := make(map[string]struct{}, len(latestPkg.AgentFiles))
 	for _, agent := range latestPkg.AgentFiles {
-		latestAgentSources[agent] = true
+		latestAgentSources[agent] = struct{}{}
 	}
 	for _, agent := range currentPkg.AgentFiles {
-		if latestAgentSources[agent] {
+		if _, exists := latestAgentSources[agent]; exists {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
@@ -416,7 +511,7 @@ func removeManifestManagedWorkflow(workflowPath string) error {
 	return nil
 }
 
-func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) error {
+func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	updateManifestLog.Printf("Updating manifest-managed workflow %s: %s@%s -> %s@%s", update.wf.Name, update.currentPath, update.currentRef, update.latestPath, update.latestRef)
 	sourceSpecCurrent := sourceSpecWithRef(&SourceSpec{Repo: update.repo, Path: update.currentPath}, update.currentRef)
 	newContent, err := downloadWorkflowContentFn(ctx, update.repo, update.latestPath, update.latestRef, opts.Verbose)
