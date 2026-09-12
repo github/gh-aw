@@ -6,11 +6,11 @@ set -euo pipefail
 # Copies aw_info, agent/detection usage JSONL, evals, grader results, rate limits,
 # and token-usage logs from the firewall sandbox directories.
 #
-# Token-usage files are copied in ascending priority order so the last
-# non-empty source wins:
+# Token-usage files are copied in ascending priority order so the last source
+# wins:
 #   firewall-audit-logs/ (legacy)  →  firewall/audit/ (AWF audit)  →  firewall/logs/ (authoritative)
-# The -s check (non-empty) prevents an empty stub file from zeroing out
-# valid data already written by a higher-priority source.
+# The authoritative agent source is copied even when empty so its presence is
+# preserved; missing agent accounting is not synthesized below.
 
 mkdir -p /tmp/gh-aw/usage/agent /tmp/gh-aw/usage/detection
 
@@ -56,17 +56,16 @@ if [ -f /tmp/gh-aw/agent/graders/grader_manifest.json ]; then mkdir -p /tmp/gh-a
 if [ -f /tmp/gh-aw/agent/graders/grader_results.json ]; then mkdir -p /tmp/gh-aw/usage/graders && cp /tmp/gh-aw/agent/graders/grader_results.json /tmp/gh-aw/usage/graders/grader_results.json || true; fi
 if [ -f /tmp/gh-aw/github_rate_limits.jsonl ]; then cp /tmp/gh-aw/github_rate_limits.jsonl /tmp/gh-aw/usage/github_rate_limits.jsonl || true; fi
 
-# Agent token usage (ascending priority — last non-empty source wins).
+# Agent token usage (ascending priority — authoritative source wins even when empty).
 if [ -s /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
 if [ -s /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
-if [ -s /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
+if [ -f /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/agent/token_usage.jsonl || true; fi
 
 # Detection token usage (ascending priority — last non-empty source wins).
 if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/threat-detection/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
 if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/threat-detection/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
 if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]; then cp /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl /tmp/gh-aw/usage/detection/token_usage.jsonl || true; fi
 
-[ -f /tmp/gh-aw/usage/agent/token_usage.jsonl ] || : > /tmp/gh-aw/usage/agent/token_usage.jsonl
 [ -f /tmp/gh-aw/usage/detection/token_usage.jsonl ] || : > /tmp/gh-aw/usage/detection/token_usage.jsonl
 
 mkdir -p /tmp/gh-aw/usage/activity

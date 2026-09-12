@@ -150,6 +150,11 @@ it("counts empty authoritative agent accounting as zero when the agent job faile
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
 });
 
+it("still requires accounting when a failed agent job has no authoritative source", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
 it("still requires accounting when an agent job succeeds", async () => {
   const f = evaluate({ "agent/token_usage.jsonl": "" }, [job("agent")]);
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");

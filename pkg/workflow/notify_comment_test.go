@@ -1419,16 +1419,16 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl") {
 		t.Errorf("Expected collect script to include firewall audit token usage path for agent.\nScript:\n%s", script)
 	}
-	// Verify non-empty check (-s) is used for token-usage copies so empty stub files from
-	// AWF's audit dir cannot zero out valid data written by the primary proxy-logs dir.
-	if !strings.Contains(script, "[ -s /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]") {
-		t.Errorf("Expected collect script to use non-empty (-s) check for firewall/logs token-usage copy.\nScript:\n%s", script)
+	// Verify the authoritative source is copied even when empty so its presence is
+	// distinguishable from missing accounting.
+	if !strings.Contains(script, "[ -f /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]") {
+		t.Errorf("Expected collect script to preserve empty firewall/logs token-usage accounting.\nScript:\n%s", script)
 	}
 	if !strings.Contains(script, "[ -s /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]") {
 		t.Errorf("Expected collect script to use non-empty (-s) check for firewall/audit token-usage copy.\nScript:\n%s", script)
 	}
-	// Verify firewall/logs/ copy appears after firewall/audit/ copy so it wins (last non-empty wins).
-	logsIdx := strings.Index(script, "[ -s /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]")
+	// Verify firewall/logs/ copy appears after firewall/audit/ copy so the authoritative source wins.
+	logsIdx := strings.Index(script, "[ -f /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl ]")
 	auditIdx := strings.Index(script, "[ -s /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl ]")
 	if logsIdx > 0 && auditIdx > 0 && logsIdx <= auditIdx {
 		t.Errorf("Expected firewall/logs token-usage copy to appear AFTER firewall/audit copy (logs = higher priority).\nScript:\n%s", script)
@@ -1439,8 +1439,8 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "Usage artifact source file status:") {
 		t.Errorf("Expected collect script to log source file status for diagnostics.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, ": > /tmp/gh-aw/usage/agent/token_usage.jsonl") {
-		t.Errorf("Expected collect script to ensure agent token usage file exists.\nScript:\n%s", script)
+	if strings.Contains(script, ": > /tmp/gh-aw/usage/agent/token_usage.jsonl") {
+		t.Errorf("Expected collect script not to synthesize missing agent token usage.\nScript:\n%s", script)
 	}
 	if !strings.Contains(script, ": > /tmp/gh-aw/usage/detection/token_usage.jsonl") {
 		t.Errorf("Expected collect script to ensure detection token usage file exists.\nScript:\n%s", script)
