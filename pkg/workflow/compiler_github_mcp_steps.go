@@ -23,6 +23,23 @@ func githubLockdownDetectionStepEnabled(data *WorkflowData) bool {
 	if enclaveDynamicRepositoryPolicyEnabled(data) {
 		return true
 	}
+	// A static enclave-only GitHub backend still needs the target repository's visibility
+	// for its safe-outputs write-sink policy, even when the primary agent has no GitHub
+	// MCP access at all (tools.github: false). Generate the step in that case too, so the
+	// write-sink policy's sink-visibility field always has a valid producer step.
+	//
+	// This intentionally checks staticEnclaveWriteSinkGuardPolicy(data) != nil rather than
+	// the broader githubBackendIsEnclaveOnly(data) helper: the latter is true whenever an
+	// enclave-only backend exists at all, even one with no allowed repos (in which case
+	// staticEnclaveWriteSinkGuardPolicy returns nil because there is no write-sink policy to
+	// populate). Using the broader helper here would generate this step needlessly for those
+	// repo-less configurations. githubBackendIsEnclaveOnly remains the right check for the
+	// separate question of "does the primary GitHub MCP server's own guard policy come from
+	// this step's outputs" (see githubGuardPoliciesFromStep and collectMCPEnvironmentVariables),
+	// which is unrelated to whether the step itself needs to exist for sink-visibility.
+	if staticEnclaveWriteSinkGuardPolicy(data) != nil {
+		return true
+	}
 	if githubTool, hasGitHub := data.Tools["github"]; hasGitHub {
 		return githubTool != false
 	}

@@ -94,24 +94,33 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 			envVars["GITHUB_MCP_SERVER_TOKEN"] = effectiveToken
 		}
 
-		// Add guard policy env vars if the determine-automatic-lockdown step will be generated.
-		// Skip only when guard policy is already explicitly set — in that case, the
-		// determine-automatic-lockdown step is not generated.
+		// Add guard policy env vars if the determine-automatic-lockdown step will be generated
+		// and its outputs are actually used to render the primary GitHub MCP server's guard
+		// policy. Skip when guard policy is already explicitly set, or when the GitHub MCP
+		// server exists solely to serve an enclave identity — enclave-only backends always
+		// derive their guard policy from the enclave declaration, never from the step outputs
+		// (see staticEnclaveGitHubGuardPolicies / dynamicEnclaveGitHubGuardPolicies), even
+		// though the step may still be generated to supply GH_AW_SINK_VISIBILITY.
 		// Security: Pass step outputs through environment variables to prevent template injection.
 		guardPoliciesExplicit := len(getGitHubGuardPolicies(toolConfig)) > 0
-		if githubToolEnabledInTools && !guardPoliciesExplicit && githubLockdownDetectionStepEnabled(workflowData) {
+		if githubToolEnabledInTools && !guardPoliciesExplicit && !githubBackendIsEnclaveOnly(workflowData) && githubLockdownDetectionStepEnabled(workflowData) {
 			envVars["GITHUB_MCP_GUARD_MIN_INTEGRITY"] = "${{ steps.determine-automatic-lockdown.outputs.min_integrity }}"
 			envVars["GITHUB_MCP_GUARD_REPOS"] = "${{ steps.determine-automatic-lockdown.outputs.repos }}"
 		}
 	}
 
 	// Emit GH_AW_SINK_VISIBILITY for all workflows where the determine-automatic-lockdown step
-	// runs (i.e., any workflow with a GitHub tool or a dynamic enclave). This avoids
+	// runs (i.e., any workflow with a GitHub tool, or an enclave-only GitHub backend — static
+	// or dynamic — whose write-sink policy needs the destination visibility). This avoids
 	// embedding a ${{ }} expression directly in the run: heredoc, which zizmor flags as
 	// template injection. The value is the raw step output (no toJSON), and the surrounding
 	// JSON double-quotes in the heredoc produce a valid JSON string at runtime:
 	//   "sink-visibility": "${GH_AW_SINK_VISIBILITY}"  →  "sink-visibility": "public"
-	if githubToolEnabledInTools || enclaveDynamicRepositoryPolicyEnabled(workflowData) {
+	// githubBackendIsEnclaveOnly is the same shared helper used to decide whether the primary
+	// agent's automatic guard-policy env vars apply, keeping both decisions in sync.
+	// Gating on githubLockdownDetectionStepEnabled ensures this never references a step that
+	// isn't actually generated (a dangling steps.<id>.outputs.* reference).
+	if (githubToolEnabledInTools || githubBackendIsEnclaveOnly(workflowData)) && githubLockdownDetectionStepEnabled(workflowData) {
 		envVars[sinkVisibilityEnvVar] = "${{ steps.determine-automatic-lockdown.outputs.visibility }}"
 	}
 	if enclaveDynamicRepositoryPolicyEnabled(workflowData) {
