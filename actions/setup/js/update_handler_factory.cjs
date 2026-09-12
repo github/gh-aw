@@ -44,10 +44,10 @@ function createStandardResolveNumber(config) {
   const { itemType, itemNumberField, supportsPR, supportsIssue } = config;
 
   return function resolveNumber(item, updateTarget, context, resolvedTemporaryIds) {
-    // Resolve temporary IDs in the item number field before target resolution
+    // Resolve model-provided temporary IDs only when wildcard targeting allows them.
     let resolvedItem = item;
     const itemNumberValue = item[itemNumberField];
-    if (resolvedTemporaryIds && itemNumberValue != null) {
+    if (updateTarget === "*" && resolvedTemporaryIds && itemNumberValue != null) {
       const tempIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
       const resolvedTarget = resolveRepoIssueTarget(itemNumberValue, tempIdMap, context.repo.owner, context.repo.repo);
       if (resolvedTarget.wasTemporaryId && resolvedTarget.resolved) {

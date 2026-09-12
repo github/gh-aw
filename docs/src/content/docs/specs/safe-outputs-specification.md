@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.2<br>
+**Version**: 1.29.3<br>
 **Status**: Working Draft<br>
 **Publication Date**: 2026-09-12<br>
 **Editor**: GitHub Agentic Workflows Team<br>
@@ -2715,6 +2715,7 @@ This section provides complete definitions for all remaining safe output types. 
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 - `staged`: Staged mode override
@@ -2725,6 +2726,16 @@ This section provides complete definitions for all remaining safe output types. 
 - Label values MUST be validated against repository labels before application
 - Cross-repository targets MUST be validated against the `allowed-repos` allowlist
 - Issue number MUST be validated as a positive integer belonging to the target repository
+
+**UI-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**UI-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**UI-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**UI-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**UI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -5622,6 +5633,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.3** (2026-09-12):
+
+- **Specified**: Runtime target authorization for `update_issue`, including wildcard-only resolution of agent-supplied temporary issue IDs.
+- **Updated**: Publication metadata to 1.29.3.
 
 **Version 1.29.2** (2026-09-12):
 
