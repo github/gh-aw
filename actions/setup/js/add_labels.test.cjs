@@ -184,6 +184,7 @@ describe("add_labels", () => {
         const result = await handler({ labels: ["bug"] }, {});
 
         expect(result.success).toBe(false);
+        expect(result.error).toBe("Invalid issue/PR number");
         expect(addLabelsCalls).toHaveLength(0);
       });
 

@@ -137,7 +137,7 @@ const main = createCountGatedHandler({
 
       itemNumber = Number(itemNumber);
       if (!Number.isInteger(itemNumber) || itemNumber <= 0) {
-        const error = "No issue/PR number available";
+        const error = target !== "*" && target !== "triggering" ? "Invalid issue/PR number" : "No issue/PR number available";
         core.warning(error);
         return { success: false, error };
       }

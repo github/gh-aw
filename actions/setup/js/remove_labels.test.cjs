@@ -153,6 +153,7 @@ describe("remove_labels", () => {
         const result = await handler({ labels: ["bug"] }, {});
 
         expect(result.success).toBe(false);
+        expect(result.error).toBe("Invalid issue/PR number");
         expect(removeLabelCalls).toHaveLength(0);
       });
 

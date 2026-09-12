@@ -143,6 +143,7 @@ describe("replace_label", () => {
       const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
 
       expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid issue/PR number");
       expect(setLabelsCalls).toHaveLength(0);
     });
 
