@@ -3,7 +3,7 @@
 **Date**: 2026-08-27
 **Status**: Draft
 **Deciders**: Unknown (automated draft from PR #56353 — review and finalize)
-**Revision note**: Renamed from `56353-always-configure-otlp-from-enterprise-defaults.md` after review clarified that GitHub Actions secrets are repository- or organization-scoped while variables can still be enterprise-scoped.
+**Revision note**: Renamed from `56353-always-configure-otlp-from-enterprise-defaults.md` after review clarified that GitHub Actions secrets are repository- or organization-scoped while variables can still be enterprise-scoped. The ADR remains Draft until a human reviewer finalizes the automated draft.
 
 ---
 
