@@ -179,6 +179,8 @@ print_info "Platform: $PLATFORM"
 # Get version (use provided version or default to "latest")
 # VERSION is already set from argument parsing
 REPO="github/gh-aw"
+MAX_RETRIES=5
+RETRY_DELAY=2
 
 if [ -z "$VERSION" ]; then
     print_info "No version specified, using 'latest'..."
@@ -281,10 +283,20 @@ LATEST_TAG=""
 FALLBACK_DOWNLOAD_URL=""
 FALLBACK_CHECKSUMS_URL=""
 if [ "$VERSION" = "latest" ]; then
-    if LATEST_RELEASE_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest"); then
-        LATEST_TAG=$(printf '%s' "$LATEST_RELEASE_RESPONSE" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-    else
-        print_warning "Failed to resolve latest release tag from GitHub API."
+    latest_retry_delay="$RETRY_DELAY"
+    for attempt in $(seq 1 "$MAX_RETRIES"); do
+        if LATEST_RELEASE_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest"); then
+            LATEST_TAG=$(printf '%s' "$LATEST_RELEASE_RESPONSE" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+            break
+        fi
+        if [ "$attempt" -lt "$MAX_RETRIES" ]; then
+            print_warning "Latest release lookup attempt $attempt failed. Retrying in ${latest_retry_delay}s..."
+            sleep "$latest_retry_delay"
+            latest_retry_delay=$((latest_retry_delay * 2))
+        fi
+    done
+    if [ -z "$LATEST_TAG" ]; then
+        print_warning "Failed to resolve latest release tag from GitHub API after $MAX_RETRIES attempts."
     fi
     if [ -n "$LATEST_TAG" ]; then
         FALLBACK_DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$PLATFORM"
@@ -318,8 +330,6 @@ fi
 
 # Download the binary with retry logic
 print_info "Downloading gh-aw binary..."
-MAX_RETRIES=3
-RETRY_DELAY=2
 download_binary_with_retry() {
     local url="$1"
     local delay="$RETRY_DELAY"
@@ -361,6 +371,7 @@ fi
 if [ "$SKIP_CHECKSUM" = false ]; then
     print_info "Downloading checksums file..."
     CHECKSUMS_DOWNLOADED=false
+    checksum_retry_delay="$RETRY_DELAY"
     
     for attempt in $(seq 1 $MAX_RETRIES); do
         if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$CHECKSUMS_URL" 2>/dev/null; then
@@ -374,8 +385,9 @@ if [ "$SKIP_CHECKSUM" = false ]; then
                 print_info "This may occur for older releases that don't include checksums."
                 break
             else
-                print_warning "Checksum download attempt $attempt failed. Retrying in 2s..."
-                sleep 2
+                print_warning "Checksum download attempt $attempt failed. Retrying in ${checksum_retry_delay}s..."
+                sleep "$checksum_retry_delay"
+                checksum_retry_delay=$((checksum_retry_delay * 2))
             fi
         fi
     done

@@ -194,10 +194,10 @@ echo ""
 echo "Test 8: Verify download retry logic"
 
 # Check for MAX_RETRIES variable
-if grep -q "MAX_RETRIES=" "$PROJECT_ROOT/install-gh-aw.sh"; then
-    echo "  ✓ PASS: MAX_RETRIES variable exists"
+if grep -q "MAX_RETRIES=5" "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✓ PASS: Downloads retry up to five times"
 else
-    echo "  ✗ FAIL: MAX_RETRIES variable not found"
+    echo "  ✗ FAIL: Downloads should retry up to five times"
     exit 1
 fi
 
@@ -214,6 +214,14 @@ if grep -q "RETRY_DELAY=\$((RETRY_DELAY \* 2))" "$PROJECT_ROOT/install-gh-aw.sh"
     echo "  ✓ PASS: Exponential backoff implemented"
 else
     echo "  ✗ FAIL: Exponential backoff not found"
+    exit 1
+fi
+
+if grep -q "latest_retry_delay=\$((latest_retry_delay \* 2))" "$PROJECT_ROOT/install-gh-aw.sh" &&
+   grep -q "checksum_retry_delay=\$((checksum_retry_delay \* 2))" "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✓ PASS: Release metadata and checksum retries use exponential backoff"
+else
+    echo "  ✗ FAIL: Release metadata and checksum retries should use exponential backoff"
     exit 1
 fi
 
