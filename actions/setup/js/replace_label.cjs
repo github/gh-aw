@@ -135,7 +135,8 @@ const main = createCountGatedHandler({
         itemNumber = Number(target);
       }
 
-      if (!itemNumber || Number.isNaN(Number(itemNumber))) {
+      itemNumber = Number(itemNumber);
+      if (!Number.isInteger(itemNumber) || itemNumber <= 0) {
         const error = "No issue/PR number available";
         core.warning(error);
         return { success: false, error };

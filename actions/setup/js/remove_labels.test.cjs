@@ -142,6 +142,20 @@ describe("remove_labels", () => {
         expect(removeLabelCalls[0].issue_number).toBe(789);
       });
 
+      it.each([-1, 1.5, Infinity])("rejects invalid fixed target %s", async target => {
+        const handler = await main({ max: 10, target });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(false);
+        expect(removeLabelCalls).toHaveLength(0);
+      });
+
       it("RML-004 accepts item_number when target is wildcard", async () => {
         const handler = await main({ max: 10, target: "*" });
         const removeLabelCalls = [];

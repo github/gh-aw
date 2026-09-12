@@ -173,6 +173,20 @@ describe("add_labels", () => {
         expect(addLabelsCalls[0].issue_number).toBe(789);
       });
 
+      it.each([-1, 1.5, Infinity])("rejects invalid fixed target %s", async target => {
+        const handler = await main({ max: 10, target });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(false);
+        expect(addLabelsCalls).toHaveLength(0);
+      });
+
       it("AL-004 accepts item_number when target is wildcard", async () => {
         const handler = await main({ max: 10, target: "*" });
         const addLabelsCalls = [];

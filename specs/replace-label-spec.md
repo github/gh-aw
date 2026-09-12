@@ -161,7 +161,7 @@ safe-outputs:
 | `allowed-remove` | `string[]` | `[]` (any) | Glob patterns for labels the agent is permitted to remove. When empty or absent, no remove restriction applies. |
 | `blocked` | `string[]` | `[]` (none) | Glob patterns that are unconditionally prohibited for both add and remove operations. Applied after allowlist checks. |
 | `max` | `integer` or GHA expression | `5` | Maximum number of `replace-label` operations permitted in a single workflow run. Supports GitHub Actions expressions (e.g., `${{ inputs.max_labels }}`). |
-| `target` | `"triggering"` \| `"*"` \| integer | `"triggering"` | Determines which issue/PR may be targeted. `"triggering"` restricts to the event item; `"*"` permits any item (requires `item_number` in message); an integer pins to a specific item number. |
+| `target` | `"triggering"` \| `"*"` \| integer | `"triggering"` | Determines which issue/PR may be targeted. `"triggering"` restricts to the event item; `"*"` permits an `item_number` from the message, or falls back to the event item when absent; an integer pins to a specific item number. |
 | `target-repo` | `string` | (current repo) | Default target repository in `owner/repo` format for cross-repository operations. |
 | `allowed-repos` | `string[]` | `[]` | Additional repositories the agent may target, beyond `target-repo`. |
 | `github-token` | `string` | (workflow default) | GitHub token or GitHub Actions expression for authentication. Overrides the workflow-level token for this type only. |

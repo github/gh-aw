@@ -132,6 +132,20 @@ describe("replace_label", () => {
       expect(setLabelsCalls[0].issue_number).toBe(123);
     });
 
+    it.each([-1, 1.5, Infinity])("rejects invalid fixed target %s", async target => {
+      const handler = await main({ target });
+      const setLabelsCalls = [];
+      mockGithub.rest.issues.setLabels = async params => {
+        setLabelsCalls.push(params);
+        return { data: [] };
+      };
+
+      const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
+
+      expect(result.success).toBe(false);
+      expect(setLabelsCalls).toHaveLength(0);
+    });
+
     it("T-RL-018 accepts item_number when target is wildcard", async () => {
       const setLabelsCalls = [];
       mockGithub.rest.issues.setLabels = async params => {
