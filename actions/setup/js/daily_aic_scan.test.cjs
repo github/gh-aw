@@ -108,6 +108,7 @@ describe("complete daily AIC scan observations", () => {
     expect(f.artifactClient.listArtifacts).not.toHaveBeenCalled();
     expect(f.artifactClient.downloadArtifact).not.toHaveBeenCalled();
     expect(f.github.rest.actions.listJobsForWorkflowRun).not.toHaveBeenCalled();
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"scan_cache"'));
   });
 
   it.each(["missing", "metadata-only", "malformed", "unknown-model", "old-attempt", "detection", "evals", "invalid-numeric"])("does not convert %s usage into an under-budget observation", async kind => {

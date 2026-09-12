@@ -70,7 +70,7 @@ function evaluate(files, jobs, overrides = {}) {
   };
 }
 
-it.each(["detection", "evals"])("rejects executed %s with missing accounting despite valid agent usage", async component => {
+it("rejects executed evals with missing accounting despite valid agent usage", async () => {
   const f = evaluate(
     {
       "agent_usage.jsonl": '{"aic":2}',
@@ -79,12 +79,28 @@ it.each(["detection", "evals"])("rejects executed %s with missing accounting des
       "detection/token_usage.jsonl": "",
       "evals.jsonl": "",
     },
-    [job("agent"), job(component)]
+    [job("agent"), job("evals")]
   );
-  await expect(f.result).rejects.toThrow(`Missing accounting for executed ${component} component in run 1 (attempt 1, job ${component === "detection" ? 2 : 3}, conclusion success)`);
-  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining(`"component":"${component}"`));
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component in run 1 (attempt 1, job 3, conclusion success)");
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"evals"'));
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"state":"empty"'));
   expect(f.list).toHaveBeenCalledOnce();
+});
+
+it("counts an empty detection accounting file as zero AIC", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+      "detection/token_usage.jsonl": "",
+      "detection_usage.jsonl": '{"aic":99}',
+    },
+    [job("agent"), job("detection")]
+  );
+
+  await expect(f.result).resolves.toBe(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"detection"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"empty_detection_accounting"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
 it.each(["skipped", "not-configured"])("accepts %s detection without requiring placeholder data", async state => {
@@ -98,6 +114,9 @@ it.each(["skipped", "not-configured"])("accepts %s detection without requiring p
     jobs
   );
   await expect(f.result).resolves.toBe(2);
+  if (state === "skipped") {
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"job_skipped"'));
+  }
 });
 
 it("accepts aggregated agent accounting when a failed request produced no raw usage", async () => {
@@ -116,6 +135,14 @@ it("accepts a completed run with no jobs as zero usage", async () => {
   const f = evaluate({}, []);
   await expect(f.result).resolves.toBe(0);
   expect(f.client.listArtifacts).not.toHaveBeenCalled();
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"no_billable_jobs"'));
+});
+
+it("accepts a completed run with all billable jobs skipped as zero usage", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "skipped" }), job("detection", { conclusion: "skipped" })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.listArtifacts).not.toHaveBeenCalled();
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"all_billable_jobs_skipped"'));
 });
 
 it("rejects a non-empty job list without the required agent job", async () => {
@@ -137,6 +164,7 @@ it.each(["agent", "detection"])("accepts provable zero usage when %s execution n
     component === "agent" ? [job("agent", { conclusion: "failure" })] : [job("agent", { conclusion: "skipped" }), job("detection", { conclusion: "failure" })]
   );
   await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"execution_not_started"'));
 });
 
 it.each([
@@ -178,6 +206,10 @@ it("selects raw accounting once per component instead of summing overlapping sum
     [job("agent"), job("detection"), job("evals")]
   );
   await expect(f.result).resolves.toBe(9);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"accounting_file","source":"agent/token_usage.jsonl"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"accounting_file","source":"detection/token_usage.jsonl"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"accounting_file","source":"evals/token_usage.jsonl"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Computed covered component total"));
 });
 
 it("does not fall back to a valid summary when authoritative raw data is malformed", async () => {

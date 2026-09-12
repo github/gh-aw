@@ -52,7 +52,7 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     expect(rendered).toContain("run 34616576735");
     expect(rendered).toContain("detection/token_usage.jsonl is empty");
     expect(rendered).toContain("fails closed");
-    expect(rendered).toContain("HTTP error");
+    expect(rendered).toContain("missing, empty, or unreadable");
   });
 
   it("returns empty string when accounting was verified", () => {

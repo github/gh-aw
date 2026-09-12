@@ -66,7 +66,10 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       const hit = matchesCompletedRun(cached, run);
       const aic = hit ? cached.aic : await getRunAIC(artifactClient, run.id, token, owner, repo, run, { github, budget });
       entries.set(run.id, scanCacheEntry(run, aic, repository, current.workflow_id, now));
-      if (hit) cacheHits++;
+      if (hit) {
+        cacheHits++;
+        core.info(`[daily-workflow-aic] Computed run AIC: ${JSON.stringify({ runId: run.id, aic, reason: "scan_cache" })}`);
+      }
       countedRuns.push({ ...run, aic });
     }
   } finally {
