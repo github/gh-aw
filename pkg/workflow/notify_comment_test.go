@@ -1406,8 +1406,9 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "cp /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json") {
 		t.Errorf("Expected collect script to copy agent_usage.json.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "cp /tmp/gh-aw/threat-detection/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl") {
-		t.Errorf("Expected collect script to copy detection_usage.jsonl from the downloaded detection artifact.\nScript:\n%s", script)
+	if !strings.Contains(script, "if [ -f /tmp/gh-aw/threat-detection/detection_usage.jsonl ]; then") ||
+		!strings.Contains(script, "elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then") {
+		t.Errorf("Expected collect script to prefer detection_usage.jsonl from the downloaded detection artifact with a legacy fallback.\nScript:\n%s", script)
 	}
 	if !strings.Contains(script, "cp /tmp/gh-aw/agent/graders/grader_manifest.json /tmp/gh-aw/usage/graders/grader_manifest.json") {
 		t.Errorf("Expected collect script to copy grader manifest into usage.\nScript:\n%s", script)

@@ -40,8 +40,11 @@ if [ -f /tmp/gh-aw/aw_info.json ]; then cp /tmp/gh-aw/aw_info.json /tmp/gh-aw/us
 if [ -f /tmp/gh-aw/aw-info.jsonl ]; then cp /tmp/gh-aw/aw-info.jsonl /tmp/gh-aw/usage/aw-info.jsonl || true; fi
 if [ -f /tmp/gh-aw/agent_usage.json ]; then cp /tmp/gh-aw/agent_usage.json /tmp/gh-aw/usage/agent_usage.json || true; fi
 if [ -f /tmp/gh-aw/agent_usage.jsonl ]; then cp /tmp/gh-aw/agent_usage.jsonl /tmp/gh-aw/usage/agent_usage.jsonl || true; fi
-if [ -f /tmp/gh-aw/detection_usage.jsonl ]; then cp /tmp/gh-aw/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true; fi
-if [ -f /tmp/gh-aw/threat-detection/detection_usage.jsonl ]; then cp /tmp/gh-aw/threat-detection/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true; fi
+if [ -f /tmp/gh-aw/threat-detection/detection_usage.jsonl ]; then
+  cp /tmp/gh-aw/threat-detection/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true
+elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
+  cp /tmp/gh-aw/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true
+fi
 if [ -f /tmp/gh-aw/agent_execution.json ]; then cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
 if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
