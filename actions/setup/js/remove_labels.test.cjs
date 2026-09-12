@@ -81,8 +81,85 @@ describe("remove_labels", () => {
   });
 
   describe("handleRemoveLabels", () => {
+    describe("runtime target authorization", () => {
+      it("RML-002 ignores a conflicting item_number when target is triggering", async () => {
+        const handler = await main({ max: 10, target: "triggering" });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(removeLabelCalls[0].issue_number).toBe(123);
+      });
+
+      it("RML-001 defaults to the triggering item when target is omitted", async () => {
+        const handler = await main({ max: 10 });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(removeLabelCalls[0].issue_number).toBe(123);
+      });
+
+      it("RML-003 ignores a conflicting item_number when target is a fixed number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(removeLabelCalls[0].issue_number).toBe(789);
+      });
+
+      it("RML-003 uses a fixed numeric target without an item_number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(removeLabelCalls[0].issue_number).toBe(789);
+      });
+
+      it("RML-004 accepts item_number when target is wildcard", async () => {
+        const handler = await main({ max: 10, target: "*" });
+        const removeLabelCalls = [];
+        mockGithub.rest.issues.removeLabel = async params => {
+          removeLabelCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(456);
+        expect(removeLabelCalls[0].issue_number).toBe(456);
+      });
+    });
+
     it("should remove labels from an issue using explicit item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -108,7 +185,7 @@ describe("remove_labels", () => {
     });
 
     it("should accept structured label entries and remove normalized label names", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -131,7 +208,7 @@ describe("remove_labels", () => {
     });
 
     it("should accept issue_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -153,7 +230,7 @@ describe("remove_labels", () => {
     });
 
     it("should accept pr_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -175,7 +252,7 @@ describe("remove_labels", () => {
     });
 
     it("should accept pull_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -280,7 +357,7 @@ describe("remove_labels", () => {
     });
 
     it("should handle invalid item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler(
         {
@@ -654,7 +731,7 @@ describe("remove_labels", () => {
     });
 
     it("should resolve temporary ID in item_number to real issue number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {
@@ -677,7 +754,7 @@ describe("remove_labels", () => {
     });
 
     it("should defer when item_number is an unresolved temporary ID", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler(
         {
@@ -693,7 +770,7 @@ describe("remove_labels", () => {
     });
 
     it("should resolve temporary ID with hash prefix in item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const removeLabelCalls = [];
 
       mockGithub.rest.issues.removeLabel = async params => {

@@ -478,13 +478,27 @@ func TestFormalReplaceLabelP14_CrossRepoRestriction(t *testing.T) {
 }
 
 func TestFormalReplaceLabelP15_TargetModeEnforcement(t *testing.T) {
-	n, ok := formalResolveTargetNumber("triggering", 42, 99)
-	require.True(t, ok)
-	assert.Equal(t, 42, n)
+	tests := []struct {
+		name      string
+		target    string
+		trigger   int
+		requested int
+		expected  int
+	}{
+		{name: "T-RL-014 omitted target uses triggering item", trigger: 42, requested: 99, expected: 42},
+		{name: "T-RL-015 triggering target ignores requested item", target: "triggering", trigger: 42, requested: 99, expected: 42},
+		{name: "T-RL-016 fixed target ignores requested item", target: "123", trigger: 42, requested: 99, expected: 123},
+		{name: "T-RL-017 fixed target works without requested item", target: "123", trigger: 42, expected: 123},
+		{name: "T-RL-018 wildcard target uses requested item", target: "*", trigger: 42, requested: 99, expected: 99},
+	}
 
-	n, ok = formalResolveTargetNumber("*", 42, 99)
-	require.True(t, ok)
-	assert.Equal(t, 99, n)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, ok := formalResolveTargetNumber(tt.target, tt.trigger, tt.requested)
+			require.True(t, ok)
+			assert.Equal(t, tt.expected, n)
+		})
+	}
 }
 
 func TestFormalReplaceLabelEdge_BothLabelsIdentical(t *testing.T) {

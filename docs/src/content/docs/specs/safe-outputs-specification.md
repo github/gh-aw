@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.1<br>
+**Version**: 1.29.2<br>
 **Status**: Working Draft<br>
 **Publication Date**: 2026-09-12<br>
 **Editor**: GitHub Agentic Workflows Team<br>
@@ -3630,6 +3630,14 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Same permissions as `add_labels`
 - Missing labels are silently ignored (no error)
 
+**Target Authorization Requirements**:
+
+- **RML-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **RML-002**: With `target: "triggering"`, the handler MUST use only the issue or pull request number from trusted triggering-event context. It MUST ignore agent-supplied `item_number` and equivalent aliases.
+- **RML-003**: With a fixed numeric `target`, the handler MUST use the configured number whether or not the agent supplies an item number. It MUST ignore conflicting agent-supplied target identifiers.
+- **RML-004**: Only `target: "*"` MAY select an issue or pull request from an agent-supplied `item_number` or equivalent alias.
+- **RML-005**: The privileged handler MUST enforce RML-001 through RML-004 at runtime.
+
 ---
 
 #### Type: add_reviewer
@@ -5614,6 +5622,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.2** (2026-09-12):
+
+- **Specified**: Runtime target authorization for `remove_labels`, matching `add_labels`: omitted and explicit `triggering` targets are restricted to trusted event context, fixed numeric targets override agent output, and only wildcard targets may use agent-supplied item numbers.
+- **Updated**: Publication metadata to 1.29.2.
 
 **Version 1.29.1** (2026-09-12):
 

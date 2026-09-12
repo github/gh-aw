@@ -7,11 +7,11 @@ sidebar:
 
 # replace-label Safe-Output Type Specification
 
-**Version**: 1.0.0  
+**Version**: 1.0.2
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/replace-label-spec.md  
 **Editors**: GitHub gh-aw Team (GitHub, Inc.)  
-**Publication Date**: 2026-06-20
+**Publication Date**: 2026-09-12
 
 ---
 
@@ -196,7 +196,7 @@ AI agents emit `replace_label` messages as part of the safe-outputs protocol. Th
 |-------|------|----------|------------|-------------|
 | `label_to_remove` | `string` | Yes | 128 characters | Name of the label to remove from the target item. The label need not currently be present on the item (see §5.3.4). |
 | `label_to_add` | `string` | Yes | 128 characters | Name of the label to add to the target item. The label need not pre-exist in the repository (see §5.4). |
-| `item_number` | `integer` or temporary-ID `string` | No | — | Issue or pull request number to target. When absent, falls back to the triggering item derived from the GitHub Actions event context. May be a temporary-ID string resolved by the gh-aw temporary-ID framework. |
+| `item_number` | `integer` or temporary-ID `string` | No | — | Issue or pull request number to target when `target: "*"` is configured. When absent, falls back to the triggering item derived from the GitHub Actions event context. May be a temporary-ID string resolved by the gh-aw temporary-ID framework. |
 | `repo` | `string` | No | 256 characters | Target repository in `owner/repo` format. Overrides the configured `target-repo` for this message only. Must satisfy the `allowed-repos` configuration constraint. |
 
 **RL-004**: A conforming implementation MUST reject any `replace_label` message in which `label_to_remove` is absent, empty after trimming, or exceeds 128 characters.
@@ -209,7 +209,7 @@ AI agents emit `replace_label` messages as part of the safe-outputs protocol. Th
 
 #### 4.2.2 Aliased Item Number Fields
 
-For compatibility with agents that follow other safe-output conventions, the handler MUST also accept the following field names as aliases for `item_number`:
+With `target: "*"`, the handler MUST also accept the following field names as aliases for `item_number`:
 
 - `issue_number`
 - `pr_number`
@@ -315,22 +315,19 @@ Messages that fail schema validation MUST be rejected with a structured error lo
 
 #### 5.3.2 Item Number Resolution
 
-**RL-016**: The target item number is resolved as follows, in priority order:
+**RL-016**: The target item number MUST be resolved from the configured `target` mode before considering agent-supplied fields. Omitted `target` MUST be interpreted as `"triggering"`.
 
-1. The item number resolved from any temporary-ID field (`item_number`, `issue_number`, `pr_number`, `pull_number`) via the gh-aw temporary-ID framework.
-2. A literal numeric value from the same aliased fields.
-3. The triggering issue number from `github.event.issue.number`.
-4. The triggering pull request number from `github.event.pull_request.number`.
-
-**RL-017**: When no item number can be resolved through any of the four mechanisms above, the message MUST be rejected with the error "No issue/PR number available".
+**RL-017**: When no item number can be resolved for the configured target mode, the message MUST be rejected with the error "No issue/PR number available".
 
 #### 5.3.3 Target Mode Enforcement
 
-**RL-018**: When `target` is set to `"triggering"`, the resolved item number MUST equal the triggering item's number. A message specifying a different `item_number` MUST be rejected.
+**RL-018**: When `target` is set to `"triggering"` or omitted, the handler MUST use the triggering item's number and MUST ignore agent-supplied item-number fields.
 
-**RL-019**: When `target` is set to an explicit integer, the resolved item number MUST equal that integer. Messages specifying a different number MUST be rejected.
+**RL-019**: When `target` is set to an explicit integer, the handler MUST use that integer and MUST ignore agent-supplied item-number fields.
 
-**RL-020**: When `target` is set to `"*"`, any item number is permitted, subject to repository constraints.
+**RL-020**: Only when `target` is set to `"*"` MAY the handler resolve an item number from `item_number`, `issue_number`, `pr_number`, or `pull_number`, subject to repository constraints. If no agent-supplied number is present, the handler MAY fall back to the triggering item.
+
+**RL-020a**: The privileged handler MUST enforce RL-016 and RL-018 through RL-020 at runtime.
 
 ### 5.4 Stage 4: Label Validation
 
@@ -561,7 +558,15 @@ For outcome evaluation compliance (verifying that the `replace_label` outcome ev
 - **T-RL-012**: Verify that the default max of 5 is enforced when `max` is absent from configuration.
 - **T-RL-013**: Verify that a GHA expression in `max` is resolved at runtime.
 
-#### 9.2.3 Label Validation Tests
+#### 9.2.3 Target Authorization Tests
+
+- **T-RL-014**: Verify that an omitted `target` ignores a conflicting agent-supplied item number and uses the triggering item.
+- **T-RL-015**: Verify that `target: "triggering"` ignores a conflicting agent-supplied item number.
+- **T-RL-016**: Verify that a fixed numeric target ignores a conflicting agent-supplied item number.
+- **T-RL-017**: Verify that a fixed numeric target is used when the message omits an item number.
+- **T-RL-018**: Verify that `target: "*"` accepts an agent-supplied item number.
+
+#### 9.2.4 Label Validation Tests
 
 The normative compliance fixtures for the allowlist and blocklist edge cases in
 this subsection live in `specs/replace-label-compliance/rl-002-allowlist-enforcement.yaml`
@@ -583,20 +588,20 @@ Fixture linkage check (2026-08-01):
 - [x] T-RL-024 covered by `specs/replace-label-compliance/rl-003-blocklist-ordering.yaml`
 - [x] T-RL-025 covered by `specs/replace-label-compliance/rl-002-allowlist-enforcement.yaml`
 
-#### 9.2.4 Gate Check Tests
+#### 9.2.5 Gate Check Tests
 
 - **T-RL-030**: Verify that an item satisfying all `required-labels` proceeds to the mutation stage.
 - **T-RL-031**: Verify that an item missing a required label is skipped (`skipped: true`) without failing.
 - **T-RL-032**: Verify that an item with a title matching `required-title-prefix` proceeds.
 - **T-RL-033**: Verify that an item whose title does not match `required-title-prefix` is skipped without failing.
 
-#### 9.2.5 Label Set Computation Tests
+#### 9.2.6 Label Set Computation Tests
 
 - **T-RL-040**: Verify that when `label_to_remove` is on the item, the computed new label set excludes it and includes `label_to_add`.
 - **T-RL-041**: Verify that when `label_to_add` is passed to `setLabels` and the label does not exist in the repository, the call fails with a hard error.
 - **T-RL-044**: Verify that when `label_to_remove` is not on the item, the computed new label set adds `label_to_add` without removing any label.
 
-#### 9.2.6 REST setLabels Tests
+#### 9.2.7 REST setLabels Tests
 
 - **T-RL-050**: Verify that `setLabels` is called with the correct `owner`, `repo`, `issue_number`, and `labels` array.
 - **T-RL-051**: Verify that the updated label list returned by `setLabels` is logged.
@@ -604,13 +609,13 @@ Fixture linkage check (2026-08-01):
 - **T-RL-053**: Verify that `label_to_add` always appears exactly once in the `labels` array.
 - **T-RL-054**: Verify that rate-limit responses trigger retry behavior.
 
-#### 9.2.7 Staged Mode Tests
+#### 9.2.8 Staged Mode Tests
 
 - **T-RL-060**: Verify that no write API call is made when `staged: true`.
 - **T-RL-061**: Verify that the preview log entry includes the correct label names, item number, and repository.
 - **T-RL-062**: Verify that staged mode returns `{ success: true, staged: true }`.
 
-#### 9.2.8 Cross-Repository Tests
+#### 9.2.9 Cross-Repository Tests
 
 - **T-RL-070**: Verify that a message with a `repo` in `allowed-repos` is accepted.
 - **T-RL-071**: Verify that a message with a `repo` not in `allowed-repos` is rejected.
@@ -629,7 +634,11 @@ Fixture linkage check (2026-08-01):
 | RL-007 String sanitization | T-RL-006 | 1 | Required |
 | RL-010 Count gate enforcement | T-RL-010, T-RL-011 | 1 | Required |
 | RL-012 Default max = 5 | T-RL-012 | 1 | Required |
+| RL-016 Target mode precedence | T-RL-014 – T-RL-018 | 1 | Required |
 | RL-017 No item number error | T-RL-006 | 1 | Required |
+| RL-018 Triggering target authorization | T-RL-014, T-RL-015 | 1 | Required |
+| RL-019 Fixed target authorization | T-RL-016, T-RL-017 | 1 | Required |
+| RL-020 Wildcard target authorization | T-RL-018 | 1 | Required |
 | RL-024 required-labels gate | T-RL-030, T-RL-031 | 1 | Required |
 | RL-025 required-title-prefix gate | T-RL-032, T-RL-033 | 1 | Required |
 | RL-027 Staged mode no writes | T-RL-060 | 1 | Required |
@@ -700,6 +709,7 @@ With `staged: true` in the configuration:
 safe-outputs:
   replace-label:
     staged: true
+    target: "*"
     allowed-add: ["done"]
     allowed-remove: ["in-progress"]
 ```
@@ -727,6 +737,7 @@ The message is rejected with `{ success: false }`. The label must be created in 
 ```yaml
 safe-outputs:
   replace-label:
+    target: "*"
     target-repo: "owner/infra"
     allowed-repos: ["owner/infra", "owner/platform"]
     allowed-add: ["deployed"]
@@ -796,6 +807,11 @@ The message is skipped. The workflow run is not marked as failed.
 ---
 
 ## Change Log
+
+### Version 1.0.2 (Revision) — 2026-09-12
+
+- Clarified that configured target modes take precedence over agent-supplied item numbers.
+- Added T-RL-014 through T-RL-018 target authorization tests.
 
 ### Version 1.0.1 (Revision) — 2026-06-22
 
