@@ -81,7 +81,9 @@ it.each(["detection", "evals"])("rejects executed %s with missing accounting des
     },
     [job("agent"), job(component)]
   );
-  await expect(f.result).rejects.toThrow(`Missing accounting for executed ${component}`);
+  await expect(f.result).rejects.toThrow(`Missing accounting for executed ${component} component in run 1 (attempt 1, job ${component === "detection" ? 2 : 3}, conclusion success)`);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining(`"component":"${component}"`));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"state":"empty"'));
   expect(f.list).toHaveBeenCalledOnce();
 });
 

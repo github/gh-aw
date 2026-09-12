@@ -326,6 +326,8 @@ func buildAgentFailureActivationStatusVars(data *WorkflowData) []string {
 	}
 	if hasMaxDailyAICGuardrail(data) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.%s.outputs.daily_ai_credits_exceeded }}\n", constants.ActivationJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.%s.outputs.daily_ai_credits_guardrail_status }}\n", constants.ActivationJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.%s.outputs.daily_ai_credits_guardrail_error }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS: ${{ needs.%s.outputs.daily_ai_credits_total_effective_tokens }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.%s.outputs.daily_ai_credits_threshold }}\n", constants.ActivationJobName))
 	}
@@ -513,7 +515,12 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	}
 	if hasMaxDailyAICGuardrail(data) {
 		dailyAICExceeded := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.daily_ai_credits_exceeded", constants.ActivationJobName)), BuildStringLiteral("true"))
-		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, dailyAICExceeded)
+		dailyAICStatus := BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.daily_ai_credits_guardrail_status", constants.ActivationJobName))
+		dailyAICFailed := BuildOr(
+			BuildEquals(dailyAICStatus, BuildStringLiteral("structural_error")),
+			BuildEquals(dailyAICStatus, BuildStringLiteral("transient_error")),
+		)
+		activationGuardrailsFailed = BuildOr(activationGuardrailsFailed, BuildOr(dailyAICExceeded, dailyAICFailed))
 	}
 	if len(data.SkillReferences) > 0 || len(data.Skills) > 0 {
 		skillInstallFailureCount := BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.skill_install_failure_count", constants.ActivationJobName))

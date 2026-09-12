@@ -287,6 +287,7 @@ function buildFailureMatchCategories(options) {
   if (options.hasOAuthTokenCheckFailed) categories.push("oauth_token_check_failed");
   if (options.hasStaleLockFileFailed) categories.push("stale_lock_file_failed");
   if (options.hasDailyAICExceeded) categories.push("daily_ai_credits_exceeded");
+  if (options.hasDailyAICGuardrailError) categories.push("daily_ai_credits_unknown");
   if (options.isAWFFirewallStartupFailed) categories.push("awf_firewall_startup_failed");
 
   // Keep agent_failure as the fallback class only when no existing
@@ -316,6 +317,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.hasOAuthTokenCheckFailed
  * @param {boolean} options.hasStaleLockFileFailed
  * @param {boolean} options.hasDailyAICExceeded
+ * @param {boolean} options.hasDailyAICGuardrailError
  * @param {boolean} options.aiCreditsRateLimitError
  * @param {boolean} options.hasEngineRateLimit429
  * @param {boolean} options.maxAICreditsExceeded
@@ -331,6 +333,7 @@ function buildFailureMatchCategories(options) {
 function buildFailureIssueTitle(options) {
   const { workflowName } = options;
   if (options.hasDailyAICExceeded) return `[aw] ${workflowName} exceeded daily AI credits budget`;
+  if (options.hasDailyAICGuardrailError) return `[aw] ${workflowName} could not verify daily AI credits`;
   if (options.maxAICreditsExceeded) return `[aw] ${workflowName} exceeded max AI credits`;
   if (options.aiCreditsRateLimitError) return `[aw] ${workflowName} hit AI credits rate limit`;
   if (options.hasEngineRateLimit429) return `[aw] ${workflowName} hit engine rate limit (HTTP 429)`;
@@ -2310,6 +2313,27 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) 
 }
 
 /**
+ * Build a context string when the daily AIC guardrail could not verify a complete accounting window.
+ * @param {boolean} hasDailyAICGuardrailError
+ * @param {string} status
+ * @param {string} error
+ * @returns {string}
+ */
+function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, error) {
+  if (!hasDailyAICGuardrailError) {
+    return "";
+  }
+
+  return (
+    "\n" +
+    renderTemplateFromFile(getPromptPath("daily_workflow_aic_unknown.md"), {
+      status: sanitizeContent(status, 100) || "unknown_error",
+      error: sanitizeContent(error, 2000) || "The daily guardrail did not provide an error reason.",
+    })
+  );
+}
+
+/**
  * Build the "Optimize token consumption" details section for the failure issue when a guardrail
  * limit was the root cause of the failure.
  *
@@ -3417,6 +3441,9 @@ async function main() {
     // The agent is skipped in this case; the conclusion job runs to surface remediation guidance.
     const hasStaleLockFileFailed = process.env.GH_AW_STALE_LOCK_FILE_FAILED === "true";
     const hasDailyAICExceeded = process.env.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "true";
+    const dailyAICGuardrailStatus = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS || "";
+    const dailyAICGuardrailError = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR || "";
+    const hasDailyAICGuardrailError = dailyAICGuardrailStatus === "structural_error" || dailyAICGuardrailStatus === "transient_error";
     const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS || "";
     const dailyAICThreshold = process.env.GH_AW_DAILY_AI_CREDITS_THRESHOLD || "";
     // Cache-memory availability flag — set when cache-memory is configured for the workflow.
@@ -3461,6 +3488,7 @@ async function main() {
     core.info(`AI credits rate-limit error: ${aiCreditsRateLimitError}`);
     core.info(`Max AI credits exceeded (harness budget abort): ${maxAICreditsExceeded}`);
     core.info(`Daily workflow AIC guardrail exceeded: ${hasDailyAICExceeded}`);
+    core.info(`Daily workflow AIC guardrail status: ${dailyAICGuardrailStatus || "(none)"}; error detail: ${dailyAICGuardrailError ? "(set)" : "(none)"}`);
     core.info(`Inference access error: ${inferenceAccessError}`);
     core.info(`MCP policy error: ${mcpPolicyError}`);
     core.info(`Agentic engine timeout: ${agenticEngineTimeout}`);
@@ -3664,6 +3692,7 @@ async function main() {
       !hasOAuthTokenCheckFailed &&
       !hasStaleLockFileFailed &&
       !hasDailyAICExceeded &&
+      !hasDailyAICGuardrailError &&
       !hasReportIncomplete &&
       !hasCacheMissMisconfiguration &&
       !aiCreditsRateLimitError &&
@@ -3673,7 +3702,7 @@ async function main() {
       !hasToolDenialsExceeded
     ) {
       core.info(
-        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification/docker-sbx-secret errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
+        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification/docker-sbx-secret errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
       );
       return;
     }
@@ -3788,6 +3817,7 @@ async function main() {
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
       hasDailyAICExceeded,
+      hasDailyAICGuardrailError,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
       maxAICreditsExceeded,
@@ -3831,6 +3861,7 @@ async function main() {
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
       hasDailyAICExceeded,
+      hasDailyAICGuardrailError,
       isAWFFirewallStartupFailed: detectAWFFirewallStartupFailureFromLog(),
     });
 
@@ -4013,6 +4044,7 @@ async function main() {
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError);
 
         // Build copilot assignment failure context for created issues
         const assignCopilotFailureContext = buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilotErrors);
@@ -4063,6 +4095,7 @@ async function main() {
           oauth_token_check_failed_context: oauthTokenCheckFailedContext,
           stale_lock_file_failed_context: staleLockFileFailedContext,
           daily_ai_credits_exceeded_context: dailyAICExceededContext,
+          daily_ai_credits_guardrail_error_context: dailyAICGuardrailErrorContext,
         };
 
         // Render the comment template
@@ -4241,6 +4274,7 @@ async function main() {
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError);
 
         // Build copilot assignment failure context for created issues
         const assignCopilotFailureContext = buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilotErrors);
@@ -4295,6 +4329,7 @@ async function main() {
           oauth_token_check_failed_context: oauthTokenCheckFailedContext,
           stale_lock_file_failed_context: staleLockFileFailedContext,
           daily_ai_credits_exceeded_context: dailyAICExceededContext,
+          daily_ai_credits_guardrail_error_context: dailyAICGuardrailErrorContext,
           optimize_token_consumption_context: optimizeTokenConsumptionContext,
         };
 
@@ -4397,6 +4432,7 @@ module.exports = {
   buildOAuthTokenCheckFailedContext,
   buildStaleLockFileFailedContext,
   buildDailyAICExceededContext,
+  buildDailyAICGuardrailErrorContext,
   buildOptimizeTokenConsumptionContext,
   buildTimeoutContext,
   shouldBuildEngineFailureContext,

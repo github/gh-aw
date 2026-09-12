@@ -112,6 +112,7 @@ jobs:
       comment_repo: ${{ steps.add-comment.outputs.comment-repo }}
       comment_url: ${{ steps.add-comment.outputs.comment-url }}
       daily_ai_credits_exceeded: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}
+      daily_ai_credits_guardrail_error: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}
       daily_ai_credits_guardrail_status: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}
       daily_ai_credits_threshold: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}
       daily_ai_credits_total_effective_tokens: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_total_effective_tokens || '' }}
@@ -1311,6 +1312,7 @@ jobs:
       always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
       needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
       needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
+      needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error' ||
       needs.activation.outputs.steering_issue_number != '')
     runs-on: ubuntu-slim
     permissions:
@@ -1530,6 +1532,8 @@ jobs:
           GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
           GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
           GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
+          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
+          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS: ${{ needs.activation.outputs.daily_ai_credits_total_effective_tokens }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🗜️ *Compressed by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"📦 Time to slim down! [{workflow_name}]({run_url}) is trimming the excess from this {event_type}...\",\"runSuccess\":\"🗜️ Docs on a diet! [{workflow_name}]({run_url}) has removed the bloat. Lean and mean! 💪\",\"runFailure\":\"📦 Unbloating paused! [{workflow_name}]({run_url}) {status}. The docs remain... fluffy.\"}"

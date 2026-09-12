@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 let buildDailyAICExceededContext;
+let buildDailyAICGuardrailErrorContext;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("handle_agent_failure daily workflow AI Credits context", () => {
@@ -12,6 +13,7 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     const mod = await import("./handle_agent_failure.cjs");
     const exports = mod.default || mod;
     buildDailyAICExceededContext = exports.buildDailyAICExceededContext;
+    buildDailyAICGuardrailErrorContext = exports.buildDailyAICGuardrailErrorContext;
   });
 
   afterEach(() => {
@@ -36,5 +38,24 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
 
   it("returns empty string when the guardrail did not trigger", () => {
     expect(buildDailyAICExceededContext(false, "2500", "2000", "")).toBe("");
+  });
+
+  it("renders an actionable accounting failure with the propagated reason", () => {
+    const rendered = buildDailyAICGuardrailErrorContext(
+      true,
+      "transient_error",
+      "Daily workflow AI Credits are unknown: Missing accounting for executed detection component in run 34616576735 (attempt 1, job 103321731068, conclusion success): detection/token_usage.jsonl is empty; detection_usage.jsonl is missing"
+    );
+
+    expect(rendered).toContain("Daily Workflow AI Credits Could Not Be Verified");
+    expect(rendered).toContain("`transient_error`");
+    expect(rendered).toContain("run 34616576735");
+    expect(rendered).toContain("detection/token_usage.jsonl is empty");
+    expect(rendered).toContain("fails closed");
+    expect(rendered).toContain("HTTP error");
+  });
+
+  it("returns empty string when accounting was verified", () => {
+    expect(buildDailyAICGuardrailErrorContext(false, "under_budget", "")).toBe("");
   });
 });

@@ -290,6 +290,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       // The default "false" output must be set
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("transient_error");
+      expect(coreOutputs["daily_ai_credits_guardrail_error"]).toBe("Daily workflow AI Credits are unknown: Network error");
       // Unknown accounting is an activation failure, not a successful skip.
       expect(coreWarnings.some(w => /AI Credits are unknown/i.test(w))).toBe(true);
     } finally {

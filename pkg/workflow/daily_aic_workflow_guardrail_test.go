@@ -140,6 +140,9 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_status: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}") {
 		t.Fatal("expected activation job to expose daily_ai_credits_guardrail_status output for structural vs transient failure distinction")
 	}
+	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_error: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}") {
+		t.Fatal("expected activation job to expose the daily AI Credits guardrail error")
+	}
 	if !strings.Contains(lockStr, "daily_ai_credits_total_effective_tokens: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_total_effective_tokens || '' }}") {
 		t.Fatal("expected activation job to expose the aggregated AI Credits total output")
 	}
@@ -152,8 +155,18 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}") {
 		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail output")
 	}
+	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}") {
+		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail status")
+	}
+	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}") {
+		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail error")
+	}
 	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_exceeded == 'true'") {
 		t.Fatal("expected the conclusion job condition to allow activation guardrail failures through")
+	}
+	if !strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error'") ||
+		!strings.Contains(lockStr, "needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error'") {
+		t.Fatal("expected the conclusion job condition to report daily AI Credits accounting failures")
 	}
 	if !strings.Contains(activationSection, "actions: read") {
 		t.Fatal("expected activation permissions to include actions: read for workflow run inspection")

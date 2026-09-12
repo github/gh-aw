@@ -117,6 +117,7 @@ describe("handle_agent_failure", () => {
       hasLockdownCheckFailed: false,
       hasStaleLockFileFailed: false,
       hasDailyAICExceeded: false,
+      hasDailyAICGuardrailError: false,
       aiCreditsRateLimitError: false,
       hasEngineRateLimit429: false,
       maxAICreditsExceeded: false,
@@ -130,6 +131,7 @@ describe("handle_agent_failure", () => {
 
     const cases = [
       { flag: "hasDailyAICExceeded", expected: "[aw] Test Workflow exceeded daily AI credits budget" },
+      { flag: "hasDailyAICGuardrailError", expected: "[aw] Test Workflow could not verify daily AI credits" },
       { flag: "maxAICreditsExceeded", expected: "[aw] Test Workflow exceeded max AI credits" },
       { flag: "aiCreditsRateLimitError", expected: "[aw] Test Workflow hit AI credits rate limit" },
       { flag: "hasEngineRateLimit429", expected: "[aw] Test Workflow hit engine rate limit (HTTP 429)" },
@@ -5641,6 +5643,13 @@ describe("handle_agent_failure", () => {
         http400ResponseError: true,
       });
       expect(categories).toContain("http_400_response_error");
+    });
+
+    it("returns daily_ai_credits_unknown category for guardrail accounting errors", () => {
+      const categories = buildFailureMatchCategories({
+        hasDailyAICGuardrailError: true,
+      });
+      expect(categories).toContain("daily_ai_credits_unknown");
     });
 
     it("returns awf_firewall_startup_failed category when isAWFFirewallStartupFailed is true", () => {

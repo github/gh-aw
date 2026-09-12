@@ -65,6 +65,16 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
   }
 }
 
+function inspectAccountingFile(directory, file) {
+  const relativeFile = path.relative(directory, file);
+  if (!fs.existsSync(file)) return { file: relativeFile, state: "missing" };
+  try {
+    return { file: relativeFile, state: fs.readFileSync(file, "utf8").trim() ? "non-empty" : "empty" };
+  } catch (error) {
+    return { file: relativeFile, state: `unreadable (${error instanceof Error ? error.message : String(error)})` };
+  }
+}
+
 function sumCoveredComponents(directory, components, artifactCreatedAt, artifacts, usageArtifactName, attempt, runId) {
   let total = 0;
   for (const [name, job] of components) {
@@ -87,10 +97,23 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       }
     }
     const candidates = COMPONENT_FILES[name].map(parts => path.join(directory, ...parts));
-    const selected = candidates.find(file => fs.existsSync(file) && fs.readFileSync(file, "utf8").trim());
+    const candidateStates = candidates.map(file => inspectAccountingFile(directory, file));
+    core.info(
+      `[daily-workflow-aic] Inspected component accounting: ${JSON.stringify({
+        runId,
+        component: name,
+        jobId: job.id,
+        runAttempt: job.run_attempt,
+        conclusion: job.conclusion,
+        candidates: candidateStates,
+      })}`
+    );
+    const selectedIndex = candidateStates.findIndex(candidate => candidate.state === "non-empty");
+    const selected = selectedIndex >= 0 ? candidates[selectedIndex] : "";
     if (!selected) {
       if (provesExecutionNotStarted(directory, name, runId, job.run_attempt)) continue;
-      throw new Error(`Missing accounting for executed ${name} component`);
+      const candidateSummary = candidateStates.map(candidate => `${candidate.file} is ${candidate.state}`).join("; ");
+      throw new Error(`Missing accounting for executed ${name} component in run ${runId} (attempt ${job.run_attempt}, job ${job.id}, conclusion ${job.conclusion}): ${candidateSummary}`);
     }
     total += sumAICFromUsageJSONLFiles([selected], { strict: true });
   }

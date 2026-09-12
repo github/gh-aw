@@ -557,6 +557,7 @@ async function main(options = {}) {
   core.setOutput("daily_ai_credits_total_effective_tokens", "");
   core.setOutput("daily_ai_credits_threshold", "");
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
+  core.setOutput("daily_ai_credits_guardrail_error", "");
   const threshold = parsePositiveCompactNumber(process.env.GH_AW_MAX_DAILY_AI_CREDITS);
   if (threshold <= 0) {
     core.setOutput("daily_ai_credits_guardrail_status", "disabled");
@@ -570,8 +571,10 @@ async function main(options = {}) {
 
   const token = process.env.GH_AW_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
   if (!token) {
+    const message = "Daily workflow AI Credits are unknown: no artifact lookup token.";
     core.setOutput("daily_ai_credits_guardrail_status", "structural_error");
-    core.setFailed("Daily workflow AI Credits are unknown: no artifact lookup token.");
+    core.setOutput("daily_ai_credits_guardrail_error", message);
+    core.setFailed(message);
     return;
   }
 
@@ -638,10 +641,14 @@ async function main(options = {}) {
     // workflow to fail even though hitting the daily limit is an expected, graceful outcome.
     core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold}.`);
   } catch (error) {
-    core.setOutput("daily_ai_credits_guardrail_status", isStructuralGuardrailError(error) ? "structural_error" : "transient_error");
+    const status = isStructuralGuardrailError(error) ? "structural_error" : "transient_error";
+    const message = `Daily workflow AI Credits are unknown: ${getErrorMessage(error)}`;
+    core.setOutput("daily_ai_credits_guardrail_status", status);
+    core.setOutput("daily_ai_credits_guardrail_error", message);
+    logDailyGuardrail("AIC inspection failed", { status, error: getErrorMessage(error) });
     const retryAt = retryNotBefore(error?.response?.headers);
     if (retryAt) core.info(`Daily AIC inspection must not retry before ${retryAt}`);
-    core.setFailed(`Daily workflow AI Credits are unknown: ${getErrorMessage(error)}`);
+    core.setFailed(message);
   }
 }
 
