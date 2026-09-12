@@ -212,6 +212,7 @@ const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
+    const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
     const issueIntentStrict = config.issue_intent === true; // strict mode: plain-string labels rejected, metadata required
     const createIfMissing = config.create_if_missing === true;
@@ -248,12 +249,20 @@ const main = createCountGatedHandler({
       const { repo: itemRepo, repoParts } = repoResult;
       core.info(`Target repository: ${itemRepo}`);
 
-      // Determine target issue/PR number
-      // Accept common aliases: issue_number, pr_number, and pull_number are normalised to item_number
-      const targetResult = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE });
-      if (!targetResult.success) return targetResult;
       const effectiveContext = resolveInvocationContext(context);
-      const itemNumber = targetResult.number ?? effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
+      const triggeringItemNumber = effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
+      let itemNumber;
+
+      if (target === "*") {
+        // Accept common aliases: issue_number, pr_number, and pull_number are normalised to item_number
+        const targetResult = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE });
+        if (!targetResult.success) return targetResult;
+        itemNumber = targetResult.number ?? triggeringItemNumber;
+      } else if (target === "triggering") {
+        itemNumber = triggeringItemNumber;
+      } else {
+        itemNumber = Number(target);
+      }
 
       if (!itemNumber || Number.isNaN(Number(itemNumber))) {
         const error = "No issue/PR number available";
