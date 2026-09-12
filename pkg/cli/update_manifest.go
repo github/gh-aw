@@ -212,10 +212,8 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	assetEngine := resolveManifestAssetEngine(grouped, opts)
 	if err := reconcileManifestManagedAssets(ctx, repoSpec, currentPkg, latestPkg, assetEngine, opts); err != nil {
 		failures = append(failures, updateFailure{Name: source, Error: err.Error()})
-	} else {
-		if err := refreshManifestManagedOwnership(repoSpec, latestPkg, latestRef, assetEngine, opts); err != nil {
-			failures = append(failures, updateFailure{Name: source, Error: err.Error()})
-		}
+	} else if err := refreshManifestManagedOwnership(repoSpec, latestPkg, latestRef, assetEngine, opts); err != nil {
+		failures = append(failures, updateFailure{Name: source, Error: err.Error()})
 	}
 	if len(groupedSuccesses) == 0 && len(failures) == 0 {
 		groupedSuccesses = append(groupedSuccesses, repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath))
@@ -264,14 +262,14 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 			continue
 		}
 		destPath := filepath.Join(workflowsDir, filepath.Base(installable.DestinationPath))
+		if err := fileutil.ValidatePathWithinBase(gitRoot, destPath); err != nil {
+			return fmt.Errorf("package action workflow destination escapes repository root: %w", err)
+		}
 		destination, err := filepath.Rel(gitRoot, destPath)
 		if err != nil {
 			return fmt.Errorf("unable to resolve package action workflow destination %s: %w", destPath, err)
 		}
 		destination = filepath.ToSlash(destination)
-		if err := fileutil.ValidatePathWithinBase(gitRoot, destPath); err != nil {
-			return fmt.Errorf("package action workflow %q escapes repository root: %w", destination, err)
-		}
 		fileExists := false
 		if _, err := os.Stat(destPath); err == nil {
 			fileExists = true

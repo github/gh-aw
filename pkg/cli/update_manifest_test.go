@@ -218,6 +218,7 @@ func TestReconcileManifestManagedAssets_RefreshesExistingPackageOwnedAssets(t *t
 			{Source: ".github/workflows/new.yml", Destination: ".github/workflows/new.yml", SHA256: sha256Bytes([]byte("name: old action\n"))},
 			{Source: "skills/review/scripts/check.sh", Destination: filepath.ToSlash(filepath.Join(workflow.GetEngineSkillDir(engine), "review", "scripts", "check.sh")), SHA256: sha256Bytes([]byte("#!/bin/sh\necho old\n"))},
 			{Source: "agents/reviewer.md", Destination: filepath.ToSlash(filepath.Join(workflow.GetEngineSubAgentDir(engine), "reviewer.md")), SHA256: sha256Bytes([]byte("# Old Reviewer\n"))},
+			{Source: "workflows/removed.md", Destination: ".github/workflows/removed.md", SHA256: sha256Bytes([]byte("removed\n"))},
 		},
 	}
 	recordPath := packageOwnershipRecordPath(tmpDir, packageBase)

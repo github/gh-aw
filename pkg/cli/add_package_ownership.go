@@ -451,7 +451,7 @@ func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepository
 		Installer:      "gh-aw " + GetVersion(),
 	}
 	if existing, readErr := readPackageOwnershipRecord(recordPath); readErr == nil && existing != nil {
-		record.Files = existing.Files
+		record.Files = existingPackageOwnershipFiles(gitRoot, existing.Files)
 	}
 
 	workflowsDir := absolutePackageWorkflowsDir(gitRoot, opts.WorkflowsDir)
@@ -494,6 +494,17 @@ func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepository
 		return fmt.Errorf("failed to write package ownership record: %w", err)
 	}
 	return nil
+}
+
+func existingPackageOwnershipFiles(gitRoot string, entries []packageOwnershipFileEntry) []packageOwnershipFileEntry {
+	var existing []packageOwnershipFileEntry
+	for _, entry := range entries {
+		destination := filepath.Join(gitRoot, filepath.FromSlash(entry.Destination))
+		if fileutil.FileExists(destination) {
+			existing = append(existing, entry)
+		}
+	}
+	return existing
 }
 
 func refreshManifestWorkflowOwnership(gitRoot, workflowsDir string, record *packageOwnershipRecord, installables []resolvedPackageInstallable) error {
