@@ -353,12 +353,20 @@ Test workflow`
 		if !strings.Contains(uploadStep, "            "+constants.ThreatDetectionResultPath+"\n") {
 			t.Errorf("External detector path must upload %s", constants.ThreatDetectionResultPath)
 		}
+		if !strings.Contains(uploadStep, "            "+constants.TmpGhAwDir+"/threat-detection/detection_usage.jsonl\n") {
+			t.Error("External detector path must upload detection AI Credits accounting")
+		}
 		// The raw engine log (detection.log) and step-summary must NOT be uploaded on the
 		// external detector path: both can contain content derived from the untrusted agent
 		// transcript passed to the detection engine, and persisting them as a downloadable
 		// artifact would be a secret-exfiltration path. Only the structured verdict is uploaded.
 		if strings.Contains(uploadStep, constants.ThreatDetectionLogPath) {
 			t.Errorf("External detector path must NOT include %s in upload artifact path block (secret-exfil risk)", constants.ThreatDetectionLogPath)
+		}
+
+		parseUsageStep := strings.Index(detectionSection, "      - name: Parse threat detection token usage for step summary\n")
+		if parseUsageStep == -1 || uploadStepStart == -1 || parseUsageStep > uploadStepStart {
+			t.Error("External detector path must parse detection usage before uploading the detection artifact")
 		}
 		if strings.Contains(uploadStep, constants.ThreatDetectionStepSummaryPath) {
 			t.Errorf("External detector path must NOT include %s in upload artifact path block (secret-exfil risk)", constants.ThreatDetectionStepSummaryPath)

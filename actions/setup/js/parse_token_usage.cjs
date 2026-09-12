@@ -27,6 +27,22 @@ const AGENT_USAGE_JSONL_PATH = "/tmp/gh-aw/agent_usage.jsonl";
 const COPILOT_SESSION_STATE_DIR = "/tmp/gh-aw/sandbox/agent/logs/copilot-session-state";
 const DEFAULT_SUMMARY_TITLE = "Token Usage";
 
+function getUsageOutputPath(envName, defaultPath) {
+  const configured = process.env[envName];
+  return configured && configured.trim() ? configured.trim() : defaultPath;
+}
+
+function writeEmptyUsageEvidence() {
+  if (process.env.GH_AW_WRITE_EMPTY_USAGE !== "true") return;
+  const usagePath = getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH);
+  const usageJSONLPath = getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", AGENT_USAGE_JSONL_PATH);
+  fs.mkdirSync(path.dirname(usagePath), { recursive: true });
+  fs.mkdirSync(path.dirname(usageJSONLPath), { recursive: true });
+  fs.writeFileSync(usagePath, '{"input_tokens":0,"output_tokens":0,"ai_credits":0}\n');
+  fs.writeFileSync(usageJSONLPath, '{"provider":"unknown","ai_credits":0}\n');
+  core.info("Recorded explicit zero token usage evidence");
+}
+
 /**
  * Returns readable, non-empty token usage files, skipping paths that error.
  * @param {string[]} paths
@@ -180,8 +196,8 @@ async function reportCopilotUsageCheckpoint(checkpoint) {
     premium_requests: checkpoint.premiumRequests,
   };
   try {
-    fs.writeFileSync(AGENT_USAGE_PATH, JSON.stringify(agentUsage) + "\n");
-    fs.writeFileSync(AGENT_USAGE_JSONL_PATH, JSON.stringify({ provider: "copilot", ai_credits: checkpoint.aiCredits, premium_requests: checkpoint.premiumRequests }) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH), JSON.stringify(agentUsage) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", AGENT_USAGE_JSONL_PATH), JSON.stringify({ provider: "copilot", ai_credits: checkpoint.aiCredits, premium_requests: checkpoint.premiumRequests }) + "\n");
   } catch (error) {
     throw new Error(`${ERR_PARSE}: Failed to write Copilot usage files: ${getErrorMessage(error)}`, { cause: error });
   }
@@ -296,6 +312,7 @@ async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
         await reportCopilotUsageCheckpoint(checkpoint);
         return;
       }
+      writeEmptyUsageEvidence();
       core.info("No token usage data found, skipping summary");
       return;
     }
@@ -310,6 +327,7 @@ async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
         await reportCopilotUsageCheckpoint(checkpoint);
         return;
       }
+      writeEmptyUsageEvidence();
       core.info("Token usage file contained no valid entries");
       return;
     }
@@ -348,7 +366,7 @@ async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
       ai_credits: summary.aiCreditsSource === "awf_reported" ? Number(summary.totalAIC.toFixed(6)) : Number((summary.totalAIC || 0).toFixed(3)),
       ...(primaryModel ? { primary_model: primaryModel } : {}),
     };
-    fs.writeFileSync(AGENT_USAGE_PATH, JSON.stringify(agentUsage) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH), JSON.stringify(agentUsage) + "\n");
 
     if (primaryModel) {
       core.exportVariable("GH_AW_PRIMARY_MODEL", primaryModel);
@@ -395,6 +413,8 @@ if (typeof module !== "undefined" && module.exports) {
     DEFAULT_SUMMARY_TITLE,
     findCopilotUsageCheckpoint,
     reportCopilotUsageCheckpoint,
+    getUsageOutputPath,
+    writeEmptyUsageEvidence,
   };
 }
 

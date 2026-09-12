@@ -98,11 +98,11 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 			steps = append(steps, c.buildCustomThreatDetectionSteps(data.SafeOutputs.ThreatDetection.PostSteps)...)
 		}
 
-		// Step 13: Upload detection_result.json as the detection artifact
-		steps = append(steps, c.buildUploadDetectionArtifactStep(data)...)
-
-		// Step 14: Parse threat-detection token usage for step summary and downstream footer rendering.
+		// Step 13: Parse threat-detection token usage for step summary and downstream footer rendering.
 		steps = append(steps, c.buildDetectionTokenUsageSummaryStep(data)...)
+
+		// Step 14: Upload detection_result.json and accounting as the detection artifact.
+		steps = append(steps, c.buildUploadDetectionArtifactStep(data)...)
 
 		// Step 15: Conclude via threat-detect conclude (no .cjs)
 		steps = append(steps, c.buildExternalDetectorConcludeStep(data)...)
@@ -325,6 +325,9 @@ func (c *Compiler) buildDetectionTokenUsageSummaryStep(data *WorkflowData) []str
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_AW_TOKEN_USAGE_SUMMARY_TITLE: Threat Detection Token Usage\n",
+		"          GH_AW_AGENT_USAGE_PATH: " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
+		"          GH_AW_AGENT_USAGE_JSONL_PATH: " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
+		"          GH_AW_WRITE_EMPTY_USAGE: \"true\"\n",
 		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",

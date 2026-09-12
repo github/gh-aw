@@ -1551,17 +1551,6 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall
           if [ -d /tmp/gh-aw/sandbox/firewall/logs ]; then mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall/logs && cp -r /tmp/gh-aw/sandbox/firewall/logs/. /tmp/gh-aw/threat-detection/sandbox/firewall/logs/; fi
           if [ -d /tmp/gh-aw/sandbox/firewall/audit ]; then mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall/audit && cp -r /tmp/gh-aw/sandbox/firewall/audit/. /tmp/gh-aw/threat-detection/sandbox/firewall/audit/; fi
-      - name: Upload threat detection artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: detection
-          path: |
-            /tmp/gh-aw/threat-detection/detection_result.json
-            /tmp/gh-aw/threat-detection/execution.json
-            /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
-            /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
-          if-no-files-found: ignore
       - name: Parse threat detection token usage for step summary
         id: parse_detection_token_usage
         if: always()
@@ -1569,6 +1558,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_TOKEN_USAGE_SUMMARY_TITLE: Threat Detection Token Usage
+          GH_AW_AGENT_USAGE_PATH: /tmp/gh-aw/threat-detection/detection_usage.json
+          GH_AW_AGENT_USAGE_JSONL_PATH: /tmp/gh-aw/threat-detection/detection_usage.jsonl
+          GH_AW_WRITE_EMPTY_USAGE: "true"
         with:
           script: |
             const path = require('path');
@@ -1577,6 +1569,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'parse_token_usage.cjs'));
             await main();
+      - name: Upload threat detection artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: detection
+          path: |
+            /tmp/gh-aw/threat-detection/detection_result.json
+            /tmp/gh-aw/threat-detection/execution.json
+            /tmp/gh-aw/threat-detection/detection_usage.json
+            /tmp/gh-aw/threat-detection/detection_usage.jsonl
+            /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
+            /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
+          if-no-files-found: ignore
       - name: Conclude threat detection
         id: detection_conclusion
         if: always()

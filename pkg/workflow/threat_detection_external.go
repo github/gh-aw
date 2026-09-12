@@ -625,6 +625,8 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 		"          path: |\n",
 		"            " + constants.ThreatDetectionResultPath + "\n",
 		"            " + detectionExecutionEvidencePath + "\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
 	}
 	// Include the detection AWF run's own firewall proxy/audit logs (token usage, squid
 	// logs) so detection-phase usage surfaces in the usage artifact and counts toward the

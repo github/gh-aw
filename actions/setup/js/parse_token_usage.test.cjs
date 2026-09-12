@@ -85,6 +85,9 @@ describe("parse_token_usage", () => {
     beforeEach(() => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "parse-token-usage-test-"));
       delete process.env.GH_AW_TOKEN_USAGE_SUMMARY_TITLE;
+      delete process.env.GH_AW_AGENT_USAGE_PATH;
+      delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
+      delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       process.env.GITHUB_STEP_SUMMARY = "";
 
       mockCore = {
@@ -130,6 +133,9 @@ describe("parse_token_usage", () => {
       fs.statSync = originalStatSync;
       fs.readFileSync = originalReadFileSync;
       fs.writeFileSync = originalWriteFileSync;
+      delete process.env.GH_AW_AGENT_USAGE_PATH;
+      delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
+      delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       delete global.core;
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
@@ -155,6 +161,26 @@ describe("parse_token_usage", () => {
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No token usage data found"));
       expect(mockCore.summary.addDetails).not.toHaveBeenCalled();
       expect(mockCore.summary.write).not.toHaveBeenCalled();
+    });
+
+    test("writes explicit zero usage evidence when requested and no usage exists", async () => {
+      const usagePath = path.join(tmpDir, "detection_usage.json");
+      const usageJSONLPath = path.join(tmpDir, "detection_usage.jsonl");
+      process.env.GH_AW_AGENT_USAGE_PATH = usagePath;
+      process.env.GH_AW_AGENT_USAGE_JSONL_PATH = usageJSONLPath;
+      process.env.GH_AW_WRITE_EMPTY_USAGE = "true";
+
+      await main(path.join(tmpDir, "missing-session-state"));
+
+      expect(JSON.parse(originalReadFileSync(usagePath, "utf8"))).toEqual({
+        input_tokens: 0,
+        output_tokens: 0,
+        ai_credits: 0,
+      });
+      expect(JSON.parse(originalReadFileSync(usageJSONLPath, "utf8"))).toEqual({
+        provider: "unknown",
+        ai_credits: 0,
+      });
     });
 
     test("writes authoritative Copilot checkpoint usage when proxy usage is unavailable", async () => {
