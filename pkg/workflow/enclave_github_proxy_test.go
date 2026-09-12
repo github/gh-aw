@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -358,12 +359,18 @@ Read the private repository's issues through the enclave.
 	var doc any
 	require.NoError(t, yaml.Unmarshal(lockBytes, &doc), "generated lock file must be valid YAML")
 
-	// The determine-automatic-lockdown step is not generated, so its outputs must not be
-	// referenced by the server-level guard policy or the gateway step environment.
-	assert.NotContains(t, lock, "Determine automatic lockdown mode")
+	// The determine-automatic-lockdown step IS generated in this configuration, solely to
+	// supply the target repository's visibility for the static enclave's write-sink policy
+	// (GH_AW_SINK_VISIBILITY). Its min_integrity/repos outputs must still not be referenced,
+	// because the server-level guard policy for this enclave-only backend is derived
+	// statically from the enclave declaration, not from the step outputs.
+	assert.Contains(t, lock, "Determine automatic lockdown mode")
+	assert.Contains(t, lock, "id: determine-automatic-lockdown")
+	assert.Contains(t, lock, "GH_AW_SINK_VISIBILITY: ${{ steps.determine-automatic-lockdown.outputs.visibility }}")
 	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_MIN_INTEGRITY")
 	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_REPOS")
 	assert.NotContains(t, lock, "GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}")
+	assert.NotContains(t, lock, "GITHUB_MCP_GUARD_REPOS: ${{ steps.determine-automatic-lockdown.outputs.repos }}")
 
 	// The server-level guard policy mirrors the enclave identity policy, so it never
 	// broadens access beyond what the enclave identity already allows.
@@ -372,6 +379,9 @@ Read the private repository's issues through the enclave.
 	assert.Contains(t, lock, `"write-sink"`)
 	assert.Contains(t, lock, `"private:octo-org/private-service"`)
 	assert.Contains(t, lock, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
+	// The sink-visibility env var must reference the step actually generated above — no
+	// dangling steps.<id>.outputs.* reference.
+	assert.Contains(t, lock, "steps.determine-automatic-lockdown.outputs.visibility")
 	assert.Contains(t, lock, `"${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}":{"servers":["github"],"tools":{"github":["list_issues","issue_read"]},"allow-only":{"min-integrity":"none","repos":["octo-org/private-service"]}}`)
 	assert.Contains(t, lock, `export GH_AW_MCP_GITHUB_CHECK_AGENT_ID="${AWF_ENCLAVE_GITHUB_MCP_AGENT_ID}"`)
 	assert.NotContains(t, lock, `"${MCP_GATEWAY_AGENT_ID}":{"servers":["awf-enclave","github"`)
@@ -380,6 +390,138 @@ Read the private repository's issues through the enclave.
 	// allow-only scope to repos="public" in a public repository, discarding
 	// allowed-repos and leaving the enclave with nothing to read.
 	assert.Contains(t, lock, `"forcePublicRepos": false`)
+}
+
+// stepOutputRefPattern matches steps.<id>.outputs.<name> references, capturing the step id.
+var stepOutputRefPattern = regexp.MustCompile(`steps\.([A-Za-z0-9_-]+)\.outputs\.[A-Za-z0-9_-]+`)
+
+// assertNoDanglingStepOutputReferences verifies that every `steps.<id>.outputs.*` reference
+// in the generated lock file corresponds to a step id that is actually emitted in the same
+// job. For references made from a step field, the producer step must also appear earlier in
+// that job's step list. This guards against the class of bug described in gh-aw#60336, where a
+// consumer (e.g. an environment variable or guard policy) references a step's outputs even
+// though the producer step itself was never generated, expanding to an empty string at runtime.
+func assertNoDanglingStepOutputReferences(t *testing.T, lock string) {
+	t.Helper()
+
+	var workflow map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(lock), &workflow), "generated lock file must be valid YAML")
+
+	jobs, ok := workflow["jobs"].(map[string]any)
+	require.True(t, ok, "generated lock file must contain jobs")
+
+	for jobID, jobValue := range jobs {
+		job, ok := jobValue.(map[string]any)
+		require.True(t, ok, "job %q must be an object", jobID)
+
+		steps, _ := job["steps"].([]any)
+		allStepIDs := make(map[string]bool)
+		for _, stepValue := range steps {
+			step, ok := stepValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			if stepID, ok := step["id"].(string); ok {
+				allStepIDs[stepID] = true
+			}
+		}
+
+		jobBytes, err := yaml.Marshal(jobValue)
+		require.NoError(t, err, "job %q must marshal for step reference checks", jobID)
+		for _, match := range stepOutputRefPattern.FindAllStringSubmatch(string(jobBytes), -1) {
+			stepID := match[1]
+			assert.True(t, allStepIDs[stepID], "job %q reference %q has no corresponding emitted step id %q", jobID, match[0], stepID)
+		}
+
+		previousStepIDs := make(map[string]bool)
+		for stepIndex, stepValue := range steps {
+			step, ok := stepValue.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			stepBytes, err := yaml.Marshal(stepValue)
+			require.NoError(t, err, "job %q step %d must marshal for step reference checks", jobID, stepIndex)
+			for _, match := range stepOutputRefPattern.FindAllStringSubmatch(string(stepBytes), -1) {
+				stepID := match[1]
+				assert.True(t, previousStepIDs[stepID], "job %q step %d reference %q must refer to a previously emitted step id %q", jobID, stepIndex, match[0], stepID)
+			}
+
+			if stepID, ok := step["id"].(string); ok {
+				previousStepIDs[stepID] = true
+			}
+		}
+	}
+}
+
+// TestCompileStaticEnclaveOnlyGitHubDisabledSinkVisibility is a regression test for
+// gh-aw#60336: a static GitHub enclave combined with `tools.github: false` and safe-outputs
+// must not emit GH_AW_SINK_VISIBILITY (or any other value) referencing the
+// determine-automatic-lockdown step unless that step is actually generated. Before the fix,
+// the compiler emitted `GH_AW_SINK_VISIBILITY: ${{ steps.determine-automatic-lockdown.outputs.visibility }}`
+// and `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"` even though no `determine-automatic-lockdown`
+// step existed, so the env var resolved to an empty string and MCP Gateway rejected the
+// resulting `sink-visibility: ""` as invalid.
+func TestCompileStaticEnclaveOnlyGitHubDisabledSinkVisibility(t *testing.T) {
+	tmp := t.TempDir()
+	workflowPath := filepath.Join(tmp, "roadmap-triage-enclave.md")
+	content := `---
+on: workflow_dispatch
+strict: false
+network: defaults
+engine: copilot
+tools:
+  github: false
+enclaves:
+  - agent:
+      model: gpt-5
+      tools:
+        github:
+          allowed: [list_issues, issue_read]
+          allowed-repos: [githubnext/gh-aw-enclave-demo-private]
+          min-integrity: none
+    repos:
+      - repo: githubnext/gh-aw-enclave-demo-private
+        sensitivity: confidential
+safe-outputs:
+  add-comment:
+    max: 1
+---
+
+Read the private repository's issues through the enclave and post a triage comment.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o600))
+	compiler := NewCompiler()
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+	lockBytes, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	lock := string(lockBytes)
+
+	var doc any
+	require.NoError(t, yaml.Unmarshal(lockBytes, &doc), "generated lock file must be valid YAML")
+
+	// General invariant: every steps.<id>.outputs.* reference must correspond to an
+	// emitted step id somewhere in the generated workflow.
+	assertNoDanglingStepOutputReferences(t, lock)
+
+	// The determine-automatic-lockdown step and its producer for GH_AW_SINK_VISIBILITY must
+	// either both be present, or both be absent — never a dangling reference to one without
+	// the other. Here, the step IS generated (solely to supply visibility for the static
+	// enclave's write-sink policy).
+	assert.Contains(t, lock, "id: determine-automatic-lockdown")
+	assert.Contains(t, lock, "GH_AW_SINK_VISIBILITY: ${{ steps.determine-automatic-lockdown.outputs.visibility }}")
+	assert.Contains(t, lock, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
+
+	// The primary agent must have no GitHub access: its own guard policy must not be
+	// automatically derived from the lockdown step's min_integrity/repos outputs.
+	assert.NotContains(t, lock, "GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}")
+	assert.NotContains(t, lock, "GITHUB_MCP_GUARD_REPOS: ${{ steps.determine-automatic-lockdown.outputs.repos }}")
+
+	// The enclave identity retains its scoped repository access, and the static write-sink
+	// retains its narrow accepted secrecy labels.
+	assert.Contains(t, lock, `"private:githubnext/gh-aw-enclave-demo-private"`)
+	assert.Contains(t, lock, `"allow-only":{"min-integrity":"none","repos":["githubnext/gh-aw-enclave-demo-private"]}`)
 }
 
 // TestBuildMCPGatewayConfigForcePublicReposForStaticEnclave verifies that the gateway's
@@ -424,7 +566,11 @@ func TestGitHubGuardPoliciesFromStepSkipsEnclaveOnlyBackend(t *testing.T) {
 	delete(data.Tools, "github")
 	data.ExplicitlyDisabledTools = map[string]struct{}{"github": {}}
 
-	assert.False(t, githubLockdownDetectionStepEnabled(data))
+	// The determine-automatic-lockdown step is still generated for an enclave-only static
+	// backend, solely to supply GH_AW_SINK_VISIBILITY for the write-sink policy — but its
+	// min_integrity/repos outputs must never drive the primary GitHub MCP server's guard
+	// policy, which stays derived statically from the enclave declaration.
+	assert.True(t, githubLockdownDetectionStepEnabled(data))
 	assert.False(t, githubGuardPoliciesFromStep(data, nil))
 	assert.True(t, githubBackendIsStaticEnclaveDelegationOnly(data))
 
