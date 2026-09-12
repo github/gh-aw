@@ -45,6 +45,7 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
       break;
     }
   }
+  // A complete empty job list proves the run ended before any billable job existed.
   if (!complete || (components.size > 0 && !components.has("agent"))) throw new Error("Cannot prove complete billable-component coverage");
   return components;
 }
