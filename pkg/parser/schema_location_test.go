@@ -556,6 +556,24 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsThreatDetec
 	}
 }
 
+func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsDailyAICreditsUnknownCategory(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": "workflow_dispatch",
+		"safe-outputs": map[string]any{
+			"create-issue": map[string]any{},
+			"report-failure-as-issue": []any{
+				"daily_ai_credits_exceeded",
+				"daily_ai_credits_unknown",
+			},
+		},
+	}
+
+	err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/test/workflow.md")
+	if err != nil {
+		t.Fatalf("ValidateMainWorkflowFrontmatterWithSchemaAndLocation() unexpected error = %v", err)
+	}
+}
+
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsAllowedBaseBranchesInCreatePullRequest(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{

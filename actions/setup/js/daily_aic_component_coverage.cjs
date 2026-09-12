@@ -126,6 +126,13 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
         candidates: candidateStates,
       })}`
     );
+    // An empty raw detection/token_usage.jsonl is authoritative proof that
+    // detection ran but produced no firewall-observed usage (e.g. threat
+    // detection was skipped internally). Unlike every other component, this
+    // deliberately overrides the "first non-empty candidate wins" fallback
+    // below: the legacy detection_usage.jsonl summary is not consulted, so a
+    // stale or unrelated fallback value cannot resurrect nonzero AIC for a
+    // component whose primary source proves zero usage.
     if (name === "detection" && candidateStates[0].state === "empty") {
       logComponentAIC(runId, name, job, 0, "empty_detection_accounting", {
         source: candidateStates[0].file,

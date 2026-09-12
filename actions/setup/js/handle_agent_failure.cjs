@@ -2313,6 +2313,25 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) 
 }
 
 /**
+ * Pick actionable guidance for a daily AIC guardrail failure based on its status
+ * and, for transient failures, whether the underlying reason is a missing/invalid
+ * prior-run accounting record (as opposed to a generic API/network failure).
+ * @param {string} status
+ * @param {string} error
+ * @returns {string}
+ */
+function buildDailyAICGuardrailGuidance(status, error) {
+  if (status === "structural_error") {
+    return "This is caused by an access or configuration problem, such as an insufficient token permission, a missing or renamed workflow, or a repository the guardrail cannot read. Fix the underlying access or configuration issue, then rerun the workflow.";
+  }
+  const isAccountingFailure = /missing accounting|cannot prove complete billable-component coverage|ambiguous daily aic component jobs|does not cover the .* component attempt|cannot verify the .* producer artifact/i.test(error);
+  if (isAccountingFailure) {
+    return "This means a billable component in a prior run completed without leaving a valid accounting record. Inspect the affected prior run and its component logs. Once that run leaves the rolling 24-hour window, the guardrail can evaluate the remaining runs normally.";
+  }
+  return "This is typically a transient GitHub API failure, such as a network error or rate limiting. The guardrail will retry automatically on the next run; no action is required unless the failures persist.";
+}
+
+/**
  * Build a context string when the daily AIC guardrail could not verify a complete accounting window.
  * @param {boolean} hasDailyAICGuardrailError
  * @param {string} status
@@ -2329,6 +2348,7 @@ function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, e
     renderTemplateFromFile(getPromptPath("daily_workflow_aic_unknown.md"), {
       status: sanitizeContent(status, 100) || "unknown_error",
       error: sanitizeContent(error, 2000) || "The daily guardrail did not provide an error reason.",
+      guidance: buildDailyAICGuardrailGuidance(status, error),
     })
   );
 }

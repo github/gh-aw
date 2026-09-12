@@ -104,6 +104,17 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
+it("still requires accounting when detection/token_usage.jsonl is missing (not empty)", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+      "detection_usage.jsonl": "",
+    },
+    [job("agent"), job("detection")]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed detection component");
+});
+
 it.each(["skipped", "not-configured"])("accepts %s detection without requiring placeholder data", async state => {
   const jobs = state === "skipped" ? [job("agent"), job("detection", { conclusion: "skipped" })] : [job("agent")];
   const f = evaluate(

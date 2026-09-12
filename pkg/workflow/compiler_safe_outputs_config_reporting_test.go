@@ -64,6 +64,11 @@ func TestReportFailureAsIssueWithCategoriesFilter(t *testing.T) {
 			expectCategories:         []string{"agent_failure", "missing_safe_outputs"},
 			expectExcludedCategories: []string{"unknown_model_ai_credits"},
 		},
+		{
+			name:             "array including daily_ai_credits_unknown category",
+			reportValue:      []any{"daily_ai_credits_exceeded", "daily_ai_credits_unknown"},
+			expectCategories: []string{"daily_ai_credits_exceeded", "daily_ai_credits_unknown"},
+		},
 	}
 
 	for _, tt := range tests {

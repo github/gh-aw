@@ -5,6 +5,6 @@
 
 **Reason:** {error}
 
-The guardrail fails closed when a billable component ran but its usage artifact has no valid accounting record. The detailed reason identifies the affected run, component, job attempt, and whether each expected accounting file was missing, empty, or unreadable.
+The guardrail fails closed either because a billable component's usage artifact is missing, empty, or unreadable, or because the guardrail could not reach the GitHub API to verify prior runs. The detailed reason above identifies the specific cause.
 
-Inspect the affected prior run and its component logs. Once that run leaves the rolling 24-hour window, the guardrail can evaluate the remaining runs normally.
+{guidance}
