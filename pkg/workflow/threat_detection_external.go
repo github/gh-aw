@@ -488,6 +488,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		PathSetup:          pathSetup.hostSetup,
 	}
 	command := BuildAWFCommand(awfConfig)
+	command = injectComponentExecutionStartedInShellScript(command, "detection", detectionExecutionEvidencePath)
 
 	// Reuse the engine's own execution env block so the external detector path
 	// gets the same token/model/runtime environment configuration as the agent job.
@@ -531,9 +532,6 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
 	steps = append(steps, "        run: |\n")
-	for _, line := range componentExecutionEvidenceShellLines("detection", "started", detectionExecutionEvidencePath) {
-		steps = append(steps, "          "+line+"\n")
-	}
 	for _, line := range strings.SplitAfter(command, "\n") {
 		if line == "" {
 			continue

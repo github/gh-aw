@@ -43,6 +43,19 @@ func componentExecutionEvidenceShellLines(component, state, filePath string) []s
 	}
 }
 
+func injectComponentExecutionStartedInShellScript(command, component, filePath string) string {
+	var started strings.Builder
+	for _, line := range componentExecutionEvidenceShellLines(component, "started", filePath) {
+		started.WriteString(line)
+		started.WriteByte('\n')
+	}
+
+	if awfInvocation := strings.Index(command, "GH_AW_AWF_ENGINE_NAME="); awfInvocation >= 0 {
+		return command[:awfInvocation] + started.String() + command[awfInvocation:]
+	}
+	return started.String() + command
+}
+
 func injectComponentExecutionStarted(step GitHubActionStep, component, filePath string) GitHubActionStep {
 	runIndex := -1
 	for i, line := range step {
@@ -55,14 +68,23 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 		return step
 	}
 
-	insertIndex := runIndex + 1
-	for insertIndex < len(step) {
-		trimmed := strings.TrimSpace(step[insertIndex])
-		if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
-			insertIndex++
-			continue
+	insertIndex := -1
+	for i := runIndex + 1; i < len(step); i++ {
+		if strings.HasPrefix(strings.TrimSpace(step[i]), "GH_AW_AWF_ENGINE_NAME=") {
+			insertIndex = i
+			break
 		}
-		break
+	}
+	if insertIndex < 0 {
+		insertIndex = runIndex + 1
+		for insertIndex < len(step) {
+			trimmed := strings.TrimSpace(step[insertIndex])
+			if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
+				insertIndex++
+				continue
+			}
+			break
+		}
 	}
 
 	startedLines := componentExecutionEvidenceShellLines(component, "started", filePath)

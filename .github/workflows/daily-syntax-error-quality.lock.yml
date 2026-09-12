@@ -877,10 +877,6 @@ jobs:
         timeout-minutes: 20
         run: |
           set -o pipefail
-          mkdir -p "/tmp/gh-aw"
-          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
-          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
-          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
@@ -921,6 +917,10 @@ jobs:
           fi
 
           # shellcheck disable=SC1003,SC2016,SC2086
+          mkdir -p "/tmp/gh-aw"
+          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
+          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
           GH_AW_AWF_ENGINE_NAME=copilot \
           GH_AW_AWF_HARNESS_MARKER='[copilot-harness]' \
           GH_AW_AWF_LOG_FILE=/tmp/gh-aw/agent-stdio.log \
