@@ -255,11 +255,73 @@ func TestLogsToolPassesArtifactsArgument(t *testing.T) {
 	for i, arg := range capturedArgs {
 		if arg == "--artifacts" {
 			require.Less(t, i+1, len(capturedArgs), "--artifacts should have a value")
-			assert.Equal(t, "agent,firewall", capturedArgs[i+1], "logs tool should join artifact sets for the CLI")
+			assert.Equal(t, "agent,firewall,usage", capturedArgs[i+1], "logs tool should join artifact sets for the CLI and always add the usage set")
 			return
 		}
 	}
 	t.Fatal("expected --artifacts flag in command args")
+}
+
+func TestEffectiveMCPLogsToolArtifacts(t *testing.T) {
+	tests := []struct {
+		name      string
+		artifacts []string
+		expected  []string
+	}{
+		{
+			name:      "omitted artifacts use info and usage defaults",
+			artifacts: nil,
+			expected:  []string{"info", "usage"},
+		},
+		{
+			name:      "usage set is added so token usage stays populated",
+			artifacts: []string{"info"},
+			expected:  []string{"info", "usage"},
+		},
+		{
+			name:      "explicit usage set is preserved as-is",
+			artifacts: []string{"usage"},
+			expected:  []string{"usage"},
+		},
+		{
+			name:      "all set is preserved as-is",
+			artifacts: []string{"all"},
+			expected:  []string{"all"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, effectiveMCPLogsToolArtifacts(tt.artifacts))
+		})
+	}
+}
+
+// TestLogsToolDefaultsToUsageArtifact guards against the regression where the logs
+// tool downloaded only the "info" artifact, leaving token_usage at 0 for every run.
+func TestLogsToolDefaultsToUsageArtifact(t *testing.T) {
+	var capturedArgs []string
+	mockExecCmd := func(ctx context.Context, args ...string) *exec.Cmd {
+		capturedArgs = append([]string(nil), args...)
+		return exec.CommandContext(ctx, "sh", "-c", `printf '%s' "$1"`, "sh", `{"file_path":"/tmp/gh-aw/aw-mcp/logs/runs.json"}`)
+	}
+
+	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "1.0"}, nil)
+	err := registerLogsTool(server, mockExecCmd, "", false)
+	require.NoError(t, err, "registerLogsTool should succeed")
+
+	session := connectInMemory(t, server)
+	_, err = session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "logs",
+		Arguments: map[string]any{},
+	})
+	require.NoError(t, err, "logs tool should succeed")
+
+	artifactsIndex := slices.Index(capturedArgs, "--artifacts")
+	require.NotEqual(t, -1, artifactsIndex, "logs tool should pass --artifacts")
+	require.Less(t, artifactsIndex+1, len(capturedArgs), "--artifacts should have a value")
+	assert.Equal(t, "info,usage", capturedArgs[artifactsIndex+1],
+		"logs tool should download the usage artifact by default so token_usage is populated")
 }
 
 func TestLogsToolPassesGradersArgument(t *testing.T) {
