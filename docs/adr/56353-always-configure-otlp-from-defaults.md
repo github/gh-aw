@@ -8,7 +8,7 @@
 
 ### Context
 
-Agentic workflows in gh-aw previously required per-workflow opt-in for OTLP telemetry via an `observability.otlp` frontmatter block (typically pulled in through a shared import). Organizations wanting to enable telemetry for all workflows had to modify every workflow individually, creating adoption friction and making centralized observability governance impractical. The compiler already has a `compilerenv` default-env infrastructure for injecting organization- and enterprise-level variable values; OTLP configuration was not wired into it. GitHub Actions makes repository- or organization-level secrets and organization- or enterprise-level variables available as `secrets.*` / `vars.*` expressions, which are the appropriate mechanism for centralized defaults.
+Agentic workflows in gh-aw previously required per-workflow opt-in for OTLP telemetry via an `observability.otlp` frontmatter block (typically pulled in through a shared import). Repository or organization administrators wanting to enable telemetry for all workflows had to modify every workflow individually, creating adoption friction and making centralized observability governance impractical. The compiler already has a `compilerenv` default-env infrastructure for injecting organization- and enterprise-level variable values; OTLP configuration was not wired into it. GitHub Actions makes repository- or organization-level secrets and organization- or enterprise-level variables available as `secrets.*` / `vars.*` expressions, which are the appropriate mechanism for centralized defaults.
 
 ### Decision
 
@@ -27,16 +27,16 @@ Introduce an org-level variable that the existing `observability.otlp` resolutio
 ### Consequences
 
 #### Positive
-- Organizations can configure OTLP once at the repository or organization level and all agentic workflows inherit it automatically with no per-workflow changes.
+- Repository or organization administrators can configure OTLP once at the repository or organization level and all agentic workflows inherit it automatically with no per-workflow changes.
 - Workflows without explicit OTLP frontmatter do not break when defaults are absent — `GH_AW_OTLP_IF_MISSING: ignore` makes the empty-URL endpoint a silent no-op at runtime.
 - Existing workflows with explicit `observability.otlp` frontmatter are unaffected; their configuration takes precedence and the new env vars are simply overwritten.
 
 #### Negative
 - Every compiled workflow now declares `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` in its manifest as referenced secrets, even when OTLP is not actually used, increasing manifest noise and slightly expanding the secret-reference surface area.
-- The runtime credential guard fails hard (job error) when an endpoint is set without headers, which may be too strict for organizations running unauthenticated internal collectors; this strictness is scoped only to the default path, not to explicit frontmatter-configured endpoints.
+- The runtime credential guard fails hard (job error) when an endpoint is set without headers, which may be too strict for repositories or organizations running unauthenticated internal collectors; this strictness is scoped only to the default path, not to explicit frontmatter-configured endpoints.
 
 #### Neutral
-- The collector domain is not known at compile time (it is an expression-valued variable), so no firewall allowlist entry is added automatically; organizations must add their collector to `network.allowed` themselves, which is documented but requires a manual step.
+- The collector domain is not known at compile time (it is an expression-valued variable), so no firewall allowlist entry is added automatically; repository or organization administrators must add their collector to `network.allowed` themselves, which is documented but requires a manual step.
 - `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` are registered as compiler-internal in `safe_update_enforcement.go` so that safe-update does not flag every recompile as introducing new secret references.
 - The credential-emptiness check that drops a half-configured default endpoint is centralized in `parseOTLPEndpoints()` (`actions/setup/js/send_otlp_span.cjs`) rather than only in the agent job's bash guard, so no job ordering can result in one unauthenticated export attempt slipping through before validation runs. The env-key injection in `injectOTLPConfig` (`pkg/workflow/observability_otlp.go`) also checks the workflow's own `env:` block for every OTLP-related key it emits, not only `OTEL_SERVICE_NAME`, to avoid duplicate YAML mapping keys.
 

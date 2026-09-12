@@ -28,7 +28,7 @@ Use these variables to set organization- or repository-wide defaults without edi
 | `GH_AW_DEFAULT_OTLP_HEADERS` | GitHub Actions `secrets.*` at runtime | Default OTLP exporter headers for `GH_AW_DEFAULT_OTLP_ENDPOINT` | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
 
 Use `gh aw env get` and `gh aw env update` to manage these
-variables in batch at repo, org, or enterprise scope. These commands manage GitHub Actions variables; set OTLP secrets separately at repository or organization scope with `gh secret set`. The defaults file uses
+variables in batch at repo, org, or enterprise scope. That scope list applies to GitHub Actions variables managed by these commands; set OTLP secrets separately at repository or organization scope with `gh secret set`. The defaults file uses
 `default_`-prefixed keys such as `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, `default_detection_job_timeout_minutes`,
 `default_model_copilot`, `default_otlp_endpoint`, and `default_utc`. `gh aw env update --scope ent` writes only the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
 `gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is always a secret and must also be set with `gh secret set` at repository or organization scope. If both endpoint values exist, clearing only one leaves the other effective through the fallback expression; clear both the endpoint secret and variable to disable OTLP export.
