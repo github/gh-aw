@@ -450,18 +450,17 @@ func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepository
 		ResolvedCommit: ref,
 		Installer:      "gh-aw " + GetVersion(),
 	}
-	if existing, readErr := readPackageOwnershipRecord(recordPath); readErr == nil && existing != nil {
-		record.Files = existingPackageOwnershipFiles(gitRoot, existing.Files)
+	record.Files, err = readExistingPackageOwnershipFiles(gitRoot, recordPath)
+	if err != nil {
+		return err
 	}
 
 	workflowsDir := absolutePackageWorkflowsDir(gitRoot, opts.WorkflowsDir)
 	if err := refreshManifestWorkflowOwnership(gitRoot, workflowsDir, &record, pkg.InstallationSource); err != nil {
 		return err
 	}
-	for _, resource := range pkg.ResourceFiles {
-		if err := refreshPackageOwnershipFile(gitRoot, &record, resource.SourcePath, filepath.Join(gitRoot, filepath.FromSlash(resource.DestinationPath))); err != nil {
-			return err
-		}
+	if err := refreshManifestResourceOwnership(gitRoot, &record, pkg.ResourceFiles); err != nil {
+		return err
 	}
 	for _, skill := range pkg.SkillFiles {
 		destination, err := packageSkillDestinationPath(gitRoot, skill, engineOverride)
@@ -494,6 +493,27 @@ func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepository
 		return fmt.Errorf("failed to write package ownership record: %w", err)
 	}
 	return nil
+}
+
+func refreshManifestResourceOwnership(gitRoot string, record *packageOwnershipRecord, resources []resolvedPackageResource) error {
+	for _, resource := range resources {
+		destination := filepath.Join(gitRoot, filepath.FromSlash(resource.DestinationPath))
+		if err := refreshPackageOwnershipFile(gitRoot, record, resource.SourcePath, destination); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readExistingPackageOwnershipFiles(gitRoot, recordPath string) ([]packageOwnershipFileEntry, error) {
+	existing, err := readPackageOwnershipRecord(recordPath)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read package ownership record: %w", err)
+	}
+	return existingPackageOwnershipFiles(gitRoot, existing.Files), nil
 }
 
 func existingPackageOwnershipFiles(gitRoot string, entries []packageOwnershipFileEntry) []packageOwnershipFileEntry {
