@@ -205,6 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
+      actions: read
       contents: read
       code-quality: write
       pull-requests: read
@@ -230,7 +231,11 @@ jobs:
         - name: "CLI Audit Logs & Firewall"
           packages: "./pkg/cli"
           pattern: "TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow|^TestAudit|^TestInspect"
-          skip_pattern: "TestLogsMultiTarget"
+          skip_pattern: "TestLogsMultiTarget|TestLogsCachedJSONLLiveCaching"
+        - name: "CLI Logs Live Cache"
+          packages: "./pkg/cli"
+          pattern: "^TestLogsCachedJSONLLiveCaching$"
+          github_token: true
         - name: "CLI Logs Multi-Target Count"    # Dedicated job: --count must be a shared max across targets, not per-target, and siblings must be cancelled promptly once it is reached
           packages: "./pkg/cli"
           pattern: "TestLogsMultiTarget"
@@ -394,6 +399,8 @@ jobs:
 
     - name: Run integration tests - ${{ matrix.test-group.name }}
       id: run-tests
+      env:
+        GH_TOKEN: ${{ matrix.test-group.github_token && github.token || '' }}
       run: |
         set -o pipefail
         # Sanitize the test group name for use in filename
