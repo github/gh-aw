@@ -81,12 +81,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 }
 
 func isPackageUpdateTarget(target string) (bool, error) {
-	target = strings.TrimSpace(target)
-	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		return true, nil
-	}
-	_, ok, err := parseRepositoryPackageSpec(target)
-	return ok, err
+	return isPackageURLTarget(target), nil
 }
 
 func findInstalledPackageRecord(records []packageOwnershipRecord, target string) (*packageOwnershipRecord, bool, error) {
@@ -95,7 +90,7 @@ func findInstalledPackageRecord(records []packageOwnershipRecord, target string)
 		return nil, false, nil
 	}
 
-	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+	if isPackageURLTarget(target) {
 		parsed, err := url.Parse(target)
 		if err != nil {
 			return nil, true, fmt.Errorf("invalid package URL %q: %w", target, err)
@@ -113,20 +108,12 @@ func findInstalledPackageRecord(records []packageOwnershipRecord, target string)
 		return bestMatch, true, nil
 	}
 
-	repoSpec, ok, err := parseRepositoryPackageSpec(target)
-	if err != nil {
-		return nil, ok, err
-	}
-	if !ok || repoSpec == nil {
-		return nil, false, nil
-	}
-	packageID := repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath)
-	for i := range records {
-		if strings.EqualFold(records[i].Package, packageID) {
-			return &records[i], true, nil
-		}
-	}
-	return nil, true, nil
+	return nil, false, nil
+}
+
+func isPackageURLTarget(target string) bool {
+	target = strings.ToLower(strings.TrimSpace(target))
+	return strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 }
 
 func packageURLMatchesRecord(packageURL *url.URL, record packageOwnershipRecord) bool {

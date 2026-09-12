@@ -30,10 +30,9 @@ func NewUpdateCommand(validateEngine func(string) error) *cobra.Command { //noli
 The update command fetches the latest version of each workflow from its source
 repository, merges upstream changes with any local modifications, and recompiles.
 
-Arguments may be workflow names, installed package names (owner/repo[/path]), or
-GitHub package URLs. Package arguments reapply every workflow and asset owned by
-that package. If no arguments are specified, all workflows with a 'source' field
-are updated.
+Arguments may be workflow names or installed GitHub package URLs. Package URL
+arguments reapply every workflow and asset owned by that package. If no arguments
+are specified, all workflows with a 'source' field are updated.
 
 By default, the update performs a 3-way merge to preserve your local changes.
 Use --no-merge to override local changes with the upstream version.
@@ -56,8 +55,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` update                    # Update all workflows from source
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist        # Update a specific workflow
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist.md     # Same (alternative format)
-  ` + string(constants.CLIExtensionPrefix) + ` update owner/package      # Reapply an installed package
-  ` + string(constants.CLIExtensionPrefix) + ` update https://github.com/owner/package  # Same, using its URL
+  ` + string(constants.CLIExtensionPrefix) + ` update https://github.com/owner/package  # Reapply an installed package
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org       # Preview workflow updates across an organization
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --repos '*-service'  # Limit org mode to matching repositories
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-issue  # Open issues in repos with pending updates

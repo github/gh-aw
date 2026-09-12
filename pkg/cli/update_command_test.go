@@ -173,8 +173,8 @@ func TestNewUpdateCommand_SupportsPackageTargets(t *testing.T) {
 	require.NotNil(t, cmd)
 
 	assert.Equal(t, "update [workflow-or-package]...", cmd.Use)
-	assert.Contains(t, cmd.Long, "installed package names")
-	assert.Contains(t, cmd.Example, "update owner/package")
+	assert.Contains(t, cmd.Long, "installed GitHub package URLs")
+	assert.NotContains(t, cmd.Example, "update owner/package")
 	assert.Contains(t, cmd.Example, "update https://github.com/owner/package")
 }
 

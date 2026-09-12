@@ -25,13 +25,13 @@ func TestFindInstalledPackageRecord(t *testing.T) {
 		wantPackage string
 		packageLike bool
 	}{
-		{name: "root package name", target: "owner/repo", wantPackage: "owner/repo", packageLike: true},
-		{name: "nested package name with ref", target: "owner/repo/packages/reviewer@v2", wantPackage: "owner/repo/packages/reviewer", packageLike: true},
 		{name: "root package URL", target: "https://github.com/owner/repo", wantPackage: "owner/repo", packageLike: true},
 		{name: "nested package tree URL", target: "https://github.com/owner/repo/tree/main/packages/reviewer", wantPackage: "owner/repo/packages/reviewer", packageLike: true},
 		{name: "nested manifest URL", target: "https://github.com/owner/repo/blob/main/packages/reviewer/aw.yml", wantPackage: "owner/repo/packages/reviewer", packageLike: true},
 		{name: "workflow name", target: "repo-assist", packageLike: false},
-		{name: "missing package", target: "other/repo", packageLike: true},
+		{name: "package identifier", target: "owner/repo", packageLike: false},
+		{name: "package identifier with ref", target: "owner/repo/packages/reviewer@v2", packageLike: false},
+		{name: "missing package URL", target: "https://github.com/other/repo", packageLike: true},
 	}
 
 	for _, tt := range tests {
