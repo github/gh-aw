@@ -11,21 +11,20 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-// otlpTelemetryStepNames are compiler-injected observability steps. They are emitted
-// for every workflow because the OTLP endpoint defaults to the enterprise
-// vars.GH_AW_DEFAULT_OTLP_ENDPOINT / secrets.GH_AW_DEFAULT_OTLP_HEADERS pair, so they
-// are not part of the checkout ordering contract exercised by these tests.
-var otlpTelemetryStepNames = map[string]bool{
-	"Mask OTLP telemetry headers":        true,
-	"Mask OTLP custom attribute values":  true,
-	"Check OTLP telemetry configuration": true,
+// compilerInjectedStepNames are not part of the checkout ordering contract exercised
+// by these tests.
+var compilerInjectedStepNames = map[string]bool{
+	"Mask OTLP telemetry headers":         true,
+	"Mask OTLP custom attribute values":   true,
+	"Check OTLP telemetry configuration":  true,
+	"Initialize agent execution evidence": true,
 }
 
-// filterOTLPTelemetrySteps removes compiler-injected OTLP steps from a step name list.
-func filterOTLPTelemetrySteps(names []string) []string {
+// filterCompilerInjectedSteps removes unrelated compiler-injected steps from a step name list.
+func filterCompilerInjectedSteps(names []string) []string {
 	filtered := make([]string, 0, len(names))
 	for _, name := range names {
-		if otlpTelemetryStepNames[name] {
+		if compilerInjectedStepNames[name] {
 			continue
 		}
 		filtered = append(filtered, name)
@@ -141,7 +140,7 @@ steps:
 		}
 	}
 
-	stepNames = filterOTLPTelemetrySteps(stepNames)
+	stepNames = filterCompilerInjectedSteps(stepNames)
 
 	t.Logf("Found %d steps: %v", len(stepNames), stepNames)
 
@@ -460,7 +459,7 @@ Run node --version to check the Node.js version.
 		}
 	}
 
-	stepNames = filterOTLPTelemetrySteps(stepNames)
+	stepNames = filterCompilerInjectedSteps(stepNames)
 
 	if len(stepNames) < 4 {
 		t.Fatalf("Expected at least 4 steps, got %d: %v", len(stepNames), stepNames)
