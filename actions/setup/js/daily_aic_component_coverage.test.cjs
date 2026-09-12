@@ -110,6 +110,17 @@ it("accepts aggregated agent accounting when a failed request produced no raw us
   await expect(f.result).resolves.toBe(0);
 });
 
+it("accepts a completed run with no jobs as zero usage", async () => {
+  const f = evaluate({}, []);
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.listArtifacts).not.toHaveBeenCalled();
+});
+
+it("rejects a non-empty job list without the required agent job", async () => {
+  const f = evaluate({}, [job("detection")]);
+  await expect(f.result).rejects.toThrow("Cannot prove complete billable-component coverage");
+});
+
 it.each(["agent", "detection"])("accepts provable zero usage when %s execution never started", async component => {
   const f = evaluate(
     {

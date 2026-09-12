@@ -45,7 +45,7 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
       break;
     }
   }
-  if (!complete || !components.has("agent")) throw new Error("Cannot prove complete billable-component coverage");
+  if (!complete || (components.size > 0 && !components.has("agent"))) throw new Error("Cannot prove complete billable-component coverage");
   return components;
 }
 
