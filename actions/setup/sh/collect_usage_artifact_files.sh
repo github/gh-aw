@@ -12,7 +12,7 @@ set -euo pipefail
 # The -s check (non-empty) prevents an empty stub file from zeroing out
 # valid data already written by a higher-priority source.
 
-mkdir -p /tmp/gh-aw/usage/agent /tmp/gh-aw/usage/detection
+mkdir -p /tmp/gh-aw/usage/agent /tmp/gh-aw/usage/detection /tmp/gh-aw/usage/evals
 
 echo "Usage artifact source file status:"
 for file in \

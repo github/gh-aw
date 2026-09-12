@@ -35,7 +35,7 @@ func (c *Compiler) buildEvalsJobSteps(data *WorkflowData) []string {
 	var steps []string
 
 	steps = append(steps, "      # --- BinEval Evaluations ---\n")
-	steps = append(steps, generateComponentExecutionEvidenceStep("evals", "not_started", evalsExecutionEvidencePath, "")...)
+	steps = append(steps, generateComponentExecutionEvidenceStep("evals", "not_started", evalsExecutionEvidencePath, "always()")...)
 
 	// Step 1: Clean stale firewall files from the agent artifact download so the
 	// AWF squid container does not fail when the evals job pre-pulls images.

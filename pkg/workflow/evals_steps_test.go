@@ -43,6 +43,9 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("collector must retain evals accounting separately from evaluation results")
 	}
+	if !strings.Contains(string(script), "mkdir -p /tmp/gh-aw/usage/agent /tmp/gh-aw/usage/detection /tmp/gh-aw/usage/evals") {
+		t.Fatal("collector must create evals usage directory before copying evals evidence")
+	}
 	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Fatal("collector must retain evals execution evidence")
 	}
@@ -64,6 +67,9 @@ func TestEvalsExecutionEvidence(t *testing.T) {
 	started := strings.Index(steps, `"state":"started"`)
 	if initialize < 0 || install <= initialize || execution <= install || started <= execution {
 		t.Fatalf("expected evals execution evidence to distinguish setup failures from started execution:\n%s", steps)
+	}
+	if !strings.Contains(steps[initialize:install], "if: always()") {
+		t.Fatalf("expected evals execution initializer to run after earlier failures:\n%s", steps[initialize:install])
 	}
 }
 

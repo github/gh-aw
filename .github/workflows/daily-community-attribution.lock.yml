@@ -2032,6 +2032,7 @@ jobs:
           path: /tmp/gh-aw/experiments/
       # --- BinEval Evaluations ---
       - name: Initialize evals execution evidence
+        if: always()
         run: |
           mkdir -p "/tmp/gh-aw/evals"
           evidence_tmp="/tmp/gh-aw/evals/execution.json.tmp"
