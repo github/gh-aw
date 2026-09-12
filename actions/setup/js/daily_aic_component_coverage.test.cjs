@@ -143,6 +143,18 @@ it("accepts aggregated agent accounting when a failed request produced no raw us
   await expect(f.result).resolves.toBe(0);
 });
 
+it("counts empty authoritative agent accounting as zero when the agent job failed", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": "" }, [job("agent", { conclusion: "failure" })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
+});
+
+it("still requires accounting when an agent job succeeds", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": "" }, [job("agent")]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
 it("accepts a completed run with no jobs as zero usage", async () => {
   const f = evaluate({}, []);
   await expect(f.result).resolves.toBe(0);

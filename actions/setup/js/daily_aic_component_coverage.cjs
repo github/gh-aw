@@ -146,6 +146,15 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
     if (unreadableIndex >= 0 && (selectedIndex < 0 || unreadableIndex < selectedIndex)) {
       throw new Error(`Missing accounting for executed ${name} component in run ${runId} (attempt ${job.run_attempt}, job ${job.id}, conclusion ${job.conclusion}): ${candidateSummary}`);
     }
+    // Failed agent requests can be rejected before the provider returns usage
+    // (for example, an unsupported model). An empty authoritative firewall
+    // file proves that no billable response was observed.
+    if (!selected && name === "agent" && job.conclusion === "failure" && candidateStates[0].state === "empty") {
+      logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
+        source: candidateStates[0].file,
+      });
+      continue;
+    }
     if (!selected) {
       if (provesExecutionNotStarted(directory, name, runId, job.run_attempt)) {
         logComponentAIC(runId, name, job, 0, "execution_not_started");
