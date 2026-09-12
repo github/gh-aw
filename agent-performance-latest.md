@@ -1,55 +1,44 @@
 # Agent Performance Analyzer — Latest Run
 
-**Run:** 2026-09-10T12:58Z | **Workflow:** agent-performance-analyzer
+**Run:** 2026-09-12T12:48Z | **Workflow:** agent-performance-analyzer
 
 ## Summary
 
-Full agent ranking deferred again this run (2nd consecutive deferral) — `metrics/latest.json` is
-still dated 2026-09-01 (10 days stale). Root cause now confirmed: Metrics Collector's own workflow
-is chronically broken. Escalating as new P0.
+Full agent ranking deferred a 3rd consecutive run — `metrics/latest.json` still dated 2026-09-01
+(11 days stale). Root cause confirmed and escalated with new evidence this run: Metrics Collector's
+own `codex` + `gpt-5.3-codex` config produces recurring `model_not_supported_error`.
 
-## New Finding: Metrics Collector chronic failure (P0 escalation)
+## New Finding: systemic codex + gpt-5.3-codex model_not_supported_error (P0, filed as new issue)
 
-Open issue **#59851** "[aw] Metrics Collector produced no safe outputs" (created 2026-09-10T02:45Z,
-still open). Historical search found **9 distinct recurrence issues** since inception: #59851,
-#59611, #59344, #59105, #58848 (AR-vs-executed counting bug), #58701, #58367, #58133, #57830. This
-has never received a durable fix — issues keep auto-expiring/closing without the underlying
-timeout/pagination bug being addressed. Every downstream meta-orchestrator (this one, Workflow
-Health Manager, Campaign Manager) is scoring off a 10-day-stale snapshot as a result. Recommend
-treating as the top systemic blocker until a maintainer lands a real fix (raise timeout / paginate
-more robustly / reduce collection scope).
+Cross-checked 30 "no safe outputs"/failure issues live (2026-08-05 → 2026-09-12, since metrics
+snapshot is stale). Of the last 25 (since 2026-09-06), **19 share the identical
+`model_not_supported_error` failure category**, across 12+ distinct workflows: Metrics Collector
+(×6: #58895,#59105,#59344,#59611,#59851,#60157), Daily Evals Feature Report (×3), Daily CLI
+Performance Agent (×3), Daily Cache Strategy Analyzer (×2), Daily Regulatory Report Generator (×2),
+Daily Documentation Diagram (#60373 open), Daily Documentation Updater (#60392 open), PureLock
+(#60405 open), Auto-Triage Issues (#60406 open). Repo-wide grep of workflow frontmatter finds
+**69 workflows** on `engine: codex` + `model: {copilot,openai}/gpt-5.3-codex`. Filed a single
+consolidated improvement issue (not per-workflow) recommending: (1) verify Copilot/OpenAI policy
+enablement of `gpt-5.3-codex` under the `codex` engine specifically, (2) fall back Metrics
+Collector (and other high-frequency failures) to `gpt-5.2-codex` until resolved, (3) add a
+day-over-day failure-rate guard so this doesn't silently degrade Metrics Collector for 11+ days
+again.
 
-## Correction: lint-monster / daily-go-test-parallelizer root cause
+## Correction to prior "transient flakiness" framing (2026-09-10/11 notes)
 
-Prior shared-alerts/WHM notes (2026-09-09/10) attributed recurring failures to a **permanent model
-misconfiguration** (`model: openai/gpt-5.3-codex` for lint-monster, `model: copilot/gpt-5.3-codex`
-for daily-go-test-parallelizer) requiring a `model:`/`model-provider` fix. Re-verified this run:
-- `gpt-5.3-codex` **is** a valid listed model for both `openai` and `github-copilot` providers in
-  `pkg/cli/data/models.json` — the model name is not invalid.
-- Live run history: daily-go-test-parallelizer 10/10 recent runs successful; lint-monster's most
-  recent run succeeded; same `model:` config unchanged throughout.
+Prior notes reclassified lint-monster/daily-go-test-parallelizer `model:` config issues as
+"transient model-availability/policy flakiness, not a hard config defect" based on those two
+workflows recovering. Re-verified against the fuller 2026-09-06→09-12 dataset: this is NOT isolated
+to those two — it's an expanding, daily-recurring pattern across 12+ rotating workflows. Updated
+framing: this is a real, ongoing systemic issue requiring engineering + policy attention, not mere
+flakiness. See shared-alerts.md for full correction.
 
-**Reclassified:** transient model-availability/policy flakiness, not a hard config defect. Do NOT
-prescribe a model/config change based on this pattern without new evidence — the current config
-works. No re-file needed; #59853/#59879/#59847 already track occurrences, #59790 self-resolved
-correctly (closed).
+## Actions Taken This Run
 
-## GitHub MCP Read Access (this run)
+- Created weekly performance report discussion (2026-09-12).
+- Filed 1 consolidated systemic improvement issue for codex/gpt-5.3-codex model_not_supported_error.
+- Corrected prior "transient flakiness" framing in shared-alerts.md.
+- Did not re-file any of the 30 already-closed "no safe outputs" issues (all DO NOT RE-FILE per
+  existing convention — consolidated into the new tracking issue instead).
 
-Working cleanly this session — `search_issues`, `search_pull_requests`, `issue_read`, `actions_list`
-all returned real data. The prior "[Filtered]...lower integrity" limitation noted 2026-09-09 did
-NOT recur; confirms it was session-specific as suspected, not a persistent tooling defect.
-
-## Actions Taken
-
-- No new issues filed (Metrics Collector failure already tracked by open #59851 — do not re-file).
-- Corrected/updated shared-alerts.md root-cause note for lint-monster/daily-go-test-parallelizer.
-- Created discussion: "Agent Performance Report — Week of 2026-09-10"
-
-## Recommendations for Next Run
-
-1. Track whether #59851 gets a durable fix vs. auto-expiring again (9th recurrence and counting).
-2. Re-run full agent ranking once metrics/latest.json is fresh (≤2 days old) for 3+ consecutive
-   collector runs — now overdue two analyzer runs.
-3. Watch that the lint-monster/daily-go-test-parallelizer correction isn't reverted without new
-   concrete evidence of a real config defect.
+> Last updated: 2026-09-12T12:48Z

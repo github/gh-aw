@@ -92,6 +92,27 @@
 - Compilation clean: 299/299 workflows have lock files, no compile errors.
 - No material delta vs. 2026-09-10 run — dashboard issue not updated, `noop` called instead.
 
+## Escalation + Correction — 2026-09-12T12:48Z (Agent Performance Analyzer)
+- **P0 — filed consolidated tracking issue** for `codex` engine + `gpt-5.3-codex` model
+  `model_not_supported_error`, now confirmed as a real, expanding systemic pattern (not isolated
+  flakiness). Evidence: 19 of the last 25 "no safe outputs" issues (2026-09-06→09-12) share this
+  exact failure category, across 12+ distinct workflows (Metrics Collector ×6, Daily Evals Feature
+  Report ×3, Daily CLI Performance Agent ×3, Daily Cache Strategy Analyzer ×2, Daily Regulatory
+  Report Generator ×2, plus 4 new occurrences today: Daily Documentation Diagram #60373, Daily
+  Documentation Updater #60392, PureLock #60405, Auto-Triage Issues #60406). 69 workflows repo-wide
+  use this engine/model pairing. DO NOT RE-FILE the 30 individual per-workflow issues (all already
+  closed/auto-expired) — track via the new consolidated issue instead.
+- **CORRECTION to 2026-09-10/11 "transient flakiness" framing:** those notes concluded
+  lint-monster/daily-go-test-parallelizer model config was "transient model-availability/policy
+  flakiness, not a hard config defect," based only on those two workflows recovering. The fuller
+  2026-09-06→09-12 dataset shows this is NOT isolated — it's an ongoing, daily-recurring,
+  expanding pattern across a rotating set of 12+ workflows including Metrics Collector itself. This
+  is why `metrics/latest.json` has been stale for 11+ days (3 consecutive weekly runs affected).
+  Reclassified back to: real systemic issue requiring policy verification + fallback model, not mere
+  flakiness. Updated recommendation: fall back to `gpt-5.2-codex` (valid for both providers) for
+  Metrics Collector and other high-frequency-failing workflows until Copilot/OpenAI policy
+  enablement of `gpt-5.3-codex` under the `codex` engine is confirmed or fixed.
+
 ## Correction + Escalation — 2026-09-10T12:58Z (Agent Performance Analyzer)
 - **P0 ESCALATION — Metrics Collector chronic failure:** Open **#59851** (created 2026-09-10T02:45Z)
   is the 9th recurrence of "Metrics Collector produced no safe outputs/timed out" (prior: #59611,
