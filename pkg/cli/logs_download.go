@@ -57,6 +57,30 @@ func isInfoOnlyArtifactFilter(artifactFilter []string) bool {
 	return len(artifactFilter) == 1 && artifactFilter[0] == constants.InfoArtifactName.String()
 }
 
+// isInfoWithOptionalUsageArtifactFilter reports whether the artifact filter requests
+// only the info artifact, or the info artifact plus the compact usage artifact (the
+// default selection used by the logs MCP tool). Both shapes must fall back to the
+// activation artifact for aw_info.json when the compact artifacts are unavailable, e.g.
+// legacy runs that predate the info/usage artifacts.
+func isInfoWithOptionalUsageArtifactFilter(artifactFilter []string) bool {
+	if isInfoOnlyArtifactFilter(artifactFilter) {
+		return true
+	}
+	if len(artifactFilter) != 2 {
+		return false
+	}
+	hasInfo, hasUsage := false, false
+	for _, artifact := range artifactFilter {
+		switch artifact {
+		case constants.InfoArtifactName.String():
+			hasInfo = true
+		case constants.UsageArtifactName.String():
+			hasUsage = true
+		}
+	}
+	return hasInfo && hasUsage
+}
+
 func shouldDownloadWorkflowRunLogs(artifactFilter []string) bool {
 	if len(artifactFilter) == 0 {
 		return true
@@ -175,7 +199,7 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 
 	downloadableNames, individualDownload, done, err := planArtifactDownload(ctx, opts, shouldLogProgress)
 	if done || err != nil {
-		if errors.Is(err, ErrNoArtifacts) && isInfoOnlyArtifactFilter(opts.artifactFilter) {
+		if errors.Is(err, ErrNoArtifacts) && isInfoWithOptionalUsageArtifactFilter(opts.artifactFilter) {
 			return downloadActivationAwInfoFallback(ctx, opts)
 		}
 		return err
@@ -192,7 +216,7 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 			spinner.Stop()
 		}
 		if err := downloadArtifactsIndividually(ctx, opts, downloadableNames); err != nil {
-			if errors.Is(err, ErrNoArtifacts) && isInfoOnlyArtifactFilter(opts.artifactFilter) {
+			if errors.Is(err, ErrNoArtifacts) && isInfoWithOptionalUsageArtifactFilter(opts.artifactFilter) {
 				return downloadActivationAwInfoFallback(ctx, opts)
 			}
 			return err
@@ -254,7 +278,7 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 		return err
 	}
 
-	if isInfoOnlyArtifactFilter(opts.artifactFilter) && !fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
+	if isInfoWithOptionalUsageArtifactFilter(opts.artifactFilter) && !fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
 		if err := downloadActivationAwInfoFallback(ctx, opts); err != nil {
 			return err
 		}
