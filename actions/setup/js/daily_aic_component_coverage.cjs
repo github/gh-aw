@@ -7,7 +7,7 @@ const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs"
 // These are the compiler-owned jobs and collect_usage_artifact_files.sh paths.
 // Raw firewall accounting is preferred to the overlapping engine summary.
 const COMPONENT_FILES = {
-  agent: [["agent", "token_usage.jsonl"], ["agent_usage.jsonl"]],
+  agent: [["agent", "token_usage.jsonl"], ["agent_usage.jsonl"], ["agent_usage.json"]],
   detection: [["detection", "token_usage.jsonl"], ["detection_usage.jsonl"]],
   evals: [["evals", "token_usage.jsonl"]],
 };

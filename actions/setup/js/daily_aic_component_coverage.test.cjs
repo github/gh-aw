@@ -98,6 +98,18 @@ it.each(["skipped", "not-configured"])("accepts %s detection without requiring p
   await expect(f.result).resolves.toBe(2);
 });
 
+it("accepts aggregated agent accounting when a failed request produced no raw usage", async () => {
+  const f = evaluate(
+    {
+      "agent_usage.json": '{"input_tokens":0,"output_tokens":0,"ai_credits":0}',
+      "agent_usage.jsonl": "",
+      "agent/token_usage.jsonl": "",
+    },
+    [job("agent", { conclusion: "failure" })]
+  );
+  await expect(f.result).resolves.toBe(0);
+});
+
 it.each(["agent", "detection"])("accepts provable zero usage when %s execution never started", async component => {
   const f = evaluate(
     {
@@ -143,6 +155,7 @@ it("selects raw accounting once per component instead of summing overlapping sum
   const f = evaluate(
     {
       "agent_usage.jsonl": '{"aic":99}',
+      "agent_usage.json": '{"ai_credits":999}',
       "agent/token_usage.jsonl": '{"aic":2}',
       "detection_usage.jsonl": '{"aic":99}',
       "detection/token_usage.jsonl": '{"aic":3}',
