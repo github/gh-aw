@@ -74,15 +74,11 @@ func manifestWorkflowPathByName(installables []resolvedPackageInstallable) map[s
 	return byName
 }
 
-func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*workflowWithSource, opts UpdateWorkflowsOptions) ([]string, []updateFailure) {
+func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*workflowWithSource, opts UpdateWorkflowsOptions) ([]string, []updateFailure) { //nolint:largefunc
 	updateManifestLog.Printf("updateManifestWorkflowGroup: source=%s, workflows=%d, force=%v, no_merge=%v", source, len(grouped), opts.Force, opts.NoMerge)
 	var successes []string
 	var failures []updateFailure
 	var groupedSuccesses []string
-
-	if len(grouped) == 0 {
-		return successes, failures
-	}
 
 	repoSpec, _, err := parseManifestSourceSpec(source)
 	if err != nil {
@@ -183,7 +179,13 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 		groupedSuccesses = append(groupedSuccesses, wf.Name)
 	}
 
-	targetDir := filepath.Dir(grouped[0].Path)
+	targetDir := opts.WorkflowsDir
+	if targetDir == "" {
+		targetDir = getWorkflowsDir()
+	}
+	if len(grouped) > 0 {
+		targetDir = filepath.Dir(grouped[0].Path)
+	}
 	for name, latestPath := range latestByName {
 		if _, exists := existingByName[name]; exists {
 			continue
@@ -196,6 +198,10 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	}
 
 	if err := syncManifestManagedResources(ctx, repoSpec, latestPkg, latestRef, opts); err != nil {
+		if len(groupedSuccesses) == 0 {
+			failures = append(failures, updateFailure{Name: source, Error: err.Error()})
+			return successes, failures
+		}
 		for _, name := range groupedSuccesses {
 			failures = append(failures, updateFailure{Name: name, Error: err.Error()})
 		}
@@ -204,6 +210,9 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 	assetEngine := resolveManifestAssetEngine(grouped, opts)
 	if err := reconcileManifestManagedAssets(ctx, repoSpec, currentPkg, latestPkg, assetEngine, opts); err != nil {
 		failures = append(failures, updateFailure{Name: source, Error: err.Error()})
+	}
+	if len(groupedSuccesses) == 0 && len(failures) == 0 {
+		groupedSuccesses = append(groupedSuccesses, repositoryPackageIdentifier(repoSpec.RepoSlug, repoSpec.PackagePath))
 	}
 	successes = append(successes, groupedSuccesses...)
 
@@ -216,7 +225,7 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 // under .github/aw/packages. Existing destinations are only overwritten when they are
 // tracked as owned by this package (and unmodified locally, or opts.Force is set);
 // otherwise the reconciliation fails rather than clobbering an unrelated file.
-func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, currentPkg *resolvedRepositoryPackage, latestPkg *resolvedRepositoryPackage, engineOverride string, opts UpdateWorkflowsOptions) error {
+func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, currentPkg *resolvedRepositoryPackage, latestPkg *resolvedRepositoryPackage, engineOverride string, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("unable to find repository root for package assets: %w", err)
@@ -330,12 +339,12 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 		return
 	}
 
-	latestSkillSources := make(map[string]bool, len(latestPkg.SkillFiles))
+	latestSkillSources := make(map[string]struct{}, len(latestPkg.SkillFiles))
 	for _, skill := range latestPkg.SkillFiles {
-		latestSkillSources[skill.SourcePath] = true
+		latestSkillSources[skill.SourcePath] = struct{}{}
 	}
 	for _, skill := range currentPkg.SkillFiles {
-		if latestSkillSources[skill.SourcePath] {
+		if _, exists := latestSkillSources[skill.SourcePath]; exists {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
@@ -343,12 +352,12 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 			skill.SourcePath)))
 	}
 
-	latestAgentSources := make(map[string]bool, len(latestPkg.AgentFiles))
+	latestAgentSources := make(map[string]struct{}, len(latestPkg.AgentFiles))
 	for _, agent := range latestPkg.AgentFiles {
-		latestAgentSources[agent] = true
+		latestAgentSources[agent] = struct{}{}
 	}
 	for _, agent := range currentPkg.AgentFiles {
-		if latestAgentSources[agent] {
+		if _, exists := latestAgentSources[agent]; exists {
 			continue
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
@@ -416,7 +425,7 @@ func removeManifestManagedWorkflow(workflowPath string) error {
 	return nil
 }
 
-func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) error {
+func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	updateManifestLog.Printf("Updating manifest-managed workflow %s: %s@%s -> %s@%s", update.wf.Name, update.currentPath, update.currentRef, update.latestPath, update.latestRef)
 	sourceSpecCurrent := sourceSpecWithRef(&SourceSpec{Repo: update.repo, Path: update.currentPath}, update.currentRef)
 	newContent, err := downloadWorkflowContentFn(ctx, update.repo, update.latestPath, update.latestRef, opts.Verbose)

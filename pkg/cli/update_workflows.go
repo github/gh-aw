@@ -98,7 +98,7 @@ type UpdateWorkflowsOptions struct {
 }
 
 // UpdateWorkflows updates workflows from their source repositories
-func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
+func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	clearUpdateResolutionCaches()
 	updateLog.Printf("Scanning for workflows with source field: dir=%s, filter=%v, noMerge=%v, noCompile=%v, noRedirect=%v, disableSecurityScanner=%v, coolDown=%v", opts.WorkflowsDir, opts.WorkflowNames, opts.NoMerge, opts.NoCompile, opts.NoRedirect, opts.DisableSecurityScanner, opts.CoolDown)
 
@@ -108,15 +108,22 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
 		workflowsDir = getWorkflowsDir()
 	}
 
-	// Find all workflows with source field
-	workflows, err := findWorkflowsWithSource(workflowsDir, opts.WorkflowNames, opts.Verbose)
+	workflowTargets, packageUpdates, err := resolveInstalledPackageUpdates(opts.WorkflowNames)
 	if err != nil {
 		return err
 	}
 
+	var workflows []*workflowWithSource
+	if len(opts.WorkflowNames) == 0 || len(workflowTargets) > 0 {
+		workflows, err = findWorkflowsWithSource(workflowsDir, workflowTargets, opts.Verbose)
+		if err != nil {
+			return err
+		}
+	}
+
 	updateLog.Printf("Found %d workflows with source field", len(workflows))
 
-	if len(workflows) == 0 {
+	if len(workflows) == 0 && len(packageUpdates) == 0 {
 		if len(opts.WorkflowNames) > 0 {
 			return errors.New("no workflows found matching the specified names with source field")
 		}
@@ -144,6 +151,19 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error {
 			continue
 		}
 		directWorkflows = append(directWorkflows, wf)
+	}
+	for _, pkg := range packageUpdates {
+		source := pkg.record.Source
+		if len(pkg.workflows) > 0 {
+			source = pkg.workflows[0].SourceSpec
+		}
+		if _, ok, err := parseManifestSourceSpec(source); err != nil || !ok {
+			if err == nil {
+				err = fmt.Errorf("source %q is not a repository package", source)
+			}
+			return fmt.Errorf("installed package %q has an invalid source: %w", pkg.record.Package, err)
+		}
+		manifestGroups[strings.TrimSpace(source)] = append(manifestGroups[strings.TrimSpace(source)], pkg.workflows...)
 	}
 
 	// Update each workflow
@@ -194,7 +214,7 @@ func allFailuresAreRateLimited(failures []updateFailure) bool {
 }
 
 // findWorkflowsWithSource finds all workflows that have a source field
-func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose bool) ([]*workflowWithSource, error) {
+func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose bool) ([]*workflowWithSource, error) { //nolint:largefunc
 	updateLog.Printf("Finding workflows with source field in %s", workflowsDir)
 	var workflows []*workflowWithSource
 
@@ -576,7 +596,7 @@ func defaultWorkflowUpdateDeps() workflowUpdateDeps {
 	}
 }
 
-func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error) {
+func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, repo, currentRef string, allowMajor, verbose bool, coolDown time.Duration) (string, error) { //nolint:largefunc
 	updateLog.Printf("Resolving latest release for repo %s (current: %s, allowMajor=%v)", repo, currentRef, allowMajor)
 
 	if verbose {
@@ -678,7 +698,7 @@ func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, 
 }
 
 // updateWorkflow updates a single workflow from its source
-func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) error {
+func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWorkflowsOptions) error { //nolint:largefunc
 	updateLog.Printf("Updating workflow: name=%s, source=%s, force=%v, noMerge=%v", wf.Name, wf.SourceSpec, opts.Force, opts.NoMerge)
 
 	if opts.Verbose {
