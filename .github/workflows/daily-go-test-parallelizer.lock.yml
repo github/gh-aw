@@ -1385,6 +1385,7 @@ jobs:
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
+            /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
       - name: Process no-op messages
@@ -1914,6 +1915,12 @@ jobs:
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
       # --- BinEval Evaluations ---
+      - name: Initialize evals execution evidence
+        run: |
+          mkdir -p "/tmp/gh-aw/evals"
+          evidence_tmp="/tmp/gh-aw/evals/execution.json.tmp"
+          printf '{"version":1,"component":"evals","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/evals/execution.json"
       - name: Clean stale firewall files from agent artifact
         run: |
           rm -rf /tmp/gh-aw/sandbox/firewall/logs
@@ -2080,6 +2087,10 @@ jobs:
             fi
           fi
           # shellcheck disable=SC1003,SC2016,SC2086
+          mkdir -p "/tmp/gh-aw/evals"
+          evidence_tmp="/tmp/gh-aw/evals/execution.json.tmp"
+          printf '{"version":1,"component":"evals","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/evals/execution.json"
           GH_AW_AWF_ENGINE_NAME=codex \
           GH_AW_AWF_HARNESS_MARKER='[codex-harness]' \
           GH_AW_AWF_LOG_FILE=/tmp/gh-aw/evals/evals.log \
@@ -2177,6 +2188,16 @@ jobs:
           path: |
             /tmp/gh-aw/evals.jsonl
             /tmp/gh-aw/evals_token_usage.jsonl
+            /tmp/gh-aw/evals/execution.json
+          if-no-files-found: ignore
+      - name: Upload evals accounting after failure
+        if: always() && steps.redact_evals_results.outcome != 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evals
+          path: |
+            /tmp/gh-aw/evals_token_usage.jsonl
+            /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
       - name: Restore actions folder
         if: always()

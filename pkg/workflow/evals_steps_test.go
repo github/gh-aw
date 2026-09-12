@@ -19,8 +19,11 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 		"name: Collect evals token usage",
 		"if: always()",
 		"/tmp/gh-aw/evals_token_usage.jsonl",
+		evalsExecutionEvidencePath,
 		"/tmp/gh-aw/evals.jsonl",
 		"if: steps.redact_evals_results.outcome == 'success'",
+		"name: Upload evals accounting after failure",
+		"if: always() && steps.redact_evals_results.outcome != 'success'",
 	} {
 		if !strings.Contains(steps, expected) {
 			t.Errorf("evals accounting transport missing %q", expected)
@@ -30,12 +33,37 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("conclusion must publish evals token usage")
 	}
+	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/execution.json") {
+		t.Fatal("conclusion must publish evals execution evidence")
+	}
 	script, err := os.ReadFile("../../actions/setup/sh/collect_usage_artifact_files.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("collector must retain evals accounting separately from evaluation results")
+	}
+	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+		t.Fatal("collector must retain evals execution evidence")
+	}
+}
+
+func TestEvalsExecutionEvidence(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI: "copilot",
+		Evals: &EvalsConfig{
+			Questions: []EvalDefinition{{ID: "example", Question: "Is the result valid?"}},
+		},
+	}
+
+	steps := strings.Join(compiler.buildEvalsJobSteps(data), "")
+	initialize := strings.Index(steps, "name: Initialize evals execution evidence")
+	install := strings.Index(steps, "name: Install AWF binary")
+	execution := strings.Index(steps, "id: evals_agentic_execution")
+	started := strings.Index(steps, `"state":"started"`)
+	if initialize < 0 || install <= initialize || execution <= install || started <= execution {
+		t.Fatalf("expected evals execution evidence to distinguish setup failures from started execution:\n%s", steps)
 	}
 }
 

@@ -35,6 +35,7 @@ func (c *Compiler) buildEvalsJobSteps(data *WorkflowData) []string {
 	var steps []string
 
 	steps = append(steps, "      # --- BinEval Evaluations ---\n")
+	steps = append(steps, generateComponentExecutionEvidenceStep("evals", "not_started", evalsExecutionEvidencePath, "")...)
 
 	// Step 1: Clean stale firewall files from the agent artifact download so the
 	// AWF squid container does not fail when the evals job pre-pulls images.
@@ -273,6 +274,12 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 	// Execute the engine through AWF; output is written to evalsLogPath.
 	executionSteps := engine.GetExecutionSteps(evalsData, evalsLogPath)
 	for _, step := range executionSteps {
+		for _, line := range step {
+			if strings.Contains(line, "id: agentic_execution") {
+				step = injectComponentExecutionStarted(step, "evals", evalsExecutionEvidencePath)
+				break
+			}
+		}
 		// injected, skipNextIf and skipNextContinueOnError are intentionally scoped
 		// per-step (declared inside the outer loop) so they reset to false for each new
 		// step, preventing carry-over. skipNextIf/skipNextContinueOnError are set after
@@ -447,6 +454,16 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		"          path: |\n",
 		"            " + evalsResultsPath + "\n",
 		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
+		"            " + evalsExecutionEvidencePath + "\n",
+		"          if-no-files-found: ignore\n",
+		"      - name: Upload evals accounting after failure\n",
+		"        if: always() && steps.redact_evals_results.outcome != 'success'\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		"        with:\n",
+		"          name: " + evalsArtifactName + "\n",
+		"          path: |\n",
+		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
+		"            " + evalsExecutionEvidencePath + "\n",
 		"          if-no-files-found: ignore\n",
 	}
 }

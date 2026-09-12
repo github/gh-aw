@@ -252,6 +252,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
+		"            /tmp/gh-aw/usage/evals/execution.json\n",
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
 		"          if-no-files-found: ignore\n",
 	)

@@ -162,7 +162,7 @@ it("rejects a non-empty job list without the required agent job", async () => {
   await expect(f.result).rejects.toThrow("Cannot prove complete billable-component coverage");
 });
 
-it.each(["agent", "detection"])("accepts provable zero usage when %s execution never started", async component => {
+it.each(["agent", "detection", "evals"])("accepts provable zero usage when %s execution never started", async component => {
   const f = evaluate(
     {
       [`${component}/execution.json`]: JSON.stringify({
@@ -173,7 +173,7 @@ it.each(["agent", "detection"])("accepts provable zero usage when %s execution n
         state: "not_started",
       }),
     },
-    component === "agent" ? [job("agent", { conclusion: "failure" })] : [job("agent", { conclusion: "skipped" }), job("detection", { conclusion: "failure" })]
+    component === "agent" ? [job("agent", { conclusion: "failure" })] : [job("agent", { conclusion: "skipped" }), job(component, { conclusion: "failure" })]
   );
   await expect(f.result).resolves.toBe(0);
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"execution_not_started"'));

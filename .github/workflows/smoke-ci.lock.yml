@@ -1578,6 +1578,7 @@ jobs:
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
+            /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
       - name: Process no-op messages

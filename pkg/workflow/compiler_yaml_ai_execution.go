@@ -11,6 +11,7 @@ import (
 const (
 	agentExecutionEvidencePath     = constants.TmpGhAwDirSlash + "agent_execution.json"
 	detectionExecutionEvidencePath = constants.ThreatDetectionDir + "/execution.json"
+	evalsExecutionEvidencePath     = constants.TmpGhAwDirSlash + "evals/execution.json"
 )
 
 func generateComponentExecutionEvidenceStep(component, state, filePath, condition string) []string {

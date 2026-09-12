@@ -47,6 +47,7 @@ elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
 fi
 if [ -f /tmp/gh-aw/agent_execution.json ]; then cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
+if [ -f /tmp/gh-aw/evals/execution.json ]; then cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true; fi
 if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
 if [ -f /tmp/gh-aw/evals/evals_token_usage.jsonl ]; then
   mkdir -p /tmp/gh-aw/usage/evals
