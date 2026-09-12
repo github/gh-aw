@@ -29,6 +29,7 @@ type repositoryPackageManifest struct {
 	License         string
 	Private         bool
 	Experimental    bool
+	ScheduleSeed    string
 	Imports         []string
 	Includes        []repositoryPackageInclude
 	Files           []string
@@ -172,6 +173,9 @@ func populateRepositoryPackageManifestBasicMetadata(manifest *repositoryPackageM
 	}
 	if experimental, ok := root["experimental"].(bool); ok {
 		manifest.Experimental = experimental
+	}
+	if scheduleSeed, ok := stringValue(root["schedule-seed"]); ok {
+		manifest.ScheduleSeed = scheduleSeed
 	}
 }
 

@@ -50,6 +50,7 @@ The manifest document MUST be a YAML mapping. Unknown top-level fields MUST be r
 | `license` | string | No | SPDX license identifier or license name for the package. |
 | `private` | boolean | No | Whether the package is unavailable for installation. Defaults to `false`. |
 | `experimental` | boolean | No | Whether the package is experimental. Defaults to `false`. |
+| `schedule-seed` | string | No | Repository slug used for fuzzy schedule scattering when the compile flag is omitted. |
 | `imports` | array of strings | No | Paths to package manifests included recursively in the install set. |
 | `files` | array of strings | No | Deprecated. Explicit installable workflow file list. Use `includes` instead. |
 | `includes` | array of strings or mappings | No | Explicit installable package entries. String entries use path conventions; mapping entries declare an explicit source-to-destination install path. |
@@ -103,6 +104,12 @@ If omitted, `private` defaults to `false`. When `private` is `true`, `gh aw add`
 ### 4.9 `experimental`
 
 If omitted, `experimental` defaults to `false`. When `experimental` is `true`, `gh aw add` MUST warn before installing the package.
+
+### 4.9.1 `schedule-seed`
+
+If present, `schedule-seed` MUST be a string in `owner/repo` form. `gh aw compile`
+MUST use it for fuzzy schedule scattering when `--schedule-seed` is omitted. An
+explicit `--schedule-seed` value MUST take precedence.
 
 ### 4.10 `files`
 

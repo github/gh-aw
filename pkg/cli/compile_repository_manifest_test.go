@@ -12,7 +12,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -179,6 +181,46 @@ engine: copilot
 	require.NoError(t, err)
 }
 
+func TestCompileWorkflows_UsesManifestScheduleSeed(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "aw-manifest-schedule-seed-*")
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	require.NoError(t, os.Chdir(tmpDir))
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	require.NoError(t, cmd.Run())
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".github", "workflows"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".github", "workflows", "test.md"), []byte(`---
+on: daily
+permissions:
+  contents: read
+engine: copilot
+---
+
+# Test
+`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Repo Assist\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "aw.yml"), []byte(`name: Repo Assist
+schedule-seed: github/gh-aw
+`), 0o644))
+
+	wasRelease := workflow.IsRelease()
+	workflow.SetIsRelease(true)
+	t.Cleanup(func() { workflow.SetIsRelease(wasRelease) })
+
+	_, err = CompileWorkflows(context.Background(), CompileConfig{})
+	require.NoError(t, err)
+
+	lockContent, err := os.ReadFile(filepath.Join(tmpDir, ".github", "workflows", "test.lock.yml"))
+	require.NoError(t, err)
+	expectedCron, err := parser.ScatterSchedule("FUZZY:DAILY * * *", "github/gh-aw/.github/workflows/test.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(lockContent), expectedCron, "compiled schedule should use the aw.yml schedule seed")
+}
+
 func TestCompileWorkflows_ResolvesImportedManifestRootRelativeWorkflow(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "aw-manifest-import-root-relative-*")
 	originalWd, err := os.Getwd()
@@ -287,8 +329,45 @@ func TestValidateRepositoryManifestForCompilation_PropagatesGitRootErrors(t *tes
 
 	stats := &CompilationStats{}
 	var results []ValidationResult
-	err := validateRepositoryManifestForCompilation(CompileConfig{}, stats, &results)
+	_, err := validateRepositoryManifestForCompilation(CompileConfig{}, stats, &results)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to find git root for manifest validation")
 	require.ErrorContains(t, err, "permission denied")
+}
+
+func TestApplyRepositoryManifestDefaults_ScheduleSeed(t *testing.T) {
+	t.Parallel()
+
+	manifest := &repositoryPackageManifest{ScheduleSeed: "github/gh-aw"}
+
+	t.Run("uses manifest value when flag omitted", func(t *testing.T) {
+		config := applyRepositoryManifestDefaults(CompileConfig{}, manifest)
+		assert.Equal(t, "github/gh-aw", config.ScheduleSeed)
+	})
+
+	t.Run("preserves explicit flag value", func(t *testing.T) {
+		config := applyRepositoryManifestDefaults(CompileConfig{ScheduleSeed: "octo/repo"}, manifest)
+		assert.Equal(t, "octo/repo", config.ScheduleSeed)
+	})
+
+	t.Run("handles missing manifest", func(t *testing.T) {
+		config := applyRepositoryManifestDefaults(CompileConfig{}, nil)
+		assert.Empty(t, config.ScheduleSeed)
+	})
+}
+
+func TestParseRepositoryPackageManifest_ScheduleSeed(t *testing.T) {
+	t.Parallel()
+
+	manifest, _, err := parseRepositoryPackageManifest("aw.yml", []byte("name: Repo Assist\nschedule-seed: github/gh-aw\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "github/gh-aw", manifest.ScheduleSeed)
+}
+
+func TestParseRepositoryPackageManifest_RejectsInvalidScheduleSeed(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := parseRepositoryPackageManifest("aw.yml", []byte("name: Repo Assist\nschedule-seed: invalid\n"))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "schedule-seed")
 }

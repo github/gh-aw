@@ -33,6 +33,7 @@ The package root is the folder that contains `aw.yml`.
 | `description` | string | No | Optional package description. `gh aw add` warns when it exceeds 255 characters. |
 | `private` | boolean | No | Marks the package as unavailable for installation. Defaults to `false`; `gh aw add` refuses packages set to `true`. |
 | `experimental` | boolean | No | Marks the package as experimental. Defaults to `false`; `gh aw add` displays a warning when set to `true`. |
+| `schedule-seed` | string | No | Repository slug in `owner/repo` form used for fuzzy schedule scattering by `gh aw compile`. The `--schedule-seed` flag takes precedence. |
 | `files` | array of strings | No | Deprecated; use `includes`. Package-root-relative paths. Agentic markdown workflows under `workflows/` or `.github/workflows/`; raw GitHub Actions YAML (`.yml`) is also accepted as direct children of `.github/workflows/`. |
 | `includes` | array | No | Installable entries, or paths to other `aw.yml` manifests whose installable files are included recursively. Each entry is either a path string (same rules as `files`, plus skill and agent paths), a path ending in `/*` that matches supported direct children, or a source-to-destination mapping. |
 | `resources` | array | No | Repository assets copied from package-relative `source` paths to allowlisted repository-relative `destination` paths. |

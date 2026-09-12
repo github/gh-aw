@@ -16,34 +16,41 @@ var compileRepositoryManifestLog = logger.New("cli:compile_repository_manifest")
 
 var findGitRootForManifestValidation = gitutil.FindGitRoot
 
-func validateRepositoryManifestForCompilation(config CompileConfig, stats *CompilationStats, validationResults *[]ValidationResult) error {
+func applyRepositoryManifestDefaults(config CompileConfig, manifest *repositoryPackageManifest) CompileConfig {
+	if config.ScheduleSeed == "" && manifest != nil {
+		config.ScheduleSeed = manifest.ScheduleSeed
+	}
+	return config
+}
+
+func validateRepositoryManifestForCompilation(config CompileConfig, stats *CompilationStats, validationResults *[]ValidationResult) (*repositoryPackageManifest, error) {
 	compileRepositoryManifestLog.Print("Validating repository manifest for compilation")
 
 	gitRoot, err := findGitRootForManifestValidation()
 	if err != nil {
 		if errors.Is(err, gitutil.ErrNotGitRepository) {
 			compileRepositoryManifestLog.Print("Not in a git repository, skipping manifest validation")
-			return nil
+			return nil, nil
 		}
-		return fmt.Errorf("failed to find git root for manifest validation: %w", err)
+		return nil, fmt.Errorf("failed to find git root for manifest validation: %w", err)
 	}
 
 	manifestPath, err := findLocalRepositoryPackageManifest(gitRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if manifestPath == "" {
 		compileRepositoryManifestLog.Printf("No repository manifest found in %s", gitRoot)
-		return nil
+		return nil, nil
 	}
 
 	compileRepositoryManifestLog.Printf("Found repository manifest at %s", manifestPath)
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("failed to read Agentic Workflow manifest %q: %w", manifestPath, err)
+		return nil, fmt.Errorf("failed to read Agentic Workflow manifest %q: %w", manifestPath, err)
 	}
 
-	_, warnings, parseErr := parseRepositoryPackageManifest(manifestPath, content)
+	manifest, warnings, parseErr := parseRepositoryPackageManifest(manifestPath, content)
 	if parseErr == nil {
 		parseErr = validateLocalRepositoryPackageContents(manifestPath)
 	}
@@ -62,7 +69,10 @@ func validateRepositoryManifestForCompilation(config CompileConfig, stats *Compi
 			Message: warning,
 		})
 	}
-	return reportRepositoryManifestValidation(config, validationResults, warnings, parseErr, result)
+	if err := reportRepositoryManifestValidation(config, validationResults, warnings, parseErr, result); err != nil {
+		return nil, err
+	}
+	return manifest, nil
 }
 
 func reportRepositoryManifestValidation(config CompileConfig, validationResults *[]ValidationResult, warnings []string, parseErr error, result ValidationResult) error {

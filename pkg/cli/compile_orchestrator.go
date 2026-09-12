@@ -115,10 +115,8 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 		return nil, err
 	}
 
-	compiler := createAndConfigureCompiler(config)
-	compiler.SetContext(ctx)
-
-	if err := validateRepositoryManifestForCompilation(config, stats, &validationResults); err != nil {
+	manifest, err := validateRepositoryManifestForCompilation(config, stats, &validationResults)
+	if err != nil {
 		if config.JSONOutput {
 			if outputErr := outputResults(stats, &validationResults, config); outputErr != nil {
 				return nil, outputErr
@@ -126,6 +124,10 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 		}
 		return nil, err
 	}
+	config = applyRepositoryManifestDefaults(config, manifest)
+
+	compiler := createAndConfigureCompiler(config)
+	compiler.SetContext(ctx)
 
 	// Handle watch mode (early return)
 	if config.Watch {
