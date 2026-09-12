@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -131,7 +132,7 @@ var defaultMCPLogsToolArtifacts = []string{string(ArtifactSetInfo), string(Artif
 // sets always get the compact usage set added so token usage stays populated.
 func effectiveMCPLogsToolArtifacts(artifacts []string) []string {
 	if len(artifacts) == 0 {
-		return defaultMCPLogsToolArtifacts
+		return slices.Clone(defaultMCPLogsToolArtifacts)
 	}
 	for _, set := range artifacts {
 		if ArtifactSet(set) == ArtifactSetAll || ArtifactSet(set) == ArtifactSetUsage {
