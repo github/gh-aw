@@ -28,11 +28,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 	var workflowTargets []string
 	var packageTargets []string
 	for _, target := range targets {
-		packageLike, err := isPackageUpdateTarget(target)
-		if err != nil {
-			return nil, nil, err
-		}
-		if packageLike {
+		if isPackageUpdateTarget(target) {
 			packageTargets = append(packageTargets, target)
 		} else {
 			workflowTargets = append(workflowTargets, target)
@@ -68,7 +64,7 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 		if err != nil {
 			return nil, nil, err
 		}
-		workflowsDir, engineOverride := packageInstallContext(*record)
+		workflowsDir, engineOverride := packageInstallContext(gitRoot, *record)
 		packages = append(packages, installedPackageUpdate{
 			record:         *record,
 			workflows:      workflows,
@@ -80,8 +76,8 @@ func resolveInstalledPackageUpdates(targets []string) ([]string, []installedPack
 	return workflowTargets, packages, nil
 }
 
-func isPackageUpdateTarget(target string) (bool, error) {
-	return isPackageURLTarget(target), nil
+func isPackageUpdateTarget(target string) bool {
+	return isPackageURLTarget(target)
 }
 
 func findInstalledPackageRecord(records []packageOwnershipRecord, target string) (*packageOwnershipRecord, bool, error) {
@@ -128,7 +124,7 @@ func packageURLMatchesRecord(packageURL *url.URL, record packageOwnershipRecord)
 		return false
 	}
 
-	packagePath := strings.TrimPrefix(record.Package, repoID)
+	packagePath := record.Package[len(repoID):]
 	packagePath = strings.Trim(packagePath, "/")
 	if len(parts) == 2 {
 		return packagePath == ""
@@ -191,12 +187,12 @@ func packageWorkflowsFromOwnershipRecord(gitRoot string, record packageOwnership
 	return workflows, nil
 }
 
-func packageInstallContext(record packageOwnershipRecord) (workflowsDir string, engineOverride string) {
+func packageInstallContext(gitRoot string, record packageOwnershipRecord) (workflowsDir string, engineOverride string) {
 	for _, entry := range record.Files {
 		destination := filepath.ToSlash(filepath.Clean(entry.Destination))
-		if workflowsDir == "" && strings.HasSuffix(strings.ToLower(destination), ".md") &&
+		if workflowsDir == "" && (strings.HasSuffix(strings.ToLower(destination), ".md") || isActionWorkflowPath(destination)) &&
 			isSupportedPackageInstallablePath(entry.Source) {
-			workflowsDir = filepath.Dir(filepath.FromSlash(destination))
+			workflowsDir = filepath.Join(gitRoot, filepath.Dir(filepath.FromSlash(destination)))
 		}
 		if engineOverride != "" {
 			continue

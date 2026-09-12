@@ -162,7 +162,11 @@ func UpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error { /
 			if err == nil {
 				err = fmt.Errorf("source %q is not a repository package", source)
 			}
-			return fmt.Errorf("installed package %q has an invalid source: %w", pkg.record.Package, err)
+			failedUpdates = append(failedUpdates, updateFailure{
+				Name:  pkg.record.Package,
+				Error: fmt.Sprintf("invalid source: %v", err),
+			})
+			continue
 		}
 		source = strings.TrimSpace(source)
 		manifestGroups[source] = append(manifestGroups[source], pkg.workflows...)

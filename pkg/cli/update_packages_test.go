@@ -76,6 +76,10 @@ func TestPackageURLMatchesRecord(t *testing.T) {
 	parsed, err := url.Parse("https://github.com/owner/repo/tree/main/packages/other")
 	require.NoError(t, err)
 	assert.False(t, packageURLMatchesRecord(parsed, record))
+
+	parsed, err = url.Parse("https://github.com/owner/repo/packages/reviewer")
+	require.NoError(t, err)
+	assert.True(t, packageURLMatchesRecord(parsed, packageOwnershipRecord{Package: "Owner/Repo/packages/reviewer"}))
 }
 
 func TestPackageWorkflowsFromOwnershipRecord(t *testing.T) {
@@ -110,14 +114,15 @@ func TestPackageWorkflowsFromOwnershipRecord(t *testing.T) {
 
 func TestPackageInstallContext(t *testing.T) {
 	t.Parallel()
+	gitRoot := t.TempDir()
 	record := packageOwnershipRecord{
 		Files: []packageOwnershipFileEntry{
-			{Source: "workflows/review.md", Destination: "custom/workflows/review.md"},
+			{Source: ".github/workflows/review.yml", Destination: "custom/workflows/review.yml"},
 			{Source: "skills/reviewer/SKILL.md", Destination: ".claude/skills/reviewer/SKILL.md"},
 		},
 	}
 
-	workflowsDir, engineOverride := packageInstallContext(record)
-	assert.Equal(t, filepath.Join("custom", "workflows"), workflowsDir)
+	workflowsDir, engineOverride := packageInstallContext(gitRoot, record)
+	assert.Equal(t, filepath.Join(gitRoot, "custom", "workflows"), workflowsDir)
 	assert.Equal(t, "claude", engineOverride)
 }
