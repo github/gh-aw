@@ -112,79 +112,81 @@ describe("add_labels", () => {
   });
 
   describe("handleAddLabels", () => {
-    it("should ignore a conflicting item_number when target is triggering", async () => {
-      const handler = await main({ max: 10, target: "triggering" });
-      const addLabelsCalls = [];
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return {};
-      };
+    describe("AL-005 runtime target authorization", () => {
+      it("AL-002 ignores a conflicting item_number when target is triggering", async () => {
+        const handler = await main({ max: 10, target: "triggering" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
 
-      const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
 
-      expect(result.success).toBe(true);
-      expect(result.number).toBe(123);
-      expect(addLabelsCalls[0].issue_number).toBe(123);
-    });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(addLabelsCalls[0].issue_number).toBe(123);
+      });
 
-    it("should default to the triggering item when target is omitted", async () => {
-      const handler = await main({ max: 10 });
-      const addLabelsCalls = [];
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return {};
-      };
+      it("AL-001 defaults to the triggering item when target is omitted", async () => {
+        const handler = await main({ max: 10 });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
 
-      const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
 
-      expect(result.success).toBe(true);
-      expect(result.number).toBe(123);
-      expect(addLabelsCalls[0].issue_number).toBe(123);
-    });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(addLabelsCalls[0].issue_number).toBe(123);
+      });
 
-    it("should ignore a conflicting item_number when target is a fixed number", async () => {
-      const handler = await main({ max: 10, target: "789" });
-      const addLabelsCalls = [];
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return {};
-      };
+      it("AL-003 ignores a conflicting item_number when target is a fixed number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
 
-      const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
 
-      expect(result.success).toBe(true);
-      expect(result.number).toBe(789);
-      expect(addLabelsCalls[0].issue_number).toBe(789);
-    });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(addLabelsCalls[0].issue_number).toBe(789);
+      });
 
-    it("should use a fixed numeric target without an item_number", async () => {
-      const handler = await main({ max: 10, target: "789" });
-      const addLabelsCalls = [];
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return {};
-      };
+      it("AL-003 uses a fixed numeric target without an item_number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
 
-      const result = await handler({ labels: ["bug"] }, {});
+        const result = await handler({ labels: ["bug"] }, {});
 
-      expect(result.success).toBe(true);
-      expect(result.number).toBe(789);
-      expect(addLabelsCalls[0].issue_number).toBe(789);
-    });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(addLabelsCalls[0].issue_number).toBe(789);
+      });
 
-    it("should accept item_number when target is wildcard", async () => {
-      const handler = await main({ max: 10, target: "*" });
-      const addLabelsCalls = [];
-      mockGithub.rest.issues.addLabels = async params => {
-        addLabelsCalls.push(params);
-        return {};
-      };
+      it("AL-004 accepts item_number when target is wildcard", async () => {
+        const handler = await main({ max: 10, target: "*" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
 
-      const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
 
-      expect(result.success).toBe(true);
-      expect(result.number).toBe(456);
-      expect(addLabelsCalls[0].issue_number).toBe(456);
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(456);
+        expect(addLabelsCalls[0].issue_number).toBe(456);
+      });
     });
 
     it("should add labels to an issue using explicit item_number", async () => {
