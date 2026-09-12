@@ -430,6 +430,9 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 	return nil
 }
 
+// refreshManifestManagedOwnership recomputes ownership entries and hashes for the
+// installed package files after successful reconciliation, preserving entries for
+// package files intentionally retained from the previous installation.
 func refreshManifestManagedOwnership(repoSpec *RepoSpec, pkg *resolvedRepositoryPackage, ref, engineOverride string, opts UpdateWorkflowsOptions) error {
 	if repoSpec == nil || pkg == nil {
 		return nil

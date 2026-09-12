@@ -210,12 +210,9 @@ func updateManifestWorkflowGroup(ctx context.Context, source string, grouped []*
 		return successes, failures
 	}
 	assetEngine := resolveManifestAssetEngine(grouped, opts)
-	assetsReconciled := true
 	if err := reconcileManifestManagedAssets(ctx, repoSpec, currentPkg, latestPkg, assetEngine, opts); err != nil {
 		failures = append(failures, updateFailure{Name: source, Error: err.Error()})
-		assetsReconciled = false
-	}
-	if assetsReconciled {
+	} else {
 		if err := refreshManifestManagedOwnership(repoSpec, latestPkg, latestRef, assetEngine, opts); err != nil {
 			failures = append(failures, updateFailure{Name: source, Error: err.Error()})
 		}
@@ -395,6 +392,7 @@ func capturePackageAssetRollback(path string) (packageAssetRollback, error) {
 }
 
 func rollbackPackageAssets(rollbacks []packageAssetRollback) {
+	// Rollback is best-effort so the original reconciliation error remains actionable.
 	for _, rollback := range slices.Backward(rollbacks) {
 		if rollback.existed {
 			_ = os.MkdirAll(filepath.Dir(rollback.path), constants.DirPermPublic)

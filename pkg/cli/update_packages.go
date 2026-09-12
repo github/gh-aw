@@ -119,12 +119,13 @@ func packageURLMatchesRecord(packageURL *url.URL, record packageOwnershipRecord)
 	}
 	parts[1] = strings.TrimSuffix(parts[1], ".git")
 	repoID := strings.Join(parts[:2], "/")
-	if !strings.EqualFold(record.Package, repoID) &&
-		!strings.HasPrefix(strings.ToLower(record.Package), strings.ToLower(repoID)+"/") {
+	lowerPackage := strings.ToLower(record.Package)
+	lowerRepoID := strings.ToLower(repoID)
+	if lowerPackage != lowerRepoID && !strings.HasPrefix(lowerPackage, lowerRepoID+"/") {
 		return false
 	}
 
-	packagePath := record.Package[len(repoID):]
+	packagePath := strings.TrimPrefix(lowerPackage, lowerRepoID)
 	packagePath = strings.Trim(packagePath, "/")
 	if len(parts) == 2 {
 		return packagePath == ""
