@@ -120,6 +120,54 @@ func TestDownloadWorkflowLogsForTargetsConcurrentAndResilient(t *testing.T) {
 	assert.Equal(t, int64(123), report.Continuations[0].BeforeRunID)
 }
 
+// TestDownloadWorkflowLogsForTargetsReportsCollectionStatsAcrossTargets verifies
+// that DownloadWorkflowLogsForTargets renders one combined collection-stats
+// summary reflecting every target's recorded discovered/downloaded/cached
+// counts, confirming the shared collectionStats pointer is wired through to
+// each concurrent target and rendered once after they finish.
+func TestDownloadWorkflowLogsForTargetsReportsCollectionStatsAcrossTargets(t *testing.T) {
+	original := collectWorkflowLogsForTarget
+	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
+	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		opts.collectionStats.recordDiscovered(2)
+		opts.collectionStats.recordResult(DownloadResult{})
+		opts.collectionStats.recordResult(DownloadResult{Cached: true})
+		return workflowLogsResult{
+			processedRuns: []ProcessedRun{{
+				Run: WorkflowRun{
+					DatabaseID:   int64(len(opts.WorkflowName)),
+					WorkflowName: opts.WorkflowName,
+					CreatedAt:    time.Now(),
+					LogsPath:     filepath.Join(opts.OutputDir, "run-1"),
+				},
+			}},
+		}, nil
+	}
+
+	tempDir := t.TempDir()
+	originalDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	cachedJSONL := filepath.Join(tempDir, "logs.jsonl")
+	require.NoError(t, os.WriteFile(cachedJSONL, nil, 0o600))
+
+	_, stderr := captureOutput(t, func() error {
+		return DownloadWorkflowLogsForTargets(context.Background(), LogsDownloadOptions{
+			OutputDir:      filepath.Join(tempDir, "logs"),
+			SummaryFile:    "summary.json",
+			SuppressRender: true,
+			CachedJSONL:    cachedJSONL,
+		}, []logsWorkflowTarget{
+			{workflowName: "alpha", repoOverride: "org/repo-a"},
+			{workflowName: "bravo", repoOverride: "org/repo-b"},
+		}, nil)
+	})
+
+	assert.Contains(t, stderr, "Runs: 4 discovered; reports: 2 downloaded, 2 skipped because cached analyses were reused")
+}
+
 func TestDownloadWorkflowLogsForTargetsReturnsErrorWhenAllFail(t *testing.T) {
 	original := collectWorkflowLogsForTarget
 	t.Cleanup(func() { collectWorkflowLogsForTarget = original })

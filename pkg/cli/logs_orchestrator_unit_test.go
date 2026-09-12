@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -822,6 +823,89 @@ func TestLogsCollectionStatsReportsDiscoveredDownloadedAndCached(t *testing.T) {
 	assert.Contains(t, stderr, "Runs: 4 discovered; reports: 1 downloaded, 2 skipped because cached analyses were reused")
 }
 
+// TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits verifies
+// that the single-target DownloadWorkflowLogs entry point wires --cached-jsonl
+// discovery/download results through to the rendered collection-stats summary,
+// counting both a JSONL cache hit and an on-disk (run_summary.json) cache hit
+// toward the "skipped" total. This mirrors the entry-point-level check
+// requested in review: mocking only the batch-discovery indirection point
+// (logsFetchWorkflowRunBatch) so the real cache-lookup and stats-recording
+// code in the download pipeline executes unmocked.
+func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *testing.T) {
+	originalFetch := logsFetchWorkflowRunBatch
+	t.Cleanup(func() { logsFetchWorkflowRunBatch = originalFetch })
+
+	outputDir := t.TempDir()
+
+	// Run 1: on-disk cache hit — a complete run_summary.json plus artifact marker
+	// already exists locally, so the download pipeline reuses it without any
+	// --cached-jsonl involvement.
+	const diskCachedRunID int64 = 101
+	diskRunDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", diskCachedRunID))
+	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(diskRunDir, runAPIResponseFileName),
+		[]byte(fmt.Sprintf(`{"id":%d,"status":"completed","conclusion":"success"}`, diskCachedRunID)),
+		0o600,
+	))
+	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       diskCachedRunID,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", Status: "completed", Conclusion: "success"},
+		},
+	}, false))
+	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))
+
+	// Run 2: JSONL cache hit — the run is only ever known via --cached-jsonl.
+	const jsonlCachedRunID int64 = 202
+	jsonlUpdatedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	cachedJSONLPath := filepath.Join(outputDir, "cached-logs.jsonl")
+	cachedRecord := fmt.Sprintf(
+		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
+		jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339),
+	)
+	require.NoError(t, os.WriteFile(cachedJSONLPath, []byte(cachedRecord), 0o600))
+
+	batchCalls := 0
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		batchCalls++
+		if batchCalls > 1 {
+			return workflowRunBatch{}, nil
+		}
+		return workflowRunBatch{
+			runs: []WorkflowRun{
+				{DatabaseID: diskCachedRunID},
+				{
+					DatabaseID: jsonlCachedRunID,
+					Status:     "completed",
+					Conclusion: "success",
+					Attempt:    1,
+					UpdatedAt:  jsonlUpdatedAt,
+					Repository: "owner/repo",
+				},
+			},
+			totalFetched:           2,
+			batchSize:              2,
+			oldestFetchedCreatedAt: time.Now(),
+		}, nil
+	}
+
+	_, stderr := captureOutput(t, func() error {
+		return DownloadWorkflowLogs(context.Background(), LogsDownloadOptions{
+			Count:          2,
+			OutputDir:      outputDir,
+			SummaryFile:    "summary.json",
+			CachedJSONL:    cachedJSONLPath,
+			ArtifactSets:   []string{"usage"},
+			SuppressRender: true,
+		})
+	})
+
+	assert.Contains(t, stderr, "Runs: 2 discovered; reports: 0 downloaded, 2 skipped because cached analyses were reused")
+}
+
 // TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange verifies that
 // --stdin honors --start-date/--end-date by pruning out-of-range cached run
 // records, mirroring the discovery-mode behavior in DownloadWorkflowLogs.
@@ -846,4 +930,73 @@ func TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange(t *testing.T
 	content := string(data)
 	assert.NotContains(t, content, `"run_id":1`)
 	assert.Contains(t, content, `"run_id":2`)
+}
+
+// TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCacheHits
+// verifies that the --stdin entry point (DownloadWorkflowLogsFromStdin) wires
+// its collection stats through to the rendered summary, counting both a
+// disk-cached run (existing run_summary.json) and a --cached-jsonl-cached run
+// toward the "skipped" total. Run metadata is fetched through a fake `gh`
+// binary on PATH so no live GitHub API access is required.
+func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCacheHits(t *testing.T) {
+	outputDir := t.TempDir()
+
+	const diskCachedRunID int64 = 101
+	const jsonlCachedRunID int64 = 202
+	jsonlUpdatedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	fakeBinDir := t.TempDir()
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"case \"$*\" in\n" +
+		fmt.Sprintf("  *runs/%d*) cat <<'EOF'\n", diskCachedRunID) +
+		fmt.Sprintf(`{"databaseId":%d,"number":1,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"Disk Cached","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:01:00Z","repository":"owner/repo"}`+"\n", diskCachedRunID, diskCachedRunID) +
+		"EOF\n" +
+		"    ;;\n" +
+		fmt.Sprintf("  *runs/%d*) cat <<'EOF'\n", jsonlCachedRunID) +
+		fmt.Sprintf(`{"databaseId":%d,"number":2,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"JSONL Cached","attempt":1,"createdAt":"2026-01-01T00:00:00Z","updatedAt":%q,"repository":"owner/repo"}`+"\n", jsonlCachedRunID, jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339)) +
+		"EOF\n" +
+		"    ;;\n" +
+		"esac\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	// Run 101: on-disk cache hit — a complete run_summary.json plus artifact
+	// marker already exists locally.
+	diskRunDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", diskCachedRunID))
+	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(diskRunDir, runAPIResponseFileName),
+		[]byte(fmt.Sprintf(`{"id":%d,"status":"completed","conclusion":"success","repository":{"full_name":"owner/repo"}}`, diskCachedRunID)),
+		0o600,
+	))
+	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       diskCachedRunID,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", Status: "completed", Conclusion: "success"},
+		},
+	}, false))
+	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))
+
+	// Run 202: JSONL cache hit — known only via --cached-jsonl.
+	cachedJSONLPath := filepath.Join(outputDir, "cached-logs.jsonl")
+	cachedRecord := fmt.Sprintf(
+		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
+		jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339),
+	)
+	require.NoError(t, os.WriteFile(cachedJSONLPath, []byte(cachedRecord), 0o600))
+
+	_, stderr := captureOutput(t, func() error {
+		return DownloadWorkflowLogsFromStdin(context.Background(), StdinLogsOptions{
+			RunURLs:      []string{strconv.FormatInt(diskCachedRunID, 10), strconv.FormatInt(jsonlCachedRunID, 10)},
+			OutputDir:    outputDir,
+			RepoOverride: "owner/repo",
+			CachedJSONL:  cachedJSONLPath,
+			ArtifactSets: []string{"usage"},
+		})
+	})
+
+	assert.Contains(t, stderr, "Runs: 2 discovered; reports: 0 downloaded, 2 skipped because cached analyses were reused")
 }
