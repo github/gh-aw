@@ -9,16 +9,16 @@ import (
 func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowData) error {
 	compilerYamlLog.Printf("Generating main job steps for workflow: %s", data.Name)
 
-	for _, line := range generateComponentExecutionEvidenceStep("agent", "not_started", agentExecutionEvidencePath, "") {
-		yaml.WriteString(line)
-	}
-
 	// Phase 1: Initial setup, checkout, and repository imports
 	checkoutMgr, needsCheckout, err := c.generateInitialAndCheckoutSteps(yaml, data)
 	if err != nil {
 		return err
 	}
 	compilerYamlLog.Printf("Initial and checkout steps generated (needsCheckout=%v)", needsCheckout)
+
+	for _, line := range generateComponentExecutionEvidenceStep("agent", "not_started", agentExecutionEvidencePath, "") {
+		yaml.WriteString(line)
+	}
 
 	// Phase 2: Runtime detection, custom steps, and workspace setup
 	customStepsContainCheckout := c.generateRuntimeAndWorkspaceSetupSteps(yaml, data, needsCheckout)

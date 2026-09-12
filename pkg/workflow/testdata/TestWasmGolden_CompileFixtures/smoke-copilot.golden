@@ -402,12 +402,6 @@ jobs:
           GH_AW_INFO_VERSION: "COPILOT_VERSION"
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "copilot"
-      - name: Initialize agent execution evidence
-        run: |
-          mkdir -p "/tmp/gh-aw"
-          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
-          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
-          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -442,6 +436,12 @@ jobs:
           tags: localhost/gh-aw:dev
           build-args: |
             BINARY=dist/gh-aw-linux-amd64
+      - name: Initialize agent execution evidence
+        run: |
+          mkdir -p "/tmp/gh-aw"
+          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
+          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
