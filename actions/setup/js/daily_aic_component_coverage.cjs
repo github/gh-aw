@@ -133,13 +133,17 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       continue;
     }
     const selectedIndex = candidateStates.findIndex(candidate => candidate.state === "non-empty");
+    const unreadableIndex = candidateStates.findIndex(candidate => candidate.state.startsWith("unreadable"));
     const selected = selectedIndex >= 0 ? candidates[selectedIndex] : "";
+    const candidateSummary = candidateStates.map(candidate => `${candidate.file} is ${candidate.state}`).join("; ");
+    if (unreadableIndex >= 0 && (selectedIndex < 0 || unreadableIndex < selectedIndex)) {
+      throw new Error(`Missing accounting for executed ${name} component in run ${runId} (attempt ${job.run_attempt}, job ${job.id}, conclusion ${job.conclusion}): ${candidateSummary}`);
+    }
     if (!selected) {
       if (provesExecutionNotStarted(directory, name, runId, job.run_attempt)) {
         logComponentAIC(runId, name, job, 0, "execution_not_started");
         continue;
       }
-      const candidateSummary = candidateStates.map(candidate => `${candidate.file} is ${candidate.state}`).join("; ");
       throw new Error(`Missing accounting for executed ${name} component in run ${runId} (attempt ${job.run_attempt}, job ${job.id}, conclusion ${job.conclusion}): ${candidateSummary}`);
     }
     const componentAIC = sumAICFromUsageJSONLFiles([selected], { strict: true });

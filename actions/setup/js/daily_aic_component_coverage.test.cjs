@@ -26,6 +26,7 @@ beforeEach(() => {
   global.core = { info: vi.fn(), warning: vi.fn() };
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(directory, { recursive: true, force: true });
   delete global.core;
 });
@@ -221,6 +222,17 @@ it("does not fall back to a valid summary when authoritative raw data is malform
     [job("agent")]
   );
   await expect(f.result).rejects.toThrow("could not be resolved");
+});
+
+it("does not fall back to a valid summary when authoritative raw data is unreadable", async () => {
+  const f = evaluate({}, [job("agent")]);
+  f.client.downloadArtifact.mockImplementation(async (_id, options) => {
+    fs.writeFileSync(path.join(options.path, "agent_usage.jsonl"), '{"aic":2}');
+    fs.mkdirSync(path.join(options.path, "agent/token_usage.jsonl"), { recursive: true });
+    return { downloadPath: options.path };
+  });
+
+  await expect(f.result).rejects.toThrow("agent/token_usage.jsonl is unreadable");
 });
 
 it("counts carried-forward agent usage and rerun detection once after a failed-only rerun", async () => {
