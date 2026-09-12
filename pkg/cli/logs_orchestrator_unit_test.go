@@ -860,7 +860,7 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 
 	// Run 2: JSONL cache hit — the run is only ever known via --cached-jsonl.
 	const jsonlCachedRunID int64 = 202
-	jsonlUpdatedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	jsonlUpdatedAt := time.Now().Add(-time.Hour).Truncate(time.Second)
 	cachedJSONLPath := filepath.Join(outputDir, "cached-logs.jsonl")
 	cachedRecord := fmt.Sprintf(
 		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
@@ -943,17 +943,17 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 
 	const diskCachedRunID int64 = 101
 	const jsonlCachedRunID int64 = 202
-	jsonlUpdatedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	jsonlUpdatedAt := time.Now().Add(-time.Hour).Truncate(time.Second)
 
 	fakeBinDir := t.TempDir()
 	fakeGH := filepath.Join(fakeBinDir, "gh")
 	fakeGHScript := "#!/bin/sh\n" +
 		"case \"$*\" in\n" +
-		fmt.Sprintf("  *runs/%d*) cat <<'EOF'\n", diskCachedRunID) +
+		fmt.Sprintf("  *\"/runs/%d --jq\"*) cat <<'EOF'\n", diskCachedRunID) +
 		fmt.Sprintf(`{"databaseId":%d,"number":1,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"Disk Cached","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:01:00Z","repository":"owner/repo"}`+"\n", diskCachedRunID, diskCachedRunID) +
 		"EOF\n" +
 		"    ;;\n" +
-		fmt.Sprintf("  *runs/%d*) cat <<'EOF'\n", jsonlCachedRunID) +
+		fmt.Sprintf("  *\"/runs/%d --jq\"*) cat <<'EOF'\n", jsonlCachedRunID) +
 		fmt.Sprintf(`{"databaseId":%d,"number":2,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"JSONL Cached","attempt":1,"createdAt":"2026-01-01T00:00:00Z","updatedAt":%q,"repository":"owner/repo"}`+"\n", jsonlCachedRunID, jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339)) +
 		"EOF\n" +
 		"    ;;\n" +
