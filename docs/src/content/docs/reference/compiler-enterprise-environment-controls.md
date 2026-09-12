@@ -7,7 +7,7 @@ sidebar:
 
 Use these variables to set organization- or repository-wide defaults without editing individual workflow frontmatter files.
 
-In this enterprise controls reference, OTLP defaults are the scope-sensitive exception: `GH_AW_DEFAULT_OTLP_ENDPOINT` can be a GitHub Actions variable at repository, organization, or enterprise scope, but OTLP secrets are limited to repository or organization scope.
+In this enterprise controls reference, OTLP defaults are the scope-sensitive exception: `GH_AW_DEFAULT_OTLP_ENDPOINT` can be a GitHub Actions variable at repository, organization, or enterprise scope, but the `GH_AW_DEFAULT_OTLP_ENDPOINT` and `GH_AW_DEFAULT_OTLP_HEADERS` secrets are limited to repository or organization scope.
 
 ## Enterprise Control Variables
 
