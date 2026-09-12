@@ -45,11 +45,11 @@ When a workflow does not configure `observability.otlp` (in its own frontmatter 
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | Secret or variable | OTLP endpoint URL used when no endpoint is configured in frontmatter |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | Secret | Exporter headers (`key=value` pairs, comma-separated) sent to that endpoint |
 
-Because both are resolved at run time, setting them at the repository, organization, or enterprise level enables telemetry for every agentic workflow without editing any workflow file.
+Because both are resolved at run time, setting them at the repository or organization level enables telemetry for every agentic workflow without editing any workflow file.
 
 Behavior:
 
-- The endpoint secret takes precedence over the variable when both are set.
+- The endpoint secret takes precedence over the variable when both are set; clear both values to disable OTLP export.
 - When both endpoint values are unset, the endpoint resolves to an empty string and OTLP export is a no-op.
 - When an endpoint is set but `GH_AW_DEFAULT_OTLP_HEADERS` is empty, no span is exported to that endpoint from any job (setup, conclusion, outcome, or MCP gateway) — the runtime treats an endpoint without matching credentials as unconfigured rather than exporting unauthenticated telemetry. The agent job additionally fails with an error so the misconfiguration is visible instead of silently degrading to no telemetry.
 - Any `observability.otlp` configuration in frontmatter or an import overrides these defaults entirely.

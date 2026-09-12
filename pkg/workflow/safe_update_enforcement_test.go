@@ -96,6 +96,20 @@ func TestEnforceSafeUpdate(t *testing.T) {
 			wantErr:     false,
 		},
 		{
+			name:        "compiler-injected OTLP endpoint secret alone is allowed",
+			manifest:    &GHAWManifest{Version: 1, Secrets: []string{}, Actions: []GHAWManifestAction{}},
+			secretNames: []string{"GH_AW_DEFAULT_OTLP_ENDPOINT"},
+			actionRefs:  []string{},
+			wantErr:     false,
+		},
+		{
+			name:        "compiler-injected OTLP headers secret alone is allowed",
+			manifest:    &GHAWManifest{Version: 1, Secrets: []string{}, Actions: []GHAWManifestAction{}},
+			secretNames: []string{"GH_AW_DEFAULT_OTLP_HEADERS"},
+			actionRefs:  []string{},
+			wantErr:     false,
+		},
+		{
 			name:        "GITHUB_TOKEN with secrets. prefix always allowed",
 			manifest:    &GHAWManifest{Version: 1, Secrets: []string{}, Actions: []GHAWManifestAction{}},
 			secretNames: []string{"secrets.GITHUB_TOKEN"},
