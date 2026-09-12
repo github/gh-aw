@@ -83,6 +83,21 @@ class PushSignedCommitsPolicyViolation extends Error {
 }
 
 /**
+ * Sentinel error class marking a terminal failure of the unsigned git push fallback that is
+ * attempted after a genuine (non-recoverable) rebase conflict. This must propagate as-is
+ * without triggering the generic "GraphQL failed, retry with git push" fallback further up —
+ * that push was already attempted (and rejected), so retrying it again would just repeat the
+ * same failure (e.g. against a branch-protection rule requiring signed commits).
+ */
+class PushSignedCommitsUnsignedFallbackFailed extends Error {
+  /** @param {string} message */
+  constructor(message, options) {
+    super(message, options);
+    this.name = "PushSignedCommitsUnsignedFallbackFailed";
+  }
+}
+
+/**
  * Unescape a C-quoted path returned by `git diff-tree --raw`.
  *
  * git wraps paths that contain special characters (spaces, non-ASCII bytes,
@@ -467,6 +482,14 @@ async function pushSignedCommits({
   }
   let shas = revListEntries.map(entry => entry.sha);
 
+  // When a genuine (non-recoverable) rebase conflict is hit below, the original un-rebased
+  // commit range is pushed unsigned instead of being replayed through GraphQL. Rather than
+  // returning immediately, that path sets this flag and falls through into the same
+  // preflight validation (merge commit / unsupported file mode / file-protection policy
+  // checks) that every other unsigned-push fallback goes through, so genuinely unsupported
+  // or policy-blocked content still refuses the fallback instead of being pushed as-is.
+  let unsignedPushFallbackReason;
+
   if (shas.length === 0) {
     core.info("pushSignedCommits: no new commits to push via GraphQL");
     return undefined;
@@ -564,16 +587,37 @@ async function pushSignedCommits({
         if (recovered) {
           rebaseResult = await runRebase();
           if (rebaseResult.exitCode !== 0) {
+            const retryOutput = `${rebaseResult.stdout || ""}\n${rebaseResult.stderr || ""}`;
             try {
               await exec.exec("git", ["rebase", "--abort"], { cwd });
-            } catch {
-              // Ignore cleanup failures.
+            } catch (abortError) {
+              throw new Error(
+                `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}) even after backfilling the required commit objects, ` +
+                  `and 'git rebase --abort' also failed to restore branch '${branch}' to its original state. ` +
+                  `Root cause: ${retryOutput.trim()}. Abort failure: ${getErrorMessage(abortError)}`,
+                { cause: abortError }
+              );
             }
-            const retryOutput = `${rebaseResult.stdout || ""}\n${rebaseResult.stderr || ""}`;
-            throw new Error(
-              `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}) even after backfilling the required commit objects. ` +
-                `Resolve conflicts by rebasing/cherry-picking locally and retry. Root cause: ${retryOutput.trim()}`
-            );
+            if (isPartialCloneObjectFailure(retryOutput)) {
+              // Still a missing-object failure even after the targeted backfill — the shallow/
+              // partial clone genuinely cannot supply what this rebase needs, so there is no
+              // valid replay range to fall back to unsigned; this remains fatal.
+              throw new Error(
+                `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}) even after backfilling the required commit objects. ` +
+                  `Resolve conflicts by rebasing/cherry-picking locally and retry. Root cause: ${retryOutput.trim()}`
+              );
+            }
+            // The backfill succeeded (the objects needed to attempt the rebase are now present),
+            // but retrying the rebase still failed — this is a genuine content conflict that was
+            // only revealed once the missing objects were available, not a partial-clone object
+            // issue. Route it through the same unsigned-push fallback as any other genuine
+            // conflict below, instead of unconditionally throwing.
+            const diagnosticMessage =
+              `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}) even after backfilling the required commit objects. ` + `Root cause: ${retryOutput.trim()}`;
+            if (allowGitPushFallback === false) {
+              throw new Error(`${ERR_SYSTEM}: ${diagnosticMessage} Resolve conflicts by rebasing/cherry-picking locally and retry.`);
+            }
+            unsignedPushFallbackReason = diagnosticMessage;
           }
         } else {
           throw new Error(
@@ -585,27 +629,52 @@ async function pushSignedCommits({
       } else {
         try {
           await exec.exec("git", ["rebase", "--abort"], { cwd });
-        } catch {
-          // Ignore cleanup failures.
+        } catch (abortError) {
+          // If the abort itself fails, HEAD can be left in a detached, partially-rebased or
+          // still-conflicted state. Continuing from there (falling through to the unsigned push
+          // fallback, or even the strict throw below) would risk operating on / pushing that
+          // broken worktree state, so this must be fatal rather than silently ignored.
+          throw new Error(
+            `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}), and 'git rebase --abort' also failed to restore branch '${branch}' to its original state. ` +
+              `Root cause: ${combinedOutput.trim()}. Abort failure: ${getErrorMessage(abortError)}`,
+            { cause: abortError }
+          );
         }
-        throw new Error(
-          `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}). ` + `Resolve conflicts by rebasing/cherry-picking locally and retry. Root cause: ${combinedOutput.trim()}`
-        );
+        const diagnosticMessage = `${ERR_SYSTEM}: pushSignedCommits: failed to rebase commit range onto current GraphQL parent (${firstGraphqlParentOid}). ` + `Root cause: ${combinedOutput.trim()}`;
+        if (allowGitPushFallback === false) {
+          throw new Error(`${ERR_SYSTEM}: ${diagnosticMessage} Resolve conflicts by rebasing/cherry-picking locally and retry.`);
+        }
+        // Genuine merge conflict (not a shallow/partial-clone object-fetch issue, and no custom
+        // resolver handled it): rebasing the commit range onto the current base cannot be done
+        // automatically, and replaying the stale-base commits through GraphQL would silently
+        // synthesize file content against the wrong parent. Rather than failing the whole
+        // operation (which previously forced callers to fall back to opening an issue instead
+        // of a pull request), fall through to push the ORIGINAL un-rebased commits directly via
+        // unsigned `git push` once they pass the same preflight validation (merge commit /
+        // unsupported file mode / file-protection policy) as any other unsigned push fallback.
+        // GitHub will still create the pull request; it will simply report the branch as having
+        // conflicts that need to be resolved, the same as any normal PR.
+        // `rebase --abort` (above) already restored HEAD and the branch to their original,
+        // un-rebased state, so revListEntries/shas (computed before the rebase attempt) still
+        // describe exactly what will be pushed — no need to recompute them.
+        unsignedPushFallbackReason = diagnosticMessage;
       }
     }
-    const { stdout: rebasedRevListOut } = await exec.getExecOutput("git", ["rev-list", "--parents", "--topo-order", "--reverse", `${firstGraphqlParentOid}..HEAD`], { cwd });
-    revListEntries = rebasedRevListOut
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map(line => {
-        const fields = line.split(" ");
-        return { line, fields, sha: fields[0] };
-      });
-    shas = revListEntries.map(entry => entry.sha);
-    if (shas.length === 0) {
-      core.info("pushSignedCommits: no new commits to replay after rebase");
-      return undefined;
+    if (!unsignedPushFallbackReason) {
+      const { stdout: rebasedRevListOut } = await exec.getExecOutput("git", ["rev-list", "--parents", "--topo-order", "--reverse", `${firstGraphqlParentOid}..HEAD`], { cwd });
+      revListEntries = rebasedRevListOut
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map(line => {
+          const fields = line.split(" ");
+          return { line, fields, sha: fields[0] };
+        });
+      shas = revListEntries.map(entry => entry.sha);
+      if (shas.length === 0) {
+        core.info("pushSignedCommits: no new commits to replay after rebase");
+        return undefined;
+      }
     }
   }
 
@@ -739,6 +808,32 @@ async function pushSignedCommits({
       deletionsMap.set(sha, deletions);
     }
 
+    // Enforce file-protection/size policy for every commit up front — before choosing between
+    // an unsigned push fallback and the GraphQL replay below — so a validationConfig-blocked
+    // file always refuses the unsigned push fallback, not just the GraphQL path.
+    for (const sha of shas) {
+      validateSynthesizedFileChanges(additionsMap.get(sha) || [], deletionsMap.get(sha) || [], validationConfig);
+    }
+
+    if (unsignedPushFallbackReason) {
+      // All commits in the original, un-rebased range passed the same merge-commit,
+      // unsupported-file-mode, and file-protection-policy checks as the GraphQL replay path
+      // above; push them directly via unsigned `git push` instead of replaying through GraphQL
+      // (which would synthesize file content against the wrong parent).
+      core.warning(`${unsignedPushFallbackReason} Falling back to an unsigned git push of the un-rebased commit(s) so the pull request can still be created (it will show as having merge conflicts with the base branch).`);
+      try {
+        const fallbackSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken });
+        core.info(`pushSignedCommits: unsigned git push fallback (unresolved rebase conflict) completed, using pushed SHA ${fallbackSha}`);
+        return fallbackSha;
+      } catch (pushError) {
+        // The unsigned push itself can be rejected (e.g. by branch protection rules requiring
+        // signed commits). Surface a clear, combined error instead of letting the raw git-push
+        // failure — or a misleading "success" — propagate; this preserves the original
+        // throw-on-conflict behavior for repos where an unsigned push is not a viable fallback.
+        throw new PushSignedCommitsUnsignedFallbackFailed(`${ERR_SYSTEM}: ${unsignedPushFallbackReason} Unsigned git push fallback was also rejected: ${getErrorMessage(pushError)}`, { cause: pushError });
+      }
+    }
+
     // All commits passed the mode checks. Replay via GraphQL.
     /** @type {string | undefined} */
     let lastOid;
@@ -814,7 +909,6 @@ async function pushSignedCommits({
 
       const additions = additionsMap.get(sha) || [];
       const deletions = deletionsMap.get(sha) || [];
-      validateSynthesizedFileChanges(additions, deletions, validationConfig);
       core.info(`pushSignedCommits: file changes: ${additions.length} addition(s), ${deletions.length} deletion(s)`);
 
       /** @type {any} */
@@ -842,6 +936,11 @@ async function pushSignedCommits({
     core.info(`pushSignedCommits: all ${shas.length} commit(s) pushed as signed commits`);
     return lastOid ?? shas[shas.length - 1];
   } catch (err) {
+    if (err instanceof PushSignedCommitsUnsignedFallbackFailed) {
+      // The unsigned push fallback for a genuine rebase conflict was already attempted (and
+      // rejected) above; re-throw as-is instead of retrying the same push again below.
+      throw err;
+    }
     if (err instanceof PushSignedCommitsUnsupportedShape) {
       throw new Error(
         `${ERR_VALIDATION}: pushSignedCommits: refusing unsigned push for branch '${branch}': ${stripLeadingErrorCode(getErrorMessage(err))}. ` +
