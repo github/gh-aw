@@ -107,10 +107,5 @@ func writeDrain3Weights(coordinator *agentdrain.Coordinator, outputDir string) e
 		return fmt.Errorf("log pattern training: write weights file: %w", err)
 	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Log pattern weights written to: "+outputPath))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
-		"To embed these weights as default, copy the file and rebuild:\n"+
-			"  cp "+outputPath+" pkg/agentdrain/data/default_weights.json\n"+
-			"  make build",
-	))
 	return nil
 }

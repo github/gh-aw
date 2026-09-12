@@ -125,6 +125,8 @@ func TestTrainDrain3Weights_LoadsExistingWeights(t *testing.T) {
 	})
 
 	assert.Contains(t, stderr, "Loaded log pattern weights from: "+weightsPath)
+	assert.NotContains(t, stderr, "To embed these weights as default")
+	assert.NotContains(t, stderr, "make build")
 	assert.FileExists(t, filepath.Join(outputDir, drain3WeightsFilename))
 }
 

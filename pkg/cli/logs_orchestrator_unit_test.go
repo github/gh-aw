@@ -806,6 +806,22 @@ func TestCurrentLogsGuardrailStatusReportsAllBoundaries(t *testing.T) {
 	assert.LessOrEqual(t, status.timeoutRemaining, time.Minute)
 }
 
+func TestLogsCollectionStatsReportsDiscoveredDownloadedAndCached(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordDiscovered(4)
+	stats.recordResult(DownloadResult{})
+	stats.recordResult(DownloadResult{Cached: true})
+	stats.recordResult(DownloadResult{Cached: true, CachedRun: &RunData{RunID: 42}})
+	stats.recordResult(DownloadResult{Skipped: true})
+
+	_, stderr := captureOutput(t, func() error {
+		renderLogsCollectionStats(stats)
+		return nil
+	})
+
+	assert.Contains(t, stderr, "Runs: 4 discovered; reports: 1 downloaded, 2 skipped because cached analyses were reused")
+}
+
 // TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange verifies that
 // --stdin honors --start-date/--end-date by pruning out-of-range cached run
 // records, mirroring the discovery-mode behavior in DownloadWorkflowLogs.

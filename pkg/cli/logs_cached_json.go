@@ -137,7 +137,13 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 }
 
 func prepareCachedLogsJSONL(opts *LogsDownloadOptions) error {
-	if opts.CachedJSONL == "" || opts.cachedJSONLWriter != nil {
+	if opts.CachedJSONL == "" {
+		return nil
+	}
+	if opts.collectionStats == nil {
+		opts.collectionStats = &logsCollectionStats{}
+	}
+	if opts.cachedJSONLWriter != nil {
 		return nil
 	}
 	cache, err := loadCachedLogsJSONL(opts.CachedJSONL)

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -34,6 +35,41 @@ type workflowRunBatch struct {
 	oldestFetchedCreatedAt time.Time
 }
 
+type logsCollectionStats struct {
+	discoveredRuns    atomic.Int64
+	downloadedReports atomic.Int64
+	cachedReports     atomic.Int64
+}
+
+func (s *logsCollectionStats) recordDiscovered(count int) {
+	if s != nil {
+		s.discoveredRuns.Add(int64(count))
+	}
+}
+
+func (s *logsCollectionStats) recordResult(result DownloadResult) {
+	if s == nil {
+		return
+	}
+	if result.Cached {
+		s.cachedReports.Add(1)
+		return
+	}
+	if !result.Skipped && result.Error == nil {
+		s.downloadedReports.Add(1)
+	}
+}
+
+func renderLogsCollectionStats(stats *logsCollectionStats) {
+	if stats == nil {
+		return
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+		"Runs: %d discovered; reports: %d downloaded, %d skipped because cached analyses were reused",
+		stats.discoveredRuns.Load(), stats.downloadedReports.Load(), stats.cachedReports.Load(),
+	)))
+}
+
 type processWorkflowRunBatchOptions struct {
 	count                  int
 	outputDir              string
@@ -50,6 +86,7 @@ type processWorkflowRunBatchOptions struct {
 	cachedRuns             cachedLogsRuns
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	countLimit             *logsCountLimit
+	collectionStats        *logsCollectionStats
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -355,6 +392,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	if err != nil {
 		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, err)
 	}
+	opts.collectionStats.recordDiscovered(len(batch.runs))
 	if len(batch.runs) == 0 {
 		cursor, shouldContinue, shouldStop := handleEmptyWorkflowRunBatch(batch, opts.Verbose)
 		if shouldStop {
@@ -384,6 +422,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		cachedRuns:             runtime.cachedRuns,
 		cachedJSONLWriter:      opts.cachedJSONLWriter,
 		countLimit:             opts.countLimit,
+		collectionStats:        opts.collectionStats,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	logProcessedWorkflowRunBatch(opts, runtime.fetchAllInRange, state.iteration, batchProcessed, len(state.processedRuns), opts.Verbose)
@@ -712,6 +751,7 @@ func (c *orderedLogsRunCollector) recordResult(index int, result DownloadResult)
 
 func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	result := c.pendingResults[index]
+	c.opts.collectionStats.recordResult(result)
 	if c.processedBase+c.acceptedCount >= c.opts.count || c.opts.countLimit.isReached() {
 		finalizeLogsRunDownload(c.opts.storageLimit, result)
 		return

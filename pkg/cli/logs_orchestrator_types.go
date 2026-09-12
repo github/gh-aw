@@ -69,6 +69,7 @@ type LogsDownloadOptions struct {
 	inheritTimeoutContext bool
 	cachedJSONLWriter     *cachedLogsJSONLWriter
 	cachedJSONLCache      *cachedLogsJSONLCache
+	collectionStats       *logsCollectionStats
 }
 
 type workflowLogsResult struct {

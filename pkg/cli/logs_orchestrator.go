@@ -310,6 +310,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	if err != nil {
 		return err
 	}
+	renderLogsCollectionStats(opts.collectionStats)
 	finishGitHubAPIRateLimitReport(ctx, apiRateLimit, opts.JSONOutput)
 	cacheGitHubAPIRateLimitReports(opts.cachedJSONLWriter, apiRateLimit)
 	if handled, err := handleEmptyProcessedRuns(result.processedRuns, opts, result.timeoutReached, result.storageLimitReached, result.continuation, nil, apiRateLimit, nil); handled || err != nil {

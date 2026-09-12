@@ -209,11 +209,14 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		gradersOnly:       opts.GradersOnly,
 	}
 	downloadResults := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{outputDir: opts.OutputDir, verbose: opts.Verbose, maxRuns: len(runs), repoOverride: opts.RepoOverride, artifactFilter: artifactFilter, evalsOnly: opts.EvalsOnly, artifactSets: opts.ArtifactSets, storageLimit: storageLimit, cachedRuns: cachedRuns, filters: filters})
+	collectionStats := &logsCollectionStats{}
+	collectionStats.recordDiscovered(len(runs))
 
 	// Process download results applying the same filters as DownloadWorkflowLogs.
 	var processedRuns []ProcessedRun
 	var storageLimitReached bool
 	for _, result := range downloadResults {
+		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
 			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
 			continue
@@ -268,6 +271,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 		finalizeLogsRunDownload(storageLimit, result)
+	}
+	if opts.CachedJSONL != "" {
+		renderLogsCollectionStats(collectionStats)
 	}
 
 	if len(processedRuns) == 0 {
