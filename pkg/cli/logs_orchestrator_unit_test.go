@@ -805,3 +805,29 @@ func TestCurrentLogsGuardrailStatusReportsAllBoundaries(t *testing.T) {
 	assert.Positive(t, status.timeoutRemaining)
 	assert.LessOrEqual(t, status.timeoutRemaining, time.Minute)
 }
+
+// TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange verifies that
+// --stdin honors --start-date/--end-date by pruning out-of-range cached run
+// records, mirroring the discovery-mode behavior in DownloadWorkflowLogs.
+func TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	outOfRangeRun := `{"schema_version":2,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T00:00:00Z"}}`
+	inRangeRun := `{"schema_version":2,"kind":"run","run":{"run_id":2,"created_at":"2026-09-05T00:00:00Z"}}`
+	previous := outOfRangeRun + "\n" + inRangeRun + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(previous), 0o600))
+
+	opts := StdinLogsOptions{
+		OutputDir:   t.TempDir(),
+		CachedJSONL: path,
+		StartDate:   "2026-09-01",
+		EndDate:     "2026-09-10",
+	}
+
+	require.NoError(t, DownloadWorkflowLogsFromStdin(context.Background(), opts))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+	assert.NotContains(t, content, `"run_id":1`)
+	assert.Contains(t, content, `"run_id":2`)
+}

@@ -391,6 +391,7 @@ func (w *cachedLogsJSONLWriter) filterDateRange(startDate, endDate string) error
 		var record cachedLogsJSONLRecord
 		if err := json.Unmarshal(trimmed, &record); err != nil ||
 			record.Kind != cachedLogsJSONLKindRun ||
+			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
 			filtered = append(filtered, line...)

@@ -22,7 +22,7 @@ import (
 // DownloadWorkflowLogsFromStdin fetches and processes workflow run logs for runs
 // provided as IDs or URLs, bypassing the GitHub API run-discovery step.
 // This is used when the --stdin flag is passed to the logs command.
-func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) error { //nolint:largefunc // Existing stdin orchestration remains centralized.
+func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (err error) { //nolint:largefunc // Existing stdin orchestration remains centralized.
 	logsOrchestratorLog.Printf("Starting stdin log download: runs=%d, outputDir=%s", len(opts.RunURLs), opts.OutputDir)
 
 	if err := ValidateArtifactSets(opts.ArtifactSets); err != nil {
@@ -50,6 +50,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		cachedRuns = nil
 	}
 	cachedJSONLWriter := newCachedLogsJSONLWriter(opts.CachedJSONL)
+	defer func() {
+		err = errors.Join(err, cachedJSONLWriter.filterDateRange(opts.StartDate, opts.EndDate))
+	}()
 
 	if err := ensureLogsGitignore(); err != nil {
 		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)

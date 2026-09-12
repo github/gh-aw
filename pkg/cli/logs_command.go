@@ -229,6 +229,8 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 	}
 	return StdinLogsOptions{
 		OutputDir:         values.OutputDir,
+		StartDate:         values.StartDate,
+		EndDate:           values.EndDate,
 		Engine:            values.Engine,
 		Runtime:           values.Runtime,
 		RepoOverride:      values.RepoOverride,

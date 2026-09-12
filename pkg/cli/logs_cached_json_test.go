@@ -278,7 +278,8 @@ func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
 	rateLimit := `{"schema_version":2,"kind":"github_api_rate_limit","rate_limit":{"host":"github.com"}}`
 	unknown := `{"schema_version":99,"kind":"future","value":"preserved"}`
 	withoutCreatedAt := `{"schema_version":2,"kind":"run","run":{"run_id":5}}`
-	previous := strings.Join([]string{oldRun, firstIncludedRun, lastIncludedRun, futureRun, workflowRuns, rateLimit, unknown, withoutCreatedAt}, "\n") + "\n"
+	futureSchemaRun := `{"schema_version":99,"kind":"run","run":{"run_id":7,"created_at":"2026-08-31T00:00:00Z"}}`
+	previous := strings.Join([]string{oldRun, firstIncludedRun, lastIncludedRun, futureRun, workflowRuns, rateLimit, unknown, withoutCreatedAt, futureSchemaRun}, "\n") + "\n"
 	require.NoError(t, os.WriteFile(path, []byte(previous), 0o600))
 	writer := newCachedLogsJSONLWriter(path)
 	appendedAt := time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC)
@@ -297,6 +298,7 @@ func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
 	assert.Contains(t, content, rateLimit)
 	assert.Contains(t, content, unknown)
 	assert.Contains(t, content, withoutCreatedAt)
+	assert.Contains(t, content, futureSchemaRun)
 	assert.Contains(t, content, `"run_id":6`)
 	assert.Contains(t, content, appendedAt.Format(time.RFC3339))
 	info, err := os.Stat(path)
