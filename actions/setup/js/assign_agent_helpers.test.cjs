@@ -508,7 +508,7 @@ describe("assign_agent_helpers.cjs", () => {
       const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
       const restClient = { request: mockRequest };
 
-      await assignAgentToIssue("id", "copilot-swe-agent[bot]", [], "copilot", null, "o3", "my-agent", "Follow the guidelines.", "main", restClient, taskContext, "otherorg/otherrepo", {}, true, "high");
+      await assignAgentToIssue("id", "copilot-swe-agent[bot]", [], "copilot", null, "future-model", "my-agent", "Follow the guidelines.", "main", restClient, taskContext, "otherorg/otherrepo", {}, true, "high");
 
       expect(mockRequest).toHaveBeenCalledWith(
         "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
@@ -518,30 +518,28 @@ describe("assign_agent_helpers.cjs", () => {
             base_branch: "main",
             custom_instructions: "Follow the guidelines.",
             custom_agent: "my-agent",
-            model: "o3",
+            model: "future-model",
             reasoning_effort: "high",
           },
         })
       );
     });
 
+    it.each(["none", "minimal", "low", "medium", "high", "xhigh"])("should support the %s reasoning_effort enum value", effort => {
+      expect(resolveReasoningEffort(effort)).toBe(effort);
+      expect(mockCore.warning).not.toHaveBeenCalled();
+    });
+
     it.each([
-      ["unsupported agent", "other", "o3", "high"],
-      ["unsupported model", "copilot", "claude-opus-4.6", "high"],
-      ["unsupported value", "copilot", "o3", "xhigh"],
-      ["empty value", "copilot", "o3", ""],
-      ["non-string value", "copilot", "o3", 42],
-    ])("should warn and omit reasoning_effort for %s", async (_case, agentName, model, effort) => {
-      expect(resolveReasoningEffort(agentName, model, effort)).toBeNull();
+      ["unsupported value", "extreme"],
+      ["empty value", ""],
+      ["non-string value", 42],
+    ])("should warn and omit reasoning_effort for %s", async (_case, effort) => {
+      expect(resolveReasoningEffort(effort)).toBeNull();
       expect(mockCore.warning).toHaveBeenCalledOnce();
     });
 
-    it("should support model-specific reasoning effort values", () => {
-      expect(resolveReasoningEffort("copilot", "gpt-5.2-codex", "xhigh")).toBe("xhigh");
-      expect(resolveReasoningEffort("copilot", "gpt-5-codex", "minimal")).toBe("minimal");
-    });
-
-    it("should omit unsupported reasoning_effort without changing other assignment fields", async () => {
+    it("should forward reasoning_effort without enforcing model capabilities", async () => {
       const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
       const restClient = { request: mockRequest };
 
@@ -553,10 +551,11 @@ describe("assign_agent_helpers.cjs", () => {
           agent_assignment: {
             base_branch: "main",
             model: "claude-opus-4.6",
+            reasoning_effort: "high",
           },
         })
       );
-      expect(mockCore.warning).toHaveBeenCalledOnce();
+      expect(mockCore.warning).not.toHaveBeenCalled();
     });
 
     it("should include agent_assignment with only the provided fields", async () => {

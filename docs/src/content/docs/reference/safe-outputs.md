@@ -1608,7 +1608,7 @@ safe-outputs:
   assign-to-agent:
     name: "copilot"            # default agent (default: "copilot")
     model: "o3"                # default AI model (default: "auto")
-    reasoning_effort: "high"   # optional model-specific value or expression
+    reasoning_effort: "high"   # optional enum value or expression
     custom-agent: "agent-id"   # default custom agent ID (optional)
     custom-instructions: "..."  # default custom instructions (optional)
     allowed: [copilot]         # restrict to specific agents (optional)
@@ -1621,7 +1621,7 @@ safe-outputs:
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }} # optional custom token for permissions
 ```
 
-`reasoning_effort` is forwarded only for compatible agents and models. It accepts model-specific strings and GitHub Actions expressions; invalid or unsupported runtime values produce a warning and are omitted without failing assignment.
+`reasoning_effort` accepts `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`, as well as GitHub Actions expressions. Valid values are forwarded without enforcing model-specific capabilities; invalid runtime values produce a warning and are omitted without failing assignment.
 
 See **[Copilot Cloud Agent](/gh-aw/reference/copilot-cloud-agent/#assign-to-agent)** for complete configuration options and authorization setup.
 

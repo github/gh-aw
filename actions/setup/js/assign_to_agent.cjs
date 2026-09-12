@@ -252,7 +252,7 @@ async function main(config = {}) {
           }
           parts.push(`**Agent:** ${item.agent || defaultAgent}`);
           if (defaultModel) parts.push(`**Model:** ${defaultModel}`);
-          const stagedReasoningEffort = resolveReasoningEffort(item.agent || defaultAgent, defaultModel, reasoningEffort);
+          const stagedReasoningEffort = resolveReasoningEffort(reasoningEffort);
           if (stagedReasoningEffort) parts.push(`**Reasoning Effort:** ${stagedReasoningEffort}`);
           if (defaultCustomAgent) parts.push(`**Custom Agent:** ${defaultCustomAgent}`);
           if (defaultCustomInstructions) parts.push(`**Custom Instructions:** ${defaultCustomInstructions}`);

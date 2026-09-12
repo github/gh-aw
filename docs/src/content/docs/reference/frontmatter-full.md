@@ -13862,9 +13862,9 @@ safe-outputs:
     # (optional)
     model: "example-value"
 
-    # Optional model-specific reasoning effort to forward to compatible agents and
-    # models. Supports literal values and GitHub Actions expressions. Invalid or
-    # unsupported runtime values are ignored with a warning.
+    # Optional reasoning effort to forward without model-specific capability checks.
+    # Supports none, minimal, low, medium, high, xhigh, and GitHub Actions
+    # expressions. Invalid runtime values are ignored with a warning.
     # (optional)
     reasoning_effort: "example-value"
 

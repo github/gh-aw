@@ -1181,7 +1181,7 @@ safe-outputs:
 - Agent creates PR in `octocat/codebase` (not in `octocat/issues`)
 - GraphQL mutation includes `agentAssignment.targetRepositoryId`
 - Enables issue tracking separate from code repositories
-- Compatible agents and models receive `reasoning_effort` in the REST `agent_assignment` object; invalid or unsupported values warn and are omitted
+- Valid `reasoning_effort` enum values are forwarded in the REST `agent_assignment` object without model-specific capability checks; invalid values warn and are omitted
 
 #### A.4 Staged Mode Preview
 

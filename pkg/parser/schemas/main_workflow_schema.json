@@ -9595,7 +9595,7 @@
                 },
                 "reasoning_effort": {
                   "type": "string",
-                  "description": "Optional model-specific reasoning effort to forward to compatible agents and models. Supports literal values and GitHub Actions expressions. Invalid or unsupported runtime values are ignored with a warning.",
+                  "description": "Optional reasoning effort to forward without model-specific capability checks. Supports none, minimal, low, medium, high, xhigh, and GitHub Actions expressions. Invalid runtime values are ignored with a warning.",
                   "examples": ["high", "${{ inputs.reasoning_effort }}"]
                 },
                 "custom-agent": {
