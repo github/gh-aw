@@ -40,13 +40,9 @@ const REASONING_EFFORT_VALUES = new Set(["none", "minimal", "low", "medium", "hi
 
 function resolveReasoningEffort(reasoningEffort) {
   if (reasoningEffort == null) return null;
-  if (typeof reasoningEffort !== "string") {
-    core.warning("Ignoring reasoning_effort: expected a string.");
-    return null;
-  }
 
-  const normalizedEffort = reasoningEffort.trim().toLowerCase();
-  if (!REASONING_EFFORT_VALUES.has(normalizedEffort)) {
+  const normalizedEffort = typeof reasoningEffort === "string" ? reasoningEffort.trim().toLowerCase() : null;
+  if (normalizedEffort == null || !REASONING_EFFORT_VALUES.has(normalizedEffort)) {
     core.warning(`Ignoring reasoning_effort: expected one of ${[...REASONING_EFFORT_VALUES].join(", ")}.`);
     return null;
   }
