@@ -504,7 +504,7 @@ describe("assign_agent_helpers.cjs", () => {
       });
     });
 
-    it("should include supported reasoning_effort while preserving existing fields", async () => {
+    it("should include supported reasoning effort while preserving existing fields", async () => {
       const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
       const restClient = { request: mockRequest };
 
@@ -525,7 +525,7 @@ describe("assign_agent_helpers.cjs", () => {
       );
     });
 
-    it.each(["none", "minimal", "low", "medium", "high", "xhigh"])("should support the %s reasoning_effort enum value", effort => {
+    it.each(["none", "minimal", "low", "medium", "high", "xhigh"])("should support the %s reasoning-effort enum value", effort => {
       expect(resolveReasoningEffort(effort)).toBe(effort);
       expect(mockCore.warning).not.toHaveBeenCalled();
     });
@@ -534,12 +534,12 @@ describe("assign_agent_helpers.cjs", () => {
       ["unsupported value", "extreme"],
       ["empty value", ""],
       ["non-string value", 42],
-    ])("should warn and omit reasoning_effort for %s", async (_case, effort) => {
+    ])("should warn and omit reasoning-effort for %s", async (_case, effort) => {
       expect(resolveReasoningEffort(effort)).toBeNull();
       expect(mockCore.warning).toHaveBeenCalledOnce();
     });
 
-    it("should forward reasoning_effort without enforcing model capabilities", async () => {
+    it("should forward reasoning effort without enforcing model capabilities", async () => {
       const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
       const restClient = { request: mockRequest };
 

@@ -64,7 +64,7 @@ permissions:
   contents: read
 safe-outputs:
   assign-to-agent:
-    reasoning_effort: "` + tt.value + `"
+    reasoning-effort: "` + tt.value + `"
 ---
 # Test Workflow
 `
@@ -88,7 +88,7 @@ permissions:
   contents: read
 safe-outputs:
   assign-to-agent:
-    reasoning_effort: 42
+    reasoning-effort: 42
 ---
 # Test Workflow
 `

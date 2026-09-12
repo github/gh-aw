@@ -15,7 +15,7 @@ safe-outputs:
   assign-to-agent:
     name: copilot
     model: o3
-    reasoning_effort: ${{ inputs.reasoning_effort }}
+    reasoning-effort: ${{ inputs.reasoning_effort }}
 strict: false
 ---
 

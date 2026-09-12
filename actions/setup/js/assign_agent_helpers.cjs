@@ -43,7 +43,7 @@ function resolveReasoningEffort(reasoningEffort) {
 
   const normalizedEffort = typeof reasoningEffort === "string" ? reasoningEffort.trim().toLowerCase() : null;
   if (normalizedEffort == null || !REASONING_EFFORT_VALUES.has(normalizedEffort)) {
-    core.warning(`Ignoring reasoning_effort: expected one of ${[...REASONING_EFFORT_VALUES].join(", ")}.`);
+    core.warning(`Ignoring reasoning-effort: expected one of ${[...REASONING_EFFORT_VALUES].join(", ")}.`);
     return null;
   }
   return normalizedEffort;

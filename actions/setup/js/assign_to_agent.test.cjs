@@ -67,7 +67,7 @@ describe("assign_to_agent", () => {
     if (process.env.GH_AW_AGENT_PULL_REQUEST_REPO?.trim()) _config["pull-request-repo"] = process.env.GH_AW_AGENT_PULL_REQUEST_REPO.trim();
     if (process.env.GH_AW_AGENT_ALLOWED_PULL_REQUEST_REPOS?.trim()) _config["allowed-pull-request-repos"] = process.env.GH_AW_AGENT_ALLOWED_PULL_REQUEST_REPOS.trim();
     if (process.env.GH_AW_AGENT_BASE_BRANCH?.trim()) _config["base-branch"] = process.env.GH_AW_AGENT_BASE_BRANCH.trim();
-    if (process.env.GH_AW_AGENT_REASONING_EFFORT != null) _config.reasoning_effort = process.env.GH_AW_AGENT_REASONING_EFFORT;
+    if (process.env.GH_AW_AGENT_REASONING_EFFORT != null) _config["reasoning-effort"] = process.env.GH_AW_AGENT_REASONING_EFFORT;
     if (process.env.GH_AW_ALLOWED_REPOS?.trim()) _config.allowed_repos = process.env.GH_AW_ALLOWED_REPOS.trim();
 
     let _handler;

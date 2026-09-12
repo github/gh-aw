@@ -153,7 +153,7 @@ async function main(config = {}) {
   }
   const defaultAgent = String(config.name ?? "copilot").trim();
   const defaultModel = config.model ? String(config.model).trim() : null;
-  const reasoningEffort = config.reasoning_effort ?? null;
+  const reasoningEffort = config["reasoning-effort"] ?? null;
   const defaultCustomAgent = config["custom-agent"] ? String(config["custom-agent"]).trim() : null;
   const defaultCustomInstructions = config["custom-instructions"] ? String(config["custom-instructions"]).trim() : null;
   const configuredBaseBranch = config["base-branch"] ? String(config["base-branch"]).trim() : null;
