@@ -79,6 +79,8 @@ func TestThreatDetectionStepsOrdering(t *testing.T) {
 		// Find the positions of key steps
 		preStepPos := strings.Index(stepsString, "Custom Pre Scan")
 		setupStepPos := strings.Index(stepsString, "Setup threat detection")
+		initializePos := strings.Index(stepsString, "Initialize detection execution evidence")
+		startedPos := strings.Index(stepsString, "Mark detection execution started")
 		uploadStepPos := strings.Index(stepsString, "Upload threat detection log")
 
 		// Verify all steps exist
@@ -90,6 +92,12 @@ func TestThreatDetectionStepsOrdering(t *testing.T) {
 		}
 		if uploadStepPos == -1 {
 			t.Error("Expected to find 'Upload threat detection log' step")
+		}
+		if initializePos < 0 || initializePos > preStepPos || startedPos < setupStepPos {
+			t.Error("Expected detection evidence to surround pre-execution setup")
+		}
+		if !strings.Contains(stepsString[uploadStepPos:], "if: always()") || !strings.Contains(stepsString[uploadStepPos:], "/tmp/gh-aw/threat-detection/execution.json") {
+			t.Error("Expected detection execution evidence to be uploaded after pre-execution failures")
 		}
 		if !strings.Contains(stepsString, "Parse and conclude threat detection") {
 			t.Error("Expected to find 'Parse and conclude threat detection' step")

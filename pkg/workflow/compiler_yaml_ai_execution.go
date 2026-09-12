@@ -2,10 +2,37 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
+
+const (
+	agentExecutionEvidencePath     = constants.TmpGhAwDirSlash + "agent_execution.json"
+	detectionExecutionEvidencePath = constants.ThreatDetectionDir + "/execution.json"
+)
+
+func generateComponentExecutionEvidenceStep(component, state, filePath, condition string) []string {
+	stepName := "Initialize " + component + " execution evidence"
+	if state == "started" {
+		stepName = "Mark " + component + " execution started"
+	}
+	lines := []string{
+		"      - name: " + stepName + "\n",
+	}
+	if condition != "" {
+		lines = append(lines, "        if: "+condition+"\n")
+	}
+	lines = append(lines,
+		"        run: |\n",
+		fmt.Sprintf("          mkdir -p %q\n", path.Dir(filePath)),
+		fmt.Sprintf("          evidence_tmp=%q\n", filePath+".tmp"),
+		fmt.Sprintf("          printf '{\"version\":1,\"component\":\"%s\",\"run_id\":%%s,\"run_attempt\":%%s,\"state\":\"%s\"}\\n' \"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\" > \"$evidence_tmp\"\n", component, state),
+		fmt.Sprintf("          mv \"$evidence_tmp\" %q\n", filePath),
+	)
+	return lines
+}
 
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine
 func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, logFile string) {
@@ -501,6 +528,11 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
+	if !data.UseSamples {
+		for _, line := range generateComponentExecutionEvidenceStep("agent", "started", agentExecutionEvidencePath, "") {
+			yaml.WriteString(line)
+		}
+	}
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
 
 	// Stop CLI proxy after AWF execution (always runs to ensure cleanup)

@@ -470,6 +470,12 @@ jobs:
             echo "GH_AW_SAFE_OUTPUTS_CONFIG_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/config.json"
             echo "GH_AW_SAFE_OUTPUTS_TOOLS_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/tools.json"
           } >> "$GITHUB_OUTPUT"
+      - name: Initialize agent execution evidence
+        run: |
+          mkdir -p "/tmp/gh-aw"
+          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
+          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Checkout repository
@@ -871,6 +877,12 @@ jobs:
           CLI_PROXY_IMAGE: 'ghcr.io/github/gh-aw-mcpg:v0.4.20'
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/start_cli_proxy.sh"
+      - name: Mark agent execution started
+        run: |
+          mkdir -p "/tmp/gh-aw"
+          evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
+          printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Execute Pi CLI
         id: agentic_execution
         timeout-minutes: 20
@@ -1120,6 +1132,7 @@ jobs:
           name: agent
           path: |
             /tmp/gh-aw/aw-prompts/prompt.txt
+            /tmp/gh-aw/agent_execution.json
             /tmp/gh-aw/pi-streaming.jsonl
             /tmp/gh-aw/redacted-urls.log
             /tmp/gh-aw/mcp-logs/
@@ -1466,6 +1479,12 @@ jobs:
         with:
           persist-credentials: false
       # --- Threat Detection ---
+      - name: Initialize detection execution evidence
+        run: |
+          mkdir -p "/tmp/gh-aw/threat-detection"
+          evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
+          printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
       - name: Clean stale firewall files from agent artifact
         run: |
           rm -rf /tmp/gh-aw/sandbox/firewall/logs
@@ -1535,6 +1554,13 @@ jobs:
         continue-on-error: true
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh" v0.5.1
+      - name: Mark detection execution started
+        if: always() && steps.detection_guard.outputs.run_detection == 'true'
+        run: |
+          mkdir -p "/tmp/gh-aw/threat-detection"
+          evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
+          printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
+          mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
       - name: Execute threat detection with AWF
         id: detection_agentic_execution
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
@@ -1634,12 +1660,13 @@ jobs:
           if [ -d /tmp/gh-aw/sandbox/firewall/logs ]; then mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall/logs && cp -r /tmp/gh-aw/sandbox/firewall/logs/. /tmp/gh-aw/threat-detection/sandbox/firewall/logs/; fi
           if [ -d /tmp/gh-aw/sandbox/firewall/audit ]; then mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall/audit && cp -r /tmp/gh-aw/sandbox/firewall/audit/. /tmp/gh-aw/threat-detection/sandbox/firewall/audit/; fi
       - name: Upload threat detection artifact
-        if: always() && steps.detection_guard.outputs.run_detection == 'true'
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: detection
           path: |
             /tmp/gh-aw/threat-detection/detection_result.json
+            /tmp/gh-aw/threat-detection/execution.json
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore

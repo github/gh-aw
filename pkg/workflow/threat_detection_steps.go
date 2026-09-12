@@ -14,7 +14,7 @@ import (
 // These steps run after the agent job completes and analyze agent output for threats using the
 // same agentic engine with sandbox.agent and fully blocked network.
 // The detection job downloads the agent artifact to access the output files.
-func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
+func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolint:largefunc // Detection step order remains intentionally explicit.
 	threatLog.Print("Building threat detection steps for detection job")
 	if data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil {
 		return nil
@@ -24,6 +24,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 
 	// Comment separator
 	steps = append(steps, "      # --- Threat Detection ---\n")
+	steps = append(steps, generateComponentExecutionEvidenceStep("detection", "not_started", detectionExecutionEvidencePath, "")...)
 
 	// Step 0: Clean stale firewall files left by the agent artifact download.
 	// The agent artifact populates sandbox/firewall/logs and sandbox/firewall/audit
@@ -83,6 +84,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 		steps = append(steps, c.buildInstallThreatDetectStep(data)...)
 
 		// Step 11: Run threat-detect under AWF with a read-write mount for the result file
+		steps = append(steps, generateComponentExecutionEvidenceStep("detection", "started", detectionExecutionEvidencePath, detectionStepCondition)...)
 		steps = append(steps, c.buildExternalDetectorExecutionStep(data)...)
 
 		// Step 11a: Render detection.log to the Actions log wrapped in group/stop-commands macros.
@@ -109,6 +111,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 		// Inline engine path (default)
 
 		// Step 7: Engine execution (AWF, no network)
+		steps = append(steps, generateComponentExecutionEvidenceStep("detection", "started", detectionExecutionEvidencePath, detectionStepCondition)...)
 		steps = append(steps, c.buildDetectionEngineExecutionStep(data)...)
 
 		// Step 7a: Echo detection step summary so the GitHub runner can mask any secrets.
@@ -505,12 +508,13 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 	detectionArtifactName := artifactPrefixExprForAgentDownstreamJob(data) + constants.DetectionArtifactName.String()
 	steps := []string{
 		"      - name: Upload threat detection log\n",
-		fmt.Sprintf("        if: %s\n", detectionStepCondition),
+		"        if: always()\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		"          name: " + detectionArtifactName + "\n",
 		"          path: |\n",
 		"            /tmp/gh-aw/threat-detection/detection.log\n",
+		"            " + detectionExecutionEvidencePath + "\n",
 	}
 	if isFirewallEnabled(data) {
 		steps = append(steps,

@@ -98,6 +98,47 @@ it.each(["skipped", "not-configured"])("accepts %s detection without requiring p
   await expect(f.result).resolves.toBe(2);
 });
 
+it.each(["agent", "detection"])("accepts provable zero usage when %s execution never started", async component => {
+  const f = evaluate(
+    {
+      [`${component}/execution.json`]: JSON.stringify({
+        version: 1,
+        component,
+        run_id: 1,
+        run_attempt: 1,
+        state: "not_started",
+      }),
+    },
+    component === "agent" ? [job("agent", { conclusion: "failure" })] : [job("agent", { conclusion: "skipped" }), job("detection", { conclusion: "failure" })]
+  );
+  await expect(f.result).resolves.toBe(0);
+});
+
+it.each([
+  ["started execution", { version: 1, component: "agent", run_id: 1, run_attempt: 1, state: "started" }],
+  ["malformed evidence", { version: 1, component: "agent", run_id: 1, run_attempt: 1 }],
+])("fails closed for missing accounting after %s", async (_name, evidence) => {
+  const f = evaluate({ "agent/execution.json": JSON.stringify(evidence) }, [job("agent", { conclusion: "failure" })]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent");
+});
+
+it("rejects stale zero-usage evidence from an earlier rerun attempt", async () => {
+  const f = evaluate(
+    {
+      "agent/execution.json": JSON.stringify({
+        version: 1,
+        component: "agent",
+        run_id: 1,
+        run_attempt: 1,
+        state: "not_started",
+      }),
+    },
+    [job("agent", { id: 10, run_attempt: 2, conclusion: "failure", started_at: later, completed_at: later })],
+    { attempt: 2, runStarted: later, producerTime: later }
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent");
+});
+
 it("selects raw accounting once per component instead of summing overlapping summaries", async () => {
   const f = evaluate(
     {

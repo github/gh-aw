@@ -617,12 +617,13 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	detectionArtifactName := artifactPrefixExprForAgentDownstreamJob(data) + constants.DetectionArtifactName.String()
 	steps := []string{
 		"      - name: Upload threat detection artifact\n",
-		fmt.Sprintf("        if: %s\n", detectionStepCondition),
+		"        if: always()\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		"          name: " + detectionArtifactName + "\n",
 		"          path: |\n",
 		"            " + constants.ThreatDetectionResultPath + "\n",
+		"            " + detectionExecutionEvidencePath + "\n",
 	}
 	// Include the detection AWF run's own firewall proxy/audit logs (token usage, squid
 	// logs) so detection-phase usage surfaces in the usage artifact and counts toward the
