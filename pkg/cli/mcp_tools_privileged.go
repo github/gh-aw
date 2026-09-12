@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -116,7 +117,29 @@ type logsArgs struct {
 	MaxStorageMB          int      `json:"max_storage,omitempty" jsonschema:"Maximum logs storage in MB after pruning non-essential cache data (0 means unlimited)."`
 	PruneOlderRuns        bool     `json:"prune_older_runs,omitempty" jsonschema:"Remove oldest completed runs when non-essential cache pruning cannot satisfy max_storage."`
 	MaxTokens             int      `json:"max_tokens,omitempty" jsonschema:"Deprecated: accepted for backward compatibility but ignored. Output is always written to a file."`
-	Artifacts             []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: usage). Valid sets: all, activation, agent, detection, evals, experiment, firewall, github-api, graders, mcp, usage"`
+	Artifacts             []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: info,usage). Valid sets: all, activation, agent, detection, evals, experiment, firewall, github-api, graders, info, mcp, usage. The compact usage set is always added so per-run token_usage is populated."`
+}
+
+// defaultMCPLogsToolArtifacts is the artifact selection used when the caller does
+// not request specific sets.  The compact "info" artifact supplies run metadata and
+// the compact "usage" artifact supplies per-run token usage (token_usage.jsonl /
+// agent_usage.json).  Without the usage set every run reports zero tokens, which
+// silently breaks fleet-analytics reports that aggregate token usage from the run list.
+var defaultMCPLogsToolArtifacts = []string{string(ArtifactSetInfo), string(ArtifactSetUsage)}
+
+// effectiveMCPLogsToolArtifacts resolves the artifact sets the logs tool downloads.
+// Callers that omit the parameter get the defaults; callers that request specific
+// sets always get the compact usage set added so token usage stays populated.
+func effectiveMCPLogsToolArtifacts(artifacts []string) []string {
+	if len(artifacts) == 0 {
+		return slices.Clone(defaultMCPLogsToolArtifacts)
+	}
+	for _, set := range artifacts {
+		if ArtifactSet(set) == ArtifactSetAll || ArtifactSet(set) == ArtifactSetUsage {
+			return artifacts
+		}
+	}
+	return append(append([]string(nil), artifacts...), string(ArtifactSetUsage))
 }
 
 func defaultMCPLogsToolTimeoutMinutesForCount(count int) int {
@@ -171,7 +194,7 @@ func registerLogsTool(server *mcp.Server, execCmd execCmdFunc, actor string, val
 	logsSchema, err := generateSchemaWithDefaults[logsArgs](map[string]any{
 		"count":      defaultMCPLogsToolCount,
 		"max_tokens": 12000,
-		"artifacts":  []string{"info"},
+		"artifacts":  defaultMCPLogsToolArtifacts,
 	})
 	if err != nil {
 		mcpLog.Printf("Failed to generate logs tool schema: %v", err)
@@ -213,7 +236,12 @@ When results are incomplete, the tool response also sets "partial": true and rep
 "continuation" cursor inline, so partial results can be detected without reading the file.
 
 The continuation field includes all necessary parameters (before_run_id, etc.) to resume fetching
-from where the previous request stopped due to timeout.`
+from where the previous request stopped due to timeout.
+
+Each run record includes a "token_usage" field (input+output tokens) and an "aic" field.
+Both are always present, so aggregating them across runs yields real fleet-level metrics.
+The compact "usage" artifact set is downloaded by default (and added to any explicit
+artifact selection) because it carries the per-run token usage data.`
 
 // newLogsToolHandler builds the handler for the logs tool.
 func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) func(context.Context, *mcp.CallToolRequest, logsArgs) (*mcp.CallToolResult, any, error) {
@@ -382,8 +410,8 @@ func appendLogsFilterArgs(cmdArgs []string, args logsArgs) []string {
 	if args.PruneOlderRuns {
 		cmdArgs = append(cmdArgs, "--prune-older-runs")
 	}
-	if len(args.Artifacts) > 0 {
-		cmdArgs = append(cmdArgs, "--artifacts", strings.Join(args.Artifacts, ","))
+	if artifacts := effectiveMCPLogsToolArtifacts(args.Artifacts); len(artifacts) > 0 {
+		cmdArgs = append(cmdArgs, "--artifacts", strings.Join(artifacts, ","))
 	}
 	return cmdArgs
 }

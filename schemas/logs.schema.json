@@ -997,6 +997,8 @@
               "workflow_path",
               "status",
               "classification",
+              "token_usage",
+              "aic",
               "created_at",
               "url",
               "logs_path",

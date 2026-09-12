@@ -940,6 +940,47 @@ func TestAccessLogSummaryJSONUsesEmbeddedBaseFields(t *testing.T) {
 	}
 }
 
+// TestRunDataJSONIncludesZeroTokenUsageAndAIC is a regression guard for the bug where
+// TokenUsage/AIC used `omitempty` and silently dropped out of the JSON output whenever
+// a run genuinely recorded zero tokens, making "field absent" indistinguishable from
+// "no tokens recorded". Marshaling a zero-metric RunData must still surface both keys.
+func TestRunDataJSONIncludesZeroTokenUsageAndAIC(t *testing.T) {
+	run := RunData{
+		RunID:        1,
+		WorkflowName: "wf-1",
+		WorkflowPath: ".github/workflows/wf-1.md",
+		Status:       "completed",
+		TokenUsage:   0,
+		AIC:          0,
+	}
+
+	data, err := json.Marshal(run)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+
+	tokenUsage, ok := got["token_usage"]
+	if !ok {
+		t.Fatalf("expected token_usage key to be present in %s", string(data))
+	}
+	if tokenUsage != float64(0) {
+		t.Fatalf("expected token_usage = 0, got %v", tokenUsage)
+	}
+
+	aic, ok := got["aic"]
+	if !ok {
+		t.Fatalf("expected aic key to be present in %s", string(data))
+	}
+	if aic != float64(0) {
+		t.Fatalf("expected aic = 0, got %v", aic)
+	}
+}
+
 // TestBuildFirewallLogSummaryWithSharedHelper tests firewall log summary with shared helper
 func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
 	processedRuns := []ProcessedRun{

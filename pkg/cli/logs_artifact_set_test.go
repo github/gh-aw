@@ -416,6 +416,30 @@ func TestIsInfoOnlyArtifactFilter(t *testing.T) {
 	}
 }
 
+func TestIsInfoWithOptionalUsageArtifactFilter(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		filter   []string
+		expected bool
+	}{
+		{name: "info only", filter: []string{"info"}, expected: true},
+		{name: "info plus usage", filter: []string{"info", "usage"}, expected: true},
+		{name: "usage plus info reversed order", filter: []string{"usage", "info"}, expected: true},
+		{name: "info plus another artifact", filter: []string{"info", "agent"}, expected: false},
+		{name: "usage only", filter: []string{"usage"}, expected: false},
+		{name: "non-info only", filter: []string{"agent"}, expected: false},
+		{name: "empty filter", filter: nil, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, isInfoWithOptionalUsageArtifactFilter(tt.filter))
+		})
+	}
+}
+
 func TestShouldDownloadWorkflowRunLogs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -20,7 +20,7 @@ features:
   gh-aw-detection: true
 
 network:
-  allowed: [defaults, go]
+  allowed: [defaults, go, node]
 
 model: claude-sonnet-5
 engine:

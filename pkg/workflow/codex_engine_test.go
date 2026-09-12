@@ -75,9 +75,12 @@ func TestCodexEngine_ResolveLLMProviderFromModel(t *testing.T) {
 
 func TestCodexModelID(t *testing.T) {
 	tests := map[string]string{
-		"copilot/auto":    "auto",
-		"copilot/gpt-5.4": "gpt-5.4",
-		"gpt-5-codex":     "gpt-5-codex",
+		"copilot/auto":          "auto",
+		"copilot/gpt-5.4":       "gpt-5.4",
+		"gpt-5-codex":           "gpt-5-codex",
+		"openai/gpt-5.3-codex":  "gpt-5.3-codex",
+		"OpenAI/gpt-5.2-codex":  "gpt-5.2-codex",
+		"anthropic/claude-opus": "anthropic/claude-opus",
 	}
 
 	for model, expected := range tests {

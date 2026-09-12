@@ -150,11 +150,13 @@ type RunData struct {
 	//                   turns were observed, or job metadata shows agent=success followed
 	//                   by a failed safe_outputs job.
 	// ""              – the run did not fail (success), or turn data was unavailable for classification.
-	FailureKind                string                 `json:"failure_kind,omitempty" console:"-"`
-	Duration                   string                 `json:"duration,omitempty" console:"header:Duration,omitempty"`
-	ActionMinutes              float64                `json:"action_minutes,omitempty" console:"header:Action Minutes,omitempty"`
-	TokenUsage                 int                    `json:"token_usage,omitempty" console:"header:Tokens,format:number,omitempty"`
-	AIC                        float64                `json:"aic,omitempty"`
+	FailureKind   string  `json:"failure_kind,omitempty" console:"-"`
+	Duration      string  `json:"duration,omitempty" console:"header:Duration,omitempty"`
+	ActionMinutes float64 `json:"action_minutes,omitempty" console:"header:Action Minutes,omitempty"`
+	// TokenUsage is always emitted (even when 0) so consumers of the run list can
+	// discover the field and distinguish "no tokens recorded" from "field absent".
+	TokenUsage                 int                    `json:"token_usage" console:"header:Tokens,format:number,omitempty"`
+	AIC                        float64                `json:"aic"`
 	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
 	WSRF                       string                 `json:"-" console:"header:WSRF,omitempty"` // Working-Set Rebuild Factor, pre-formatted for table display
