@@ -80,7 +80,11 @@ func TestThreatDetectionStepsOrdering(t *testing.T) {
 		preStepPos := strings.Index(stepsString, "Custom Pre Scan")
 		setupStepPos := strings.Index(stepsString, "Setup threat detection")
 		initializePos := strings.Index(stepsString, "Initialize detection execution evidence")
-		startedPos := strings.Index(stepsString, "Mark detection execution started")
+		engineStepPos := strings.Index(stepsString, "id: detection_agentic_execution")
+		startedPos := -1
+		if engineStepPos >= 0 {
+			startedPos = strings.Index(stepsString[engineStepPos:], `"state":"started"`)
+		}
 		uploadStepPos := strings.Index(stepsString, "Upload threat detection log")
 
 		// Verify all steps exist
@@ -93,8 +97,8 @@ func TestThreatDetectionStepsOrdering(t *testing.T) {
 		if uploadStepPos == -1 {
 			t.Error("Expected to find 'Upload threat detection log' step")
 		}
-		if initializePos < 0 || initializePos > preStepPos || startedPos < setupStepPos {
-			t.Error("Expected detection evidence to surround pre-execution setup")
+		if initializePos < 0 || initializePos > preStepPos || engineStepPos < setupStepPos || startedPos < 0 {
+			t.Error("Expected detection evidence to initialize before setup and start inside engine execution")
 		}
 		if !strings.Contains(stepsString[uploadStepPos:], "if: always()") || !strings.Contains(stepsString[uploadStepPos:], "/tmp/gh-aw/threat-detection/execution.json") {
 			t.Error("Expected detection execution evidence to be uploaded after pre-execution failures")

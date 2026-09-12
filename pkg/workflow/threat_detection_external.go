@@ -531,6 +531,9 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
 	steps = append(steps, "        run: |\n")
+	for _, line := range componentExecutionEvidenceShellLines("detection", "started", detectionExecutionEvidencePath) {
+		steps = append(steps, "          "+line+"\n")
+	}
 	for _, line := range strings.SplitAfter(command, "\n") {
 		if line == "" {
 			continue

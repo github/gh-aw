@@ -84,7 +84,6 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 		steps = append(steps, c.buildInstallThreatDetectStep(data)...)
 
 		// Step 11: Run threat-detect under AWF with a read-write mount for the result file
-		steps = append(steps, generateComponentExecutionEvidenceStep("detection", "started", detectionExecutionEvidencePath, detectionStepCondition)...)
 		steps = append(steps, c.buildExternalDetectorExecutionStep(data)...)
 
 		// Step 11a: Render detection.log to the Actions log wrapped in group/stop-commands macros.
@@ -111,7 +110,6 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 		// Inline engine path (default)
 
 		// Step 7: Engine execution (AWF, no network)
-		steps = append(steps, generateComponentExecutionEvidenceStep("detection", "started", detectionExecutionEvidencePath, detectionStepCondition)...)
 		steps = append(steps, c.buildDetectionEngineExecutionStep(data)...)
 
 		// Step 7a: Echo detection step summary so the GitHub runner can mask any secrets.

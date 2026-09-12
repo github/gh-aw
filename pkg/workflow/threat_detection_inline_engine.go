@@ -215,6 +215,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		for _, line := range step {
 			if strings.Contains(line, "id: agentic_execution") {
 				isAWFExecutionStep = true
+				step = injectComponentExecutionStarted(step, "detection", detectionExecutionEvidencePath)
 				break
 			}
 		}

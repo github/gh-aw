@@ -34,6 +34,47 @@ func generateComponentExecutionEvidenceStep(component, state, filePath, conditio
 	return lines
 }
 
+func componentExecutionEvidenceShellLines(component, state, filePath string) []string {
+	return []string{
+		fmt.Sprintf("mkdir -p %q", path.Dir(filePath)),
+		fmt.Sprintf("evidence_tmp=%q", filePath+".tmp"),
+		fmt.Sprintf("printf '{\"version\":1,\"component\":\"%s\",\"run_id\":%%s,\"run_attempt\":%%s,\"state\":\"%s\"}\\n' \"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\" > \"$evidence_tmp\"", component, state),
+		fmt.Sprintf("mv \"$evidence_tmp\" %q", filePath),
+	}
+}
+
+func injectComponentExecutionStarted(step GitHubActionStep, component, filePath string) GitHubActionStep {
+	runIndex := -1
+	for i, line := range step {
+		if strings.TrimSpace(line) == "run: |" {
+			runIndex = i
+			break
+		}
+	}
+	if runIndex < 0 {
+		return step
+	}
+
+	insertIndex := runIndex + 1
+	for insertIndex < len(step) {
+		trimmed := strings.TrimSpace(step[insertIndex])
+		if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
+			insertIndex++
+			continue
+		}
+		break
+	}
+
+	startedLines := componentExecutionEvidenceShellLines(component, "started", filePath)
+	injected := make(GitHubActionStep, 0, len(step)+len(startedLines))
+	injected = append(injected, step[:insertIndex]...)
+	for _, line := range startedLines {
+		injected = append(injected, "          "+line)
+	}
+	injected = append(injected, step[insertIndex:]...)
+	return injected
+}
+
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine
 func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, logFile string) {
 	// --use-samples (hidden) replaces the agent step with a deterministic driver
@@ -49,6 +90,12 @@ func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *Wor
 	compilerYamlLog.Printf("Generating engine execution steps: engine=%s, steps=%d", engine.GetID(), len(steps))
 
 	for _, step := range steps {
+		for _, line := range step {
+			if strings.Contains(line, "id: agentic_execution") {
+				step = injectComponentExecutionStarted(step, "agent", agentExecutionEvidencePath)
+				break
+			}
+		}
 		for _, line := range step {
 			yaml.WriteString(line)
 			yaml.WriteByte('\n')
@@ -528,11 +575,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
-	if !data.UseSamples {
-		for _, line := range generateComponentExecutionEvidenceStep("agent", "started", agentExecutionEvidencePath, "") {
-			yaml.WriteString(line)
-		}
-	}
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
 
 	// Stop CLI proxy after AWF execution (always runs to ensure cleanup)

@@ -225,9 +225,12 @@ Pre-agent failure accounting test`
 	lockStr := string(lockContent)
 	initialize := strings.Index(lockStr, "name: Initialize agent execution evidence")
 	failure := strings.Index(lockStr, "name: Fail before agent execution")
-	started := strings.Index(lockStr, "name: Mark agent execution started")
 	execution := strings.Index(lockStr, "id: agentic_execution")
-	if initialize < 0 || failure <= initialize || started <= failure || execution <= started {
+	started := -1
+	if execution >= 0 {
+		started = strings.Index(lockStr[execution:], `"state":"started"`)
+	}
+	if initialize < 0 || failure <= initialize || execution <= failure || started < 0 {
 		t.Fatalf("expected execution evidence to prove a setup failure occurred before agent execution")
 	}
 	if !strings.Contains(lockStr, "/tmp/gh-aw/agent_execution.json") {
