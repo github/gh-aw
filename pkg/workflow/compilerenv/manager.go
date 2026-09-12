@@ -80,9 +80,9 @@ const (
 	// when rendering local times in CLI output.
 	DefaultUTC = "GH_AW_DEFAULT_UTC"
 
-	// DefaultOTLPEndpoint is the GitHub Actions variable used as the fallback
-	// OTLP endpoint when observability.otlp.endpoint is not configured in
-	// workflow frontmatter (or any imported workflow).
+	// DefaultOTLPEndpoint is the GitHub Actions secret or variable used as the
+	// fallback OTLP endpoint when observability.otlp.endpoint is not configured
+	// in workflow frontmatter (or any imported workflow).
 	DefaultOTLPEndpoint = "GH_AW_DEFAULT_OTLP_ENDPOINT"
 	// DefaultOTLPHeaders is the GitHub Actions secret used as the fallback OTLP
 	// exporter headers (comma-separated key=value pairs) that accompany
@@ -272,12 +272,13 @@ func BuildDefaultMaxTurnsExpression() string {
 	return fmt.Sprintf("${{ vars.%s || '' }}", DefaultMaxTurns)
 }
 
-// BuildDefaultOTLPEndpointExpression builds a vars expression that resolves the
-// OTLP endpoint at runtime from the GH_AW_DEFAULT_OTLP_ENDPOINT GitHub variable.
-// The expression evaluates to an empty string when the variable is unset, which
-// downstream runtime code treats as "observability disabled".
+// BuildDefaultOTLPEndpointExpression builds an expression that resolves the OTLP
+// endpoint at runtime from the GH_AW_DEFAULT_OTLP_ENDPOINT GitHub secret, falling
+// back to the variable for compatibility. The expression evaluates to an empty
+// string when both are unset, which downstream runtime code treats as
+// "observability disabled".
 func BuildDefaultOTLPEndpointExpression() string {
-	return fmt.Sprintf("${{ vars.%s }}", DefaultOTLPEndpoint)
+	return fmt.Sprintf("${{ secrets.%s || vars.%s }}", DefaultOTLPEndpoint, DefaultOTLPEndpoint)
 }
 
 // BuildDefaultOTLPHeadersExpression builds a secrets expression that resolves the

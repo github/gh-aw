@@ -123,6 +123,13 @@ func TestBuildDefaultMaxTurnsExpression(t *testing.T) {
 	)
 }
 
+func TestBuildDefaultOTLPEndpointExpression(t *testing.T) {
+	assert.Equal(t,
+		"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}",
+		BuildDefaultOTLPEndpointExpression(),
+	)
+}
+
 func TestBuildTimeoutMinutesExpression(t *testing.T) {
 	assert.Equal(t,
 		"${{ fromJSON(vars.GH_AW_DEFAULT_TIMEOUT_MINUTES || '20') }}",

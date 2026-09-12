@@ -43,6 +43,62 @@ This workflow tests canonical 'name' key.
 	assert.Equal(t, "copilot", workflowData.SafeOutputs.AssignToAgent.DefaultAgent, "Should parse 'name' key as DefaultAgent")
 }
 
+func TestAssignToAgentReasoningEffort(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{name: "literal", value: "high"},
+		{name: "model specific", value: "xhigh"},
+		{name: "expression", value: "${{ inputs.reasoning_effort }}"},
+		{name: "empty", value: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "assign-to-agent-reasoning-effort")
+			workflow := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  assign-to-agent:
+    reasoning-effort: "` + tt.value + `"
+---
+# Test Workflow
+`
+			testFile := filepath.Join(tmpDir, "test-assign-to-agent.md")
+			require.NoError(t, os.WriteFile(testFile, []byte(workflow), 0644))
+
+			workflowData, err := NewCompiler(WithVersion("1.0.0")).ParseWorkflowFile(testFile)
+			require.NoError(t, err)
+			require.NotNil(t, workflowData.SafeOutputs.AssignToAgent)
+			assert.Equal(t, tt.value, workflowData.SafeOutputs.AssignToAgent.ReasoningEffort)
+		})
+	}
+}
+
+func TestAssignToAgentReasoningEffortRejectsNonString(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "assign-to-agent-reasoning-effort-invalid")
+	workflow := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  assign-to-agent:
+    reasoning-effort: 42
+---
+# Test Workflow
+`
+	testFile := filepath.Join(tmpDir, "test-assign-to-agent.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(workflow), 0644))
+
+	_, err := NewCompiler(WithVersion("1.0.0")).ParseWorkflowFile(testFile)
+	require.Error(t, err)
+}
+
 // TestAssignToAgentInHandlerManagerStep verifies that assign_to_agent is processed within
 // the handler manager step (process_safe_outputs) and that the safe_outputs job exports
 // the required assign_to_agent outputs for the conclusion job.

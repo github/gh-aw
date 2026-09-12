@@ -33,8 +33,20 @@ const mockGithub = {
 globalThis.core = mockCore;
 globalThis.github = mockGithub;
 
-const { AGENT_LOGIN_NAMES, getAgentName, getAgentLogins, getAvailableAgentLogins, getAssignableBots, findAgent, getIssueDetails, getPullRequestDetails, assignAgentToIssue, generatePermissionErrorSummary, assignAgentToIssueByName } =
-  await import("./assign_agent_helpers.cjs");
+const {
+  AGENT_LOGIN_NAMES,
+  getAgentName,
+  getAgentLogins,
+  getAvailableAgentLogins,
+  getAssignableBots,
+  findAgent,
+  getIssueDetails,
+  getPullRequestDetails,
+  assignAgentToIssue,
+  resolveReasoningEffort,
+  generatePermissionErrorSummary,
+  assignAgentToIssueByName,
+} = await import("./assign_agent_helpers.cjs");
 
 describe("assign_agent_helpers.cjs", () => {
   const originalPromptsDir = process.env.GH_AW_PROMPTS_DIR;
@@ -490,6 +502,60 @@ describe("assign_agent_helpers.cjs", () => {
           model: "claude-opus-4.6",
         },
       });
+    });
+
+    it("should include supported reasoning effort while preserving existing fields", async () => {
+      const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
+      const restClient = { request: mockRequest };
+
+      await assignAgentToIssue("id", "copilot-swe-agent[bot]", [], "copilot", null, "future-model", "my-agent", "Follow the guidelines.", "main", restClient, taskContext, "otherorg/otherrepo", {}, true, "high");
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+        expect.objectContaining({
+          agent_assignment: {
+            target_repo: "otherorg/otherrepo",
+            base_branch: "main",
+            custom_instructions: "Follow the guidelines.",
+            custom_agent: "my-agent",
+            model: "future-model",
+            reasoning_effort: "high",
+          },
+        })
+      );
+    });
+
+    it.each(["none", "minimal", "low", "medium", "high", "xhigh"])("should support the %s reasoning-effort enum value", effort => {
+      expect(resolveReasoningEffort(effort)).toBe(effort);
+      expect(mockCore.warning).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["unsupported value", "extreme"],
+      ["empty value", ""],
+      ["non-string value", 42],
+    ])("should warn and omit reasoning-effort for %s", async (_case, effort) => {
+      expect(resolveReasoningEffort(effort)).toBeNull();
+      expect(mockCore.warning).toHaveBeenCalledOnce();
+    });
+
+    it("should forward reasoning effort without enforcing model capabilities", async () => {
+      const mockRequest = vi.fn().mockResolvedValue({ status: 201 });
+      const restClient = { request: mockRequest };
+
+      await assignAgentToIssue("id", "copilot-swe-agent[bot]", [], "copilot", null, "claude-opus-4.6", null, null, "main", restClient, taskContext, null, {}, true, "high");
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+        expect.objectContaining({
+          agent_assignment: {
+            base_branch: "main",
+            model: "claude-opus-4.6",
+            reasoning_effort: "high",
+          },
+        })
+      );
+      expect(mockCore.warning).not.toHaveBeenCalled();
     });
 
     it("should include agent_assignment with only the provided fields", async () => {

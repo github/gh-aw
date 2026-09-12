@@ -12,6 +12,7 @@ type AssignToAgentConfig struct {
 	SafeOutputTargetConfig    `yaml:",inline"`
 	DefaultAgent              string   `yaml:"name,omitempty"`                       // Default agent to assign (e.g., "copilot")
 	DefaultModel              string   `yaml:"model,omitempty"`                      // Default AI model to use (e.g., "claude-sonnet-5")
+	ReasoningEffort           string   `yaml:"reasoning-effort,omitempty"`           // Optional reasoning effort
 	DefaultCustomAgent        string   `yaml:"custom-agent,omitempty"`               // Default custom agent ID for custom agents
 	DefaultCustomInstructions string   `yaml:"custom-instructions,omitempty"`        // Default custom instructions for the agent
 	Allowed                   []string `yaml:"allowed,omitempty"`                    // Optional list of allowed agent names. If omitted, any agents are allowed.

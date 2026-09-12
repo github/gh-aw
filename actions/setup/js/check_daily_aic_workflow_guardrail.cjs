@@ -295,7 +295,7 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
     });
 
     const usageJSONLFiles = findJSONLFiles(download.downloadPath || downloadRoot);
-    if (run && usageJSONLFiles.length === 0) {
+    if (run && !components && usageJSONLFiles.length === 0) {
       throw new Error(`Usage artifact contains no accounting records for run ${runId}`);
     }
     logDailyGuardrail("Downloaded guardrail artifact", {
@@ -305,7 +305,7 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
       downloadPath: download.downloadPath || downloadRoot,
       usageJSONLFiles,
     });
-    const aic = components ? sumCoveredComponents(download.downloadPath || downloadRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
+    const aic = components ? sumCoveredComponents(download.downloadPath || downloadRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
     logDailyGuardrail("Computed run AIC from artifact", {
       runId,
       artifactId: artifact.id,

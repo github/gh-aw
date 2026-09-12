@@ -36,6 +36,19 @@ function normalizeLogin(login) {
  */
 const AGENT_NAME_BY_LOGIN = Object.fromEntries(Object.entries(AGENT_LOGIN_NAMES).flatMap(([agentName, logins]) => logins.map(login => [normalizeLogin(login), agentName])));
 
+const REASONING_EFFORT_VALUES = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+
+function resolveReasoningEffort(reasoningEffort) {
+  if (reasoningEffort == null) return null;
+
+  const normalizedEffort = typeof reasoningEffort === "string" ? reasoningEffort.trim().toLowerCase() : null;
+  if (normalizedEffort == null || !REASONING_EFFORT_VALUES.has(normalizedEffort)) {
+    core.warning(`Ignoring reasoning-effort: expected one of ${[...REASONING_EFFORT_VALUES].join(", ")}.`);
+    return null;
+  }
+  return normalizedEffort;
+}
+
 /**
  * GitHub can surface bots either via type="Bot" or a [bot] login suffix.
  * Check both because assignee responses are not always consistent across endpoints.
@@ -335,6 +348,7 @@ async function getPullRequestDetails(owner, repo, pullNumber, githubClient = git
  * @param {string|null} [pullRequestRepoSlug] - Optional pull request repository slug (owner/repo) for REST path
  * @param {{rationale?: string, confidence?: "LOW"|"MEDIUM"|"HIGH", suggest?: boolean}} [intentMetadata] - Optional issue-intent metadata
  * @param {boolean} [useIssueIntent] - Whether to include issue-intent metadata/headers
+ * @param {string|null} [reasoningEffort] - Optional reasoning effort
  * @returns {Promise<boolean>} True if successful
  */
 async function assignAgentToIssue(
@@ -351,7 +365,8 @@ async function assignAgentToIssue(
   taskContext = null,
   pullRequestRepoSlug = null,
   intentMetadata = {},
-  useIssueIntent = true
+  useIssueIntent = true,
+  reasoningEffort = null
 ) {
   // SECURITY: pullRequestRepoSlug specifies a cross-repo target repository slug.
   // Callers MUST validate the corresponding repository slug against allowedRepos using
@@ -409,6 +424,8 @@ async function assignAgentToIssue(
     if (customInstructions != null) agentAssignment.custom_instructions = customInstructions;
     if (customAgent != null) agentAssignment.custom_agent = customAgent;
     if (model != null) agentAssignment.model = model;
+    const validReasoningEffort = resolveReasoningEffort(reasoningEffort);
+    if (validReasoningEffort != null) agentAssignment.reasoning_effort = validReasoningEffort;
     if (Object.keys(agentAssignment).length > 0) assignParams.agent_assignment = agentAssignment;
     await githubClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", assignParams);
     return true;
@@ -525,6 +542,7 @@ module.exports = {
   getIssueDetails,
   getPullRequestDetails,
   assignAgentToIssue,
+  resolveReasoningEffort,
   logPermissionError,
   generatePermissionErrorSummary,
   assignAgentToIssueByName,

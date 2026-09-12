@@ -11,6 +11,7 @@ var assignmentHandlerRegistry = map[string]handlerBuilder{
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("name", c.DefaultAgent).
 			AddIfNotEmpty("model", c.DefaultModel).
+			AddIfNotEmpty("reasoning-effort", c.ReasoningEffort).
 			AddIfNotEmpty("custom-agent", c.DefaultCustomAgent).
 			AddIfNotEmpty("custom-instructions", c.DefaultCustomInstructions).
 			AddStringSlice("allowed", c.Allowed).

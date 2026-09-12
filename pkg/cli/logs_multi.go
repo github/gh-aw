@@ -140,12 +140,12 @@ func logsTargetContinuationOptions(opts LogsDownloadOptions) continuationOptions
 // DownloadWorkflowLogsForTargets downloads several workflow reports concurrently
 // and renders one combined report. Each target gets an isolated output directory
 // so run IDs from different repositories cannot collide in the local cache.
-func DownloadWorkflowLogsForTargets(
+func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collection and final cache filtering in one lifecycle.
 	ctx context.Context,
 	opts LogsDownloadOptions,
 	targets []logsWorkflowTarget,
 	initialErrors []error,
-) error {
+) (err error) {
 	if len(targets) == 0 {
 		return errors.Join(initialErrors...)
 	}
@@ -159,6 +159,9 @@ func DownloadWorkflowLogsForTargets(
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
 		return err
 	}
+	defer func() {
+		err = errors.Join(err, opts.cachedJSONLWriter.filterDateRange(opts.StartDate, opts.EndDate))
+	}()
 	allAPIRateLimits := startGitHubAPIRateLimitReports(activeCtx, logsTargetRateLimitHosts(targets))
 	results := collectLogsTargets(activeCtx, opts, targets)
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
@@ -296,7 +299,7 @@ type logsTargetSharedState struct {
 // collectSingleLogsTarget runs one workflow target's log collection, recovering
 // from panics and building a resumable continuation when the target is still
 // waiting for a worker slot when the shared deadline or cancellation fires.
-func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) {
+func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) { //nolint:largefunc // Existing target collection remains centralized.
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			targetResult = logsTargetResult{target: target, err: fmt.Errorf("workflow collector panicked: %v", recovered)}

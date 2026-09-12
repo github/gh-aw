@@ -193,6 +193,17 @@ func mergeJobInjectedSteps(jobName string, mainJob any, importedJob any) (map[st
 		mergedAny = true
 	}
 
+	// continue-on-error is a scalar built-in job augmentation: the main workflow's value
+	// always wins when present, but an imported value should still apply when the main
+	// workflow leaves the field unset entirely (rather than being silently dropped just
+	// because the job is also declared in the main workflow for other fields, e.g. needs).
+	if _, hasMain := mainMap["continue-on-error"]; !hasMain {
+		if importedValue, hasImported := importedMap["continue-on-error"]; hasImported {
+			merged["continue-on-error"] = importedValue
+			mergedAny = true
+		}
+	}
+
 	return merged, mergedAny
 }
 

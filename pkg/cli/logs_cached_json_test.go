@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -265,6 +266,46 @@ func TestPrepareCachedLogsJSONLLoadsOnceAndOnlyAppends(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, bytes.HasPrefix(data, first))
 	assert.Equal(t, 2, bytes.Count(bytes.TrimSpace(data), []byte{'\n'})+1)
+}
+
+func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	oldRun := `{"schema_version":2,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
+	firstIncludedRun := `{"schema_version":2,"kind":"run","run":{"run_id":2,"created_at":"2026-09-01T00:00:00Z"}}`
+	lastIncludedRun := `{"schema_version":2,"kind":"run","run":{"run_id":3,"created_at":"2026-09-10T23:59:59Z"}}`
+	futureRun := `{"schema_version":2,"kind":"run","run":{"run_id":4,"created_at":"2026-09-11T00:00:00Z"}}`
+	workflowRuns := `{"schema_version":2,"kind":"workflow_runs","request":{"host":"github.com","repository":"github/gh-aw","args":["run","list"]},"payload":[{"databaseId":1}]}`
+	rateLimit := `{"schema_version":2,"kind":"github_api_rate_limit","rate_limit":{"host":"github.com"}}`
+	unknown := `{"schema_version":99,"kind":"future","value":"preserved"}`
+	withoutCreatedAt := `{"schema_version":2,"kind":"run","run":{"run_id":5}}`
+	futureSchemaRun := `{"schema_version":99,"kind":"run","run":{"run_id":7,"created_at":"2026-08-31T00:00:00Z"}}`
+	olderSchemaRun := `{"schema_version":1,"kind":"run","run":{"run_id":8,"created_at":"2026-08-31T00:00:00Z"}}`
+	previous := strings.Join([]string{oldRun, firstIncludedRun, lastIncludedRun, futureRun, workflowRuns, rateLimit, unknown, withoutCreatedAt, futureSchemaRun, olderSchemaRun}, "\n") + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(previous), 0o600))
+	writer := newCachedLogsJSONLWriter(path)
+	appendedAt := time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC)
+
+	require.NoError(t, writer.Append(ProcessedRun{Run: WorkflowRun{DatabaseID: 6, CreatedAt: appendedAt}}))
+	require.NoError(t, writer.filterDateRange("2026-09-01", "2026-09-10"))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+	assert.NotContains(t, content, `"run_id":1`)
+	assert.Contains(t, content, firstIncludedRun)
+	assert.Contains(t, content, lastIncludedRun)
+	assert.NotContains(t, content, `"run_id":4`)
+	assert.Contains(t, content, workflowRuns)
+	assert.Contains(t, content, rateLimit)
+	assert.Contains(t, content, unknown)
+	assert.Contains(t, content, withoutCreatedAt)
+	assert.Contains(t, content, futureSchemaRun)
+	assert.Contains(t, content, olderSchemaRun)
+	assert.Contains(t, content, `"run_id":6`)
+	assert.Contains(t, content, appendedAt.Format(time.RFC3339))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestCachedLogsJSONLStoresCompleteWorkflowRunsPayload(t *testing.T) {

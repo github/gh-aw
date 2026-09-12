@@ -1356,8 +1356,14 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/token_usage.jsonl") {
 		t.Errorf("Expected usage artifact to include agent token usage path.\nGenerated steps:\n%s", allSteps)
 	}
+	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/execution.json") {
+		t.Errorf("Expected usage artifact to include agent execution evidence path.\nGenerated steps:\n%s", allSteps)
+	}
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/detection/token_usage.jsonl") {
 		t.Errorf("Expected usage artifact to include detection token usage path.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/detection/execution.json") {
+		t.Errorf("Expected usage artifact to include detection execution evidence path.\nGenerated steps:\n%s", allSteps)
 	}
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/activity/summary.json") {
 		t.Errorf("Expected usage artifact to include activity summary path.\nGenerated steps:\n%s", allSteps)
@@ -1434,6 +1440,12 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	}
 	if !strings.Contains(script, ": > /tmp/gh-aw/usage/detection/token_usage.jsonl") {
 		t.Errorf("Expected collect script to ensure detection token usage file exists.\nScript:\n%s", script)
+	}
+	if !strings.Contains(script, "cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json") {
+		t.Errorf("Expected collect script to copy agent execution evidence into usage artifact staging.\nScript:\n%s", script)
+	}
+	if !strings.Contains(script, "cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json") {
+		t.Errorf("Expected collect script to copy detection execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
 	if !strings.Contains(script, "generate_usage_activity_summary.cjs") {
 		t.Errorf("Expected collect script to generate activity summary aggregates.\nScript:\n%s", script)

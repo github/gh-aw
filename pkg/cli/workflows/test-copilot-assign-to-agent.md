@@ -8,6 +8,8 @@ engine: copilot
 safe-outputs:
   assign-to-agent:
     max: 1
+    model: o3
+    reasoning-effort: high
 ---
 
 # Test Copilot Assign To Agent

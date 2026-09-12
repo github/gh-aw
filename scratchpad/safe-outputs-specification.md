@@ -1159,6 +1159,8 @@ safe-outputs:
   assign-to-agent:
     target-repo: "octocat/issues"
     pull-request-repo: "octocat/codebase"
+    model: "o3"
+    reasoning-effort: "high"
     allowed-pull-request-repos:
       - "octocat/codebase"
       - "octocat/codebase-v2"
@@ -1179,6 +1181,7 @@ safe-outputs:
 - Agent creates PR in `octocat/codebase` (not in `octocat/issues`)
 - GraphQL mutation includes `agentAssignment.targetRepositoryId`
 - Enables issue tracking separate from code repositories
+- Valid `reasoning-effort` enum values are forwarded as `agent_assignment.reasoning_effort` without model-specific capability checks; invalid values warn and are omitted
 
 #### A.4 Staged Mode Preview
 

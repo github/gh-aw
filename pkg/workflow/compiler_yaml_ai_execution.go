@@ -2,10 +2,100 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
+
+const (
+	agentExecutionEvidencePath     = constants.TmpGhAwDirSlash + "agent_execution.json"
+	detectionExecutionEvidencePath = constants.ThreatDetectionDir + "/execution.json"
+)
+
+func generateComponentExecutionEvidenceStep(component, state, filePath, condition string) []string {
+	stepName := "Initialize " + component + " execution evidence"
+	if state == "started" {
+		stepName = "Mark " + component + " execution started"
+	}
+	lines := []string{
+		"      - name: " + stepName + "\n",
+	}
+	if condition != "" {
+		lines = append(lines, "        if: "+condition+"\n")
+	}
+	lines = append(lines,
+		"        run: |\n",
+		fmt.Sprintf("          mkdir -p %q\n", path.Dir(filePath)),
+		fmt.Sprintf("          evidence_tmp=%q\n", filePath+".tmp"),
+		fmt.Sprintf("          printf '{\"version\":1,\"component\":\"%s\",\"run_id\":%%s,\"run_attempt\":%%s,\"state\":\"%s\"}\\n' \"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\" > \"$evidence_tmp\"\n", component, state),
+		fmt.Sprintf("          mv \"$evidence_tmp\" %q\n", filePath),
+	)
+	return lines
+}
+
+func componentExecutionEvidenceShellLines(component, state, filePath string) []string {
+	return []string{
+		fmt.Sprintf("mkdir -p %q", path.Dir(filePath)),
+		fmt.Sprintf("evidence_tmp=%q", filePath+".tmp"),
+		fmt.Sprintf("printf '{\"version\":1,\"component\":\"%s\",\"run_id\":%%s,\"run_attempt\":%%s,\"state\":\"%s\"}\\n' \"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\" > \"$evidence_tmp\"", component, state),
+		fmt.Sprintf("mv \"$evidence_tmp\" %q", filePath),
+	}
+}
+
+func injectComponentExecutionStartedInShellScript(command, component, filePath string) string {
+	var started strings.Builder
+	for _, line := range componentExecutionEvidenceShellLines(component, "started", filePath) {
+		started.WriteString(line)
+		started.WriteByte('\n')
+	}
+
+	if awfInvocation := strings.Index(command, "GH_AW_AWF_ENGINE_NAME="); awfInvocation >= 0 {
+		return command[:awfInvocation] + started.String() + command[awfInvocation:]
+	}
+	return started.String() + command
+}
+
+func injectComponentExecutionStarted(step GitHubActionStep, component, filePath string) GitHubActionStep {
+	runIndex := -1
+	for i, line := range step {
+		if strings.TrimSpace(line) == "run: |" {
+			runIndex = i
+			break
+		}
+	}
+	if runIndex < 0 {
+		return step
+	}
+
+	insertIndex := -1
+	for i := runIndex + 1; i < len(step); i++ {
+		if strings.HasPrefix(strings.TrimSpace(step[i]), "GH_AW_AWF_ENGINE_NAME=") {
+			insertIndex = i
+			break
+		}
+	}
+	if insertIndex < 0 {
+		insertIndex = runIndex + 1
+		for insertIndex < len(step) {
+			trimmed := strings.TrimSpace(step[insertIndex])
+			if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
+				insertIndex++
+				continue
+			}
+			break
+		}
+	}
+
+	startedLines := componentExecutionEvidenceShellLines(component, "started", filePath)
+	injected := make(GitHubActionStep, 0, len(step)+len(startedLines))
+	injected = append(injected, step[:insertIndex]...)
+	for _, line := range startedLines {
+		injected = append(injected, "          "+line)
+	}
+	injected = append(injected, step[insertIndex:]...)
+	return injected
+}
 
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine
 func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, logFile string) {
@@ -22,6 +112,12 @@ func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *Wor
 	compilerYamlLog.Printf("Generating engine execution steps: engine=%s, steps=%d", engine.GetID(), len(steps))
 
 	for _, step := range steps {
+		for _, line := range step {
+			if strings.Contains(line, "id: agentic_execution") {
+				step = injectComponentExecutionStarted(step, "agent", agentExecutionEvidencePath)
+				break
+			}
+		}
 		for _, line := range step {
 			yaml.WriteString(line)
 			yaml.WriteByte('\n')

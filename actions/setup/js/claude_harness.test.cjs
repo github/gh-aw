@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const {
   resolveClaudePromptFileArgs,
   stripPromptFileArgs,
+  classifiableOutput,
   isRateLimitError,
   isAuthenticationFailedError,
   isMaxTurnsExit,
@@ -196,6 +197,16 @@ describe("claude_harness.cjs", () => {
     });
   });
 
+  describe("classifiableOutput", () => {
+    it("drops user events while preserving result events and plain text", () => {
+      const userEvent = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", content: "not logged in" }] } });
+      const resultEvent = JSON.stringify({ type: "result", result: "not logged in" });
+
+      expect(classifiableOutput(`${userEvent}\n${resultEvent}\nplain-text error`)).toBe(`${resultEvent}\nplain-text error`);
+      expect(isRateLimitError(classifiableOutput(JSON.stringify({ type: "user", result: "rate limiting" })))).toBe(false);
+    });
+  });
+
   describe("isAuthenticationFailedError", () => {
     it("returns true for authentication failed with request id", () => {
       expect(isAuthenticationFailedError("Authentication failed (Request ID: C818:3ED713:19D401B:1C446B7:69D653CA)")).toBe(true);
@@ -216,6 +227,15 @@ describe("claude_harness.cjs", () => {
 
     it('returns true for "not logged in" (case-insensitive)', () => {
       expect(isAuthenticationFailedError("NOT LOGGED IN")).toBe(true);
+    });
+
+    it("ignores authentication text in user tool results", () => {
+      const userEvent = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", content: "not logged in" }] } });
+      const resultEvent = JSON.stringify({ type: "result", result: "not logged in" });
+
+      expect(isAuthenticationFailedError(classifiableOutput(userEvent))).toBe(false);
+      expect(isAuthenticationFailedError(classifiableOutput(resultEvent))).toBe(true);
+      expect(isAuthenticationFailedError(classifiableOutput("not logged in"))).toBe(true);
     });
 
     describe("isInvalidModelError", () => {
@@ -382,6 +402,11 @@ describe("claude_harness.cjs", () => {
 
     it("does not classify sparse permission-denied output as numerous", () => {
       expect(hasNumerousPermissionDeniedIssues("permission denied")).toBe(false);
+    });
+
+    it("ignores repeated permission-denied signals in user tool results", () => {
+      const output = [1, 2, 3].map(index => JSON.stringify({ type: "user", tool_use_result: `upload ${index}: EACCES` })).join("\n");
+      expect(hasNumerousPermissionDeniedIssues(classifiableOutput(output))).toBe(false);
     });
 
     it("builds missing_tool payload for permission issues", () => {
@@ -577,7 +602,7 @@ process.exit(0);
       expect(calls.map(call => call.args.includes("--continue"))).toEqual([true, true, false]);
     }, 50000);
 
-    it("uses a fresh retry after signal-style termination instead of --continue", () => {
+    it("uses a fresh retry after signal-style termination even when output is classified as an auth failure", () => {
       const stubScript = `
 const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
@@ -586,7 +611,8 @@ const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8")
 fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
 
 if (priorCalls === 0) {
-  process.stdout.write("partial execution before SIGTERM-style exit\\n");
+  process.stdout.write('{"type":"user","message":{"content":[{"type":"tool_result","content":"not logged in"}]}}\\n');
+  process.stdout.write('{"type":"result","result":"not logged in"}\\n');
   process.exit(143);
 }
 
@@ -603,6 +629,7 @@ process.exit(0);
       expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, false]);
       expect(calls[1].args).toContain("fix the bug");
       expect(result.stderr).toContain("failure_reason=cancelled_or_timed_out");
+      expect(result.stderr).toContain("isAuthenticationFailedError=true");
     }, 30000);
 
     it("retries a connection-refused failure before the first assistant response as a fresh run", () => {

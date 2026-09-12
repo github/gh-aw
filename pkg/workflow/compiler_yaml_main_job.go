@@ -16,6 +16,10 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	}
 	compilerYamlLog.Printf("Initial and checkout steps generated (needsCheckout=%v)", needsCheckout)
 
+	for _, line := range generateComponentExecutionEvidenceStep("agent", "not_started", agentExecutionEvidencePath, "") {
+		yaml.WriteString(line)
+	}
+
 	// Phase 2: Runtime detection, custom steps, and workspace setup
 	customStepsContainCheckout := c.generateRuntimeAndWorkspaceSetupSteps(yaml, data, needsCheckout)
 	needsGitConfig := needsCheckout || customStepsContainCheckout

@@ -84,6 +84,8 @@ type workflowLogsResult struct {
 type StdinLogsOptions struct {
 	RunURLs           []string
 	OutputDir         string
+	StartDate         string
+	EndDate           string
 	Engine            string
 	Runtime           string
 	RepoOverride      string

@@ -50,7 +50,8 @@ If you're creating new issues and want to assign Copilot immediately, use `assig
 safe-outputs:
   assign-to-agent:
     name: "copilot"            # default agent (default: "copilot")
-    model: "claude-opus-4.6"   # default AI model (default: "auto")
+    model: "o3"                # default AI model (default: "auto")
+    reasoning-effort: "high"   # optional reasoning effort
     custom-agent: "agent-id"   # default custom agent ID (optional)
     custom-instructions: "..."  # default custom instructions (optional)
     allowed: [copilot]         # restrict to specific agents (optional)
@@ -64,6 +65,15 @@ safe-outputs:
 ```
 
 **Supported agents:** `copilot` (`copilot-swe-agent`)
+
+`reasoning-effort` accepts `none`, `minimal`, `low`, `medium`, `high`, or `xhigh` and is forwarded as `agent_assignment.reasoning_effort` without enforcing model-specific capabilities. Invalid values produce a warning and are omitted without failing the assignment. The field also supports expressions:
+
+```yaml wrap
+safe-outputs:
+  assign-to-agent:
+    model: "o3"
+    reasoning-effort: ${{ inputs.reasoning_effort }}
+```
 
 ### Target Issue or Pull Request
 

@@ -9593,6 +9593,11 @@
                   "type": "string",
                   "description": "Default AI model to use for the agent (e.g., 'auto', 'claude-sonnet-4.5', 'claude-opus-4.5', 'claude-opus-4.6', 'gpt-5.1-codex-max', 'gpt-5.2-codex'). Defaults to 'auto' if not specified."
                 },
+                "reasoning-effort": {
+                  "type": "string",
+                  "description": "Optional reasoning effort to forward without model-specific capability checks. Supports none, minimal, low, medium, high, xhigh, and GitHub Actions expressions. Invalid runtime values are ignored with a warning.",
+                  "examples": ["high", "${{ inputs.reasoning_effort }}"]
+                },
                 "custom-agent": {
                   "type": "string",
                   "description": "Default custom agent ID to use when assigning custom agents. This is used for specialized agent configurations beyond the standard Copilot agent."

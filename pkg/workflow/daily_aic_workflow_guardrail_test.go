@@ -195,6 +195,49 @@ Guardrail test workflow`
 	}
 }
 
+func TestDailyAICExecutionEvidenceSurroundsPreAgentFailure(t *testing.T) {
+	testDir := testutil.TempDir(t, "daily-aic-pre-agent-failure-*")
+	workflowFile := filepath.Join(testDir, "daily-aic-pre-agent-failure.md")
+	workflow := `---
+on:
+  workflow_dispatch:
+steps:
+  - name: Fail before agent execution
+    run: exit 1
+safe-outputs:
+  add-comment:
+    max: 1
+---
+
+Pre-agent failure accounting test`
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
+		t.Fatalf("failed to write test workflow: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowFile); err != nil {
+		t.Fatalf("failed to compile workflow: %v", err)
+	}
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowFile))
+	if err != nil {
+		t.Fatalf("failed to read lock file: %v", err)
+	}
+	lockStr := string(lockContent)
+	initialize := strings.Index(lockStr, "name: Initialize agent execution evidence")
+	failure := strings.Index(lockStr, "name: Fail before agent execution")
+	execution := strings.Index(lockStr, "id: agentic_execution")
+	started := -1
+	if execution >= 0 {
+		started = strings.Index(lockStr[execution:], `"state":"started"`)
+	}
+	if initialize < 0 || failure <= initialize || execution <= failure || started < 0 {
+		t.Fatalf("expected execution evidence to prove a setup failure occurred before agent execution")
+	}
+	if !strings.Contains(lockStr, "/tmp/gh-aw/agent_execution.json") {
+		t.Fatal("expected the agent artifact to include execution evidence")
+	}
+}
+
 func TestDailyETGuardrailDynamicGate(t *testing.T) {
 	testDir := testutil.TempDir(t, "daily-effective-workflow-no-guardrail-*")
 	workflowFile := filepath.Join(testDir, "no-daily-guardrail.md")

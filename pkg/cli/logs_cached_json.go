@@ -364,6 +364,93 @@ func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
 	return nil
 }
 
+func (w *cachedLogsJSONLWriter) filterDateRange(startDate, endDate string) error {
+	if w == nil || (startDate == "" && endDate == "") {
+		return nil
+	}
+	dateRange, err := newCachedLogsJSONLDateRange(startDate, endDate)
+	if err != nil {
+		return err
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	data, err := os.ReadFile(w.path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to read cached logs JSONL for date filtering: %w", err)
+	}
+	filtered := make([]byte, 0, len(data))
+	for _, line := range bytes.SplitAfter(data, []byte{'\n'}) {
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
+			filtered = append(filtered, line...)
+			continue
+		}
+		var record cachedLogsJSONLRecord
+		if err := json.Unmarshal(trimmed, &record); err != nil ||
+			record.Kind != cachedLogsJSONLKindRun ||
+			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			record.Run == nil ||
+			record.Run.CreatedAt.IsZero() {
+			filtered = append(filtered, line...)
+			continue
+		}
+		if !dateRange.includes(record.Run.CreatedAt) {
+			continue
+		}
+		filtered = append(filtered, line...)
+	}
+	if bytes.Equal(data, filtered) {
+		return nil
+	}
+	if err := writeFileAtomically(w.path, filtered); err != nil {
+		return fmt.Errorf("failed to filter cached logs JSONL by date range: %w", err)
+	}
+	return nil
+}
+
+type cachedLogsJSONLDateRange struct {
+	start         time.Time
+	end           time.Time
+	endIsDateOnly bool
+}
+
+func newCachedLogsJSONLDateRange(startDate, endDate string) (cachedLogsJSONLDateRange, error) {
+	resolvedStart, resolvedEnd, err := resolveLogsDateRange(startDate, endDate, time.Now())
+	if err != nil {
+		return cachedLogsJSONLDateRange{}, err
+	}
+	dateRange := cachedLogsJSONLDateRange{endIsDateOnly: len(resolvedEnd) == len("2006-01-02")}
+	if resolvedStart != "" {
+		dateRange.start, err = parseFilterDate(resolvedStart)
+		if err != nil {
+			return cachedLogsJSONLDateRange{}, fmt.Errorf("failed to parse cached logs JSONL start date: %w", err)
+		}
+	}
+	if resolvedEnd != "" {
+		dateRange.end, err = parseFilterDate(resolvedEnd)
+		if err != nil {
+			return cachedLogsJSONLDateRange{}, fmt.Errorf("failed to parse cached logs JSONL end date: %w", err)
+		}
+	}
+	return dateRange, nil
+}
+
+func (r cachedLogsJSONLDateRange) includes(createdAt time.Time) bool {
+	if !r.start.IsZero() && createdAt.Before(r.start) {
+		return false
+	}
+	if r.end.IsZero() {
+		return true
+	}
+	if r.endIsDateOnly {
+		return createdAt.Before(r.end.AddDate(0, 0, 1))
+	}
+	return !createdAt.After(r.end)
+}
+
 func (request cachedWorkflowRunsRequest) key() (string, error) {
 	data, err := json.Marshal(request)
 	if err != nil {

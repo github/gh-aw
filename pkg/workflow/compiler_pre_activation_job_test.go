@@ -24,6 +24,31 @@ func TestBuildPreActivationPermissions(t *testing.T) {
 		assert.Empty(t, permissions)
 	})
 
+	t.Run("centralized command grants pull request read", func(t *testing.T) {
+		c := NewCompiler()
+		c.SetActionMode(ActionModeRelease)
+
+		_, permissions := c.buildPreActivationPermissions(&WorkflowData{
+			Name:               "wf",
+			Command:            []string{"triage"},
+			CommandCentralized: true,
+		}, "./actions/setup")
+
+		assert.Contains(t, permissions, "pull-requests: read")
+	})
+
+	t.Run("non-centralized command keeps permissions empty", func(t *testing.T) {
+		c := NewCompiler()
+		c.SetActionMode(ActionModeRelease)
+
+		_, permissions := c.buildPreActivationPermissions(&WorkflowData{
+			Name:    "wf",
+			Command: []string{"triage"},
+		}, "./actions/setup")
+
+		assert.Empty(t, permissions)
+	})
+
 	t.Run("script mode merges inferred and explicit permissions", func(t *testing.T) {
 		c := NewCompiler()
 		c.SetActionMode(ActionModeScript)

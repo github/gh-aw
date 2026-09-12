@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { AGENT_LOGIN_NAMES, getAgentLogins, getAvailableAgentLogins, findAgent, getIssueDetails, getPullRequestDetails, assignAgentToIssue, generatePermissionErrorSummary } = require("./assign_agent_helpers.cjs");
+const { AGENT_LOGIN_NAMES, getAgentLogins, getAvailableAgentLogins, findAgent, getIssueDetails, getPullRequestDetails, assignAgentToIssue, generatePermissionErrorSummary, resolveReasoningEffort } = require("./assign_agent_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateStagedPreview } = require("./staged_preview.cjs");
@@ -153,6 +153,7 @@ async function main(config = {}) {
   }
   const defaultAgent = String(config.name ?? "copilot").trim();
   const defaultModel = config.model ? String(config.model).trim() : null;
+  const reasoningEffort = config["reasoning-effort"] ?? null;
   const defaultCustomAgent = config["custom-agent"] ? String(config["custom-agent"]).trim() : null;
   const defaultCustomInstructions = config["custom-instructions"] ? String(config["custom-instructions"]).trim() : null;
   const configuredBaseBranch = config["base-branch"] ? String(config["base-branch"]).trim() : null;
@@ -251,6 +252,8 @@ async function main(config = {}) {
           }
           parts.push(`**Agent:** ${item.agent || defaultAgent}`);
           if (defaultModel) parts.push(`**Model:** ${defaultModel}`);
+          const stagedReasoningEffort = resolveReasoningEffort(reasoningEffort);
+          if (stagedReasoningEffort) parts.push(`**Reasoning Effort:** ${stagedReasoningEffort}`);
           if (defaultCustomAgent) parts.push(`**Custom Agent:** ${defaultCustomAgent}`);
           if (defaultCustomInstructions) parts.push(`**Custom Instructions:** ${defaultCustomInstructions}`);
           return parts.join("\n") + "\n\n";
@@ -496,7 +499,8 @@ async function main(config = {}) {
         taskContext,
         effectivePullRequestRepoSlug,
         intentMetadata,
-        issueIntentEnabled
+        issueIntentEnabled,
+        reasoningEffort
       );
       if (!success) throw new Error(`Failed to assign ${agentName} via REST`);
 

@@ -1607,7 +1607,8 @@ Programmatically assigns GitHub Copilot coding agent to **existing** issues or p
 safe-outputs:
   assign-to-agent:
     name: "copilot"            # default agent (default: "copilot")
-    model: "claude-sonnet-5"   # default AI model (default: "auto")
+    model: "o3"                # default AI model (default: "auto")
+    reasoning-effort: "high"   # optional enum value or expression
     custom-agent: "agent-id"   # default custom agent ID (optional)
     custom-instructions: "..."  # default custom instructions (optional)
     allowed: [copilot]         # restrict to specific agents (optional)
@@ -1619,6 +1620,8 @@ safe-outputs:
     base-branch: "develop"     # target branch for PR (default: target repo's default branch)
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }} # optional custom token for permissions
 ```
+
+`reasoning-effort` accepts `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`, as well as GitHub Actions expressions. Valid values are forwarded without enforcing model-specific capabilities; invalid runtime values produce a warning and are omitted without failing assignment.
 
 See **[Copilot Cloud Agent](/gh-aw/reference/copilot-cloud-agent/#assign-to-agent)** for complete configuration options and authorization setup.
 

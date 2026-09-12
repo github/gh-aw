@@ -103,10 +103,10 @@ func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupAction
 		}
 		perms.Set(PermissionActions, PermissionRead)
 	}
-	// Auto-grant pull-requests: read when label_command uses decentralized strategy
-	// with pull_request events. The check_membership.cjs script calls the pulls API
-	// to verify PR provenance, which requires pull-requests: read.
-	if data.LabelCommandDecentralized && slices.Contains(FilterLabelCommandEvents(data.LabelCommandEvents), "pull_request") {
+	// Auto-grant pull-requests: read when check_membership.cjs may call the pulls API
+	// to verify PR provenance.
+	if (data.CommandCentralized && len(data.Command) > 0) ||
+		(data.LabelCommandDecentralized && slices.Contains(FilterLabelCommandEvents(data.LabelCommandEvents), "pull_request")) {
 		if perms == nil {
 			perms = NewPermissions()
 		}

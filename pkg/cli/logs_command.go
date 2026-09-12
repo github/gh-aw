@@ -152,8 +152,9 @@ Use --artifacts all to download all artifacts, or specify individual sets such a
 --artifacts agent,firewall to fetch only what you need.
 
 Use --cached-jsonl to reuse matching run records without downloading and processing their
-artifacts again. New results are appended immediately as JSON Lines. Aggregate analysis may be approximate when compact
-cached records omit detailed data.
+artifacts again. New results are appended immediately as JSON Lines. When a date range is specified,
+cached run records outside that range are removed after collection; other record types are retained.
+Aggregate analysis may be approximate when compact cached records omit detailed data.
 
 All available artifact sets: %s.
 
@@ -228,6 +229,8 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 	}
 	return StdinLogsOptions{
 		OutputDir:         values.OutputDir,
+		StartDate:         values.StartDate,
+		EndDate:           values.EndDate,
 		Engine:            values.Engine,
 		Runtime:           values.Runtime,
 		RepoOverride:      values.RepoOverride,
@@ -634,7 +637,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("drain3-weights", "", "Path to existing Drain3 weights JSON used to seed log pattern training")
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
-	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse for matching runs and append new results immediately")
+	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse, append new results, and retain runs in the requested date range")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
 	logsCmd.Flags().StringSlice("artifacts", []string{"info"}, "Artifact sets to download (default: info — compact workflow metadata). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")

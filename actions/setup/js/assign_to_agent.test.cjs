@@ -59,6 +59,7 @@ describe("assign_to_agent", () => {
   const STANDALONE_RUNNER = `
     const _config = {};
     if (process.env.GH_AW_AGENT_DEFAULT?.trim()) _config.name = process.env.GH_AW_AGENT_DEFAULT.trim();
+    if (process.env.GH_AW_AGENT_MODEL?.trim()) _config.model = process.env.GH_AW_AGENT_MODEL.trim();
     if (process.env.GH_AW_AGENT_MAX_COUNT?.trim()) _config.max = process.env.GH_AW_AGENT_MAX_COUNT.trim();
     if (process.env.GH_AW_AGENT_TARGET?.trim()) _config.target = process.env.GH_AW_AGENT_TARGET.trim();
     if (process.env.GH_AW_AGENT_ALLOWED?.trim()) _config.allowed = process.env.GH_AW_AGENT_ALLOWED.trim();
@@ -66,6 +67,7 @@ describe("assign_to_agent", () => {
     if (process.env.GH_AW_AGENT_PULL_REQUEST_REPO?.trim()) _config["pull-request-repo"] = process.env.GH_AW_AGENT_PULL_REQUEST_REPO.trim();
     if (process.env.GH_AW_AGENT_ALLOWED_PULL_REQUEST_REPOS?.trim()) _config["allowed-pull-request-repos"] = process.env.GH_AW_AGENT_ALLOWED_PULL_REQUEST_REPOS.trim();
     if (process.env.GH_AW_AGENT_BASE_BRANCH?.trim()) _config["base-branch"] = process.env.GH_AW_AGENT_BASE_BRANCH.trim();
+    if (process.env.GH_AW_AGENT_REASONING_EFFORT != null) _config["reasoning-effort"] = process.env.GH_AW_AGENT_REASONING_EFFORT;
     if (process.env.GH_AW_ALLOWED_REPOS?.trim()) _config.allowed_repos = process.env.GH_AW_ALLOWED_REPOS.trim();
 
     let _handler;
@@ -121,6 +123,7 @@ describe("assign_to_agent", () => {
     delete process.env.GH_AW_AGENT_OUTPUT;
     delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
     delete process.env.GH_AW_AGENT_DEFAULT;
+    delete process.env.GH_AW_AGENT_MODEL;
     delete process.env.GH_AW_AGENT_MAX_COUNT;
     delete process.env.GH_AW_AGENT_TARGET;
     delete process.env.GH_AW_AGENT_ALLOWED;
@@ -131,6 +134,7 @@ describe("assign_to_agent", () => {
     delete process.env.GH_AW_AGENT_PULL_REQUEST_REPO;
     delete process.env.GH_AW_AGENT_ALLOWED_PULL_REQUEST_REPOS;
     delete process.env.GH_AW_AGENT_BASE_BRANCH;
+    delete process.env.GH_AW_AGENT_REASONING_EFFORT;
 
     // Reset context to default
     mockContext.eventName = "issues";
@@ -190,6 +194,17 @@ describe("assign_to_agent", () => {
     expect(summaryCall).toContain("Agent:** copilot");
   });
 
+  it("should include configured reasoning effort in staged previews", async () => {
+    process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+    process.env.GH_AW_AGENT_REASONING_EFFORT = "high";
+    process.env.GH_AW_AGENT_MODEL = "o3";
+    setAgentOutput({ items: [{ type: "assign_to_agent", pull_number: 42, agent: "copilot" }], errors: [] });
+
+    await eval(`(async () => { ${assignToAgentScript}; ${STANDALONE_RUNNER} })()`);
+
+    expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Reasoning Effort:** high");
+  });
+
   it("should use default agent when not specified", async () => {
     process.env.GH_AW_AGENT_DEFAULT = "copilot";
     setAgentOutput({
@@ -213,6 +228,27 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; ${STANDALONE_RUNNER} })()`);
 
     expect(mockCore.info).toHaveBeenCalledWith("Default agent: copilot");
+  });
+
+  it("should forward reasoning effort for issue assignments", async () => {
+    process.env.GH_AW_AGENT_MODEL = "o3";
+    process.env.GH_AW_AGENT_REASONING_EFFORT = "high";
+    setAgentOutput({ items: [{ type: "assign_to_agent", issue_number: 42, agent: "copilot" }], errors: [] });
+    mockGithub.rest.issues.get.mockResolvedValueOnce({
+      data: { id: 12345, number: 42, assignees: [], html_url: "", title: "", body: "" },
+    });
+
+    await eval(`(async () => { ${assignToAgentScript}; ${STANDALONE_RUNNER} })()`);
+
+    expect(mockGithub.request).toHaveBeenLastCalledWith(
+      "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+      expect.objectContaining({
+        agent_assignment: expect.objectContaining({
+          model: "o3",
+          reasoning_effort: "high",
+        }),
+      })
+    );
   });
 
   it("should respect max count configuration", async () => {
@@ -797,11 +833,10 @@ describe("assign_to_agent", () => {
     expect(summaryCall).toContain("Permission Requirements");
   });
 
-  it.skip("should handle pull_number parameter", async () => {
-    // TODO: Fix test mocking - the code works but the test setup has issues with GraphQL mocking for PR queries
-    // The functionality is identical to issue_number (just uses pullRequest instead of issue in the GraphQL query)
-    // and the schema/validation changes have been tested via the other validation tests
+  it("should forward reasoning effort for pull request assignments", async () => {
     process.env.GH_AW_AGENT_DEFAULT = "copilot";
+    process.env.GH_AW_AGENT_MODEL = "o3";
+    process.env.GH_AW_AGENT_REASONING_EFFORT = "high";
     setAgentOutput({
       items: [
         {
@@ -827,6 +862,15 @@ describe("assign_to_agent", () => {
     }
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Successfully assigned copilot coding agent to pull request #123"));
+    expect(mockGithub.request).toHaveBeenLastCalledWith(
+      "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
+      expect.objectContaining({
+        agent_assignment: expect.objectContaining({
+          model: "o3",
+          reasoning_effort: "high",
+        }),
+      })
+    );
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
