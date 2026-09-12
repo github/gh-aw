@@ -62,6 +62,33 @@ func TestGeneratedAgentJobContinueOnErrorFromImport(t *testing.T) {
 	assert.Equal(t, true, jobs[string(constants.AgentJobName)]["continue-on-error"])
 }
 
+func TestGeneratedAgentJobContinueOnErrorImportAppliesWhenMainOmitsField(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-continue-on-error-import-merge")
+	sharedPath := filepath.Join(tmpDir, "shared.md")
+	require.NoError(t, os.WriteFile(sharedPath, []byte("---\njobs:\n  agent:\n    continue-on-error: true\n---\n"), 0o644))
+
+	workflowPath := filepath.Join(tmpDir, "imported.md")
+	workflow := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\nstrict: false\nimports:\n  - ./shared.md\njobs:\n  agent:\n    timeout-minutes: 30\n---\n\nTest workflow.\n"
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o644))
+
+	jobs := compileContinueOnErrorWorkflowFile(t, workflowPath)
+	assert.Equal(t, true, jobs[string(constants.AgentJobName)]["continue-on-error"])
+	assert.Equal(t, uint64(30), jobs[string(constants.AgentJobName)]["timeout-minutes"])
+}
+
+func TestGeneratedAgentJobContinueOnErrorMainWinsOverImport(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-continue-on-error-main-wins")
+	sharedPath := filepath.Join(tmpDir, "shared.md")
+	require.NoError(t, os.WriteFile(sharedPath, []byte("---\njobs:\n  agent:\n    continue-on-error: true\n---\n"), 0o644))
+
+	workflowPath := filepath.Join(tmpDir, "imported.md")
+	workflow := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\nstrict: false\nimports:\n  - ./shared.md\njobs:\n  agent:\n    continue-on-error: false\n---\n\nTest workflow.\n"
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o644))
+
+	jobs := compileContinueOnErrorWorkflowFile(t, workflowPath)
+	assert.Equal(t, false, jobs[string(constants.AgentJobName)]["continue-on-error"])
+}
+
 func TestContinueOnErrorRejectedForUnsupportedBuiltinJob(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "activation-continue-on-error")
 	workflowPath := filepath.Join(tmpDir, "unsupported.md")
