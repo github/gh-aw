@@ -103,7 +103,7 @@ func TestEnforceSafeUpdate(t *testing.T) {
 			wantErr:     false,
 		},
 		{
-			name:        "compiler-injected OTLP endpoint secret is allowed when headers secret is known",
+			name:        "compiler-injected OTLP endpoint secret is allowed when headers secret already exists in manifest",
 			manifest:    &GHAWManifest{Version: 1, Secrets: []string{"GH_AW_DEFAULT_OTLP_HEADERS"}, Actions: []GHAWManifestAction{}},
 			secretNames: []string{"GH_AW_DEFAULT_OTLP_ENDPOINT"},
 			actionRefs:  []string{},
