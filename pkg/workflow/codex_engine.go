@@ -93,10 +93,15 @@ func (e *CodexEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider
 	return resolveEngineLLMProvider(workflowData, LLMProviderOpenAI)
 }
 
+// codexModelID strips the provider prefix from a model identifier because the Codex
+// CLI expects a bare model name (for example "gpt-5.3-codex"). Both the "copilot/"
+// prefix (GitHub-hosted inference through Codex's BYOK provider) and the "openai/"
+// prefix (OpenAI-hosted inference) are removed; keeping them would make Codex request
+// a model name the provider does not know and fail with model_not_supported_error.
 func codexModelID(model string) string {
 	model = strings.TrimSpace(model)
 	provider, modelID, found := strings.Cut(model, "/")
-	if found && strings.EqualFold(provider, "copilot") {
+	if found && (strings.EqualFold(provider, "copilot") || strings.EqualFold(provider, "openai")) {
 		return modelID
 	}
 	return model
