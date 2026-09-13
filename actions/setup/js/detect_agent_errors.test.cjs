@@ -312,6 +312,10 @@ describe("detect_agent_errors.cjs", () => {
       expect(HTTP_400_RESPONSE_ERROR_PATTERN.test("Response status code does not indicate success: 400")).toBe(true);
     });
 
+    it("matches a standalone Copilot CLI 400 Bad Request line", () => {
+      expect(HTTP_400_RESPONSE_ERROR_PATTERN.test("400 Bad Request\nChanges    +0 -0")).toBe(true);
+    });
+
     it("does not match unrelated 400 text", () => {
       expect(HTTP_400_RESPONSE_ERROR_PATTERN.test("CAPIError: 400 Bad Request")).toBe(false);
       expect(HTTP_400_RESPONSE_ERROR_PATTERN.test("Error: 400 Bad Request")).toBe(false);

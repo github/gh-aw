@@ -191,6 +191,26 @@ it("counts missing evals accounting as zero when the successful-path upload step
   await expect(f.result).resolves.toBe(2);
 });
 
+it("counts missing evals accounting as zero for a legacy failed evals job", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Install AWF binary", conclusion: "failure" },
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals results", conclusion: "skipped" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).resolves.toBe(2);
+});
+
 it("still requires evals accounting when collection did not succeed", async () => {
   const f = evaluate(
     {
@@ -222,6 +242,26 @@ it("still requires evals accounting when collection succeeded but the eval artif
         steps: [
           { name: "Collect evals token usage", conclusion: "success" },
           { name: "Upload evals accounting after failure", conclusion: "failure" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it("still requires evals accounting when the current failure upload was skipped", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals results", conclusion: "skipped" },
+          { name: "Upload evals accounting after failure", conclusion: "skipped" },
         ],
       }),
     ]

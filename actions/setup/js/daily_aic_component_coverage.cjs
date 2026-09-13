@@ -71,6 +71,10 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
 function provesFailedEvalsHadNoUsage(job) {
   if (job.conclusion !== "failure" || !Array.isArray(job.steps)) return false;
   const succeeded = name => job.steps.some(step => step.name === name && step.conclusion === "success");
+  const hasFailureUpload = job.steps.some(step => step.name === "Upload evals accounting after failure");
+  // Legacy workflows had no failure-path accounting upload. Treat a successful
+  // collector with no published file as zero usage for those workflows.
+  if (!hasFailureUpload && succeeded("Collect evals token usage")) return true;
   // A successful collector only proves the local shell step ran; the eval
   // artifact upload (whichever of the two mutually exclusive steps applies)
   // must also have succeeded, or a transport failure would be miscounted as zero.

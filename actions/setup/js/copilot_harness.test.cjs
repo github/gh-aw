@@ -1498,6 +1498,10 @@ describe("copilot_harness.cjs", () => {
       expect(isHTTP400ResponseError("Response status code does not indicate success: 400")).toBe(true);
     });
 
+    it("matches the standalone Copilot CLI error from the failed workflow run", () => {
+      expect(isHTTP400ResponseError("400 Bad Request\nChanges    +0 -0")).toBe(true);
+    });
+
     it("does not match CAPIError 400 (a distinct error shape)", () => {
       expect(isHTTP400ResponseError("CAPIError: 400 The requested model is not supported.")).toBe(false);
     });
