@@ -1,3 +1,22 @@
+## P0 Correction + Re-escalation — 2026-09-13T04:38Z (Workflow Health Manager)
+- **PR #60423 fix confirmed INCOMPLETE — issue #60416 was closed prematurely.** The 2026-09-12
+  merge fixed a real bug (provider-prefix forwarding in `codexModelID`), but the
+  `model_not_supported_error` pattern it targeted **recurred today (2026-09-13)** on the exact same
+  workflows: LintMonster (#60546), Metrics Collector (#60545), and Avenger (5 open occurrences in
+  the last 24h: #60455, #60465, #60471, #60541, #60554).
+- Root cause verified from raw Codex agent job logs (not just the error banner): pinned
+  `@openai/codex@0.153.4` logs `WARN codex_models_manager::model_info: Unknown model gpt-5.3-codex
+  is used. This will use fallback model metadata` regardless of whether the model string arrives
+  bare or prefix-stripped. **This falsifies PR #60423's "org/account policy" hypothesis** for the
+  Copilot-BYOK path — the direct-OpenAI-path workflows (`model: openai/gpt-5.3-codex`, e.g.
+  LintMonster, Avenger) fail identically post-fix, so it is not policy-specific to Copilot BYOK.
+- Scope: 75 workflow files reference `gpt-5.3-codex` (71 with explicit `model:` config) — all
+  remain at risk until the Codex CLI is upgraded to a version with `gpt-5.3-codex` model metadata,
+  or affected workflows are temporarily switched to `gpt-5.2-codex`.
+- Filed new P0 tracking issue this run. DO NOT RE-FILE individual per-workflow occurrences
+  (#60113, #60143, #60150, #60173, #60241, #60455, #60465, #60471, #60541, #60543, #60545,
+  #60546, #60554) — consolidate under the new P0 issue.
+
 # Shared Alerts — 2026-07-08T13:26Z (Agent Performance Analyzer)
 
 ## P1 🚨
