@@ -682,7 +682,7 @@ function runOperationalValueGrader(id, evaluatorContent, meta, options) {
  * @param {any} [githubClient]
  * @returns {Promise<{createdAt: string, error?: string}>}
  */
-async function resolveRunCreatedAt(env = process.env, githubClient = undefined) {
+async function resolveRunCreatedAtForGrading(env = process.env, githubClient = undefined) {
   const fromEnv = normalizeRunCreatedAt(env.GH_AW_RUN_CREATED_AT);
   if (fromEnv) return { createdAt: fromEnv };
 
@@ -813,7 +813,7 @@ async function main(manifestB64, execSpecB64) {
   let operationalValueRunCreatedAtError;
   let operationalValueRunMetadata;
   if (operationalValueManifest) {
-    const resolved = await resolveRunCreatedAt();
+    const resolved = await resolveRunCreatedAtForGrading();
     if (resolved.createdAt) {
       operationalValueRunMetadata = { createdAt: resolved.createdAt };
     } else {
@@ -920,7 +920,7 @@ module.exports = {
   runBuiltinGrader,
   runCustomGrader,
   runOperationalValueGrader,
-  resolveRunCreatedAt,
+  resolveRunCreatedAtForGrading,
   normalizeResult,
   buildGradersSummaryBody,
   evaluateThreshold,

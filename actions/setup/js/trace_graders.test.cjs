@@ -19,7 +19,7 @@ const {
   runGrader,
   runBuiltinGrader,
   runCustomGrader,
-  resolveRunCreatedAt,
+  resolveRunCreatedAtForGrading,
   normalizeResult,
   buildGradersSummaryBody,
   evaluateThreshold,
@@ -197,14 +197,14 @@ describe("trace_graders", () => {
     });
   });
 
-  describe("resolveRunCreatedAt", () => {
+  describe("resolveRunCreatedAtForGrading", () => {
     it("normalizes the activation output to a UTC ISO timestamp", async () => {
-      await expect(resolveRunCreatedAt({ GH_AW_RUN_CREATED_AT: "2026-09-12T20:58:00.000Z" })).resolves.toEqual({ createdAt: "2026-09-12T20:58:00Z" });
+      await expect(resolveRunCreatedAtForGrading({ GH_AW_RUN_CREATED_AT: "2026-09-12T20:58:00.000Z" })).resolves.toEqual({ createdAt: "2026-09-12T20:58:00Z" });
     });
 
     it("falls back to Actions run metadata when the activation output is missing", async () => {
       const getWorkflowRun = vi.fn().mockResolvedValue({ data: { created_at: "2026-09-12T20:58:00Z" } });
-      const resolved = await resolveRunCreatedAt({ GH_AW_RUN_CREATED_AT: "", GITHUB_REPOSITORY: "githubnext/gh-aw-cao", GITHUB_RUN_ID: "34718229379" }, { rest: { actions: { getWorkflowRun } } });
+      const resolved = await resolveRunCreatedAtForGrading({ GH_AW_RUN_CREATED_AT: "", GITHUB_REPOSITORY: "githubnext/gh-aw-cao", GITHUB_RUN_ID: "34718229379" }, { rest: { actions: { getWorkflowRun } } });
 
       expect(getWorkflowRun).toHaveBeenCalledWith({ owner: "githubnext", repo: "gh-aw-cao", run_id: 34718229379 });
       expect(resolved).toEqual({ createdAt: "2026-09-12T20:58:00Z" });
@@ -212,14 +212,14 @@ describe("trace_graders", () => {
 
     it("reports an acquisition failure when the fallback lookup fails", async () => {
       const getWorkflowRun = vi.fn().mockRejectedValue(new Error("forbidden"));
-      const resolved = await resolveRunCreatedAt({ GITHUB_REPOSITORY: "githubnext/gh-aw-cao", GITHUB_RUN_ID: "34718229379" }, { rest: { actions: { getWorkflowRun } } });
+      const resolved = await resolveRunCreatedAtForGrading({ GITHUB_REPOSITORY: "githubnext/gh-aw-cao", GITHUB_RUN_ID: "34718229379" }, { rest: { actions: { getWorkflowRun } } });
 
       expect(resolved.createdAt).toBe("");
       expect(resolved.error).toContain("forbidden");
     });
 
     it("reports an acquisition failure when no lookup is possible", async () => {
-      const resolved = await resolveRunCreatedAt({ GITHUB_REPOSITORY: "", GITHUB_RUN_ID: "" }, null);
+      const resolved = await resolveRunCreatedAtForGrading({ GITHUB_REPOSITORY: "", GITHUB_RUN_ID: "" }, null);
 
       expect(resolved.createdAt).toBe("");
       expect(resolved.error).toContain("unavailable");

@@ -40,10 +40,10 @@ function isNonRetryableRunCreatedAtError(err) {
  */
 async function resolveRunCreatedAt(core, ctx, githubClient) {
   let lastError = "workflow run creation time is unavailable";
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
+  const github = githubClient || global.github;
   for (let attempt = 1; attempt <= RUN_CREATED_AT_ATTEMPTS; attempt++) {
     try {
-      // @ts-ignore - global.github is set by setupGlobals() from github-script context
-      const github = githubClient || global.github;
       const response = await github.rest.actions.getWorkflowRun({
         owner: ctx.repo.owner,
         repo: ctx.repo.repo,
@@ -61,7 +61,7 @@ async function resolveRunCreatedAt(core, ctx, githubClient) {
       }
     }
     if (attempt < RUN_CREATED_AT_ATTEMPTS) {
-      await new Promise(resolve => setTimeout(resolve, RUN_CREATED_AT_RETRY_DELAY_MS));
+      await new Promise(resolve => setTimeout(resolve, RUN_CREATED_AT_RETRY_DELAY_MS * attempt));
     }
   }
   core.warning(`Unable to load workflow-run creation time: ${lastError}`);
