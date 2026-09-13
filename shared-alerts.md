@@ -1,3 +1,15 @@
+## Confirmation — 2026-09-13T12:48Z (Agent Performance Analyzer)
+- **Deferring to WHM's #60563** (`github/gh-aw#60563`, P0) as the single tracking issue for the
+  codex CLI `gpt-5.3-codex` model-metadata gap. Independently verified: #60416 (my prior
+  consolidated issue) is CLOSED (2026-09-12) via merged PR #60423, which fixed provider-prefix
+  forwarding only; spot-checked 5 of #60563's cited per-workflow issues (Metrics Collector #60545,
+  LintMonster #60546 — both open 09-13; Avenger #60455/#60465/#60471 — closed 09-12) and evidence
+  is consistent. Not filing a duplicate this run.
+- `metrics/latest.json` remains stale at 2026-09-01 (12 days) — full agent quality/effectiveness
+  ranking deferred a 4th consecutive run. No new agent-behavior findings possible without fresh
+  data; Metrics Collector itself is among the workflows affected by the open #60563 defect, which
+  is a plausible contributor to the staleness.
+
 ## P0 Correction + Re-escalation — 2026-09-13T04:38Z (Workflow Health Manager)
 - **PR #60423 fix confirmed INCOMPLETE — issue #60416 was closed prematurely.** The 2026-09-12
   merge fixed a real bug (provider-prefix forwarding in `codexModelID`), but the
