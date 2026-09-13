@@ -23,6 +23,7 @@ Load these additional files only when relevant:
 - [visual-regression.md](visual-regression.md)
 - [serena-tool.md](serena-tool.md)
 - [linter-workflows.md](linter-workflows.md)
+- [release-workflow.md](release-workflow.md) whenever a workflow creates or updates release notes
 - [agent-runtime-instructions.md](agent-runtime-instructions.md) for changes involving Docker, gVisor, Docker sbx, ARC DinD, self-hosted runners, or `sandbox.agent.runtime-install`
 - [skills.md](skills.md) when the user asks to add specific skills or agent plugins
 
@@ -50,6 +51,7 @@ Use [workflow-editing.md](workflow-editing.md) as the source of truth for when r
 - when an implementation-only change selects a different architecture, revalidate activation conditions, evidence window, deduplication or previous-result strategy, no-op behavior, and evals so event-specific rules do not survive an incompatible redesign
 - when targeting the Copilot coding agent, recommend `permissions: { copilot-requests: write }` for Copilot authentication
 - prefer `toolsets:` for GitHub tools
+- require `update-release` for agent-generated release notes or release-description changes; never use direct `gh`, API, or GitHub write-tool mutations from the agent
 - when the user asks for specific skills or agent plugins, add them to the top-level `skills:` / `plugins:` frontmatter fields; never add on-the-fly install steps or prompt instructions to install them at run time (see [skills.md](skills.md))
 
 See [workflow-constraints.md](workflow-constraints.md) for the read-only security posture (keep the agent job read-only, route writes through `safe-outputs:`).
