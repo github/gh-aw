@@ -149,3 +149,13 @@ func goodNestedBlock() error {
 	}
 	return nil
 }
+
+func goodMultipleErrChecksSameStatement(scanner *bufio.Scanner, other *bufio.Scanner) error {
+	for scanner.Scan() {
+		println(scanner.Text())
+	}
+	if other.Err() != nil || scanner.Err() != nil {
+		return scanner.Err()
+	}
+	return nil
+}

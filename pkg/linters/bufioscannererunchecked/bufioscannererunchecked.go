@@ -147,10 +147,22 @@ func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiver
 
 // scannerMethodReceiverMatches checks if a node contains a scanner method call on the same receiver.
 func scannerMethodReceiverMatches(pass *analysis.Pass, node ast.Node, methodName string, scanner *receiverRef) bool {
-	if scanner == nil {
+	if node == nil || scanner == nil {
 		return false
 	}
-	return sameReceiver(findScannerMethodReceiver(pass, node, methodName, false), scanner)
+	matched := false
+	ast.Inspect(node, func(n ast.Node) bool {
+		if matched {
+			return false
+		}
+		receiver := scannerMethodCallReceiver(pass, n, methodName)
+		if sameReceiver(receiver, scanner) {
+			matched = true
+			return false
+		}
+		return true
+	})
+	return matched
 }
 
 func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName string, skipNestedLoops bool) *receiverRef {
@@ -158,10 +170,9 @@ func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName st
 		return nil
 	}
 
-	found := false
 	var result *receiverRef
 	ast.Inspect(node, func(n ast.Node) bool {
-		if found {
+		if result != nil {
 			return false
 		}
 		if skipNestedLoops && n != node {
@@ -171,26 +182,8 @@ func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName st
 			}
 		}
 
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-
-		if sel.Sel.Name != methodName {
-			return true
-		}
-
-		if !isBufioScanner(pass, sel.X) {
-			return true
-		}
-		if receiver := receiverKey(pass, sel.X); receiver != nil {
+		if receiver := scannerMethodCallReceiver(pass, n, methodName); receiver != nil {
 			result = receiver
-			found = true
 			return false
 		}
 
@@ -198,6 +191,27 @@ func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName st
 	})
 
 	return result
+}
+
+func scannerMethodCallReceiver(pass *analysis.Pass, node ast.Node, methodName string) *receiverRef {
+	call, ok := node.(*ast.CallExpr)
+	if !ok {
+		return nil
+	}
+
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return nil
+	}
+
+	if sel.Sel.Name != methodName {
+		return nil
+	}
+
+	if !isBufioScanner(pass, sel.X) {
+		return nil
+	}
+	return receiverKey(pass, sel.X)
 }
 
 // isBufioScanner reports whether expr has type bufio.Scanner or *bufio.Scanner.
