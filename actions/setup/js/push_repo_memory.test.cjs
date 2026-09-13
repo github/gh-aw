@@ -1867,6 +1867,26 @@ describe("push_repo_memory.cjs - concurrent merge policy", () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it("configures the merge policy before the retry pull, in its own try/catch (source check)", () => {
+    const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = fs.readFileSync(scriptPath, "utf8");
+
+    const policyIndex = scriptContent.indexOf("configureRepoMemoryMergePolicy(workspaceDir)");
+    const pullIndex = scriptContent.indexOf('execGitSync(["pull", "--no-rebase", "-X", "ours"');
+
+    // The merge policy must be wired into the retry path and run before the pull
+    expect(policyIndex).toBeGreaterThan(-1);
+    expect(pullIndex).toBeGreaterThan(-1);
+    expect(policyIndex).toBeLessThan(pullIndex);
+
+    // A merge-policy failure must be reported distinctly instead of being
+    // swallowed by the generic "Pull on retry failed" message
+    const between = scriptContent.slice(policyIndex, pullIndex);
+    expect(between).toContain("catch (mergePolicyError)");
+    expect(between).toContain("core.warning");
+    expect(between).not.toContain("Pull on retry failed");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

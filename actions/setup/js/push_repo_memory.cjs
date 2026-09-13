@@ -691,6 +691,10 @@ async function main() {
             // will fall back to git push for this retry attempt.
             try {
               configureRepoMemoryMergePolicy(workspaceDir);
+            } catch (mergePolicyError) {
+              core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
+            }
+            try {
               execGitSync(["pull", "--no-rebase", "-X", "ours", repoUrlWithToken, branchName], { stdio: "inherit", suppressLogs: true });
             } catch (pullError) {
               core.info(`Pull on retry failed (may be expected for new branches): ${getErrorMessage(pullError)}`);
