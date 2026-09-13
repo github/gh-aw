@@ -120,56 +120,51 @@ func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt) *receiverRe
 }
 
 // scannerMethodReceiver returns the receiver of a bufio.Scanner method call.
-func scannerMethodReceiver(pass *analysis.Pass, expr ast.Node, methodName string) *receiverRef {
-	if expr == nil {
-		return nil
-	}
-	var result *receiverRef
-	ast.Inspect(expr, func(n ast.Node) bool {
-		if result != nil {
-			return false
-		}
-
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-
-		if sel.Sel.Name != methodName {
-			return true
-		}
-
-		if !isBufioScanner(pass, sel.X) {
-			return true
-		}
-		if receiver := receiverKey(pass, sel.X); receiver != nil {
-			result = receiver
-			return false
-		}
-
-		return true
-	})
-
-	return result
+func scannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName string) *receiverRef {
+	return findScannerMethodReceiver(pass, node, methodName, false)
 }
 
 // scannerMethodReceiverSkippingNestedLoops finds scanner calls in loop bodies
 // without attributing scanner loops nested inside another loop to the outer loop.
-func scannerMethodReceiverSkippingNestedLoops(pass *analysis.Pass, expr ast.Node, methodName string) *receiverRef {
-	if expr == nil {
+func scannerMethodReceiverSkippingNestedLoops(pass *analysis.Pass, node ast.Node, methodName string) *receiverRef {
+	return findScannerMethodReceiver(pass, node, methodName, true)
+}
+
+// hasScannerErrCheck checks if the following statements call scanner.Err()
+func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiverRef) bool {
+	for _, stmt := range stmts {
+		if stmt == nil {
+			continue
+		}
+
+		if scannerMethodReceiverMatches(pass, stmt, "Err", scanner) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// scannerMethodReceiverMatches checks if a node contains a scanner method call on the same receiver.
+func scannerMethodReceiverMatches(pass *analysis.Pass, node ast.Node, methodName string, scanner *receiverRef) bool {
+	if scanner == nil {
+		return false
+	}
+	return sameReceiver(findScannerMethodReceiver(pass, node, methodName, false), scanner)
+}
+
+func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName string, skipNestedLoops bool) *receiverRef {
+	if node == nil {
 		return nil
 	}
+
+	found := false
 	var result *receiverRef
-	ast.Inspect(expr, func(n ast.Node) bool {
-		if result != nil {
+	ast.Inspect(node, func(n ast.Node) bool {
+		if found {
 			return false
 		}
-		if n != expr {
+		if skipNestedLoops && n != node {
 			switch n.(type) {
 			case *ast.ForStmt, *ast.RangeStmt:
 				return false
@@ -195,59 +190,6 @@ func scannerMethodReceiverSkippingNestedLoops(pass *analysis.Pass, expr ast.Node
 		}
 		if receiver := receiverKey(pass, sel.X); receiver != nil {
 			result = receiver
-			return false
-		}
-
-		return true
-	})
-
-	return result
-}
-
-// hasScannerErrCheck checks if the following statements call scanner.Err()
-func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiverRef) bool {
-	for _, stmt := range stmts {
-		if stmt == nil {
-			continue
-		}
-
-		if scannerMethodReceiverMatches(pass, stmt, "Err", scanner) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// scannerMethodReceiverMatches checks if a node contains a scanner method call on the same receiver.
-func scannerMethodReceiverMatches(pass *analysis.Pass, stmt ast.Node, methodName string, scanner *receiverRef) bool {
-	if scanner == nil {
-		return false
-	}
-	found := false
-	ast.Inspect(stmt, func(n ast.Node) bool {
-		if found {
-			return false
-		}
-
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-
-		if sel.Sel.Name != methodName {
-			return true
-		}
-
-		if !isBufioScanner(pass, sel.X) {
-			return true
-		}
-		if sameReceiver(receiverKey(pass, sel.X), scanner) {
 			found = true
 			return false
 		}
@@ -255,7 +197,7 @@ func scannerMethodReceiverMatches(pass *analysis.Pass, stmt ast.Node, methodName
 		return true
 	})
 
-	return found
+	return result
 }
 
 // isBufioScanner reports whether expr has type bufio.Scanner or *bufio.Scanner.
