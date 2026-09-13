@@ -159,7 +159,10 @@ it("counts missing evals accounting as zero when the failed job collected no usa
       job("agent"),
       job("evals", {
         conclusion: "failure",
-        steps: [{ name: "Collect evals token usage", conclusion: "success" }],
+        steps: [
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals accounting after failure", conclusion: "success" },
+        ],
       }),
     ]
   );
@@ -169,12 +172,69 @@ it("counts missing evals accounting as zero when the failed job collected no usa
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"evals/token_usage.jsonl"'));
 });
 
+it("counts missing evals accounting as zero when the successful-path upload step ran instead", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals results", conclusion: "success" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).resolves.toBe(2);
+});
+
 it("still requires evals accounting when collection did not succeed", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
     },
-    [job("agent"), job("evals", { conclusion: "failure", steps: [{ name: "Collect evals token usage", conclusion: "failure" }] })]
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Collect evals token usage", conclusion: "failure" },
+          { name: "Upload evals accounting after failure", conclusion: "success" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it("still requires evals accounting when collection succeeded but the eval artifact upload failed", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals accounting after failure", conclusion: "failure" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
+it("still requires evals accounting when the job failed before any step ran", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [job("agent"), job("evals", { conclusion: "failure", steps: [] })]
   );
   await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
 });
