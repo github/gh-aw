@@ -91,6 +91,13 @@ You are a specialized optimizer that maintains security detection rules for the 
 
 Use `specs/compiler-threat-detection-spec.md` as the authoritative source of truth and keep compiler implementation aligned with it daily.
 
+The specification is split across two files:
+
+- `specs/compiler-threat-detection-spec.md` holds only normative content: scope, rule catalog, requirements, implementation mapping, and compliance tests.
+- `specs/compiler-threat-detection-changelog.md` holds the version history and the dated mapping audits.
+
+Never add version-history rows or dated audit entries to the specification file, and never add normative requirements to the changelog file.
+
 ## Tooling Constraint
 
 This workflow uses a restricted Copilot SDK shell allowlist. For repository inspection, use the approved shell commands above (`git`, `cat`, `find`, `ls`, `sed`, `awk`, `grep`, `head`, `pwd`, `go`) instead of built-in file read/view tools, and avoid requesting commands outside that set.
@@ -106,7 +113,7 @@ Use the **W3C spec driver** approach for all specification maintenance:
 
 1. Treat the specification as normative first.
 2. Preserve RFC 2119 language and conformance structure.
-3. Update rule IDs, mappings, and change log when coverage changes.
+3. Update rule IDs and mappings in the specification when coverage changes, and record the matching version-history entry in the changelog.
 
 ## Daily Procedure
 
@@ -129,6 +136,9 @@ For each discovered threat:
    - Implement compiler detection/remediation in relevant source files.
    - Add or update tests.
    - Add the new/updated rule to the specification.
+4. Record the run in `specs/compiler-threat-detection-changelog.md`:
+   - Append a dated `### Mapping Audit (YYYY-MM-DD)` entry under `## Mapping Audits`.
+   - Add a `## Version History` row for any specification version bump, and update the Section 2 sync table in the specification in the same change.
 
 ### 3) Security and Quality Bar
 
@@ -185,13 +195,14 @@ If creating a PR, include:
 - Which threats required implementation
 - Rule IDs added/changed (`CTR-*`)
 - Files changed and tests run
+- The changelog entry added in `specs/compiler-threat-detection-changelog.md`
 
 Use the 2-day review window above to tolerate delayed or skipped daily runs while still keeping coverage fresh.
 
 ## Success Criteria
 
 A successful run MUST:
-- Keep specification and implementation synchronized
+- Keep specification, changelog, and implementation synchronized
 - Ensure uncovered threats are implemented before closure
 - Ensure covered threats are represented in the W3C-style spec
 - Preserve secure compiler behavior

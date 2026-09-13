@@ -107,13 +107,14 @@ func tableCells(row string) []string {
 	return cells
 }
 
-// parseCTRSpecArtifacts extracts the §5.1 catalog, §7.1 mapping, §8.1 test
-// catalog, §10 change log, and the compliance README crosswalk.
-func parseCTRSpecArtifacts(spec, complianceREADME string) ctrSpecArtifacts {
+// parseCTRSpecArtifacts extracts the §5.1 catalog, §7.1 mapping, and §8.1 test
+// catalog from the specification, the version history from the separate
+// changelog document, and the compliance README crosswalk.
+func parseCTRSpecArtifacts(spec, changeLog, complianceREADME string) ctrSpecArtifacts {
 	artifacts := ctrSpecArtifacts{
 		catalog:   map[string]ctrCatalogEntry{},
 		mapping:   map[string]ctrMappingRow{},
-		changeLog: specSection(spec, "## 10. Change Log"),
+		changeLog: changeLog,
 	}
 
 	for line := range strings.SplitSeq(specSection(spec, "### 5.1 Core Rule Catalog"), "\n") {
@@ -316,9 +317,11 @@ func readCTRSpecArtifacts(t *testing.T) ctrSpecArtifacts {
 	specsDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "specs")
 	spec, err := os.ReadFile(filepath.Join(specsDir, "compiler-threat-detection-spec.md"))
 	require.NoError(t, err)
+	changeLog, err := os.ReadFile(filepath.Join(specsDir, "compiler-threat-detection-changelog.md"))
+	require.NoError(t, err)
 	readme, err := os.ReadFile(filepath.Join(specsDir, "compiler-threat-detection-compliance", "README.md"))
 	require.NoError(t, err)
-	return parseCTRSpecArtifacts(string(spec), string(readme))
+	return parseCTRSpecArtifacts(string(spec), string(changeLog), string(readme))
 }
 
 func TestFormal_DeprecationPolicy_SpecArtifactsAreParsed(t *testing.T) {
@@ -328,7 +331,7 @@ func TestFormal_DeprecationPolicy_SpecArtifactsAreParsed(t *testing.T) {
 	require.NotEmpty(t, artifacts.mapping, "Section 7.1 baseline rule mapping must be parsed")
 	require.NotEmpty(t, artifacts.tests, "Section 8.1 test ID catalog must be parsed")
 	require.NotEmpty(t, artifacts.crosswalk, "compliance crosswalk must be parsed")
-	require.NotEmpty(t, artifacts.changeLog, "Section 10 change log must be parsed")
+	require.NotEmpty(t, artifacts.changeLog, "changelog document must be parsed")
 
 	for _, ruleID := range []string{"CTR-001", "CTR-011", "CTR-026"} {
 		require.Contains(t, artifacts.catalog, ruleID)
@@ -370,8 +373,9 @@ const ctrFixtureSpec = `### 5.1 Core Rule Catalog
 | **T-CTR-002** [DEPRECATED] | CTR-002 Retired Rule | trigger | none | ` + "`CTR-002`" + ` |
 
 ### 8.2 Optimizer Protocol Test ID Catalog
+`
 
-## 10. Change Log
+const ctrFixtureChangeLog = `## Version History
 
 ### 1.2.3 (2026-01-01)
 
@@ -385,7 +389,7 @@ const ctrFixtureREADME = `| Rule ID | Test ID |
 `
 
 func TestFormal_DeprecationPolicy_CompliantDeprecationConforms(t *testing.T) {
-	artifacts := parseCTRSpecArtifacts(ctrFixtureSpec, ctrFixtureREADME)
+	artifacts := parseCTRSpecArtifacts(ctrFixtureSpec, ctrFixtureChangeLog, ctrFixtureREADME)
 
 	require.Equal(t, []string{"CTR-002"}, artifacts.deprecatedRuleIDs())
 	require.Empty(t, artifacts.verifyDeprecationPolicy())
@@ -399,6 +403,7 @@ func TestFormal_DeprecationPolicy_DetectsNonConformingDeprecations(t *testing.T)
 	cases := []struct {
 		name          string
 		spec          string
+		changeLog     string
 		readme        string
 		wantViolation string
 	}{
@@ -446,7 +451,8 @@ func TestFormal_DeprecationPolicy_DetectsNonConformingDeprecations(t *testing.T)
 		},
 		{
 			name:          "change log entry missing",
-			spec:          strings.ReplaceAll(ctrFixtureSpec, "- Deprecated CTR-002 in v1.2.3 because the compiler feature it depended on was removed.", "- Routine maintenance."),
+			spec:          ctrFixtureSpec,
+			changeLog:     strings.ReplaceAll(ctrFixtureChangeLog, "- Deprecated CTR-002 in v1.2.3 because the compiler feature it depended on was removed.", "- Routine maintenance."),
 			readme:        ctrFixtureREADME,
 			wantViolation: "change log must document the deprecation",
 		},
@@ -454,7 +460,11 @@ func TestFormal_DeprecationPolicy_DetectsNonConformingDeprecations(t *testing.T)
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			violations := parseCTRSpecArtifacts(tc.spec, tc.readme).verifyDeprecationPolicy()
+			changeLog := tc.changeLog
+			if changeLog == "" {
+				changeLog = ctrFixtureChangeLog
+			}
+			violations := parseCTRSpecArtifacts(tc.spec, changeLog, tc.readme).verifyDeprecationPolicy()
 			require.NotEmpty(t, violations)
 			require.Contains(t, strings.Join(violations, "\n"), tc.wantViolation)
 		})
@@ -462,7 +472,7 @@ func TestFormal_DeprecationPolicy_DetectsNonConformingDeprecations(t *testing.T)
 }
 
 func TestFormal_DeprecationPolicy_DeprecatedTestIDsLeaveRequiredGate(t *testing.T) {
-	artifacts := parseCTRSpecArtifacts(ctrFixtureSpec, ctrFixtureREADME)
+	artifacts := parseCTRSpecArtifacts(ctrFixtureSpec, ctrFixtureChangeLog, ctrFixtureREADME)
 
 	required := artifacts.requiredTestIDs()
 	require.Contains(t, required, "T-CTR-001", "active rule's test ID must remain required")
