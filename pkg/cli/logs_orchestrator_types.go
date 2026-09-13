@@ -68,10 +68,12 @@ type LogsDownloadOptions struct {
 	// because the caller (multi-target orchestration) already installed the
 	// shared deadline on the context passed in. TimeoutMinutes/TimeoutSeconds
 	// remain set so continuations still report the caller's timeout.
-	inheritTimeoutContext bool
-	cachedJSONLWriter     *cachedLogsJSONLWriter
-	cachedJSONLCache      *cachedLogsJSONLCache
-	collectionStats       *logsCollectionStats
+	inheritTimeoutContext  bool
+	cachedJSONLWriter      *cachedLogsJSONLWriter
+	cachedJSONLCache       *cachedLogsJSONLCache
+	cachedJSONLSourcePaths []string
+	cachedJSONLWildcard    bool
+	collectionStats        *logsCollectionStats
 }
 
 type workflowLogsResult struct {

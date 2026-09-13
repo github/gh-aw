@@ -38,20 +38,20 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
-	cachedJSONLCache, err := loadCachedLogsJSONL(opts.CachedJSONL)
+	preparedCachedJSONL, err := prepareCachedLogsJSONLPath(opts.CachedJSONL)
 	if err != nil {
 		return err
 	}
 	var cachedRuns cachedLogsRuns
-	if cachedJSONLCache != nil {
-		cachedRuns = cachedJSONLCache.runs
+	if preparedCachedJSONL.cache != nil {
+		cachedRuns = preparedCachedJSONL.cache.runs
 	}
 	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
-	cachedJSONLWriter := newCachedLogsJSONLWriter(opts.CachedJSONL)
+	cachedJSONLWriter := preparedCachedJSONL.writer
 	defer func() {
-		err = errors.Join(err, cachedJSONLWriter.filterDateRange(opts.StartDate, opts.EndDate))
+		err = errors.Join(err, finalizeCachedLogsJSONL(cachedJSONLWriter, preparedCachedJSONL.sourcePaths, preparedCachedJSONL.wildcard, opts.StartDate, opts.EndDate))
 	}()
 
 	if err := ensureLogsGitignore(); err != nil {
