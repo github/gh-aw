@@ -19,3 +19,4 @@ Safe outputs are the write path for agentic workflows. Keep the main agent job r
 - Always scope mutating operations as tightly as possible.
 - For pull-request or branch mutation, always restrict `allowed-files`.
 - Use `noop` when no visible change is required after successful execution.
+- `target:` is enforced, not merely validated: when set to `"triggering"` or a fixed number, any issue/PR number the agent supplies in its JSON output (including temporary-id references) is ignored in favor of the configured target. Only `target: "*"` lets the agent's own output select which issue/PR is affected.

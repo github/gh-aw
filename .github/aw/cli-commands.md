@@ -223,6 +223,7 @@ Update imported shared workflow components.
 ```bash
 gh aw update                                # Update all workflows from source
 gh aw update <workflow-name>                # Update a specific workflow
+gh aw update <package-url-or-name>          # Update all workflows installed from a package
 gh aw update --major                        # Allow major version updates
 gh aw update --create-pull-request          # Update and open a PR (alias: --pr)
 gh aw update --repo owner/repo              # Update workflows in another repository (isolated shallow checkout)
