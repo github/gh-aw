@@ -215,8 +215,8 @@ func loadGraderResultsDocument(logsPath string) *graderArtifactFullDocument {
 
 // graderResultsFromUsageSummary returns the grader result document embedded in the usage
 // artifact's activity summary, or nil when it is absent or unreadable.
-func graderResultsFromUsageSummary(logsPath string) *graderArtifactFullDocument {
-	summary, err := loadUsageActivitySummary(logsPath)
+func graderResultsFromUsageSummary(runDir string) *graderArtifactFullDocument {
+	summary, err := loadUsageActivitySummary(runDir)
 	if err != nil {
 		gradersDataLog.Printf("Failed to load usage activity summary for grader results: %v", err)
 		return nil

@@ -808,7 +808,9 @@ function parseGraderResults(candidatePaths = GRADER_RESULTS_PATHS) {
       return parsed;
     } catch (err) {
       // Keep trying the remaining candidates: a truncated copy in one artifact
-      // must not hide a usable copy in another.
+      // must not hide a usable copy in another. The failure is still reported so a
+      // malformed file does not go unnoticed when a fallback path succeeds.
+      core.warning(`grader results ${candidate} could not be read: ${String(err)}`);
       lastError = new Error(`Failed to read grader results ${candidate}`, { cause: err });
     }
   }
