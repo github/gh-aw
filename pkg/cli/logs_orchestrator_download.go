@@ -83,6 +83,7 @@ type processWorkflowRunBatchOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
+	rateLimitState         *logsRateLimitState
 	cachedRuns             cachedLogsRuns
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	countLimit             *logsCountLimit
@@ -338,21 +339,23 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 			state.countLimitReached = runtime.fetchAllInRange
 			break
 		}
-		if err := waitForLogsRateLimit(runtime.activeCtx, opts.Verbose, state.iteration, opts.rateLimitFirstRequest, opts.MaxGitHubAPIRateLimit); err != nil {
+		if err := waitForLogsRateLimit(runtime.activeCtx, opts.Verbose, state.iteration, opts.rateLimitFirstRequest, opts.MaxGitHubAPIRateLimit, opts.rateLimitState); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				state.timeoutReached = true
 				break
 			}
 			if errors.Is(err, context.Canceled) {
 				if opts.countLimit.isReached() {
-					// Another target already filled the shared budget while
-					// this one was waiting on the rate limiter; stop cleanly
-					// and keep whatever this target already processed instead
-					// of discarding it behind a spurious cancellation error.
 					markSharedLogsCountReached(&state, runtime.fetchAllInRange, opts.countLimit)
 					break
 				}
+				if opts.rateLimitState.isReached() {
+					return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, errLogsAPIRateLimitReached
+				}
 				return nil, false, false, false, "", err
+			}
+			if errors.Is(err, errLogsAPIRateLimitReached) {
+				return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
 			}
 			if errors.Is(err, errInvalidMaxGitHubAPIRateLimit) {
 				return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
@@ -390,7 +393,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	opts.cachedJSONLCache = runtime.cachedJSONLCache
 	batch, err := logsFetchWorkflowRunBatch(runtime.activeCtx, opts, state.beforeDate, len(state.processedRuns), runtime.fetchAllInRange)
 	if err != nil {
-		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, err)
+		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, opts.rateLimitState, err)
 	}
 	opts.collectionStats.recordDiscovered(len(batch.runs))
 	if len(batch.runs) == 0 {
@@ -419,6 +422,7 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		maxConcurrentDownloads: opts.maxConcurrentDownloads,
 		storageLimit:           runtime.storageLimit,
 		maxGitHubAPIRateLimit:  opts.MaxGitHubAPIRateLimit,
+		rateLimitState:         opts.rateLimitState,
 		cachedRuns:             runtime.cachedRuns,
 		cachedJSONLWriter:      opts.cachedJSONLWriter,
 		countLimit:             opts.countLimit,
@@ -491,7 +495,7 @@ func effectiveLogsBatchCount(count, processedCount int, limit *logsCountLimit) i
 	return min(count, processedCount+remaining)
 }
 
-func handleLogsBatchError(state *logsCollectionState, fetchAllInRange bool, countLimit *logsCountLimit, err error) (bool, error) {
+func handleLogsBatchError(state *logsCollectionState, fetchAllInRange bool, countLimit *logsCountLimit, rateLimitState *logsRateLimitState, err error) (bool, error) {
 	if errors.Is(err, context.DeadlineExceeded) {
 		state.timeoutReached = true
 		return true, nil
@@ -502,6 +506,9 @@ func handleLogsBatchError(state *logsCollectionState, fetchAllInRange bool, coun
 			// stop cleanly instead of surfacing a spurious cancellation error.
 			markSharedLogsCountReached(state, fetchAllInRange, countLimit)
 			return true, nil
+		}
+		if rateLimitState.isReached() {
+			return true, errLogsAPIRateLimitReached
 		}
 		return true, err
 	}
@@ -526,6 +533,9 @@ func shouldStopLogsIteration(runtime logsDownloadRuntime, opts LogsDownloadOptio
 			// semantics and avoids surfacing a spurious cancellation error.
 			return false, false, nil
 		}
+		if opts.rateLimitState.isReached() {
+			return true, false, errLogsAPIRateLimitReached
+		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return true, false, runtime.activeCtx.Err()
 	default:
@@ -545,12 +555,15 @@ func shouldStopLogsIteration(runtime logsDownloadRuntime, opts LogsDownloadOptio
 // budget must fail closed rather than proceed with unknown consumption.
 var errLogsRateLimitEnforcementFailed = errors.New("failed to enforce configured GitHub API rate limit")
 
-func waitForLogsRateLimit(ctx context.Context, verbose bool, iteration int, firstRequest bool, configuredMax int) error {
+func waitForLogsRateLimit(ctx context.Context, verbose bool, iteration int, firstRequest bool, configuredMax int, state *logsRateLimitState) error {
 	if iteration == 0 && !firstRequest && configuredMax == 0 {
 		return nil
 	}
-	if err := checkAndWaitForRateLimitShared(ctx, verbose, configuredMax, 1); err != nil {
+	if err := state.check(ctx, verbose, configuredMax, 1); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		if errors.Is(err, errLogsAPIRateLimitReached) {
 			return err
 		}
 		if errors.Is(err, errInvalidMaxGitHubAPIRateLimit) {
@@ -814,6 +827,7 @@ func appendProcessedWorkflowRuns(
 		maxConcurrentDownloads: opts.maxConcurrentDownloads,
 		storageLimit:           opts.storageLimit,
 		maxGitHubAPIRateLimit:  opts.maxGitHubAPIRateLimit,
+		rateLimitState:         opts.rateLimitState,
 		cachedRuns:             opts.cachedRuns,
 		filters:                opts.filters,
 		onResult:               collector.onResult,

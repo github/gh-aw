@@ -107,7 +107,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs weekly-research --repo owner/repo  # Download logs from specific repository
 
   # Resource budgets
-  %[1]s logs --timeout 30 --max-github-api-rate-limit 12000 # Wait after 12000 core API requests are used
+  %[1]s logs --timeout 30 --max-github-api-rate-limit 12000 # Pause one target or stop multiple targets after 12000 requests
   %[1]s logs --timeout 30 --max-github-api-rate-limit -2000 # Keep 2000 core API requests available
   %[1]s logs --timeout 30 --max-storage 10240                # Prune cache data and stop downloads at 10 GB
   %[1]s logs --max-storage 10240 --prune-older-runs          # Remove oldest runs if cache pruning is insufficient
@@ -629,7 +629,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Int("timeout", 0, "Total download timeout in minutes across all targets (0 = no timeout)")
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")
-	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before waiting for reset (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")
+	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before pausing one target or stopping multiple targets (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")
 	logsCmd.Flags().Int("max-storage", 0, "Maximum logs storage in MB after pruning non-essential cache data (0 = unlimited)")
 	logsCmd.Flags().Bool("prune-older-runs", false, "Remove oldest completed runs when non-essential cache pruning cannot satisfy --max-storage")
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")

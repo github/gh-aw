@@ -9,6 +9,7 @@ import (
 	stderrors "errors"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -251,6 +252,55 @@ func TestSharedRateLimitGateRespectsCancellation(t *testing.T) {
 
 	require.ErrorIs(t, err, context.Canceled)
 	assert.Less(t, time.Since(start), time.Second, "waiting for the shared rate-limit gate should be cancellable")
+}
+
+func TestLogsRateLimitStateStopsAndReusesReachedState(t *testing.T) {
+	oldFetchRateLimitFunc := fetchRateLimitFunc
+	var calls atomic.Int64
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		calls.Add(1)
+		return rateLimitResource{
+			Limit:     15000,
+			Remaining: 3000,
+			Reset:     time.Now().Add(10 * time.Minute).Unix(),
+			Used:      12000,
+		}, nil
+	}
+	t.Cleanup(func() { fetchRateLimitFunc = oldFetchRateLimitFunc })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	state := newLogsRateLimitState(cancel)
+
+	start := time.Now()
+	err := state.check(ctx, false, 12000, 1)
+	require.ErrorIs(t, err, errLogsAPIRateLimitReached)
+	assert.Less(t, time.Since(start), time.Second, "multi-target rate limiting must not wait for reset")
+	require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+	err = state.check(context.Background(), false, 12000, 1)
+	require.ErrorIs(t, err, errLogsAPIRateLimitReached)
+	assert.Equal(t, int64(1), calls.Load(), "subsequent targets must reuse the shared reached state")
+}
+
+func TestNilLogsRateLimitStatePreservesSingleTargetWait(t *testing.T) {
+	oldFetchRateLimitFunc := fetchRateLimitFunc
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		return rateLimitResource{
+			Limit:     5000,
+			Remaining: RateLimitThreshold,
+			Reset:     time.Now().Add(10 * time.Minute).Unix(),
+			Used:      5000 - RateLimitThreshold,
+		}, nil
+	}
+	t.Cleanup(func() { fetchRateLimitFunc = oldFetchRateLimitFunc })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	var state *logsRateLimitState
+
+	err := state.check(ctx, false, 0, 1)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NotErrorIs(t, err, errLogsAPIRateLimitReached)
 }
 
 // TestSleepWithContextDeadlineExceeded verifies that sleepWithContext respects a

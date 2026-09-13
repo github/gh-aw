@@ -41,6 +41,7 @@ type concurrentRunDownloadParams struct {
 	evalsOnly             bool
 	storageLimit          *logsStorageLimit
 	maxGitHubAPIRateLimit int
+	rateLimitState        *logsRateLimitState
 	// evalsArtifactRequested is true when the caller wants evals results, either
 	// because --evals was passed (evalsOnly) or because --artifacts evals was
 	// explicitly listed. This drives the fallback download of the dedicated evals
@@ -65,6 +66,7 @@ type runArtifactsConcurrentOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	maxGitHubAPIRateLimit  int
+	rateLimitState         *logsRateLimitState
 	cachedRuns             cachedLogsRuns
 	filters                runFilterOpts
 	onResult               func(int, DownloadResult)
@@ -146,6 +148,7 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 	params := buildConcurrentDownloadParams(opts.outputDir, opts.verbose, opts.repoOverride, opts.artifactFilter, opts.evalsOnly, opts.artifactSets)
 	params.storageLimit = opts.storageLimit
 	params.maxGitHubAPIRateLimit = opts.maxGitHubAPIRateLimit
+	params.rateLimitState = opts.rateLimitState
 
 	results := runConcurrentArtifactDownloads(ctx, runs, opts, params, &completedCount, progressBar, maxConcurrent)
 	if progressBar != nil {
@@ -370,7 +373,7 @@ func processSingleRunDownload(
 			writeWorkflowRunFolderLocation(run.DatabaseID, runOutputDir)
 			logsOrchestratorLog.Printf("Downloading artifacts for run %d: owner=%s, repo=%s", run.DatabaseID, perRunParams.dlOwner, perRunParams.dlRepo)
 			err := params.storageLimit.runDownloadDeferredReserved(ctx, runOutputDir, func() error {
-				if err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, logsRunPreflightAPIReserve); err != nil {
+				if err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, logsRunPreflightAPIReserve, params.rateLimitState); err != nil {
 					return err
 				}
 
@@ -449,7 +452,7 @@ func prepareRunDownload(
 func tryDownloadEvalsArtifactFallback(ctx context.Context, runID int64, runOutputDir string, params concurrentRunDownloadParams) {
 	logsOrchestratorLog.Printf("evals not found in usage artifact for run %d, attempting fallback download of dedicated evals artifact", runID)
 	evalsFilter := []string{constants.EvalsArtifactName.String()}
-	err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1)
+	err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	if err == nil {
 		err = downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: runID, outputDir: runOutputDir, verbose: params.verbose, owner: params.dlOwner, repo: params.dlRepo, hostname: params.dlHost, artifactFilter: evalsFilter})
 	}
@@ -464,11 +467,11 @@ func tryDownloadEvalsArtifactFallback(ctx context.Context, runID int64, runOutpu
 	}
 }
 
-func waitForConfiguredRateLimit(ctx context.Context, verbose bool, configuredMax, reserve int) error {
+func waitForConfiguredRateLimit(ctx context.Context, verbose bool, configuredMax, reserve int, state *logsRateLimitState) error {
 	if configuredMax == 0 {
 		return nil
 	}
-	return checkAndWaitForRateLimitShared(ctx, verbose, configuredMax, reserve)
+	return state.check(ctx, verbose, configuredMax, reserve)
 }
 
 // tryLoadCachedRunResult attempts to return a pre-built DownloadResult from the on-disk
@@ -536,7 +539,7 @@ func tryLoadCachedRunResult(
 func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) bool {
 	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo)
 	if err == nil && needsRefresh {
-		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1)
+		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	}
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)

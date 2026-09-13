@@ -340,6 +340,52 @@ func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *t
 	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared count is reached")
 }
 
+func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
+	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
+	originalCollector := collectWorkflowLogsForTarget
+	originalFetchRateLimit := fetchRateLimitFunc
+	t.Cleanup(func() {
+		collectWorkflowLogsForTarget = originalCollector
+		fetchRateLimitFunc = originalFetchRateLimit
+	})
+
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		return rateLimitResource{
+			Limit:     15000,
+			Remaining: 3000,
+			Reset:     time.Now().Add(10 * time.Minute).Unix(),
+			Used:      12000,
+		}, nil
+	}
+	var calls atomic.Int64
+	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		calls.Add(1)
+		return workflowLogsResult{}, opts.rateLimitState.check(ctx, false, 12000, 1)
+	}
+
+	results := collectLogsTargets(context.Background(), LogsDownloadOptions{
+		Count:                 10,
+		OutputDir:             t.TempDir(),
+		MaxGitHubAPIRateLimit: 12000,
+	}, []logsWorkflowTarget{
+		{workflowName: "first"},
+		{workflowName: "second"},
+		{workflowName: "third"},
+	})
+
+	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared API ceiling is reached")
+	require.Len(t, results, 3)
+	continuationCount := 0
+	for _, result := range results {
+		require.ErrorIs(t, result.err, errLogsAPIRateLimitReached)
+		if result.result.continuation != nil {
+			continuationCount++
+			assert.Contains(t, result.result.continuation.Message, "GitHub API rate limit ceiling reached")
+		}
+	}
+	assert.Equal(t, 2, continuationCount, "each queued target must retain a continuation")
+}
+
 func TestCountLimitedLogsTargetResultPreservesDateRangeContinuation(t *testing.T) {
 	result := countLimitedLogsTargetResult(LogsDownloadOptions{
 		WorkflowName: "queued",

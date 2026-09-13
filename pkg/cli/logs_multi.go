@@ -109,14 +109,19 @@ func queuedLogsTargetResult(opts LogsDownloadOptions, ctx context.Context) workf
 	if !timeoutReached {
 		return workflowLogsResult{}
 	}
-	continuation := buildContinuationIfNeeded(nil, timeoutReached, false, false, logsTargetContinuationOptions(opts))
+	continuation := buildContinuationIfNeeded(nil, timeoutReached, false, false, false, logsTargetContinuationOptions(opts))
 	return workflowLogsResult{timeoutReached: true, continuation: continuation}
 }
 
 func countLimitedLogsTargetResult(opts LogsDownloadOptions) workflowLogsResult {
 	fetchAllInRange := opts.StartDate != "" || opts.EndDate != ""
-	continuation := buildContinuationIfNeeded(nil, false, fetchAllInRange, false, logsTargetContinuationOptions(opts))
+	continuation := buildContinuationIfNeeded(nil, false, fetchAllInRange, false, false, logsTargetContinuationOptions(opts))
 	return workflowLogsResult{countLimitReached: fetchAllInRange, continuation: continuation}
+}
+
+func rateLimitedLogsTargetResult(opts LogsDownloadOptions) workflowLogsResult {
+	continuation := buildContinuationIfNeeded(nil, false, false, false, true, logsTargetContinuationOptions(opts))
+	return workflowLogsResult{continuation: continuation}
 }
 
 func logsTargetContinuationOptions(opts LogsDownloadOptions) continuationOptions {
@@ -246,17 +251,16 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 	var wg sync.WaitGroup
 	workerCount := min(len(targets), getMaxConcurrentWorkflowDownloads())
 	countLimit := newLogsCountLimit(opts.Count)
+	targetsCtx, cancelTargets := context.WithCancel(ctx)
+	defer cancelTargets()
+	rateLimitState := newLogsRateLimitState(cancelTargets)
 	// targetsCtx is canceled the instant the shared run-count budget is
 	// exhausted (see logsCountLimit.cancelRemainingTargets), so every target
 	// still running or queued observes it at its next cooperative
 	// cancellation checkpoint instead of only checking countLimit.isReached()
 	// between its own batches/iterations.
-	targetsCtx := ctx
 	if countLimit != nil {
-		var cancel context.CancelFunc
-		targetsCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-		countLimit.cancel = cancel
+		countLimit.cancel = cancelTargets
 	}
 	shared := logsTargetSharedState{
 		sem:                make(chan struct{}, workerCount),
@@ -264,6 +268,7 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 		cleanupErrors:      make(map[string]error, len(targets)),
 		storageLimit:       newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns),
 		countLimit:         countLimit,
+		rateLimitState:     rateLimitState,
 	}
 	for _, target := range targets {
 		cleanupOpts := opts
@@ -295,6 +300,7 @@ type logsTargetSharedState struct {
 	cleanupErrors      map[string]error
 	storageLimit       *logsStorageLimit
 	countLimit         *logsCountLimit
+	rateLimitState     *logsRateLimitState
 }
 
 // collectSingleLogsTarget runs one workflow target's log collection, recovering
@@ -322,6 +328,7 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	targetOpts.maxConcurrentDownloads = shared.perTargetDownloads
 	targetOpts.storageLimit = shared.storageLimit
 	targetOpts.countLimit = shared.countLimit
+	targetOpts.rateLimitState = shared.rateLimitState
 	// The shared deadline is already installed on ctx by the caller, so the
 	// target must not build a second timeout context of its own. TimeoutMinutes
 	// and TimeoutSeconds are deliberately preserved (rather than zeroed) so the
@@ -344,6 +351,9 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 			logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
 			return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
 		}
+		if shared.rateLimitState.isReached() {
+			return logsTargetResult{target: target, result: rateLimitedLogsTargetResult(targetOpts), err: errLogsAPIRateLimitReached}
+		}
 		// The target never started (e.g. it was still queued behind the
 		// semaphore when the shared deadline or cancellation fired). Build a
 		// continuation from its own options so a resumable date-range target
@@ -358,6 +368,9 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 		if shared.countLimit.isReached() {
 			logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
 			return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
+		}
+		if shared.rateLimitState.isReached() {
+			return logsTargetResult{target: target, result: rateLimitedLogsTargetResult(targetOpts), err: errLogsAPIRateLimitReached}
 		}
 		return logsTargetResult{
 			target: target,

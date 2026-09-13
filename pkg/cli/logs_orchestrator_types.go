@@ -28,8 +28,9 @@ type LogsDownloadOptions struct {
 	TimeoutMinutes     int
 	TimeoutSeconds     int
 	// MaxGitHubAPIRateLimit is the maximum number of core API requests that may
-	// be used in the current window before downloads wait for the reset. Negative
-	// values reserve that many requests from the API-reported limit.
+	// be used in the current window before a single target waits for the reset or
+	// multiple targets stop. Negative values reserve that many requests from the
+	// API-reported limit.
 	MaxGitHubAPIRateLimit int
 	// MaxStorageMB prunes non-essential cache data and stops new artifact
 	// downloads when OutputDir cannot be reduced below this size.
@@ -62,6 +63,7 @@ type LogsDownloadOptions struct {
 	maxConcurrentDownloads int
 	storageLimit           *logsStorageLimit
 	countLimit             *logsCountLimit
+	rateLimitState         *logsRateLimitState
 	// inheritTimeoutContext suppresses building a per-download timeout context
 	// because the caller (multi-target orchestration) already installed the
 	// shared deadline on the context passed in. TimeoutMinutes/TimeoutSeconds

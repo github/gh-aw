@@ -196,7 +196,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	}
 
 	t.Run("count limit reached emits cursor with correct message and BeforeRunID", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, false, true, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, true, false, false, continuationOptions{
 			workflowName:          "my-workflow",
 			startDate:             "2026-06-01",
 			endDate:               "2026-06-30",
@@ -224,7 +224,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 		// actually reached. The continuation must bound its end_date at the real
 		// pagination cursor, not the original request's end_date, or a resumed
 		// request restarts from the top of the original window (see github/gh-aw#54110).
-		c := buildContinuationIfNeeded(runs, false, true, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, true, false, false, continuationOptions{
 			workflowName:          "my-workflow",
 			startDate:             "2026-01-01",
 			endDate:               "2026-06-30",
@@ -238,7 +238,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("timeout reached emits cursor with timeout message", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, true, false, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, true, false, false, false, continuationOptions{
 			workflowName:   "my-workflow",
 			startDate:      "2026-06-01",
 			endDate:        "",
@@ -254,7 +254,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("storage limit reached emits resumable cursor", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, false, false, true, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, false, true, false, continuationOptions{
 			workflowName:   "my-workflow",
 			count:          50,
 			maxStorageMB:   2048,
@@ -268,7 +268,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("neither flag set returns nil", func(t *testing.T) {
-		c := buildContinuationIfNeeded(runs, false, false, false, continuationOptions{
+		c := buildContinuationIfNeeded(runs, false, false, false, false, continuationOptions{
 			workflowName:   "my-workflow",
 			startDate:      "2026-06-01",
 			endDate:        "",
@@ -282,7 +282,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("empty processedRuns returns current cursor when count limit stops a queued target", func(t *testing.T) {
-		c := buildContinuationIfNeeded(nil, false, true, false, continuationOptions{
+		c := buildContinuationIfNeeded(nil, false, true, false, false, continuationOptions{
 			workflowName:        "my-workflow",
 			startDate:           "2026-06-01",
 			endDate:             "",
@@ -297,7 +297,7 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 	})
 
 	t.Run("empty processedRuns returns current cursor when storage blocks progress", func(t *testing.T) {
-		c := buildContinuationIfNeeded(nil, false, false, true, continuationOptions{
+		c := buildContinuationIfNeeded(nil, false, false, true, false, continuationOptions{
 			workflowName: "my-workflow",
 			count:        100,
 			maxStorageMB: 2048,

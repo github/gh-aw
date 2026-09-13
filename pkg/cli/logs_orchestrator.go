@@ -239,10 +239,10 @@ func selectPaginationCursorDate(filteredRuns []WorkflowRun, oldestFetchedCreated
 //     returned in this batch.
 func buildContinuationIfNeeded(
 	processedRuns []ProcessedRun,
-	timeoutReached, countLimitReached, storageLimitReached bool,
+	timeoutReached, countLimitReached, storageLimitReached, rateLimitReached bool,
 	opts continuationOptions,
 ) *ContinuationData {
-	if !timeoutReached && !countLimitReached && !storageLimitReached {
+	if !timeoutReached && !countLimitReached && !storageLimitReached && !rateLimitReached {
 		return nil
 	}
 	// A target can make zero progress (e.g. a timeout, shared count limit, or
@@ -277,6 +277,8 @@ func buildContinuationIfNeeded(
 		message = "Count limit reached. Use these parameters to continue fetching more logs from the same date range."
 	} else if storageLimitReached {
 		message = "Storage limit reached. Use these parameters to continue fetching more logs after freeing space or changing max_storage."
+	} else if rateLimitReached {
+		message = "GitHub API rate limit ceiling reached. Use these parameters to continue fetching more logs after the rate limit resets."
 	}
 	return &ContinuationData{
 		Message:               message,
@@ -350,9 +352,16 @@ func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflo
 
 	processedRuns, timeoutReached, countLimitReached, storageLimitReached, lastFetchedBeforeDate, err := collectProcessedWorkflowRuns(runtime, opts)
 	if err != nil {
+		var continuation *ContinuationData
+		if errors.Is(err, errLogsAPIRateLimitReached) {
+			continuationOpts := logsTargetContinuationOptions(opts)
+			continuationOpts.lastFetchedBeforeDate = lastFetchedBeforeDate
+			continuation = buildContinuationIfNeeded(processedRuns, false, false, false, true, continuationOpts)
+		}
 		return workflowLogsResult{
 			processedRuns:       processedRuns,
 			artifactFilter:      runtime.artifactFilter,
+			continuation:        continuation,
 			countLimitReached:   countLimitReached,
 			timeoutReached:      timeoutReached,
 			storageLimitReached: storageLimitReached,
@@ -360,7 +369,7 @@ func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflo
 	}
 	processedRuns = limitProcessedRuns(processedRuns, opts.Count, opts.Verbose)
 	logsOrchestratorLog.Printf("Collected %d processed runs (timeoutReached=%v, countLimitReached=%v)", len(processedRuns), timeoutReached, countLimitReached)
-	continuation := buildContinuationIfNeeded(processedRuns, timeoutReached, countLimitReached, storageLimitReached, continuationOptions{
+	continuation := buildContinuationIfNeeded(processedRuns, timeoutReached, countLimitReached, storageLimitReached, false, continuationOptions{
 		workflowName:          opts.WorkflowName,
 		startDate:             opts.StartDate,
 		endDate:               opts.EndDate,

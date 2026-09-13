@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -35,6 +36,45 @@ var fetchRateLimitForHostFunc = func(ctx context.Context, host string) (rateLimi
 }
 var logsRateLimitGate = make(chan struct{}, 1)
 var errInvalidMaxGitHubAPIRateLimit = errors.New("invalid maximum GitHub API rate limit")
+var errLogsAPIRateLimitReached = errors.New("GitHub API rate limit ceiling reached")
+
+type logsRateLimitState struct {
+	gate    chan struct{}
+	cancel  context.CancelFunc
+	reached atomic.Bool
+}
+
+func newLogsRateLimitState(cancel context.CancelFunc) *logsRateLimitState {
+	return &logsRateLimitState{
+		gate:   make(chan struct{}, 1),
+		cancel: cancel,
+	}
+}
+
+func (s *logsRateLimitState) isReached() bool {
+	return s != nil && s.reached.Load()
+}
+
+func (s *logsRateLimitState) check(ctx context.Context, verbose bool, configuredMax, reserve int) error {
+	if s == nil {
+		return checkAndWaitForRateLimitShared(ctx, verbose, configuredMax, reserve)
+	}
+	select {
+	case s.gate <- struct{}{}:
+		defer func() { <-s.gate }()
+	case <-ctx.Done():
+		return contextCause(ctx)
+	}
+	if s.reached.Load() {
+		return errLogsAPIRateLimitReached
+	}
+	err := checkAndWaitForRateLimitMode(ctx, verbose, configuredMax, reserve, false)
+	if errors.Is(err, errLogsAPIRateLimitReached) {
+		s.reached.Store(true)
+		s.cancel()
+	}
+	return err
+}
 
 // checkAndWaitForRateLimitShared serializes quota checks and their cooldowns so
 // concurrent workflow downloads are staggered rather than consuming the API
@@ -286,6 +326,10 @@ func resolveMaxGitHubAPIRateLimit(configuredMax, apiLimit int) (int, error) {
 }
 
 func checkAndWaitForRateLimit(ctx context.Context, verbose bool, configuredMax, reserve int) error {
+	return checkAndWaitForRateLimitMode(ctx, verbose, configuredMax, reserve, true)
+}
+
+func checkAndWaitForRateLimitMode(ctx context.Context, verbose bool, configuredMax, reserve int, waitForReset bool) error {
 	rl, err := fetchRateLimitFunc(ctx)
 	if err != nil {
 		// Best-effort: fall back to static cooldown so the caller can continue.
@@ -317,6 +361,10 @@ func checkAndWaitForRateLimit(ctx context.Context, verbose bool, configuredMax, 
 		// Add a small buffer so we don't resume right on the boundary.
 		waitDur += rateLimitResetBuffer
 
+		if !waitForReset {
+			return stopForLogsRateLimit(rl, maxUsed, resetAt)
+		}
+
 		msg := fmt.Sprintf(
 			"GitHub API usage ceiling reached (%d of %d requests used; maximum %d). Waiting %.0f seconds until reset at %s",
 			rl.Used, rl.Limit, maxUsed, waitDur.Seconds(), resetAt.UTC().Format(time.RFC3339),
@@ -338,4 +386,13 @@ func checkAndWaitForRateLimit(ctx context.Context, verbose bool, configuredMax, 
 		return nil
 	}
 	return sleepWithContext(ctx, APICallCooldown)
+}
+
+func stopForLogsRateLimit(rl rateLimitResource, maxUsed int, resetAt time.Time) error {
+	err := fmt.Errorf(
+		"%w (%d of %d requests used; maximum %d; resets at %s)",
+		errLogsAPIRateLimitReached, rl.Used, rl.Limit, maxUsed, resetAt.UTC().Format(time.RFC3339),
+	)
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()+". Stopping remaining workflow targets"))
+	return err
 }
