@@ -16,6 +16,7 @@ const fs = require("fs");
 const path = require("path");
 const { GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
+const { findExistingFiles, findFirstExistingFile } = require("./file_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
 require("./shim.cjs");
@@ -646,8 +647,8 @@ function parseGatewayActivity(logRoots = ["/tmp/gh-aw", "/tmp/gh-aw/threat-detec
   };
 
   for (const root of logRoots) {
-    const gatewayPath = [path.join(root, "mcp-logs/gateway.jsonl"), path.join(root, "gateway.jsonl")].find(candidate => fs.existsSync(candidate));
-    const rpcPath = [path.join(root, "mcp-logs/rpc-messages.jsonl"), path.join(root, "rpc-messages.jsonl")].find(candidate => fs.existsSync(candidate));
+    const gatewayPath = findFirstExistingFile([path.join(root, "mcp-logs/gateway.jsonl"), path.join(root, "gateway.jsonl")]);
+    const rpcPath = findFirstExistingFile([path.join(root, "mcp-logs/rpc-messages.jsonl"), path.join(root, "rpc-messages.jsonl")]);
     const selectedPath = gatewayPath || rpcPath;
     if (!selectedPath) {
       continue;
@@ -796,10 +797,7 @@ function parseExperimentsData() {
 function parseGraderResults(candidatePaths = GRADER_RESULTS_PATHS) {
   /** @type {Error | null} */
   let lastError = null;
-  for (const candidate of candidatePaths) {
-    if (!fs.existsSync(candidate)) {
-      continue;
-    }
+  for (const candidate of findExistingFiles(candidatePaths)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
       if (!parsed || !Array.isArray(parsed.results)) {

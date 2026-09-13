@@ -15,6 +15,35 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 
 /**
+ * Return the candidate paths that exist as regular files, preserving the caller's
+ * preference order. Use this when the same file may be published in several
+ * artifact layouts (for example the compact usage artifact and the agent artifact).
+ *
+ * @param {string[]} candidatePaths - Candidate file paths, in preference order
+ * @returns {string[]} The subset of candidates that exist
+ */
+function findExistingFiles(candidatePaths) {
+  return candidatePaths.filter(candidate => {
+    try {
+      return fs.statSync(candidate).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Return the first candidate path that exists as a regular file, or undefined when
+ * none of them do.
+ *
+ * @param {string[]} candidatePaths - Candidate file paths, in preference order
+ * @returns {string | undefined} The first existing candidate
+ */
+function findFirstExistingFile(candidatePaths) {
+  return findExistingFiles(candidatePaths)[0];
+}
+
+/**
  * List all files recursively in a directory
  * @param {string} dirPath - The directory path to list
  * @param {string} [relativeTo] - Optional base path to show relative paths
@@ -89,4 +118,4 @@ function checkFileExists(filePath, artifactDir, fileDescription, required, conti
   }
 }
 
-module.exports = { listFilesRecursively, checkFileExists };
+module.exports = { listFilesRecursively, checkFileExists, findExistingFiles, findFirstExistingFile };

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { listFilesRecursively, checkFileExists } = require("./file_helpers.cjs");
+const { listFilesRecursively, checkFileExists, findExistingFiles, findFirstExistingFile } = require("./file_helpers.cjs");
 
 // Mock core object for testing
 global.core = {
@@ -147,5 +147,43 @@ describe("checkFileExists", () => {
     expect(mockCore.infoCalls.some(msg => msg.includes("Listing all files"))).toBe(true);
     expect(mockCore.infoCalls.some(msg => msg.includes("Found 1 file(s)"))).toBe(true);
     expect(mockCore.infoCalls.some(msg => msg.includes("other.txt"))).toBe(true);
+  });
+});
+
+describe("findExistingFiles / findFirstExistingFile", () => {
+  /** @type {string} */
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "find-existing-files-"));
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns existing candidates in preference order", () => {
+    const first = path.join(tmpDir, "first.json");
+    const second = path.join(tmpDir, "second.json");
+    fs.writeFileSync(first, "{}");
+    fs.writeFileSync(second, "{}");
+
+    expect(findExistingFiles([path.join(tmpDir, "missing.json"), second, first])).toEqual([second, first]);
+    expect(findFirstExistingFile([path.join(tmpDir, "missing.json"), second, first])).toBe(second);
+  });
+
+  it("ignores directories and missing paths", () => {
+    const dir = path.join(tmpDir, "nested");
+    fs.mkdirSync(dir);
+
+    expect(findExistingFiles([dir, path.join(tmpDir, "missing.json")])).toEqual([]);
+    expect(findFirstExistingFile([dir])).toBeUndefined();
+  });
+
+  it("returns an empty result for no candidates", () => {
+    expect(findExistingFiles([])).toEqual([]);
+    expect(findFirstExistingFile([])).toBeUndefined();
   });
 });
