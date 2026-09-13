@@ -18,8 +18,9 @@ GitHub Agentic Workflows upload several artifacts during workflow execution. Thi
 | `detection` | `constants.DetectionArtifactName` | Conditional | Legacy inline engine (`features.gh-aw-detection: false`): single-file `detection.log`. The default external `gh-aw-detection` engine: multi-file `detection_result.json` + `step-summary.md`; `detection.log` is intentionally **not** uploaded (see below) |
 | `safe-output` | `constants.SafeOutputArtifactName` | Legacy/back-compat | Historical standalone safe output artifact (`safe_output.jsonl`); in current compiled workflows this content is included in the unified `agent` artifact instead |
 | `agent-output` | `constants.AgentOutputArtifactName` | Legacy/back-compat | Historical standalone agent output artifact (`agent_output.json`); in current compiled workflows this content is included in the unified `agent` artifact instead |
-| `aw-info` | — | Single-file | Engine configuration (`aw_info.json`) |
-| `prompt` | — | Single-file | Generated prompt (`prompt.txt`) |
+| `info` | `constants.InfoArtifactName` | Single-file | Standalone copy of the workflow run information (`aw_info.json`), uploaded by the activation job in addition to the copy bundled in the `activation` artifact |
+| `aw-info` | — | Legacy/back-compat | Historical standalone engine-configuration artifact (`aw_info.json`); current compiled workflows upload this as `info` instead |
+| `prompt` | — | Legacy/back-compat | Historical standalone prompt artifact (`prompt.txt`); in current compiled workflows `prompt.txt` is included in the `activation` artifact instead |
 | `experiment` | `constants.ExperimentArtifactName` | Multi-file | A/B experiment state (`state.json`) uploaded by the activation job when experiments are declared in the frontmatter |
 | `usage` | `constants.UsageArtifactName` | Multi-file | Compact conclusion-job artifact with workflow-run metadata and token-usage files used by lightweight reporting and forecasting paths |
 | `evals` | `constants.EvalsArtifactName` | Single-file | BinEval evaluation results (`evals.jsonl`) uploaded by the evals job when `evals` are declared in the workflow frontmatter |
