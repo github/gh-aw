@@ -342,6 +342,30 @@ func TestPruneCachedLogsJSONLWildcardSourcesDeletesFilesWithoutInRangeRuns(t *te
 	assert.FileExists(t, unrelatedPath)
 }
 
+func TestFinalizeCachedLogsJSONLDeletesExpiredWildcardShards(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "logs-old.jsonl")
+	currentPath := filepath.Join(dir, "logs-current.jsonl")
+	futurePath := filepath.Join(dir, "logs-future.jsonl")
+	require.NoError(t, os.WriteFile(oldPath, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":1,\"created_at\":\"2026-08-31T23:59:59Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(currentPath, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":2,\"created_at\":\"2026-09-05T00:00:00Z\"}}\n"), 0o600))
+	require.NoError(t, os.WriteFile(futurePath, []byte("{\"schema_version\":2,\"kind\":\"run\",\"run\":{\"run_id\":3,\"created_at\":\"2026-09-11T00:00:00Z\"}}\n"), 0o600))
+
+	prepared, err := prepareCachedLogsJSONLPath(filepath.Join(dir, "logs-*"))
+	require.NoError(t, err)
+	require.NoError(t, prepared.writer.Append(ProcessedRun{Run: WorkflowRun{
+		DatabaseID: 4,
+		CreatedAt:  time.Date(2026, time.September, 5, 0, 0, 0, 0, time.UTC),
+	}}))
+
+	require.NoError(t, finalizeCachedLogsJSONL(prepared.writer, prepared.sourcePaths, prepared.wildcard, "2026-09-01", "2026-09-10"))
+
+	assert.NoFileExists(t, oldPath)
+	assert.FileExists(t, currentPath)
+	assert.NoFileExists(t, futurePath)
+	assert.FileExists(t, prepared.writer.path)
+}
+
 func TestCachedLogsJSONLWriterFiltersAppendedContentByDateRange(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	oldRun := `{"schema_version":2,"kind":"run","run":{"run_id":1,"created_at":"2026-08-31T23:59:59Z","future_field":"preserved"}}`
