@@ -249,6 +249,26 @@ it("still requires evals accounting when collection succeeded but the eval artif
   await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
 });
 
+it("still requires evals accounting when the current failure upload was skipped", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals results", conclusion: "skipped" },
+          { name: "Upload evals accounting after failure", conclusion: "skipped" },
+        ],
+      }),
+    ]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
 it("still requires evals accounting when the job failed before any step ran", async () => {
   const f = evaluate(
     {
