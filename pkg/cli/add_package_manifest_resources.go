@@ -69,9 +69,7 @@ func parseManifestResourceMapping(mapping map[string]any, manifestPath string) (
 func validateManifestResourceDestination(destination string) error {
 	switch {
 	case strings.HasPrefix(destination, constants.WorkflowsDirSlash+"shared/"):
-		remaining := strings.TrimPrefix(destination, constants.WorkflowsDirSlash+"shared/")
-		lower := strings.ToLower(remaining)
-		if remaining == "" || (!strings.HasSuffix(lower, ".mjs") && !strings.HasSuffix(lower, ".cjs")) {
+		if !isSharedWorkflowScriptDestination(destination) {
 			return errorsForResourceDestination()
 		}
 		return nil

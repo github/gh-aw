@@ -1053,6 +1053,58 @@ func TestAddWorkflowsWithTracking_PackageResourceWritesOwnershipRecord(t *testin
 	assert.Contains(t, string(record), `"sha256":`)
 }
 
+func TestAddWorkflowsWithTracking_PackageSharedScriptResourceWritesOwnershipRecord(t *testing.T) {
+	tempDir := testutil.TempDir(t, "test-package-shared-script-resource-*")
+	setupMinimalGitRepo(t, tempDir)
+
+	resourceContent := []byte("export function run() {}\n")
+	workflows := []*ResolvedWorkflow{
+		{
+			Spec: &WorkflowSpec{
+				RepoSpec: RepoSpec{
+					RepoSlug:    "owner/repo",
+					Version:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					PackagePath: "packages/repo-assist",
+				},
+				WorkflowPath:           "packages/repo-assist/shared/runtime.mjs",
+				WorkflowName:           "runtime",
+				DestinationPath:        ".github/workflows/shared/runtime.mjs",
+				FromRepositoryManifest: true,
+				IsPackageResourceFile:  true,
+			},
+			Content: resourceContent,
+			SourceInfo: &FetchedWorkflow{
+				Content:    resourceContent,
+				CommitSHA:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				IsLocal:    false,
+				SourcePath: "packages/repo-assist/shared/runtime.mjs",
+			},
+			IsPackageResourceFile: true,
+		},
+	}
+
+	err := addWorkflowsWithTracking(context.Background(), workflows, NewFileTracker(), AddOptions{
+		NoGitattributes:        true,
+		DisableSecurityScanner: true,
+		Quiet:                  true,
+	})
+	require.NoError(t, err)
+
+	resourcePath := filepath.Join(tempDir, ".github", "workflows", "shared", "runtime.mjs")
+	written, err := os.ReadFile(resourcePath)
+	require.NoError(t, err)
+	assert.Equal(t, resourceContent, written)
+
+	recordFiles, err := filepath.Glob(filepath.Join(tempDir, ".github", "aw", "packages", "*.json"))
+	require.NoError(t, err)
+	require.Len(t, recordFiles, 1)
+	record, err := os.ReadFile(recordFiles[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(record), `"source": "owner/repo/packages/repo-assist@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
+	assert.Contains(t, string(record), `"destination": ".github/workflows/shared/runtime.mjs"`)
+	assert.Contains(t, string(record), `"sha256":`)
+}
+
 func TestAddWorkflowsWithTracking_PackageResourceRejectsLocalDrift(t *testing.T) {
 	tempDir := testutil.TempDir(t, "test-package-resource-drift-*")
 	setupMinimalGitRepo(t, tempDir)
