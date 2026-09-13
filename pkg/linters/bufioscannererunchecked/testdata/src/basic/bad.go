@@ -124,3 +124,31 @@ func badInsideOuterLoop(file *os.File) {
 		}
 	}
 }
+
+func badScanInLoopBody(scanner *bufio.Scanner) {
+	for { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		if !scanner.Scan() {
+			break
+		}
+		println(scanner.Text())
+	}
+}
+
+func badSwitchCase(scanner *bufio.Scanner, mode string) {
+	switch mode {
+	case "scan":
+		for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+			println(scanner.Text())
+		}
+	}
+}
+
+func badSelectCase(scanner *bufio.Scanner, ch <-chan struct{}) {
+	select {
+	case <-ch:
+		for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+			println(scanner.Text())
+		}
+	default:
+	}
+}

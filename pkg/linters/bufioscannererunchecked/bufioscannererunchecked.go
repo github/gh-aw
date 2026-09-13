@@ -4,9 +4,7 @@
 package bufioscannererunchecked
 
 import (
-	"bytes"
 	"go/ast"
-	"go/printer"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
@@ -52,11 +50,14 @@ func analyzeFuncBody(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.G
 	}
 
 	ast.Inspect(body, func(n ast.Node) bool {
-		block, ok := n.(*ast.BlockStmt)
-		if !ok {
-			return true
+		switch node := n.(type) {
+		case *ast.BlockStmt:
+			analyzeBlockStatements(pass, node.List, generatedFiles, noLintIndex)
+		case *ast.CaseClause:
+			analyzeBlockStatements(pass, node.Body, generatedFiles, noLintIndex)
+		case *ast.CommClause:
+			analyzeBlockStatements(pass, node.Body, generatedFiles, noLintIndex)
 		}
-		analyzeBlockStatements(pass, block.List, generatedFiles, noLintIndex)
 		return true
 	})
 }
@@ -109,15 +110,70 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFile
 
 // findScannerInForLoop checks if a for loop uses bufio.Scanner.Scan().
 func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt) *receiverRef {
-	return scannerMethodReceiver(pass, forStmt.Cond, "Scan")
+	if scanner := scannerMethodReceiver(pass, forStmt.Cond, "Scan"); scanner != nil {
+		return scanner
+	}
+	if forStmt.Body == nil {
+		return nil
+	}
+	return scannerMethodReceiverSkippingNestedLoops(pass, forStmt.Body, "Scan")
 }
 
 // scannerMethodReceiver returns the receiver of a bufio.Scanner method call.
 func scannerMethodReceiver(pass *analysis.Pass, expr ast.Node, methodName string) *receiverRef {
+	if expr == nil {
+		return nil
+	}
 	var result *receiverRef
 	ast.Inspect(expr, func(n ast.Node) bool {
 		if result != nil {
 			return false
+		}
+
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		if sel.Sel.Name != methodName {
+			return true
+		}
+
+		if !isBufioScanner(pass, sel.X) {
+			return true
+		}
+		if receiver := receiverKey(pass, sel.X); receiver != nil {
+			result = receiver
+			return false
+		}
+
+		return true
+	})
+
+	return result
+}
+
+// scannerMethodReceiverSkippingNestedLoops finds scanner calls in loop bodies
+// without attributing scanner loops nested inside another loop to the outer loop.
+func scannerMethodReceiverSkippingNestedLoops(pass *analysis.Pass, expr ast.Node, methodName string) *receiverRef {
+	if expr == nil {
+		return nil
+	}
+	var result *receiverRef
+	ast.Inspect(expr, func(n ast.Node) bool {
+		if result != nil {
+			return false
+		}
+		if n != expr {
+			switch n.(type) {
+			case *ast.ForStmt, *ast.RangeStmt:
+				return false
+			}
 		}
 
 		call, ok := n.(*ast.CallExpr)
@@ -222,6 +278,7 @@ func isBufioScanner(pass *analysis.Pass, expr ast.Expr) bool {
 // receiverKey identifies a scanner receiver by its base object plus selector path.
 // Identifiers use type-checker objects to distinguish shadowed variables; selectors
 // append field names so calls like holder.scanner.Scan() match holder.scanner.Err().
+// Receivers without object identity are skipped instead of matched textually.
 func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -233,7 +290,7 @@ func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
 	case *ast.SelectorExpr:
 		base := receiverKey(pass, e.X)
 		if base == nil {
-			return receiverKeyFromString(pass, expr)
+			return nil
 		}
 		key := *base
 		if key.path == "" {
@@ -243,7 +300,7 @@ func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
 		}
 		return &key
 	default:
-		return receiverKeyFromString(pass, expr)
+		return nil
 	}
 }
 
@@ -261,22 +318,4 @@ func sameReceiver(a, b *receiverRef) bool {
 		return false
 	}
 	return a.obj == b.obj && a.path == b.path
-}
-
-// receiverKeyFromString falls back to source text for receivers without an object identity.
-func receiverKeyFromString(pass *analysis.Pass, expr ast.Expr) *receiverRef {
-	path := exprString(pass, expr)
-	if path == "" {
-		return nil
-	}
-	return &receiverRef{path: path}
-}
-
-// exprString formats an expression into stable source text for fallback receiver matching.
-func exprString(pass *analysis.Pass, expr ast.Expr) string {
-	var buf bytes.Buffer
-	if err := printer.Fprint(&buf, pass.Fset, expr); err != nil {
-		return ""
-	}
-	return buf.String()
 }
