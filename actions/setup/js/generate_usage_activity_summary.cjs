@@ -14,6 +14,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
@@ -29,7 +30,7 @@ const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
-const GRADER_RESULTS_PATHS = ["/tmp/gh-aw/usage/graders/grader_results.json", "/tmp/gh-aw/agent/graders/grader_results.json"];
+const GRADER_RESULTS_PATHS = [path.join(TMP_GH_AW_PATH, "usage", GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME), path.join(TMP_GH_AW_PATH, "agent", GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME)];
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 
 function findFiles(rootDir, shouldIncludeFile, maxDepth = Number.POSITIVE_INFINITY, currentDepth = 0) {
@@ -793,20 +794,26 @@ function parseExperimentsData() {
  * @returns {{ version?: number, results: any[] } | null} grader document, or null when unavailable
  */
 function parseGraderResults(candidatePaths = GRADER_RESULTS_PATHS) {
+  /** @type {Error | null} */
+  let lastError = null;
   for (const candidate of candidatePaths) {
     if (!fs.existsSync(candidate)) {
       continue;
     }
-    let parsed;
     try {
-      parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+      const parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+      if (!parsed || !Array.isArray(parsed.results)) {
+        throw new Error(`Grader results ${candidate} do not contain a results array`);
+      }
+      return parsed;
     } catch (err) {
-      throw new Error(`Failed to read grader results ${candidate}`, { cause: err });
+      // Keep trying the remaining candidates: a truncated copy in one artifact
+      // must not hide a usable copy in another.
+      lastError = new Error(`Failed to read grader results ${candidate}`, { cause: err });
     }
-    if (!parsed || !Array.isArray(parsed.results)) {
-      throw new Error(`Grader results ${candidate} do not contain a results array`);
-    }
-    return parsed;
+  }
+  if (lastError) {
+    throw lastError;
   }
   return null;
 }

@@ -160,6 +160,27 @@ const RUN_CREATED_AT_INITIAL_DELAY_MS = 500;
  */
 const RUN_CREATED_AT_MAX_DELAY_MS = 2000;
 
+/**
+ * Directory name holding deterministic grader output files.
+ * Counterpart of GradersDirName in pkg/constants/job_constants.go.
+ * @type {string}
+ */
+const GRADERS_DIR_NAME = "graders";
+
+/**
+ * Filename of the deterministic grader results document.
+ * Counterpart of GraderResultsFilename in pkg/constants/job_constants.go.
+ * @type {string}
+ */
+const GRADER_RESULTS_FILENAME = "grader_results.json";
+
+/**
+ * Filename of the deterministic grader manifest.
+ * Counterpart of GraderManifestFilename in pkg/constants/job_constants.go.
+ * @type {string}
+ */
+const GRADER_MANIFEST_FILENAME = "grader_manifest.json";
+
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
@@ -180,4 +201,7 @@ module.exports = {
   RUN_CREATED_AT_MAX_RETRIES,
   RUN_CREATED_AT_INITIAL_DELAY_MS,
   RUN_CREATED_AT_MAX_DELAY_MS,
+  GRADERS_DIR_NAME,
+  GRADER_RESULTS_FILENAME,
+  GRADER_MANIFEST_FILENAME,
 };

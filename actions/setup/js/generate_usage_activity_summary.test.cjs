@@ -422,6 +422,15 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(parseGraderResults([resultsPath])).toEqual(document);
     });
 
+    it("falls back to the next candidate when the first file is malformed", () => {
+      const brokenPath = path.join(gradersDir, "broken.json");
+      const goodPath = path.join(gradersDir, "good.json");
+      fs.writeFileSync(brokenPath, "not json");
+      fs.writeFileSync(goodPath, JSON.stringify({ version: 1, results: [{ id: "agent" }] }));
+
+      expect(parseGraderResults([brokenPath, goodPath]).results[0].id).toBe("agent");
+    });
+
     it("prefers the first existing candidate path", () => {
       const usagePath = path.join(gradersDir, "usage_results.json");
       const agentPath = path.join(gradersDir, "agent_results.json");
@@ -438,7 +447,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(() => parseGraderResults([resultsPath])).toThrow(/Failed to read grader results/);
 
       fs.writeFileSync(resultsPath, JSON.stringify({ version: 1 }));
-      expect(() => parseGraderResults([resultsPath])).toThrow(/do not contain a results array/);
+      expect(() => parseGraderResults([resultsPath])).toThrow(/Failed to read grader results/);
     });
   });
 

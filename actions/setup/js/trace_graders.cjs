@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const cp = require("child_process");
 const crypto = require("crypto");
+const { GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME, GRADER_MANIFEST_FILENAME } = require("./constants.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
@@ -13,10 +14,10 @@ const { resolveRunCreatedAtForGrading } = require("./run_created_at.cjs");
 
 // --- Constants ---
 const TMP_GH_AW = "/tmp/gh-aw";
-const GRADERS_DIR = path.join(TMP_GH_AW, "agent", "graders");
-const MANIFEST_PATH = path.join(GRADERS_DIR, "grader_manifest.json");
+const GRADERS_DIR = path.join(TMP_GH_AW, "agent", GRADERS_DIR_NAME);
+const MANIFEST_PATH = path.join(GRADERS_DIR, GRADER_MANIFEST_FILENAME);
 const PAYLOAD_PATH = path.join(GRADERS_DIR, "grader_payload.json");
-const RESULTS_PATH = path.join(GRADERS_DIR, "grader_results.json");
+const RESULTS_PATH = path.join(GRADERS_DIR, GRADER_RESULTS_FILENAME);
 const OPERATIONAL_VALUE_EVALUATOR_PATH = path.join(GRADERS_DIR, "operational_value_evaluator.sh");
 
 // Trace source file paths
