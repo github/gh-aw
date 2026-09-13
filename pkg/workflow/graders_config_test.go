@@ -651,7 +651,7 @@ func TestGenerateGradersStep_Present(t *testing.T) {
 	}
 }
 
-func TestGenerateGradersStep_OperationalValueUsesActivationRunMetadata(t *testing.T) {
+func TestGenerateGradersStep_OperationalValueUsesGitHubToken(t *testing.T) {
 	c := &Compiler{}
 	initActionPinCacheForTest(c)
 	var yaml strings.Builder
@@ -660,8 +660,8 @@ func TestGenerateGradersStep_OperationalValueUsesActivationRunMetadata(t *testin
 	c.generateGradersStep(&yaml, data)
 
 	output := yaml.String()
-	assert.Contains(t, output, "GH_AW_RUN_CREATED_AT: ${{ needs.activation.outputs.run_created_at }}")
 	assert.Contains(t, output, "GH_TOKEN: ${{ github.token }}")
+	assert.NotContains(t, output, "GH_AW_RUN_CREATED_AT")
 	assert.NotContains(t, output, "getWorkflowRun")
 }
 

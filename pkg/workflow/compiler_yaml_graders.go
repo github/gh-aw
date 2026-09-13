@@ -65,7 +65,6 @@ func (c *Compiler) generateGradersStep(yaml *strings.Builder, data *WorkflowData
 	if operationalValueGrader, ok := data.Graders.Graders["operational-value"]; ok && (operationalValueGrader.Enabled == nil || *operationalValueGrader.Enabled) {
 		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-		yaml.WriteString("          GH_AW_RUN_CREATED_AT: ${{ needs.activation.outputs.run_created_at }}\n")
 	}
 
 	compilerYamlGradersLog.Print("Generated graders step")

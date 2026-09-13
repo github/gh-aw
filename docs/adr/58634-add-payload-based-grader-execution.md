@@ -40,7 +40,7 @@ This would avoid storing a dedicated `grader_payload.json` by rebuilding the gra
 
 #### Neutral
 - Integration and unit tests now cover help text, invalid run IDs, stdin payload execution, inline script grading, and script-file operational-value grading.
-- The CLI documentation now treats `graders run` and `graders operational-value` as separate replay-oriented entry points under the `graders` command.
+- The CLI documentation uses `graders run` as the single entry point for built-in, inline, and operational-value graders.
 - Future changes to trace preprocessing will need to preserve compatibility with the stored payload format or update both the runtime producer and replay consumer together.
 
 ---

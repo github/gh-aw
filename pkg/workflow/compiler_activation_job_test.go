@@ -73,21 +73,22 @@ func TestActivationInfoArtifactUpload(t *testing.T) {
 	})
 }
 
-func TestOperationalValueGraderScopesActionsReadToActivation(t *testing.T) {
+func TestOperationalValueGraderDoesNotAddActivationRunMetadata(t *testing.T) {
 	compiler := NewCompiler()
 	data := operationalValueGraderWorkflowData(".github/graders/example-operational-value.sh")
 	data.Name = "Operational Value"
 	data.StaleCheckDisabled = true
 	data.Permissions = "permissions:\n  contents: read"
+	data.RawFrontmatter = map[string]any{maxDailyAICreditsField: -1}
 
 	job, err := compiler.buildActivationJob(data, false, "", "operational-value.lock.yml")
 	require.NoError(t, err)
 	require.NotNil(t, job)
-	assert.Contains(t, job.Permissions, "actions: read")
-	assert.Equal(t, "${{ steps.generate_aw_info.outputs.run_created_at }}", job.Outputs["run_created_at"])
+	assert.NotContains(t, job.Permissions, "actions: read")
+	assert.NotContains(t, job.Outputs, "run_created_at")
 
 	steps := strings.Join(job.Steps, "")
-	assert.Contains(t, steps, "GH_AW_INFO_FETCH_RUN_CREATED_AT: \"true\"")
+	assert.NotContains(t, steps, "GH_AW_INFO_FETCH_RUN_CREATED_AT")
 	assert.Contains(t, steps, "await main(core, context)")
 
 	mainPermissions, err := compiler.buildMainJobPermissions(data)

@@ -1,27 +1,41 @@
 ---
 name: operational-value-designer
-description: "Design and verify a deterministic operational-value grader for a GitHub Agentic Workflow. Use for per-run operational value, evidence attribution, maturation, baselines, and operational-value evaluators. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
+description: "Design and verify a deterministic operational-value grader for any GitHub Agentic Workflow. Use when choosing outcome metrics or creating an operational-value evaluator. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
 argument-hint: "OWNER/REPO WORKFLOW-NAME"
 allowed-tools: bash jq gh
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
 ---
 
 # Operational Value Grader
 
-Design one deterministic `operational-value` grader that reports absolute operational attainment for each workflow run. Keep exactly one authoritative primary value, and declare any normalized diagnostic metrics separately.
+Create one small deterministic evaluator that measures whether a workflow produced its intended operational outcome. Put domain knowledge in the evaluator: gh-aw only supplies run context, executes it, and validates its metrics.
 
-Operational value is the degree to which the workflow's intended repository outcome is attained for the opportunity assigned to a run, demonstrated by accepted repository evidence under a frozen contract. It is not execution quality, output volume, safe-output creation, or an agent's assessment.
+Operational value measures repository outcomes, not agent activity, output volume, or subjective quality. Do not count tool calls, tokens, comments, commits, or pull requests unless that activity is itself the workflow's intended outcome.
 
-## Output
+## Design
 
-Create one executable evaluator at:
+1. Resolve `OWNER/REPO` and `.github/workflows/WORKFLOW-NAME.md` from the arguments, then derive the intended repository outcome from the effective workflow. Use top-level `intent:` as canonical when present; otherwise read the Markdown body and its prompt imports for the mission, required effects, success conditions, and required `noop` cases. Use `description`, `evals`, deterministic `steps`/`pre-agent-steps`/`post-steps`, custom jobs, and `safe-outputs` as corroborating evidence for precomputed inputs and observable effects. Do not infer intent from triggers, tools, permissions, or an allowed output type alone; those describe execution mechanics and constraints.
+2. If the outcome has no obvious direct metric, optionally do bounded web research for how authoritative sources and comparable systems measure the same outcome. Use it to discover candidate definitions, denominators, and failure cases, not to replace the workflow's intent or import an industry benchmark blindly. Reject measures that are not attributable to one run, cannot be observed from available evidence, or reward activity instead of the intended result. Record links or reasoning in the implementation or PR when external research materially influences the metric.
+3. Choose one direct, domain-named primary metric grounded in the workflow's intent and available evidence. Higher values must mean more of the intended outcome, normalized to `[0,1]`.
+4. Add diagnostic metrics only when they explain the primary result. Keep every metric independently useful and domain-named.
+5. Decide what repository evidence each metric needs. Prefer event data and the local checkout. Use GitHub APIs only when the outcome cannot be determined locally, and request only the workflow permissions needed for those calls.
+6. Define when evidence is unavailable. Return `null`; do not turn missing data into zero.
+7. Implement and verify the evaluator.
+
+Web research is a design-time aid, never evaluator input. Do not make runtime web requests to obtain generic benchmarks or definitions; runtime network calls are only for evidence about the specific repository outcome being graded.
+
+Avoid baselines, maturity windows, opportunity keys, historical replay, and aggregation unless the workflow itself explicitly needs them. They are not part of the gh-aw evaluator protocol.
+
+## Files
+
+Create one executable Bash evaluator:
 
 ```text
 .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
 
-Configure the workflow:
+Configure it in the workflow:
 
 ```yaml
 graders:
@@ -29,37 +43,11 @@ graders:
     run: .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
 
-The grader's primary operational value (`value`) is absolute attainment in `[0,1]`. A comparable frozen baseline may be reported separately as `baselineValue`; gh-aw derives `deltaFromBaseline`. Never define the primary operational value as a difference from baseline.
+The evaluator must be compatible with Bash 3.2. It may use `jq`, the local checkout, and `GH_TOKEN` for APIs allowed by the workflow's declared permissions.
 
-## Design Procedure
+## Input
 
-1. Validate `OWNER/REPO` and resolve `.github/workflows/WORKFLOW-NAME.md`. Do not infer inputs from the workspace or remotes.
-2. Recover adoption-time intent from the workflow's first commit and first parent. Use only adoption-time workflow content and pre-adoption evidence to choose opportunities, accepted evidence, formulas, targets, or a baseline.
-3. Define how every workflow run binds to one operational case:
-   - produce a stable `opportunityKey`;
-   - prevent overlapping ownership where possible;
-   - preserve repeated keys when duplicate runs target the same opportunity so downstream analysis can cluster or deduplicate them;
-   - treat reruns with the same GitHub run ID as the same subject.
-4. Freeze accepted evidence, evidence repositories, matching rules, zero-versus-missing behavior, and `maturesAt` computation.
-  - Declare only the workflow permission scopes required to collect that evidence. The evaluator receives `GH_TOKEN` with the agent job's declared permissions; gh-aw does not add evidence permissions automatically.
-5. Choose exactly one direct primary metric in `[0,1]`. Higher must always mean greater attainment. Optional diagnostic metrics may provide normalized outcome context, but must remain separate rather than being combined into the primary value. Keep trace graders and activity counts separate.
-6. If comparable pre-adoption evidence exists, score it with the same metric and freeze it under `baseline`. Otherwise use `attainment-only` with a null baseline value.
-7. Implement the evaluator interface below and run:
-
-   ```bash
-  .github/skills/operational-value-designer/scripts/verify-operational-value-evaluator.sh .github/graders/WORKFLOW-NAME-operational-value.sh
-   gh aw compile .github/workflows/WORKFLOW-NAME.md
-   ```
-
-## Evaluator Interface
-
-The evaluator uses Bash 3.2-compatible Bash plus `jq` and supports:
-
-- `--definition`: print the frozen schema-version 4 contract.
-- `--metric`: read one evidence object on stdin and print a deterministic number in `[0,1]` or `null`.
-- `--grade-run`: read a run request on stdin and print one operational-value observation.
-
-`--grade-run` receives:
+gh-aw invokes the evaluator once with no arguments and writes this JSON to stdin:
 
 ```json
 {
@@ -71,80 +59,45 @@ The evaluator uses Bash 3.2-compatible Bash plus `jq` and supports:
     "workflow": "Workflow name",
     "ref": "refs/heads/main",
     "sha": "...",
-    "eventName": "schedule",
-    "createdAt": "2026-08-23T11:58:00Z"
+    "eventName": "schedule"
   },
-  "evidenceAt": "2026-08-23T12:00:00.000Z",
-  "case": null,
-  "event": null,
+  "event": {},
   "config": {}
 }
 ```
 
-It returns:
+`event` is the triggering event payload when available. `config` is the grader's frontmatter configuration.
+
+## Output
+
+Write one non-empty ordered JSON array to stdout:
 
 ```json
-{
-  "value": 0.75,
-  "opportunityKey": "issue:42",
-  "case": {"issue": 42},
-  "evidenceCutoff": "2026-08-23T12:00:00.000Z",
-  "maturesAt": "2026-08-30T12:00:00.000Z",
-  "provenance": [
-    {"repository": "OWNER/REPO", "kind": "issue", "ref": "42"}
-  ],
-  "diagnostics": {"repository-health": 0.8}
-}
+[
+  {"id": "issue-resolution", "value": 0.75},
+  {"id": "repository-health", "value": 0.9}
+]
 ```
 
-The function must cap `evidenceCutoff` at the earlier of `evidenceAt` and `maturesAt`. A run is never intrinsically pending: the operational value is an as-of observation and may be recomputed until maturity. After maturity, the cap makes the result stable.
+Rules:
 
-## Regrade a Historical Run
+- Each item contains `id` and `value`.
+- `id` is a stable, non-empty, unique domain metric name.
+- `value` is a finite number in `[0,1]` or `null` when evidence is unavailable.
+- The first item is the primary operational-value metric.
+- Later items are optional diagnostics and never alter the primary value.
+- Write diagnostics and progress to stderr, never stdout.
 
-Recompute a run at an explicit evidence time with the same evaluator used by the original run:
+gh-aw preserves the array in `grader_results.json` as `metrics` and exposes the first metric's value through the grader's top-level `value` for thresholds and experiments.
+
+## Verify
+
+Run:
 
 ```bash
-gh aw graders operational-value RUN-ID \
-  --evidence-at 2026-08-30T12:00:00.000Z \
-  --json
+.github/skills/operational-value-designer/scripts/verify-operational-value-evaluator.sh \
+  .github/graders/WORKFLOW-NAME-operational-value.sh
+gh aw compile .github/workflows/WORKFLOW-NAME.md
 ```
 
-Add `--repo [HOST/]OWNER/REPO` to select the GitHub host for the current repository checkout. The command downloads the original grader artifact, reuses its operational case and complete run subject, and refuses to execute unless the archived evaluator matches both digest records and the evaluator at the recorded commit in the trusted checkout. It prints a new observation and never modifies the original artifact.
-
-## Build a Historical Report
-
-Build a report across all completed runs from the contract's adoption time:
-
-```bash
-gh aw graders operational-value report WORKFLOW-NAME
-```
-
-This writes JSON, SVG, and Markdown artifacts under `reports/operational-value`. It applies the current evaluator digest to every run for comparability and backfills pre-grader runs by passing their run subject with `case: null` and `event: null`. The evaluator must reconstruct assignment from accepted evidence when the case is null.
-
-Mature numeric results are cached by repository, workflow, evaluator digest, and Monday-based UTC week. Unavailable, immature, and failed evaluations are retried. Independent weeks are evaluated concurrently; use `--concurrency` to control evaluator executions (the default is 8). Use `--refresh` to bypass cached observations, `--until` to choose the evidence endpoint, and `--output` or `--cache-dir` to relocate generated files.
-
-Reports preserve all run-level points. Weekly primary means retain the latest observation per repeated `opportunityKey` within each week. Declared diagnostics are plotted independently using their `latest` or `mean` aggregation. Missing evidence remains null, and changes over time or from a baseline do not establish causation.
-
-## Definition Contract
-
-`--definition` must contain:
-
-- `schemaVersion: 4` and `grader: "operational-value"`;
-- repository, workflow name, source path, and adoption commit/time;
-- operational-value statement;
-- evidence opportunity, assignment, accepted evidence, repositories, collection, maturation, zero rule, and missing rule;
-- one primary metric with formula and validation examples;
-- optional `diagnosticMetrics`, each with a unique ID, name, formula, `higher_is_better` direction, and `latest` or `mean` aggregation;
-- baseline mode, value, cutoff, and provenance.
-
-For `baseline-comparable`, baseline value must be in `[0,1]` and have immutable provenance. For `attainment-only`, baseline value and cutoff must be null.
-
-## Interpretation Rules
-
-- `value` answers “what operational value did this run attain for its assigned opportunity?”
-- `deltaFromBaseline` answers “how far is this observation above or below the frozen pre-adoption reference?”
-- Diagnostics provide separate normalized context and never contribute to `value`.
-- Neither establishes that the workflow caused the outcome.
-- Compare runs only under the same evaluator digest and evidence horizon.
-- Identify a replayed observation by `(runId, evaluatorDigest, evidenceAt)`.
-- Do not treat repeated observations of one run, duplicate opportunity keys, or overlapping state windows as independent samples.
+Before finishing, inspect the compiled grader step and confirm the workflow grants only permissions the evaluator actually uses.

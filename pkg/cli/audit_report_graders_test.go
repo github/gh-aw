@@ -39,6 +39,7 @@ func sampleGraderResults() map[string]any {
 	return map[string]any{
 		"version": 1,
 		"results": []map[string]any{
+			{"id": "operational-value", "name": "Operational value", "status": "pass", "value": 0.75, "metrics": []map[string]any{{"id": "issue-triage", "value": 0.75}, {"id": "repository-health", "value": nil}}},
 			{"id": "turns", "name": "Turn count", "status": "pass", "value": 12, "unit": "turns", "passed": true},
 			{"id": "cost", "name": "Cost", "status": "fail", "value": 3.5, "unit": "USD", "passed": false},
 			{"id": "flaky", "status": "error", "value": nil, "error": "grader flaky failed"},
@@ -67,10 +68,10 @@ func TestExtractGradersDataFromUsageArtifact(t *testing.T) {
 	if graders == nil {
 		t.Fatal("expected graders data to be extracted from the usage artifact")
 	}
-	if len(graders.Results) != 4 {
-		t.Fatalf("expected 4 grader results, got %d", len(graders.Results))
+	if len(graders.Results) != 5 {
+		t.Fatalf("expected 5 grader results, got %d", len(graders.Results))
 	}
-	if graders.Total != 4 || graders.Passed != 1 || graders.Failed != 1 || graders.ErrorCount != 1 || graders.UnavailableCount != 1 {
+	if graders.Total != 5 || graders.Passed != 2 || graders.Failed != 1 || graders.ErrorCount != 1 || graders.UnavailableCount != 1 {
 		t.Fatalf("unexpected status counts: %+v", graders)
 	}
 	data, err := json.Marshal(graders)
@@ -78,7 +79,7 @@ func TestExtractGradersDataFromUsageArtifact(t *testing.T) {
 		t.Fatalf("failed to marshal graders data: %v", err)
 	}
 	jsonText := string(data)
-	for _, want := range []string{`"total":4`, `"passed":1`, `"failed":1`} {
+	for _, want := range []string{`"total":5`, `"passed":2`, `"failed":1`, `"metrics":[{"id":"issue-triage","value":0.75},{"id":"repository-health","value":null}]`} {
 		if !strings.Contains(jsonText, want) {
 			t.Fatalf("expected graders JSON to contain %s, got %s", want, jsonText)
 		}
@@ -87,7 +88,7 @@ func TestExtractGradersDataFromUsageArtifact(t *testing.T) {
 		t.Fatalf("graders JSON should use public count names, got %s", jsonText)
 	}
 
-	// Results are sorted by ID: absent, cost, flaky, turns
+	// Results are sorted by ID: absent, cost, flaky, operational-value, turns
 	cost := graders.Results[1]
 	if cost.ID != "cost" {
 		t.Fatalf("expected results sorted by id, got %q at index 1", cost.ID)

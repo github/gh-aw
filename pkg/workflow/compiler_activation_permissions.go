@@ -138,7 +138,7 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	permsMap := map[PermissionScope]PermissionLevel{
 		PermissionContents: PermissionRead,
 	}
-	if !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) || operationalValueGraderEnabled(ctx.data) {
+	if !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) {
 		permsMap[PermissionActions] = PermissionRead
 	}
 	if isSteeringIssueEnabled(ctx.data) {

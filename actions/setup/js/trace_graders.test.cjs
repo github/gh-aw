@@ -496,6 +496,16 @@ describe("trace_graders", () => {
       expect(r.details).toBe("too slow");
     });
 
+    it("preserves ordered operational-value metrics", () => {
+      const metrics = [
+        { id: "primary", value: 0.75 },
+        { id: "diagnostic", value: null },
+      ];
+      const r = normalizeResult("operational-value", { value: 0.75, metrics }, { ...meta, source: "operational-value" });
+      expect(r.value).toBe(0.75);
+      expect(r.metrics).toEqual(metrics);
+    });
+
     it("omits an unrecognized custom severity", () => {
       const r = normalizeResult("test", { value: 42, severity: "sensitive trace content" }, { ...meta, source: "inline" });
       expect(r.severity).toBeUndefined();

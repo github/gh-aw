@@ -20,18 +20,26 @@ import (
 
 var gradersDataLog = logger.New("cli:audit_report_graders")
 
+// GraderMetric is one named operational-value metric. A nil value is serialized
+// as null to distinguish unavailable evidence from a zero score.
+type GraderMetric struct {
+	ID    string   `json:"id"`
+	Value *float64 `json:"value"`
+}
+
 // GraderResult is a single grader outcome surfaced in the audit report.
 type GraderResult struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name,omitempty"`
-	Status    string   `json:"status"`
-	Value     *float64 `json:"value,omitempty"`
-	Unit      string   `json:"unit,omitempty"`
-	Passed    *bool    `json:"passed,omitempty"`
-	Direction string   `json:"direction,omitempty"`
-	Threshold *float64 `json:"threshold,omitempty"`
-	Message   string   `json:"message,omitempty"`
-	Error     string   `json:"error,omitempty"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name,omitempty"`
+	Status    string         `json:"status"`
+	Value     *float64       `json:"value,omitempty"`
+	Unit      string         `json:"unit,omitempty"`
+	Passed    *bool          `json:"passed,omitempty"`
+	Direction string         `json:"direction,omitempty"`
+	Threshold *float64       `json:"threshold,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	Metrics   []GraderMetric `json:"metrics,omitempty"`
 }
 
 // GradersData aggregates the grader results recorded for a single workflow run.
@@ -57,6 +65,7 @@ type graderArtifactFullResult struct {
 	Passed  *bool           `json:"passed"`
 	Message string          `json:"message"`
 	Error   string          `json:"error"`
+	Metrics []GraderMetric  `json:"metrics,omitempty"`
 }
 
 type graderArtifactFullDocument struct {
@@ -225,6 +234,7 @@ func buildGraderResult(result graderArtifactFullResult, manifest graderManifestE
 		Error:     result.Error,
 		Direction: manifest.Direction,
 		Threshold: manifest.Threshold,
+		Metrics:   result.Metrics,
 	}
 	if summary.Name == "" {
 		summary.Name = manifest.Name

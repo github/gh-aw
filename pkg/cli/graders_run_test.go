@@ -90,29 +90,17 @@ graders:
 	}`, output.String())
 }
 
-func TestRunScriptFileGraderFromStdin(t *testing.T) {
-	workflowID := writeGraderRunWorkflow(t, `---
-graders:
-  operational-value:
-    run: .github/graders/test-operational-value.sh
----
-`)
+func TestRunOperationalValueGraderFromStdin(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, "---\ngraders:\n  operational-value:\n    run: .github/graders/test-operational-value.sh\n    config:\n      weight: 0.5\n---\n")
 	require.NoError(t, os.Mkdir(".git", 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(".github", "graders"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(".github", "graders", "test-operational-value.sh"), []byte(`#!/usr/bin/env bash
 set -euo pipefail
-case "${1:-}" in
---definition)
-  printf '%s\n' '{"schemaVersion":4,"grader":"operational-value","repository":"example/repo","workflowName":"Test","sourcePath":".github/workflows/test.md","adoption":{"commit":"abc","adoptedAt":"2026-01-01T00:00:00Z"},"operationalValue":"Test direct script execution.","evidence":{"opportunity":"test","assignment":"payload","accepted":"stdin","repositories":["example/repo"],"collection":"test","maturation":"immediate","zeroRule":"none","missingRule":"null"},"primaryMetric":{"id":"score","formula":"payload score","direction":"higher_is_better"},"baseline":{"mode":"attainment-only","value":null,"evidenceCutoff":null,"provenance":[]},"validationExamples":{"sample":{"valid":true}}}'
-  ;;
---grade-run)
-  [[ "${GH_HOST:-}" == "ghe.example" ]]
-  payload=$(cat)
-  [[ "$payload" == '{"score":0.8}' ]]
-  printf '%s\n' '{"value":0.8,"source":"script-file"}'
-  ;;
-*) exit 1 ;;
-esac
+[[ $# -eq 0 ]]
+[[ "${GH_HOST:-}" == "ghe.example" ]]
+payload=$(cat)
+[[ "$payload" == '{"schemaVersion":1,"run":{"id":"42"},"event":{"issue":{"number":7}},"config":{"weight":0.5}}' ]]
+printf '%s\n' '[{"id":"attainment","value":0.8},{"id":"coverage","value":null}]'
 `), 0o700))
 
 	var output bytes.Buffer
@@ -120,11 +108,37 @@ esac
 		Workflow: workflowID,
 		GraderID: "operational-value",
 		Repo:     "ghe.example/example/repo",
-		Input:    bytes.NewBufferString(`{"score":0.8}`),
+		Input:    bytes.NewBufferString(`{"run":{"id":"42"},"event":{"issue":{"number":7}}}`),
 		Output:   &output,
 	})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"value":0.8,"source":"script-file"}`, output.String())
+	assert.Equal(t, `[{"id":"attainment","value":0.8},{"id":"coverage","value":null}]`+"\n", output.String())
+}
+
+func TestGradersCommandOnlyRegistersRun(t *testing.T) {
+	commands := NewGradersCommand().Commands()
+	require.Len(t, commands, 1)
+	assert.Equal(t, "run", commands[0].Name())
+}
+
+func TestValidateOperationalValueMetrics(t *testing.T) {
+	tests := []struct {
+		name    string
+		output  string
+		wantErr string
+	}{
+		{name: "empty array", output: `[]`, wantErr: "non-empty metric array"},
+		{name: "empty id", output: `[{"id":" ","value":0.5}]`, wantErr: "non-empty string"},
+		{name: "duplicate id", output: `[{"id":"score","value":0.5},{"id":"score","value":null}]`, wantErr: "duplicated"},
+		{name: "missing value", output: `[{"id":"score"}]`, wantErr: "must include value"},
+		{name: "out of range", output: `[{"id":"score","value":1.1}]`, wantErr: "finite number in [0,1]"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := validateOperationalValueMetrics([]byte(test.output))
+			require.ErrorContains(t, err, test.wantErr)
+		})
+	}
 }
 
 func TestReadGraderPayloadValidation(t *testing.T) {

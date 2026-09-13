@@ -8,19 +8,21 @@
 
 ### Context
 
-The existing built-in and inline graders measure execution quality from a run's trace, but operational value depends on repository evidence, maturation windows, and a stable baseline contract. That evidence must remain attributable to the workflow run and evaluator version while supporting deterministic replay after the original run artifact is sealed. Allowing arbitrary evaluator locations or mutable evaluator code would weaken provenance and make historical results difficult to reproduce. Authoritative workflow-run creation time is useful for assigning time-based opportunities, but fetching it must not broaden the token available to the agent.
+The existing built-in and inline graders measure execution quality from a run's trace, while operational value is domain-specific and may depend on repository evidence. Encoding every domain's evidence lifecycle, baseline, maturation, replay, and aggregation policy in gh-aw would make the generic grader protocol costly and difficult to use. Allowing arbitrary evaluator locations or mutable evaluator code would still weaken auditability.
 
 ### Decision
 
-We will reserve the `operational-value` grader ID for a repository-relative Bash evaluator under `.github/graders/*.sh`. At compile time, gh-aw will reject traversal, symlinks, and non-regular files, validate Bash syntax, and freeze the evaluator bytes and SHA-256 digest into the compiled workflow. At runtime, gh-aw will execute deterministic `--definition` and `--grade-run` modes in the gh-aw temporary area with a curated environment, producing absolute attainment in `[0,1]` or `null` plus evidence provenance, maturity, a frozen baseline, and an optional derived delta. The activation job will fetch authoritative workflow-run creation time with its compiler-owned `actions: read` permission and pass it to the agent job as non-secret metadata. Enabling the grader will not modify the agent job's permissions; evaluator evidence access must be declared explicitly by the workflow.
+We will reserve the `operational-value` grader ID for a repository-relative Bash evaluator under `.github/graders/*.sh`. At compile time, gh-aw will reject traversal, symlinks, and non-regular files, validate Bash syntax, and freeze the evaluator bytes and SHA-256 digest into the compiled workflow.
 
-The unified agent artifact will contain `grader_manifest.json`, `grader_results.json`, and the frozen evaluator for replay. Historical regrading will execute only after verifying the archived bytes against the manifest/result digests and the evaluator at the recorded commit in a trusted checkout, while preserving the original run identity, attempt, subject, and operational case.
+At runtime, gh-aw will invoke the evaluator once with run, event, and config JSON on standard input. The evaluator returns a non-empty ordered array of unique domain-named `{id,value}` metrics. Values are finite numbers in `[0,1]` or `null`; the first metric is primary. Domain evidence decisions belong in the evaluator and its authoring skill. Enabling the grader does not modify the agent job's permissions; API access must be declared explicitly by the workflow.
+
+The unified agent artifact will contain `grader_manifest.json`, `grader_results.json`, and the frozen evaluator for auditability. gh-aw preserves the metric array and exposes the first value through the existing scalar grader interface.
 
 ### Alternatives Considered
 
 #### Alternative 1: Use Ordinary Inline Execution-Quality Graders
 
-Represent operational value as another inline JavaScript grader over the preprocessed execution trace. This would reuse the existing isolated worker and artifact schema, but traces describe how the agent executed rather than whether repository-level outcomes were attained. Inline graders also lack the evidence cutoff, maturity, baseline, provenance, and trusted-checkout replay contract required for operational value.
+Represent operational value as another inline JavaScript grader over the preprocessed execution trace. This would reuse the existing isolated worker and artifact schema, but traces describe how the agent executed rather than whether repository-level outcomes were attained. Inline graders are also deliberately restricted from repository and API access needed by some operational metrics.
 
 #### Alternative 2: Embed Evaluator Logic in Workflow Frontmatter or JavaScript
 
@@ -28,24 +30,24 @@ Place the complete evaluator directly in frontmatter or implement it as gh-aw-ow
 
 #### Alternative 3: Compute Operational Value Only Asynchronously
 
-Run value evaluation later in an external service or periodic process, outside the original run artifacts. This could wait naturally for mature evidence and avoid adding Bash execution to the agent job, but it would separate observations from their original run identity and frozen evaluator unless a parallel provenance system were built. It would also make immediate attainment unavailable and weaken self-contained replay from the run artifact.
+Run value evaluation later in an external service or periodic process, outside the original run artifacts. This could wait for durable outcomes and avoid Bash execution in the agent job, but it would require a separate service, identity model, and storage contract. The in-run grader instead measures evidence available when the agent job finishes.
 
 ### Consequences
 
 #### Positive
-- Each observation is tied to a run, operational case, evidence cutoff, provenance, and evaluator digest, enabling reproducible historical regrading.
-- The manifest, results, and frozen evaluator form a self-contained artifact set for audit and replay without mutating the original run.
-- Baseline-comparable and attainment-only definitions share one normalized result contract while preserving `null` for unavailable or immature evidence.
+- Domain-specific metric names remain visible in artifacts instead of being collapsed into a generic score.
+- The manifest, results, and frozen evaluator form a self-contained artifact set for auditing the original run.
+- Missing evidence remains `null` rather than being coerced to zero.
 
 #### Negative
-- The activation job requires `actions: read` to obtain authoritative run creation time; a failed lookup leaves that optional subject field empty.
-- The feature adds Bash availability, syntax validation, process timeout, output validation, curated-environment, and temporary-file complexity to compiler and runtime maintenance.
-- Run artifacts contain trusted executable bytes; consumers must continue verifying digests and checkout provenance before executing them.
+- The evaluator can only measure evidence available before the grader step; durable outcomes applied by later jobs require another measurement system.
+- The feature still requires Bash availability, syntax validation, process timeout, output validation, a curated environment, and temporary-file handling.
+- Run artifacts contain trusted executable bytes and should be treated accordingly by artifact consumers.
 
 #### Neutral
-- Operational value is absolute attainment, not proof that the workflow caused the observed outcome; the optional baseline delta remains descriptive rather than causal.
-- Evaluators may access only the curated runtime environment, including the workflow token and GitHub host variables, and execute from the gh-aw temporary area rather than inheriting the full workflow environment.
-- Historical regrading creates a new observation keyed by run ID, evaluator digest, and evidence time while preserving the original run artifact and case.
+- Operational value is a deterministic measurement, not proof that the workflow caused the observed outcome.
+- Evaluators use a curated runtime environment, including the workflow token and GitHub host variables, rather than inheriting the full workflow environment.
+- Baselines, maturity, replay, and aggregation may be implemented externally when a specific domain needs them; they are not part of the core protocol.
 
 ---
 
