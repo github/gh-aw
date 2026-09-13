@@ -65,6 +65,10 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
   }
 }
 
+function provesFailedEvalsHadNoUsage(job) {
+  return job.conclusion === "failure" && Array.isArray(job.steps) && job.steps.some(step => step.name === "Collect evals token usage" && step.conclusion === "success");
+}
+
 function inspectAccountingFile(directory, file) {
   const relativeFile = path.relative(directory, file);
   if (!fs.existsSync(file)) return { file: relativeFile, state: "missing" };
@@ -150,6 +154,15 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
     // (for example, an unsupported model). An empty authoritative firewall
     // file proves that no billable response was observed.
     if (!selected && name === "agent" && job.conclusion === "failure" && candidateStates[0].state === "empty") {
+      logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
+        source: candidateStates[0].file,
+      });
+      continue;
+    }
+    // The eval collector only publishes its output when it finds non-empty
+    // firewall accounting. A successful collector with no published file
+    // therefore proves that the failed eval made no billable model request.
+    if (!selected && name === "evals" && provesFailedEvalsHadNoUsage(job)) {
       logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
         source: candidateStates[0].file,
       });

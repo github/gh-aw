@@ -150,6 +150,35 @@ it("counts empty authoritative agent accounting as zero when the agent job faile
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
 });
 
+it("counts missing evals accounting as zero when the failed job collected no usage", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
+        conclusion: "failure",
+        steps: [{ name: "Collect evals token usage", conclusion: "success" }],
+      }),
+    ]
+  );
+  await expect(f.result).resolves.toBe(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"evals"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"evals/token_usage.jsonl"'));
+});
+
+it("still requires evals accounting when collection did not succeed", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [job("agent"), job("evals", { conclusion: "failure", steps: [{ name: "Collect evals token usage", conclusion: "failure" }] })]
+  );
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+});
+
 it("still requires accounting when a failed agent job has no authoritative source", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
