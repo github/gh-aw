@@ -225,6 +225,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: ` + getActionPin("actions/checkout") + `
+        with:
+          persist-credentials: false
 
 ` + installCLISteps + `      - name: Setup Scripts
         uses: ` + setupActionRef + `

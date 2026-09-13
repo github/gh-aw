@@ -37,6 +37,7 @@ func TestGenerateAutoUpdateWorkflow_Enabled(t *testing.T) {
 	assert.Contains(t, content, "GH_AW_OPERATION: upgrade", "should set upgrade operation")
 	assert.Contains(t, content, "GH_AW_CMD_PREFIX: ./gh-aw", "should use dev CLI prefix by default")
 	assert.Contains(t, content, "Checkout repository", "should include checkout step")
+	assert.Contains(t, content, "persist-credentials: false", "should not persist checkout credentials")
 	assert.Contains(t, content, "Build gh-aw", "should include local gh-aw build step in dev mode")
 	assert.Contains(t, content, "mainNotifyIssue", "should call mainNotifyIssue")
 	assert.NotContains(t, content, "uses: ./.github/workflows/agentics-maintenance.yml", "should not use workflow_call")
