@@ -835,6 +835,47 @@
                       },
                       "error": {
                         "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "implementation": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "digest": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "observation": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "diagnostics": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "baselineValue": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "deltaFromBaseline": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
                       }
                     },
                     "required": [
@@ -3417,6 +3458,47 @@
                           },
                           "error": {
                             "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "implementation": {
+                            "type": [
+                              "null",
+                              "object"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "integer"
+                              },
+                              "digest": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "observation": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "diagnostics": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "baselineValue": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "deltaFromBaseline": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
                           }
                         },
                         "required": [

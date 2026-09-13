@@ -282,10 +282,7 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 	if value.DeltaFromBaseline == nil || *value.DeltaFromBaseline != -0.25 {
 		t.Fatalf("expected delta from baseline to be preserved, got %v", value.DeltaFromBaseline)
 	}
-	var observation map[string]any
-	if err := json.Unmarshal(value.Observation, &observation); err != nil {
-		t.Fatalf("failed to decode observation: %v", err)
-	}
+	observation := value.Observation
 	if observation["opportunityKey"] != "schedule:2026-09-12" || observation["maturesAt"] != "2026-09-19T20:58:00Z" || observation["mature"] != false {
 		t.Fatalf("expected maturity fields to be preserved, got %+v", observation)
 	}
@@ -293,12 +290,8 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 	if !ok || subject["createdAt"] != "2026-09-12T20:58:00Z" {
 		t.Fatalf("expected observation subject to be preserved, got %+v", observation["subject"])
 	}
-	var diagnostics map[string]any
-	if err := json.Unmarshal(value.Diagnostics, &diagnostics); err != nil {
-		t.Fatalf("failed to decode diagnostics: %v", err)
-	}
-	if diagnostics["considered"] != float64(3) {
-		t.Fatalf("expected diagnostics to be preserved, got %+v", diagnostics)
+	if value.Diagnostics["considered"] != float64(3) {
+		t.Fatalf("expected diagnostics to be preserved, got %+v", value.Diagnostics)
 	}
 
 	unavailable := decoded.Results[1]
@@ -311,14 +304,10 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 	if unavailable.BaselineValue != nil || unavailable.DeltaFromBaseline != nil {
 		t.Fatalf("expected null baseline fields to remain absent, got %+v", unavailable)
 	}
-	if string(unavailable.Observation) != "" {
-		t.Fatalf("expected absent observation to stay absent, got %s", unavailable.Observation)
+	if unavailable.Observation != nil {
+		t.Fatalf("expected absent observation to stay absent, got %v", unavailable.Observation)
 	}
-	var unavailableDiagnostics map[string]any
-	if err := json.Unmarshal(unavailable.Diagnostics, &unavailableDiagnostics); err != nil {
-		t.Fatalf("failed to decode diagnostics: %v", err)
-	}
-	if unavailableDiagnostics["missingReason"] != "invalid request" {
-		t.Fatalf("expected diagnostics missingReason to be preserved, got %+v", unavailableDiagnostics)
+	if unavailable.Diagnostics["missingReason"] != "invalid request" {
+		t.Fatalf("expected diagnostics missingReason to be preserved, got %+v", unavailable.Diagnostics)
 	}
 }

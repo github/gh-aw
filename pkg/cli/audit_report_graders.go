@@ -6,7 +6,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -41,8 +40,8 @@ type GraderResult struct {
 	Error             string                `json:"error,omitempty"`
 	Source            string                `json:"source,omitempty"`
 	Implementation    *GraderImplementation `json:"implementation,omitempty"`
-	Observation       json.RawMessage       `json:"observation,omitempty"`
-	Diagnostics       json.RawMessage       `json:"diagnostics,omitempty"`
+	Observation       map[string]any        `json:"observation,omitempty"`
+	Diagnostics       map[string]any        `json:"diagnostics,omitempty"`
 	BaselineValue     *float64              `json:"baselineValue,omitempty"`
 	DeltaFromBaseline *float64              `json:"deltaFromBaseline,omitempty"`
 }
@@ -79,8 +78,8 @@ type graderArtifactFullResult struct {
 	Error             string                `json:"error"`
 	Source            string                `json:"source"`
 	Implementation    *GraderImplementation `json:"implementation"`
-	Observation       json.RawMessage       `json:"observation"`
-	Diagnostics       json.RawMessage       `json:"diagnostics"`
+	Observation       map[string]any        `json:"observation"`
+	Diagnostics       map[string]any        `json:"diagnostics"`
 	BaselineValue     json.RawMessage       `json:"baselineValue"`
 	DeltaFromBaseline json.RawMessage       `json:"deltaFromBaseline"`
 }
@@ -253,8 +252,8 @@ func buildGraderResult(result graderArtifactFullResult, manifest graderManifestE
 		Threshold:      manifest.Threshold,
 		Source:         result.Source,
 		Implementation: result.Implementation,
-		Observation:    normalizeGraderRawJSON(result.Observation),
-		Diagnostics:    normalizeGraderRawJSON(result.Diagnostics),
+		Observation:    result.Observation,
+		Diagnostics:    result.Diagnostics,
 	}
 	if summary.Name == "" {
 		summary.Name = manifest.Name
@@ -274,16 +273,6 @@ func buildGraderResult(result graderArtifactFullResult, manifest graderManifestE
 		summary.DeltaFromBaseline = &value
 	}
 	return summary
-}
-
-// normalizeGraderRawJSON returns the raw JSON payload for structured grader fields,
-// dropping empty and explicit null payloads so absent evidence stays absent.
-func normalizeGraderRawJSON(raw json.RawMessage) json.RawMessage {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 || string(trimmed) == "null" {
-		return nil
-	}
-	return append(json.RawMessage(nil), trimmed...)
 }
 
 // parseGraderValue decodes a grader value, accepting numbers and booleans (booleans are
