@@ -61,6 +61,7 @@ func analyzeFuncBody(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.G
 	})
 }
 
+// receiverRef is the comparable identity used to match Scan and Err receivers.
 type receiverRef struct {
 	obj  types.Object
 	path string
@@ -108,21 +109,7 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFile
 
 // findScannerInForLoop checks if a for loop uses bufio.Scanner.Scan().
 func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt) *receiverRef {
-	// Check the condition for scanner.Scan()
-	if scanner := scannerMethodReceiver(pass, forStmt.Cond, "Scan"); scanner != nil {
-		return scanner
-	}
-
-	// Check the body for scanner.Scan()
-	if forStmt.Body != nil {
-		for _, stmt := range forStmt.Body.List {
-			if scanner := scannerMethodReceiver(pass, stmt, "Scan"); scanner != nil {
-				return scanner
-			}
-		}
-	}
-
-	return nil
+	return scannerMethodReceiver(pass, forStmt.Cond, "Scan")
 }
 
 // scannerMethodReceiver returns the receiver of a bufio.Scanner method call.
@@ -168,17 +155,12 @@ func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiver
 			continue
 		}
 
-		if hasErrCall(pass, stmt, scanner) {
+		if scannerMethodReceiverMatches(pass, stmt, "Err", scanner) {
 			return true
 		}
 	}
 
 	return false
-}
-
-// hasErrCall checks if a statement contains a scanner.Err() call
-func hasErrCall(pass *analysis.Pass, stmt ast.Node, scanner *receiverRef) bool {
-	return scannerMethodReceiverMatches(pass, stmt, "Err", scanner)
 }
 
 // scannerMethodReceiverMatches checks if a node contains a scanner method call on the same receiver.
@@ -220,6 +202,7 @@ func scannerMethodReceiverMatches(pass *analysis.Pass, stmt ast.Node, methodName
 	return found
 }
 
+// isBufioScanner reports whether expr has type bufio.Scanner or *bufio.Scanner.
 func isBufioScanner(pass *analysis.Pass, expr ast.Expr) bool {
 	t := pass.TypesInfo.TypeOf(expr)
 	if t == nil {
@@ -236,14 +219,21 @@ func isBufioScanner(pass *analysis.Pass, expr ast.Expr) bool {
 	return obj != nil && obj.Name() == "Scanner" && obj.Pkg() != nil && obj.Pkg().Path() == "bufio"
 }
 
+// receiverKey identifies a scanner receiver by its base object plus selector path.
+// Identifiers use type-checker objects to distinguish shadowed variables; selectors
+// append field names so calls like holder.scanner.Scan() match holder.scanner.Err().
 func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
 	switch e := expr.(type) {
 	case *ast.Ident:
-		return &receiverRef{obj: objectForIdent(pass, e)}
+		obj := objectForIdent(pass, e)
+		if obj == nil {
+			return nil
+		}
+		return &receiverRef{obj: obj}
 	case *ast.SelectorExpr:
 		base := receiverKey(pass, e.X)
 		if base == nil {
-			return &receiverRef{path: exprString(pass, expr)}
+			return receiverKeyFromString(pass, expr)
 		}
 		key := *base
 		if key.path == "" {
@@ -253,10 +243,11 @@ func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
 		}
 		return &key
 	default:
-		return &receiverRef{path: exprString(pass, expr)}
+		return receiverKeyFromString(pass, expr)
 	}
 }
 
+// objectForIdent returns the type-checker object for an identifier use or definition.
 func objectForIdent(pass *analysis.Pass, ident *ast.Ident) types.Object {
 	if obj := pass.TypesInfo.Uses[ident]; obj != nil {
 		return obj
@@ -264,6 +255,7 @@ func objectForIdent(pass *analysis.Pass, ident *ast.Ident) types.Object {
 	return pass.TypesInfo.Defs[ident]
 }
 
+// sameReceiver reports whether two scanner method calls refer to the same receiver key.
 func sameReceiver(a, b *receiverRef) bool {
 	if a == nil || b == nil {
 		return false
@@ -271,6 +263,16 @@ func sameReceiver(a, b *receiverRef) bool {
 	return a.obj == b.obj && a.path == b.path
 }
 
+// receiverKeyFromString falls back to source text for receivers without an object identity.
+func receiverKeyFromString(pass *analysis.Pass, expr ast.Expr) *receiverRef {
+	path := exprString(pass, expr)
+	if path == "" {
+		return nil
+	}
+	return &receiverRef{path: path}
+}
+
+// exprString formats an expression into stable source text for fallback receiver matching.
 func exprString(pass *analysis.Pass, expr ast.Expr) string {
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, pass.Fset, expr); err != nil {

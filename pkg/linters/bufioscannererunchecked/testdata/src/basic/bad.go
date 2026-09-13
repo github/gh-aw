@@ -115,3 +115,12 @@ func badSelectorScanner(holder scannerHolder) {
 		println(holder.scanner.Text())
 	}
 }
+
+func badInsideOuterLoop(file *os.File) {
+	for i := 0; i < 1; i++ {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+			println(scanner.Text())
+		}
+	}
+}
