@@ -583,7 +583,16 @@ func isPackageResourceDestination(destination string) bool {
 	return strings.EqualFold(destination, constants.GithubDir+"CODEOWNERS") ||
 		strings.HasPrefix(destination, constants.GithubDir+"ISSUE_TEMPLATE/") ||
 		strings.HasPrefix(destination, constants.GithubDir+"aw/") ||
+		isSharedWorkflowScriptDestination(destination) ||
 		workflow.IsValidOperationalValueEvaluatorRunPath(destination)
+}
+
+func isSharedWorkflowScriptDestination(destination string) bool {
+	cleaned := filepath.ToSlash(filepath.Clean(destination))
+	lower := strings.ToLower(cleaned)
+	prefix := constants.WorkflowsDirSlash + "shared/"
+	return strings.HasPrefix(cleaned, prefix) &&
+		(strings.HasSuffix(lower, ".mjs") || strings.HasSuffix(lower, ".cjs"))
 }
 
 func removePackageOwnedFilesIfUnused(packageBase string) error {

@@ -185,6 +185,8 @@ Resource destinations are restricted to non-hook repository asset namespaces:
 - `.github/ISSUE_TEMPLATE/*.yaml`
 - `.github/CODEOWNERS`
 - `.github/aw/**`
+- `.mjs` files under `.github/workflows/shared/`
+- `.cjs` files under `.github/workflows/shared/`
 
 Implementations MUST reject duplicate or case-insensitive duplicate resource destinations before writing files. Resources are copied as inert content from the selected package ref; installers MUST NOT execute package-provided scripts or expose configured secrets to package content during installation.
 

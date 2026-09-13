@@ -97,7 +97,7 @@
     },
     "resources": {
       "type": "array",
-      "description": "Declarative repository assets installed as-is from immutable package content. Each entry maps a package-relative source to an allowlisted repository destination.",
+      "description": "Repository assets copied as-is from immutable package content. Each entry maps a package-relative source to an allowlisted repository destination, including .mjs and .cjs helper scripts under .github/workflows/shared/.",
       "items": {
         "type": "object",
         "required": ["source", "destination"],

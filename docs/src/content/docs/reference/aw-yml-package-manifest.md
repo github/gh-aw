@@ -128,11 +128,12 @@ If no installable workflow files are resolved, validation fails.
 
 ## Resources
 
-The `resources` field installs inert repository assets. Each entry maps a package-relative `source` to a repository-relative `destination`. Supported destinations are:
+The `resources` field copies repository assets as-is without executing them during installation. Each entry maps a package-relative `source` to a repository-relative `destination`. Supported destinations are:
 
 - Direct children of `.github/ISSUE_TEMPLATE/` with a `.yml` or `.yaml` extension
 - `.github/CODEOWNERS`
 - Files under `.github/aw/`
+- `.mjs` and `.cjs` helper scripts under `.github/workflows/shared/`
 
 Resource destinations must be unique, including case-insensitive comparisons. Path traversal, symbolic links, non-regular local files, and destinations outside the allowlist are rejected. Installed resources are tracked with package-scoped ownership metadata in `.github/aw/packages/*.json`.
 
