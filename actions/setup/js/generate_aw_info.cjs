@@ -42,6 +42,10 @@ async function resolveRunCreatedAt(core, ctx, githubClient) {
   let lastError = "workflow run creation time is unavailable";
   // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
+  if (typeof github?.rest?.actions?.getWorkflowRun !== "function") {
+    core.warning("Unable to load workflow-run creation time: no authenticated GitHub client is available");
+    return "";
+  }
   for (let attempt = 1; attempt <= RUN_CREATED_AT_ATTEMPTS; attempt++) {
     try {
       const response = await github.rest.actions.getWorkflowRun({

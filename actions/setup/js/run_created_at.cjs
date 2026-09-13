@@ -25,7 +25,7 @@ function normalizeRunCreatedAt(value) {
   if (!ISO_8601_DATE_TIME.test(trimmed)) return "";
   const parsed = Date.parse(trimmed);
   if (!Number.isFinite(parsed)) return "";
-  return new Date(Math.floor(parsed / 1000) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return new Date(Math.trunc(parsed / 1000) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 module.exports = { normalizeRunCreatedAt };

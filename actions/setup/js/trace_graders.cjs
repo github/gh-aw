@@ -844,10 +844,11 @@ async function main(manifestB64, execSpecB64) {
       result = normalizeResult(grader.id, null, meta);
       result.status = "error";
       result.error = `grader ${grader.id} runtime error: ${operationalValueEvaluatorArchiveError}`;
-    } else if (grader.source === "operational-value" && operationalValueRunCreatedAtError) {
+    } else if (grader.source === "operational-value" && !operationalValueRunMetadata) {
+      // Operational-value grading requires an authoritative run creation time; never grade without it.
       result = normalizeResult(grader.id, null, meta);
       result.status = "error";
-      result.error = `grader ${grader.id} runtime error: ${operationalValueRunCreatedAtError}`;
+      result.error = `grader ${grader.id} runtime error: ${operationalValueRunCreatedAtError || "workflow run creation time is unavailable"}`;
       result.diagnostics = { missingReason: "run created-at acquisition failed" };
     } else if (grader.source === "operational-value" && executionMap[grader.id]?.run) {
       result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta, { runMetadata: operationalValueRunMetadata });
