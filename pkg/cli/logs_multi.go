@@ -398,7 +398,7 @@ func mergeLogsTargetResults(
 	storageLimitReached := false
 	var continuations []WorkflowContinuation
 	for _, targetResult := range results {
-		if targetResult.err != nil {
+		if targetResult.err != nil && !errors.Is(targetResult.err, errLogsAPIRateLimitReached) {
 			allErrors = append(allErrors, fmt.Errorf("%s: %w", targetResult.target.displayName(), targetResult.err))
 		}
 		processedRuns = append(processedRuns, targetResult.result.processedRuns...)

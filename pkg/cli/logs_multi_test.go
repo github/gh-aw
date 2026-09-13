@@ -383,6 +383,9 @@ func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
 			assert.Contains(t, result.result.continuation.Message, "GitHub API rate limit ceiling reached")
 		}
 	}
+	_, continuations, _, _, _, errs := mergeLogsTargetResults(results, nil)
+	assert.Empty(t, errs, "rate-limit termination must not suppress continuations with a hard error")
+	assert.Len(t, continuations, continuationCount)
 	assert.Equal(t, 2, continuationCount, "each queued target must retain a continuation")
 }
 

@@ -468,6 +468,43 @@ func TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached(t *testing.T
 	assert.Equal(t, "previous-cursor", state.beforeDate)
 }
 
+// TestFetchAndProcessLogsBatchKeepsCursorWhenRateLimitReached verifies that
+// a rate limit reached while downloading artifacts does not advance past runs
+// that were not processed before the shared cancellation.
+func TestFetchAndProcessLogsBatchKeepsCursorWhenRateLimitReached(t *testing.T) {
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		return workflowRunBatch{
+			runs:                   []WorkflowRun{{DatabaseID: 10}, {DatabaseID: 9}},
+			totalFetched:           2,
+			batchSize:              2,
+			oldestFetchedCreatedAt: time.Now().Add(-time.Hour),
+		}, nil
+	}
+	rateLimitState := newLogsRateLimitState(func() {})
+	logsProcessWorkflowRunBatch = func(_ context.Context, _ workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+		rateLimitState.reached.Store(true)
+		return append(processedRuns, ProcessedRun{Run: WorkflowRun{DatabaseID: 10}}), 1, false, false, false
+	}
+
+	state := logsCollectionState{beforeDate: "previous-cursor"}
+	stop, err := fetchAndProcessLogsBatch(
+		&state,
+		logsDownloadRuntime{activeCtx: context.Background()},
+		LogsDownloadOptions{Count: 10, rateLimitState: rateLimitState},
+	)
+
+	assert.True(t, stop)
+	require.ErrorIs(t, err, errLogsAPIRateLimitReached)
+	assert.Equal(t, "previous-cursor", state.beforeDate)
+}
+
 // TestFetchAndProcessLogsBatchAdvancesCursorWhenSharedCountLimitReached verifies
 // that a continuation emitted when the shared multi-target count budget is
 // exhausted mid-batch still resumes after the fully-consumed batch, instead of
