@@ -102,6 +102,8 @@ func TestGenerateCentralSlashCommandWorkflow_GeneratesWorkflow(t *testing.T) {
 	require.Contains(t, text, "runs-on: ubuntu-slim")
 	require.Contains(t, text, "timeout-minutes: 15")
 	require.Contains(t, text, "    permissions:\n      actions: write\n      contents: read\n      issues: write\n      pull-requests: write\n      discussions: write")
+	require.Contains(t, text, "      - name: Checkout repository")
+	require.Contains(t, text, "        with:\n          persist-credentials: false")
 	require.Contains(t, text, "      - name: Setup Scripts")
 	require.Contains(t, text, "        uses: ./actions/setup")
 	require.Contains(t, text, "          destination: ${{ runner.temp }}/gh-aw/actions")
@@ -540,4 +542,25 @@ func typeSetKeys(typeSet map[string]struct{}) []string {
 		out = append(out, key)
 	}
 	return out
+}
+
+func TestGenerateCentralSlashCommandWorkflow_CheckoutDoesNotPersistCredentials(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "central-slash-workflow-persist-creds")
+	data := []*WorkflowData{
+		{
+			WorkflowID:         "triage",
+			Command:            []string{"triage"},
+			CommandEvents:      []string{"issue_comment"},
+			CommandCentralized: true,
+		},
+	}
+
+	require.NoError(t, GenerateCentralSlashCommandWorkflow(context.Background(), data, tmpDir, nil))
+	content, err := os.ReadFile(filepath.Join(tmpDir, centralSlashCommandWorkflowFilename))
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "      - name: Checkout repository\n")
+	require.Contains(t, text, "        with:\n          persist-credentials: false\n")
+	require.NotContains(t, text, "persist-credentials: true")
 }

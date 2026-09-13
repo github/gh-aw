@@ -413,6 +413,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: ` + getActionPin("actions/checkout") + `
+        with:
+          persist-credentials: false
 
       - name: Setup Scripts
         uses: ` + setupActionRef + `
