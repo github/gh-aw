@@ -5,3 +5,4 @@
 {"date":"2026-09-12","loop_name":"Detect-Classify-PreserveOutput","evidence_runs":[34671095868],"direction":"improving","reinforcer":"detection and safe_outputs completed despite agent failure"}
 {"date":"2026-09-12","loop_name":"Observability-to-Reliability","evidence_runs":[34657470495,34659052909],"direction":"stable-to-improving","reinforcer":"reporting workflows completed with full downstream stages"}
 {"date":"2026-09-12","loop_name":"Governance-Pulse-Loop","evidence_runs":[34674344416,34676638964],"direction":"stable","reinforcer":"repeated decision/reviewer workflow executions throughout the window"}
+{"date": "2026-09-13", "loop_name": "Scheduled probes to tighter execution shape", "direction": "improving", "evidence_runs": [34726913882, 34726917192, 34733467133], "notes": "Blocked request reductions and lower turn counts vs baselines in sampled runs.", "confidence": "medium"}
