@@ -122,14 +122,15 @@ const COPILOT_REQUESTS_PROXY_AUTH_403_TEMPLATE_NAME = "copilot_requests_proxy_au
 const CAPI_ERROR_400_PATTERN = /CAPIError:\s*400/;
 // Pattern to detect generic HTTP 400 Bad Request responses emitted by engine CLI / SDK wrappers.
 // NOTE: keep in sync with HTTP_400_RESPONSE_ERROR_PATTERN in detect_agent_errors.cjs.
-// Also matches "400 400 400 no model endpoints available given user constraints" which is emitted
+// Also matches a standalone "400 Bad Request" line emitted by the Copilot CLI, and
+// "400 400 400 no model endpoints available given user constraints" which is emitted
 // by the Copilot SDK when no model endpoints are available for the user's configured constraints.
 // Also matches "400 400 400 stream_options: Extra inputs are not permitted" which is emitted when
 // the Copilot SDK sends an OpenAI-only field to an Anthropic-type provider.
 // The non-first alternatives are anchored to a leading "400" to avoid false positives from unrelated
 // diagnostic or informational messages that might contain the phrase.
 const HTTP_400_RESPONSE_ERROR_PATTERN =
-  /(?:Response status code does not indicate success:\s*400(?:\s*\(Bad Request\))?|400[^\n]*no model endpoints available given user constraints|400[^\n]*stream_options:\s*Extra inputs are not permitted)/i;
+  /(?:Response status code does not indicate success:\s*400(?:\s*\(Bad Request\))?|(?:^|\r?\n)[ \t]*400 Bad Request[ \t]*(?=\r?\n|$)|400[^\n]*no model endpoints available given user constraints|400[^\n]*stream_options:\s*Extra inputs are not permitted)/i;
 
 // Pattern to detect MCP servers blocked by enterprise/organization policy.
 // This is a persistent policy configuration error — retrying will not help.
