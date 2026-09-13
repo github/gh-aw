@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const req = createRequire(import.meta.url);
-const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, MANIFEST_FILE_PATH } = req("./generate_usage_activity_summary.cjs");
+const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, parseGraderResults, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, MANIFEST_FILE_PATH } =
+  req("./generate_usage_activity_summary.cjs");
 
 describe("generate_usage_activity_summary.cjs", () => {
   /** Unique directory for each test to avoid cross-test interference */
@@ -375,6 +376,69 @@ describe("generate_usage_activity_summary.cjs", () => {
       fs.writeFileSync(path.join(experimentStateDir, "assignments.json"), "not json");
       const result = parseExperimentsData();
       expect(result).toBeNull();
+    });
+  });
+
+  describe("parseGraderResults", () => {
+    let gradersDir;
+
+    beforeEach(() => {
+      gradersDir = fs.mkdtempSync(path.join(os.tmpdir(), "graders-test-"));
+    });
+
+    afterEach(() => {
+      if (fs.existsSync(gradersDir)) {
+        fs.rmSync(gradersDir, { recursive: true, force: true });
+      }
+    });
+
+    it("returns null when no grader results file exists", () => {
+      expect(parseGraderResults([path.join(gradersDir, "missing.json")])).toBeNull();
+    });
+
+    it("preserves the full operational-value result contract", () => {
+      const document = {
+        version: 1,
+        results: [
+          {
+            id: "operational-value",
+            name: "Operational Value",
+            status: "pass",
+            value: 0,
+            unit: "ratio",
+            direction: "higher_is_better",
+            source: "operational-value",
+            implementation: { id: "gh-aw/graders", version: 1, digest: "db58f6" },
+            observation: { subject: { runId: "34718229379", createdAt: "2026-09-12T20:58:00Z" }, mature: true, provenance: [] },
+            diagnostics: { missingReason: null },
+            baselineValue: 0.5,
+            deltaFromBaseline: -0.5,
+          },
+        ],
+      };
+      const resultsPath = path.join(gradersDir, "grader_results.json");
+      fs.writeFileSync(resultsPath, JSON.stringify(document));
+
+      expect(parseGraderResults([resultsPath])).toEqual(document);
+    });
+
+    it("prefers the first existing candidate path", () => {
+      const usagePath = path.join(gradersDir, "usage_results.json");
+      const agentPath = path.join(gradersDir, "agent_results.json");
+      fs.writeFileSync(usagePath, JSON.stringify({ version: 1, results: [{ id: "usage" }] }));
+      fs.writeFileSync(agentPath, JSON.stringify({ version: 1, results: [{ id: "agent" }] }));
+
+      expect(parseGraderResults([usagePath, agentPath]).results[0].id).toBe("usage");
+      expect(parseGraderResults([path.join(gradersDir, "missing.json"), agentPath]).results[0].id).toBe("agent");
+    });
+
+    it("throws when the grader results file is malformed", () => {
+      const resultsPath = path.join(gradersDir, "grader_results.json");
+      fs.writeFileSync(resultsPath, "not json");
+      expect(() => parseGraderResults([resultsPath])).toThrow(/Failed to read grader results/);
+
+      fs.writeFileSync(resultsPath, JSON.stringify({ version: 1 }));
+      expect(() => parseGraderResults([resultsPath])).toThrow(/do not contain a results array/);
     });
   });
 

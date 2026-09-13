@@ -235,6 +235,8 @@ All applicable files MUST be included in the unified `agent` artifact.
 
 `grader_results.json` SHOULD include normalized run/result structures suitable for downstream programmatic reads, including per-grader value/status and run-level pass/fail/error counts.
 
+The conclusion job MUST also embed the grader result document in the usage artifact's `activity/summary.json` payload (under `graders`), so grader results remain readable from the compact usage artifact alone.
+
 Tooling that republishes grader results, including `gh aw logs --json` and its cached JSONL records, MUST preserve the result contract: `source`, `value`, `unit`, `implementation`, `observation`, `diagnostics`, `baselineValue`, and `deltaFromBaseline`. Metric units MUST NOT change during serialization.
 
 ---

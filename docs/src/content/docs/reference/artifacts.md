@@ -265,9 +265,32 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "peak_input_tokens": 224000,
     "rebuild_excess_tokens": 650000,
     "invocations": 5
+  },
+  "graders": {
+    "version": 1,
+    "results": [
+      {
+        "id": "operational-value",
+        "name": "Operational Value",
+        "status": "pass",
+        "value": 0,
+        "unit": "ratio",
+        "source": "operational-value",
+        "implementation": { "id": "gh-aw/graders", "version": 1, "digest": "db58f690" },
+        "observation": { "subject": { "runId": "34718229379", "createdAt": "2026-09-12T20:58:00Z" }, "mature": true },
+        "diagnostics": {},
+        "baselineValue": null,
+        "deltaFromBaseline": null
+      }
+    ]
   }
 }
 ```
+
+The `graders` section embeds `grader_results.json` verbatim, so the complete grader
+result contract — including `source`, `value`, `unit`, `implementation`, `observation`,
+`diagnostics`, and baseline fields — is available from the summary payload alone. It is
+present only when the run produced grader results.
 
 MCP `tool_calls` contain quantitative metadata only. Tool-call IDs are replaced with
 run-local opaque identifiers, and request and response content is never copied into

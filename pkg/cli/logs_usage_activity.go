@@ -26,6 +26,10 @@ type usageActivitySummary struct {
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
+	// Graders carries the full grader result document mirrored into the usage
+	// artifact by the conclusion job, so grader results survive even when the
+	// standalone grader_results.json file is unavailable.
+	Graders *graderArtifactFullDocument `json:"graders,omitempty"`
 }
 
 // WorkingSetMetrics describes cumulative model-input traffic relative to the

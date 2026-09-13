@@ -10,6 +10,7 @@
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
+//   graders: deterministic grader results, preserved verbatim from grader_results.json
 
 const fs = require("fs");
 const path = require("path");
@@ -28,6 +29,7 @@ const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
+const GRADER_RESULTS_PATHS = ["/tmp/gh-aw/usage/graders/grader_results.json", "/tmp/gh-aw/agent/graders/grader_results.json"];
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 
 function findFiles(rootDir, shouldIncludeFile, maxDepth = Number.POSITIVE_INFINITY, currentDepth = 0) {
@@ -780,6 +782,36 @@ function parseExperimentsData() {
 }
 
 /**
+ * Read the deterministic grader results produced by the agent job.
+ *
+ * The full grader result contract (including `source`, `value`, `unit`,
+ * `implementation`, `observation`, `diagnostics`, and baseline fields) is preserved
+ * verbatim so downstream consumers can reconstruct an operational-value observation
+ * from the usage artifact alone, without re-reading the agent artifact.
+ *
+ * @param {string[]} [candidatePaths] - Candidate grader result files, in preference order
+ * @returns {{ version?: number, results: any[] } | null} grader document, or null when unavailable
+ */
+function parseGraderResults(candidatePaths = GRADER_RESULTS_PATHS) {
+  for (const candidate of candidatePaths) {
+    if (!fs.existsSync(candidate)) {
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+    } catch (err) {
+      throw new Error(`Failed to read grader results ${candidate}`, { cause: err });
+    }
+    if (!parsed || !Array.isArray(parsed.results)) {
+      throw new Error(`Grader results ${candidate} do not contain a results array`);
+    }
+    return parsed;
+  }
+  return null;
+}
+
+/**
  * Main function to generate usage activity summary
  */
 function main() {
@@ -830,6 +862,18 @@ function main() {
     core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${String(err)} — safe_outputs omitted from summary`);
   }
 
+  // Include the full grader results so the usage artifact payload carries the
+  // complete grader contract, not just the files copied alongside it.
+  try {
+    const graders = parseGraderResults();
+    if (graders) {
+      summary.graders = graders;
+      core.info(`grader results: ${graders.results.length} result(s) included in the usage summary`);
+    }
+  } catch (err) {
+    core.warning(`grader results could not be read: ${String(err)} — graders omitted from summary`);
+  }
+
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
   const experiments = parseExperimentsData();
   if (experiments) {
@@ -871,8 +915,10 @@ module.exports = {
   parseGatewayActivity,
   parseSafeOutputsManifest,
   parseExperimentsData,
+  parseGraderResults,
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
   AGENT_TOKEN_USAGE_PATH,
   MANIFEST_FILE_PATH,
+  GRADER_RESULTS_PATHS,
 };

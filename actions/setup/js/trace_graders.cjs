@@ -9,7 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
 const { executeOperationalValueEvaluator } = require("./operational_value_grader.cjs");
-const { normalizeRunCreatedAt } = require("./run_created_at.cjs");
+const { resolveRunCreatedAtForGrading } = require("./run_created_at.cjs");
 
 // --- Constants ---
 const TMP_GH_AW = "/tmp/gh-aw";
@@ -668,45 +668,6 @@ function runOperationalValueGrader(id, evaluatorContent, meta, options) {
     result.status = "error";
     result.error = `grader ${id} runtime error: ${getErrorMessage(err)}`;
     return result;
-  }
-}
-
-/**
- * Resolve the authoritative workflow-run creation time for operational-value grading.
- *
- * The activation job normally publishes it through GH_AW_RUN_CREATED_AT. When that
- * value is missing or unusable (for example the activation lookup failed), fall back
- * to the Actions run metadata so the grader request is still bound to a run opportunity.
- *
- * @param {NodeJS.ProcessEnv} [env]
- * @param {any} [githubClient]
- * @returns {Promise<{createdAt: string, error?: string}>}
- */
-async function resolveRunCreatedAtForGrading(env = process.env, githubClient = undefined) {
-  const fromEnv = normalizeRunCreatedAt(env.GH_AW_RUN_CREATED_AT);
-  if (fromEnv) return { createdAt: fromEnv };
-
-  // @ts-ignore - global.github is set by setupGlobals() from the github-script context
-  const github = githubClient || global.github;
-  const repository = String(env.GITHUB_REPOSITORY || "");
-  const [owner, repo] = repository.split("/");
-  const runId = String(env.GITHUB_RUN_ID || "");
-  const missing = [];
-  if (!github?.rest?.actions?.getWorkflowRun) missing.push("an authenticated GitHub client");
-  if (!owner || !repo) missing.push("GITHUB_REPOSITORY");
-  if (!/^\d+$/.test(runId)) missing.push("GITHUB_RUN_ID");
-  if (missing.length > 0) {
-    return { createdAt: "", error: `workflow run creation time is unavailable and cannot be read from Actions run metadata (missing ${missing.join(", ")})` };
-  }
-  try {
-    const response = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });
-    const createdAt = normalizeRunCreatedAt(response?.data?.created_at);
-    if (!createdAt) {
-      return { createdAt: "", error: "Actions run metadata did not provide a valid workflow run creation time" };
-    }
-    return { createdAt };
-  } catch (err) {
-    return { createdAt: "", error: `failed to read workflow run creation time from Actions run metadata: ${getErrorMessage(err)}` };
   }
 }
 

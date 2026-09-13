@@ -140,7 +140,8 @@ describe("generate_aw_info.cjs", () => {
 
   it("should retry a transient run creation time lookup failure", async () => {
     process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
-    mockGithub.rest.actions.getWorkflowRun.mockRejectedValueOnce(new Error("server error")).mockResolvedValue({ data: { created_at: "2026-08-24T12:00:00Z" } });
+    const serverError = Object.assign(new Error("server error"), { status: 500 });
+    mockGithub.rest.actions.getWorkflowRun.mockRejectedValueOnce(serverError).mockResolvedValue({ data: { created_at: "2026-08-24T12:00:00Z" } });
 
     await main(mockCore, mockContext, mockGithub);
 

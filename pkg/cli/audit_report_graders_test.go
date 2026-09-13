@@ -311,3 +311,41 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 		t.Fatalf("expected diagnostics missingReason to be preserved, got %+v", unavailable.Diagnostics)
 	}
 }
+
+// TestExtractGradersDataFromUsageActivitySummary verifies that grader results embedded in
+// the conclusion job's usage activity summary are used when the standalone
+// grader_results.json file is unavailable.
+func TestExtractGradersDataFromUsageActivitySummary(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	summaryDir := filepath.Join(runDir, constants.UsageArtifactName.String(), "activity")
+	if err := os.MkdirAll(summaryDir, 0o755); err != nil {
+		t.Fatalf("failed to create summary dir: %v", err)
+	}
+	summary := map[string]any{
+		"schema":  "usage-activity-summary/v1",
+		"graders": operationalValueGraderResults(),
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatalf("failed to marshal summary: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(summaryDir, "summary.json"), data, 0o600); err != nil {
+		t.Fatalf("failed to write summary: %v", err)
+	}
+
+	graders := extractGradersData(runDir)
+	if graders == nil {
+		t.Fatal("expected graders data to be extracted from the usage activity summary")
+	}
+	if len(graders.Results) != 2 {
+		t.Fatalf("expected 2 grader results, got %d", len(graders.Results))
+	}
+	value := graders.Results[0]
+	if value.ID != "operational-value" || value.Unit != "ratio" || value.Source != "operational-value" {
+		t.Fatalf("expected the full grader contract to survive, got %+v", value)
+	}
+	if value.Implementation == nil || value.Implementation.Digest != "db58f69" {
+		t.Fatalf("expected implementation digest to be preserved, got %+v", value.Implementation)
+	}
+}

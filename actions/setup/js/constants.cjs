@@ -140,6 +140,26 @@ const DETECTION_LOG_FILENAME = "detection.log";
  */
 const DETECTION_RESULT_FILENAME = "detection_result.json";
 
+/**
+ * Maximum retry attempts for the workflow-run creation time lookup.
+ * The operational-value grader cannot bind a run opportunity without this
+ * timestamp, so transient lookup failures are retried before giving up.
+ * @type {number}
+ */
+const RUN_CREATED_AT_MAX_RETRIES = 2;
+
+/**
+ * Initial backoff delay, in milliseconds, for the workflow-run creation time lookup.
+ * @type {number}
+ */
+const RUN_CREATED_AT_INITIAL_DELAY_MS = 500;
+
+/**
+ * Maximum backoff delay, in milliseconds, for the workflow-run creation time lookup.
+ * @type {number}
+ */
+const RUN_CREATED_AT_MAX_DELAY_MS = 2000;
+
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
@@ -157,4 +177,7 @@ module.exports = {
   GITHUB_RATE_LIMITS_JSONL_PATH,
   DETECTION_LOG_FILENAME,
   DETECTION_RESULT_FILENAME,
+  RUN_CREATED_AT_MAX_RETRIES,
+  RUN_CREATED_AT_INITIAL_DELAY_MS,
+  RUN_CREATED_AT_MAX_DELAY_MS,
 };

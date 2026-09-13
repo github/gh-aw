@@ -163,10 +163,31 @@ func extractGradersData(logsPath string) *GradersData {
 		return nil
 	}
 
+	doc := loadGraderResultsDocument(logsPath)
+	if doc == nil || len(doc.Results) == 0 {
+		return nil
+	}
+
+	manifest := loadGraderManifestEntries(logsPath)
+	graders := &GradersData{Version: doc.Version}
+	for _, result := range doc.Results {
+		graders.Results = append(graders.Results, buildGraderResult(result, manifest[result.ID]))
+	}
+	slices.SortFunc(graders.Results, func(a, b GraderResult) int { return strings.Compare(a.ID, b.ID) })
+	countGraderStatuses(graders)
+	gradersDataLog.Printf("Parsed %d grader result(s)", len(graders.Results))
+	return graders
+}
+
+// loadGraderResultsDocument reads the grader result document for a run. It prefers the
+// standalone grader_results.json file and falls back to the copy embedded in the usage
+// artifact's activity summary, which the conclusion job writes so grader results survive
+// even when only the compact usage summary is available.
+func loadGraderResultsDocument(logsPath string) *graderArtifactFullDocument {
 	resultsPath := findGraderFile(logsPath, constants.GraderResultsFilename.String())
 	if resultsPath == "" {
-		gradersDataLog.Printf("No grader results found in: %s", logsPath)
-		return nil
+		gradersDataLog.Printf("No grader results file found in: %s, trying usage activity summary", logsPath)
+		return graderResultsFromUsageSummary(logsPath)
 	}
 	gradersDataLog.Printf("Reading grader results from: %s", resultsPath)
 
@@ -189,19 +210,22 @@ func extractGradersData(logsPath string) *GradersData {
 		gradersDataLog.Printf("Failed to parse grader results: %v", err)
 		return nil
 	}
-	if len(doc.Results) == 0 {
+	return &doc
+}
+
+// graderResultsFromUsageSummary returns the grader result document embedded in the usage
+// artifact's activity summary, or nil when it is absent or unreadable.
+func graderResultsFromUsageSummary(logsPath string) *graderArtifactFullDocument {
+	summary, err := loadUsageActivitySummary(logsPath)
+	if err != nil {
+		gradersDataLog.Printf("Failed to load usage activity summary for grader results: %v", err)
 		return nil
 	}
-
-	manifest := loadGraderManifestEntries(logsPath)
-	graders := &GradersData{Version: doc.Version}
-	for _, result := range doc.Results {
-		graders.Results = append(graders.Results, buildGraderResult(result, manifest[result.ID]))
+	if summary == nil || summary.Graders == nil || len(summary.Graders.Results) == 0 {
+		return nil
 	}
-	slices.SortFunc(graders.Results, func(a, b GraderResult) int { return strings.Compare(a.ID, b.ID) })
-	countGraderStatuses(graders)
-	gradersDataLog.Printf("Parsed %d grader result(s)", len(graders.Results))
-	return graders
+	gradersDataLog.Printf("Using %d grader result(s) from the usage activity summary", len(summary.Graders.Results))
+	return summary.Graders
 }
 
 // loadGraderManifestEntries reads the grader manifest, when present, keyed by grader ID.

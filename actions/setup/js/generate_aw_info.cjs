@@ -9,68 +9,8 @@ const { validateContextVariables } = require("./validate_context_variables.cjs")
 const validateLockdownRequirements = require("./validate_lockdown_requirements.cjs");
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { normalizeRunCreatedAt } = require("./run_created_at.cjs");
+const { resolveRunCreatedAtForInfo } = require("./run_created_at.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
-
-// Retries guard the operational-value grader against transient run-metadata lookup failures.
-const RUN_CREATED_AT_ATTEMPTS = 3;
-const RUN_CREATED_AT_RETRY_DELAY_MS = 500;
-
-/**
- * Report whether a workflow-run lookup failure is permanent (for example a missing
- * `actions: read` permission), so retries are not spent on a request that cannot succeed.
- *
- * @param {any} err
- * @returns {boolean}
- */
-function isNonRetryableRunCreatedAtError(err) {
-  const status = Number(err?.status);
-  return Number.isInteger(status) && status >= 400 && status < 500 && status !== 408 && status !== 429;
-}
-
-/**
- * Resolve the authoritative workflow-run creation time as a UTC ISO timestamp.
- * Consumers (the operational-value grader) require a valid timestamp, so transient
- * lookup failures are retried before the value is reported as unavailable.
- *
- * @param {typeof import('@actions/core')} core - GitHub Actions core library
- * @param {any} ctx - GitHub Actions context object
- * @param {any} [githubClient] - Authenticated GitHub client; falls back to global.github
- * @returns {Promise<string>} normalized timestamp, or "" when it cannot be resolved
- */
-async function resolveRunCreatedAt(core, ctx, githubClient) {
-  let lastError = "workflow run creation time is unavailable";
-  // @ts-ignore - global.github is set by setupGlobals() from github-script context
-  const github = githubClient || global.github;
-  if (typeof github?.rest?.actions?.getWorkflowRun !== "function") {
-    core.warning("Unable to load workflow-run creation time: no authenticated GitHub client is available");
-    return "";
-  }
-  for (let attempt = 1; attempt <= RUN_CREATED_AT_ATTEMPTS; attempt++) {
-    try {
-      const response = await github.rest.actions.getWorkflowRun({
-        owner: ctx.repo.owner,
-        repo: ctx.repo.repo,
-        run_id: ctx.runId,
-      });
-      const runCreatedAt = normalizeRunCreatedAt(response?.data?.created_at);
-      if (runCreatedAt) {
-        return runCreatedAt;
-      }
-      lastError = `workflow run creation time is not a valid timestamp: ${JSON.stringify(response?.data?.created_at)}`;
-    } catch (err) {
-      lastError = getErrorMessage(err);
-      if (isNonRetryableRunCreatedAtError(err)) {
-        break;
-      }
-    }
-    if (attempt < RUN_CREATED_AT_ATTEMPTS) {
-      await new Promise(resolve => setTimeout(resolve, RUN_CREATED_AT_RETRY_DELAY_MS * attempt));
-    }
-  }
-  core.warning(`Unable to load workflow-run creation time: ${lastError}`);
-  return "";
-}
 
 /**
  * Generate aw_info.json with workflow run metadata.
@@ -160,7 +100,7 @@ async function main(core, ctx, githubClient) {
   };
 
   if (process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT === "true") {
-    core.setOutput("run_created_at", await resolveRunCreatedAt(core, ctx, githubClient));
+    core.setOutput("run_created_at", await resolveRunCreatedAtForInfo(core, ctx, githubClient));
   }
 
   const frontmatterSource = process.env.GH_AW_INFO_FRONTMATTER_SOURCE || "";
