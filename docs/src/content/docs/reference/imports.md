@@ -86,11 +86,11 @@ Paths are resolved within the `.github` folder. You can specify paths with or wi
 
 ## Shared Workflow Components
 
-Files without a trigger event are shared workflow components: they are validated, can be imported by other workflows, and are not compiled into standalone GitHub Actions. Shared components may also define import-safe `on` keys (`skip-if-match`, `skip-if-no-match`, `skip-roles`, `skip-bots`, `github-token`, `github-app`) and the top-level `ambient-folders` field for reuse through imports.
+Files without a trigger event are shared workflow components. They are validated, importable by other workflows, and not compiled into standalone GitHub Actions. Shared components may also define import-safe `on` keys (`skip-if-match`, `skip-if-no-match`, `skip-roles`, `skip-bots`, `github-token`, `github-app`) plus the top-level `ambient-folders` field.
 
-A shared workflow's frontmatter can contain comments only. Comment-only frontmatter is treated as present, so the file still parses as a shared component and produces an empty frontmatter map rather than failing with `no frontmatter found`. Only truly missing or whitespace-only frontmatter is rejected.
+Comment-only frontmatter still counts as present, so the file parses as a shared component and produces an empty frontmatter map instead of failing with `no frontmatter found`. Only missing or whitespace-only frontmatter is rejected.
 
-When you regularly import the same pair together, bundle them into one shared file:
+If you often import the same pair together, bundle them into one shared file:
 
 ```aw wrap
 ---
@@ -193,7 +193,7 @@ The compiler validates `required` fields, `choice` options, array element types,
 
 ## Path Resolution
 
-Imports resolve in three ways depending on path format.
+Imports resolve by path format:
 
 ### Relative paths (default)
 
@@ -319,20 +319,20 @@ Imported step fields use dependency order: a file's steps are processed after th
 | `tools:` | Deep merge; `allowed` arrays concatenate and deduplicate. MCP tool conflicts fail except on `allowed` arrays. |
 | `mcp-servers:` | Imported servers override same-named main servers; first-wins across imports. |
 | `network:` | `allowed` domains union (deduped, sorted). Main `mode` and `firewall` take precedence. |
-| `permissions:` | Validation only — not merged. Main must declare all imported permissions at sufficient levels (`write` ≥ `read` ≥ `none`). |
-| `safe-outputs:` | Each type defined once; main overrides imports. Duplicate types across imports fail. |
-| `runtimes:` | Main overrides imports; imported values fill in unspecified fields. |
+| `permissions:` | Validation only. Main must declare all imported permissions at sufficient levels (`write` ≥ `read` ≥ `none`). |
+| `safe-outputs:` | Each type may be defined once; main overrides imports. Duplicate types across imports fail. |
+| `runtimes:` | Main overrides imports; imported values fill unspecified fields. |
 | `plugins:` | Union by plugin path. Identical refs are deduplicated; compatible semantic versions select the highest version. Incompatible major versions or conflicting non-semver refs fail. |
-| `services:` | All services merged; duplicate names fail compilation. |
-| `github-app:` | Main workflow's `github-app` takes precedence; first imported value fills in if main does not define one. |
-| `checkout:` | Imported checkout entries are appended after the main workflow's entries. For duplicate (repository, path) pairs, the main workflow's entry takes precedence: first-seen wins for `ref`, and auth is mutually exclusive — once `github-token` or `github-app` is set by the main workflow, an imported duplicate cannot add the other auth method. `checkout: false` in the main workflow disables all checkout including imported entries. |
-| `engine.mcp` | First-wins across imports. Shared files may define `engine:` with only `mcp.tool-timeout` and/or `mcp.session-timeout` (no engine identifier). The importing workflow's own engine setting always takes precedence; the first imported value fills in if the main workflow does not set a value. |
+| `services:` | All services merge; duplicate names fail compilation. |
+| `github-app:` | Main takes precedence; otherwise the first imported value is used. |
+| `checkout:` | Imported entries are appended after the main workflow's entries. For duplicate `(repository, path)` pairs, the main entry wins: first-seen wins for `ref`, auth is mutually exclusive, and `checkout: false` in the main workflow disables all checkout, including imported entries. |
+| `engine.mcp` | First-wins across imports. Shared files may define only `mcp.tool-timeout` and/or `mcp.session-timeout`; the importing workflow's engine identifier always wins. |
 | `steps:` | Imported steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
 | `pre-agent-steps:` | Imported pre-agent steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
 | `post-steps:` | Imported post-steps are appended after main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
-| `jobs:` | Not merged — define only in the main workflow. Use `safe-outputs.jobs` for importable jobs. |
-| `safe-outputs.jobs` | Names must be unique; duplicates fail. Order determined by `needs:` dependencies. |
-| `env:` | Main workflow env vars take precedence over imports. Duplicate keys across different imports fail compilation — move to the main workflow to override imported values. |
+| `jobs:` | Not merged; define only in the main workflow. Use `safe-outputs.jobs` for importable jobs. |
+| `safe-outputs.jobs` | Names must be unique; duplicates fail. Order is determined by `needs:` dependencies. |
+| `env:` | Main env vars take precedence. Duplicate keys across imports fail compilation; move the override to the main workflow. |
 
 Example — `tools.bash.allowed` merging:
 
@@ -528,12 +528,12 @@ Consumers import it with `imports: [shared/notify.md]` and instruct the agent to
 
 Setting `inlined-imports: true` embeds all imported content directly into the compiled `.lock.yml` at compile time, producing a **self-contained** lock file that does not need file-system access or cross-repository checkout at runtime.
 
-Enable it when runtime import resolution would otherwise fail:
+Enable it when runtime import resolution would otherwise fail, especially for:
 
-- **Cross-organization `workflow_call`** — a trigger in Org A calling a workflow in Org B cannot check out Org B's `.github` folder with the caller's `GITHUB_TOKEN`, producing `fatal: repository '...' not found`.
-- **Repository rulesets** — workflows used as a [required status check](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) run in a restricted context that cannot access other files in the repo, producing `ERR_SYSTEM: Runtime import file not found`.
+- **Cross-organization `workflow_call`** runs, where the caller's `GITHUB_TOKEN` cannot check out the callee repository's `.github` folder and Git returns `fatal: repository '...' not found`.
+- **Repository rulesets**, where workflows running as [required status checks](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) cannot access other repo files and fail with `ERR_SYSTEM: Runtime import file not found`.
 
-Both cases are solved by bundling imports into the lock file at compile time:
+In both cases, bundling imports into the lock file at compile time avoids the runtime lookup:
 
 ```aw wrap
 ---
