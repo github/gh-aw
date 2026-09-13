@@ -6,6 +6,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
+	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
 	"github.com/github/gh-aw/pkg/linters/bytescomparestring"
 	"github.com/github/gh-aw/pkg/linters/contextcancelnotdeferred"
@@ -87,6 +88,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	appendbytestring.Analyzer,
 	appendoneelement.Analyzer,
 	bufferresetbeforereuse.Analyzer,
+	bufioscannererunchecked.Analyzer,
 	bytesbufferstring.Analyzer,
 	bytescomparestring.Analyzer,
 	contextcancelnotdeferred.Analyzer,
