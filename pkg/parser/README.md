@@ -374,7 +374,7 @@ This appendix is generated from the current non-test Go source files in this pac
 
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented.
+Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review.
 
 ---
 
