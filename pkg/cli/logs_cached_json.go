@@ -265,7 +265,7 @@ func resolveCachedLogsJSONLPaths(path string) ([]string, string, bool, error) {
 			sourcePaths = append(sourcePaths, filepath.Join(dir, name))
 		}
 	}
-	sortCachedLogsJSONLSourcePaths(sourcePaths)
+	sortCachedLogsJSONLSourcePaths(sourcePaths, prefix)
 	writerPath, err := uniqueCachedLogsJSONLPath(dir, prefix)
 	if err != nil {
 		return nil, "", false, err
@@ -273,7 +273,7 @@ func resolveCachedLogsJSONLPaths(path string) ([]string, string, bool, error) {
 	return sourcePaths, writerPath, true, nil
 }
 
-func sortCachedLogsJSONLSourcePaths(paths []string) {
+func sortCachedLogsJSONLSourcePaths(paths []string, prefix string) {
 	slices.SortStableFunc(paths, func(leftPath, rightPath string) int {
 		left, leftErr := os.Stat(leftPath)
 		right, rightErr := os.Stat(rightPath)
@@ -283,8 +283,33 @@ func sortCachedLogsJSONLSourcePaths(paths []string) {
 			}
 			return 1
 		}
+		leftUnix, leftOK := cachedLogsJSONLUnixSuffix(leftPath, prefix)
+		rightUnix, rightOK := cachedLogsJSONLUnixSuffix(rightPath, prefix)
+		if leftOK && rightOK && leftUnix != rightUnix {
+			if leftUnix < rightUnix {
+				return -1
+			}
+			return 1
+		}
 		return strings.Compare(leftPath, rightPath)
 	})
+}
+
+func cachedLogsJSONLUnixSuffix(path, prefix string) (int64, bool) {
+	name := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	suffix, ok := strings.CutPrefix(name, prefix)
+	if !ok {
+		return 0, false
+	}
+	digitCount := 0
+	for digitCount < len(suffix) && suffix[digitCount] >= '0' && suffix[digitCount] <= '9' {
+		digitCount++
+	}
+	if digitCount == 0 {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(suffix[:digitCount], 10, 64)
+	return value, err == nil
 }
 
 func uniqueCachedLogsJSONLPath(dir, prefix string) (string, error) {

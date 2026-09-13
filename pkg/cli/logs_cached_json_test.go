@@ -301,6 +301,22 @@ func TestResolveCachedLogsJSONLPathsRejectsNonTrailingWildcard(t *testing.T) {
 	require.ErrorContains(t, err, "trailing prefix match")
 }
 
+func TestSortCachedLogsJSONLSourcePathsUsesEmbeddedUnixTimeAsTieBreaker(t *testing.T) {
+	dir := t.TempDir()
+	olderPath := filepath.Join(dir, "logs-100-b.jsonl")
+	newerPath := filepath.Join(dir, "logs-200-a.jsonl")
+	manualPath := filepath.Join(dir, "logs-manual.jsonl")
+	for _, path := range []string{newerPath, manualPath, olderPath} {
+		require.NoError(t, os.WriteFile(path, []byte("{}\n"), 0o600))
+		require.NoError(t, os.Chtimes(path, time.Unix(300, 0), time.Unix(300, 0)))
+	}
+	paths := []string{newerPath, manualPath, olderPath}
+
+	sortCachedLogsJSONLSourcePaths(paths, "logs-")
+
+	assert.Equal(t, []string{olderPath, newerPath, manualPath}, paths)
+}
+
 func TestPruneCachedLogsJSONLWildcardSourcesDeletesFilesWithoutInRangeRuns(t *testing.T) {
 	dir := t.TempDir()
 	oldPath := filepath.Join(dir, "logs-old.jsonl")
