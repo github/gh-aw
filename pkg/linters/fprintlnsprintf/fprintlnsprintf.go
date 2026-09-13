@@ -63,7 +63,7 @@ func run(pass *analysis.Pass) (any, error) {
 			Pos:            call.Pos(),
 			End:            call.End(),
 			Message:        "use fmt.Fprintf instead of fmt.Fprintln(w, fmt.Sprintf(...))",
-			SuggestedFixes: buildFprintfFix(call, printedArg),
+			SuggestedFixes: buildFprintfFix(pass, call, printedArg),
 		})
 	})
 }
@@ -73,8 +73,11 @@ func run(pass *analysis.Pass) (any, error) {
 // fmt.Fprintf(w, "format\n", args...).
 // A fix is only emitted when the format argument is a plain double-quoted
 // string literal; other forms (raw strings, variables) are left unfixed.
-func buildFprintfFix(call *ast.CallExpr, sprintfCall *ast.CallExpr) []analysis.SuggestedFix {
+func buildFprintfFix(pass *analysis.Pass, call *ast.CallExpr, sprintfCall *ast.CallExpr) []analysis.SuggestedFix {
 	if len(sprintfCall.Args) == 0 {
+		return nil
+	}
+	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
 		return nil
 	}
 	formatLit, ok := sprintfCall.Args[0].(*ast.BasicLit)

@@ -184,6 +184,8 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
 - `footer:` - Global footer control for all safe outputs (boolean, default: `true`)
   - When `false`, omits visible AI-generated footer content from all created/updated entities (issues, PRs, discussions, releases) while still including XML markers for searchability
   - Individual safe-output types can override this setting
+- `body-footer:` - Deterministic template appended to every body-producing safe output, additive with any handler-specific `body-footer:` (string)
+  - Appended even when `footer: false` omits the AI-generated footer
 - `staged:` - Preview mode for all safe outputs (boolean)
   - When `true`, emits step summary messages instead of making GitHub API calls; useful for testing without side effects
 - `env:` - Environment variables passed to all safe output jobs (object)

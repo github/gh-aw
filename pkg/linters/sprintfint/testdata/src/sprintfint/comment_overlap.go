@@ -1,0 +1,7 @@
+package sprintfint
+
+import "fmt"
+
+func overlapSprintfInt(x int) string {
+	return fmt.Sprintf("%d" /* keep */, x) // want `use strconv\.Itoa\(x\) instead of fmt\.Sprintf\("%d", x\)`
+}

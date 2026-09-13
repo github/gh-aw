@@ -1,0 +1,7 @@
+package writebytestring
+
+import "io"
+
+func overlapWriteByteString(w io.Writer, s string) {
+	_, _ = w.Write([]byte(/* keep */ s)) // want `w\.Write\(\[\]byte\(s\)\) can be replaced with io\.WriteString\(w, s\) to potentially avoid a \[\]byte allocation if the writer implements io\.StringWriter`
+}

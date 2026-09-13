@@ -1,0 +1,7 @@
+package tolowerequalfold
+
+import "strings"
+
+func overlapToLowerEqualFold(s string) bool {
+	return strings.ToLower(/* keep */ s) == "alice" // want `use strings\.EqualFold`
+}

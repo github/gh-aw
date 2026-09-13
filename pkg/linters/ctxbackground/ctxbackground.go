@@ -52,11 +52,9 @@ func run(pass *analysis.Pass) (any, error) {
 				break
 			}
 
-			pass.Report(analysis.Diagnostic{
-				Pos:     call.Pos(),
-				End:     call.End(),
-				Message: "use the context.Context parameter instead of context.Background()",
-				SuggestedFixes: []analysis.SuggestedFix{
+			var fixes []analysis.SuggestedFix
+			if !astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+				fixes = []analysis.SuggestedFix{
 					{
 						Message: "Replace context.Background() with context parameter",
 						TextEdits: []analysis.TextEdit{
@@ -67,7 +65,13 @@ func run(pass *analysis.Pass) (any, error) {
 							},
 						},
 					},
-				},
+				}
+			}
+			pass.Report(analysis.Diagnostic{
+				Pos:            call.Pos(),
+				End:            call.End(),
+				Message:        "use the context.Context parameter instead of context.Background()",
+				SuggestedFixes: fixes,
 			})
 			break
 		}

@@ -183,6 +183,9 @@ func resolveFixOp(normalOp token.Token, lit int) (fixOp token.Token, cmpVerb str
 // buildLenStringFix returns a SuggestedFix that rewrites a direct len(s) comparison
 // to a direct string comparison using fixOp (== or !=).
 func buildLenStringFix(pass *analysis.Pass, expr *ast.BinaryExpr, lenArg ast.Expr, fixOp token.Token) []analysis.SuggestedFix {
+	if astutil.HasOverlappingComment(pass.Files, expr.Pos(), expr.End()) {
+		return nil
+	}
 	text := astutil.NodeText(pass.Fset, lenArg)
 	if text == "" {
 		return nil

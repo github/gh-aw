@@ -88,6 +88,9 @@ func buildReplaceAllFix(pass *analysis.Pass, call *ast.CallExpr) []analysis.Sugg
 	if len(call.Args) != 4 {
 		return nil
 	}
+	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		return nil
+	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return nil

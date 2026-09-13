@@ -69,18 +69,22 @@ func analyzeIndexHasPrefix(pass *analysis.Pass, n ast.Node, generatedFiles filec
 		msg = fmt.Sprintf("use strings.HasPrefix(%s, %s) instead of strings.Index comparison", sText, subText)
 	}
 
-	pass.Report(analysis.Diagnostic{
-		Pos:     expr.Pos(),
-		End:     expr.End(),
-		Message: msg,
-		SuggestedFixes: []analysis.SuggestedFix{{
+	var fixes []analysis.SuggestedFix
+	if !astutil.HasOverlappingComment(pass.Files, expr.Pos(), expr.End()) {
+		fixes = []analysis.SuggestedFix{{
 			Message: "Replace strings.Index comparison with strings.HasPrefix",
 			TextEdits: []analysis.TextEdit{{
 				Pos:     expr.Pos(),
 				End:     expr.End(),
 				NewText: []byte(replacement),
 			}},
-		}},
+		}}
+	}
+	pass.Report(analysis.Diagnostic{
+		Pos:            expr.Pos(),
+		End:            expr.End(),
+		Message:        msg,
+		SuggestedFixes: fixes,
 	})
 }
 

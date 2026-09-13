@@ -1,0 +1,7 @@
+package ctxbackground
+
+import "context"
+
+func overlapCtxBackground(ctx context.Context) context.Context {
+	return context.Background /* keep */ () // want `use the context.Context parameter instead of context.Background\(\)`
+}

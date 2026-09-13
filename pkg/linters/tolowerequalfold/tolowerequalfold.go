@@ -94,6 +94,9 @@ func run(pass *analysis.Pass) (any, error) {
 // an alias variable), since alias variables may be defined at a different
 // source location.
 func buildEqualFoldFix(pass *analysis.Pass, expr *ast.BinaryExpr) []analysis.SuggestedFix {
+	if astutil.HasOverlappingComment(pass.Files, expr.Pos(), expr.End()) {
+		return nil
+	}
 	leftArg, leftOK := caseConvArg(pass, expr.X)
 	rightArg, rightOK := caseConvArg(pass, expr.Y)
 	if !leftOK && !rightOK {

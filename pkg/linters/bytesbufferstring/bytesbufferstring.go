@@ -81,18 +81,22 @@ func analyzeStringBytesCall(pass *analysis.Pass, n ast.Node, generatedFiles file
 		return
 	}
 
-	pass.Report(analysis.Diagnostic{
-		Pos:     call.Pos(),
-		End:     call.End(),
-		Message: fmt.Sprintf("string(%s.Bytes()) can be simplified to %s.String()", receiverText, receiverText),
-		SuggestedFixes: []analysis.SuggestedFix{{
+	var fixes []analysis.SuggestedFix
+	if !astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		fixes = []analysis.SuggestedFix{{
 			Message: fmt.Sprintf("Replace string(%s.Bytes()) with %s.String()", receiverText, receiverText),
 			TextEdits: []analysis.TextEdit{{
 				Pos:     call.Pos(),
 				End:     call.End(),
 				NewText: []byte(receiverText + ".String()"),
 			}},
-		}},
+		}}
+	}
+	pass.Report(analysis.Diagnostic{
+		Pos:            call.Pos(),
+		End:            call.End(),
+		Message:        fmt.Sprintf("string(%s.Bytes()) can be simplified to %s.String()", receiverText, receiverText),
+		SuggestedFixes: fixes,
 	})
 }
 
