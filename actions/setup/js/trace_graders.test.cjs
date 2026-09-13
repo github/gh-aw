@@ -226,6 +226,48 @@ describe("trace_graders", () => {
     });
   });
 
+  describe("operational-value run created-at acquisition", () => {
+    it("reports an explicit grader error instead of grading an invalid request", async () => {
+      const originalCore = global.core;
+      const originalGithub = global.github;
+      const originalRunId = process.env.GITHUB_RUN_ID;
+      const originalRepository = process.env.GITHUB_REPOSITORY;
+      const originalCreatedAt = process.env.GH_AW_RUN_CREATED_AT;
+      // @ts-ignore - minimal core stub for the graders entry point
+      global.core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn(), summary: { addDetails: vi.fn(), write: vi.fn() } };
+      // @ts-ignore - no authenticated client is available for the metadata fallback
+      global.github = undefined;
+      process.env.GITHUB_RUN_ID = "34718229379";
+      process.env.GITHUB_REPOSITORY = "githubnext/gh-aw-cao";
+      delete process.env.GH_AW_RUN_CREATED_AT;
+
+      const evaluator = "#!/usr/bin/env bash\nexit 0\n";
+      const digest = crypto.createHash("sha256").update(evaluator, "utf8").digest("hex");
+      const manifest = { version: 1, graders: [{ id: "operational-value", name: "Operational Value", source: "operational-value", enabled: true, unit: "ratio", digest }] };
+      const execSpec = [{ id: "operational-value", run: evaluator }];
+
+      try {
+        await main(Buffer.from(JSON.stringify(manifest)).toString("base64"), Buffer.from(JSON.stringify(execSpec)).toString("base64"));
+        const results = JSON.parse(fs.readFileSync(RESULTS_PATH, "utf8"));
+        const result = results.results.find(entry => entry.id === "operational-value");
+
+        expect(result.status).toBe("error");
+        expect(result.unit).toBe("ratio");
+        expect(result.error).toContain("workflow run creation time is unavailable");
+        expect(result.diagnostics).toEqual({ missingReason: "run created-at acquisition failed" });
+      } finally {
+        global.core = originalCore;
+        global.github = originalGithub;
+        if (originalRunId === undefined) delete process.env.GITHUB_RUN_ID;
+        else process.env.GITHUB_RUN_ID = originalRunId;
+        if (originalRepository === undefined) delete process.env.GITHUB_REPOSITORY;
+        else process.env.GITHUB_REPOSITORY = originalRepository;
+        if (originalCreatedAt === undefined) delete process.env.GH_AW_RUN_CREATED_AT;
+        else process.env.GH_AW_RUN_CREATED_AT = originalCreatedAt;
+      }
+    });
+  });
+
   describe("archiveOperationalValueEvaluator", () => {
     it("writes only evaluator bytes matching the frozen digest", () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "operational-value-evaluator-archive-"));

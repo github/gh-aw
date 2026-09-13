@@ -691,8 +691,12 @@ async function resolveRunCreatedAt(env = process.env, githubClient = undefined) 
   const repository = String(env.GITHUB_REPOSITORY || "");
   const [owner, repo] = repository.split("/");
   const runId = String(env.GITHUB_RUN_ID || "");
-  if (!github?.rest?.actions?.getWorkflowRun || !owner || !repo || !/^\d+$/.test(runId)) {
-    return { createdAt: "", error: "workflow run creation time is unavailable and cannot be read from Actions run metadata" };
+  const missing = [];
+  if (!github?.rest?.actions?.getWorkflowRun) missing.push("an authenticated GitHub client");
+  if (!owner || !repo) missing.push("GITHUB_REPOSITORY");
+  if (!/^\d+$/.test(runId)) missing.push("GITHUB_RUN_ID");
+  if (missing.length > 0) {
+    return { createdAt: "", error: `workflow run creation time is unavailable and cannot be read from Actions run metadata (missing ${missing.join(", ")})` };
   }
   try {
     const response = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });

@@ -17,6 +17,18 @@ const RUN_CREATED_AT_ATTEMPTS = 3;
 const RUN_CREATED_AT_RETRY_DELAY_MS = 500;
 
 /**
+ * Report whether a workflow-run lookup failure is permanent (for example a missing
+ * `actions: read` permission), so retries are not spent on a request that cannot succeed.
+ *
+ * @param {any} err
+ * @returns {boolean}
+ */
+function isNonRetryableRunCreatedAtError(err) {
+  const status = Number(err?.status);
+  return Number.isInteger(status) && status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+/**
  * Resolve the authoritative workflow-run creation time as a UTC ISO timestamp.
  * Consumers (the operational-value grader) require a valid timestamp, so transient
  * lookup failures are retried before the value is reported as unavailable.
@@ -44,6 +56,9 @@ async function resolveRunCreatedAt(core, ctx, githubClient) {
       lastError = `workflow run creation time is not a valid timestamp: ${JSON.stringify(response?.data?.created_at)}`;
     } catch (err) {
       lastError = getErrorMessage(err);
+      if (isNonRetryableRunCreatedAtError(err)) {
+        break;
+      }
     }
     if (attempt < RUN_CREATED_AT_ATTEMPTS) {
       await new Promise(resolve => setTimeout(resolve, RUN_CREATED_AT_RETRY_DELAY_MS));

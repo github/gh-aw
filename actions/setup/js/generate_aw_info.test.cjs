@@ -148,6 +148,17 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "2026-08-24T12:00:00Z");
   });
 
+  it("should not retry a permanent run creation time lookup failure", async () => {
+    process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
+    const forbidden = Object.assign(new Error("forbidden"), { status: 403 });
+    mockGithub.rest.actions.getWorkflowRun.mockRejectedValue(forbidden);
+
+    await main(mockCore, mockContext, mockGithub);
+
+    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "");
+  });
+
   it("should warn and clear the run creation time when the lookup returns no usable timestamp", async () => {
     process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
     mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { created_at: null } });
