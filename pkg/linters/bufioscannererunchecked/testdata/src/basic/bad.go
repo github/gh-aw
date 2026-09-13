@@ -66,3 +66,52 @@ func badNolintIgnored() {
 	}
 	// With nolint, this should not be flagged
 }
+
+func badNestedBlock() {
+	file, _ := os.Open("test.txt")
+	defer file.Close()
+
+	if file != nil {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+			println(scanner.Text())
+		}
+	}
+}
+
+func badVarScanner() {
+	file, _ := os.Open("test.txt")
+	defer file.Close()
+
+	var scanner = bufio.NewScanner(file)
+	for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+}
+
+func badReassignedScanner() {
+	file, _ := os.Open("test.txt")
+	defer file.Close()
+
+	var scanner *bufio.Scanner
+	scanner = bufio.NewScanner(file)
+	for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+}
+
+func badScannerParameter(scanner *bufio.Scanner) {
+	for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(scanner.Text())
+	}
+}
+
+type scannerHolder struct {
+	scanner *bufio.Scanner
+}
+
+func badSelectorScanner(holder scannerHolder) {
+	for holder.scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+		println(holder.scanner.Text())
+	}
+}

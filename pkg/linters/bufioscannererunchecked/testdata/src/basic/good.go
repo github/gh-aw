@@ -115,3 +115,37 @@ func goodExampleWithFunctionCall() error {
 func processLine(s string) {
 	println(s)
 }
+
+func goodScannerParameter(scanner *bufio.Scanner) error {
+	for scanner.Scan() {
+		println(scanner.Text())
+	}
+	return scanner.Err()
+}
+
+type checkedScannerHolder struct {
+	scanner *bufio.Scanner
+}
+
+func goodSelectorScanner(holder checkedScannerHolder) error {
+	for holder.scanner.Scan() {
+		println(holder.scanner.Text())
+	}
+	return holder.scanner.Err()
+}
+
+func goodNestedBlock() error {
+	file, _ := os.Open("test.txt")
+	defer file.Close()
+
+	if file != nil {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			println(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

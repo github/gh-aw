@@ -4,14 +4,14 @@
 package bufioscannererunchecked
 
 import (
-	"fmt"
+	"bytes"
 	"go/ast"
+	"go/printer"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
-	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -51,90 +51,23 @@ func analyzeFuncBody(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.G
 		return
 	}
 
-	// Find all scanner variables and their assignments
-	scanners := findScannerVariables(pass, body)
-	if len(scanners) == 0 {
-		return
-	}
-
-	// For each statement in the function body, check for scanner loops
-	analyzeBlockStatements(pass, body.List, scanners, generatedFiles, noLintIndex)
-}
-
-// ScannerInfo holds information about a scanner variable
-type ScannerInfo struct {
-	Name   string           // Variable name
-	ObjSet map[types.Object]bool // All versions of this object (due to shadowing)
-}
-
-// findScannerVariables finds all bufio.Scanner variables in the given block
-func findScannerVariables(pass *analysis.Pass, block *ast.BlockStmt) map[string]*ScannerInfo {
-	scanners := make(map[string]*ScannerInfo)
-
-	ast.Inspect(block, func(n ast.Node) bool {
-		// Look for assignments: scanner := bufio.NewScanner(...)
-		assign, ok := n.(*ast.AssignStmt)
+	ast.Inspect(body, func(n ast.Node) bool {
+		block, ok := n.(*ast.BlockStmt)
 		if !ok {
 			return true
 		}
-
-		for i, rhs := range assign.Rhs {
-			if i >= len(assign.Lhs) {
-				continue
-			}
-
-			// Check if this is a bufio.NewScanner call
-			if !isNewScannerCall(pass, rhs) {
-				continue
-			}
-
-			// Get the identifier on the LHS
-			ident, ok := assign.Lhs[i].(*ast.Ident)
-			if !ok || ident.Name == "_" {
-				continue
-			}
-
-			obj := pass.TypesInfo.Defs[ident]
-			if obj == nil {
-				continue
-			}
-
-			if _, exists := scanners[ident.Name]; !exists {
-				scanners[ident.Name] = &ScannerInfo{
-					Name:   ident.Name,
-					ObjSet: make(map[types.Object]bool),
-				}
-			}
-			scanners[ident.Name].ObjSet[obj] = true
-		}
-
+		analyzeBlockStatements(pass, block.List, generatedFiles, noLintIndex)
 		return true
 	})
-
-	return scanners
 }
 
-// isNewScannerCall checks if the expression is a bufio.NewScanner(...) call
-func isNewScannerCall(pass *analysis.Pass, expr ast.Expr) bool {
-	call, ok := expr.(*ast.CallExpr)
-	if !ok {
-		return false
-	}
-
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-
-	if sel.Sel.Name != "NewScanner" {
-		return false
-	}
-
-	return astutil.IsPkgSelector(pass, sel, "bufio")
+type receiverRef struct {
+	obj  types.Object
+	path string
 }
 
 // analyzeBlockStatements analyzes a list of statements for scanner loops
-func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, scanners map[string]*ScannerInfo, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
+func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	for i, stmt := range stmts {
 		if stmt == nil {
 			continue
@@ -146,8 +79,8 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, scanners map[
 		}
 
 		// Check if this for loop uses scanner.Scan()
-		scannerVar := findScannerInForLoop(pass, forStmt, scanners)
-		if scannerVar == "" {
+		scanner := findScannerInForLoop(pass, forStmt)
+		if scanner == nil {
 			continue
 		}
 
@@ -160,7 +93,7 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, scanners map[
 		}
 
 		// Check if scanner.Err() is called after the loop in the same block
-		if hasScannerErrCheck(pass, stmts[i+1:], scannerVar, scanners[scannerVar]) {
+		if hasScannerErrCheck(pass, stmts[i+1:], scanner) {
 			continue
 		}
 
@@ -168,39 +101,38 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, scanners map[
 		pass.Report(analysis.Diagnostic{
 			Pos:     forStmt.Pos(),
 			End:     forStmt.End(),
-			Message: fmt.Sprintf("Scanner loop does not check Err() after completion; read errors may be silently dropped"),
+			Message: "Scanner loop does not check Err() after completion; read errors may be silently dropped",
 		})
 	}
 }
 
-// findScannerInForLoop checks if a for loop uses scanner.Scan() from the scanners map
-func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt, scanners map[string]*ScannerInfo) string {
+// findScannerInForLoop checks if a for loop uses bufio.Scanner.Scan().
+func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt) *receiverRef {
 	// Check the condition for scanner.Scan()
-	if usesScanner(pass, forStmt.Cond, scanners) != "" {
-		return usesScanner(pass, forStmt.Cond, scanners)
+	if scanner := scannerMethodReceiver(pass, forStmt.Cond, "Scan"); scanner != nil {
+		return scanner
 	}
 
 	// Check the body for scanner.Scan()
 	if forStmt.Body != nil {
 		for _, stmt := range forStmt.Body.List {
-			if name := usesScanner(pass, stmt, scanners); name != "" {
-				return name
+			if scanner := scannerMethodReceiver(pass, stmt, "Scan"); scanner != nil {
+				return scanner
 			}
 		}
 	}
 
-	return ""
+	return nil
 }
 
-// usesScanner checks if an expression uses any of the scanner variables
-func usesScanner(pass *analysis.Pass, expr ast.Node, scanners map[string]*ScannerInfo) string {
-	var result string
+// scannerMethodReceiver returns the receiver of a bufio.Scanner method call.
+func scannerMethodReceiver(pass *analysis.Pass, expr ast.Node, methodName string) *receiverRef {
+	var result *receiverRef
 	ast.Inspect(expr, func(n ast.Node) bool {
-		if result != "" {
+		if result != nil {
 			return false
 		}
 
-		// Look for scanner.Scan() calls
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -211,27 +143,15 @@ func usesScanner(pass *analysis.Pass, expr ast.Node, scanners map[string]*Scanne
 			return true
 		}
 
-		if sel.Sel.Name != "Scan" {
+		if sel.Sel.Name != methodName {
 			return true
 		}
 
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok {
+		if !isBufioScanner(pass, sel.X) {
 			return true
 		}
-
-		scannerInfo, exists := scanners[ident.Name]
-		if !exists {
-			return true
-		}
-
-		obj := pass.TypesInfo.Uses[ident]
-		if obj == nil {
-			return true
-		}
-
-		if scannerInfo.ObjSet[obj] {
-			result = ident.Name
+		if receiver := receiverKey(pass, sel.X); receiver != nil {
+			result = receiver
 			return false
 		}
 
@@ -242,13 +162,13 @@ func usesScanner(pass *analysis.Pass, expr ast.Node, scanners map[string]*Scanne
 }
 
 // hasScannerErrCheck checks if the following statements call scanner.Err()
-func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scannerName string, scannerInfo *ScannerInfo) bool {
+func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiverRef) bool {
 	for _, stmt := range stmts {
 		if stmt == nil {
 			continue
 		}
 
-		if hasErrCall(pass, stmt, scannerName, scannerInfo) {
+		if hasErrCall(pass, stmt, scanner) {
 			return true
 		}
 	}
@@ -257,26 +177,21 @@ func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scannerName strin
 }
 
 // hasErrCall checks if a statement contains a scanner.Err() call
-func hasErrCall(pass *analysis.Pass, stmt ast.Node, scannerName string, scannerInfo *ScannerInfo) bool {
+func hasErrCall(pass *analysis.Pass, stmt ast.Node, scanner *receiverRef) bool {
+	return scannerMethodReceiverMatches(pass, stmt, "Err", scanner)
+}
+
+// scannerMethodReceiverMatches checks if a node contains a scanner method call on the same receiver.
+func scannerMethodReceiverMatches(pass *analysis.Pass, stmt ast.Node, methodName string, scanner *receiverRef) bool {
+	if scanner == nil {
+		return false
+	}
 	found := false
 	ast.Inspect(stmt, func(n ast.Node) bool {
 		if found {
 			return false
 		}
 
-		// Check if this is a return statement that uses scanner.Err()
-		// This handles cases like: return scanner.Err()
-		retStmt, ok := n.(*ast.ReturnStmt)
-		if ok {
-			for _, val := range retStmt.Results {
-				if hasErrCallInExpr(pass, val, scannerName, scannerInfo) {
-					found = true
-					return false
-				}
-			}
-		}
-
-		// Look for scanner.Err() calls
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -287,25 +202,14 @@ func hasErrCall(pass *analysis.Pass, stmt ast.Node, scannerName string, scannerI
 			return true
 		}
 
-		if sel.Sel.Name != "Err" {
+		if sel.Sel.Name != methodName {
 			return true
 		}
 
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok {
+		if !isBufioScanner(pass, sel.X) {
 			return true
 		}
-
-		if ident.Name != scannerName {
-			return true
-		}
-
-		obj := pass.TypesInfo.Uses[ident]
-		if obj == nil {
-			return true
-		}
-
-		if scannerInfo.ObjSet[obj] {
+		if sameReceiver(receiverKey(pass, sel.X), scanner) {
 			found = true
 			return false
 		}
@@ -316,49 +220,61 @@ func hasErrCall(pass *analysis.Pass, stmt ast.Node, scannerName string, scannerI
 	return found
 }
 
-// hasErrCallInExpr checks if an expression contains a scanner.Err() call
-func hasErrCallInExpr(pass *analysis.Pass, expr ast.Expr, scannerName string, scannerInfo *ScannerInfo) bool {
-	found := false
-	ast.Inspect(expr, func(n ast.Node) bool {
-		if found {
-			return false
+func isBufioScanner(pass *analysis.Pass, expr ast.Expr) bool {
+	t := pass.TypesInfo.TypeOf(expr)
+	if t == nil {
+		return false
+	}
+	if ptr, ok := t.(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	named, ok := t.(*types.Named)
+	if !ok {
+		return false
+	}
+	obj := named.Obj()
+	return obj != nil && obj.Name() == "Scanner" && obj.Pkg() != nil && obj.Pkg().Path() == "bufio"
+}
+
+func receiverKey(pass *analysis.Pass, expr ast.Expr) *receiverRef {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return &receiverRef{obj: objectForIdent(pass, e)}
+	case *ast.SelectorExpr:
+		base := receiverKey(pass, e.X)
+		if base == nil {
+			return &receiverRef{path: exprString(pass, expr)}
 		}
-
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
+		key := *base
+		if key.path == "" {
+			key.path = e.Sel.Name
+		} else {
+			key.path += "." + e.Sel.Name
 		}
+		return &key
+	default:
+		return &receiverRef{path: exprString(pass, expr)}
+	}
+}
 
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
+func objectForIdent(pass *analysis.Pass, ident *ast.Ident) types.Object {
+	if obj := pass.TypesInfo.Uses[ident]; obj != nil {
+		return obj
+	}
+	return pass.TypesInfo.Defs[ident]
+}
 
-		if sel.Sel.Name != "Err" {
-			return true
-		}
+func sameReceiver(a, b *receiverRef) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return a.obj == b.obj && a.path == b.path
+}
 
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok {
-			return true
-		}
-
-		if ident.Name != scannerName {
-			return true
-		}
-
-		obj := pass.TypesInfo.Uses[ident]
-		if obj == nil {
-			return true
-		}
-
-		if scannerInfo.ObjSet[obj] {
-			found = true
-			return false
-		}
-
-		return true
-	})
-
-	return found
+func exprString(pass *analysis.Pass, expr ast.Expr) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, pass.Fset, expr); err != nil {
+		return ""
+	}
+	return buf.String()
 }
