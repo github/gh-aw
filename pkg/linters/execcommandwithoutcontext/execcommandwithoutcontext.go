@@ -75,11 +75,9 @@ func checkExecCommandCall(pass *analysis.Pass, cur inspector.Cursor, generatedFi
 			continue
 		}
 		pkgLog.Printf("flagging exec.Command without context at %s", pos)
-		pass.Report(analysis.Diagnostic{
-			Pos:     call.Pos(),
-			End:     call.End(),
-			Message: fmt.Sprintf("use exec.CommandContext(%s, ...) instead of exec.Command to propagate context cancellation", ctxParamName),
-			SuggestedFixes: []analysis.SuggestedFix{
+		var fixes []analysis.SuggestedFix
+		if !astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+			fixes = []analysis.SuggestedFix{
 				{
 					Message: fmt.Sprintf("Replace exec.Command with exec.CommandContext(%s, ...)", ctxParamName),
 					TextEdits: []analysis.TextEdit{
@@ -95,7 +93,13 @@ func checkExecCommandCall(pass *analysis.Pass, cur inspector.Cursor, generatedFi
 						},
 					},
 				},
-			},
+			}
+		}
+		pass.Report(analysis.Diagnostic{
+			Pos:            call.Pos(),
+			End:            call.End(),
+			Message:        fmt.Sprintf("use exec.CommandContext(%s, ...) instead of exec.Command to propagate context cancellation", ctxParamName),
+			SuggestedFixes: fixes,
 		})
 		break
 	}

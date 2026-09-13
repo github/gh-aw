@@ -187,6 +187,9 @@ func buildLenStringFix(pass *analysis.Pass, expr *ast.BinaryExpr, lenArg ast.Exp
 	if text == "" {
 		return nil
 	}
+	if astutil.HasOverlappingComment(pass.Files, expr.Pos(), expr.End()) {
+		return nil
+	}
 	replacement := fmt.Sprintf(`%s %s ""`, text, fixOp.String())
 	return []analysis.SuggestedFix{{
 		Message: "Replace with direct string comparison",

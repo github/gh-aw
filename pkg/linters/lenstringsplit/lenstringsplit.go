@@ -117,6 +117,9 @@ func buildCountFix(pass *analysis.Pass, outer, inner *ast.CallExpr) []analysis.S
 	if len(inner.Args) != 2 {
 		return nil
 	}
+	if astutil.HasOverlappingComment(pass.Files, outer.Pos(), outer.End()) {
+		return nil
+	}
 
 	sText := astutil.NodeText(pass.Fset, inner.Args[0])
 	sepText := astutil.NodeText(pass.Fset, inner.Args[1])

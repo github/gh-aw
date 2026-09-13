@@ -138,6 +138,9 @@ func bytesQualifier(pass *analysis.Pass, pos token.Pos) (qualifier string, skipF
 // seenImportFiles tracks files that have already received an import edit in
 // this pass so that multi-violation files do not get duplicate overlapping edits.
 func buildFix(pass *analysis.Pass, bin *ast.BinaryExpr, replacement string, seenImportFiles map[token.Pos]bool) []analysis.SuggestedFix {
+	if astutil.HasOverlappingComment(pass.Files, bin.Pos(), bin.End()) {
+		return nil
+	}
 	edits := []analysis.TextEdit{{
 		Pos:     bin.Pos(),
 		End:     bin.End(),

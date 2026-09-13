@@ -187,6 +187,9 @@ func implementsWriter(pass *analysis.Pass, expr ast.Expr) bool {
 // variable at the call site, no SuggestedFix is emitted (the diagnostic is
 // still reported).
 func buildFix(pass *analysis.Pass, call *ast.CallExpr, writerArg, sText string, filesWithImportEdit map[token.Pos]bool) []analysis.SuggestedFix {
+	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		return nil
+	}
 	// Find the file containing this call.
 	file := astutil.FileForPos(pass.Files, call.Pos())
 

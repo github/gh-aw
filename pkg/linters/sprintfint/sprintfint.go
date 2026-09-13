@@ -89,6 +89,9 @@ func analyzeSprintfInt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 // variable at the call site, no SuggestedFix is emitted (the diagnostic is
 // still reported).
 func buildItoaFix(pass *analysis.Pass, call *ast.CallExpr, arg ast.Expr, seenImportFiles map[token.Pos]bool) []analysis.SuggestedFix {
+	if astutil.HasOverlappingComment(pass.Files, call.Pos(), call.End()) {
+		return nil
+	}
 	argText := astutil.NodeText(pass.Fset, arg)
 	if argText == "" {
 		return nil

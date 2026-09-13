@@ -106,6 +106,9 @@ func buildFix(pass *analysis.Pass, conv *ast.CallExpr, strArg ast.Expr) []analys
 	if sText == "" {
 		return nil
 	}
+	if astutil.HasOverlappingComment(pass.Files, conv.Pos(), conv.End()) {
+		return nil
+	}
 	// Replace the entire second argument []byte(s) with just s.
 	// The ellipsis token follows the closing paren of the outer append call,
 	// so we only need to rewrite conv.Pos()..conv.End() to sText.
