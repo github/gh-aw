@@ -62,7 +62,7 @@ function evaluate(files, jobs, overrides = {}) {
       "example",
       "project",
       {
-        id: 1,
+        id: overrides.runId || 1,
         run_attempt: overrides.attempt || 1,
         run_started_at: overrides.runStarted || time,
       },
@@ -199,6 +199,28 @@ it("counts missing evals accounting as zero when legacy evals failed to install 
     [
       job("agent"),
       job("evals", {
+        id: 103592729178,
+        conclusion: "failure",
+        steps: [
+          { name: "Install AWF binary", conclusion: "failure" },
+          { name: "Collect evals token usage", conclusion: "success" },
+          { name: "Upload evals results", conclusion: "skipped" },
+        ],
+      }),
+    ],
+    { runId: 34708221982 }
+  );
+  await expect(f.result).resolves.toBe(2);
+});
+
+it("still requires accounting for unrecognized legacy AWF installation failures", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":2}',
+    },
+    [
+      job("agent"),
+      job("evals", {
         conclusion: "failure",
         steps: [
           { name: "Install AWF binary", conclusion: "failure" },
@@ -208,7 +230,7 @@ it("counts missing evals accounting as zero when legacy evals failed to install 
       }),
     ]
   );
-  await expect(f.result).resolves.toBe(2);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
 });
 
 it("still requires evals accounting when collection did not succeed", async () => {
