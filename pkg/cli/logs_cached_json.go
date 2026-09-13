@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -163,8 +162,16 @@ func loadCachedLogsJSONLFiles(paths []string) (*cachedLogsJSONLCache, error) {
 		if cache == nil {
 			continue
 		}
-		maps.Copy(merged.runs, cache.runs)
+		for id, run := range cache.runs {
+			if _, exists := merged.runs[id]; exists {
+				logsCacheLog.Printf("Overwriting duplicate cached logs JSONL run record from wildcard source: run_id=%d path=%s", id, path)
+			}
+			merged.runs[id] = run
+		}
 		for key, payload := range cache.workflowRunLists {
+			if _, exists := merged.workflowRunLists[key]; exists {
+				logsCacheLog.Printf("Overwriting duplicate cached workflow runs JSONL record from wildcard source: path=%s", path)
+			}
 			merged.workflowRunLists[key] = append(json.RawMessage(nil), payload...)
 		}
 	}
@@ -277,12 +284,12 @@ func pruneCachedLogsJSONLWildcardSources(sourcePaths []string, wildcard bool, st
 	}
 	var result error
 	for _, path := range sourcePaths {
-		hasMatch, err := cachedLogsJSONLFileHasRunInDateRange(path, dateRange)
+		hasMatch, canDelete, err := cachedLogsJSONLFileDateRangeStatus(path, dateRange)
 		if err != nil {
 			result = errors.Join(result, err)
 			continue
 		}
-		if hasMatch {
+		if hasMatch || !canDelete {
 			continue
 		}
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -292,11 +299,13 @@ func pruneCachedLogsJSONLWildcardSources(sourcePaths []string, wildcard bool, st
 	return result
 }
 
-func cachedLogsJSONLFileHasRunInDateRange(path string, dateRange cachedLogsJSONLDateRange) (bool, error) {
+func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDateRange) (bool, bool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return false, fmt.Errorf("failed to read cached logs JSONL for wildcard pruning: %w", err)
+		return false, false, fmt.Errorf("failed to read cached logs JSONL for wildcard pruning: %w", err)
 	}
+	hasDatedRun := false
+	hasPreservedRecord := false
 	lines := bytes.Split(data, []byte{'\n'})
 	for index, line := range lines {
 		trimmed := bytes.TrimSpace(line)
@@ -308,19 +317,21 @@ func cachedLogsJSONLFileHasRunInDateRange(path string, dateRange cachedLogsJSONL
 			if index == len(lines)-1 {
 				break
 			}
-			return false, fmt.Errorf("failed to parse cached logs JSONL record %d for wildcard pruning: %w", index+1, err)
+			return false, false, fmt.Errorf("failed to parse cached logs JSONL record %d for wildcard pruning: %w", index+1, err)
 		}
 		if record.Kind != cachedLogsJSONLKindRun ||
 			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
 			record.Run == nil ||
 			record.Run.CreatedAt.IsZero() {
+			hasPreservedRecord = true
 			continue
 		}
+		hasDatedRun = true
 		if dateRange.includes(record.Run.CreatedAt) {
-			return true, nil
+			return true, false, nil
 		}
 	}
-	return false, nil
+	return false, hasDatedRun && !hasPreservedRecord, nil
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {

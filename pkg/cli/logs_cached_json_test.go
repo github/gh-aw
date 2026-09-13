@@ -322,7 +322,7 @@ func TestPruneCachedLogsJSONLWildcardSourcesDeletesFilesWithoutInRangeRuns(t *te
 
 	assert.NoFileExists(t, oldPath)
 	assert.FileExists(t, mixedPath)
-	assert.NoFileExists(t, undatedPath)
+	assert.FileExists(t, undatedPath)
 	assert.FileExists(t, unrelatedPath)
 }
 
