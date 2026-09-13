@@ -102,8 +102,6 @@ func TestGenerateCentralSlashCommandWorkflow_GeneratesWorkflow(t *testing.T) {
 	require.Contains(t, text, "runs-on: ubuntu-slim")
 	require.Contains(t, text, "timeout-minutes: 15")
 	require.Contains(t, text, "    permissions:\n      actions: write\n      contents: read\n      issues: write\n      pull-requests: write\n      discussions: write")
-	require.Contains(t, text, "      - name: Checkout repository")
-	require.Contains(t, text, "        with:\n          persist-credentials: false")
 	require.Contains(t, text, "      - name: Setup Scripts")
 	require.Contains(t, text, "        uses: ./actions/setup")
 	require.Contains(t, text, "          destination: ${{ runner.temp }}/gh-aw/actions")
@@ -560,7 +558,6 @@ func TestGenerateCentralSlashCommandWorkflow_CheckoutDoesNotPersistCredentials(t
 	require.NoError(t, err)
 	text := string(content)
 
-	require.Contains(t, text, "      - name: Checkout repository\n")
-	require.Contains(t, text, "        with:\n          persist-credentials: false\n")
+	require.Contains(t, text, "      - name: Checkout repository\n        uses: "+getActionPin("actions/checkout")+"\n        with:\n          persist-credentials: false\n")
 	require.NotContains(t, text, "persist-credentials: true")
 }
