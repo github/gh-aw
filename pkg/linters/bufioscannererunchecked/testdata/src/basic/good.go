@@ -159,3 +159,13 @@ func goodMultipleErrChecksSameStatement(scanner *bufio.Scanner, other *bufio.Sca
 	}
 	return nil
 }
+
+func goodScanInLoopBody(scanner *bufio.Scanner) error {
+	for {
+		if !scanner.Scan() {
+			break
+		}
+		println(scanner.Text())
+	}
+	return scanner.Err()
+}
