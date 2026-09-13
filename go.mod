@@ -1,6 +1,6 @@
 module github.com/github/gh-aw
 
-go 1.26.7
+go 1.26.8
 
 require (
 	charm.land/bubbles/v2 v2.2.1
