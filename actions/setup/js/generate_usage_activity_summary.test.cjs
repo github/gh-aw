@@ -422,13 +422,13 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(parseGraderResults([resultsPath])).toEqual(document);
     });
 
-    it("falls back to the next candidate when the first file is malformed", () => {
+    it("throws when the first existing candidate is malformed", () => {
       const brokenPath = path.join(gradersDir, "broken.json");
       const goodPath = path.join(gradersDir, "good.json");
       fs.writeFileSync(brokenPath, "not json");
       fs.writeFileSync(goodPath, JSON.stringify({ version: 1, results: [{ id: "agent" }] }));
 
-      expect(parseGraderResults([brokenPath, goodPath]).results[0].id).toBe("agent");
+      expect(() => parseGraderResults([brokenPath, goodPath])).toThrow(/Failed to read grader results/);
     });
 
     it("prefers the first existing candidate path", () => {

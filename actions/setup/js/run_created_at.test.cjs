@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { normalizeRunCreatedAt, resolveRunCreatedAtForInfo, resolveRunCreatedAtForGrading } = require("./run_created_at.cjs");
+const { normalizeRunCreatedAt, resolveRunCreatedAtForInfo, resolveRunCreatedAtForGrading, RUN_CREATED_AT_RETRY_CONFIG } = require("./run_created_at.cjs");
 
 // error_recovery.cjs (withRetry) logs through the github-script `core` global.
 const mockCore = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn() };
@@ -33,6 +33,27 @@ describe("normalizeRunCreatedAt", () => {
     expect(normalizeRunCreatedAt(null)).toBe("");
     expect(normalizeRunCreatedAt(undefined)).toBe("");
     expect(normalizeRunCreatedAt(1757710680000)).toBe("");
+  });
+
+  it("rejects calendar dates and offsets that Date.parse would normalize", () => {
+    expect(normalizeRunCreatedAt("2026-02-30T20:58:00Z")).toBe("");
+    expect(normalizeRunCreatedAt("2025-02-29T20:58:00Z")).toBe("");
+    expect(normalizeRunCreatedAt("2026-13-01T20:58:00Z")).toBe("");
+    expect(normalizeRunCreatedAt("2026-09-12T24:00:00Z")).toBe("");
+    expect(normalizeRunCreatedAt("2026-09-12T20:60:00Z")).toBe("");
+    expect(normalizeRunCreatedAt("2026-09-12T20:58:60Z")).toBe("");
+    expect(normalizeRunCreatedAt("2026-09-12T20:58:00+24:00")).toBe("");
+    expect(normalizeRunCreatedAt("2026-09-12T20:58:00+02:60")).toBe("");
+  });
+
+  it("accepts leap-day calendar dates", () => {
+    expect(normalizeRunCreatedAt("2024-02-29T20:58:00Z")).toBe("2024-02-29T20:58:00Z");
+  });
+});
+
+describe("RUN_CREATED_AT_RETRY_CONFIG", () => {
+  it("retries status-only request timeouts", () => {
+    expect(RUN_CREATED_AT_RETRY_CONFIG.shouldRetry({ status: 408, message: "Request failed" })).toBe(true);
   });
 });
 

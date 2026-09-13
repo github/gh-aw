@@ -28,14 +28,41 @@ const RUN_CREATED_AT_RETRY_CONFIG = {
   jitterMs: 0,
   shouldRetry: error => {
     const status = Number(error?.status ?? error?.response?.status);
-    return (Number.isInteger(status) && status >= 500) || isTransientError(error);
+    return (Number.isInteger(status) && (status === 408 || status >= 500)) || isTransientError(error);
   },
 };
 
 // ISO-8601 date-time with a UTC designator or a numeric offset. Date.parse accepts
 // looser formats (for example "2026" or "2026-09-12 20:58:00"), which must not be
 // promoted to a valid run creation time.
-const ISO_8601_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_8601_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+
+function isLeapYear(year) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function daysInMonth(year, month) {
+  return [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] || 0;
+}
+
+function isValidRunCreatedAtMatch(match) {
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, offsetSign, offsetHourText, offsetMinuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59 || second > 59) {
+    return false;
+  }
+  if (offsetSign) {
+    const offsetHour = Number(offsetHourText);
+    const offsetMinute = Number(offsetMinuteText);
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+  }
+  return true;
+}
 
 /**
  * Normalize a workflow-run creation time into the strict UTC ISO-8601 form
@@ -54,7 +81,8 @@ const ISO_8601_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[
 function normalizeRunCreatedAt(value) {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  if (!ISO_8601_DATE_TIME.test(trimmed)) return "";
+  const match = ISO_8601_DATE_TIME.exec(trimmed);
+  if (!match || !isValidRunCreatedAtMatch(match)) return "";
   const parsed = Date.parse(trimmed);
   if (!Number.isFinite(parsed)) return "";
   return new Date(Math.trunc(parsed / 1000) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");

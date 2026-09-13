@@ -44,6 +44,12 @@ type GraderResult struct {
 	Diagnostics       map[string]any        `json:"diagnostics,omitempty"`
 	BaselineValue     *float64              `json:"baselineValue,omitempty"`
 	DeltaFromBaseline *float64              `json:"deltaFromBaseline,omitempty"`
+
+	valuePresent             bool
+	observationPresent       bool
+	diagnosticsPresent       bool
+	baselineValuePresent     bool
+	deltaFromBaselinePresent bool
 }
 
 // GraderImplementation identifies the grader runtime that produced a result.
@@ -101,6 +107,63 @@ type graderManifestDocument struct {
 	Graders []graderManifestEntry `json:"graders"`
 }
 
+// MarshalJSON preserves explicitly transported null scalar values and empty
+// payload objects from grader_results.json. The public fields remain pointer/map
+// typed so existing CLI rendering can continue to treat missing and null values
+// identically, but the JSON report keeps the original transport contract.
+func (result GraderResult) MarshalJSON() ([]byte, error) {
+	type alias GraderResult
+	data, err := json.Marshal(alias(result))
+	if err != nil {
+		return nil, err
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil, err
+	}
+	if result.valuePresent && result.Value == nil {
+		obj["value"] = nil
+	}
+	if result.observationPresent && result.Observation == nil {
+		obj["observation"] = nil
+	} else if result.observationPresent && len(result.Observation) == 0 {
+		obj["observation"] = map[string]any{}
+	}
+	if result.diagnosticsPresent && result.Diagnostics == nil {
+		obj["diagnostics"] = nil
+	} else if result.diagnosticsPresent && len(result.Diagnostics) == 0 {
+		obj["diagnostics"] = map[string]any{}
+	}
+	if result.baselineValuePresent && result.BaselineValue == nil {
+		obj["baselineValue"] = nil
+	}
+	if result.deltaFromBaselinePresent && result.DeltaFromBaseline == nil {
+		obj["deltaFromBaseline"] = nil
+	}
+	return json.Marshal(obj)
+}
+
+// UnmarshalJSON records which optional keys were present so a JSON round trip
+// through cached log records does not drop explicit nulls or empty objects.
+func (result *GraderResult) UnmarshalJSON(data []byte) error {
+	type alias GraderResult
+	var decoded alias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*result = GraderResult(decoded)
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	_, result.valuePresent = raw["value"]
+	_, result.observationPresent = raw["observation"]
+	_, result.diagnosticsPresent = raw["diagnostics"]
+	_, result.baselineValuePresent = raw["baselineValue"]
+	_, result.deltaFromBaselinePresent = raw["deltaFromBaseline"]
+	return nil
+}
+
 // graderArtifactDirCandidates returns the directories, relative to a run's log directory,
 // that may contain grader output files. The order reflects preference: the compact usage
 // artifact first (it is downloaded for every run), then the dedicated graders artifact,
@@ -152,7 +215,11 @@ func findGraderFile(runDir, filename string) string {
 
 // runHasGraders reports whether a run's output directory contains grader results.
 func runHasGraders(runDir string) bool {
-	return findGraderFile(runDir, constants.GraderResultsFilename.String()) != ""
+	if findGraderFile(runDir, constants.GraderResultsFilename.String()) != "" {
+		return true
+	}
+	doc := graderResultsFromUsageSummary(runDir)
+	return doc != nil && len(doc.Results) > 0
 }
 
 // extractGradersData reads grader results (and the grader manifest, when available) from
@@ -193,22 +260,22 @@ func loadGraderResultsDocument(logsPath string) *graderArtifactFullDocument {
 
 	info, err := os.Stat(resultsPath)
 	if err != nil {
-		return nil
+		return graderResultsFromUsageSummary(logsPath)
 	}
 	if info.Size() > maxGraderResultsBytes {
 		gradersDataLog.Printf("Grader results too large (%d bytes), skipping: %s", info.Size(), resultsPath)
-		return nil
+		return graderResultsFromUsageSummary(logsPath)
 	}
 	data, err := os.ReadFile(resultsPath) // #nosec G304 -- path resolved beneath the run's logs directory
 	if err != nil {
 		gradersDataLog.Printf("Failed to read grader results: %v", err)
-		return nil
+		return graderResultsFromUsageSummary(logsPath)
 	}
 
 	var doc graderArtifactFullDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
 		gradersDataLog.Printf("Failed to parse grader results: %v", err)
-		return nil
+		return graderResultsFromUsageSummary(logsPath)
 	}
 	return &doc
 }
@@ -278,6 +345,12 @@ func buildGraderResult(result graderArtifactFullResult, manifest graderManifestE
 		Implementation: result.Implementation,
 		Observation:    result.Observation,
 		Diagnostics:    result.Diagnostics,
+
+		valuePresent:             len(result.Value) > 0,
+		observationPresent:       result.Observation != nil,
+		diagnosticsPresent:       result.Diagnostics != nil,
+		baselineValuePresent:     len(result.BaselineValue) > 0,
+		deltaFromBaselinePresent: len(result.DeltaFromBaseline) > 0,
 	}
 	if summary.Name == "" {
 		summary.Name = manifest.Name

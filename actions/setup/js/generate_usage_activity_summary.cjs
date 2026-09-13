@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 const { GRADERS_DIR_NAME, GRADER_RESULTS_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
-const { findExistingFiles, findFirstExistingFile } = require("./file_helpers.cjs");
+const { findFirstExistingFile } = require("./file_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
 require("./shim.cjs");
@@ -795,27 +795,20 @@ function parseExperimentsData() {
  * @returns {{ version?: number, results: any[] } | null} grader document, or null when unavailable
  */
 function parseGraderResults(candidatePaths = GRADER_RESULTS_PATHS) {
-  /** @type {Error | null} */
-  let lastError = null;
-  for (const candidate of findExistingFiles(candidatePaths)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
-      if (!parsed || !Array.isArray(parsed.results)) {
-        throw new Error(`Grader results ${candidate} do not contain a results array`);
-      }
-      return parsed;
-    } catch (err) {
-      // Keep trying the remaining candidates: a truncated copy in one artifact
-      // must not hide a usable copy in another. The failure is still reported so a
-      // malformed file does not go unnoticed when a fallback path succeeds.
-      core.warning(`grader results ${candidate} could not be read: ${String(err)}`);
-      lastError = new Error(`Failed to read grader results ${candidate}`, { cause: err });
+  const candidate = findFirstExistingFile(candidatePaths);
+  if (!candidate) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+    if (!parsed || !Array.isArray(parsed.results)) {
+      throw new Error(`Grader results ${candidate} do not contain a results array`);
     }
+    return parsed;
+  } catch (err) {
+    core.warning(`grader results ${candidate} could not be read: ${String(err)}`);
+    throw new Error(`Failed to read grader results ${candidate}`, { cause: err });
   }
-  if (lastError) {
-    throw lastError;
-  }
-  return null;
 }
 
 /**

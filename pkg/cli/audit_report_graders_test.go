@@ -252,6 +252,12 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal graders data: %v", err)
 	}
+	encodedText := string(encoded)
+	for _, want := range []string{`"id":"operational-value-unavailable"`, `"value":null`, `"baselineValue":null`, `"deltaFromBaseline":null`} {
+		if !strings.Contains(encodedText, want) {
+			t.Fatalf("expected graders JSON to preserve %s, got %s", want, encodedText)
+		}
+	}
 	var decoded GradersData
 	if err := json.Unmarshal(encoded, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal graders data: %v", err)
@@ -312,6 +318,28 @@ func TestExtractGradersDataPreservesOperationalValueContract(t *testing.T) {
 	}
 }
 
+func TestGraderResultJSONPreservesExplicitEmptyPayloads(t *testing.T) {
+	t.Parallel()
+	result := GraderResult{
+		ID:                 "empty-payload",
+		Status:             "pass",
+		Observation:        map[string]any{},
+		Diagnostics:        map[string]any{},
+		observationPresent: true,
+		diagnosticsPresent: true,
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("failed to marshal grader result: %v", err)
+	}
+	encodedText := string(encoded)
+	for _, want := range []string{`"observation":{}`, `"diagnostics":{}`} {
+		if !strings.Contains(encodedText, want) {
+			t.Fatalf("expected grader result JSON to preserve %s, got %s", want, encodedText)
+		}
+	}
+}
+
 // TestExtractGradersDataFromUsageActivitySummary verifies that grader results embedded in
 // the conclusion job's usage activity summary are used when the standalone
 // grader_results.json file is unavailable.
@@ -334,6 +362,9 @@ func TestExtractGradersDataFromUsageActivitySummary(t *testing.T) {
 		t.Fatalf("failed to write summary: %v", err)
 	}
 
+	if !runHasGraders(runDir) {
+		t.Fatal("expected runHasGraders to recognize embedded grader results")
+	}
 	graders := extractGradersData(runDir)
 	if graders == nil {
 		t.Fatal("expected graders data to be extracted from the usage activity summary")
@@ -347,5 +378,39 @@ func TestExtractGradersDataFromUsageActivitySummary(t *testing.T) {
 	}
 	if value.Implementation == nil || value.Implementation.Digest != "db58f69" {
 		t.Fatalf("expected implementation digest to be preserved, got %+v", value.Implementation)
+	}
+}
+
+func TestExtractGradersDataFallsBackToUsageActivitySummaryAfterMalformedStandalone(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	gradersDir := filepath.Join(runDir, constants.UsageArtifactName.String(), constants.GradersDirName.String())
+	if err := os.MkdirAll(gradersDir, 0o755); err != nil {
+		t.Fatalf("failed to create graders dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gradersDir, constants.GraderResultsFilename.String()), []byte("{not json"), 0o600); err != nil {
+		t.Fatalf("failed to write malformed results: %v", err)
+	}
+	summaryDir := filepath.Join(runDir, constants.UsageArtifactName.String(), "activity")
+	if err := os.MkdirAll(summaryDir, 0o755); err != nil {
+		t.Fatalf("failed to create summary dir: %v", err)
+	}
+	data, err := json.Marshal(map[string]any{
+		"schema":  "usage-activity-summary/v1",
+		"graders": operationalValueGraderResults(),
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal summary: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(summaryDir, "summary.json"), data, 0o600); err != nil {
+		t.Fatalf("failed to write summary: %v", err)
+	}
+
+	graders := extractGradersData(runDir)
+	if graders == nil {
+		t.Fatal("expected graders data to fall back to the usage activity summary")
+	}
+	if graders.Results[0].ID != "operational-value" {
+		t.Fatalf("unexpected fallback grader data: %+v", graders.Results)
 	}
 }

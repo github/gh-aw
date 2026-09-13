@@ -40,7 +40,21 @@ function findExistingFiles(candidatePaths) {
  * @returns {string | undefined} The first existing candidate
  */
 function findFirstExistingFile(candidatePaths) {
-  return findExistingFiles(candidatePaths)[0];
+  for (const candidate of candidatePaths) {
+    if (!fs.existsSync(candidate)) {
+      continue;
+    }
+    try {
+      if (fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch (error) {
+      if (typeof global.core?.debug === "function") {
+        global.core.debug("Candidate file is not usable: " + candidate + ": " + getErrorMessage(error));
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
