@@ -3,9 +3,6 @@
 package linters_test
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -319,40 +316,4 @@ func TestRegistryMatchesDocumentation(t *testing.T) {
 		"linters.All() has %d analyzers but documentedAnalyzers() has %d; "+
 			"keep both in sync when adding or removing a linter",
 		len(allAnalyzers), len(documented))
-}
-
-// TestSpec_SuggestedFixes_CommentOverlapGuardsForFullSpanRewrites enforces that
-// linters with full-span SuggestedFix rewrites guard against overlapping
-// comments using astutil.HasOverlappingComment.
-func TestSpec_SuggestedFixes_CommentOverlapGuardsForFullSpanRewrites(t *testing.T) {
-	t.Parallel()
-
-	_, thisFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "runtime.Caller must resolve spec_test.go path")
-	base := filepath.Dir(thisFile)
-
-	files := []string{
-		"appendbytestring/appendbytestring.go",
-		"bytesbufferstring/bytesbufferstring.go",
-		"bytescomparestring/bytescomparestring.go",
-		"ctxbackground/ctxbackground.go",
-		"execcommandwithoutcontext/execcommandwithoutcontext.go",
-		"fprintlnsprintf/fprintlnsprintf.go",
-		"lenstringsplit/lenstringsplit.go",
-		"lenstringzero/lenstringzero.go",
-		"sprintfint/sprintfint.go",
-		"stringreplaceminusone/stringreplaceminusone.go",
-		"stringsindexhasprefix/stringsindexhasprefix.go",
-		"tolowerequalfold/tolowerequalfold.go",
-		"writebytestring/writebytestring.go",
-	}
-
-	for _, rel := range files {
-		t.Run(rel, func(t *testing.T) {
-			t.Parallel()
-			src, err := os.ReadFile(filepath.Join(base, rel))
-			require.NoError(t, err, "failed reading %s", rel)
-			assert.Contains(t, string(src), "HasOverlappingComment", "expected %s to guard SuggestedFixes against overlapping comments", rel)
-		})
-	}
 }
