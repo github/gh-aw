@@ -1,5 +1,13 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-13 snapshot
+- 50 sessions; **16.0% raw completion** (8 success, 16 failure, 26 action_required); 21-day mean (cache-memory) 29.7%. **Cascade-adjusted completion 23.5%** (8/34) once the merge-invalidation artifacts below are excluded.
+- **merge_invalidation_cascade — largest instance recorded (6th occurrence)**: PR #60561 merged at 05:18:27Z invalidated all 16 of today's failures on `copilot/fix-github-actions-job-failure` (incl. 8 reviewer-bot workflows firing/failing in a 4s window), 4x the prior peak of 4 runs. Verified via `gh pr list`. Excluding these, that branch converts 2 success/1 action_required = 66.7% (healthy).
+- True-agentic completions (2x "Running Copilot cloud agent") = 2/2 = 100%, 7th consecutive 100% day. provenance_inversion holds (6/8 successes = bot-driven, 75%, upper edge of historical range).
+- burst_clustering_temporal_density signal has collapsed to near-parity (isolated 16.7% vs burst 15.9%, ~1.05x) — cascade artifacts are almost all burst-classified and now dominate the bucket; needs cascade exclusion to stay useful.
+- Orphans 0/3 open PRs (all Copilot-assigned + human reviewer requested) → 0% NORMAL, 22nd+ consecutive healthy day. Conv logs empty (22nd+ day). Standard run (roll=53).
+- _Note: this repo-memory branch had not been updated since run 28925210910 (~07-08); cache-memory (`/tmp/gh-aw/cache-memory/session-analysis/history.json`) has been the continuously-updated source of truth in the interim (22 entries through today) and remains authoritative for the full daily series._
+
 ## 2026-07-08 snapshot
 - 50 sessions; **8% completion** (4 success, 41 action_required, 1 cancelled, 4 in_progress) — floor regime; saw-tooth pullback from 07-07 (18%). Trailing: 20→8→4→**54**→16→8→18→**8**. 30d-mean ~13%.
 - **provenance_inversion holds**: all 4 successes = "Addressing comment on PR" agentic runs (13–23m, on cache-checkout-visibility #44224 ×2, specify-checkout #44225, fix-threat-detection #44202); 0/4 core CI gates. 45 gate stubs 0-dur. Reverts the 07-04 flip; consistent with the floor+inversion regime.
