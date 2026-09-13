@@ -340,7 +340,7 @@ func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *t
 	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared count is reached")
 }
 
-func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
+func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T) {
 	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
 	originalCollector := collectWorkflowLogsForTarget
 	originalFetchRateLimit := fetchRateLimitFunc
@@ -349,24 +349,27 @@ func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
 		fetchRateLimitFunc = originalFetchRateLimit
 	})
 
+	var rateLimitCalls atomic.Int64
 	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		rateLimitCalls.Add(1)
 		return rateLimitResource{
 			Limit:     15000,
-			Remaining: 3000,
+			Remaining: 2000,
 			Reset:     time.Now().Add(10 * time.Minute).Unix(),
-			Used:      12000,
+			Used:      13000,
 		}, nil
 	}
 	var calls atomic.Int64
 	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
 		calls.Add(1)
-		return workflowLogsResult{}, opts.rateLimitState.check(ctx, false, 12000, 1)
+		assert.Equal(t, -2000, opts.MaxGitHubAPIRateLimit)
+		return workflowLogsResult{}, opts.rateLimitState.check(ctx, false, opts.MaxGitHubAPIRateLimit, 1)
 	}
 
 	results := collectLogsTargets(context.Background(), LogsDownloadOptions{
 		Count:                 10,
 		OutputDir:             t.TempDir(),
-		MaxGitHubAPIRateLimit: 12000,
+		MaxGitHubAPIRateLimit: -2000,
 	}, []logsWorkflowTarget{
 		{workflowName: "first"},
 		{workflowName: "second"},
@@ -374,6 +377,7 @@ func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
 	})
 
 	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared API ceiling is reached")
+	assert.Equal(t, int64(1), rateLimitCalls.Load(), "the reached reserve limit must be reused without another API check")
 	require.Len(t, results, 3)
 	continuationCount := 0
 	for _, result := range results {
@@ -381,6 +385,7 @@ func TestCollectLogsTargetsClearsQueueWhenRateLimitReached(t *testing.T) {
 		if result.result.continuation != nil {
 			continuationCount++
 			assert.Contains(t, result.result.continuation.Message, "GitHub API rate limit ceiling reached")
+			assert.Equal(t, -2000, result.result.continuation.MaxGitHubAPIRateLimit)
 		}
 	}
 	_, continuations, _, _, _, errs := mergeLogsTargetResults(results, nil)
