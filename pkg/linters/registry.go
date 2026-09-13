@@ -5,6 +5,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
+	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
 	"github.com/github/gh-aw/pkg/linters/bytescomparestring"
@@ -86,6 +87,7 @@ func All() []*analysis.Analyzer {
 var allAnalyzers = []*analysis.Analyzer{
 	appendbytestring.Analyzer,
 	appendoneelement.Analyzer,
+	bufioscannererunchecked.Analyzer,
 	bufferresetbeforereuse.Analyzer,
 	bytesbufferstring.Analyzer,
 	bytescomparestring.Analyzer,
