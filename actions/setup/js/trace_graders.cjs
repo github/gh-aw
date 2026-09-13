@@ -9,6 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
 const { executeOperationalValueEvaluator } = require("./operational_value_grader.cjs");
+const { normalizeRunCreatedAt } = require("./run_created_at.cjs");
 
 // --- Constants ---
 const TMP_GH_AW = "/tmp/gh-aw";
@@ -670,6 +671,41 @@ function runOperationalValueGrader(id, evaluatorContent, meta, options) {
   }
 }
 
+/**
+ * Resolve the authoritative workflow-run creation time for operational-value grading.
+ *
+ * The activation job normally publishes it through GH_AW_RUN_CREATED_AT. When that
+ * value is missing or unusable (for example the activation lookup failed), fall back
+ * to the Actions run metadata so the grader request is still bound to a run opportunity.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {any} [githubClient]
+ * @returns {Promise<{createdAt: string, error?: string}>}
+ */
+async function resolveRunCreatedAt(env = process.env, githubClient = undefined) {
+  const fromEnv = normalizeRunCreatedAt(env.GH_AW_RUN_CREATED_AT);
+  if (fromEnv) return { createdAt: fromEnv };
+
+  // @ts-ignore - global.github is set by setupGlobals() from the github-script context
+  const github = githubClient || global.github;
+  const repository = String(env.GITHUB_REPOSITORY || "");
+  const [owner, repo] = repository.split("/");
+  const runId = String(env.GITHUB_RUN_ID || "");
+  if (!github?.rest?.actions?.getWorkflowRun || !owner || !repo || !/^\d+$/.test(runId)) {
+    return { createdAt: "", error: "workflow run creation time is unavailable and cannot be read from Actions run metadata" };
+  }
+  try {
+    const response = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(runId) });
+    const createdAt = normalizeRunCreatedAt(response?.data?.created_at);
+    if (!createdAt) {
+      return { createdAt: "", error: "Actions run metadata did not provide a valid workflow run creation time" };
+    }
+    return { createdAt };
+  } catch (err) {
+    return { createdAt: "", error: `failed to read workflow run creation time from Actions run metadata: ${getErrorMessage(err)}` };
+  }
+}
+
 function archiveOperationalValueEvaluator(evaluatorContent, expectedDigest, outputPath = OPERATIONAL_VALUE_EVALUATOR_PATH) {
   const actualDigest = crypto.createHash("sha256").update(evaluatorContent, "utf8").digest("hex");
   if (!expectedDigest || actualDigest !== expectedDigest) {
@@ -770,8 +806,17 @@ async function main(manifestB64, execSpecB64) {
   } catch (err) {
     core.warning(`Graders: failed to write payload: ${getErrorMessage(err)}`);
   }
-  const runCreatedAt = process.env.GH_AW_RUN_CREATED_AT;
-  const operationalValueRunMetadata = runCreatedAt ? { createdAt: runCreatedAt } : undefined;
+  let operationalValueRunCreatedAtError;
+  let operationalValueRunMetadata;
+  if (operationalValueManifest) {
+    const resolved = await resolveRunCreatedAt();
+    if (resolved.createdAt) {
+      operationalValueRunMetadata = { createdAt: resolved.createdAt };
+    } else {
+      operationalValueRunCreatedAtError = resolved.error || "workflow run creation time is unavailable";
+      core.warning(`Graders: ${operationalValueRunCreatedAtError}`);
+    }
+  }
 
   // Run all graders
   /** @type {GraderResult[]} */
@@ -795,6 +840,11 @@ async function main(manifestB64, execSpecB64) {
       result = normalizeResult(grader.id, null, meta);
       result.status = "error";
       result.error = `grader ${grader.id} runtime error: ${operationalValueEvaluatorArchiveError}`;
+    } else if (grader.source === "operational-value" && operationalValueRunCreatedAtError) {
+      result = normalizeResult(grader.id, null, meta);
+      result.status = "error";
+      result.error = `grader ${grader.id} runtime error: ${operationalValueRunCreatedAtError}`;
+      result.diagnostics = { missingReason: "run created-at acquisition failed" };
     } else if (grader.source === "operational-value" && executionMap[grader.id]?.run) {
       result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta, { runMetadata: operationalValueRunMetadata });
     } else if (executionMap[grader.id]?.script) {
@@ -866,6 +916,7 @@ module.exports = {
   runBuiltinGrader,
   runCustomGrader,
   runOperationalValueGrader,
+  resolveRunCreatedAt,
   normalizeResult,
   buildGradersSummaryBody,
   evaluateThreshold,

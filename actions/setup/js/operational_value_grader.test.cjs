@@ -56,6 +56,14 @@ describe("operational_value_grader", () => {
     });
   });
 
+  it("binds the run subject to an acquired creation time", () => {
+    expect(buildRunSubject(TEST_ENV, { createdAt: "2026-08-23T12:00:00Z" }).createdAt).toBe("2026-08-23T12:00:00Z");
+  });
+
+  it("rejects a malformed run creation time instead of building an invalid request", () => {
+    expect(() => buildRunSubject(TEST_ENV, { createdAt: "2026-08-23 12:00:00" })).toThrow("run.createdAt must be a UTC ISO-8601 timestamp");
+  });
+
   it("returns absolute value with a secondary baseline delta", () => {
     const output = executeOperationalValueEvaluator(
       operationalValueEvaluator({

@@ -6,6 +6,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -21,17 +22,36 @@ import (
 var gradersDataLog = logger.New("cli:audit_report_graders")
 
 // GraderResult is a single grader outcome surfaced in the audit report.
+//
+// The operational-value fields (Source, Implementation, Observation, Diagnostics,
+// BaselineValue, DeltaFromBaseline) mirror the grader result contract written to
+// grader_results.json so that `gh aw logs --json` and the cached JSONL records can
+// reproduce a grader result without re-reading the artifact. Field names for those
+// keys intentionally match the artifact contract.
 type GraderResult struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name,omitempty"`
-	Status    string   `json:"status"`
-	Value     *float64 `json:"value,omitempty"`
-	Unit      string   `json:"unit,omitempty"`
-	Passed    *bool    `json:"passed,omitempty"`
-	Direction string   `json:"direction,omitempty"`
-	Threshold *float64 `json:"threshold,omitempty"`
-	Message   string   `json:"message,omitempty"`
-	Error     string   `json:"error,omitempty"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name,omitempty"`
+	Status            string                `json:"status"`
+	Value             *float64              `json:"value,omitempty"`
+	Unit              string                `json:"unit,omitempty"`
+	Passed            *bool                 `json:"passed,omitempty"`
+	Direction         string                `json:"direction,omitempty"`
+	Threshold         *float64              `json:"threshold,omitempty"`
+	Message           string                `json:"message,omitempty"`
+	Error             string                `json:"error,omitempty"`
+	Source            string                `json:"source,omitempty"`
+	Implementation    *GraderImplementation `json:"implementation,omitempty"`
+	Observation       json.RawMessage       `json:"observation,omitempty"`
+	Diagnostics       json.RawMessage       `json:"diagnostics,omitempty"`
+	BaselineValue     *float64              `json:"baselineValue,omitempty"`
+	DeltaFromBaseline *float64              `json:"deltaFromBaseline,omitempty"`
+}
+
+// GraderImplementation identifies the grader runtime that produced a result.
+type GraderImplementation struct {
+	ID      string `json:"id,omitempty"`
+	Version int    `json:"version,omitempty"`
+	Digest  string `json:"digest,omitempty"`
 }
 
 // GradersData aggregates the grader results recorded for a single workflow run.
@@ -49,14 +69,20 @@ type GradersData struct {
 // It extends the subset parsed for experiment observations with the display fields
 // (name, unit, passed, message, error) used by the audit report.
 type graderArtifactFullResult struct {
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Status  string          `json:"status"`
-	Value   json.RawMessage `json:"value"`
-	Unit    string          `json:"unit"`
-	Passed  *bool           `json:"passed"`
-	Message string          `json:"message"`
-	Error   string          `json:"error"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Status            string                `json:"status"`
+	Value             json.RawMessage       `json:"value"`
+	Unit              string                `json:"unit"`
+	Passed            *bool                 `json:"passed"`
+	Message           string                `json:"message"`
+	Error             string                `json:"error"`
+	Source            string                `json:"source"`
+	Implementation    *GraderImplementation `json:"implementation"`
+	Observation       json.RawMessage       `json:"observation"`
+	Diagnostics       json.RawMessage       `json:"diagnostics"`
+	BaselineValue     json.RawMessage       `json:"baselineValue"`
+	DeltaFromBaseline json.RawMessage       `json:"deltaFromBaseline"`
 }
 
 type graderArtifactFullDocument struct {
@@ -216,26 +242,48 @@ func loadGraderManifestEntries(logsPath string) map[string]graderManifestEntry {
 
 func buildGraderResult(result graderArtifactFullResult, manifest graderManifestEntry) GraderResult {
 	summary := GraderResult{
-		ID:        result.ID,
-		Name:      result.Name,
-		Status:    result.Status,
-		Unit:      result.Unit,
-		Passed:    result.Passed,
-		Message:   result.Message,
-		Error:     result.Error,
-		Direction: manifest.Direction,
-		Threshold: manifest.Threshold,
+		ID:             result.ID,
+		Name:           result.Name,
+		Status:         result.Status,
+		Unit:           result.Unit,
+		Passed:         result.Passed,
+		Message:        result.Message,
+		Error:          result.Error,
+		Direction:      manifest.Direction,
+		Threshold:      manifest.Threshold,
+		Source:         result.Source,
+		Implementation: result.Implementation,
+		Observation:    normalizeGraderRawJSON(result.Observation),
+		Diagnostics:    normalizeGraderRawJSON(result.Diagnostics),
 	}
 	if summary.Name == "" {
 		summary.Name = manifest.Name
 	}
+	// The declared unit is only a fallback: a unit recorded by the grader runtime is
+	// authoritative and must survive serialization unchanged.
 	if summary.Unit == "" {
 		summary.Unit = manifest.Unit
 	}
 	if value, ok := parseGraderValue(result.Value); ok {
 		summary.Value = &value
 	}
+	if value, ok := parseGraderValue(result.BaselineValue); ok {
+		summary.BaselineValue = &value
+	}
+	if value, ok := parseGraderValue(result.DeltaFromBaseline); ok {
+		summary.DeltaFromBaseline = &value
+	}
 	return summary
+}
+
+// normalizeGraderRawJSON returns the raw JSON payload for structured grader fields,
+// dropping empty and explicit null payloads so absent evidence stays absent.
+func normalizeGraderRawJSON(raw json.RawMessage) json.RawMessage {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		return nil
+	}
+	return append(json.RawMessage(nil), trimmed...)
 }
 
 // parseGraderValue decodes a grader value, accepting numbers and booleans (booleans are

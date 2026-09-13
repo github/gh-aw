@@ -190,6 +190,8 @@ The reserved grader ID MUST be `operational-value`. It MUST NOT accept an inline
 
 The compiler MUST resolve `run` within the repository, reject symlinks and non-regular files, validate Bash syntax prerequisites, freeze the evaluator bytes, and record their SHA-256 digest in the grader manifest and result implementation.
 
+The implementation MUST acquire the workflow run creation time, from the activation job output or from Actions run metadata, and MUST bind it to `run.createdAt` in the grader request. When the creation time cannot be acquired, the implementation MUST report an explicit grader error and MUST NOT issue a grader request with a missing or malformed `run.createdAt`.
+
 The evaluator MUST implement `--definition` and `--grade-run`. Its primary `value` MUST be absolute operational attainment in `[0,1]` or `null`. A baseline MAY be frozen separately; gh-aw MUST derive `deltaFromBaseline` and MUST NOT replace the primary value with that delta.
 
 An operational-value observation MUST include:
@@ -232,6 +234,8 @@ All applicable files MUST be included in the unified `agent` artifact.
 ### 8.4 Deterministic Output Contract
 
 `grader_results.json` SHOULD include normalized run/result structures suitable for downstream programmatic reads, including per-grader value/status and run-level pass/fail/error counts.
+
+Tooling that republishes grader results, including `gh aw logs --json` and its cached JSONL records, MUST preserve the result contract: `source`, `value`, `unit`, `implementation`, `observation`, `diagnostics`, `baselineValue`, and `deltaFromBaseline`. Metric units MUST NOT change during serialization.
 
 ---
 

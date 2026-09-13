@@ -34,6 +34,10 @@ function buildRunSubject(env, metadata = {}) {
   if (!/^\d+$/.test(runId) || runId === "0") {
     throw new Error("GITHUB_RUN_ID must identify the workflow run");
   }
+  if (metadata.createdAt !== undefined && metadata.createdAt !== null) {
+    // Reject malformed acquisition results instead of forwarding an invalid run subject.
+    parseTimestamp(metadata.createdAt, "run.createdAt");
+  }
   return {
     id: runId,
     attempt: Number(env.GITHUB_RUN_ATTEMPT) || 1,

@@ -129,6 +129,35 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "2026-08-24T12:00:00Z");
   });
 
+  it("should normalize the run creation time to a UTC ISO timestamp", async () => {
+    process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { created_at: "2026-08-24T14:00:00+02:00" } });
+
+    await main(mockCore, mockContext, mockGithub);
+
+    expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "2026-08-24T12:00:00Z");
+  });
+
+  it("should retry a transient run creation time lookup failure", async () => {
+    process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
+    mockGithub.rest.actions.getWorkflowRun.mockRejectedValueOnce(new Error("server error")).mockResolvedValue({ data: { created_at: "2026-08-24T12:00:00Z" } });
+
+    await main(mockCore, mockContext, mockGithub);
+
+    expect(mockGithub.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(2);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "2026-08-24T12:00:00Z");
+  });
+
+  it("should warn and clear the run creation time when the lookup returns no usable timestamp", async () => {
+    process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT = "true";
+    mockGithub.rest.actions.getWorkflowRun.mockResolvedValue({ data: { created_at: null } });
+
+    await main(mockCore, mockContext, mockGithub);
+
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Unable to load workflow-run creation time"));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("run_created_at", "");
+  });
+
   it("should include features from GH_AW_INFO_FEATURES and preserve value types", async () => {
     process.env.GH_AW_INFO_FEATURES = JSON.stringify({
       "gh-aw-detection": true,
