@@ -431,7 +431,9 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 	state.timeoutReached = state.timeoutReached || batchTimedOut
 	logProcessedWorkflowRunBatch(opts, runtime.fetchAllInRange, state.iteration, batchProcessed, len(state.processedRuns), opts.Verbose)
 	if opts.rateLimitState.isReached() {
-		// Keep the incoming cursor so canceled runs in this batch are resumed.
+		// Timeout state is copied above, but preserve the incoming cursor because
+		// cancellation may leave runs in this batch unprocessed. Storage state
+		// remains relevant because it independently constrains the continuation.
 		state.storageLimitReached = batchStorageLimitReached
 		return true, errLogsAPIRateLimitReached
 	}
