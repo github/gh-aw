@@ -503,6 +503,8 @@ func TestFetchAndProcessLogsBatchKeepsCursorWhenRateLimitReached(t *testing.T) {
 	assert.True(t, stop)
 	require.ErrorIs(t, err, errLogsAPIRateLimitReached)
 	assert.Equal(t, "previous-cursor", state.beforeDate)
+	require.Len(t, state.processedRuns, 1)
+	assert.Equal(t, int64(10), state.processedRuns[0].Run.DatabaseID)
 }
 
 // TestFetchAndProcessLogsBatchAdvancesCursorWhenSharedCountLimitReached verifies
