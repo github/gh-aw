@@ -972,3 +972,17 @@ next_index unchanged at 216. This is 22 consecutive identical halts (08-16
 through 09-11). Standing recommendation unchanged: a human maintainer should
 pause/retire/redesign this workflow (target a disposable sandbox repo, not
 github/gh-aw) rather than have it re-litigate the same conflict daily.
+
+## HALTED 2026-09-13 (23rd consecutive run) — independently reconfirmed
+
+Re-derived the policy conflict from the actual outer safe-outputs policy text
+(not just trusting the prior 22 halts): it says safe-output calls are
+"write-once declarations for real downstream side effects" and explicitly
+bans using them "for probing, auth tests, retries with placeholder content,
+or 'let me see if this works' experiments." That is a precise description of
+this workflow's entire Phase 2/4 method (real create_pull_request/create_issue
+calls on github/gh-aw filled with synthetic sim-line/probe content solely to
+observe size/file-count enforcement). No real safe-output calls attempted;
+next_index left at 216. Recommend continuing to skip straight to Phase 6 noop
+on future runs unless a human has redesigned/re-authorized this workflow
+(e.g., retargeting a disposable sandbox repo instead of github/gh-aw).
