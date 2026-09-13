@@ -110,24 +110,13 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFile
 
 // findScannerInForLoop checks if a for loop uses bufio.Scanner.Scan().
 func findScannerInForLoop(pass *analysis.Pass, forStmt *ast.ForStmt) *receiverRef {
-	if scanner := scannerMethodReceiver(pass, forStmt.Cond, "Scan"); scanner != nil {
+	if scanner := findScannerMethodReceiver(pass, forStmt.Cond, "Scan", false); scanner != nil {
 		return scanner
 	}
 	if forStmt.Body == nil {
 		return nil
 	}
-	return scannerMethodReceiverSkippingNestedLoops(pass, forStmt.Body, "Scan")
-}
-
-// scannerMethodReceiver returns the receiver of a bufio.Scanner method call.
-func scannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName string) *receiverRef {
-	return findScannerMethodReceiver(pass, node, methodName, false)
-}
-
-// scannerMethodReceiverSkippingNestedLoops finds scanner calls in loop bodies
-// without attributing scanner loops nested inside another loop to the outer loop.
-func scannerMethodReceiverSkippingNestedLoops(pass *analysis.Pass, node ast.Node, methodName string) *receiverRef {
-	return findScannerMethodReceiver(pass, node, methodName, true)
+	return findScannerMethodReceiver(pass, forStmt.Body, "Scan", true)
 }
 
 // hasScannerErrCheck checks if the following statements call scanner.Err()
@@ -177,7 +166,7 @@ func findScannerMethodReceiver(pass *analysis.Pass, node ast.Node, methodName st
 		}
 		if skipNestedLoops && n != node {
 			switch n.(type) {
-			case *ast.ForStmt, *ast.RangeStmt:
+			case *ast.ForStmt, *ast.RangeStmt, *ast.FuncLit:
 				return false
 			}
 		}

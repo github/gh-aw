@@ -169,3 +169,17 @@ func goodScanInLoopBody(scanner *bufio.Scanner) error {
 	}
 	return scanner.Err()
 }
+
+func goodClosureInsideLoop(scanner *bufio.Scanner) error {
+	for i := 0; i < 1; i++ {
+		func() {
+			for scanner.Scan() {
+				println(scanner.Text())
+			}
+			if err := scanner.Err(); err != nil {
+				panic(err)
+			}
+		}()
+	}
+	return nil
+}
