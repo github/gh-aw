@@ -71,6 +71,10 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
 function provesFailedEvalsHadNoUsage(job) {
   if (job.conclusion !== "failure" || !Array.isArray(job.steps)) return false;
   const succeeded = name => job.steps.some(step => step.name === name && step.conclusion === "success");
+  const failed = name => job.steps.some(step => step.name === name && step.conclusion === "failure");
+  // Older compiled workflows did not upload accounting after a failure. An AWF
+  // installation failure still proves the eval could not have made a request.
+  if (failed("Install AWF binary") && succeeded("Collect evals token usage")) return true;
   // A successful collector only proves the local shell step ran; the eval
   // artifact upload (whichever of the two mutually exclusive steps applies)
   // must also have succeeded, or a transport failure would be miscounted as zero.
