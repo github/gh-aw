@@ -69,7 +69,8 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
     } catch (error) {
       throw new Error(`Failed to read memory file ${file.relativePath}: ${getErrorMessage(error)}`, { cause: error });
     }
-    if (buffer.includes(0) || !isUtf8(buffer)) {
+    // NUL is valid UTF-8 but indicates binary content for repo-memory files.
+    if (!isUtf8(buffer) || buffer.includes(0)) {
       continue;
     }
     const content = buffer.toString("utf8");
