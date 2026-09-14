@@ -146,11 +146,11 @@ func TestParseGradersFromFrontmatter_OperationalValueGrader(t *testing.T) {
 			if grader.Run != runPath {
 				t.Fatalf("unexpected operational-value run path: %q", grader.Run)
 			}
-			if grader.Unit != "ratio" || grader.Direction != "higher_is_better" {
+			if grader.Unit != "" || grader.Direction != "higher_is_better" {
 				t.Fatalf("unexpected operational-value defaults: unit=%q direction=%q", grader.Unit, grader.Direction)
 			}
-			if grader.Min == nil || *grader.Min != 0 || grader.Max == nil || *grader.Max != 1 {
-				t.Fatalf("expected operational-value range [0,1], got min=%v max=%v", grader.Min, grader.Max)
+			if grader.Min != nil || grader.Max != nil {
+				t.Fatalf("expected operational-value range to be unset, got min=%v max=%v", grader.Min, grader.Max)
 			}
 		})
 	}
@@ -188,11 +188,9 @@ func TestParseGradersFromFrontmatter_OperationalValueGraderValidation(t *testing
 		{name: "absolute path", entry: map[string]any{"run": "/tmp/operational-value.sh"}, errText: "workspace-relative"},
 		{name: "wrong extension", entry: map[string]any{"run": ".github/workflows/graders/operational-value.js"}, errText: "workspace-relative"},
 		{name: "run and inline script", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "script": "#!/usr/bin/env bash\n"}, errText: "must specify exactly one of 'run' or 'script'"},
-		{name: "direction", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "direction": "lower_is_better"}, errText: "direction must be 'higher_is_better'"},
-		{name: "minimum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "min": 0.1}, errText: "range must be min: 0 and max: 1"},
-		{name: "maximum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "max": 2.0}, errText: "range must be min: 0 and max: 1"},
-		{name: "threshold below range", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "threshold": -0.1}, errText: "threshold must be between 0 and 1"},
-		{name: "threshold above range", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "threshold": 1.1}, errText: "threshold must be between 0 and 1"},
+		{name: "inverted range", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "min": 2.0, "max": 1.0}, errText: "min must not exceed max"},
+		{name: "threshold below minimum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "min": -1.0, "threshold": -2.0}, errText: "threshold must not be less than min"},
+		{name: "threshold above maximum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "max": 5.0, "threshold": 6.0}, errText: "threshold must not exceed max"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -203,6 +201,29 @@ func TestParseGradersFromFrontmatter_OperationalValueGraderValidation(t *testing
 				t.Fatalf("expected error containing %q, got %v", test.errText, err)
 			}
 		})
+	}
+}
+
+func TestParseGradersFromFrontmatter_OperationalValuePreservesNumericScale(t *testing.T) {
+	var c Compiler
+	cfg, err := c.parseGradersFromFrontmatter(map[string]any{
+		"graders": map[string]any{
+			"operational-value": map[string]any{
+				"run":       ".github/workflows/graders/operational-value.sh",
+				"unit":      "USD",
+				"direction": "lower_is_better",
+				"min":       -10.5,
+				"max":       250.75,
+				"threshold": 12.25,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	grader := cfg.Graders["operational-value"]
+	if grader.Unit != "USD" || grader.Direction != "lower_is_better" || *grader.Min != -10.5 || *grader.Max != 250.75 || *grader.Threshold != 12.25 {
+		t.Fatalf("operational-value scale was not preserved: %+v", grader)
 	}
 }
 

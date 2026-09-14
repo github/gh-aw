@@ -79,6 +79,22 @@ describe("operational_value_grader", () => {
     ]);
   });
 
+  it("preserves operational values outside the unit interval", () => {
+    const output = executeOperationalValueEvaluator(
+      operationalValueEvaluator([
+        { id: "value-created", value: 2.5 },
+        { id: "cost", value: -3.25 },
+      ]),
+      { config: { mode: "test" } },
+      { env: TEST_ENV, event: { issue: { number: 42 } } }
+    );
+
+    expect(output).toEqual([
+      { id: "value-created", value: 2.5 },
+      { id: "cost", value: -3.25 },
+    ]);
+  });
+
   it.each([
     ["empty array", [], "non-empty array"],
     ["extra fields", [{ id: "score", value: 1, message: "no" }], "exactly id and value"],
@@ -91,8 +107,7 @@ describe("operational_value_grader", () => {
       "non-empty and unique",
     ],
     ["empty id", [{ id: " ", value: 1 }], "non-empty and unique"],
-    ["out-of-range value", [{ id: "score", value: 2 }], "finite numbers in [0,1]"],
-    ["string value", [{ id: "score", value: "1" }], "finite numbers in [0,1]"],
+    ["string value", [{ id: "score", value: "1" }], "finite numbers"],
   ])("rejects %s", (_name, output, message) => {
     expect(() => executeOperationalValueEvaluator(operationalValueEvaluator(output), { config: { mode: "test" } }, { env: TEST_ENV, event: { issue: { number: 42 } } })).toThrow(message);
   });

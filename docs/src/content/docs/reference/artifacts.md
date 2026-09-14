@@ -369,7 +369,7 @@ gh aw audit <run-id> --evals
 When the workflow frontmatter declares one or more `graders`, the grader files are stored inside existing artifacts rather than uploaded as a standalone `graders` artifact. They live under `agent/graders/` in the unified `agent` artifact, under `graders/` in the `agent-output-fallback` artifact when the fallback transport is used, and under `usage/graders/` after the conclusion job mirrors them for lightweight downloads. The files are:
 
 - `grader_manifest.json` — The configured graders with their unit, direction, and threshold
-- `grader_results.json` — The normalized grader results (status, value, pass/fail) computed from the run trace
+- `grader_results.json` — The validated grader results (status, raw value, pass/fail) computed from the run trace
 
 ### Accessing graders data
 

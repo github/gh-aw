@@ -52,13 +52,13 @@ printf 'verification diagnostic\n' >&2
 case_name=$(printf '%s\n' "$request" | jq -r '.config.case // "attained"')
 case "$case_name" in
     attained)
-        printf '%s\n' '[{"id":"correct-triage","value":1},{"id":"label-confidence","value":null}]'
+        printf '%s\n' '[{"id":"triaged-issues","value":2.5},{"id":"net-cost","value":-3.25}]'
         ;;
     missed)
-        printf '%s\n' '[{"id":"correct-triage","value":0},{"id":"label-confidence","value":null}]'
+        printf '%s\n' '[{"id":"triaged-issues","value":0.5},{"id":"net-cost","value":-7.75}]'
         ;;
     unavailable|malformed)
-        printf '%s\n' '[{"id":"correct-triage","value":null},{"id":"label-confidence","value":null}]'
+        printf '%s\n' '[{"id":"triaged-issues","value":null},{"id":"net-cost","value":null}]'
         ;;
     *)
         exit 1
@@ -87,10 +87,10 @@ jq -n '
         config: {verification: true, case: $case}
     };
     [
-        {name: "attained", request: request("attained"), expected: [{id: "correct-triage", value: 1}, {id: "label-confidence", value: null}]},
-        {name: "missed", request: request("missed"), expected: [{id: "correct-triage", value: 0}, {id: "label-confidence", value: null}]},
-        {name: "unavailable", request: request("unavailable"), expected: [{id: "correct-triage", value: null}, {id: "label-confidence", value: null}]},
-        {name: "malformed", request: request("malformed"), expected: [{id: "correct-triage", value: null}, {id: "label-confidence", value: null}]}
+        {name: "attained", request: request("attained"), expected: [{id: "triaged-issues", value: 2.5}, {id: "net-cost", value: -3.25}]},
+        {name: "missed", request: request("missed"), expected: [{id: "triaged-issues", value: 0.5}, {id: "net-cost", value: -7.75}]},
+        {name: "unavailable", request: request("unavailable"), expected: [{id: "triaged-issues", value: null}, {id: "net-cost", value: null}]},
+        {name: "malformed", request: request("malformed"), expected: [{id: "triaged-issues", value: null}, {id: "net-cost", value: null}]}
     ]
 ' > "$fixtures"
 "$skill_dir/scripts/verify-operational-value-evaluator.sh" "$valid_evaluator" "$fixtures" >/dev/null
@@ -176,8 +176,6 @@ assert_rejected empty-array '[]'
 assert_rejected top-level-object '{"id":"score","value":1}'
 assert_rejected duplicate-ids '[{"id":"same","value":1},{"id":"same","value":0}]'
 assert_rejected empty-id '[{"id":"   ","value":1}]'
-assert_rejected negative-value '[{"id":"score","value":-0.01}]'
-assert_rejected out-of-range '[{"id":"score","value":1.01}]'
 assert_rejected boolean-value '[{"id":"score","value":true}]'
 assert_rejected string-value '[{"id":"score","value":"1"}]'
 assert_rejected extra-field '[{"id":"score","value":1,"message":"not allowed"}]'

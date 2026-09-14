@@ -149,8 +149,8 @@ function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) 
       if (typeof metric.id !== "string" || metric.id.trim() === "" || ids.has(metric.id)) {
         throw new Error("operational-value evaluator metric ids must be non-empty and unique");
       }
-      if (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value) || metric.value < 0 || metric.value > 1)) {
-        throw new Error("operational-value evaluator metric values must be null or finite numbers in [0,1]");
+      if (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value))) {
+        throw new Error("operational-value evaluator metric values must be null or finite numbers");
       }
       ids.add(metric.id);
     }

@@ -241,10 +241,7 @@ func (c *Compiler) parseGradersFromFrontmatter(frontmatter map[string]any) (*Gra
 			def = builtinDefFromMeta(meta)
 		} else if id == "operational-value" {
 			def.Name = "Operational Value"
-			def.Unit = "ratio"
 			def.Direction = "higher_is_better"
-			def.Min = new(0.0)
-			def.Max = new(1.0)
 		}
 
 		_, isBuiltin := builtinSet[id]
@@ -488,14 +485,21 @@ func validateGraders(cfg *GradersConfig) error {
 		return nil
 	}
 	if grader, ok := cfg.Graders["operational-value"]; ok {
-		if grader.Direction != "higher_is_better" {
-			return errors.New("graders.operational-value.direction must be 'higher_is_better'")
+		for name, value := range map[string]*float64{
+			"min": grader.Min, "max": grader.Max, "threshold": grader.Threshold,
+		} {
+			if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)) {
+				return fmt.Errorf("graders.operational-value.%s must be finite", name)
+			}
 		}
-		if grader.Min == nil || *grader.Min != 0 || grader.Max == nil || *grader.Max != 1 {
-			return errors.New("graders.operational-value range must be min: 0 and max: 1")
+		if grader.Min != nil && grader.Max != nil && *grader.Min > *grader.Max {
+			return errors.New("graders.operational-value.min must not exceed max")
 		}
-		if grader.Threshold != nil && (math.IsNaN(*grader.Threshold) || math.IsInf(*grader.Threshold, 0) || *grader.Threshold < 0 || *grader.Threshold > 1) {
-			return errors.New("graders.operational-value.threshold must be between 0 and 1")
+		if grader.Threshold != nil && grader.Min != nil && *grader.Threshold < *grader.Min {
+			return errors.New("graders.operational-value.threshold must not be less than min")
+		}
+		if grader.Threshold != nil && grader.Max != nil && *grader.Threshold > *grader.Max {
+			return errors.New("graders.operational-value.threshold must not exceed max")
 		}
 	}
 	if !cfg.HasGraders() {

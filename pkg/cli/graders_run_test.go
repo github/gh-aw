@@ -184,13 +184,13 @@ func TestValidateOperationalValueEvaluatorSource(t *testing.T) {
 }
 
 func TestValidateOperationalValueMetrics(t *testing.T) {
-	require.NoError(t, validateOperationalValueMetrics([]byte(`[{"id":"primary","value":1},{"id":"diagnostic","value":null}]`)))
+	require.NoError(t, validateOperationalValueMetrics([]byte(`[{"id":"primary","value":2.5},{"id":"cost","value":-3.25},{"id":"diagnostic","value":null}]`)))
 
 	for _, invalid := range []string{
 		`[]`,
 		`[{"id":"score","value":1,"message":"invalid"}]`,
 		`[{"id":"score","value":1},{"id":"score","value":0}]`,
-		`[{"id":"score","value":2}]`,
+		`[{"id":"score","value":"1"}]`,
 	} {
 		require.Error(t, validateOperationalValueMetrics([]byte(invalid)), invalid)
 	}

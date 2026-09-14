@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
@@ -343,8 +344,8 @@ func validateOperationalValueMetrics(data []byte) error {
 			continue
 		}
 		var value float64
-		if err := json.Unmarshal(metric["value"], &value); err != nil || value < 0 || value > 1 {
-			return errors.New("operational-value evaluator metric values must be null or finite numbers in [0,1]")
+		if err := json.Unmarshal(metric["value"], &value); err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+			return errors.New("operational-value evaluator metric values must be null or finite numbers")
 		}
 	}
 	return nil

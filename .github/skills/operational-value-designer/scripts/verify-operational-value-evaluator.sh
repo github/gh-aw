@@ -36,7 +36,7 @@ validate_output() {
             type == "object"
             and keys == ["id", "value"]
             and (.id | type == "string" and test("[^[:space:]]"))
-            and (.value == null or (.value | type == "number" and isfinite and . >= 0 and . <= 1))))
+            and (.value == null or (.value | type == "number" and isfinite))))
         and (.[0] | [.[].id] | unique | length) == (.[0] | length)
     ' "$output_file" >/dev/null || fail "$context must print exactly one non-empty array of unique {id,value} metrics"
 }
@@ -129,8 +129,8 @@ if [[ -n $fixtures ]]; then
     done
 
     jq -en --argjson attained "$attained_value" --argjson missed "$missed_value" '
-        $attained != null and $missed != null and $attained > $missed
-    ' >/dev/null || fail "attained fixture must score higher than missed fixture"
+        $attained != null and $missed != null and $attained != $missed
+    ' >/dev/null || fail "attained and missed fixtures must have distinct primary values"
     [[ $unavailable_value == null ]] || fail "unavailable fixture primary metric must be null"
     [[ $malformed_value == null ]] || fail "malformed fixture primary metric must be null"
 fi

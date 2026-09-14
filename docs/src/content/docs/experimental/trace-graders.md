@@ -63,15 +63,15 @@ Configure the reserved `operational-value` grader with either inline Bash:
 ```aw wrap
 graders:
   operational-value:
-    name: Goal Attainment
-    description: Whether the current run attained the workflow's intended outcome
-    unit: ratio
+    name: Maintainer Time Saved
+    description: Maintainer effort avoided by the current run's accepted outcome
+    unit: hours
     direction: higher_is_better
     script: |
       #!/usr/bin/env bash
       set -euo pipefail
       request=$(cat)
-      printf '%s\n' '[{"id":"goal-attained","value":1}]'
+      printf '%s\n' '[{"id":"maintainer-hours-saved","value":2.5}]'
 ```
 
 or a repository-relative Bash evaluator:
@@ -88,7 +88,7 @@ graders:
 
 Specify exactly one of `script` or `run`. Give the primary metric a concise `name`, `description`, `unit`, and `direction`; its description is retained in grader artifacts. Document every emitted metric in evaluator comments so its meaning is frozen with the evaluator bytes. The compiler records the evaluator's SHA-256 digest and packages its exact bytes with the run.
 
-The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, `outputs`, and `config` from standard input. `outputs` contains the current run's validated safe-output requests; those requests do not prove that their GitHub mutations were applied. The evaluator writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers in `[0,1]` or `null`.
+The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, `outputs`, and `config` from standard input. `outputs` contains the current run's validated safe-output requests; those requests do not prove that their GitHub mutations were applied. The evaluator writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers or `null`. Numeric values retain their native scale; gh-aw does not normalize, clamp, or convert them to pass/fail. Use `unit` and `direction` to describe their meaning.
 
 Evaluators receive `GH_TOKEN` with the agent job's explicitly declared permissions, but no workflow secrets, and enabling the grader does not add evidence permissions to the agent job.
 
@@ -99,7 +99,7 @@ Use the `operational value designer` skill (`/operational-value-designer`) to in
 | File | Description |
 |---|---|
 | `grader_manifest.json` | Which graders were configured and their enabled state |
-| `grader_results.json` | Normalized values, status, implementation identity, and ordered operational-value metrics |
+| `grader_results.json` | Validated raw values, status, implementation identity, and ordered operational-value metrics |
 | `operational_value_evaluator.sh` | Exact frozen operational-value evaluator used for this run |
 
 All files are included in the unified `agent` artifact.

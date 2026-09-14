@@ -30,9 +30,9 @@ Choose one evaluator form. For a compact evaluator, embed the complete Bash prog
 ```yaml
 graders:
   operational-value:
-    name: Domain Outcome Conformance
-    description: Whether the current run produced the required domain outcome
-    unit: ratio
+    name: Maintainer Time Saved
+    description: Maintainer effort avoided by the current run's accepted outcome
+    unit: hours
     direction: higher_is_better
     script: |
       #!/usr/bin/env bash
@@ -52,14 +52,14 @@ and configure the workflow:
 ```yaml
 graders:
   operational-value:
-    name: Domain Outcome Conformance
-    description: Whether the current run produced the required domain outcome
-    unit: ratio
-    direction: higher_is_better
+    name: Remediation Lead Time
+    description: Time required to establish the intended repository outcome
+    unit: hours
+    direction: lower_is_better
     run: .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
 
-Always set a concise `name`, `description`, `unit`, and `direction` for the primary metric. At the top of the evaluator, comment the workflow intent and the meaning of every emitted metric, including its `1`, `0`, and `null` interpretations. These comments are frozen and archived with the evaluator bytes, preserving review context without adding a definition mode or a second metadata schema.
+Always set a concise `name`, `description`, `unit`, and `direction` for the primary metric. At the top of the evaluator, comment the workflow intent and the native meaning of every emitted metric, including its unit, direction, significant boundaries, and `null` interpretation. These comments are frozen and archived with the evaluator bytes, preserving review context without adding a definition mode or a second metadata schema.
 
 Specify exactly one of `script` or `run`. Use this decision rule:
 
@@ -234,12 +234,15 @@ Add a diagnostic only when it explains a distinct failure mode and can change an
 
 Use the simplest defensible formula:
 
-- binary `0` or `1` for discrete outcomes;
-- a proportion with an explicit numerator and denominator for sets;
-- bounded progress toward a declared target for continuous outcomes;
+- a raw count, amount, duration, or other domain quantity in its native unit;
+- a fraction or proportion with an explicit numerator and denominator for sets;
+- continuous progress in the workflow's declared unit;
+- binary `0` or `1` only when the valuable outcome is genuinely atomic and has no meaningful magnitude;
 - `null` when applicability or evidence cannot be established.
 
 For proportions, define every numerator and denominator term and prevent missing items from disappearing from the denominator. A quality metric requires independent acceptance criteria or ground truth; the workflow cannot grade its own judgment by counting its findings.
+
+Preserve the metric's native numeric scale. Do not normalize, clamp, rescale, or reduce an operational quantity to pass/fail merely to fit `[0,1]`. Values may be fractional, negative, or greater than one when the declared unit and formula give those values meaning. A ratio is appropriate only when the metric is inherently a ratio. Declare `unit` and `direction` so consumers can interpret and compare the raw value without transforming the stored observation.
 
 Translate qualitative words such as “actionable,” “correct,” “relevant,” “complete,” and “high quality” into deterministic predicates grounded in the workflow Markdown. For example, an actionable incident report might require the triggering environment, a failing step, linked evidence, and a concrete remediation. If semantic correctness cannot be determined without another model or later human judgment, narrow the metric to the strongest deterministic claim available, such as `required-incident-analysis-present`, and state that limitation in the design table.
 
@@ -247,7 +250,7 @@ For creative or aesthetic goals with no objective acceptance criteria, do not ma
 
 Validation supports only the property it checks. A passing formatter proves formatting, a focused test proves the tested behavior, and a successful build proves buildability; none alone proves semantic improvement or absence of regressions. Name the metric after the verified property and include every workflow-required check in the expected decision.
 
-Higher must always mean more value. Keep a metric ID stable while it continues to describe the same outcome.
+Set `direction` to `higher_is_better` or `lower_is_better` according to the metric's native meaning. Keep a metric ID stable while it continues to describe the same outcome and unit.
 
 Freeze the metric prospectively to prevent hindsight bias:
 
@@ -296,7 +299,7 @@ Output:
 ]
 ```
 
-The output must be one non-empty ordered array. The first item is primary. Later items are optional diagnostics. Every object must contain exactly `id` and `value`; IDs must be non-empty and unique; values must be finite numbers in `[0,1]` or `null`.
+The output must be one non-empty ordered array. The first item is primary. Later items are optional diagnostics. Every object must contain exactly `id` and `value`; IDs must be non-empty and unique; values must be finite numbers or `null`. The runtime preserves each numeric value exactly; it does not normalize operational values.
 
 The evaluator must:
 
@@ -331,6 +334,8 @@ Review the design against these checks:
 - Any fallback to a precursor states exactly why a stronger downstream effect cannot be measured at the grading boundary.
 - Missing evidence for the selected rung returns `null`; it never causes runtime fallback to a weaker rung.
 - The unit of evaluation is explicit and matches the workflow's actual subject.
+- The primary value remains in its native unit and scale rather than being normalized or collapsed to pass/fail.
+- The declared direction matches whether larger or smaller native values are better.
 - The primary metric directly answers that sentence.
 - Applicable, successful, missed, correct-restraint, and unavailable cases are distinguishable.
 - Evidence is attributable to the run or its subject.
