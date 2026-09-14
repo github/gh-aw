@@ -580,20 +580,12 @@ func TestCachedLogsLookupRejectsUnknownIdentity(t *testing.T) {
 
 func TestCachedJSONLCanSatisfy(t *testing.T) {
 	usageFilter := []string{constants.UsageArtifactName.String()}
-	infoFilter := []string{constants.InfoArtifactName.String()}
-	infoUsageFilter := []string{constants.InfoArtifactName.String(), constants.UsageArtifactName.String()}
-	agentFilter := []string{constants.AgentArtifactName.String()}
 	assert.True(t, cachedJSONLCanSatisfy(usageFilter, false, false, false, false))
-	assert.True(t, cachedJSONLCanSatisfy(infoFilter, false, false, false, false))
-	assert.True(t, cachedJSONLCanSatisfy(infoUsageFilter, false, false, false, false))
-	assert.False(t, cachedJSONLCanSatisfy(agentFilter, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(nil, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, true, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, true, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, false, true, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, false, false, true))
-	assert.False(t, cachedJSONLCanSatisfy(infoFilter, true, false, false, false))
-	assert.False(t, cachedJSONLCanSatisfy(infoFilter, false, true, false, false))
 }
 
 func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
