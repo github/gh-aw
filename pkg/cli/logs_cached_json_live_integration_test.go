@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"testing"
 	"time"
 
@@ -42,13 +41,10 @@ func TestLogsCachedJSONLLiveCaching(t *testing.T) {
 		require.NoError(t, json.Unmarshal(summaryData, &summary))
 		require.Len(t, summary.Runs, runsPerQuery)
 
-		runIDs := slices.Collect(func(yield func(int64) bool) {
-			for _, run := range summary.Runs {
-				if !yield(run.RunID) {
-					return
-				}
-			}
-		})
+		runIDs := make([]int64, 0, len(summary.Runs))
+		for _, run := range summary.Runs {
+			runIDs = append(runIDs, run.RunID)
+		}
 		if query == 0 {
 			expectedRunIDs = runIDs
 			for _, runID := range expectedRunIDs {
