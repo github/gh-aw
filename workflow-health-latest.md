@@ -1,3 +1,45 @@
+# Workflow Health — 2026-09-14T04:39Z
+
+Score: P0 escalating (spread 5→13+ workflows) | Run: §34806756728
+
+## P0 — codex `gpt-5.3-codex` model_not_supported_error spreading, not resolved
+Escalated on tracker **#60563** (opened 2026-09-13). 19 new per-workflow "no safe outputs"/model
+error issues filed 2026-09-13T14:56Z→2026-09-14T02:49Z across 13 distinct workflows (Metrics
+Collector #60722, LintMonster #60725, Daily Go Test Parallelizer #60654/#60720, Avenger ×6,
+ESLint Monster #60698, Daily Cache Strategy Analyzer #60677, Daily Regulatory Report Generator
+#60694, Auto-Triage Issues #60638, Agent Persona Explorer #60644, Daily CLI Performance Agent
+#60637, Daily AWF Spec Compiler Surfacing #60699, Agentic Workflow Audit Agent #60695, Daily Code
+Metrics and Trend Tracking Agent #60669) — all still OPEN. Failure is intermittent (same
+workflows also show successful runs in the same window with unchanged `model:` config), consistent
+with codex CLI 0.153.4's own "fallback model metadata" warning rather than a hard block.
+**New history uncovered:** `CodexDefaultModel` constant flip-flopped `gpt-5.3-codex` (PR #34518,
+2026-05-24) → `gpt-5.4` (PR #34804, 2026-05-26, because `gpt-5.3-codex` itself was later found
+unsupported) → dozens of workflows individually patched back to `gpt-5.3-codex` (PRs #58862,
+#58827, #58787, #58779, #58826, #58770, #58860, #57945, #57051, May–Sep 2026) because `gpt-5.4`
+was rejected. **Neither model is stable for the pinned CLI** — recurring churn, not a one-off
+regression. 74 workflow files still hardcode `gpt-5.3-codex`. Posted escalation comment on #60563
+with full analysis and recommendation (bump pinned Codex CLI version or bulk-migrate to a model
+confirmed compatible with current pinned CLI + add contract test). DO NOT RE-FILE the 19
+individual issues.
+
+## Compilation Status
+- **299/299 workflows have lock files (100% ✅)**. No missing locks found in this run.
+
+## Follow-up on failing-workflows.json (4 previously flagged, metrics snapshot still 2026-09-01, stale)
+- **lint-monster / metrics-collector / daily-go-test-parallelizer**: now folded into the P0 codex
+  model tracker above — DO NOT treat separately.
+- **daily-firewall-report**: no new open issues found this run; presumed still healthy.
+- **cjs**: plain GitHub Actions workflow, out of `gh aw` scope. No action needed.
+
+## Actions Taken This Run (2026-09-14)
+- Posted escalation comment on existing P0 issue #60563 (did not file a new issue — same root
+  cause, now with expanded evidence and history).
+- Verified: no missing lock files, 299/299 workflows compiled per pre-computed inventory.
+- Cross-checked 13+ live open issues via `gh issue view`/`gh api search/issues` rather than
+  trusting the stale 2026-09-01 metrics snapshot.
+
+> Last updated: 2026-09-14T04:39Z
+
 # Workflow Health — 2026-09-13T04:38Z
 
 Score: P0 regression detected | Run: §34738150503

@@ -1,3 +1,17 @@
+## Escalation — 2026-09-14T04:39Z (Workflow Health Manager)
+- **Codex `gpt-5.3-codex` model_not_supported_error is WORSE, not resolved.** Spread from ~5
+  workflows (2026-09-13T04:49Z filing of #60563) to **13+ distinct workflows** with 19 new open
+  issues in the following 24h (see `workflow-health-latest.md` for full list). Posted escalation
+  comment on #60563 rather than filing a duplicate. **New finding:** the `CodexDefaultModel`
+  constant has flip-flopped between `gpt-5.3-codex` and `gpt-5.4` since May 2026 (PRs #34518,
+  #34804, plus dozens of individual workflow patches back to `gpt-5.3-codex`, e.g. #58862,
+  #58827) — neither model is stable for the currently pinned `@openai/codex@0.153.4` CLI. This is
+  recurring, structural churn, not a one-off regression. Recommend bumping the pinned Codex CLI
+  version or bulk-migrating all 74 affected workflow files to a verified-compatible model, with a
+  regression test to prevent future flip-flop. DO NOT RE-FILE any of the 19 per-workflow issues
+  (#60637, #60638, #60640, #60644, #60654, #60655, #60667, #60669, #60677, #60681, #60688,
+  #60694, #60695, #60698, #60699, #60711, #60720, #60722, #60725) — all tracked under #60563.
+
 ## Confirmation — 2026-09-13T12:48Z (Agent Performance Analyzer)
 - **Deferring to WHM's #60563** (`github/gh-aw#60563`, P0) as the single tracking issue for the
   codex CLI `gpt-5.3-codex` model-metadata gap. Independently verified: #60416 (my prior
