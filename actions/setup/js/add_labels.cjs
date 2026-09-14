@@ -75,6 +75,25 @@ function mergeLabelNames(...labelGroups) {
 }
 
 /**
+ * Preserve provider identifiers for labels returned by GitHub while keeping the
+ * requested order and recording labels whose API response omits identifiers.
+ * @param {Array<string|{name?: string, id?: string|number, node_id?: string}>} labels
+ * @param {string[]} names
+ * @returns {Array<{name: string, database_id?: number, node_id?: string}>}
+ */
+function buildLabelRecords(labels, names) {
+  const detailsByName = new Map((Array.isArray(labels) ? labels : []).filter(label => label && typeof label === "object" && typeof label.name === "string").map(label => [label.name.toLowerCase(), label]));
+  return names.map(name => {
+    const detail = detailsByName.get(name.toLowerCase());
+    return {
+      name,
+      ...(typeof detail?.id === "number" ? { database_id: detail.id } : {}),
+      ...(typeof detail?.node_id === "string" ? { node_id: detail.node_id } : typeof detail?.id === "string" ? { node_id: detail.id } : {}),
+    };
+  });
+}
+
+/**
  * Ensures the given label names exist in the target repository, creating any that are
  * missing. A 422 response from createLabel means the label already exists (e.g. a
  * concurrent creation) and is treated as success. Other creation errors are non-fatal
@@ -141,7 +160,7 @@ async function ensureLabelsExist(githubClient, repoParts, labelNames, core) {
  *   issueNodeId: string,
  *   labelSpecs: Array<{ name: string }>,
  * }} params
- * @returns {Promise<string[]>} The label names on the issue after the mutation and any recovery
+ * @returns {Promise<{names: string[], labels: Array<{name: string, database_id?: number, node_id?: string}>}>} The labels on the issue after the mutation and any recovery
  */
 async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumber, itemRepo, contextType, issueData, issueNodeId, labelSpecs }) {
   const repoLabels = await fetchAllRepoLabels(githubClient, repoParts.owner, repoParts.repo);
@@ -166,6 +185,7 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
               id
               labels(first: 100) {
                 nodes {
+                  id
                   name
                 }
               }
@@ -178,7 +198,8 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
     `add_labels to ${contextType} #${itemNumber} in ${itemRepo}`
   );
 
-  let afterLabels = normalizeLabelNames(result?.updateIssue?.issue?.labels?.nodes || []);
+  let afterLabelDetails = result?.updateIssue?.issue?.labels?.nodes || [];
+  let afterLabels = normalizeLabelNames(afterLabelDetails);
   const afterNamesLower = new Set(afterLabels.map(name => name.toLowerCase()));
   const missingExistingLabels = existingLabelNames.filter(name => !afterNamesLower.has(name.toLowerCase()));
 
@@ -198,9 +219,16 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
       `restore labels on ${contextType} #${itemNumber} in ${itemRepo}`
     );
     afterLabels = mergeLabelNames(existingLabelNames, afterLabels, restoredLabels);
+    afterLabelDetails = [...afterLabelDetails, ...restoredLabels];
   }
 
-  return afterLabels;
+  return {
+    names: afterLabels,
+    labels: buildLabelRecords(
+      afterLabelDetails,
+      labelSpecs.map(spec => spec.name)
+    ),
+  };
 }
 
 /**
@@ -477,7 +505,7 @@ const main = createCountGatedHandler({
             const existingLabels = normalizeLabelNames(issueData.labels || []);
             const existingNamesLower = new Set(existingLabels.map(name => name.toLowerCase()));
             const newLabelSpecs = uniqueLabelSpecs.filter(spec => !existingNamesLower.has(spec.name.toLowerCase()));
-            let afterLabels =
+            const appliedLabelResult =
               newLabelSpecs.length > 0
                 ? await applyIssueIntentLabels({
                     githubClient,
@@ -490,7 +518,9 @@ const main = createCountGatedHandler({
                     issueNodeId,
                     labelSpecs: newLabelSpecs,
                   })
-                : existingLabels;
+                : { names: existingLabels, labels: [] };
+            let afterLabels = appliedLabelResult.names;
+            let labelRecords = appliedLabelResult.labels;
             let afterNamesLower = new Set(afterLabels.map(name => name.toLowerCase()));
             const plainLabelsNotApplied = newLabelSpecs.filter(spec => !hasLabelIntentMetadata(spec) && !afterNamesLower.has(spec.name.toLowerCase())).map(spec => spec.name);
 
@@ -508,6 +538,7 @@ const main = createCountGatedHandler({
                 `add metadata-free labels to ${contextType} #${itemNumber} in ${itemRepo}`
               );
               afterLabels = mergeLabelNames(afterLabels, labels);
+              labelRecords = [...labelRecords, ...buildLabelRecords(labels, plainLabelsNotApplied)];
               afterNamesLower = new Set(afterLabels.map(name => name.toLowerCase()));
             }
 
@@ -527,6 +558,7 @@ const main = createCountGatedHandler({
                 number: itemNumber,
                 repo: itemRepo,
                 labelsAdded,
+                labels: labelRecords.filter(label => labelsAdded.some(name => name.toLowerCase() === label.name.toLowerCase())),
                 labelsSuggested,
                 contextType,
               },
@@ -558,6 +590,7 @@ const main = createCountGatedHandler({
             number: itemNumber,
             repo: itemRepo,
             labelsAdded: uniqueLabels,
+            labels: buildLabelRecords(labels, uniqueLabels),
             contextType,
           },
           beforeState,

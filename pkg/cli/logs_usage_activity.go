@@ -117,8 +117,9 @@ type usageActivityGatewayTool struct {
 }
 
 type usageActivitySafeOutputs struct {
-	TotalItems  int            `json:"total_items"`
-	ItemsByType map[string]int `json:"items_by_type,omitempty"`
+	TotalItems  int                 `json:"total_items"`
+	ItemsByType map[string]int      `json:"items_by_type,omitempty"`
+	Items       []CreatedItemReport `json:"items,omitempty"`
 }
 
 type usageActivityExperiments struct {
@@ -182,6 +183,9 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	if summary.SafeOutputs != nil && result.Run.SafeItemsCount == 0 && summary.SafeOutputs.TotalItems > 0 {
 		logsUsageActivityLog.Printf("applyUsageActivitySummaryToResult: backfilling safe output item count from usage summary (total=%d)", summary.SafeOutputs.TotalItems)
 		result.Run.SafeItemsCount = summary.SafeOutputs.TotalItems
+	}
+	if summary.SafeOutputs != nil && len(result.SafeOutputs) == 0 && len(summary.SafeOutputs.Items) > 0 {
+		result.SafeOutputs = summary.SafeOutputs.Items
 	}
 }
 

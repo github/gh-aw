@@ -715,7 +715,7 @@ function parseGatewayLogs() {
  *   • throws                                → manifest file exists but could not be read
  *
  * @param {string} [manifestPath] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
- * @returns {{ total_items: number, items_by_type: Record<string, number> } | null}
+ * @returns {{ total_items: number, items_by_type: Record<string, number>, items: Array<Record<string, any>> } | null}
  */
 const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
 
@@ -734,6 +734,7 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   }
 
   const itemsByType = {};
+  const items = [];
   let totalItems = 0;
 
   for (const raw of content.split("\n")) {
@@ -756,11 +757,13 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
 
     totalItems += 1;
     itemsByType[itemType] = (itemsByType[itemType] || 0) + 1;
+    items.push(entry);
   }
 
   return {
     total_items: totalItems,
     items_by_type: itemsByType,
+    items,
   };
 }
 

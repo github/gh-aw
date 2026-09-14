@@ -608,7 +608,46 @@ function createReviewBuffer() {
      * @param {number} commentCount - Number of inline comments included
      * @param {import("./safe_output_execution_metadata.cjs").ReviewState|null} afterState - Post-submit review state
      */
-    function buildReviewSuccessResult(review, resolvedEvent, commentCount, afterState) {
+    async function buildReviewSuccessResult(review, resolvedEvent, commentCount, afterState) {
+      let reviewComments = comments.slice(0, commentCount).map(comment => ({
+        repo,
+        pull_request_number: pullRequestNumber,
+        metadata: {
+          path: comment.path,
+          line: comment.line,
+          ...(comment.start_line != null ? { start_line: comment.start_line } : {}),
+          side: comment.side,
+          review_id: review.id,
+        },
+      }));
+      if (commentCount > 0 && typeof github.rest.pulls.listCommentsForReview === "function") {
+        try {
+          const { data } = await github.rest.pulls.listCommentsForReview({
+            owner: repoParts.owner,
+            repo: repoParts.repo,
+            pull_number: pullRequestNumber,
+            review_id: review.id,
+          });
+          if (Array.isArray(data) && data.length > 0) {
+            reviewComments = data.map(comment => ({
+              id: comment.id,
+              url: comment.html_url,
+              repo,
+              pull_request_number: pullRequestNumber,
+              metadata: {
+                review_id: review.id,
+                ...(comment.node_id ? { node_id: comment.node_id } : {}),
+                ...(comment.path ? { path: comment.path } : {}),
+                ...(comment.line != null ? { line: comment.line } : {}),
+                ...(comment.start_line != null ? { start_line: comment.start_line } : {}),
+                ...(comment.side ? { side: comment.side } : {}),
+              },
+            }));
+          }
+        } catch (error) {
+          core.warning(`Could not resolve IDs for review comments on ${repo}#${pullRequestNumber}: ${getErrorMessage(error)}`);
+        }
+      }
       return attachExecutionState(
         {
           success: true,
@@ -620,6 +659,7 @@ function createReviewBuffer() {
           repo: repo,
           event: resolvedEvent,
           comment_count: commentCount,
+          review_comments: reviewComments,
           metadata: {
             review_id: review.id,
             review_event: resolvedEvent,
@@ -638,7 +678,7 @@ function createReviewBuffer() {
 
       core.info(`Created PR review #${review.id}: ${review.html_url}`);
 
-      return buildReviewSuccessResult(review, event, comments.length, afterState);
+      return await buildReviewSuccessResult(review, event, comments.length, afterState);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
 
@@ -654,7 +694,7 @@ function createReviewBuffer() {
           await maybeSupersedeOlderReviews(review.id);
           const afterState = await fetchAfterStateIfAvailable();
           core.info(`Created PR review #${review.id}: ${review.html_url}`);
-          return buildReviewSuccessResult(review, "COMMENT", comments.length, afterState);
+          return await buildReviewSuccessResult(review, "COMMENT", comments.length, afterState);
         } catch (retryError) {
           const retryErrorMsg = getErrorMessage(retryError);
           // If the COMMENT retry still fails due to unresolvable line(s), fall back to body-only COMMENT.
@@ -669,7 +709,7 @@ function createReviewBuffer() {
               await maybeSupersedeOlderReviews(review.id);
               const afterState = await fetchAfterStateIfAvailable();
               core.info(`Created PR review #${review.id} (own-PR body-only COMMENT): ${review.html_url}`);
-              return buildReviewSuccessResult(review, "COMMENT", 0, afterState);
+              return await buildReviewSuccessResult(review, "COMMENT", 0, afterState);
             } catch (bodyOnlyError) {
               core.error(`Failed to submit body-only COMMENT review: ${getErrorMessage(bodyOnlyError)}`);
               return { success: false, error: getErrorMessage(bodyOnlyError) };
@@ -697,7 +737,7 @@ function createReviewBuffer() {
             await maybeSupersedeOlderReviews(review.id);
             const afterState = await fetchAfterStateIfAvailable();
             core.info(`Created PR review #${review.id} after lock retry (attempt ${attempt}/${LOCKED_PR_RETRY_COUNT}): ${review.html_url}`);
-            return buildReviewSuccessResult(review, event, comments.length, afterState);
+            return await buildReviewSuccessResult(review, event, comments.length, afterState);
           } catch (retryError) {
             const retryErrorMessage = getErrorMessage(retryError);
             if (isLockedPrError(retryErrorMessage)) {
@@ -739,7 +779,7 @@ function createReviewBuffer() {
             await maybeSupersedeOlderReviews(review.id);
             const afterState = await fetchAfterStateIfAvailable();
             core.info(`Created PR review #${review.id} (partial-anchor fallback): ${review.html_url}`);
-            return buildReviewSuccessResult(review, event, resolvableComments.length, afterState);
+            return await buildReviewSuccessResult(review, event, resolvableComments.length, afterState);
           } catch (partialRetryError) {
             core.warning(`Failed to submit partially anchored PR review: ${getErrorMessage(partialRetryError)}. Falling back to body-only review.`);
           }
@@ -754,7 +794,7 @@ function createReviewBuffer() {
           await maybeSupersedeOlderReviews(review.id);
           const afterState = await fetchAfterStateIfAvailable();
           core.info(`Created PR review #${review.id} (body-only fallback): ${review.html_url}`);
-          return buildReviewSuccessResult(review, event, 0, afterState);
+          return await buildReviewSuccessResult(review, event, 0, afterState);
         } catch (retryError) {
           const retryErrorMsg = getErrorMessage(retryError);
           // If body-only also fails because it's a self-authored PR, retry as body-only COMMENT.
@@ -766,7 +806,7 @@ function createReviewBuffer() {
               await maybeSupersedeOlderReviews(review.id);
               const afterState = await fetchAfterStateIfAvailable();
               core.info(`Created PR review #${review.id} (body-only COMMENT fallback): ${review.html_url}`);
-              return buildReviewSuccessResult(review, "COMMENT", 0, afterState);
+              return await buildReviewSuccessResult(review, "COMMENT", 0, afterState);
             } catch (ownPrRetryError) {
               core.error(`Failed to submit body-only COMMENT review: ${getErrorMessage(ownPrRetryError)}`);
               return { success: false, error: getErrorMessage(ownPrRetryError) };

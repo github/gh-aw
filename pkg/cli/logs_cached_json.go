@@ -457,10 +457,13 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 		return errors.New("failed to build cached logs JSONL record")
 	}
 	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0])
+	runData.SafeOutputs = logsData.Runs[0].SafeOutputs
 	if includeAudit {
 		if audit, ok := loadCachedAuditData(run.Run.LogsPath, run.Run, auditCacheSourceLogs); ok {
 			runData.Audit = &audit
-			runData.SafeOutputs = audit.CreatedItems
+			if len(runData.SafeOutputs) == 0 {
+				runData.SafeOutputs = audit.CreatedItems
+			}
 		}
 		if awInfo, err := parseAwInfo(filepath.Join(run.Run.LogsPath, "aw_info.json"), false); err == nil {
 			runData.AwInfo = awInfo

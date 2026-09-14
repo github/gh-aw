@@ -229,6 +229,23 @@ describe("add_labels", () => {
       expect(addLabelsCalls[0].labels).toEqual(["bug", "enhancement"]);
     });
 
+    it("should return label database and node IDs from GitHub", async () => {
+      const handler = await main({ max: 10, target: "*" });
+      mockGithub.rest.issues.addLabels = async () => ({
+        data: [
+          { name: "bug", id: 42, node_id: "LA_bug" },
+          { name: "enhancement", id: 43, node_id: "LA_enhancement" },
+        ],
+      });
+
+      const result = await handler({ item_number: 456, labels: ["bug", "enhancement"] }, {});
+
+      expect(result.labels).toEqual([
+        { name: "bug", database_id: 42, node_id: "LA_bug" },
+        { name: "enhancement", database_id: 43, node_id: "LA_enhancement" },
+      ]);
+    });
+
     it("should accept structured label entries and add normalized label names", async () => {
       const handler = await main({ max: 10, target: "*", issue_intent: true });
       const graphqlMutationCalls = [];

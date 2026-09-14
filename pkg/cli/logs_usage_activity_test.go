@@ -394,7 +394,15 @@ func TestLoadUsageActivitySummaryWithSafeOutputs(t *testing.T) {
 		"schema":"`+usageActivitySummarySchema+`",
 		"safe_outputs":{
 			"total_items":4,
-			"items_by_type":{"create_issue":3,"add_comment":1}
+			"items_by_type":{"create_issue":3,"add_comment":1},
+			"items":[{
+				"type":"create_issue",
+				"provider":"github",
+				"url":"https://github.com/github/gh-aw/issues/1",
+				"number":1,
+				"repo":"github/gh-aw",
+				"timestamp":"2026-09-14T00:00:00Z"
+			}]
 		}
 	}`), 0o644))
 
@@ -404,6 +412,14 @@ func TestLoadUsageActivitySummaryWithSafeOutputs(t *testing.T) {
 	require.NotNil(t, summary.SafeOutputs, "safe_outputs section should be parsed from JSON")
 	assert.Equal(t, 4, summary.SafeOutputs.TotalItems, "total_items should be parsed from JSON")
 	assert.Equal(t, map[string]int{"create_issue": 3, "add_comment": 1}, summary.SafeOutputs.ItemsByType, "items_by_type should be parsed from JSON")
+	require.Len(t, summary.SafeOutputs.Items, 1)
+	assert.Equal(t, "github", summary.SafeOutputs.Items[0].Provider)
+	assert.Equal(t, "https://github.com/github/gh-aw/issues/1", summary.SafeOutputs.Items[0].URL)
+
+	result := DownloadResult{}
+	applyUsageActivitySummaryToResult(summary, &result, true)
+	require.Len(t, result.SafeOutputs, 1)
+	assert.Equal(t, "create_issue", result.SafeOutputs[0].Type)
 }
 
 // TestLoadThenApplyUsageActivitySummaryBackfillsSafeItemsCount exercises the processor

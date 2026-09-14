@@ -291,13 +291,13 @@ describe("generate_usage_activity_summary.cjs", () => {
     it("returns zero-item result when the manifest file is empty", () => {
       fs.writeFileSync(manifestPath, "");
       const result = parseSafeOutputsManifest(manifestPath);
-      expect(result).toEqual({ total_items: 0, items_by_type: {} });
+      expect(result).toEqual({ total_items: 0, items_by_type: {}, items: [] });
     });
 
     it("returns zero-item result when the manifest contains only blank lines", () => {
       fs.writeFileSync(manifestPath, "\n\n\n");
       const result = parseSafeOutputsManifest(manifestPath);
-      expect(result).toEqual({ total_items: 0, items_by_type: {} });
+      expect(result).toEqual({ total_items: 0, items_by_type: {}, items: [] });
     });
 
     it("throws when the manifest file exists but cannot be read", () => {
@@ -324,6 +324,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(result).not.toBeNull();
       expect(result.total_items).toBe(3);
       expect(result.items_by_type).toEqual({ create_issue: 2, add_comment: 1 });
+      expect(result.items).toEqual(lines.split("\n").map(line => JSON.parse(line)));
     });
 
     it("skips lines with missing or empty type field", () => {
@@ -346,7 +347,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       const lines = ["not json at all", JSON.stringify({ url: "https://example.com" })].join("\n");
       fs.writeFileSync(manifestPath, lines);
       const result = parseSafeOutputsManifest(manifestPath);
-      expect(result).toEqual({ total_items: 0, items_by_type: {} });
+      expect(result).toEqual({ total_items: 0, items_by_type: {}, items: [] });
     });
   });
 

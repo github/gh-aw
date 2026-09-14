@@ -18,6 +18,7 @@ const mockGithub = {
       createReview: vi.fn(),
       listFiles: vi.fn(),
       listReviews: vi.fn(),
+      listCommentsForReview: vi.fn(),
       dismissReview: vi.fn(),
     },
   },
@@ -133,6 +134,7 @@ describe("pr_review_buffer (factory pattern)", () => {
     });
     mockGithub.rest.pulls.listFiles.mockResolvedValue({ data: [] });
     mockGithub.rest.pulls.listReviews.mockResolvedValue({ data: [] });
+    mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({ data: [] });
 
     // Create a fresh buffer instance for each test (no shared global state)
     buffer = createReviewBuffer();
@@ -327,6 +329,13 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(result.success).toBe(true);
       expect(result.event).toBe("COMMENT");
       expect(result.comment_count).toBe(1);
+      expect(result.review_comments).toEqual([
+        {
+          repo: "owner/repo",
+          pull_request_number: 42,
+          metadata: { path: "src/index.js", line: 10, side: undefined, review_id: 100 },
+        },
+      ]);
       expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledWith({
         owner: "owner",
         repo: "repo",
@@ -335,6 +344,34 @@ describe("pr_review_buffer (factory pattern)", () => {
         event: "COMMENT",
         comments: [{ path: "src/index.js", line: 10, body: "Fix this" }],
       });
+    });
+
+    it("should capture created review comment identities", async () => {
+      buffer.addComment({ path: "src/index.js", line: 10, body: "Fix this", side: "RIGHT" });
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: { id: 100, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-100" },
+      });
+      mockGithub.rest.pulls.listCommentsForReview.mockResolvedValue({
+        data: [{ id: 200, node_id: "PRRC_200", html_url: "https://github.com/owner/repo/pull/42#discussion_r200", path: "src/index.js", line: 10, side: "RIGHT" }],
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(result.review_comments).toEqual([
+        {
+          id: 200,
+          url: "https://github.com/owner/repo/pull/42#discussion_r200",
+          repo: "owner/repo",
+          pull_request_number: 42,
+          metadata: { review_id: 100, node_id: "PRRC_200", path: "src/index.js", line: 10, side: "RIGHT" },
+        },
+      ]);
     });
 
     it("should continue when before-state capture is rate-limited", async () => {

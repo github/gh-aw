@@ -266,6 +266,48 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "peak_input_tokens": 224000,
     "rebuild_excess_tokens": 650000,
     "invocations": 5
+  },
+  "safe_outputs": {
+    "total_items": 2,
+    "items_by_type": {
+      "create_issue": 1,
+      "add_labels": 1
+    },
+    "items": [
+      {
+        "type": "create_issue",
+        "provider": "github",
+        "url": "https://github.com/owner/repo/issues/42",
+        "number": 42,
+        "repo": "owner/repo",
+        "target": {
+          "provider": "github",
+          "repository": "owner/repo",
+          "number": 42
+        },
+        "timestamp": "2026-09-14T00:00:00.000Z"
+      },
+      {
+        "type": "add_labels",
+        "provider": "github",
+        "number": 42,
+        "repo": "owner/repo",
+        "target": {
+          "provider": "github",
+          "repository": "owner/repo",
+          "number": 42,
+          "kind": "issue"
+        },
+        "labels": [
+          {
+            "name": "triage",
+            "database_id": 1234,
+            "node_id": "LA_example"
+          }
+        ],
+        "timestamp": "2026-09-14T00:00:01.000Z"
+      }
+    ]
   }
 }
 ```
@@ -273,6 +315,13 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
 MCP `tool_calls` contain quantitative metadata only. Tool-call IDs are replaced with
 run-local opaque identifiers, and request and response content is never copied into
 the usage artifact. `outcome` is `success`, `failure`, or `incomplete`.
+
+`safe_outputs.items` contains the provider-neutral records from the safe-output manifest.
+Each record identifies the provider and operation and includes the available URL, repository,
+number, provider ID, human-readable identifier, target, and label details. This lets consumers
+reconstruct created GitHub, Jira, Linear, and other provider entities from the usage artifact
+without querying those services. Label records include the associated issue or pull request,
+label name, and GitHub database or node ID when returned by the API.
 
 The conclusion job derives `gateway` and `integrity` from MCP gateway logs, falling back to `rpc-messages.jsonl` when `gateway.jsonl` is unavailable. These compact aggregates let `gh aw logs --artifacts usage` report MCP call, payload-size, duration, failure, and integrity-filter metrics without downloading raw logs. Cross-run reports include `runs_with_filtered_events`; the existing logs report summary remains the source for the total number of runs.
 

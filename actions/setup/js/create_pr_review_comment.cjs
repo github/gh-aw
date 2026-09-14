@@ -400,8 +400,15 @@ async function main(config = {}) {
     return {
       success: true,
       buffered: true,
+      deferred_manifest: true,
       pull_request_number: pullRequestNumber,
       repo: itemRepo,
+      metadata: {
+        path: bufferedComment.path,
+        line: bufferedComment.line,
+        ...(bufferedComment.start_line != null ? { start_line: bufferedComment.start_line } : {}),
+        side: bufferedComment.side,
+      },
     };
   };
 }

@@ -260,6 +260,8 @@ describe("Safe Output Handler Manager", () => {
           url: "https://github.com/owner/repo/pull/1#pullrequestreview-2",
           number: 1,
           repo: "owner/repo",
+          provider: "github",
+          target: { provider: "github", repository: "owner/repo", number: 1 },
           before_state: { reviews: [] },
           after_state: { reviews: [{ id: 2, state: "COMMENTED" }] },
         });

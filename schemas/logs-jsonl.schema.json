@@ -513,6 +513,61 @@
                 "repo": {
                   "type": "string"
                 },
+                "provider": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "integer"
+                  ]
+                },
+                "identifier": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "database_id": {
+                        "type": "integer"
+                      },
+                      "node_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "labelsAdded": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "labelsSuggested": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "labelsBefore": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "run_id": {
                   "type": "string"
                 },

@@ -247,5 +247,6 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 		WorkingSet:              result.WorkingSet,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              result.JobDetails,
+		SafeOutputs:             result.SafeOutputs,
 	}
 }

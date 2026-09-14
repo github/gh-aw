@@ -128,6 +128,7 @@ type ProcessedRun struct {
 	WorkingSet              *WorkingSetMetrics
 	GitHubRateLimitUsage    *GitHubRateLimitUsage
 	JobDetails              []JobInfoWithDuration
+	SafeOutputs             []CreatedItemReport
 	cachedData              *RunData
 }
 
@@ -277,6 +278,7 @@ type RunAnalysis struct {
 	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
 	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details
+	SafeOutputs             []CreatedItemReport      `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers
 }
 
 // RunSummary represents a complete summary of a workflow run's artifacts and metrics.

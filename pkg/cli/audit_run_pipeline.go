@@ -202,6 +202,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		Noops:                   summary.Noops,
 		MCPFailures:             summary.MCPFailures,
 		TokenUsage:              summary.TokenUsage,
+		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,
 		GitHubRateLimitUsage:    summary.GitHubRateLimitUsage,
 		JobDetails:              summary.JobDetails,

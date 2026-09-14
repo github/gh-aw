@@ -529,6 +529,7 @@ func tryLoadCachedRunResult(
 		healed.Metrics = result.Metrics
 		healed.MCPToolUsage = result.MCPToolUsage
 		healed.WorkingSet = result.WorkingSet
+		healed.SafeOutputs = result.SafeOutputs
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
@@ -712,7 +713,8 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 	// Count safe output items created in GitHub (from manifest artifact).
 	// This runs before applyUsageActivitySummaryToResult so that the summary
 	// backfill only activates when the manifest returned zero items.
-	result.Run.SafeItemsCount = len(extractCreatedItemsFromManifest(runOutputDir))
+	result.SafeOutputs = extractCreatedItemsFromManifest(runOutputDir)
+	result.Run.SafeItemsCount = len(result.SafeOutputs)
 
 	// Fill missing activity summaries from usage artifact precomputes.
 	// This call is unconditional but only backfills fields that are still empty.
@@ -751,6 +753,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 		WorkingSet:              result.WorkingSet,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              jobDetails,
+		SafeOutputs:             result.SafeOutputs,
 	}
 	awContext, _, _, taskDomain, behaviorFingerprint, agenticAssessments := deriveRunAgenticAnalysis(processedRun, metrics)
 	result.AwContext = awContext
@@ -789,6 +792,7 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 			WorkingSet:              result.WorkingSet,
 			GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 			JobDetails:              jobDetails,
+			SafeOutputs:             result.SafeOutputs,
 		},
 		ArtifactsList: artifacts,
 	}

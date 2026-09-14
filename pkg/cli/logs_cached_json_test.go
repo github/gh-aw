@@ -228,6 +228,31 @@ func TestCachedLogsJSONLWriterIncludesAuditArtifacts(t *testing.T) {
 	assert.Equal(t, "create_issue", record.Run.SafeOutputs[0].Type)
 }
 
+func TestCachedLogsJSONLWriterIncludesSafeOutputsWithoutAudit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	run := ProcessedRun{
+		Run: WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"},
+		SafeOutputs: []CreatedItemReport{{
+			Type:       "linear_create_issue",
+			Provider:   "linear",
+			ID:         "issue-id",
+			Identifier: "ENG-7",
+			Timestamp:  "2026-09-14T00:00:00Z",
+		}},
+	}
+
+	require.NoError(t, newCachedLogsJSONLWriter(path).Append(run))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var record cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &record))
+	require.Len(t, record.Run.SafeOutputs, 1)
+	assert.Equal(t, "linear", record.Run.SafeOutputs[0].Provider)
+	assert.Equal(t, "ENG-7", record.Run.SafeOutputs[0].Identifier)
+	assert.Nil(t, record.Run.Audit)
+}
+
 func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
 	jobs := projectCachedLogsJSONLJobs([]JobInfoWithDuration{
 		{JobInfo: JobInfo{ID: 0, Name: "missing-id"}},

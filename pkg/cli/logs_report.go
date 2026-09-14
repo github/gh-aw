@@ -201,6 +201,7 @@ type RunData struct {
 	AvgTimeBetweenTurns        string                 `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
 	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
+	SafeOutputs                []CreatedItemReport    `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
 	awInfo                     *AwInfo
 }
 
@@ -523,7 +524,6 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 // newRunData assembles the base RunData fields for a processed run.
 func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutputChainMetrics, comparison *AuditComparisonData, failureKind string, gitHubAPICalls int) RunData {
 	run := pr.Run
-
 	var ambientContext *AmbientContextMetrics
 	if pr.TokenUsage != nil {
 		ambientContext = pr.TokenUsage.AmbientContext
@@ -579,6 +579,7 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		GitHubAPICalls:             gitHubAPICalls,
 		Experiments:                extractExperimentData(run.LogsPath),
 		Graders:                    extractGradersData(run.LogsPath),
+		SafeOutputs:                pr.SafeOutputs,
 	}
 	applyGitHubMetadataToRunData(&runData, run)
 	return runData
