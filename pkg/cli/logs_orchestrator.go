@@ -314,6 +314,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	}
 	renderLogsCollectionStats(opts.collectionStats)
 	finishGitHubAPIRateLimitReport(ctx, apiRateLimit, opts.JSONOutput)
+	renderLogsDownloadStatsSummary(opts.collectionStats, apiRateLimit)
 	cacheGitHubAPIRateLimitReports(opts.cachedJSONLWriter, apiRateLimit)
 	if handled, err := handleEmptyProcessedRuns(result.processedRuns, opts, result.timeoutReached, result.storageLimitReached, result.continuation, nil, apiRateLimit, nil); handled || err != nil {
 		logsOrchestratorLog.Printf("No processed runs to render (timeoutReached=%v, err=%v)", result.timeoutReached, err)

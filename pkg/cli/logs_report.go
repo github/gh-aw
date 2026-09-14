@@ -202,7 +202,14 @@ type RunData struct {
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
 	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
 	SafeOutputs                []CreatedItemReport    `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
-	awInfo                     *AwInfo
+	// DownloadDurationMS is the wall-clock time (milliseconds) spent by `gh aw logs`
+	// downloading this run's artifacts from GitHub. Zero when the run was served
+	// from the on-disk cache instead of being freshly downloaded.
+	DownloadDurationMS int64 `json:"download_duration_ms,omitempty" console:"-"`
+	// DownloadSizeBytes is the total on-disk size of the artifacts downloaded for
+	// this run.
+	DownloadSizeBytes int64 `json:"download_size_bytes,omitempty" console:"-"`
+	awInfo            *AwInfo
 }
 
 // logsAggregate accumulates cross-run totals while runs are converted to RunData.
@@ -440,6 +447,8 @@ func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
 }
 
 func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
+	runData.DownloadDurationMS = run.DownloadDuration.Milliseconds()
+	runData.DownloadSizeBytes = run.DownloadSizeBytes
 	if run.Repository != "" {
 		runData.Repository = run.Repository
 	}

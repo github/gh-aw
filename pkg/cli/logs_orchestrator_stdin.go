@@ -280,6 +280,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 		cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
 		apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
+		renderLogsDownloadStatsSummary(collectionStats, allAPIRateLimits...)
 		if opts.JSONOutput {
 			logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
 			logsData.GitHubAPIRateLimit = populatedGitHubAPIRateLimitReport(apiRateLimit)
@@ -307,6 +308,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 	cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)
 	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
+	renderLogsDownloadStatsSummary(collectionStats, allAPIRateLimits...)
 	return renderLogsOutput(processedRuns, renderLogsOutputOptions{
 		outputDir:         opts.OutputDir,
 		summaryFile:       opts.SummaryFile,

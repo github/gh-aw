@@ -862,6 +862,77 @@ func TestLogsCollectionStatsReportsDiscoveredDownloadedAndCached(t *testing.T) {
 	assert.Contains(t, stderr, "Runs: 4 discovered; reports: 1 downloaded, 2 skipped because cached analyses were reused")
 }
 
+func TestLogsCollectionStatsRecordsDownloadDurationAndSize(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 2 * time.Second, DownloadSizeBytes: 1000}}})
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 4 * time.Second, DownloadSizeBytes: 3000}}})
+	// A cached hit must not contribute to download duration/size stats.
+	stats.recordResult(DownloadResult{Cached: true, RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 10 * time.Second, DownloadSizeBytes: 999_999}}})
+
+	assert.Equal(t, int64(2), stats.downloadCount.Load())
+	assert.Equal(t, (2*time.Second + 4*time.Second).Nanoseconds(), stats.totalDownloadNanos.Load())
+	assert.Equal(t, (4 * time.Second).Nanoseconds(), stats.maxDownloadNanos.Load())
+	assert.Equal(t, int64(4000), stats.totalDownloadBytes.Load())
+	assert.Equal(t, int64(3000), stats.maxDownloadBytes.Load())
+}
+
+func TestRenderLogsDownloadStatsSummaryReportsAvgMaxAndRateLimitCost(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 2 * time.Second, DownloadSizeBytes: 1024}}})
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 6 * time.Second, DownloadSizeBytes: 3072}}})
+
+	report := &GitHubAPIRateLimitReport{
+		Start: &GitHubAPIRateLimitState{Used: 10},
+		End:   &GitHubAPIRateLimitState{Used: 30},
+	}
+
+	_, stderr := captureOutput(t, func() error {
+		renderLogsDownloadStatsSummary(stats, report)
+		return nil
+	})
+
+	assert.Contains(t, stderr, "Download stats: avg 4s (max 6s) per run")
+	assert.Contains(t, stderr, "avg size 2.0KiB (max 3.0KiB) per run")
+	assert.Contains(t, stderr, "GitHub API cost estimate: ~10.0 requests/run")
+}
+
+func TestRenderLogsDownloadStatsSummaryNoOpWithoutDownloads(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{Cached: true})
+
+	_, stderr := captureOutput(t, func() error {
+		renderLogsDownloadStatsSummary(stats)
+		return nil
+	})
+
+	assert.Empty(t, stderr)
+}
+
+func TestGitHubAPIRateLimitCostEstimateHandlesWindowResetAndMissingReports(t *testing.T) {
+	calls, ok := gitHubAPIRateLimitCostEstimate(nil)
+	assert.False(t, ok)
+	assert.Zero(t, calls)
+
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{nil, {}})
+	assert.False(t, ok)
+	assert.Zero(t, calls)
+
+	// A window reset mid-run (End.Used < Start.Used) falls back to End.Used as a
+	// lower-bound approximation instead of a negative cost.
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{
+		{Start: &GitHubAPIRateLimitState{Used: 4900}, End: &GitHubAPIRateLimitState{Used: 5}},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, 5, calls)
+
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{
+		{Start: &GitHubAPIRateLimitState{Used: 10}, End: &GitHubAPIRateLimitState{Used: 25}},
+		{Start: &GitHubAPIRateLimitState{Used: 0}, End: &GitHubAPIRateLimitState{Used: 5}},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, 20, calls)
+}
+
 // TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits verifies
 // that the single-target DownloadWorkflowLogs entry point wires --cached-jsonl
 // discovery/download results through to the rendered collection-stats summary,
