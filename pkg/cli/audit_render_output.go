@@ -19,7 +19,7 @@ import (
 func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, opts AuditOptions) error {
 	runID := processedRun.Run.DatabaseID
 	runOutputDir := opts.OutputDir
-	processedRun.Run.SafeItemsCount = len(extractCreatedItemsFromManifest(runOutputDir))
+	processedRun.Run.SafeItemsCount = len(resolveCreatedItems(runOutputDir, processedRun.SafeOutputs))
 	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull)
 	if !ok {
 		auditData = buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
@@ -43,7 +43,7 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 	if !ok {
 		return buildRenderedAuditData(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
 	}
-	createdItems := extractCreatedItemsFromManifest(runOutputDir)
+	createdItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	addAuditOutcomeSummary(ctx, &auditData, createdItems)
 	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
 	auditData.Comparison = buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
@@ -51,7 +51,7 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 }
 
 func buildRenderedAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) AuditData {
-	currentCreatedItems := extractCreatedItemsFromManifest(runOutputDir)
+	currentCreatedItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	currentSnapshot := buildAuditComparisonSnapshot(processedRun, currentCreatedItems)
 	comparison := buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
 	auditData := buildAuditData(ctx, processedRun, metrics, mcpToolUsage)

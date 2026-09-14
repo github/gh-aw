@@ -1407,6 +1407,8 @@ async function main(config = {}) {
         repo: qualifiedItemRepo,
         number: issue.number,
         url: issue.html_url,
+        id: issue.id,
+        metadata: { node_id: issue.node_id },
         temporaryId: temporaryId,
         ...(blockedByFailures.length > 0 ? { blocked_by_errors: blockedByFailures } : {}),
         _repo: qualifiedItemRepo, // For tracking in the closure

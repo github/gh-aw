@@ -140,6 +140,20 @@ describe("create_pull_request - draft policy enforcement", () => {
     return global.core.warning.mock.calls.filter(args => String(args[0]).includes("Agent requested draft"));
   }
 
+  it("should propagate the created pull request's durable id and node_id", async () => {
+    global.github.rest.pulls.create = vi.fn().mockResolvedValue({
+      data: { id: 555111222, node_id: "PR_kwDOtest456", number: 1, html_url: "https://github.com/test", head: { sha: "abc123" } },
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ draft: "false", allow_empty: true });
+
+    const result = await handler({ title: "Test PR", body: "Test body" }, {});
+
+    expect(result.success).toBe(true);
+    expect(result.id).toBe(555111222);
+    expect(result.metadata).toEqual({ node_id: "PR_kwDOtest456" });
+  });
+
   it("should enforce draft: false from config even when agent requests draft: true", async () => {
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({ draft: "false", allow_empty: true });

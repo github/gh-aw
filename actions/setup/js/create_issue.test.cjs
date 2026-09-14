@@ -21,6 +21,8 @@ describe("create_issue", () => {
         issues: {
           create: vi.fn().mockResolvedValue({
             data: {
+              id: 987654321,
+              node_id: "I_kwDOtest123",
               number: 123,
               html_url: "https://github.com/owner/repo/issues/123",
               title: "Test Issue",
@@ -116,6 +118,8 @@ describe("create_issue", () => {
 
       expect(result.success).toBe(true);
       expect(result.number).toBe(123);
+      expect(result.id).toBe(987654321);
+      expect(result.metadata).toEqual({ node_id: "I_kwDOtest123" });
       expect(mockGithub.rest.issues.create).toHaveBeenCalledWith(
         expect.objectContaining({
           owner: "test-owner",

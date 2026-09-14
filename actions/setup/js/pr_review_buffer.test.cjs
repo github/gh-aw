@@ -1455,6 +1455,11 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(result.success).toBe(true);
       expect(result.review_id).toBe(803);
       expect(result.comment_count).toBe(2);
+      // The manifest must reflect the actually-submitted (resolvable) comments, not an
+      // arbitrary first-N slice of the original buffered comments — the removed index
+      // was in the middle (index 1), so a first-N slice would wrongly report the
+      // unresolved comment as submitted and drop the second resolvable one.
+      expect(result.review_comments.map(c => c.metadata.path)).toEqual(["src/valid-one.js", "src/valid-two.js"]);
       expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(2);
       const retryArgs = mockGithub.rest.pulls.createReview.mock.calls[1][0];
       expect(retryArgs.comments).toHaveLength(2);

@@ -95,6 +95,33 @@ const NOT_LOGGED_TYPES = new Set(["noop", "missing_tool", "missing_data", "repor
  */
 
 /**
+ * Recursively redacts secrets from every string leaf of a value.
+ *
+ * Redaction must happen before JSON.stringify: once a value containing a
+ * quote, backslash, or newline is serialized, its JSON-escaped form no
+ * longer matches the raw secret value that redactBuiltInPatterns/redactSecrets
+ * search for, and the secret would be persisted recoverably in the manifest.
+ *
+ * @param {unknown} value - Value to sanitize (object, array, string, or primitive)
+ * @param {string[]} secretValues - Secret values to redact
+ * @returns {unknown} Sanitized value safe to JSON.stringify
+ */
+function redactManifestValue(value, secretValues) {
+  if (typeof value === "string") {
+    let redacted = redactBuiltInPatterns(value).content;
+    redacted = redactSecrets(redacted, secretValues).content;
+    return redacted;
+  }
+  if (Array.isArray(value)) {
+    return value.map(entry => redactManifestValue(entry, secretValues));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, redactManifestValue(nestedValue, secretValues)]));
+  }
+  return value;
+}
+
+/**
  * Create a manifest logger function for recording executed safe output items.
  *
  * The logger writes JSONL entries to the specified manifest file.
@@ -137,10 +164,11 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       timestamp: new Date().toISOString(),
     };
 
-    let jsonLine = JSON.stringify(entry);
+    let jsonLine;
     try {
-      jsonLine = redactBuiltInPatterns(jsonLine).content;
-      jsonLine = redactSecrets(jsonLine, collectArtifactSecretValues()).content;
+      const secretValues = collectArtifactSecretValues();
+      const redactedEntry = /** @type {ManifestEntry} */ redactManifestValue(entry, secretValues);
+      jsonLine = JSON.stringify(redactedEntry);
     } catch {
       jsonLine = JSON.stringify({
         type: entry.type,
@@ -204,11 +232,16 @@ function extractCreatedItemFromResult(type, result) {
   const url = result.url || result.projectUrl || result.html_url || result.pull_request_url || result.review_url || result.issue_url;
   const number = result.number ?? result.pull_request_number ?? result.prNumber ?? result.issue_number ?? result.itemNumber;
   const repo = result.repo || result._repo;
-  const provider = result.provider || (type.startsWith("jira_") ? "jira" : type.startsWith("linear_") ? "linear" : type.startsWith("ado_") ? "azure_devops" : "github");
+  const provider = result.provider || result.metadata?.provider || (type.startsWith("jira_") ? "jira" : type.startsWith("linear_") ? "linear" : type.startsWith("ado_") ? "azure-devops" : "github");
   const id = result.id ?? result.commentId ?? result.comment_id ?? result.review_id ?? result.issue_id;
   const identifier = result.identifier ?? result.issue_key;
+  // result.target may be a scalar provider-specific identifier (e.g. Linear issue key "ENG-123")
+  // rather than a structured object. Normalize it to a provider-neutral object so downstream
+  // consumers (CreatedItemReport.Target, logs schema) always receive an object.
+  const rawTarget = result.target;
   const target =
-    result.target ||
+    (rawTarget && typeof rawTarget === "object" ? rawTarget : undefined) ||
+    (typeof rawTarget === "string" && rawTarget ? { provider, identifier: rawTarget } : undefined) ||
     (repo || number != null
       ? {
           provider,

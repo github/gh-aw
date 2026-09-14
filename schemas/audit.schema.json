@@ -2104,6 +2104,68 @@
               "repo": {
                 "type": "string"
               },
+              "provider": {
+                "type": "string"
+              },
+              "id": true,
+              "identifier": {
+                "type": "string"
+              },
+              "target": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "labels": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "database_id": {
+                      "type": "integer"
+                    },
+                    "node_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "labelsAdded": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "labelsSuggested": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "labelsBefore": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
               "temporaryId": {
                 "type": "string"
               },

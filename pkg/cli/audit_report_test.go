@@ -1323,6 +1323,40 @@ not-valid-json
 	})
 }
 
+func TestResolveCreatedItems(t *testing.T) {
+	t.Parallel()
+
+	t.Run("falls back to cached safe outputs when manifest is absent", func(t *testing.T) {
+		dir := t.TempDir()
+		cached := []CreatedItemReport{{Type: "create_issue", Number: 42, Repo: "owner/repo"}}
+
+		items := resolveCreatedItems(dir, cached)
+
+		require.Len(t, items, 1)
+		assert.Equal(t, "create_issue", items[0].Type)
+		assert.Equal(t, 42, items[0].Number)
+	})
+
+	t.Run("prefers the on-disk manifest over cached safe outputs when both are present", func(t *testing.T) {
+		dir := t.TempDir()
+		content := `{"type":"add_comment","number":7,"repo":"owner/repo","timestamp":"2024-01-01T00:00:00Z"}
+`
+		require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(content), 0600))
+		cached := []CreatedItemReport{{Type: "create_issue", Number: 42, Repo: "owner/repo"}}
+
+		items := resolveCreatedItems(dir, cached)
+
+		require.Len(t, items, 1)
+		assert.Equal(t, "add_comment", items[0].Type)
+	})
+
+	t.Run("returns nil when neither manifest nor cached safe outputs are available", func(t *testing.T) {
+		dir := t.TempDir()
+		items := resolveCreatedItems(dir, nil)
+		assert.Nil(t, items)
+	})
+}
+
 func TestParseStepFilename(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -193,7 +193,7 @@ func deriveRunAgenticAnalysis(processedRun ProcessedRun, metrics LogMetrics) (*A
 	}
 
 	toolUsage := buildToolUsageInfo(metrics)
-	createdItems := extractCreatedItemsFromManifest(processedRun.Run.LogsPath)
+	createdItems := resolveCreatedItems(processedRun.Run.LogsPath, processedRun.SafeOutputs)
 	metricsData := MetricsData{
 		TokenUsage:    processedRun.Run.TokenUsage,
 		ActionMinutes: processedRun.Run.ActionMinutes,

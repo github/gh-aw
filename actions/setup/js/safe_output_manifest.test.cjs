@@ -224,6 +224,23 @@ describe("safe_output_manifest", () => {
       expect(() => JSON.parse(lines[0])).not.toThrow();
     });
 
+    it("should redact secret values even when JSON-escaped by quotes or backslashes", () => {
+      global.core = { info: () => {}, warning: () => {} };
+      process.env.GH_AW_SECRET_NAMES = "CUSTOM_TEST";
+      process.env.SECRET_CUSTOM_TEST = 'my"secret\\value';
+
+      const log = createManifestLogger(testManifestFile);
+      log({ type: "create_issue", url: "https://github.com/owner/repo/issues/1", metadata: { note: 'contains my"secret\\value here' } });
+
+      const content = fs.readFileSync(testManifestFile, "utf8");
+      expect(content).not.toContain('my\\"secret\\\\value');
+      expect(content).toContain("***REDACTED***");
+
+      delete global.core;
+      delete process.env.GH_AW_SECRET_NAMES;
+      delete process.env.SECRET_CUSTOM_TEST;
+    });
+
     it("should throw when the manifest file cannot be written", () => {
       // Create a directory where the file should be to force a write error
       fs.mkdirSync(testManifestFile, { recursive: true });
@@ -281,6 +298,25 @@ describe("safe_output_manifest", () => {
       ["linear_create_issue", { id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
     ])("should preserve identity for %s", (type, result, expected) => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
+    });
+
+    it("should infer the azure-devops provider (hyphenated) from the metadata provider, matching ADO handler naming", () => {
+      const item = extractCreatedItemFromResult("ado_add_comment", {
+        success: true,
+        number: 123,
+        metadata: { provider: "azure-devops", project: "my-project", comment_id: 5 },
+      });
+      expect(item?.provider).toBe("azure-devops");
+      expect(item?.provider).not.toBe("azure_devops");
+    });
+
+    it("should convert a scalar target (e.g. Linear issue key) into a provider-neutral object", () => {
+      const item = extractCreatedItemFromResult("linear_add_comment", {
+        success: true,
+        id: "comment-1",
+        target: "ENG-123",
+      });
+      expect(item?.target).toEqual({ provider: "linear", identifier: "ENG-123" });
     });
 
     it("should associate added labels with their target and IDs", () => {

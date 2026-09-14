@@ -305,7 +305,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 	errors := extractAuditErrors(run)
 	downloadedFiles := extractDownloadedFiles(run.LogsPath)
 	toolUsage := buildAuditToolUsage(metrics, mcpToolUsage)
-	createdItems := extractCreatedItemsFromManifest(run.LogsPath)
+	createdItems := resolveCreatedItems(run.LogsPath, processedRun.SafeOutputs)
 	taskDomain, behaviorFingerprint, agenticAssessments := buildAuditAssessments(processedRun, metricsData, toolUsage, createdItems, overview.AwContext)
 	findings, recommendations, observabilityInsights := buildAuditNarrative(processedRun, metricsData, errors, toolUsage, createdItems, agenticAssessments)
 	auditData := assembleAuditData(auditDataInputs{
@@ -653,6 +653,18 @@ func extractCreatedItemsFromManifest(logsPath string) []CreatedItemReport {
 	}
 
 	auditReportLog.Printf("Extracted %d created item(s) from manifest", len(items))
+	return items
+}
+
+// resolveCreatedItems returns created items read from the on-disk safe-output manifest
+// at logsPath, falling back to entities already carried in-memory (e.g. from a cached
+// usage/activity summary) when the manifest file is absent — such as when an
+// `--artifacts usage`-only cache is reused and the manifest was never downloaded.
+func resolveCreatedItems(logsPath string, cachedSafeOutputs []CreatedItemReport) []CreatedItemReport {
+	items := extractCreatedItemsFromManifest(logsPath)
+	if len(items) == 0 && len(cachedSafeOutputs) > 0 {
+		return cachedSafeOutputs
+	}
 	return items
 }
 

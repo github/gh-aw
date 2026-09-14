@@ -2784,6 +2784,8 @@ ${issueSafeFallbackFooter}`;
           success: true,
           number: pullRequest.number,
           url: pullRequest.html_url,
+          id: pullRequest.id,
+          metadata: { node_id: pullRequest.node_id },
           managedBody: body,
           branch_name: branchName,
           temporaryId: temporaryId,

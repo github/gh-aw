@@ -137,7 +137,7 @@ func loadAuditComparisonSnapshotFromArtifacts(run WorkflowRun, logsPath string, 
 }
 
 func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath string) auditComparisonCandidate {
-	createdItems := extractCreatedItemsFromManifest(logsPath)
+	createdItems := resolveCreatedItems(logsPath, summary.SafeOutputs)
 	posture := deriveAuditPosture(createdItems)
 
 	blockedRequests := 0
@@ -161,7 +161,7 @@ func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath stri
 func buildAuditComparisonCandidateFromProcessedRun(processedRun ProcessedRun) auditComparisonCandidate {
 	return auditComparisonCandidate{
 		Run:                 processedRun.Run,
-		Snapshot:            buildAuditComparisonSnapshot(processedRun, extractCreatedItemsFromManifest(processedRun.Run.LogsPath)),
+		Snapshot:            buildAuditComparisonSnapshot(processedRun, resolveCreatedItems(processedRun.Run.LogsPath, processedRun.SafeOutputs)),
 		TaskDomain:          processedRun.TaskDomain,
 		BehaviorFingerprint: processedRun.BehaviorFingerprint,
 	}
@@ -303,7 +303,7 @@ func sameAuditComparisonWorkflow(left WorkflowRun, right WorkflowRun) bool {
 
 func buildAuditComparisonForProcessedRuns(currentRun ProcessedRun, processedRuns []ProcessedRun) *AuditComparisonData {
 	auditComparisonLog.Printf("Building audit comparison for run %d from %d processed runs", currentRun.Run.DatabaseID, len(processedRuns))
-	currentSnapshot := buildAuditComparisonSnapshot(currentRun, extractCreatedItemsFromManifest(currentRun.Run.LogsPath))
+	currentSnapshot := buildAuditComparisonSnapshot(currentRun, resolveCreatedItems(currentRun.Run.LogsPath, currentRun.SafeOutputs))
 	candidates := make([]auditComparisonCandidate, 0, len(processedRuns))
 
 	for _, candidateRun := range processedRuns {
