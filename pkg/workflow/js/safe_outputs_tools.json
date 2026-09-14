@@ -1587,7 +1587,7 @@
   },
   {
     "name": "update_release",
-    "description": "Update an existing GitHub Release description by replacing, appending to, or prepending to the existing content. Use this to add release notes, changelogs, or additional information to an existing release. Requires a GitHub Release to already exist for the tag; a Git tag alone is not enough.",
+    "description": "Update an existing GitHub Release description by replacing, appending to, or prepending to the existing content. Use this to add release notes, changelogs, or additional information to an existing release. Requires a GitHub Release (published or draft) to already exist for the tag; a Git tag alone is not enough.",
     "inputSchema": {
       "type": "object",
       "required": ["tag", "operation", "body"],

@@ -38,8 +38,10 @@ describe("update_release", () => {
           getReleaseByTag: vi.fn(),
           updateRelease: vi.fn(),
           getRelease: vi.fn(),
+          listReleases: vi.fn(),
         },
       },
+      paginate: vi.fn().mockImplementation(async () => []),
     };
 
     mockContext = {
@@ -185,8 +187,51 @@ describe("update_release", () => {
     mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
 
     await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow(
-      "ERR_VALIDATION: No GitHub Release exists for tag 'v99.99.99' in test-owner/test-repo. A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v99.99.99, then retry."
+      "ERR_VALIDATION: No GitHub Release exists for tag 'v99.99.99' in test-owner/test-repo (checked published and draft releases). A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v99.99.99, then retry."
     );
+    expect(mockGithub.paginate).toHaveBeenCalledWith(mockGithub.rest.repos.listReleases, expect.objectContaining({ owner: "test-owner", repo: "test-repo" }), expect.any(Function));
+  });
+
+  it("should fall back to a draft release when the tag lookup 404s", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+
+    const draftRelease = {
+      id: 42,
+      tag_name: "v0.0.8",
+      draft: true,
+      body: "Draft notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/untagged-abc123",
+    };
+    mockGithub.paginate.mockImplementation(async (_method, _params, callback) => {
+      if (callback) {
+        const done = vi.fn();
+        callback({ data: [{ id: 1, tag_name: "v0.0.1" }, draftRelease] }, done);
+      }
+      return [draftRelease];
+    });
+    mockGithub.rest.repos.updateRelease.mockResolvedValue({ data: { ...draftRelease, body: "Draft notes\n\nNew notes", html_url: draftRelease.html_url } });
+
+    const result = await evalHandler({}, { tag: "v0.0.8", operation: "append", body: "New notes" });
+
+    expect(mockGithub.rest.repos.updateRelease).toHaveBeenCalledWith(expect.objectContaining({ release_id: 42 }));
+    expect(result.tag).toBe("v0.0.8");
+  });
+
+  it("should report a missing release when no draft matches either", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+    mockGithub.paginate.mockImplementation(async (_method, _params, callback) => {
+      if (callback) {
+        const done = vi.fn();
+        callback({ data: [{ id: 1, tag_name: "v0.0.1" }] }, done);
+      }
+      return [];
+    });
+
+    await expect(evalHandler({}, { tag: "v0.0.8", operation: "replace", body: "New notes" })).rejects.toThrow("ERR_VALIDATION: No GitHub Release exists for tag 'v0.0.8' in test-owner/test-repo (checked published and draft releases).");
   });
 
   it("should retry transient release lookup failures", async () => {

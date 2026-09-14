@@ -1161,7 +1161,7 @@ safe-outputs:
 
 Agent output format: `{"type": "update_release", "tag": "v1.0.0", "operation": "replace", "body": "..."}`. The `tag` field is optional for release events (inferred from context). Workflow needs read access; only the generated job receives write permissions.
 
-`update-release` requires an existing **GitHub Release** for the given tag — a Git tag alone is not enough. If no release has been published for that tag, the handler fails with a diagnostic that links directly to the release-creation page for the tag.
+`update-release` requires an existing **GitHub Release** for the given tag — a Git tag alone is not enough. Both published and draft releases are supported: if the tag only has a draft release, the handler finds and updates it automatically. If no release (published or draft) exists for that tag, the handler fails with a diagnostic that links directly to the release-creation page for the tag.
 
 ### Artifact Uploads (`upload-artifact:`)
 

@@ -19,6 +19,37 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { withRetry } = require("./error_recovery.cjs");
 
 /**
+ * Search published and draft releases for one matching the given tag.
+ * `GET /repos/{owner}/{repo}/releases/tags/{tag}` (used for the primary lookup)
+ * never returns draft releases, so a tag that only has a draft release would be
+ * misreported as missing entirely. This fallback paginates `listReleases`
+ * (which does include drafts for callers with push access) to find it before
+ * giving up.
+ * @param {typeof github} client
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} tag
+ * @returns {Promise<Object | undefined>}
+ */
+async function findDraftReleaseByTag(client, owner, repo, tag) {
+  /** @type {Object | undefined} */
+  let found;
+  await withRetry(
+    () =>
+      client.paginate(client.rest.repos.listReleases, { owner, repo, per_page: 100 }, (response, done) => {
+        const match = response.data.find(r => r.tag_name === tag);
+        if (match) {
+          found = match;
+          done();
+        }
+      }),
+    {},
+    `list releases searching for draft with tag '${tag}' in ${owner}/${repo}`
+  );
+  return found;
+}
+
+/**
  * Infer the release tag from event context or dispatch inputs.
  * @param {typeof context} ctx
  * @param {typeof github} client
@@ -121,10 +152,19 @@ async function main(config = {}) {
         const errorMessage = getErrorMessage(error);
         if (error?.status === 404 || errorMessage.includes("Not Found")) {
           const repository = `${context.repo.owner}/${context.repo.repo}`;
-          const createReleaseUrl = `${context.serverUrl}/${repository}/releases/new?tag=${encodeURIComponent(releaseTag)}`;
-          throw new Error(`${ERR_VALIDATION}: No GitHub Release exists for tag '${releaseTag}' in ${repository}. A Git tag alone is not enough; create the release at ${createReleaseUrl}, then retry.`);
+          const draftRelease = await findDraftReleaseByTag(githubClient, context.repo.owner, context.repo.repo, releaseTag);
+          if (draftRelease) {
+            core.info(`Found draft release for tag '${releaseTag}' (ID: ${draftRelease.id}); the tag-lookup endpoint does not return drafts, so listReleases was used instead.`);
+            release = draftRelease;
+          } else {
+            const createReleaseUrl = `${context.serverUrl}/${repository}/releases/new?tag=${encodeURIComponent(releaseTag)}`;
+            throw new Error(
+              `${ERR_VALIDATION}: No GitHub Release exists for tag '${releaseTag}' in ${repository} (checked published and draft releases). A Git tag alone is not enough; create the release at ${createReleaseUrl}, then retry.`
+            );
+          }
+        } else {
+          throw error;
         }
-        throw error;
       }
 
       core.info(`Found release: ${release.name || release.tag_name} (ID: ${release.id})`);
