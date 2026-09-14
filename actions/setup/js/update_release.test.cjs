@@ -234,6 +234,20 @@ describe("update_release", () => {
     await expect(evalHandler({}, { tag: "v0.0.8", operation: "replace", body: "New notes" })).rejects.toThrow("ERR_VALIDATION: No GitHub Release exists for tag 'v0.0.8' in test-owner/test-repo (checked published and draft releases).");
   });
 
+  it("should still report the missing-release diagnostic when the draft search itself fails", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+    const forbiddenError = new Error("Forbidden");
+    forbiddenError.status = 403;
+    mockGithub.paginate.mockRejectedValue(forbiddenError);
+
+    await expect(evalHandler({}, { tag: "v0.0.8", operation: "replace", body: "New notes" })).rejects.toThrow(
+      "ERR_VALIDATION: No GitHub Release exists for tag 'v0.0.8' in test-owner/test-repo (checked published and draft releases). A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v0.0.8, then retry. Draft releases could not be checked (the search itself failed, possibly due to insufficient permissions); if a draft release exists, verify the token has push access to this repository."
+    );
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not search draft releases for tag 'v0.0.8'"));
+  });
+
   it("should retry transient release lookup failures", async () => {
     vi.useFakeTimers();
     const transientError = new Error("503 Service Unavailable");

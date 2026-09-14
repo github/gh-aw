@@ -155,14 +155,24 @@ async function main(config = {}) {
         const errorMessage = getErrorMessage(error);
         if (error?.status === 404 || errorMessage.includes("Not Found")) {
           const repository = `${context.repo.owner}/${context.repo.repo}`;
-          const fallbackRelease = await findReleaseByTagIncludingDrafts(githubClient, context.repo.owner, context.repo.repo, releaseTag);
+          let fallbackRelease;
+          let fallbackSearchFailed = false;
+          try {
+            fallbackRelease = await findReleaseByTagIncludingDrafts(githubClient, context.repo.owner, context.repo.repo, releaseTag);
+          } catch (fallbackError) {
+            fallbackSearchFailed = true;
+            core.warning(`Could not search draft releases for tag '${releaseTag}' in ${repository}: ${getErrorMessage(fallbackError)}. Falling back to the standard missing-release diagnostic.`);
+          }
           if (fallbackRelease) {
             core.info(`Found release for tag '${releaseTag}' (ID: ${fallbackRelease.id}, draft: ${!!fallbackRelease.draft}) via listReleases; the tag-lookup endpoint does not return draft releases.`);
             release = fallbackRelease;
           } else {
             const createReleaseUrl = `${context.serverUrl}/${repository}/releases/new?tag=${encodeURIComponent(releaseTag)}`;
+            const permissionNote = fallbackSearchFailed
+              ? " Draft releases could not be checked (the search itself failed, possibly due to insufficient permissions); if a draft release exists, verify the token has push access to this repository."
+              : "";
             throw new Error(
-              `${ERR_VALIDATION}: No GitHub Release exists for tag '${releaseTag}' in ${repository} (checked published and draft releases). A Git tag alone is not enough; create the release at ${createReleaseUrl}, then retry.`
+              `${ERR_VALIDATION}: No GitHub Release exists for tag '${releaseTag}' in ${repository} (checked published and draft releases). A Git tag alone is not enough; create the release at ${createReleaseUrl}, then retry.${permissionNote}`
             );
           }
         } else {
