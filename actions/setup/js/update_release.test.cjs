@@ -60,6 +60,7 @@ describe("update_release", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     global.core = originalGlobals.core;
     global.github = originalGlobals.github;
     global.context = originalGlobals.context;
@@ -186,6 +187,26 @@ describe("update_release", () => {
     await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow(
       "ERR_VALIDATION: No GitHub Release exists for tag 'v99.99.99' in test-owner/test-repo. A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v99.99.99, then retry."
     );
+  });
+
+  it("should retry transient release lookup failures", async () => {
+    vi.useFakeTimers();
+    const transientError = new Error("503 Service Unavailable");
+    const mockRelease = {
+      id: 1,
+      tag_name: "v1.0.0",
+      body: "Old release notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/v1.0.0",
+    };
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValueOnce(transientError).mockResolvedValue({ data: mockRelease });
+    mockGithub.rest.repos.updateRelease.mockResolvedValue({ data: mockRelease });
+
+    const resultPromise = evalHandler({}, { tag: "v1.0.0", operation: "replace", body: "New notes" });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(mockGithub.rest.repos.getReleaseByTag).toHaveBeenCalledTimes(2);
+    expect(result.tag).toBe("v1.0.0");
   });
 
   it("should report an update API 404 as an API error", async () => {

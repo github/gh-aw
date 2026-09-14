@@ -16,6 +16,7 @@ const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
+const { withRetry } = require("./error_recovery.cjs");
 
 /**
  * Infer the release tag from event context or dispatch inputs.
@@ -105,11 +106,16 @@ async function main(config = {}) {
       core.info(`Fetching release with tag: ${releaseTag}`);
       let release;
       try {
-        const response = await githubClient.rest.repos.getReleaseByTag({
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          tag: releaseTag,
-        });
+        const response = await withRetry(
+          () =>
+            githubClient.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: releaseTag,
+            }),
+          {},
+          `get release '${releaseTag}' in ${context.repo.owner}/${context.repo.repo}`
+        );
         release = response.data;
       } catch (error) {
         const errorMessage = getErrorMessage(error);
