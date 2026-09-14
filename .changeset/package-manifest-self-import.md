@@ -2,4 +2,4 @@
 "gh-aw": patch
 ---
 
-Ignore package manifest self-imports (for example `./aw.yml` inside a nested `child/aw.yml`) with a warning instead of failing with a confusing import cycle error, so `gh aw add` still installs the package root files.
+Allow a nested package manifest to import a manifest above it (for example `../aw.yml`), bounded by the repository root, and ignore self-imports such as `./aw.yml` with a warning instead of reporting an import cycle.

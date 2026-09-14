@@ -33,7 +33,7 @@ func TestResolveRepositoryPackageManifestGraph(t *testing.T) {
 	root, _, err := parseRepositoryPackageManifest("aw.yml", []byte(manifests["aw.yml"]))
 	require.NoError(t, err)
 
-	nodes, _, err := resolveRepositoryPackageManifestGraph("aw.yml", root, func(path string) ([]byte, error) {
+	nodes, _, err := resolveRepositoryPackageManifestGraph("aw.yml", root, "", func(path string) ([]byte, error) {
 		content, ok := manifests[path]
 		if !ok {
 			return nil, os.ErrNotExist
@@ -55,7 +55,7 @@ func TestResolveRepositoryPackageManifestGraphSharedImport(t *testing.T) {
 	root, _, err := parseRepositoryPackageManifest("aw.yml", []byte(manifests["aw.yml"]))
 	require.NoError(t, err)
 
-	nodes, _, err := resolveRepositoryPackageManifestGraph("aw.yml", root, func(path string) ([]byte, error) {
+	nodes, _, err := resolveRepositoryPackageManifestGraph("aw.yml", root, "", func(path string) ([]byte, error) {
 		content, ok := manifests[path]
 		if !ok {
 			return nil, os.ErrNotExist
@@ -79,7 +79,7 @@ func TestResolveRepositoryPackageManifestGraphCycle(t *testing.T) {
 	root, _, err := parseRepositoryPackageManifest("aw.yml", []byte(manifests["aw.yml"]))
 	require.NoError(t, err)
 
-	_, _, err = resolveRepositoryPackageManifestGraph("aw.yml", root, func(path string) ([]byte, error) {
+	_, _, err = resolveRepositoryPackageManifestGraph("aw.yml", root, "", func(path string) ([]byte, error) {
 		return []byte(manifests[path]), nil
 	})
 	require.ErrorContains(t, err, "package manifest import cycle detected")
@@ -101,7 +101,7 @@ func TestReadLocalImportedManifestSymlinks(t *testing.T) {
 	internalLink := filepath.Join(realRoot, "linked")
 	require.NoError(t, os.Symlink(filepath.Dir(outsideManifest), internalLink))
 	_, err = readLocalImportedManifest(filepath.Join(realRoot, "linked", "aw.yml"), realRoot)
-	require.ErrorContains(t, err, "outside the package root")
+	require.ErrorContains(t, err, "outside the repository root")
 }
 
 func TestIsPathWithinPackageRoot(t *testing.T) {
@@ -221,7 +221,7 @@ func TestResolveRepositoryPackageManifestGraphSelfImport(t *testing.T) {
 	root, _, err := parseRepositoryPackageManifest("aw.yml", []byte(manifests["aw.yml"]))
 	require.NoError(t, err)
 
-	nodes, warnings, err := resolveRepositoryPackageManifestGraph("aw.yml", root, func(path string) ([]byte, error) {
+	nodes, warnings, err := resolveRepositoryPackageManifestGraph("aw.yml", root, "", func(path string) ([]byte, error) {
 		content, ok := manifests[path]
 		if !ok {
 			return nil, os.ErrNotExist
@@ -231,4 +231,33 @@ func TestResolveRepositoryPackageManifestGraphSelfImport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"child/aw.yml", "aw.yml"}, []string{nodes[0].Path, nodes[1].Path})
 	assert.Contains(t, warnings, `Ignoring includes entry "aw.yml" in child/aw.yml because a manifest cannot import itself`)
+}
+
+func TestResolveRepositoryPackageManifestGraphImportsManifestAbovePackage(t *testing.T) {
+	manifests := map[string]string{
+		"aw.yml":                "name: Root\nincludes:\n  - workflows/root.md\n",
+		"packages/child/aw.yml": "name: Child\nincludes:\n  - ../../aw.yml\n  - workflows/child.md\n",
+	}
+	root, _, err := parseRepositoryPackageManifest("packages/child/aw.yml", []byte(manifests["packages/child/aw.yml"]))
+	require.NoError(t, err)
+
+	nodes, _, err := resolveRepositoryPackageManifestGraph("packages/child/aw.yml", root, "", func(path string) ([]byte, error) {
+		content, ok := manifests[path]
+		if !ok {
+			return nil, os.ErrNotExist
+		}
+		return []byte(content), nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"aw.yml", "packages/child/aw.yml"}, []string{nodes[0].Path, nodes[1].Path})
+}
+
+func TestResolveRepositoryPackageManifestGraphImportOutsideRepository(t *testing.T) {
+	root, _, err := parseRepositoryPackageManifest("packages/child/aw.yml", []byte("name: Child\nincludes:\n  - ../../../aw.yml\n"))
+	require.NoError(t, err)
+
+	_, _, err = resolveRepositoryPackageManifestGraph("packages/child/aw.yml", root, "", func(path string) ([]byte, error) {
+		return nil, os.ErrNotExist
+	})
+	require.ErrorContains(t, err, `import "../../../aw.yml" resolves outside the repository root`)
 }

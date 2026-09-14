@@ -39,7 +39,9 @@ func resolveRepositoryPackage(ctx context.Context, repoSpec *RepoSpec, host stri
 	if err != nil {
 		return nil, err
 	}
-	manifestNodes, importWarnings, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, func(importPath string) ([]byte, error) {
+	// Imports are bounded by the repository root so that a nested package can import a
+	// manifest above it, for example "../aw.yml".
+	manifestNodes, importWarnings, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, "", func(importPath string) ([]byte, error) {
 		return downloadPackageFileFromGitHubForHost(ctx, owner, repo, importPath, ref, host)
 	})
 	if err != nil {

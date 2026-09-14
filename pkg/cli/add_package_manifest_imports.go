@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/gitutil"
 )
 
 type repositoryPackageManifestNode struct {
@@ -18,12 +19,12 @@ type repositoryPackageManifestNode struct {
 }
 
 type repositoryPackageManifestGraphResolver struct {
-	rootPackagePath string
-	readManifest    func(string) ([]byte, error)
-	states          map[string]uint8
-	stack           []string
-	nodes           []repositoryPackageManifestNode
-	warnings        []string
+	importRoot   string
+	readManifest func(string) ([]byte, error)
+	states       map[string]uint8
+	stack        []string
+	nodes        []repositoryPackageManifestNode
+	warnings     []string
 }
 
 func isManifestImportPath(importPath string) bool {
@@ -49,23 +50,26 @@ func cleanManifestImportPath(importPath string) (string, error) {
 	return cleaned, nil
 }
 
+// resolveRepositoryPackageManifestGraph walks the import graph of the manifest at rootPath.
+// importRoot bounds where imports may resolve: imports may reach outside the package being
+// installed, for example a nested package importing '../aw.yml', but never outside
+// importRoot. Pass the repository root ("" for repository-relative paths, an absolute
+// directory for local packages).
 func resolveRepositoryPackageManifestGraph(
 	rootPath string,
 	root *repositoryPackageManifest,
+	importRoot string,
 	readManifest func(string) ([]byte, error),
 ) ([]repositoryPackageManifestNode, []string, error) {
 	rootPath = path.Clean(filepath.ToSlash(rootPath))
-	rootPackagePath := path.Dir(rootPath)
-	if rootPackagePath == "." {
-		rootPackagePath = ""
-	}
+	importRoot = normalizeManifestImportRoot(importRoot)
 
-	addPackageManifestLog.Printf("Resolving package manifest import graph: root=%s", rootPath)
+	addPackageManifestLog.Printf("Resolving package manifest import graph: root=%s importRoot=%s", rootPath, importRoot)
 
 	resolver := &repositoryPackageManifestGraphResolver{
-		rootPackagePath: rootPackagePath,
-		readManifest:    readManifest,
-		states:          make(map[string]uint8),
+		importRoot:   importRoot,
+		readManifest: readManifest,
+		states:       make(map[string]uint8),
 	}
 	if err := resolver.visit(rootPath, root); err != nil {
 		return nil, nil, err
@@ -99,8 +103,8 @@ func (r *repositoryPackageManifestGraphResolver) visit(manifestPath string, mani
 	}
 	for _, relativeImport := range manifest.Imports {
 		importPath := path.Clean(path.Join(manifestDir, relativeImport))
-		if !isPathWithinPackageRoot(importPath, r.rootPackagePath) {
-			return fmt.Errorf("invalid Agentic Workflow manifest %q: import %q resolves outside the package root", manifestPath, relativeImport)
+		if !isPathWithinPackageRoot(importPath, r.importRoot) {
+			return fmt.Errorf("invalid Agentic Workflow manifest %q: import %q resolves outside the repository root", manifestPath, relativeImport)
 		}
 		if importPath == manifestPath {
 			addPackageManifestLog.Printf("Ignoring self-import %q in %s", relativeImport, manifestPath)
@@ -132,6 +136,19 @@ func (r *repositoryPackageManifestGraphResolver) visit(manifestPath string, mani
 	r.states[manifestPath] = 2
 	r.nodes = append(r.nodes, repositoryPackageManifestNode{Path: manifestPath, PackagePath: manifestDir, Manifest: manifest})
 	return nil
+}
+
+// normalizeManifestImportRoot converts an import boundary into the slash-separated form
+// used by manifest paths. An empty boundary means the repository root.
+func normalizeManifestImportRoot(importRoot string) string {
+	if importRoot == "" {
+		return ""
+	}
+	normalized := path.Clean(filepath.ToSlash(importRoot))
+	if normalized == "." {
+		return ""
+	}
+	return strings.TrimSuffix(normalized, "/")
 }
 
 // isPathWithinPackageRoot reports whether candidate is a manifest import path
@@ -205,19 +222,32 @@ func packageSkillFileRelativePath(skillFile resolvedPackageSkillFile) string {
 	return filepath.Base(skillFile.SourcePath)
 }
 
+// localPackageImportRoot returns the boundary for manifest imports of a local package.
+// Imports may reach outside packageDir, for example a nested package importing
+// "../aw.yml", but never outside the enclosing git repository. Packages outside a git
+// repository stay bounded by their own directory.
+func localPackageImportRoot(packageDir string) string {
+	gitRoot, err := gitutil.FindGitRootFrom(packageDir)
+	if err != nil {
+		addPackageManifestLog.Printf("No git root for package %q; bounding imports by the package directory: %v", packageDir, err)
+		return filepath.Clean(packageDir)
+	}
+	return filepath.Clean(gitRoot)
+}
+
 // readLocalImportedManifest reads an imported manifest, guarding against
-// path traversal outside packageRoot and against symbolic links that would
+// path traversal outside importRoot and against symbolic links that would
 // resolve outside it. This is a path-traversal guard, not a redirect
 // handler; on platforms where backslash is not the path separator, it
 // additionally rejects any backslash in the resolved relative path
 // (consistent with CWE-601 guidance) purely to avoid matching the
 // go/bad-redirect-check heuristic, without weakening the containment check.
-func readLocalImportedManifest(manifestPath, packageRoot string) ([]byte, error) {
+func readLocalImportedManifest(manifestPath, importRoot string) ([]byte, error) {
 	evaluatedPath, err := filepath.EvalSymlinks(manifestPath)
 	if err != nil {
 		return nil, err
 	}
-	evaluatedRoot, err := filepath.EvalSymlinks(packageRoot)
+	evaluatedRoot, err := filepath.EvalSymlinks(importRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -227,10 +257,10 @@ func readLocalImportedManifest(manifestPath, packageRoot string) ([]byte, error)
 	}
 	hasStrayBackslash := os.PathSeparator != '\\' && strings.Contains(relative, `\`)
 	if relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || hasStrayBackslash {
-		addPackageManifestLog.Printf("Rejecting imported manifest %q: resolves outside package root %q", manifestPath, packageRoot)
-		return nil, fmt.Errorf("import %q resolves outside the package root", manifestPath)
+		addPackageManifestLog.Printf("Rejecting imported manifest %q: resolves outside import root %q", manifestPath, importRoot)
+		return nil, fmt.Errorf("import %q resolves outside the repository root", manifestPath)
 	}
-	declaredRelative, err := filepath.Rel(filepath.Clean(packageRoot), filepath.Clean(manifestPath))
+	declaredRelative, err := filepath.Rel(filepath.Clean(importRoot), filepath.Clean(manifestPath))
 	if err != nil {
 		return nil, err
 	}

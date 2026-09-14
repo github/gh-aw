@@ -68,15 +68,15 @@ includes:
 ```
 
 These paths are resolved relative to the manifest that declares them and must name an
-`aw.yml` file within the top-level package root. Imports are recursive. The imported
+`aw.yml` file within the repository. A nested package may import a manifest above it (for
+example `../aw.yml`) as long as that manifest does not import the nested package back.
+Imports are recursive. The imported
 manifests' workflows, resources, skills, and agents are combined into one install list;
 metadata and `config` continue to come from the top-level manifest.
 
 An entry that resolves to the manifest declaring it (for example `./aw.yml` inside
 `child/aw.yml`) is ignored with a warning, because imports resolve relative to the manifest
-that declares them. Reaching upwards out of the package being installed (for example
-`../aw.yml`) is rejected: it either escapes the package root or, when the top-level manifest
-already imports that nested manifest, forms an import cycle.
+that declares them. Imports that reach above the repository root are rejected.
 
 `gh aw` rejects import cycles and any files that would install to the same destination,
 including case-insensitive destination clashes. A manifest that only declares imports does
