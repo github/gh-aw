@@ -1,11 +1,23 @@
 {
-  "last_updated": "2026-09-10",
+  "last_updated": "2026-09-14",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/mcp-gateway.md",
       "created": "2026-09-10",
       "status": "pending",
       "issue": "Label TOML config examples as mcpg CLI format vs gateway JSON stdin format"
+    },
+    {
+      "file": "pkg/workflow/safe_outputs_needs_validation.go",
+      "created": "2026-09-14",
+      "status": "pending",
+      "issue": "List actual valid job names in safe-outputs.needs validation error instead of a hardcoded placeholder example"
+    },
+    {
+      "file": "docs/src/content/docs/gallery/metrics-analytics.md",
+      "created": "2026-09-14",
+      "status": "pending",
+      "issue": "Add a sample JSON snapshot output example to the metrics-collector gallery doc"
     }
   ]
 }
