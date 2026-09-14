@@ -73,9 +73,10 @@ manifests' workflows, resources, skills, and agents are combined into one instal
 metadata and `config` continue to come from the top-level manifest.
 
 An entry that resolves to the manifest declaring it (for example `./aw.yml` inside
-`child/aw.yml`) is ignored with a warning. Use the top-level manifest to declare root files;
-importing the package root from a nested manifest (for example `../aw.yml`) is a cycle and
-is rejected.
+`child/aw.yml`) is ignored with a warning, because imports resolve relative to the manifest
+that declares them. Reaching upwards out of the package being installed (for example
+`../aw.yml`) is rejected: it either escapes the package root or, when the top-level manifest
+already imports that nested manifest, forms an import cycle.
 
 `gh aw` rejects import cycles and any files that would install to the same destination,
 including case-insensitive destination clashes. A manifest that only declares imports does
