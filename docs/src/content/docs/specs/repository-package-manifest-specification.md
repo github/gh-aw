@@ -125,7 +125,9 @@ package root after normalization. Absolute paths and paths that escape that root
 rejected.
 
 Imports are recursive. Implementations MUST detect import cycles and report the manifest
-path chain forming the cycle. Each manifest MUST be parsed and validated before its package
+path chain forming the cycle. An entry that resolves to the manifest declaring it (for
+example `./aw.yml`) is a self-import; implementations MUST ignore it with a warning rather
+than reporting a cycle. Each manifest MUST be parsed and validated before its package
 assets are added to a unified install list. Imported workflows, resources, skills, and
 agents MUST retain paths relative to the directory containing their manifest. Top-level
 package metadata and `config` MUST NOT be replaced by imported manifest values.

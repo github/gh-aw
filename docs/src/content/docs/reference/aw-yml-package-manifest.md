@@ -72,6 +72,11 @@ These paths are resolved relative to the manifest that declares them and must na
 manifests' workflows, resources, skills, and agents are combined into one install list;
 metadata and `config` continue to come from the top-level manifest.
 
+An entry that resolves to the manifest declaring it (for example `./aw.yml` inside
+`child/aw.yml`) is ignored with a warning. Use the top-level manifest to declare root files;
+importing the package root from a nested manifest (for example `../aw.yml`) is a cycle and
+is rejected.
+
 `gh aw` rejects import cycles and any files that would install to the same destination,
 including case-insensitive destination clashes. A manifest that only declares imports does
 not auto-discover workflows from its own directory.

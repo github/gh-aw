@@ -102,6 +102,11 @@ func (r *repositoryPackageManifestGraphResolver) visit(manifestPath string, mani
 		if !isPathWithinPackageRoot(importPath, r.rootPackagePath) {
 			return fmt.Errorf("invalid Agentic Workflow manifest %q: import %q resolves outside the package root", manifestPath, relativeImport)
 		}
+		if importPath == manifestPath {
+			addPackageManifestLog.Printf("Ignoring self-import %q in %s", relativeImport, manifestPath)
+			r.warnings = append(r.warnings, fmt.Sprintf("Ignoring includes entry %q in %s because a manifest cannot import itself", relativeImport, manifestPath))
+			continue
+		}
 		switch r.states[importPath] {
 		case 1:
 			if err := r.visit(importPath, nil); err != nil {

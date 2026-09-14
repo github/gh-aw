@@ -212,3 +212,23 @@ func writePackageTestFile(t *testing.T, root, relativePath, content string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0o755))
 	require.NoError(t, os.WriteFile(fullPath, []byte(content), 0o644))
 }
+
+func TestResolveRepositoryPackageManifestGraphSelfImport(t *testing.T) {
+	manifests := map[string]string{
+		"aw.yml":       "name: Root\nincludes:\n  - child/aw.yml\n",
+		"child/aw.yml": "name: Child\nincludes:\n  - ./aw.yml\n",
+	}
+	root, _, err := parseRepositoryPackageManifest("aw.yml", []byte(manifests["aw.yml"]))
+	require.NoError(t, err)
+
+	nodes, warnings, err := resolveRepositoryPackageManifestGraph("aw.yml", root, func(path string) ([]byte, error) {
+		content, ok := manifests[path]
+		if !ok {
+			return nil, os.ErrNotExist
+		}
+		return []byte(content), nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"child/aw.yml", "aw.yml"}, []string{nodes[0].Path, nodes[1].Path})
+	assert.Contains(t, warnings, `Ignoring includes entry "aw.yml" in child/aw.yml because a manifest cannot import itself`)
+}
