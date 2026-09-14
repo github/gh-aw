@@ -7,130 +7,132 @@ fail() {
     exit 1
 }
 
-[[ $# -eq 1 ]] || fail "usage: verify-operational-value-evaluator.sh <operational-value-evaluator.sh>"
+(( $# == 1 || $# == 2 )) || fail "usage: verify-operational-value-evaluator.sh <operational-value-evaluator.sh> [fixtures.json]"
 
 evaluator=$1
+fixtures=${2:-}
 [[ -f $evaluator ]] || fail "operational-value evaluator not found: $evaluator"
 [[ -x $evaluator ]] || fail "operational-value evaluator is not executable: $evaluator"
 command -v jq >/dev/null 2>&1 || fail "jq is required"
 bash -n "$evaluator"
 
-definition=$("$evaluator" --definition)
-printf '%s\n' "$definition" | jq -e '
-    .schemaVersion == 4
-    and .grader == "operational-value"
-    and (.repository | type == "string" and test("^[^/]+/[^/]+$"))
-    and (.workflowName | type == "string" and length > 0)
-    and (.sourcePath | type == "string" and startswith(".github/workflows/") and endswith(".md"))
-    and (.adoption.commit | type == "string" and test("^[0-9a-f]{40}$"))
-    and (.adoption.adoptedAt | type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
-    and (.operationalValue | type == "string" and length > 0)
-    and (.evidence.opportunity | type == "string" and length > 0)
-    and (.evidence.assignment | type == "string" and length > 0)
-    and (.evidence.accepted | type == "string" and length > 0)
-    and (.evidence.repositories | type == "array" and length > 0)
-    and (all(.evidence.repositories[]; type == "string" and test("^[^/]+/[^/]+$")))
-    and (.evidence.collection | type == "string" and length > 0)
-    and (.evidence.maturation | type == "string" and length > 0)
-    and (.evidence.zeroRule | type == "string" and length > 0)
-    and (.evidence.missingRule | type == "string" and length > 0)
-    and (.primaryMetric.id | type == "string" and length > 0)
-    and (.primaryMetric.formula | type == "string" and length > 0)
-    and (.primaryMetric.direction == "higher_is_better")
-    and ((.diagnosticMetrics // []) | type == "array")
-    and (all((.diagnosticMetrics // [])[];
-        (.id | type == "string" and length > 0)
-        and (.name | type == "string" and length > 0)
-        and (.formula | type == "string" and length > 0)
-        and .direction == "higher_is_better"
-        and (.aggregation == "latest" or .aggregation == "mean")))
-    and ([.primaryMetric.id] + [(.diagnosticMetrics // [])[].id] | unique | length)
-        == (1 + ((.diagnosticMetrics // []) | length))
-    and (.validationExamples | has("targetAttained") and has("targetMissed") and has("missing") and has("malformed"))
-    and (.baseline.mode == "baseline-comparable" or .baseline.mode == "attainment-only")
-    and (if .baseline.mode == "baseline-comparable" then
-        (.baseline.value | type == "number" and . >= 0 and . <= 1)
-        and (.baseline.evidenceCutoff | type == "string" and length > 0)
-        and (.baseline.provenance | type == "array" and length > 0)
-      else
-        .baseline.value == null
-        and .baseline.evidenceCutoff == null
-      end)
-' >/dev/null || fail "operational-value evaluator definition is invalid"
+max_output_bytes=$((1024 * 1024))
 
-for example_name in targetAttained targetMissed missing malformed; do
-    evidence=$(printf '%s\n' "$definition" | jq -c --arg name "$example_name" '.validationExamples[$name]')
-    result=$(printf '%s\n' "$evidence" | "$evaluator" --metric)
-    printf '%s\n' "$result" | jq -e '. == null or (type == "number" and . >= 0 and . <= 1)' >/dev/null \
-        || fail "--metric returned an invalid score for $example_name"
-    case $example_name in
-        targetAttained) target_attained=$result ;;
-        targetMissed) target_missed=$result ;;
-        missing|malformed)
-            [[ $result == null ]] || fail "--metric must return null for $example_name"
-            ;;
-    esac
-done
+validate_output() {
+    local output_file=$1
+    local context=$2
+    local output_bytes
+    local text_bytes
 
-jq -en --argjson attained "$target_attained" --argjson missed "$target_missed" \
-    '$attained != null and $missed != null and $attained > $missed' >/dev/null \
-    || fail "targetAttained must score higher than targetMissed"
+    output_bytes=$(LC_ALL=C wc -c < "$output_file" | tr -d ' ')
+    (( output_bytes <= max_output_bytes )) || fail "$context output exceeds 1 MiB"
+    text_bytes=$(LC_ALL=C tr -d '\000' < "$output_file" | LC_ALL=C wc -c | tr -d ' ')
+    (( text_bytes == output_bytes )) || fail "$context output must not contain NUL bytes"
 
-repository=$(printf '%s\n' "$definition" | jq -r '.repository')
-workflow_name=$(printf '%s\n' "$definition" | jq -r '.workflowName')
-adoption_commit=$(printf '%s\n' "$definition" | jq -r '.adoption.commit')
-created_at=$(printf '%s\n' "$definition" | jq -r '.adoption.adoptedAt')
-evidence_at=2099-01-01T00:00:00Z
-request=$(jq -cn \
-        --arg repository "$repository" \
-        --arg workflow "$workflow_name" \
-        --arg sha "$adoption_commit" \
-        --arg createdAt "$created_at" \
-        --arg evidenceAt "$evidence_at" \
-        '{
-            schemaVersion: 1,
-            run: {
-                id: "1",
-                attempt: 1,
-                repository: $repository,
-                workflow: $workflow,
-                ref: "refs/heads/main",
-                sha: $sha,
-                eventName: "workflow_dispatch",
-                createdAt: $createdAt
-            },
-            evidenceAt: $evidenceAt,
-            case: null,
-            event: {},
-            config: {verification: true}
-        }')
-grade_run=$(printf '%s\n' "$request" | "$evaluator" --grade-run)
-diagnostic_metrics=$(printf '%s\n' "$definition" | jq -c '.diagnosticMetrics // []')
-printf '%s\n' "$grade_run" | jq -e --arg evidenceAt "$evidence_at" --argjson diagnosticMetrics "$diagnostic_metrics" '
-        def timestamp:
-            type == "string"
-            and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$");
-        def epoch: sub("\\.[0-9]{3}Z$"; "Z") | fromdateiso8601;
-        type == "object"
-        and (.value == null or (.value | type == "number" and isfinite and . >= 0 and . <= 1))
-        and (.opportunityKey | type == "string" and length > 0)
-        and (.case | type == "object")
-        and (.evidenceCutoff | timestamp)
-        and (.maturesAt | timestamp)
-        and ((.evidenceCutoff | epoch) <= ($evidenceAt | epoch))
-        and ((.evidenceCutoff | epoch) <= (.maturesAt | epoch))
-        and (.provenance | type == "array")
-        and (if .value == null then true else (.provenance | length > 0) end)
-        and (all(.provenance[]; type == "object"
-            and (.repository | type == "string" and length > 0)
-            and (.kind | type == "string" and length > 0)
-            and (.ref | type == "string" and length > 0)))
-        and ((has("diagnostics") | not) or (.diagnostics | type == "object"))
-        and (all($diagnosticMetrics[];
-            .id as $id
-            | (.diagnostics[$id] == null
-                or (.diagnostics[$id] | type == "number" and isfinite and . >= 0 and . <= 1))))
-        and ((has("message") | not) or (.message | type == "string"))
-' >/dev/null || fail "--grade-run returned an invalid operational-value observation"
+    jq -se '
+        length == 1
+        and (.[0] | type == "array" and length > 0)
+        and (.[0] | all(.[];
+            type == "object"
+            and keys == ["id", "value"]
+            and (.id | type == "string" and test("[^[:space:]]"))
+            and (.value == null or (.value | type == "number" and isfinite and . >= 0 and . <= 1))))
+        and (.[0] | [.[].id] | unique | length) == (.[0] | length)
+    ' "$output_file" >/dev/null || fail "$context must print exactly one non-empty array of unique {id,value} metrics"
+}
+
+output_file=$(mktemp "${TMPDIR:-/tmp}/operational-value-output.XXXXXX")
+trap 'rm -f "$output_file"' EXIT HUP INT TERM
+
+request=$(jq -cn '{
+    schemaVersion: 1,
+    run: {
+        id: "1",
+        attempt: 1,
+        repository: "owner/repo",
+        workflow: "Verification workflow",
+        ref: "refs/heads/main",
+        sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        eventName: "workflow_dispatch"
+    },
+    event: {},
+    outputs: [],
+    config: {verification: true}
+}')
+
+if ! printf '%s\n' "$request" | "$evaluator" > "$output_file"; then
+    fail "operational-value evaluator exited unsuccessfully"
+fi
+validate_output "$output_file" "operational-value evaluator"
+
+if [[ -n $fixtures ]]; then
+    [[ -f $fixtures ]] || fail "operational-value fixtures not found: $fixtures"
+    fixture_count=$(jq -er '
+        . as $fixtures
+        | if (($fixtures | type) == "array"
+            and ($fixtures | length) >= 4
+            and all($fixtures[];
+                type == "object"
+                and keys == ["expected", "name", "request"]
+                and (.name | type == "string" and length > 0)
+                and (.request | type == "object")
+                and (.expected | type == "array"))
+            and ([$fixtures[].name] | unique | length) == ($fixtures | length)
+            and (["attained", "missed", "unavailable", "malformed"] - [$fixtures[].name] | length == 0))
+          then ($fixtures | length)
+          else error("invalid fixtures")
+          end
+    ' "$fixtures") || fail "operational-value fixtures are invalid"
+
+    fixture_index=0
+    attained_value=null
+    missed_value=null
+    unavailable_value=false
+    malformed_value=false
+    metric_ids=
+    while (( fixture_index < fixture_count )); do
+        fixture_name=$(jq -er ".[$fixture_index].name" "$fixtures")
+        fixture_request=$(jq -c ".[$fixture_index].request" "$fixtures")
+        fixture_expected=$(jq -cS ".[$fixture_index].expected" "$fixtures")
+
+        printf '%s\n' "$fixture_expected" > "$output_file"
+        validate_output "$output_file" "fixture $fixture_name expected"
+        if ! printf '%s\n' "$fixture_request" | "$evaluator" > "$output_file"; then
+            fail "operational-value evaluator exited unsuccessfully for fixture $fixture_name"
+        fi
+        validate_output "$output_file" "fixture $fixture_name"
+        fixture_actual=$(jq -cS . "$output_file")
+        [[ $fixture_actual == "$fixture_expected" ]] || fail "fixture $fixture_name output does not match expected metrics"
+        fixture_metric_ids=$(jq -c '[.[].id]' "$output_file")
+        if [[ -z $metric_ids ]]; then
+            metric_ids=$fixture_metric_ids
+        else
+            [[ $fixture_metric_ids == "$metric_ids" ]] || fail "fixture $fixture_name changes metric IDs or order"
+        fi
+
+        if ! printf '%s\n' "$fixture_request" | "$evaluator" > "$output_file"; then
+            fail "operational-value evaluator exited unsuccessfully when repeating fixture $fixture_name"
+        fi
+        repeated_actual=$(jq -cS . "$output_file")
+        [[ $repeated_actual == "$fixture_actual" ]] || fail "fixture $fixture_name is not deterministic"
+
+        if [[ $fixture_name == attained ]]; then
+            attained_value=$(jq -c '.[0].value' "$output_file")
+        elif [[ $fixture_name == missed ]]; then
+            missed_value=$(jq -c '.[0].value' "$output_file")
+        elif [[ $fixture_name == unavailable ]]; then
+            unavailable_value=$(jq -c '.[0].value' "$output_file")
+        elif [[ $fixture_name == malformed ]]; then
+            malformed_value=$(jq -c '.[0].value' "$output_file")
+        fi
+        fixture_index=$((fixture_index + 1))
+    done
+
+    jq -en --argjson attained "$attained_value" --argjson missed "$missed_value" '
+        $attained != null and $missed != null and $attained > $missed
+    ' >/dev/null || fail "attained fixture must score higher than missed fixture"
+    [[ $unavailable_value == null ]] || fail "unavailable fixture primary metric must be null"
+    [[ $malformed_value == null ]] || fail "malformed fixture primary metric must be null"
+fi
 
 printf 'verified %s\n' "$evaluator"

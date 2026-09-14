@@ -15,25 +15,30 @@ const TEST_ENV = {
   GITHUB_EVENT_NAME: "schedule",
 };
 
-function operationalValueEvaluator(output, baseline = { mode: "baseline-comparable", value: 0.25 }) {
+/** @type {(output: unknown, expectedOutputs?: any[]) => string} */
+const operationalValueEvaluator = (output, expectedOutputs = []) => {
   return `#!/usr/bin/env bash
 set -euo pipefail
-case \${1:-} in
---definition)
-cat <<'DEFINITION'
-${JSON.stringify({ schemaVersion: 4, grader: "operational-value", baseline })}
-DEFINITION
-;;
---grade-run)
-cat >/dev/null
+[[ $# -eq 0 ]]
+request=$(cat)
+printf '%s' "$request" | jq -e '
+  .schemaVersion == 1
+  and .run.id == "12345"
+  and .run.attempt == 2
+  and .run.repository == "github/gh-aw"
+  and .run.workflow == "Example"
+  and .run.ref == "refs/heads/main"
+  and .run.sha == "0123456789abcdef"
+  and .run.eventName == "schedule"
+  and .event.issue.number == 42
+  and .outputs == ${JSON.stringify(expectedOutputs)}
+  and .config.mode == "test"
+' >/dev/null
 cat <<'RESULT'
 ${JSON.stringify(output)}
 RESULT
-;;
-*) exit 1 ;;
-esac
 `;
-}
+};
 
 describe("operational_value_grader", () => {
   it("uses the gh-aw agent temp root and forwards the GitHub GraphQL URL", () => {
@@ -52,130 +57,56 @@ describe("operational_value_grader", () => {
       ref: "refs/heads/main",
       sha: "0123456789abcdef",
       eventName: "schedule",
-      createdAt: null,
     });
   });
 
-  it("returns absolute value with a secondary baseline delta", () => {
-    const output = executeOperationalValueEvaluator(
-      operationalValueEvaluator({
-        value: 0.75,
-        opportunityKey: "schedule:2026-08-23",
-        case: { key: "schedule:2026-08-23" },
-        evidenceCutoff: "2026-08-23T12:00:00Z",
-        maturesAt: "2026-08-30T12:00:00Z",
-        provenance: [{ repository: "github/gh-aw", kind: "git-commit", ref: "abc123" }],
-      }),
-      { digest: "abc" },
-      { evidenceAt: "2026-08-24T12:00:00Z", env: TEST_ENV }
-    );
-
-    expect(output.value).toBe(0.75);
-    expect(output.baselineValue).toBe(0.25);
-    expect(output.deltaFromBaseline).toBe(0.5);
-    expect(output.observation.subject).toEqual({
-      type: "workflow-run",
-      runId: "12345",
-      attempt: 2,
-      repository: "github/gh-aw",
-      workflow: "Example",
-      ref: "refs/heads/main",
-      sha: "0123456789abcdef",
-      eventName: "schedule",
-      createdAt: null,
-    });
-    expect(output.observation.mature).toBe(false);
-  });
-
-  it("caps evidence at maturation and marks mature observations", () => {
+  it("runs once without mode arguments and returns ordered metrics", () => {
     const output = executeOperationalValueEvaluator(
       operationalValueEvaluator(
-        {
-          value: 1,
-          opportunityKey: "issue:42",
-          case: { issue: 42 },
-          evidenceCutoff: "2026-08-30T12:00:00Z",
-          maturesAt: "2026-08-30T12:00:00Z",
-          provenance: [{ repository: "github/gh-aw", kind: "issue", ref: "42" }],
-        },
-        { mode: "attainment-only", value: null }
+        [
+          { id: "goal-attained", value: 0.75 },
+          { id: "evidence-available", value: null },
+        ],
+        [{ type: "noop", message: "nothing to do" }]
       ),
-      {},
-      { evidenceAt: "2026-09-01T12:00:00Z", env: TEST_ENV }
+      { digest: "abc", config: { mode: "test" } },
+      { env: TEST_ENV, event: { issue: { number: 42 } }, outputs: [{ type: "noop", message: "nothing to do" }] }
     );
 
-    expect(output.observation.mature).toBe(true);
-    expect(output.observation.evidenceCutoff).toBe("2026-08-30T12:00:00Z");
-    expect(output.baselineValue).toBeNull();
-    expect(output.deltaFromBaseline).toBeNull();
+    expect(output).toEqual([
+      { id: "goal-attained", value: 0.75 },
+      { id: "evidence-available", value: null },
+    ]);
   });
 
-  it("rejects invalid values and uncapped evidence", () => {
-    expect(() =>
-      executeOperationalValueEvaluator(
-        operationalValueEvaluator({
-          value: 2,
-          opportunityKey: "issue:42",
-          case: { issue: 42 },
-          evidenceCutoff: "2026-09-01T12:00:00Z",
-          maturesAt: "2026-08-30T12:00:00Z",
-          provenance: [],
-        }),
-        {},
-        { evidenceAt: "2026-09-01T12:00:00Z", env: TEST_ENV }
-      )
-    ).toThrow("result.value must be null or a finite number in [0,1]");
+  it.each([
+    ["empty array", [], "non-empty array"],
+    ["extra fields", [{ id: "score", value: 1, message: "no" }], "exactly id and value"],
+    [
+      "duplicate ids",
+      [
+        { id: "score", value: 1 },
+        { id: "score", value: 0 },
+      ],
+      "non-empty and unique",
+    ],
+    ["empty id", [{ id: " ", value: 1 }], "non-empty and unique"],
+    ["out-of-range value", [{ id: "score", value: 2 }], "finite numbers in [0,1]"],
+    ["string value", [{ id: "score", value: "1" }], "finite numbers in [0,1]"],
+  ])("rejects %s", (_name, output, message) => {
+    expect(() => executeOperationalValueEvaluator(operationalValueEvaluator(output), { config: { mode: "test" } }, { env: TEST_ENV, event: { issue: { number: 42 } } })).toThrow(message);
   });
 
   it("rejects invalid Bash", () => {
-    expect(() => executeOperationalValueEvaluator("#!/usr/bin/env bash\nif", {}, { evidenceAt: "2026-08-24T12:00:00Z", env: TEST_ENV })).toThrow("invalid Bash syntax");
+    expect(() => executeOperationalValueEvaluator("#!/usr/bin/env bash\nif", {}, { env: TEST_ENV })).toThrow("invalid Bash syntax");
   });
 
-  it("rejects an invalid frozen baseline", () => {
-    expect(() =>
-      executeOperationalValueEvaluator(
-        operationalValueEvaluator(
-          {
-            value: 1,
-            opportunityKey: "issue:42",
-            case: { issue: 42 },
-            evidenceCutoff: "2026-08-24T12:00:00Z",
-            maturesAt: "2026-08-30T12:00:00Z",
-            provenance: [{ repository: "github/gh-aw", kind: "issue", ref: "42" }],
-          },
-          { mode: "baseline-comparable", value: 2 }
-        ),
-        {},
-        { evidenceAt: "2026-08-24T12:00:00Z", env: TEST_ENV }
-      )
-    ).toThrow("baseline value in [0,1]");
-  });
-
-  it("supports configurable grade-run timeout with resilient timeout errors", () => {
+  it("supports a configurable evaluator timeout", () => {
     const slowEvaluator = `#!/usr/bin/env bash
 set -euo pipefail
-case \${1:-} in
---definition)
-cat <<'DEFINITION'
-${JSON.stringify({ schemaVersion: 4, grader: "operational-value", baseline: { mode: "baseline-comparable", value: 0.25 } })}
-DEFINITION
-;;
---grade-run)
 cat >/dev/null
 sleep 1
-cat <<'RESULT'
-${JSON.stringify({
-  value: 0.75,
-  opportunityKey: "schedule:2026-08-23",
-  case: { key: "schedule:2026-08-23" },
-  evidenceCutoff: "2026-08-23T12:00:00Z",
-  maturesAt: "2026-08-30T12:00:00Z",
-  provenance: [{ repository: "github/gh-aw", kind: "git-commit", ref: "abc123" }],
-})}
-RESULT
-;;
-*) exit 1 ;;
-esac
+printf '%s\n' '[{"id":"score","value":1}]'
 `;
 
     expect(() =>
@@ -183,8 +114,7 @@ esac
         slowEvaluator,
         {},
         {
-          evidenceAt: "2026-08-24T12:00:00Z",
-          env: { ...TEST_ENV, GH_AW_OPERATIONAL_VALUE_GRADE_RUN_TIMEOUT_MS: "50" },
+          env: { ...TEST_ENV, GH_AW_OPERATIONAL_VALUE_EVALUATOR_TIMEOUT_MS: "50" },
         }
       )
     ).toThrow("operational-value evaluator timed out after 50ms");

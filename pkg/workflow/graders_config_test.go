@@ -156,6 +156,26 @@ func TestParseGradersFromFrontmatter_OperationalValueGrader(t *testing.T) {
 	}
 }
 
+func TestParseGradersFromFrontmatter_InlineOperationalValueGrader(t *testing.T) {
+	var c Compiler
+	script := "#!/usr/bin/env bash\nset -euo pipefail\n"
+	cfg, err := c.parseGradersFromFrontmatter(map[string]any{
+		"graders": map[string]any{
+			"operational-value": map[string]any{"script": script},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	grader := cfg.Graders["operational-value"]
+	if grader.Script != script {
+		t.Fatalf("unexpected inline operational-value script: %q", grader.Script)
+	}
+	if grader.Run != "" {
+		t.Fatalf("inline operational-value grader must not have a run path before preparation: %q", grader.Run)
+	}
+}
+
 func TestParseGradersFromFrontmatter_OperationalValueGraderValidation(t *testing.T) {
 	var c Compiler
 	tests := []struct {
@@ -163,11 +183,11 @@ func TestParseGradersFromFrontmatter_OperationalValueGraderValidation(t *testing
 		entry   map[string]any
 		errText string
 	}{
-		{name: "missing run", entry: map[string]any{}, errText: "requires a 'run' field"},
+		{name: "missing source", entry: map[string]any{}, errText: "requires exactly one of 'run' or 'script'"},
 		{name: "path traversal", entry: map[string]any{"run": ".github/workflows/graders/../secret.sh"}, errText: "workspace-relative"},
 		{name: "absolute path", entry: map[string]any{"run": "/tmp/operational-value.sh"}, errText: "workspace-relative"},
 		{name: "wrong extension", entry: map[string]any{"run": ".github/workflows/graders/operational-value.js"}, errText: "workspace-relative"},
-		{name: "inline script", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "script": "return 1"}, errText: "cannot have an inline script"},
+		{name: "run and inline script", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "script": "#!/usr/bin/env bash\n"}, errText: "must specify exactly one of 'run' or 'script'"},
 		{name: "direction", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "direction": "lower_is_better"}, errText: "direction must be 'higher_is_better'"},
 		{name: "minimum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "min": 0.1}, errText: "range must be min: 0 and max: 1"},
 		{name: "maximum", entry: map[string]any{"run": ".github/workflows/graders/operational-value.sh", "max": 2.0}, errText: "range must be min: 0 and max: 1"},
@@ -433,6 +453,15 @@ func TestParseGradersFromFrontmatter_CustomNullRejected(t *testing.T) {
 // TestParseGradersFromFrontmatter_ScriptLengthUsesCharacters verifies limits align to character count.
 func TestParseGradersFromFrontmatter_ScriptLengthUsesCharacters(t *testing.T) {
 	var c Compiler
+	exactLimitScript := "return '" + strings.Repeat("a", 4096-len("return ''")) + "'"
+	if _, err := c.parseGradersFromFrontmatter(map[string]any{
+		"graders": map[string]any{
+			"exact-limit": map[string]any{"script": exactLimitScript},
+		},
+	}); err != nil {
+		t.Fatalf("expected script of exactly 4096 characters to pass, got: %v", err)
+	}
+
 	validMultibyteScript := "return '" + strings.Repeat("é", 1366) + "'.length"
 	if _, err := c.parseGradersFromFrontmatter(map[string]any{
 		"graders": map[string]any{
@@ -442,7 +471,7 @@ func TestParseGradersFromFrontmatter_ScriptLengthUsesCharacters(t *testing.T) {
 		t.Fatalf("expected multibyte script under 4096 characters to pass, got: %v", err)
 	}
 
-	tooLongScript := "return '" + strings.Repeat("a", 4097) + "'.length"
+	tooLongScript := exactLimitScript + "a"
 	_, err := c.parseGradersFromFrontmatter(map[string]any{
 		"graders": map[string]any{
 			"too-long": map[string]any{"script": tooLongScript},
@@ -453,6 +482,28 @@ func TestParseGradersFromFrontmatter_ScriptLengthUsesCharacters(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "maximum length of 4096 characters") {
 		t.Fatalf("expected script-length error, got: %v", err)
+	}
+}
+
+func TestParseGradersFromFrontmatter_OperationalValueScriptLengthUsesBytes(t *testing.T) {
+	var c Compiler
+	prefix := "#!/usr/bin/env bash\n#"
+	exactLimitScript := prefix + strings.Repeat("x", maxOperationalValueEvaluatorSize-len(prefix)-1) + "\n"
+	if _, err := c.parseGradersFromFrontmatter(map[string]any{
+		"graders": map[string]any{
+			"operational-value": map[string]any{"script": exactLimitScript},
+		},
+	}); err != nil {
+		t.Fatalf("expected operational-value script of exactly %d bytes to pass, got: %v", maxOperationalValueEvaluatorSize, err)
+	}
+
+	_, err := c.parseGradersFromFrontmatter(map[string]any{
+		"graders": map[string]any{
+			"operational-value": map[string]any{"script": exactLimitScript + "x"},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "maximum length of 65536 bytes") {
+		t.Fatalf("expected operational-value byte-length error, got: %v", err)
 	}
 }
 
@@ -603,6 +654,29 @@ func TestBuildGraderManifest_OperationalValueGrader(t *testing.T) {
 	}
 	if !strings.Contains(string(execSpecJSON), `"run":`) || strings.Contains(string(execSpecJSON), `"evaluator"`) {
 		t.Fatalf("expected execution spec to use run field, got %s", execSpecJSON)
+	}
+}
+
+func TestBuildGraderManifest_InlineOperationalValueGrader(t *testing.T) {
+	grader := &GraderDefinition{ID: "operational-value"}
+	grader.evaluatorContent = "#!/usr/bin/env bash\necho '[]'\n"
+	grader.evaluatorSourcePath = ".github/workflows/example.md"
+	cfg := &GradersConfig{Graders: map[string]*GraderDefinition{"operational-value": grader}}
+
+	manifest := buildGraderManifest(cfg)
+	if len(manifest.Graders) != 1 {
+		t.Fatalf("expected one grader, got %d", len(manifest.Graders))
+	}
+	entry := manifest.Graders[0]
+	if entry.Run != "" || entry.Inline != ".github/workflows/example.md" {
+		t.Fatalf("unexpected inline evaluator source: run=%q inline=%q", entry.Run, entry.Inline)
+	}
+	if entry.Digest != grader.EvaluatorDigest() {
+		t.Fatalf("expected frozen inline evaluator digest, got %q", entry.Digest)
+	}
+	execSpec := buildGraderExecSpec(cfg)
+	if len(execSpec) != 1 || execSpec[0].Run != grader.evaluatorContent || execSpec[0].Script != "" {
+		t.Fatalf("expected inline Bash to use the operational-value execution path: %+v", execSpec)
 	}
 }
 

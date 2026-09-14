@@ -3,7 +3,7 @@ title: Graders
 description: Deterministic execution and operational value metrics
 ---
 
-Graders compute deterministic metrics without LLM calls. Built-in and custom inline graders inspect post-agent execution traces. The reserved `operational-value` grader evaluates operational repository outcomes under a frozen evaluator and explicit evidence cutoff. Results are persisted in the agent artifact for downstream tools.
+Graders compute deterministic metrics without LLM calls. Built-in and custom inline graders inspect post-agent execution traces. The reserved `operational-value` grader evaluates the current run's operational outcome under a frozen evaluator. Results are persisted in the agent artifact for downstream tools.
 
 For normative requirements, see the [Graders Specification](/gh-aw/specs/graders-specification/).
 
@@ -58,53 +58,49 @@ Custom scripts must return a value and stay within 4096 characters (no `require`
 
 ## Operational value grader
 
-Configure the reserved `operational-value` grader with a repository-relative Bash evaluator:
+Configure the reserved `operational-value` grader with either inline Bash:
 
 ```aw wrap
 graders:
   operational-value:
+    name: Goal Attainment
+    description: Whether the current run attained the workflow's intended outcome
+    unit: ratio
+    direction: higher_is_better
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      request=$(cat)
+      printf '%s\n' '[{"id":"goal-attained","value":1}]'
+```
+
+or a repository-relative Bash evaluator:
+
+```aw wrap
+graders:
+  operational-value:
+    name: File Diet Decision Conformance
+    description: Whether the run requested the correct refactoring issue or noop
+    unit: ratio
+    direction: higher_is_better
     run: .github/graders/daily-file-diet-operational-value.sh
 ```
 
-The compiler freezes the evaluator bytes, records their SHA-256 digest, and expects the evaluator to return absolute operational attainment in `[0,1]` for the run's assigned case. A frozen baseline is optional metadata; when present, gh-aw derives `deltaFromBaseline` without changing the primary value.
+Specify exactly one of `script` or `run`. Give the primary metric a concise `name`, `description`, `unit`, and `direction`; its description is retained in grader artifacts. Document every emitted metric in evaluator comments so its meaning is frozen with the evaluator bytes. The compiler records the evaluator's SHA-256 digest and packages its exact bytes with the run.
 
-Each result records the run subject, operational case, evidence time, maturity, and provenance. Evaluators may query only the repositories declared by their frozen evidence contract. They receive `GH_TOKEN` with the agent job's explicitly declared permissions, but no workflow secrets, and enabling the grader does not add evidence permissions to the agent job.
+The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, `outputs`, and `config` from standard input. `outputs` contains the current run's validated safe-output requests; those requests do not prove that their GitHub mutations were applied. The evaluator writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers in `[0,1]` or `null`.
+
+Evaluators receive `GH_TOKEN` with the agent job's explicitly declared permissions, but no workflow secrets, and enabling the grader does not add evidence permissions to the agent job.
 
 Use the `operational value designer` skill (`/operational-value-designer`) to infer operational value from an agentic workflow and design and verify an operational-value evaluator.
-
-### Regrade a historical run
-
-```bash
-gh aw graders operational-value 123456789 \
-  --evidence-at 2026-08-30T12:00:00.000Z \
-  --json
-```
-
-The command downloads the original grader artifact and reuses its case, run subject, and frozen evaluator. The archived evaluator must match the digest recorded by both the original manifest and result and the evaluator at the recorded commit in the current repository checkout. Regrading emits a new observation identified by `(runId, evaluatorDigest, evidenceAt)` and never modifies the original artifact. Use `--repo [HOST/]OWNER/REPO` to select the host for the checked-out repository.
-
-### Build a historical report
-
-```bash
-gh aw graders operational-value report daily-file-diet
-```
-
-The report command discovers completed workflow runs from the evaluator's declared adoption time onward, applies the current evaluator digest to each run, and writes a structured JSON report, an SVG timeline, and a Markdown report under `reports/operational-value`. The versioned JSON is the machine-readable integration contract, and each observation has the stable identity `(repository, workflowId, runId, runAttempt, evaluatorDigest)`.
-
-Pre-grader runs do not have an archived case or event payload, so the evaluator request includes run ID, attempt, repository, workflow, ref, commit SHA, event name, creation time, and `case: null`. The evaluator must reconstruct the case from that run subject. If accepted evidence still cannot reconstruct the case, the result remains unavailable rather than being scored as zero.
-
-Mature numeric observations are cached in Monday-based UTC weekly files under the user cache directory, partitioned by repository, workflow ID, evaluator digest, and week. Independent weeks are evaluated concurrently; use `--concurrency` to control evaluator executions (default `8`). Use `--refresh` to replay every run, `--until` to set an evidence endpoint, `--cache-dir` to relocate the cache, and `--output` to relocate the report artifacts.
-
-Every run remains present in the JSON report and timeline. Weekly primary means keep only the latest observation for each repeated `opportunityKey` within that week. Evaluators may also declare normalized diagnostic metrics with `latest` or `mean` weekly aggregation; the report plots and tabulates each diagnostic independently without folding it into the primary value. The report also includes coverage, errors, frozen contract details, baseline and delta when available, and a warning that the observations do not establish causation.
-
-The SVG and Markdown files are standalone local exports, not historical storage or source fixtures. Do not commit live report output merely to retain observations. Consumers such as Central Agentic Ops should ingest the JSON contract and own their presentation. The weekly user cache speeds replay but is not authoritative; deleting it causes gh-aw to rebuild observations from target-repository run metadata and accepted evidence.
 
 ## Output files
 
 | File | Description |
 |---|---|
 | `grader_manifest.json` | Which graders were configured and their enabled state |
-| `grader_results.json` | Normalized values, status, implementation identity, and value observations |
-| `operational_value_evaluator.sh` | Exact frozen operational-value evaluator used for initial grading and historical replay |
+| `grader_results.json` | Normalized values, status, implementation identity, and ordered operational-value metrics |
+| `operational_value_evaluator.sh` | Exact frozen operational-value evaluator used for this run |
 
 All files are included in the unified `agent` artifact.
 

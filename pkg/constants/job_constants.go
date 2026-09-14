@@ -148,7 +148,7 @@ const GraderResultsFilename Filename = "grader_results.json"
 // GraderPayloadFilename is the filename of the preprocessed trace payload consumed by graders.
 const GraderPayloadFilename Filename = "grader_payload.json"
 
-// OperationalValueEvaluatorFilename is the filename of the frozen operational-value evaluator archived for replay.
+// OperationalValueEvaluatorFilename is the filename of the frozen operational-value evaluator archived with a run.
 const OperationalValueEvaluatorFilename Filename = "operational_value_evaluator.sh"
 
 // GradersDir is the subdirectory under TmpGhAwAgentDir where grader output files are written.

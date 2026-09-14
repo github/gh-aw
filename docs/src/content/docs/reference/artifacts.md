@@ -334,7 +334,7 @@ gh run download <run-id> -n agent
 gh run download <run-id> -n agent-output-fallback
 ```
 
-`gh aw audit` reports grader outcomes in its console output and includes them in the JSON report under the `graders` key (results, plus `total`, `passed`, `failed`, `error_count`, and `unavailable_count`). Use `gh aw graders operational-value <run-id>` to replay the archived operational-value evaluator at an explicit evidence cutoff.
+`gh aw audit` reports grader outcomes in its console output and includes them in the JSON report under the `graders` key (results, plus `total`, `passed`, `failed`, `error_count`, and `unavailable_count`). The artifact also retains the exact operational-value evaluator bytes used for that run.
 
 ## Naming Compatibility
 

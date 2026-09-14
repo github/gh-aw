@@ -13413,7 +13413,7 @@
       "examples": ["gpt-5.4", "claude-3-5-sonnet-20241022", "gpt-4"]
     },
     "graders": {
-      "description": "\u26a0\ufe0f Experimental. Deterministic graders for workflow-run observations. Built-in graders use execution artifacts, custom graders use inline scripts, and the operational-value grader uses a repository evaluator.",
+      "description": "\u26a0\ufe0f Experimental. Deterministic graders for workflow-run observations. Built-in graders use execution artifacts, custom graders use inline JavaScript, and the operational-value grader uses either inline Bash or a repository Bash evaluator.",
       "type": "object",
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9-]{0,63}$",
@@ -13470,13 +13470,13 @@
               "script": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 4096,
-                "description": "Custom grader JavaScript script body (trusted workflows only)."
+                "maxLength": 65536,
+                "description": "Inline script body. Custom graders use JavaScript (maximum 4096 characters); the reserved operational-value grader uses a complete Bash script with a shebang (maximum 65536 bytes)."
               },
               "run": {
                 "type": "string",
                 "pattern": "^(?:\\./)?(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+)(?:/(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+))*\\.sh$",
-                "description": "Workspace-relative or ./ workflow-local Bash script for the operational-value evaluator. Supported only for the reserved operational-value grader ID."
+                "description": "Workspace-relative or ./ workflow-local Bash script for the operational-value evaluator. Supported only for the reserved operational-value grader ID and mutually exclusive with script."
               }
             }
           }

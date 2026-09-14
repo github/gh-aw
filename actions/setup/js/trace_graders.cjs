@@ -437,6 +437,7 @@ function evaluateThreshold(value, direction, threshold) {
  * @typedef {object} GraderResult
  * @property {string} id
  * @property {string} name
+ * @property {string} [description]
  * @property {number|null} value
  * @property {string} unit
  * @property {boolean|null} passed
@@ -446,10 +447,8 @@ function evaluateThreshold(value, direction, threshold) {
  * @property {string} [message]
  * @property {string} [error]
  * @property {string} source - "builtin" | "inline" | "value"
- * @property {object} [observation]
+ * @property {{id: string, value: number|null}[]} [metrics]
  * @property {object} [diagnostics]
- * @property {number|null} [baselineValue]
- * @property {number|null} [deltaFromBaseline]
  * @property {{id: string, version: number, digest?: string}} implementation
  */
 
@@ -499,7 +498,7 @@ function buildGradersSummaryBody(results) {
  * Normalize a grader result from either built-in number or custom object return.
  * @param {string} id
  * @param {any} rawResult - number or {value, unit?, passed?, severity?, details?, message?}
- * @param {{name: string, unit: string, direction: string, threshold?: number, source: string, digest?: string}} meta
+ * @param {{name: string, description?: string, unit: string, direction: string, threshold?: number, source: string, digest?: string}} meta
  * @returns {GraderResult}
  */
 function normalizeResult(id, rawResult, meta) {
@@ -507,6 +506,7 @@ function normalizeResult(id, rawResult, meta) {
   const base = {
     id,
     name: meta.name || id,
+    ...(meta.description ? { description: meta.description } : {}),
     value: null,
     unit: meta.unit || "",
     passed: null,
@@ -529,10 +529,8 @@ function normalizeResult(id, rawResult, meta) {
     if (rawResult.details) base.details = String(rawResult.details);
     if (rawResult.message) base.message = String(rawResult.message);
     if (typeof rawResult.passed === "boolean") base.passed = rawResult.passed;
-    if (isRecord(rawResult.observation)) base.observation = deepClone(rawResult.observation);
+    if (Array.isArray(rawResult.metrics)) base.metrics = deepClone(rawResult.metrics);
     if (isRecord(rawResult.diagnostics)) base.diagnostics = deepClone(rawResult.diagnostics);
-    if (typeof rawResult.baselineValue === "number" || rawResult.baselineValue === null) base.baselineValue = rawResult.baselineValue;
-    if (typeof rawResult.deltaFromBaseline === "number" || rawResult.deltaFromBaseline === null) base.deltaFromBaseline = rawResult.deltaFromBaseline;
   } else {
     value = rawResult;
   }
@@ -660,7 +658,12 @@ function runCustomGrader(id, script, trace, meta) {
 
 function runOperationalValueGrader(id, evaluatorContent, meta, options) {
   try {
-    const rawResult = executeOperationalValueEvaluator(evaluatorContent, meta, options);
+    const metrics = executeOperationalValueEvaluator(evaluatorContent, meta, options);
+    const rawResult = {
+      value: metrics[0].value,
+      metrics,
+      ...(metrics.length > 1 ? { diagnostics: Object.fromEntries(metrics.slice(1).map(metric => [metric.id, metric.value])) } : {}),
+    };
     return normalizeResult(id, rawResult, meta);
   } catch (err) {
     const result = normalizeResult(id, null, meta);
@@ -770,15 +773,13 @@ async function main(manifestB64, execSpecB64) {
   } catch (err) {
     core.warning(`Graders: failed to write payload: ${getErrorMessage(err)}`);
   }
-  const runCreatedAt = process.env.GH_AW_RUN_CREATED_AT;
-  const operationalValueRunMetadata = runCreatedAt ? { createdAt: runCreatedAt } : undefined;
-
   // Run all graders
   /** @type {GraderResult[]} */
   const results = [];
   for (const grader of enabledGraders) {
     const meta = {
       name: grader.name || grader.id,
+      description: grader.description || "",
       unit: grader.unit || "",
       direction: grader.direction || "",
       threshold: grader.threshold,
@@ -796,7 +797,7 @@ async function main(manifestB64, execSpecB64) {
       result.status = "error";
       result.error = `grader ${grader.id} runtime error: ${operationalValueEvaluatorArchiveError}`;
     } else if (grader.source === "operational-value" && executionMap[grader.id]?.run) {
-      result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta, { runMetadata: operationalValueRunMetadata });
+      result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta, { outputs: trace.artifacts });
     } else if (executionMap[grader.id]?.script) {
       result = runCustomGrader(grader.id, executionMap[grader.id].script, trace, meta);
     } else {

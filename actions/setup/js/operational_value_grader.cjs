@@ -16,20 +16,8 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** @param {string} value @param {string} label @returns {number} */
-function parseTimestamp(value, label) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) {
-    throw new Error(`${label} must be a UTC ISO-8601 timestamp`);
-  }
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) {
-    throw new Error(`${label} must be a valid timestamp`);
-  }
-  return timestamp;
-}
-
-/** @param {NodeJS.ProcessEnv} env @param {{createdAt?: string}} [metadata] */
-function buildRunSubject(env, metadata = {}) {
+/** @param {NodeJS.ProcessEnv} env */
+function buildRunSubject(env) {
   const runId = String(env.GITHUB_RUN_ID || "");
   if (!/^\d+$/.test(runId) || runId === "0") {
     throw new Error("GITHUB_RUN_ID must identify the workflow run");
@@ -42,7 +30,6 @@ function buildRunSubject(env, metadata = {}) {
     ref: String(env.GITHUB_REF || ""),
     sha: String(env.GITHUB_SHA || ""),
     eventName: String(env.GITHUB_EVENT_NAME || ""),
-    createdAt: metadata.createdAt || null,
   };
 }
 
@@ -68,30 +55,6 @@ function safeFunctionEnv(env) {
     if (env[key]) result[key] = env[key];
   }
   return result;
-}
-
-function parseOperationalValueBaselineDefinition(rawDefinition) {
-  let definition;
-  try {
-    definition = JSON.parse(rawDefinition || "{}");
-  } catch (err) {
-    throw new Error(`operational-value evaluator returned an invalid definition: ${getErrorMessage(err)}`, { cause: err });
-  }
-  if (!isRecord(definition) || definition.schemaVersion !== 4 || definition.grader !== "operational-value" || !isRecord(definition.baseline)) {
-    throw new Error("operational-value evaluator definition must use schemaVersion 4 and grader 'operational-value'");
-  }
-  if (definition.baseline.mode === "attainment-only") {
-    if (definition.baseline.value !== null) throw new Error("attainment-only operational-value evaluators must have a null baseline value");
-    return null;
-  }
-  if (definition.baseline.mode !== "baseline-comparable") {
-    throw new Error("operational-value evaluator baseline mode must be 'baseline-comparable' or 'attainment-only'");
-  }
-  const baselineValue = definition.baseline.value;
-  if (typeof baselineValue !== "number" || !Number.isFinite(baselineValue) || baselineValue < 0 || baselineValue > 1) {
-    throw new Error("baseline-comparable operational-value evaluators require a baseline value in [0,1]");
-  }
-  return baselineValue;
 }
 
 /**
@@ -128,22 +91,20 @@ function executeEvaluatorSubprocess(bashPath, args, options) {
  * Execute and validate one trusted, frozen operational-value evaluator.
  * @param {string} evaluatorContent
  * @param {{digest?: string, config?: object}} meta
- * @param {{evidenceAt?: string, env?: NodeJS.ProcessEnv, event?: object|null, case?: object|null, runMetadata?: {createdAt?: string}, bashPath?: string}} [options]
+ * @param {{env?: NodeJS.ProcessEnv, event?: object|null, outputs?: any[], bashPath?: string}} [options]
+ * @returns {{id: string, value: number|null}[]}
  */
 function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) {
   const env = options.env || process.env;
   const syntaxCheckTimeoutMs = getSetupTimeoutMs("operationalValueSyntaxCheck", env);
-  const definitionTimeoutMs = getSetupTimeoutMs("operationalValueDefinition", env);
-  const gradeRunTimeoutMs = getSetupTimeoutMs("operationalValueGradeRun", env);
-  const evidenceAt = options.evidenceAt || new Date().toISOString();
-  const evidenceAtMs = parseTimestamp(evidenceAt, "evidenceAt");
-  const run = buildRunSubject(env, options.runMetadata);
+  const evaluatorTimeoutMs = getSetupTimeoutMs("operationalValueEvaluator", env);
+  const run = buildRunSubject(env);
+  const event = options.event === undefined ? readEventPayload(env) : options.event;
   const request = {
     schemaVersion: 1,
     run,
-    evidenceAt,
-    case: options.case || null,
-    event: options.event === undefined ? readEventPayload(env) : options.event,
+    event: isRecord(event) ? event : {},
+    outputs: Array.isArray(options.outputs) ? options.outputs : [],
     config: meta.config || {},
   };
 
@@ -163,17 +124,9 @@ function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) 
       throw new Error(`operational-value evaluator has invalid Bash syntax: ${getErrorMessage(err)}`, { cause: err });
     }
 
-    const definitionExecution = executeEvaluatorSubprocess(bashPath, [evaluatorPath, "--definition"], {
-      timeout: definitionTimeoutMs,
-      maxBuffer: OPERATIONAL_VALUE_EVALUATOR_MAX_OUTPUT,
-      env: safeFunctionEnv(env),
-      operation: "operational-value evaluator --definition",
-    });
-    const baselineValue = parseOperationalValueBaselineDefinition(definitionExecution.stdout);
-
-    const execution = executeEvaluatorSubprocess(bashPath, [evaluatorPath, "--grade-run"], {
+    const execution = executeEvaluatorSubprocess(bashPath, [evaluatorPath], {
       input: JSON.stringify(request),
-      timeout: gradeRunTimeoutMs,
+      timeout: evaluatorTimeoutMs,
       maxBuffer: OPERATIONAL_VALUE_EVALUATOR_MAX_OUTPUT,
       env: safeFunctionEnv(env),
       operation: "operational-value evaluator",
@@ -181,57 +134,27 @@ function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) 
 
     let output;
     try {
-      output = JSON.parse(execution.stdout || "{}");
+      output = JSON.parse(execution.stdout || "null");
     } catch (err) {
       throw new Error(`operational-value evaluator returned invalid JSON: ${getErrorMessage(err)}`, { cause: err });
     }
-    if (!isRecord(output)) throw new Error("operational-value evaluator output must be an object");
-    if (output.value !== null && (typeof output.value !== "number" || !Number.isFinite(output.value) || output.value < 0 || output.value > 1)) {
-      throw new Error("operational-value evaluator result.value must be null or a finite number in [0,1]");
+    if (!Array.isArray(output) || output.length === 0) {
+      throw new Error("operational-value evaluator output must be a non-empty array");
     }
-    if (!isRecord(output.case)) throw new Error("operational-value evaluator output.case must be an object");
-    if (typeof output.opportunityKey !== "string" || output.opportunityKey.trim() === "") {
-      throw new Error("operational-value evaluator opportunityKey must be a non-empty string");
-    }
-    const evidenceCutoffMs = parseTimestamp(output.evidenceCutoff, "evidenceCutoff");
-    const maturesAtMs = parseTimestamp(output.maturesAt, "maturesAt");
-    if (evidenceCutoffMs > evidenceAtMs) throw new Error("operational-value evaluator evidenceCutoff cannot follow evidenceAt");
-    if (evidenceCutoffMs > maturesAtMs) throw new Error("operational-value evaluator evidenceCutoff cannot follow maturesAt");
-    if (!Array.isArray(output.provenance) || (output.value !== null && output.provenance.length === 0)) {
-      throw new Error("operational-value evaluator must return provenance for a numeric value");
-    }
-    for (const provenance of output.provenance) {
-      if (!isRecord(provenance) || !["repository", "kind", "ref"].every(key => typeof provenance[key] === "string" && provenance[key].length > 0)) {
-        throw new Error("operational-value evaluator provenance entries require repository, kind, and ref");
+    const ids = new Set();
+    for (const metric of output) {
+      if (!isRecord(metric) || Object.keys(metric).sort().join(",") !== "id,value") {
+        throw new Error("operational-value evaluator metrics must contain exactly id and value");
       }
+      if (typeof metric.id !== "string" || metric.id.trim() === "" || ids.has(metric.id)) {
+        throw new Error("operational-value evaluator metric ids must be non-empty and unique");
+      }
+      if (metric.value !== null && (typeof metric.value !== "number" || !Number.isFinite(metric.value) || metric.value < 0 || metric.value > 1)) {
+        throw new Error("operational-value evaluator metric values must be null or finite numbers in [0,1]");
+      }
+      ids.add(metric.id);
     }
-    return {
-      value: output.value,
-      ...(typeof output.message === "string" ? { message: output.message } : {}),
-      ...(isRecord(output.diagnostics) ? { diagnostics: output.diagnostics } : {}),
-      observation: {
-        subject: {
-          type: "workflow-run",
-          runId: run.id,
-          attempt: run.attempt,
-          repository: run.repository,
-          workflow: run.workflow,
-          ref: run.ref,
-          sha: run.sha,
-          eventName: run.eventName,
-          createdAt: run.createdAt,
-        },
-        opportunityKey: output.opportunityKey,
-        evidenceAt,
-        evidenceCutoff: output.evidenceCutoff,
-        maturesAt: output.maturesAt,
-        mature: evidenceAtMs >= maturesAtMs,
-        case: output.case,
-        provenance: output.provenance,
-      },
-      baselineValue,
-      deltaFromBaseline: typeof output.value === "number" && baselineValue !== null ? output.value - baselineValue : null,
-    };
+    return output;
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -241,8 +164,6 @@ module.exports = {
   executeOperationalValueEvaluator,
   buildRunSubject,
   readEventPayload,
-  parseTimestamp,
-  parseOperationalValueBaselineDefinition,
   safeFunctionEnv,
   OPERATIONAL_VALUE_EVALUATOR_TEMP_ROOT,
   OPERATIONAL_VALUE_EVALUATOR_TIMEOUT_MS,

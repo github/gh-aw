@@ -90,6 +90,30 @@ graders:
 	}`, output.String())
 }
 
+func TestRunInlineOperationalValueGraderFromStdin(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, `---
+graders:
+  operational-value:
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      [[ $# -eq 0 ]]
+      request=$(cat)
+      value=$(printf '%s' "$request" | jq -r '.score')
+      printf '[{"id":"score","value":%s}]\n' "$value"
+---
+`)
+	var output bytes.Buffer
+	err := runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID,
+		GraderID: "operational-value",
+		Input:    bytes.NewBufferString(`{"score":0.75}`),
+		Output:   &output,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `[{"id":"score","value":0.75}]`, output.String())
+}
+
 func TestRunScriptFileGraderFromStdin(t *testing.T) {
 	workflowID := writeGraderRunWorkflow(t, `---
 graders:
@@ -101,18 +125,11 @@ graders:
 	require.NoError(t, os.MkdirAll(filepath.Join(".github", "graders"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(".github", "graders", "test-operational-value.sh"), []byte(`#!/usr/bin/env bash
 set -euo pipefail
-case "${1:-}" in
---definition)
-  printf '%s\n' '{"schemaVersion":4,"grader":"operational-value","repository":"example/repo","workflowName":"Test","sourcePath":".github/workflows/test.md","adoption":{"commit":"abc","adoptedAt":"2026-01-01T00:00:00Z"},"operationalValue":"Test direct script execution.","evidence":{"opportunity":"test","assignment":"payload","accepted":"stdin","repositories":["example/repo"],"collection":"test","maturation":"immediate","zeroRule":"none","missingRule":"null"},"primaryMetric":{"id":"score","formula":"payload score","direction":"higher_is_better"},"baseline":{"mode":"attainment-only","value":null,"evidenceCutoff":null,"provenance":[]},"validationExamples":{"sample":{"valid":true}}}'
-  ;;
---grade-run)
-  [[ "${GH_HOST:-}" == "ghe.example" ]]
-  payload=$(cat)
-  [[ "$payload" == '{"score":0.8}' ]]
-  printf '%s\n' '{"value":0.8,"source":"script-file"}'
-  ;;
-*) exit 1 ;;
-esac
+[[ $# -eq 0 ]]
+[[ "${GH_HOST:-}" == "ghe.example" ]]
+payload=$(cat)
+[[ "$payload" == '{"score":0.8}' ]]
+printf '%s\n' '[{"id":"score","value":0.8},{"id":"evidence-available","value":1}]'
 `), 0o700))
 
 	var output bytes.Buffer
@@ -124,7 +141,25 @@ esac
 		Output:   &output,
 	})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"value":0.8,"source":"script-file"}`, output.String())
+	assert.JSONEq(t, `[{"id":"score","value":0.8},{"id":"evidence-available","value":1}]`, output.String())
+}
+
+func TestRunOperationalValueGraderRejectsHistoricalPayload(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, `---
+graders:
+  operational-value:
+    script: |
+      #!/usr/bin/env bash
+      cat
+---
+`)
+	err := runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID,
+		GraderID: "operational-value",
+		RunID:    123,
+		Output:   &bytes.Buffer{},
+	})
+	require.ErrorContains(t, err, "historical replay is not supported")
 }
 
 func TestReadGraderPayloadValidation(t *testing.T) {
@@ -133,4 +168,30 @@ func TestReadGraderPayloadValidation(t *testing.T) {
 
 	_, err = parseGraderRunID("0")
 	require.ErrorContains(t, err, "positive integer")
+}
+
+func TestValidateOperationalValueEvaluatorSource(t *testing.T) {
+	valid := []byte("#!/usr/bin/env bash\nprintf '%s\\n' '[]'\n")
+	actual, err := validateOperationalValueEvaluatorSource(valid)
+	require.NoError(t, err)
+	assert.Equal(t, valid, actual)
+
+	_, err = validateOperationalValueEvaluatorSource([]byte("echo invalid\n"))
+	require.ErrorContains(t, err, "Bash shebang")
+
+	_, err = validateOperationalValueEvaluatorSource(append([]byte("#!/usr/bin/env bash\n"), bytes.Repeat([]byte("x"), maxOperationalValueEvaluatorBytes)...))
+	require.ErrorContains(t, err, "65536-byte limit")
+}
+
+func TestValidateOperationalValueMetrics(t *testing.T) {
+	require.NoError(t, validateOperationalValueMetrics([]byte(`[{"id":"primary","value":1},{"id":"diagnostic","value":null}]`)))
+
+	for _, invalid := range []string{
+		`[]`,
+		`[{"id":"score","value":1,"message":"invalid"}]`,
+		`[{"id":"score","value":1},{"id":"score","value":0}]`,
+		`[{"id":"score","value":2}]`,
+	} {
+		require.Error(t, validateOperationalValueMetrics([]byte(invalid)), invalid)
+	}
 }

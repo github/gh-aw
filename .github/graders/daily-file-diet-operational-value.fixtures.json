@@ -1,0 +1,168 @@
+[
+  {
+    "name": "attained",
+    "request": {
+      "schemaVersion": 1,
+      "run": {
+        "id": "1",
+        "attempt": 1,
+        "repository": "github/gh-aw",
+        "workflow": "Daily File Diet",
+        "ref": "refs/heads/main",
+        "sha": "e66253707f1ded80c55776708ca514d8f9448140",
+        "eventName": "schedule"
+      },
+      "event": {},
+      "outputs": [
+        {
+          "type": "create_issue",
+          "title": "Split import field extraction into focused modules",
+          "body": "### Overview\n\n`pkg/parser/import_field_extractor.go` has 1152 lines.\n\n### Refactoring Strategy\n\nSplit parsing, validation, and rendering responsibilities.\n\n<details><summary>Test Coverage Plan</summary>\n\nAdd focused tests for each module.\n\n</details>\n\n### Acceptance Criteria\n\n- [ ] Existing behavior is preserved."
+        }
+      ],
+      "config": {
+        "verification": true,
+        "subject": {
+          "path": "pkg/parser/import_field_extractor.go",
+          "lines": 1152
+        }
+      }
+    },
+    "expected": [
+      {
+        "id": "file-diet-decision-conformance",
+        "value": 1
+      },
+      {
+        "id": "largest-file-under-threshold",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "missed",
+    "request": {
+      "schemaVersion": 1,
+      "run": {
+        "id": "2",
+        "attempt": 1,
+        "repository": "github/gh-aw",
+        "workflow": "Daily File Diet",
+        "ref": "refs/heads/main",
+        "sha": "e66253707f1ded80c55776708ca514d8f9448140",
+        "eventName": "schedule"
+      },
+      "event": {},
+      "outputs": [
+        {
+          "type": "noop",
+          "message": "No refactoring needed."
+        }
+      ],
+      "config": {
+        "verification": true,
+        "subject": {
+          "path": "pkg/parser/import_field_extractor.go",
+          "lines": 1152
+        }
+      }
+    },
+    "expected": [
+      {
+        "id": "file-diet-decision-conformance",
+        "value": 0
+      },
+      {
+        "id": "largest-file-under-threshold",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "noop",
+    "request": {
+      "schemaVersion": 1,
+      "run": {
+        "id": "3",
+        "attempt": 1,
+        "repository": "github/gh-aw",
+        "workflow": "Daily File Diet",
+        "ref": "refs/heads/main",
+        "sha": "e66253707f1ded80c55776708ca514d8f9448140",
+        "eventName": "schedule"
+      },
+      "event": {},
+      "outputs": [
+        {
+          "type": "noop",
+          "message": "All files are healthy. Largest file: pkg/workflow/compiler.go (799 lines). No refactoring needed today."
+        }
+      ],
+      "config": {
+        "verification": true,
+        "subject": {
+          "path": "pkg/workflow/compiler.go",
+          "lines": 799
+        }
+      }
+    },
+    "expected": [
+      {
+        "id": "file-diet-decision-conformance",
+        "value": 1
+      },
+      {
+        "id": "largest-file-under-threshold",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "unavailable",
+    "request": {
+      "schemaVersion": 1,
+      "run": {
+        "id": "4",
+        "attempt": 1,
+        "repository": "other/repository",
+        "workflow": "Daily File Diet",
+        "ref": "refs/heads/main",
+        "sha": "e66253707f1ded80c55776708ca514d8f9448140",
+        "eventName": "schedule"
+      },
+      "event": {},
+      "outputs": [],
+      "config": {}
+    },
+    "expected": [
+      {
+        "id": "file-diet-decision-conformance",
+        "value": null
+      },
+      {
+        "id": "largest-file-under-threshold",
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "malformed",
+    "request": {
+      "schemaVersion": "one",
+      "run": {},
+      "event": [],
+      "outputs": {},
+      "config": []
+    },
+    "expected": [
+      {
+        "id": "file-diet-decision-conformance",
+        "value": null
+      },
+      {
+        "id": "largest-file-under-threshold",
+        "value": null
+      }
+    ]
+  }
+]

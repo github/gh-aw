@@ -23,7 +23,7 @@ func TestGradersCommandIntegration(t *testing.T) {
 		{
 			name:       "graders help",
 			args:       []string{"graders", "--help"},
-			wantOutput: []string{"Inspect and replay workflow graders", "operational-value", "run"},
+			wantOutput: []string{"Run workflow graders", "run"},
 		},
 		{
 			name:       "run grader help",
@@ -33,34 +33,6 @@ func TestGradersCommandIntegration(t *testing.T) {
 		{
 			name:       "run grader rejects invalid run ID",
 			args:       []string{"graders", "run", "workflow", "loops", "0"},
-			wantErr:    true,
-			wantOutput: []string{"run ID must be a positive integer"},
-		},
-		{
-			name:       "operational value help",
-			args:       []string{"graders", "operational-value", "--help"},
-			wantOutput: []string{"Regrade the operational-value observation", "report", "--evidence-at", "--repo", "--json"},
-		},
-		{
-			name:       "operational value report help",
-			args:       []string{"graders", "operational-value", "report", "--help"},
-			wantOutput: []string{"complete operational-value history", "--until", "--cache-dir", "--refresh", "--output"},
-		},
-		{
-			name:       "operational value requires run ID",
-			args:       []string{"graders", "operational-value", "--evidence-at", "2026-08-30T12:00:00.000Z"},
-			wantErr:    true,
-			wantOutput: []string{"accepts 1 arg(s)"},
-		},
-		{
-			name:       "operational value requires evidence cutoff",
-			args:       []string{"graders", "operational-value", "123456789"},
-			wantErr:    true,
-			wantOutput: []string{"required flag(s) \"evidence-at\" not set"},
-		},
-		{
-			name:       "operational value rejects invalid run ID",
-			args:       []string{"graders", "operational-value", "0", "--evidence-at", "2026-08-30T12:00:00.000Z"},
 			wantErr:    true,
 			wantOutput: []string{"run ID must be a positive integer"},
 		},

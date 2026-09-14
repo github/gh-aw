@@ -17,7 +17,7 @@ sidebar:
 
 ## Abstract
 
-This specification defines the `graders` feature in gh-aw: deterministic execution metrics and operational value observations persisted as structured artifacts. It specifies configuration, built-in grader behavior, custom inline grader constraints, operational-value grader behavior, execution ordering, artifact outputs, historical regrading, experiment metric references, and conformance requirements.
+This specification defines the `graders` feature in gh-aw: deterministic execution metrics and operational-value results persisted as structured artifacts. It specifies configuration, built-in grader behavior, custom inline grader constraints, operational-value grader behavior, execution ordering, artifact outputs, experiment metric references, and conformance requirements.
 
 ## Status of This Document
 
@@ -57,7 +57,7 @@ This specification covers:
 - Frontmatter configuration under `graders`
 - Built-in grader identifiers and semantics
 - Custom inline grader script requirements
-- Operational-value evaluator and replay requirements
+- Operational-value evaluator requirements
 - Output artifact contracts
 - Experiment metric integration for grader references
 
@@ -71,7 +71,7 @@ This specification does NOT cover:
 
 A conforming implementation:
 
-1. MUST compute grader values deterministically for the same inputs and evidence cutoff.
+1. MUST compute grader values deterministically for the same request and observable evidence.
 2. MUST preserve stable grader IDs for experiment references.
 3. MUST keep trace grading isolated from network-dependent behavior.
 4. MUST emit machine-readable grader artifacts for downstream tooling.
@@ -129,7 +129,7 @@ The configuration key MUST be `graders`.
 
 - Built-in grader entries MAY be `null` to enable defaults.
 - Custom grader entries MUST be objects and MUST include `script`.
-- The reserved `operational-value` entry MUST be an object and MUST include `run`.
+- The reserved `operational-value` entry MUST be an object and MUST include exactly one of `run` or `script`.
 
 Supported object fields include `enabled`, `name`, `description`, `unit`, `direction`, `threshold`, `min`, `max`, `config`, `script`, and `run`. Only the reserved `operational-value` grader accepts `run`.
 
@@ -186,26 +186,15 @@ Inline scripts MUST be rejected if they contain any forbidden pattern, including
 
 ## 7. Operational Value Grader
 
-The reserved grader ID MUST be `operational-value`. It MUST NOT accept an inline `script`.
+The reserved grader ID MUST be `operational-value`. It MUST define exactly one evaluator source: inline Bash in `script`, or a repository-relative Bash file in `run`.
 
-The compiler MUST resolve `run` within the repository, reject symlinks and non-regular files, validate Bash syntax prerequisites, freeze the evaluator bytes, and record their SHA-256 digest in the grader manifest and result implementation.
+The grader SHOULD declare a concise `name`, `description`, `unit`, and `direction` for its primary metric. The evaluator SHOULD document the workflow intent and every emitted metric's meaning, including `1`, `0`, and `null`, in source comments that are frozen with the evaluator bytes. The primary description MUST be retained in the grader manifest and normalized result when declared.
 
-The evaluator MUST implement `--definition` and `--grade-run`. Its primary `value` MUST be absolute operational attainment in `[0,1]` or `null`. A baseline MAY be frozen separately; gh-aw MUST derive `deltaFromBaseline` and MUST NOT replace the primary value with that delta.
+Both forms MUST be valid UTF-8, start with a Bash shebang, pass Bash syntax validation, and contain no more than 65,536 bytes. The compiler MUST resolve `run` within the repository and reject symlinks and non-regular files. It MUST freeze either source as exact evaluator bytes and record their SHA-256 digest in the grader manifest and result implementation.
 
-An operational-value observation MUST include:
+The evaluator MUST run once with no mode arguments. It MUST read one JSON request from standard input containing `schemaVersion`, `run`, `event`, `outputs`, and `config`. `outputs` MUST contain the current run's validated safe-output requests and MUST NOT be treated as proof that requested GitHub mutations were applied. The evaluator MUST write exactly one non-empty ordered array of objects containing exactly `id` and `value`. IDs MUST be non-empty and unique. Values MUST be finite numbers in `[0,1]` or `null`. The first item is the primary metric; later items are diagnostics.
 
-- the complete workflow run subject and run attempt;
-- a stable opportunity key and replayable operational case;
-- requested evidence time, effective evidence cutoff, and maturity time;
-- accepted evidence provenance for every numeric value.
-
-The effective evidence cutoff MUST NOT follow either the requested evidence time or the maturity time. A replayed observation MUST be identified by `(runId, evaluatorDigest, evidenceAt)`.
-
-Historical regrading MUST reuse the original case, run subject, and archived evaluator. It MUST verify that the archived evaluator matches the digest recorded by both the original manifest and result and the evaluator at the recorded commit in a trusted local checkout before execution. It MUST emit a new observation and MUST NOT mutate the original run artifact.
-
-A historical report MUST apply one current evaluator digest to every included run so observations remain comparable. It MUST discover completed runs no earlier than the contract's adoption time. For runs without grader artifacts, it MUST provide the available workflow run subject and a null case and event, allowing the evaluator to reconstruct assignment from accepted evidence. It MUST preserve unavailable and failed observations and MUST NOT coerce missing evidence to zero.
-
-Historical report caches MUST be partitioned by repository, workflow ID, evaluator digest, and UTC week. Only mature numeric observations MAY be treated as final cache entries. Report output MUST retain every run-level observation. Aggregates MUST NOT treat repeated opportunity keys within one week as independent observations; the latest observation for each key in that week is used for the weekly mean.
+The evaluator MUST return the same metric array for the same request and observable evidence. Missing or malformed required evidence MUST produce `null`, not zero. Historical replay, maturation, baselines, opportunity keys, evaluator definitions, provenance schemas, caches, and reports are outside this contract.
 
 ---
 
@@ -275,7 +264,6 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 - Grading MUST operate on local run artifacts and MUST NOT require outbound network access for built-ins.
 - Custom inline graders MUST execute in a restricted context with blocked dangerous primitives.
 - Operational-value graders MAY access declared repository evidence using `GH_TOKEN`; implementations MUST NOT add agent-job permission scopes on behalf of the evaluator, and evaluators MUST NOT receive workflow secrets.
-- Historical regrading MUST verify archived evaluator bytes against both digest records and a trusted local checkout at the recorded commit before execution.
 - Implementations SHOULD enforce bounded execution time for inline scripts.
 - Implementations SHOULD redact grader outputs when custom scripts are enabled to reduce secret leakage risk.
 
@@ -296,9 +284,9 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 - **T-GRD-009**: Grader files are present in `agent` artifact.
 - **T-GRD-010**: `experiments.*.metric` with `grader:<id>` validates declared enabled grader.
 - **T-GRD-011**: `experiments.*.metric` with `graders.<id>.value` validates declared enabled grader.
-- **T-GRD-012**: `graders.operational-value.run` is frozen and its digest is recorded.
-- **T-GRD-013**: Operational-value output, evidence cutoff, maturity, and provenance are validated.
-- **T-GRD-014**: Historical regrading rejects evaluator or run identity mismatches.
+- **T-GRD-012**: Each operational-value evaluator source is frozen and its digest is recorded.
+- **T-GRD-013**: Operational-value metric arrays, IDs, values, and ordering are validated.
+- **T-GRD-014**: Operational-value `script` and `run` enforce the inclusive 65,536-byte limit.
 
 ### 11.2 Compliance Checklist
 
@@ -310,8 +298,7 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 | Script safety constraints enforced | T-GRD-004, T-GRD-005 | 2 | Required |
 | Required artifact files emitted | T-GRD-007, T-GRD-008 | 1 | Required |
 | Experiment grader references validate | T-GRD-010, T-GRD-011 | 3 | Required |
-| Operational-value evaluators and observations validate | T-GRD-012, T-GRD-013 | 2 | Required |
-| Historical regrading preserves identity | T-GRD-014 | 2 | Required |
+| Operational-value evaluators and metric arrays validate | T-GRD-012, T-GRD-013, T-GRD-014 | 2 | Required |
 
 ---
 
@@ -345,7 +332,7 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 ### Version 0.2.0 (Draft Specification)
 
 - Defines the operational value grader and absolute attainment semantics.
-- Defines evidence-bounded historical regrading and observation identity.
+- Defines frozen one-shot operational-value evaluators and their metric-array contract.
 
 ### Version 0.1.0 (Draft Specification)
 

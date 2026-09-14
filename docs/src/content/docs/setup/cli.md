@@ -587,20 +587,20 @@ The diff output shows: new or removed network domains, status changes (allowed â
 
 #### `graders`
 
-Inspect and replay workflow graders. `graders run` runs one grader declared by a
-local workflow against a saved run payload or JSON from standard input.
-`graders operational-value` regrades the operational-value observation from a
-completed workflow run at an explicit evidence cutoff. It verifies and executes
-the evaluator archived by the run without modifying the original artifact.
+Run one grader declared by a local workflow against a saved run payload or JSON
+from standard input. Operational-value evaluators use the same one-shot request
+shape as workflow execution and return an ordered metric array. The command
+executes either Bash embedded in `graders.operational-value.script` or a Bash
+file referenced by `graders.operational-value.run`; operational-value graders
+require standard input because historical replay is not supported.
 
 ```bash wrap
 gh aw graders run weekly-research loops 123456789
 cat payload.json | gh aw graders run weekly-research loops
-gh aw graders operational-value 123456789 \
-  --evidence-at 2026-08-30T12:00:00.000Z --json
+cat request.json | gh aw graders run daily-file-diet operational-value
 ```
 
-**Options:** `--evidence-at` (required), `--json/-j`, `--repo/-r`
+**Options:** `--repo/-r`
 
 #### `outcomes`
 

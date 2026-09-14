@@ -3,9 +3,12 @@
 package workflow
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -106,6 +109,62 @@ experiments:
 	require.Len(t, execEntries, 1)
 	assert.Equal(t, "custom-score", execEntries[0].ID)
 	assert.Contains(t, execEntries[0].Script, "helpers.clamp")
+}
+
+func TestGradersWorkflowIntegration_InlineOperationalValue(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "graders-inline-operational-value")
+	gitInit := exec.Command("git", "-C", tmpDir, "init")
+	output, err := gitInit.CombinedOutput()
+	require.NoErrorf(t, err, "git init should succeed: %s", output)
+	workflowPath := filepath.Join(tmpDir, "workflow.md")
+	evaluator := "#!/usr/bin/env bash\nset -euo pipefail\nrequest=$(cat)\nprintf '%s\\n' '[{\"id\":\"goal-attained\",\"value\":1}]'\n"
+
+	content := `---
+on: workflow_dispatch
+engine: copilot
+strict: false
+permissions:
+  contents: read
+graders:
+  operational-value:
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      request=$(cat)
+      printf '%s\n' '[{"id":"goal-attained","value":1}]'
+---
+
+# Inline operational value
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o644))
+
+	compiler := NewCompiler(WithVersion("dev"))
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+
+	compiled, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	require.NoError(t, err)
+	match := regexp.MustCompile(`await main\('([^']+)', '([^']+)'\);`).FindStringSubmatch(string(compiled))
+	require.Len(t, match, 3, "expected encoded manifest and exec spec in generated script")
+
+	manifestJSON, err := base64.StdEncoding.DecodeString(match[1])
+	require.NoError(t, err)
+	var manifest graderManifest
+	require.NoError(t, json.Unmarshal(manifestJSON, &manifest))
+	require.Len(t, manifest.Graders, 1)
+	entry := manifest.Graders[0]
+	assert.Equal(t, "operational-value", entry.ID)
+	assert.Equal(t, "operational-value", entry.Source)
+	assert.Empty(t, entry.Run)
+	assert.Equal(t, "workflow.md", entry.Inline)
+	assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256([]byte(evaluator))), entry.Digest)
+
+	execJSON, err := base64.StdEncoding.DecodeString(match[2])
+	require.NoError(t, err)
+	var execEntries []graderExecEntry
+	require.NoError(t, json.Unmarshal(execJSON, &execEntries))
+	require.Len(t, execEntries, 1)
+	assert.Equal(t, evaluator, execEntries[0].Run)
+	assert.Empty(t, execEntries[0].Script)
 }
 
 func TestGradersWorkflowIntegration_SchemaRejectsUnknownGraderField(t *testing.T) {

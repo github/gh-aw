@@ -23,13 +23,28 @@ func (c *Compiler) prepareOperationalValueGrader(data *WorkflowData, markdownPat
 	if !ok || (grader.Enabled != nil && !*grader.Enabled) {
 		return nil
 	}
-	if grader.Run == "" {
-		return errors.New("graders.operational-value requires a 'run' field")
+	if grader.Run == "" && grader.Script == "" {
+		return errors.New("graders.operational-value requires exactly one of 'run' or 'script'")
+	}
+	if grader.Run != "" && grader.Script != "" {
+		return errors.New("graders.operational-value must specify exactly one of 'run' or 'script'")
 	}
 
 	repoRoot, err := gitutil.FindGitRootFrom(filepath.Dir(markdownPath))
 	if err != nil {
-		return fmt.Errorf("cannot resolve graders.operational-value.run %q: workflow is not inside a Git repository", grader.Run)
+		return errors.New("cannot prepare graders.operational-value: workflow is not inside a Git repository")
+	}
+	if grader.Script != "" {
+		if err := validateOperationalValueEvaluatorContent(grader.Script); err != nil {
+			return fmt.Errorf("graders.operational-value.script %w", err)
+		}
+		relativeWorkflowPath, err := filepath.Rel(repoRoot, markdownPath)
+		if err != nil {
+			return fmt.Errorf("cannot resolve inline operational-value workflow source: %w", err)
+		}
+		grader.evaluatorSourcePath = filepath.ToSlash(relativeWorkflowPath)
+		grader.evaluatorContent = grader.Script
+		return nil
 	}
 	evaluatorPath := ResolveOperationalValueEvaluatorPath(repoRoot, markdownPath, grader.Run)
 	if err := fileutil.ValidatePathWithinBase(repoRoot, evaluatorPath); err != nil {
@@ -71,14 +86,24 @@ func (c *Compiler) prepareOperationalValueGrader(data *WorkflowData, markdownPat
 		return fmt.Errorf("graders.operational-value.run %q must be valid UTF-8", grader.Run)
 	}
 	evaluatorContent := string(content)
-	if !strings.HasPrefix(evaluatorContent, "#!/usr/bin/env bash\n") && !strings.HasPrefix(evaluatorContent, "#!/bin/bash\n") {
-		return fmt.Errorf("graders.operational-value.run %q must start with a Bash shebang", grader.Run)
-	}
-	if err := validateOperationalValueEvaluatorBash(evaluatorContent); err != nil {
-		return fmt.Errorf("graders.operational-value.run %q has invalid Bash syntax: %w", grader.Run, err)
+	if err := validateOperationalValueEvaluatorContent(evaluatorContent); err != nil {
+		return fmt.Errorf("graders.operational-value.run %q %w", grader.Run, err)
 	}
 
 	grader.evaluatorContent = evaluatorContent
+	return nil
+}
+
+func validateOperationalValueEvaluatorContent(evaluatorContent string) error {
+	if len(evaluatorContent) > maxOperationalValueEvaluatorSize {
+		return fmt.Errorf("exceeds the %d-byte limit", maxOperationalValueEvaluatorSize)
+	}
+	if !strings.HasPrefix(evaluatorContent, "#!/usr/bin/env bash\n") && !strings.HasPrefix(evaluatorContent, "#!/bin/bash\n") {
+		return errors.New("must start with a Bash shebang")
+	}
+	if err := validateOperationalValueEvaluatorBash(evaluatorContent); err != nil {
+		return fmt.Errorf("has invalid Bash syntax: %w", err)
+	}
 	return nil
 }
 

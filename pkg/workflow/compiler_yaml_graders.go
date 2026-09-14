@@ -96,6 +96,7 @@ type graderManifestEntry struct {
 	Min         *float64       `json:"min,omitempty"`
 	Digest      string         `json:"digest,omitempty"` // SHA-256 of inline script or operational-value evaluator
 	Run         string         `json:"run,omitempty"`
+	Inline      string         `json:"inline,omitempty"`
 	Config      map[string]any `json:"config,omitempty"`
 }
 
@@ -165,6 +166,7 @@ func buildGraderManifest(cfg *GradersConfig) *graderManifest { //nolint:largefun
 			Min:         g.Min,
 			Digest:      digest,
 			Run:         g.Run,
+			Inline:      g.evaluatorSourcePath,
 			Config:      g.Config,
 		})
 	}
