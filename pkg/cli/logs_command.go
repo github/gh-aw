@@ -94,7 +94,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs --json                    # JSON format (compact by default, use -v for full)
   %[1]s logs --json -v                 # Full JSON with audit metadata
   %[1]s logs --cached-jsonl logs.jsonl # Reuse matching records and append new results immediately
-  %[1]s logs --cached-logs logs-*      # Reuse logs-*.jsonl files and write new data to a unique logs-*.jsonl file
+  %[1]s logs --cached-logs 'logs-*'    # Reuse logs-*.jsonl files and write new data to a unique logs-*.jsonl file
   %[1]s logs --format tsv              # Tab-separated (minimal, raw data)
   %[1]s logs --format console          # Decorated console tables (human-friendly)
   %[1]s logs --format markdown         # Cross-run security audit report (Markdown)
@@ -155,9 +155,9 @@ Use --artifacts all to download all artifacts, or specify individual sets such a
 Use --cached-jsonl (or --cached-logs) to reuse matching run records without downloading and processing their
 artifacts again. New results are appended immediately as JSON Lines. When a date range is specified,
 cached run records outside that range are removed after collection; other record types are retained.
-Pass a trailing wildcard prefix such as --cached-logs logs-* to load all matching .jsonl files
+Pass a trailing wildcard prefix such as --cached-logs 'logs-*' to load all matching .jsonl files
 and write new records to a unique .jsonl file with the same prefix. In wildcard mode,
-cached files with no run records in the requested date range are deleted.
+cached files containing exclusively dated run records outside the requested range are deleted.
 Aggregate analysis may be approximate when compact cached records omit detailed data.
 
 All available artifact sets: %s.
@@ -642,7 +642,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
 	logsCmd.Flags().String("cached-jsonl", "", "Path to cached logs JSONL to reuse, append new results, and retain runs in the requested date range")
-	logsCmd.Flags().String("cached-logs", "", "Alias for --cached-jsonl; supports trailing wildcard prefixes such as logs-*")
+	logsCmd.Flags().String("cached-logs", "", "Alias for --cached-jsonl; supports trailing wildcard prefixes such as 'logs-*'")
 	logsCmd.Flags().Int("last", 0, "Alias for --count/-c: number of recent runs to download")
 	logsCmd.Flags().StringSlice("artifacts", []string{"info"}, "Artifact sets to download (default: info — compact workflow metadata). Use 'all' for everything, or comma-separate sets. Valid sets: "+validArtifactSets)
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")

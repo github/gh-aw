@@ -517,7 +517,7 @@ When multiple targets run concurrently, `--count` limits the combined number of 
 
 `--cached-jsonl` and its `--cached-logs` alias reuse compatible, schema-versioned run records and workflow-run discovery responses. They write exactly one JSON value per line, appending every complete `gh run list` payload before downloading artifacts and available GitHub API rate-limit reports after collection. Each enriched `run` record includes job execution data, sanitized MCP tool-call metadata, and available engine, model, runtime, and component versions for downstream dashboards. Raw tool errors, arguments, responses, and artifact bodies are excluded. Discovered runs therefore remain available when a timeout or API limit interrupts processing. Records from incompatible schema versions are ignored. Use `gh aw json-schema logs-jsonl` to generate the schema for each JSON Lines item.
 
-Pass a trailing wildcard prefix such as `--cached-logs logs-*` to load all matching `logs-*.jsonl` files as the starting cache and write newly downloaded data to a unique `logs-<unix-time>-<random>.jsonl` file. With `--start-date` or `--end-date`, wildcard cache files that contain no in-range run records are deleted.
+Pass a trailing wildcard prefix such as `--cached-logs 'logs-*'` to load all matching `logs-*.jsonl` files as the starting cache and write newly downloaded data to a unique `logs-<unix-time>-<random>.jsonl` file. With `--start-date` or `--end-date`, wildcard cache files containing exclusively dated run records outside the requested range are deleted.
 
 #### `audit`
 
