@@ -179,9 +179,26 @@ describe("update_release", () => {
   });
 
   it("should handle release not found error", async () => {
-    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(new Error("Not Found"));
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
 
-    await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow("Release with tag 'v99.99.99' not found");
+    await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow(
+      "ERR_VALIDATION: No GitHub Release exists for tag 'v99.99.99' in test-owner/test-repo. A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v99.99.99, then retry."
+    );
+  });
+
+  it("should report an update API 404 as an API error", async () => {
+    const mockRelease = {
+      id: 1,
+      tag_name: "v1.0.0",
+      body: "Old release notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/v1.0.0",
+    };
+    mockGithub.rest.repos.getReleaseByTag.mockResolvedValue({ data: mockRelease });
+    mockGithub.rest.repos.updateRelease.mockRejectedValue(new Error("Not Found"));
+
+    await expect(evalHandler({}, { tag: "v1.0.0", operation: "replace", body: "New notes" })).rejects.toThrow("ERR_API: Failed to update release with tag v1.0.0: Not Found");
   });
 
   it("should wrap generic API errors with ERR_API prefix", async () => {

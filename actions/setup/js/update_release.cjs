@@ -103,11 +103,23 @@ async function main(config = {}) {
       }
 
       core.info(`Fetching release with tag: ${releaseTag}`);
-      const { data: release } = await githubClient.rest.repos.getReleaseByTag({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        tag: releaseTag,
-      });
+      let release;
+      try {
+        const response = await githubClient.rest.repos.getReleaseByTag({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          tag: releaseTag,
+        });
+        release = response.data;
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        if (error?.status === 404 || errorMessage.includes("Not Found")) {
+          const repository = `${context.repo.owner}/${context.repo.repo}`;
+          const createReleaseUrl = `${context.serverUrl}/${repository}/releases/new?tag=${encodeURIComponent(releaseTag)}`;
+          throw new Error(`${ERR_VALIDATION}: No GitHub Release exists for tag '${releaseTag}' in ${repository}. A Git tag alone is not enough; create the release at ${createReleaseUrl}, then retry.`);
+        }
+        throw error;
+      }
 
       core.info(`Found release: ${release.name || release.tag_name} (ID: ${release.id})`);
 
@@ -143,10 +155,6 @@ async function main(config = {}) {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const tagInfo = message.tag || "inferred from context";
-
-      if (errorMessage.includes("Not Found")) {
-        throw new Error(`${ERR_VALIDATION}: Release with tag '${tagInfo}' not found. Please ensure the tag exists.`);
-      }
 
       if (errorMessage.startsWith(`${ERR_CONFIG}:`)) {
         throw new Error(`${ERR_CONFIG}: ${errorMessage.slice(ERR_CONFIG.length + 2)}`);
