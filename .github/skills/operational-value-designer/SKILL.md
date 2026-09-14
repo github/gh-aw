@@ -254,9 +254,12 @@ Input:
     "eventName": "issues"
   },
   "event": {},
+  "outputs": [],
   "config": {}
 }
 ```
+
+`outputs` contains the current run's validated safe-output requests from `agent_output.json`. Treat them as requested actions, not proof that the corresponding GitHub mutations were applied.
 
 Output:
 

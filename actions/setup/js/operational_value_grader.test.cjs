@@ -15,7 +15,8 @@ const TEST_ENV = {
   GITHUB_EVENT_NAME: "schedule",
 };
 
-function operationalValueEvaluator(output) {
+/** @type {(output: unknown, expectedOutputs?: any[]) => string} */
+const operationalValueEvaluator = (output, expectedOutputs = []) => {
   return `#!/usr/bin/env bash
 set -euo pipefail
 [[ $# -eq 0 ]]
@@ -30,13 +31,14 @@ printf '%s' "$request" | jq -e '
   and .run.sha == "0123456789abcdef"
   and .run.eventName == "schedule"
   and .event.issue.number == 42
+  and .outputs == ${JSON.stringify(expectedOutputs)}
   and .config.mode == "test"
 ' >/dev/null
 cat <<'RESULT'
 ${JSON.stringify(output)}
 RESULT
 `;
-}
+};
 
 describe("operational_value_grader", () => {
   it("uses the gh-aw agent temp root and forwards the GitHub GraphQL URL", () => {
@@ -60,12 +62,15 @@ describe("operational_value_grader", () => {
 
   it("runs once without mode arguments and returns ordered metrics", () => {
     const output = executeOperationalValueEvaluator(
-      operationalValueEvaluator([
-        { id: "goal-attained", value: 0.75 },
-        { id: "evidence-available", value: null },
-      ]),
+      operationalValueEvaluator(
+        [
+          { id: "goal-attained", value: 0.75 },
+          { id: "evidence-available", value: null },
+        ],
+        [{ type: "noop", message: "nothing to do" }]
+      ),
       { digest: "abc", config: { mode: "test" } },
-      { env: TEST_ENV, event: { issue: { number: 42 } } }
+      { env: TEST_ENV, event: { issue: { number: 42 } }, outputs: [{ type: "noop", message: "nothing to do" }] }
     );
 
     expect(output).toEqual([

@@ -91,7 +91,7 @@ function executeEvaluatorSubprocess(bashPath, args, options) {
  * Execute and validate one trusted, frozen operational-value evaluator.
  * @param {string} evaluatorContent
  * @param {{digest?: string, config?: object}} meta
- * @param {{env?: NodeJS.ProcessEnv, event?: object|null, bashPath?: string}} [options]
+ * @param {{env?: NodeJS.ProcessEnv, event?: object|null, outputs?: any[], bashPath?: string}} [options]
  * @returns {{id: string, value: number|null}[]}
  */
 function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) {
@@ -104,6 +104,7 @@ function executeOperationalValueEvaluator(evaluatorContent, meta, options = {}) 
     schemaVersion: 1,
     run,
     event: isRecord(event) ? event : {},
+    outputs: Array.isArray(options.outputs) ? options.outputs : [],
     config: meta.config || {},
   };
 

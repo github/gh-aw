@@ -32,7 +32,7 @@ func (c *Compiler) prepareOperationalValueGrader(data *WorkflowData, markdownPat
 
 	repoRoot, err := gitutil.FindGitRootFrom(filepath.Dir(markdownPath))
 	if err != nil {
-		return fmt.Errorf("cannot prepare graders.operational-value: workflow is not inside a Git repository")
+		return errors.New("cannot prepare graders.operational-value: workflow is not inside a Git repository")
 	}
 	if grader.Script != "" {
 		if err := validateOperationalValueEvaluatorContent(grader.Script); err != nil {

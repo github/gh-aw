@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -396,15 +397,15 @@ func runOperationalValueEvaluatorBash(ctx context.Context, evaluatorPath string,
 }
 
 func operationalValueEvaluatorEnvironment(environ []string, evaluatorHost string) []string {
-	allowed := map[string]bool{
-		"PATH": true, "HOME": true, "TMPDIR": true, "TEMP": true, "TMP": true,
-		"SystemRoot": true, "ComSpec": true, "GH_TOKEN": true, "GH_HOST": true,
-		"GITHUB_API_URL": true, "GITHUB_GRAPHQL_URL": true, "GITHUB_SERVER_URL": true,
+	allowed := map[string]struct{}{
+		"PATH": {}, "HOME": {}, "TMPDIR": {}, "TEMP": {}, "TMP": {},
+		"SystemRoot": {}, "ComSpec": {}, "GH_TOKEN": {}, "GH_HOST": {},
+		"GITHUB_API_URL": {}, "GITHUB_GRAPHQL_URL": {}, "GITHUB_SERVER_URL": {},
 	}
 	values := make(map[string]string)
 	for _, entry := range environ {
 		key, value, ok := strings.Cut(entry, "=")
-		if ok && allowed[key] {
+		if _, allowedKey := allowed[key]; ok && allowedKey {
 			values[key] = value
 		}
 	}
@@ -417,8 +418,12 @@ func operationalValueEvaluatorEnvironment(environ []string, evaluatorHost string
 			values["GITHUB_API_URL"] = "https://api.github.com"
 			values["GITHUB_GRAPHQL_URL"] = "https://api.github.com/graphql"
 		} else {
-			values["GITHUB_API_URL"] = serverURL + "/api/v3"
-			values["GITHUB_GRAPHQL_URL"] = serverURL + "/api/graphql"
+			apiURL := *hostURL
+			apiURL.Path = path.Join(apiURL.Path, "api/v3")
+			graphqlURL := *hostURL
+			graphqlURL.Path = path.Join(graphqlURL.Path, "api/graphql")
+			values["GITHUB_API_URL"] = apiURL.String()
+			values["GITHUB_GRAPHQL_URL"] = graphqlURL.String()
 		}
 	}
 	result := make([]string, 0, len(values))

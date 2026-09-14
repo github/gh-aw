@@ -794,7 +794,7 @@ async function main(manifestB64, execSpecB64) {
       result.status = "error";
       result.error = `grader ${grader.id} runtime error: ${operationalValueEvaluatorArchiveError}`;
     } else if (grader.source === "operational-value" && executionMap[grader.id]?.run) {
-      result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta);
+      result = runOperationalValueGrader(grader.id, executionMap[grader.id].run, meta, { outputs: trace.artifacts });
     } else if (executionMap[grader.id]?.script) {
       result = runCustomGrader(grader.id, executionMap[grader.id].script, trace, meta);
     } else {

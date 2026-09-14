@@ -3,7 +3,7 @@ title: Graders
 description: Deterministic execution and operational value metrics
 ---
 
-Graders compute deterministic metrics without LLM calls. Built-in and custom inline graders inspect post-agent execution traces. The reserved `operational-value` grader evaluates operational repository outcomes under a frozen evaluator and explicit evidence cutoff. Results are persisted in the agent artifact for downstream tools.
+Graders compute deterministic metrics without LLM calls. Built-in and custom inline graders inspect post-agent execution traces. The reserved `operational-value` grader evaluates the current run's operational outcome under a frozen evaluator. Results are persisted in the agent artifact for downstream tools.
 
 For normative requirements, see the [Graders Specification](/gh-aw/specs/graders-specification/).
 
@@ -80,7 +80,7 @@ graders:
 
 Specify exactly one of `script` or `run`. The compiler freezes the evaluator bytes, records their SHA-256 digest, and packages them with the run. Inline Bash is verified against the workflow Markdown at the run commit; file-backed Bash is verified against its file at that commit.
 
-The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, and `config` from standard input and writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers in `[0,1]` or `null`.
+The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, `outputs`, and `config` from standard input. `outputs` contains the current run's validated safe-output requests; those requests do not prove that their GitHub mutations were applied. The evaluator writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers in `[0,1]` or `null`.
 
 Evaluators receive `GH_TOKEN` with the agent job's explicitly declared permissions, but no workflow secrets, and enabling the grader does not add evidence permissions to the agent job.
 
