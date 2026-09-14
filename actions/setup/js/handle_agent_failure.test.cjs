@@ -3562,6 +3562,61 @@ describe("handle_agent_failure", () => {
   // buildModelNotSupportedErrorContext
   // ──────────────────────────────────────────────────────
 
+  describe("buildCopilotOrgBillingErrorContext", () => {
+    let buildCopilotOrgBillingErrorContext;
+    let detectCopilotOrgBillingErrorFromLog;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    let tmpDir;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-copilot-org-billing-"));
+      const promptsDir = path.join(tmpDir, "gh-aw", "prompts");
+      fs.mkdirSync(promptsDir, { recursive: true });
+      fs.copyFileSync(path.join(runtimePromptsDir, "copilot_org_billing_error.md"), path.join(promptsDir, "copilot_org_billing_error.md"));
+      process.env.RUNNER_TEMP = tmpDir;
+      ({ buildCopilotOrgBillingErrorContext, detectCopilotOrgBillingErrorFromLog } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.RUNNER_TEMP;
+      delete process.env.GH_AW_ENGINE_ID;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("returns billing and PAT guidance for a detected organization-billed failure", () => {
+      const result = buildCopilotOrgBillingErrorContext(true);
+      expect(result).toContain("Copilot organization billing is unavailable");
+      expect(result).toContain("Allow use of Copilot CLI billed to the organization");
+      expect(result).toContain("COPILOT_GITHUB_TOKEN");
+      expect(result).toContain("https://github.github.com/gh-aw/reference/billing/");
+    });
+
+    it("returns no guidance when the combined error was not detected", () => {
+      expect(buildCopilotOrgBillingErrorContext(false)).toBe("");
+    });
+
+    it.each([
+      "[copilot-harness] awf-reflect: models fetch returned 403 for http://api-proxy:10002/models",
+      "Copilot requests authentication failed through the gh-aw API proxy (HTTP 403, model=auto, stage=listing models).",
+      "Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).",
+    ])("detects reported organization-billed Copilot error: %s", errorOutput => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\n${errorOutput}`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(true);
+    });
+
+    it("does not classify PAT-based Copilot failures as organization billing errors", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "[copilot-harness] awf-reflect: models fetch returned 403 for http://api-proxy:10002/models");
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
+    });
+  });
+
   describe("buildModelNotSupportedErrorContext", () => {
     let buildModelNotSupportedErrorContext;
     const fs = require("fs");
