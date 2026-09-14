@@ -3,7 +3,9 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -17,35 +19,51 @@ func TestLogsCachedJSONLLiveCaching(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
-	cachePath := filepath.Join(tempDir, "logs.jsonl")
-	firstOutputDir := filepath.Join(tempDir, "first")
-	runLiveLogsCommand(t, cachePath, firstOutputDir)
+	cachePattern := filepath.Join(tempDir, "logs-*")
+	const queryCount = 3
+	const runsPerQuery = 2
+	var expectedRunIDs []int64
 
-	cache, err := loadCachedLogsJSONL(cachePath)
-	require.NoError(t, err)
-	require.Len(t, cache.runs, 1, "the live call should cache exactly one run")
+	for query := range queryCount {
+		outputDir := filepath.Join(tempDir, fmt.Sprintf("query-%d", query))
+		runLiveLogsCommand(t, cachePattern, outputDir, runsPerQuery)
 
-	var runID int64
-	for runID = range cache.runs {
-		break
+		shards, err := filepath.Glob(cachePattern + ".jsonl")
+		require.NoError(t, err)
+		require.Len(t, shards, query+1, "each query should create a new JSONL cache shard")
+
+		summaryData, err := os.ReadFile(filepath.Join(outputDir, "summary.json"))
+		require.NoError(t, err)
+		var summary LogsData
+		require.NoError(t, json.Unmarshal(summaryData, &summary))
+		require.Len(t, summary.Runs, runsPerQuery)
+
+		runIDs := make([]int64, 0, len(summary.Runs))
+		for _, run := range summary.Runs {
+			runIDs = append(runIDs, run.RunID)
+		}
+		if query == 0 {
+			expectedRunIDs = runIDs
+		} else {
+			require.ElementsMatch(t, expectedRunIDs, runIDs, "cached queries should return the same runs")
+		}
 	}
-	require.DirExists(t, filepath.Join(firstOutputDir, fmt.Sprintf("run-%d", runID)),
-		"the first call should download the live run")
 
-	secondOutputDir := filepath.Join(tempDir, "second")
-	runLiveLogsCommand(t, cachePath, secondOutputDir)
-
-	require.NoDirExists(t, filepath.Join(secondOutputDir, fmt.Sprintf("run-%d", runID)),
-		"the second call should reuse the JSONL record instead of downloading the run")
+	shards, err := filepath.Glob(cachePattern + ".jsonl")
+	require.NoError(t, err)
+	cache, err := loadCachedLogsJSONLFiles(shards)
+	require.NoError(t, err)
+	require.Len(t, cache.runs, runsPerQuery, "the wildcard cache should contain the queried runs")
 }
 
-func runLiveLogsCommand(t *testing.T, cachePath, outputDir string) {
+func runLiveLogsCommand(t *testing.T, cachePath, outputDir string, count int) {
 	t.Helper()
 	cmd := NewLogsCommand()
 	cmd.SetArgs([]string{
 		"Daily Fact",
 		"--repo", "github/gh-aw",
-		"--count", "1",
+		"--count", fmt.Sprintf("%d", count),
+		"--start-date", "-3mo",
 		"--end-date", "-1d",
 		"--cached-jsonl", cachePath,
 		"--output", outputDir,
