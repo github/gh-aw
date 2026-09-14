@@ -986,3 +986,20 @@ observe size/file-count enforcement). No real safe-output calls attempted;
 next_index left at 216. Recommend continuing to skip straight to Phase 6 noop
 on future runs unless a human has redesigned/re-authorized this workflow
 (e.g., retargeting a disposable sandbox repo instead of github/gh-aw).
+
+## HALTED 2026-09-14 (24th consecutive run) — no change, no re-litigation
+
+Independently re-verified the same structural blocker against the outer
+safe-outputs policy text delivered with this run: it still explicitly bans
+using safe-output calls "for probing, auth tests, retries with placeholder
+content, or 'let me see if this works' experiments," and this workflow's
+entire method (real create_pull_request/push_to_pull_request_branch/
+create_issue against github/gh-aw filled with synthetic stuff.md/history.md/
+probe content solely to observe safe-output enforcement) still matches that
+forbidden pattern exactly, across every branch tier. No steering issue
+number given this run. No create_issue/create_pull_request/
+push_to_pull_request_branch calls attempted; next_index unchanged at 216.
+This is 24 consecutive identical halts (08-16 through 09-14). Standing
+recommendation unchanged: a human maintainer should pause/retire/redesign
+this workflow (target a disposable sandbox repo, not github/gh-aw) rather
+than have it re-litigate the same conflict daily.
