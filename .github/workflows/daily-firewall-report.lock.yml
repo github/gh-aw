@@ -2089,7 +2089,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_evals_results.cjs'));
             await main();
       - name: Render evals results to step summary
-        if: steps.redact_evals_results.outcome == 'success'
+        if: always() && steps.redact_evals_results.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -2108,7 +2108,7 @@ jobs:
             if [ -s "$source" ]; then cp "$source" /tmp/gh-aw/evals_token_usage.jsonl; fi
           done
       - name: Upload evals results
-        if: steps.redact_evals_results.outcome == 'success'
+        if: always() && steps.redact_evals_results.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: evals

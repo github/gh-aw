@@ -418,7 +418,7 @@ await main();`
 
 	steps := []string{
 		"      - name: Render evals results to step summary\n",
-		"        if: steps.redact_evals_results.outcome == 'success'\n",
+		"        if: always() && steps.redact_evals_results.outcome == 'success'\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        with:\n",
@@ -453,7 +453,7 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		"            if [ -s \"$source\" ]; then cp \"$source\" /tmp/gh-aw/evals_token_usage.jsonl; fi\n",
 		"          done\n",
 		"      - name: Upload evals results\n",
-		"        if: steps.redact_evals_results.outcome == 'success'\n",
+		"        if: always() && steps.redact_evals_results.outcome == 'success'\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		"          name: " + evalsArtifactName + "\n",

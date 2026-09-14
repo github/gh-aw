@@ -21,7 +21,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 		"/tmp/gh-aw/evals_token_usage.jsonl",
 		evalsExecutionEvidencePath,
 		"/tmp/gh-aw/evals.jsonl",
-		"if: steps.redact_evals_results.outcome == 'success'",
+		"if: always() && steps.redact_evals_results.outcome == 'success'",
 		"name: Upload evals accounting after failure",
 		"if: always() && steps.redact_evals_results.outcome != 'success'",
 	} {
@@ -233,7 +233,7 @@ func TestBuildEvalsJobStepsRenderSummary(t *testing.T) {
 	if !strings.Contains(allSteps, "render_evals_summary.cjs") {
 		t.Errorf("expected render_evals_summary.cjs reference in evals job steps;\ngot:\n%s", allSteps)
 	}
-	if !strings.Contains(allSteps, "if: steps.redact_evals_results.outcome == 'success'") {
+	if !strings.Contains(allSteps, "if: always() && steps.redact_evals_results.outcome == 'success'") {
 		t.Errorf("expected redact outcome gating for render/upload steps;\ngot:\n%s", allSteps)
 	}
 
