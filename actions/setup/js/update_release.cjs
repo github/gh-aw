@@ -47,7 +47,7 @@ async function findReleaseByTagIncludingDrafts(client, owner, repo, tag) {
         return [];
       }),
     {},
-    `list releases searching for draft with tag '${tag}' in ${owner}/${repo}`
+    `list releases searching for release (including drafts) with tag '${tag}' in ${owner}/${repo}`
   );
   return found;
 }
