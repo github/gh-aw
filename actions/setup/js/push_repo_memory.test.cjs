@@ -4,7 +4,43 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
-import { configureRepoMemoryMergePolicy } from "./push_repo_memory.cjs";
+import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy } from "./push_repo_memory.cjs";
+
+describe("push_repo_memory.cjs - temporary ID substitutions", () => {
+  it("applies final mappings only to memory files selected for persistence", () => {
+    const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
+    try {
+      fs.writeFileSync(path.join(memoryDir, "changed.md"), "Tracks #aw_parent and #aw_external.\n");
+      fs.writeFileSync(path.join(memoryDir, "untouched.md"), "Tracks #aw_parent.\n");
+      const temporaryIdMap = new Map([
+        ["aw_parent", { repo: "owner/memory", number: 42 }],
+        ["aw_external", { repo: "other/issues", number: 99 }],
+      ]);
+
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "changed.md" }], memoryDir, temporaryIdMap, "owner/memory");
+
+      expect(updated).toEqual(["changed.md"]);
+      expect(fs.readFileSync(path.join(memoryDir, "changed.md"), "utf8")).toBe("Tracks #42 and other/issues#99.\n");
+      expect(fs.readFileSync(path.join(memoryDir, "untouched.md"), "utf8")).toBe("Tracks #aw_parent.\n");
+    } finally {
+      fs.rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves files unchanged when no temporary IDs resolve", () => {
+    const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
+    try {
+      fs.writeFileSync(path.join(memoryDir, "notes.md"), "Tracks #aw_unknown.\n");
+
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "notes.md" }], memoryDir, new Map(), "owner/memory");
+
+      expect(updated).toEqual([]);
+      expect(fs.readFileSync(path.join(memoryDir, "notes.md"), "utf8")).toBe("Tracks #aw_unknown.\n");
+    } finally {
+      fs.rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("push_repo_memory.cjs - globPatternToRegex helper", () => {
   describe("basic pattern matching", () => {

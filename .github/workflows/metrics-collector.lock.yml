@@ -1871,6 +1871,7 @@ jobs:
       - activation
       - agent
       - detection
+      - safe_outputs
     if: >
       always() && (!cancelled()) && (needs.detection.result == 'success' || needs.detection.result == 'skipped') &&
       needs.agent.result == 'success'
@@ -1934,6 +1935,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
+          GH_AW_TEMPORARY_ID_MAP: ${{ needs.safe_outputs.outputs.process_safe_outputs_temporary_id_map }}
           ARTIFACT_DIR: /tmp/gh-aw/repo-memory/default
           MEMORY_ID: default
           TARGET_REPO: ${{ github.repository }}

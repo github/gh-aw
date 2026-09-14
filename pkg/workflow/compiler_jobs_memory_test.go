@@ -73,6 +73,13 @@ func TestJobsWithRepoMemoryDependencies(t *testing.T) {
 			t.Error("push_repo_memory should depend on detection job (detection is now a separate job)")
 		}
 	}
+	if !slices.Contains(pushRepoMemoryJob.Needs, string(constants.SafeOutputsJobName)) {
+		t.Error("push_repo_memory should depend on safe_outputs so temporary ID mappings are finalized first")
+	}
+	pushSteps := strings.Join(pushRepoMemoryJob.Steps, "\n")
+	if !strings.Contains(pushSteps, "GH_AW_TEMPORARY_ID_MAP: ${{ needs.safe_outputs.outputs.process_safe_outputs_temporary_id_map }}") {
+		t.Error("push_repo_memory should receive the final temporary ID map from safe_outputs")
+	}
 
 	// Verify job name
 	if pushRepoMemoryJob.Name != "push_repo_memory" {

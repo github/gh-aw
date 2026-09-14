@@ -12,6 +12,7 @@ const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_
 const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
+const { loadTemporaryIdMap, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
@@ -42,6 +43,42 @@ function configureRepoMemoryMergePolicy(workspaceDir) {
   } catch (error) {
     throw new Error(`Failed to configure repo-memory merge attributes: ${getErrorMessage(error)}`, { cause: error });
   }
+}
+
+/**
+ * Apply the final safe-output temporary ID map to memory files before persistence.
+ *
+ * @param {Array<{relativePath: string}>} files
+ * @param {string} memoryDir
+ * @param {Map<string, {repo: string, number: number}>} temporaryIdMap
+ * @param {string} currentRepo
+ * @returns {string[]} relative paths whose contents were updated
+ */
+function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, currentRepo) {
+  if (temporaryIdMap.size === 0) {
+    return [];
+  }
+
+  const updatedFiles = [];
+  for (const file of files) {
+    const filePath = path.join(memoryDir, file.relativePath);
+    let content;
+    try {
+      content = fs.readFileSync(filePath, "utf8");
+    } catch (error) {
+      throw new Error(`Failed to read memory file ${file.relativePath}: ${getErrorMessage(error)}`, { cause: error });
+    }
+    const updatedContent = replaceTemporaryIdReferences(content, temporaryIdMap, currentRepo);
+    if (updatedContent !== content) {
+      try {
+        fs.writeFileSync(filePath, updatedContent, "utf8");
+      } catch (error) {
+        throw new Error(`Failed to write memory file ${file.relativePath}: ${getErrorMessage(error)}`, { cause: error });
+      }
+      updatedFiles.push(file.relativePath);
+    }
+  }
+  return updatedFiles;
 }
 
 /**
@@ -118,6 +155,7 @@ async function main() {
   const githubRunId = process.env.GITHUB_RUN_ID || "unknown";
   const githubServerUrl = process.env.GITHUB_SERVER_URL || "https://github.com";
   const serverHost = githubServerUrl.replace(/^https?:\/\//, "");
+  const temporaryIdMap = loadTemporaryIdMap();
 
   // Log environment variable configuration for debugging
   core.info("Environment configuration:");
@@ -129,6 +167,7 @@ async function main() {
   core.info(`  FILE_GLOB_FILTER: ${fileGlobFilter ? `"${fileGlobFilter}"` : "(empty - all files accepted)"}`);
   core.info(`  FILE_GLOB_FILTER length: ${fileGlobFilter.length}`);
   core.info(`  FORMAT_JSON: ${formatJSON}`);
+  core.info(`  TEMPORARY_ID_MAPPINGS: ${temporaryIdMap.size}`);
 
   /** @param {unknown} value */
   function isPlainObject(value) {
@@ -480,6 +519,18 @@ async function main() {
     }
   }
 
+  try {
+    const currentRepo = targetRepo.endsWith(".wiki") ? targetRepo.slice(0, -".wiki".length) : targetRepo;
+    const substitutedFiles = applyTemporaryIdSubstitutions(filesToCopy, destMemoryPath, temporaryIdMap, currentRepo);
+    if (substitutedFiles.length > 0) {
+      core.info(`Applied temporary ID substitutions to ${substitutedFiles.length} memory file(s):`);
+      substitutedFiles.forEach(file => core.info(`  - ${file}`));
+    }
+  } catch (error) {
+    core.setFailed(`Failed to apply temporary ID substitutions to repo-memory files: ${getErrorMessage(error)}`);
+    return;
+  }
+
   // Format JSON files if requested
   if (formatJSON) {
     core.info("FORMAT_JSON is enabled: formatting .json files as human-readable...");
@@ -723,4 +774,4 @@ async function main() {
   }
 }
 
-module.exports = { configureRepoMemoryMergePolicy, main };
+module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, main };

@@ -607,6 +607,9 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	}
 
 	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled)
+	if data.SafeOutputs != nil {
+		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
+	}
 	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
 	concurrencyGroup := buildPushRepoMemoryConcurrencyGroup(data.RepoMemoryConfig.Memories)
 	concurrency := c.indentYAMLLines(fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", concurrencyGroup), "    ")
@@ -689,9 +692,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	step.WriteString("        if: always()\n")
 	fmt.Fprintf(&step, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	step.WriteString("        env:\n")
-	step.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	step.WriteString("          GITHUB_RUN_ID: ${{ github.run_id }}\n")
-	step.WriteString("          GITHUB_SERVER_URL: ${{ github.server_url }}\n")
+	step.WriteString(buildRepoMemoryGitHubEnv(data))
 	fmt.Fprintf(&step, "          ARTIFACT_DIR: %s\n", artifactDir)
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", memory.ID)
 	fmt.Fprintf(&step, "          TARGET_REPO: %s\n", targetRepo)
@@ -727,6 +728,16 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 		}
 	}
 	return step.String()
+}
+
+func buildRepoMemoryGitHubEnv(data *WorkflowData) string {
+	env := "          GH_TOKEN: ${{ github.token }}\n" +
+		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
+		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
+	if data.SafeOutputs != nil {
+		env += fmt.Sprintf("          GH_AW_TEMPORARY_ID_MAP: ${{ needs.%s.outputs.process_safe_outputs_temporary_id_map }}\n", constants.SafeOutputsJobName)
+	}
+	return env
 }
 
 // buildPushRepoMemoryJobCondition computes the job condition and needs list.
