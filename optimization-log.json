@@ -255,5 +255,14 @@
     "recommendations_count": 3,
     "subagent_candidates": 1,
     "estimated_aic_savings_per_run": 180
+  },
+  {
+    "date": "2026-09-14",
+    "workflow_name": "Issue Monster",
+    "total_aic_analyzed": 65.622715,
+    "runs_audited": 51,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 100
   }
 ]
