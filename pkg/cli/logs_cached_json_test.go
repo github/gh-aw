@@ -580,7 +580,9 @@ func TestCachedLogsLookupRejectsUnknownIdentity(t *testing.T) {
 
 func TestCachedJSONLCanSatisfy(t *testing.T) {
 	usageFilter := []string{constants.UsageArtifactName.String()}
+	agentFilter := []string{constants.AgentArtifactName.String()}
 	assert.True(t, cachedJSONLCanSatisfy(usageFilter, false, false, false, false))
+	assert.False(t, cachedJSONLCanSatisfy(agentFilter, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(nil, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, true, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, true, false, false))
