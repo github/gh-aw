@@ -8,7 +8,7 @@
 
 ### Context
 
-This pull request changes the `gh aw logs` cache behavior in `pkg/cli/` so callers can pass a trailing wildcard cache prefix such as `logs-*` to `--cached-jsonl` instead of a single JSONL file. The implementation now merges multiple matching cache shards, chooses a collision-resistant output shard name, and prunes wildcard source files that contain only out-of-range dated run records when a date filter is applied. The PR also updates user-facing help text and extends tests around wildcard resolution, shard ordering, and pruning. The architectural question is how the logs command should represent reusable cached run data when repeated collections produce multiple partial cache files over time.
+This pull request changes the `gh aw logs` cache behavior in `pkg/cli/` so callers can pass a trailing wildcard cache prefix such as `logs-*` instead of a single JSONL file. The implementation now merges multiple matching cache shards, chooses a collision-resistant output shard name, and prunes wildcard source files that contain only out-of-range dated run records when a date filter is applied. The PR also adds a `--cached-logs` CLI alias, updates user-facing help text, and extends tests around wildcard resolution, shard ordering, and pruning. The architectural question is how the logs command should represent reusable cached run data when repeated collections produce multiple partial cache files over time.
 
 ### Decision
 
@@ -41,7 +41,7 @@ The command could read several cache shards, combine them in memory, and then re
 - Wildcard pruning relies on record structure and timestamps, so unusual or metadata-only files are intentionally preserved and may still accumulate.
 
 #### Neutral
-- The CLI surface keeps wildcard cache support on `--cached-jsonl` without adding another flag name.
+- The CLI surface grows by one alias, `--cached-logs`, while preserving `--cached-jsonl` compatibility.
 - The implementation extends existing JSONL cache mechanisms rather than introducing a new cache format or storage backend.
 - Additional tests now codify shard naming, wildcard validation, deterministic ordering, and date-range cleanup behavior.
 
