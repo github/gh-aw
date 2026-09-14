@@ -24,14 +24,15 @@ const { withRetry } = require("./error_recovery.cjs");
  * never returns draft releases, so a tag that only has a draft release would be
  * misreported as missing entirely. This fallback paginates `listReleases`
  * (which does include drafts for callers with push access) to find it before
- * giving up.
+ * giving up. Published releases can match too, as a safety net against any
+ * eventual-consistency gap between the two endpoints.
  * @param {typeof github} client
  * @param {string} owner
  * @param {string} repo
  * @param {string} tag
  * @returns {Promise<Object | undefined>}
  */
-async function findDraftReleaseByTag(client, owner, repo, tag) {
+async function findReleaseByTagIncludingDrafts(client, owner, repo, tag) {
   /** @type {Object | undefined} */
   let found;
   await withRetry(
@@ -41,7 +42,9 @@ async function findDraftReleaseByTag(client, owner, repo, tag) {
         if (match) {
           found = match;
           done();
+          return [match];
         }
+        return [];
       }),
     {},
     `list releases searching for draft with tag '${tag}' in ${owner}/${repo}`
@@ -152,10 +155,10 @@ async function main(config = {}) {
         const errorMessage = getErrorMessage(error);
         if (error?.status === 404 || errorMessage.includes("Not Found")) {
           const repository = `${context.repo.owner}/${context.repo.repo}`;
-          const draftRelease = await findDraftReleaseByTag(githubClient, context.repo.owner, context.repo.repo, releaseTag);
-          if (draftRelease) {
-            core.info(`Found draft release for tag '${releaseTag}' (ID: ${draftRelease.id}); the tag-lookup endpoint does not return drafts, so listReleases was used instead.`);
-            release = draftRelease;
+          const fallbackRelease = await findReleaseByTagIncludingDrafts(githubClient, context.repo.owner, context.repo.repo, releaseTag);
+          if (fallbackRelease) {
+            core.info(`Found release for tag '${releaseTag}' (ID: ${fallbackRelease.id}, draft: ${!!fallbackRelease.draft}) via listReleases; the tag-lookup endpoint does not return draft releases.`);
+            release = fallbackRelease;
           } else {
             const createReleaseUrl = `${context.serverUrl}/${repository}/releases/new?tag=${encodeURIComponent(releaseTag)}`;
             throw new Error(
