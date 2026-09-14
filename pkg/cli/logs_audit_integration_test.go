@@ -42,8 +42,10 @@ func TestLogsCommandAuditIntegration(t *testing.T) {
 
 	data, err := os.ReadFile(cachePath)
 	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.NotEmpty(t, lines)
 	var record cachedLogsJSONLRecord
-	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &record))
+	require.NoError(t, json.Unmarshal(lines[0], &record))
 	require.NotNil(t, record.Run)
 	require.NotNil(t, record.Run.Audit)
 	require.NotNil(t, record.Run.AwInfo)
