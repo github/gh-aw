@@ -751,8 +751,18 @@ func normalizeCachedLogRun(run *RunData) error {
 	return nil
 }
 
+// cachedJSONLCanSatisfy reports whether cached run records carry enough evidence
+// to replace a fresh artifact download. Only the compact info and usage artifacts
+// qualify: everything they contribute to a report is already projected into the
+// cached run records. The info artifact is the default selection of `gh aw logs`,
+// so excluding it would disable the cache for the most common invocation. Every
+// other artifact set, and the parse/audit/train/tool-graph modes, need the raw
+// artifact files on disk.
 func cachedJSONLCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
-	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !audit && !train && !toolGraph
+	if parse || audit || train || toolGraph {
+		return false
+	}
+	return isUsageOnlyArtifactFilter(artifactFilter) || isInfoWithOptionalUsageArtifactFilter(artifactFilter)
 }
 
 func processedRunFromCachedData(data RunData) ProcessedRun {
