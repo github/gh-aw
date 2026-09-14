@@ -158,6 +158,12 @@ type cachedLogsJSONLRateLimitItemSchema struct {
 	RateLimit     GitHubAPIRateLimitReport `json:"rate_limit"`
 }
 
+type cachedLogsJSONLSafeOutputItemSchema struct {
+	SchemaVersion int                          `json:"schema_version"`
+	Kind          string                       `json:"kind"`
+	SafeOutput    cachedLogsJSONLSafeOutputRow `json:"safe_output"`
+}
+
 func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	run, err := GenerateOutputSchema[cachedLogsJSONLRunItemSchema]()
 	if err != nil {
@@ -187,7 +193,13 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	}
 	rateLimit.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	rateLimit.Properties["kind"].Enum = []any{cachedLogsJSONLKindRateLimit}
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns, rateLimit}}, nil
+	safeOutput, err := GenerateOutputSchema[cachedLogsJSONLSafeOutputItemSchema]()
+	if err != nil {
+		return nil, err
+	}
+	safeOutput.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
+	safeOutput.Properties["kind"].Enum = []any{cachedLogsJSONLKindSafeOutput}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns, rateLimit, safeOutput}}, nil
 }
 
 func generateAuditOutputSchema() (*jsonschema.Schema, error) {

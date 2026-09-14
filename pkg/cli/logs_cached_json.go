@@ -27,6 +27,7 @@ const (
 	cachedLogsJSONLKindRun          = "run"
 	cachedLogsJSONLKindWorkflowRuns = "workflow_runs"
 	cachedLogsJSONLKindRateLimit    = "github_api_rate_limit"
+	cachedLogsJSONLKindSafeOutput   = "safe_output_item"
 )
 
 type cachedWorkflowRunsRequest struct {
@@ -82,12 +83,22 @@ type cachedLogsJSONLMCPToolCall struct {
 }
 
 type cachedLogsJSONLRecord struct {
-	SchemaVersion int                        `json:"schema_version"`
-	Kind          string                     `json:"kind,omitempty"`
-	Run           *cachedLogsJSONLRunData    `json:"run,omitempty"`
-	Request       *cachedWorkflowRunsRequest `json:"request,omitempty"`
-	Payload       json.RawMessage            `json:"payload,omitempty"`
-	RateLimit     *GitHubAPIRateLimitReport  `json:"rate_limit,omitempty"`
+	SchemaVersion int                           `json:"schema_version"`
+	Kind          string                        `json:"kind,omitempty"`
+	Run           *cachedLogsJSONLRunData       `json:"run,omitempty"`
+	Request       *cachedWorkflowRunsRequest    `json:"request,omitempty"`
+	Payload       json.RawMessage               `json:"payload,omitempty"`
+	RateLimit     *GitHubAPIRateLimitReport     `json:"rate_limit,omitempty"`
+	SafeOutput    *cachedLogsJSONLSafeOutputRow `json:"safe_output,omitempty"`
+}
+
+// cachedLogsJSONLSafeOutputRow projects a single safe-output entity as its own
+// cached logs JSONL event, correlated back to the run that produced it, so
+// downstream consumers can process created/modified entities individually
+// without re-parsing every "run" record's nested safe_outputs array.
+type cachedLogsJSONLSafeOutputRow struct {
+	RunID int64 `json:"run_id"`
+	CreatedItemReport
 }
 
 type cachedLogsJSONLCache struct {
@@ -410,6 +421,11 @@ func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recor
 		return nil
 	case cachedLogsJSONLKindRateLimit:
 		return nil
+	case cachedLogsJSONLKindSafeOutput:
+		// Individual safe-output entity events are informational projections of
+		// data already captured under the "run" record's safe_outputs array;
+		// they are not indexed separately in the in-memory cache.
+		return nil
 	case cachedLogsJSONLKindRun:
 	default:
 		return nil
@@ -475,7 +491,38 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 	if err != nil {
 		return fmt.Errorf("failed to marshal cached logs JSONL record: %w", err)
 	}
-	return w.appendRecord(record)
+	if err := w.appendRecord(record); err != nil {
+		return err
+	}
+	return w.appendSafeOutputItems(runData.RunID, runData.SafeOutputs)
+}
+
+// appendSafeOutputItems writes one cached logs JSONL record per safe-output
+// entity, correlated to runID, in addition to the entities already nested
+// under the "run" record's safe_outputs array. This lets downstream
+// consumers stream and process individual created/modified entities as
+// events without reconstructing them from the aggregate run record.
+func (w *cachedLogsJSONLWriter) appendSafeOutputItems(runID int64, items []CreatedItemReport) error {
+	if w == nil {
+		return nil
+	}
+	for _, item := range items {
+		record, err := json.Marshal(cachedLogsJSONLRecord{
+			SchemaVersion: cachedLogsJSONLSchemaVersion,
+			Kind:          cachedLogsJSONLKindSafeOutput,
+			SafeOutput: &cachedLogsJSONLSafeOutputRow{
+				RunID:             runID,
+				CreatedItemReport: item,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to marshal cached safe-output item JSONL record: %w", err)
+		}
+		if err := w.appendRecord(record); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJSONLRunData {

@@ -95,7 +95,7 @@ func TestJSONSchemaCommand(t *testing.T) {
 		{
 			name:       "logs-jsonl",
 			schemaName: "logs-jsonl",
-			oneOfCount: 3,
+			oneOfCount: 4,
 			validOutput: []any{
 				cachedLogsJSONLRunItemSchema{
 					SchemaVersion: cachedLogsJSONLSchemaVersion,
@@ -140,6 +140,18 @@ func TestJSONSchemaCommand(t *testing.T) {
 					RateLimit: GitHubAPIRateLimitReport{
 						Host:  "github.com",
 						Start: &GitHubAPIRateLimitState{Limit: 5000, Remaining: 4999},
+					},
+				},
+				cachedLogsJSONLSafeOutputItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindSafeOutput,
+					SafeOutput: cachedLogsJSONLSafeOutputRow{
+						RunID: 42,
+						CreatedItemReport: CreatedItemReport{
+							Type:     "create_issue",
+							Provider: "github",
+							Number:   7,
+						},
 					},
 				},
 			},

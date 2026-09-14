@@ -4048,6 +4048,140 @@
         "rate_limit"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "enum": [
+            2
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "safe_output_item"
+          ]
+        },
+        "safe_output": {
+          "type": "object",
+          "properties": {
+            "run_id": {
+              "type": "integer"
+            },
+            "type": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "number": {
+              "type": "integer"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "target": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "labels": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "database_id": {
+                    "type": "integer"
+                  },
+                  "node_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "labelsAdded": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "labelsSuggested": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "labelsBefore": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "temporaryId": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "before_state": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "after_state": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "timestamp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id",
+            "type",
+            "timestamp"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "safe_output"
+      ],
+      "additionalProperties": false
     }
   ]
 }
