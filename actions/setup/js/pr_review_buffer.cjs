@@ -628,6 +628,7 @@ function createReviewBuffer() {
             repo: repoParts.repo,
             pull_number: pullRequestNumber,
             review_id: review.id,
+            per_page: 100,
           });
           if (Array.isArray(data) && data.length > 0) {
             reviewComments = data.map(comment => ({

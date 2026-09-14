@@ -363,6 +363,13 @@ describe("pr_review_buffer (factory pattern)", () => {
 
       const result = await buffer.submitReview();
 
+      expect(mockGithub.rest.pulls.listCommentsForReview).toHaveBeenCalledWith({
+        owner: "owner",
+        repo: "repo",
+        pull_number: 42,
+        review_id: 100,
+        per_page: 100,
+      });
       expect(result.review_comments).toEqual([
         {
           id: 200,

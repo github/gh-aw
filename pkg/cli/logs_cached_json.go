@@ -51,7 +51,6 @@ type cachedLogsJSONLRunData struct {
 	MCPToolUsage    *cachedLogsJSONLMCPToolUsageData `json:"mcp_tool_usage,omitempty"`
 	Audit           *AuditData                       `json:"audit,omitempty"`
 	AwInfo          *AwInfo                          `json:"aw_info,omitempty"`
-	SafeOutputs     []CreatedItemReport              `json:"safe_outputs,omitempty"`
 }
 
 type cachedLogsJSONLJobData struct {
@@ -457,7 +456,6 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 		return errors.New("failed to build cached logs JSONL record")
 	}
 	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0])
-	runData.SafeOutputs = logsData.Runs[0].SafeOutputs
 	if includeAudit {
 		if audit, ok := loadCachedAuditData(run.Run.LogsPath, run.Run, auditCacheSourceLogs); ok {
 			runData.Audit = &audit
