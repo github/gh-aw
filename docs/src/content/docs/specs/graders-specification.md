@@ -188,6 +188,8 @@ Inline scripts MUST be rejected if they contain any forbidden pattern, including
 
 The reserved grader ID MUST be `operational-value`. It MUST define exactly one evaluator source: inline Bash in `script`, or a repository-relative Bash file in `run`.
 
+The grader SHOULD declare a concise `name`, `description`, `unit`, and `direction` for its primary metric. The evaluator SHOULD document the workflow intent and every emitted metric's meaning, including `1`, `0`, and `null`, in source comments that are frozen with the evaluator bytes. The primary description MUST be retained in the grader manifest and normalized result when declared.
+
 Both forms MUST be valid UTF-8, start with a Bash shebang, pass Bash syntax validation, and contain no more than 65,536 bytes. The compiler MUST resolve `run` within the repository and reject symlinks and non-regular files. It MUST freeze either source as exact evaluator bytes and record their SHA-256 digest in the grader manifest and result implementation.
 
 The evaluator MUST run once with no mode arguments. It MUST read one JSON request from standard input containing `schemaVersion`, `run`, `event`, `outputs`, and `config`. `outputs` MUST contain the current run's validated safe-output requests and MUST NOT be treated as proof that requested GitHub mutations were applied. The evaluator MUST write exactly one non-empty ordered array of objects containing exactly `id` and `value`. IDs MUST be non-empty and unique. Values MUST be finite numbers in `[0,1]` or `null`. The first item is the primary metric; later items are diagnostics.

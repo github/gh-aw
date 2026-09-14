@@ -63,6 +63,10 @@ Configure the reserved `operational-value` grader with either inline Bash:
 ```aw wrap
 graders:
   operational-value:
+    name: Goal Attainment
+    description: Whether the current run attained the workflow's intended outcome
+    unit: ratio
+    direction: higher_is_better
     script: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -75,10 +79,14 @@ or a repository-relative Bash evaluator:
 ```aw wrap
 graders:
   operational-value:
+    name: File Diet Decision Conformance
+    description: Whether the run requested the correct refactoring issue or noop
+    unit: ratio
+    direction: higher_is_better
     run: .github/graders/daily-file-diet-operational-value.sh
 ```
 
-Specify exactly one of `script` or `run`. The compiler freezes the evaluator bytes, records their SHA-256 digest, and packages them with the run. Inline Bash is verified against the workflow Markdown at the run commit; file-backed Bash is verified against its file at that commit.
+Specify exactly one of `script` or `run`. Give the primary metric a concise `name`, `description`, `unit`, and `direction`; its description is retained in grader artifacts. Document every emitted metric in evaluator comments so its meaning is frozen with the evaluator bytes. The compiler records the evaluator's SHA-256 digest and packages its exact bytes with the run.
 
 The evaluator runs once with no arguments. It reads a request containing `schemaVersion`, `run`, `event`, `outputs`, and `config` from standard input. `outputs` contains the current run's validated safe-output requests; those requests do not prove that their GitHub mutations were applied. The evaluator writes one non-empty ordered array of `{id,value}` metrics. The first metric is primary; later metrics are diagnostics. Values are finite numbers in `[0,1]` or `null`.
 

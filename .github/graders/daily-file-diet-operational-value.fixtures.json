@@ -36,10 +36,6 @@
       {
         "id": "largest-file-under-threshold",
         "value": 0
-      },
-      {
-        "id": "file-diet-output-valid",
-        "value": 1
       }
     ]
   },
@@ -78,10 +74,6 @@
       },
       {
         "id": "largest-file-under-threshold",
-        "value": 0
-      },
-      {
-        "id": "file-diet-output-valid",
         "value": 0
       }
     ]
@@ -122,10 +114,6 @@
       {
         "id": "largest-file-under-threshold",
         "value": 1
-      },
-      {
-        "id": "file-diet-output-valid",
-        "value": 1
       }
     ]
   },
@@ -154,10 +142,6 @@
       {
         "id": "largest-file-under-threshold",
         "value": null
-      },
-      {
-        "id": "file-diet-output-valid",
-        "value": null
       }
     ]
   },
@@ -177,10 +161,6 @@
       },
       {
         "id": "largest-file-under-threshold",
-        "value": null
-      },
-      {
-        "id": "file-diet-output-valid",
         "value": null
       }
     ]

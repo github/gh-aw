@@ -50,6 +50,7 @@ request=$(jq -cn '{
         eventName: "workflow_dispatch"
     },
     event: {},
+    outputs: [],
     config: {verification: true}
 }')
 

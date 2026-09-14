@@ -1,6 +1,6 @@
 ---
 name: operational-value-designer
-description: "Design and verify a deterministic operational-value grader for any GitHub Agentic Workflow. Use when choosing outcome metrics, defining repository evidence, or creating an operational-value evaluator. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
+description: "Design and verify a deterministic operational-value grader for any GitHub Agentic Workflow. Use when reasoning from workflow goals to measurable downstream outcomes, defining repository evidence, choosing outcome metrics, or creating an operational-value evaluator. Usage: /operational-value-designer OWNER/REPO WORKFLOW-NAME."
 argument-hint: "OWNER/REPO WORKFLOW-NAME"
 metadata:
   version: "2.0.0"
@@ -30,6 +30,10 @@ Choose one evaluator form. For a compact evaluator, embed the complete Bash prog
 ```yaml
 graders:
   operational-value:
+    name: Domain Outcome Conformance
+    description: Whether the current run produced the required domain outcome
+    unit: ratio
+    direction: higher_is_better
     script: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -48,8 +52,14 @@ and configure the workflow:
 ```yaml
 graders:
   operational-value:
+    name: Domain Outcome Conformance
+    description: Whether the current run produced the required domain outcome
+    unit: ratio
+    direction: higher_is_better
     run: .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
+
+Always set a concise `name`, `description`, `unit`, and `direction` for the primary metric. At the top of the evaluator, comment the workflow intent and the meaning of every emitted metric, including its `1`, `0`, and `null` interpretations. These comments are frozen and archived with the evaluator bytes, preserving review context without adding a definition mode or a second metadata schema.
 
 Specify exactly one of `script` or `run`. Use this decision rule:
 
@@ -68,7 +78,7 @@ For a file-backed evaluator, create exact semantic fixtures at:
 
 Each fixture contains exactly `name`, `request`, and `expected`. Include `attained`, `missed`, `unavailable`, and `malformed`; also include `noop` and `inapplicable` when those states exist. Expected metrics must be exact, ordered, and deterministic. For inline Bash, encode equivalent cases in the workflow's tests and compile the workflow before adoption.
 
-Before implementation, summarize the design in a compact table containing the intent sentence, primary metric and formula, applicability, success evidence, zero condition, null condition, noop interpretation, adoption point, and required API calls. Surface unresolved ambiguity instead of hiding it in code. Consult [metric patterns](./references/metric-patterns.md) for calibrated examples across maintenance, routing, triage, reporting, releases, research, and expert review.
+Before implementation, summarize the design in a compact table containing the ultimate goal, outcome ladder, selected measurable effect, why stronger downstream effects are unavailable, primary metric and formula, applicability, success evidence, zero condition, null condition, noop interpretation, adoption point, and required API calls. Surface unresolved ambiguity instead of hiding it in code.
 
 ## Design Procedure
 
@@ -79,7 +89,8 @@ Validate `OWNER/REPO` and resolve `.github/workflows/WORKFLOW-NAME.md`. Do not i
 Read the workflow title or `name`, `description`, canonical top-level `intent:`, effective Markdown body, and prompt imports together. Prefer an explicit `intent:` when these sources conflict. Recover:
 
 - the subject the workflow acts on;
-- the repository or operational change it is meant to produce;
+- the ultimate repository or operational condition it is meant to improve;
+- the causal path from the workflow's immediate action to that downstream condition;
 - explicit success conditions;
 - conditions where doing nothing is correct.
 
@@ -87,11 +98,13 @@ Use `evals`, deterministic steps, custom jobs, and safe outputs only as corrobor
 
 Resolve referenced prompt or policy files that materially define the goal. If an import is unavailable, report the missing authority instead of guessing. Treat generated files, caches, prior reports, and model output as evidence, not as normative truth, unless the workflow explicitly designates them as authoritative.
 
-Write one sentence before choosing a metric:
+Write two sentences before choosing a metric:
 
-> For each applicable run, the workflow creates value when ...
+> Ultimately, this workflow creates value when ...
+>
+> For this run, the strongest attributable effect observable at grading time is ...
 
-If that sentence cannot be completed from authoritative workflow content, stop and report the ambiguity instead of inventing a metric.
+If either sentence cannot be completed from authoritative workflow content and available evidence, stop and report the ambiguity instead of inventing a metric.
 
 Translate the sentence into a function before writing shell code:
 
@@ -109,13 +122,26 @@ If the workflow intentionally samples, caps, or rotates through a larger populat
 
 For workflows driven by user input, bind the unit to that exact target. An otherwise valid result for a different issue, URL, repository, ref, theme, or requested mode scores `0`.
 
-Choose the closest effect that is observable when this run is graded:
+Do not begin with the workflow's output type and turn its presence into the metric. First build an outcome ladder from the goal back toward execution:
+
+```text
+ultimate operational condition
+  <- durable downstream outcome
+  <- applied repository or service change
+  <- accepted or verifiable requested action
+  <- execution activity
+```
+
+Adapt the ladder to the domain; not every workflow has every rung. For each rung, ask whether the effect is observable at grading time, attributable to this run or its exact subject, and independently verifiable. Select the furthest downstream rung that satisfies all three. Walk backward only when a stronger rung fails one of those tests, and record the specific evidence gap. Easy-to-count outputs and workflow mechanics must not displace a measurable downstream effect.
+
+Typical measurable effects, strongest first, are:
 
 1. **Durable outcome already established**: completed release, repository mutation, validated state transition, or another lasting change completed before grading.
-2. **Verifiable requested action**: a review finding, issue, report, recommendation, patch, or noop request whose content and choice satisfy explicit workflow criteria.
-3. **Correct restraint**: an explicit noop when an eligible subject exists and evidence proves no action is appropriate.
+2. **Applied intermediate effect**: an accepted issue, merged patch, delivered notification, completed dispatch, or other causal step already proven to have occurred and still attributable to the run.
+3. **Verifiable requested action**: a review finding, issue, report, recommendation, patch, dispatch, or noop request whose content and choice satisfy explicit workflow criteria.
+4. **Correct restraint**: an explicit noop when an eligible subject exists and evidence proves no action is appropriate.
 
-Prefer established outcomes over requested actions, and requested actions over execution traces. Never reward output merely for existing. A requested issue is valuable only if requesting the right issue is the workflow's intended per-run effect or the closest observable precursor to it, and its required content can be checked.
+Prefer established outcomes over applied intermediate effects, applied effects over requested actions, and requested actions over execution traces. Never reward output merely for existing. A requested issue is valuable only when no stronger downstream effect is currently measurable and it is an independently checkable precursor on the causal path to the ultimate goal.
 
 Do not confuse the condition being observed with the workflow's value. A security audit, health report, incident monitor, or grader audit can be fully valuable while reporting severe failures. Score whether the workflow correctly detected, represented, and acted on the condition, not whether the condition was healthy.
 
@@ -162,7 +188,7 @@ Treat retries and repeated schedules as independent runs unless deduplication or
 
 For experiment variants, apply the same acceptance function to the declared subject and variant. Grade the current run's outcome, not whether its variant beat another run, unless the workflow supplies a complete fixed comparison dataset and deterministic decision rule at the grading boundary.
 
-If intended value depends on future events or human judgment unavailable during the run, do not invent a maturation window or silently substitute engagement. Measure the closest independently checkable outcome available now and name it honestly. Return `null` when no meaningful deterministic per-run outcome can be observed.
+If intended value depends on future events or human judgment unavailable during the run, do not invent a maturation window or silently substitute engagement. Preserve the downstream goal in the design, state the missing evidence, then measure the strongest independently checkable precursor available now and name it honestly. Return `null` when no meaningful deterministic per-run outcome can be observed.
 
 Dependency failure is `null` when it prevents evidence collection for some other goal. It is `0` when the dependency or permission is itself the capability under test, such as an authentication smoke test.
 
@@ -300,6 +326,10 @@ gh aw compile .github/workflows/WORKFLOW-NAME.md
 Review the design against these checks:
 
 - The intent sentence describes an outcome, not activity.
+- The outcome ladder starts from the ultimate goal rather than the configured output type.
+- The primary metric uses the furthest downstream effect that is currently observable, attributable, and independently verifiable.
+- Any fallback to a precursor states exactly why a stronger downstream effect cannot be measured at the grading boundary.
+- Missing evidence for the selected rung returns `null`; it never causes runtime fallback to a weaker rung.
 - The unit of evaluation is explicit and matches the workflow's actual subject.
 - The primary metric directly answers that sentence.
 - Applicable, successful, missed, correct-restraint, and unavailable cases are distinguishable.

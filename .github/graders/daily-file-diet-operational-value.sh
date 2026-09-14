@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Ultimate goal: decompose oversized Go files into focused files while
+# preserving behavior and improving tests.
+# Selected grading-time effect: verify that one repository scan requests the
+# action required by the largest non-test pkg/**/*.go file at the run SHA.
+# Stronger effects are unavailable here: this workflow does not refactor code,
+# and the grader runs before the safe-output job applies a requested issue.
+# Metrics:
+# - file-diet-decision-conformance (primary): 1 for the correct target-bound
+#   issue/noop, 0 for an observed missing or contradictory decision, and null
+#   when the run or repository evidence is unavailable or malformed.
+# - largest-file-under-threshold: 1 when the largest file is below 800 lines,
+#   0 when it is at least 800 lines, and null when the scan is unavailable.
+
 set -euo pipefail
 
 export LC_ALL=C
@@ -9,16 +22,14 @@ WORKFLOW_NAME="Daily File Diet"
 THRESHOLD_LINES=800
 
 emit_metrics() {
-    local primary=$1 healthy=$2 output_valid=$3
+    local primary=$1 healthy=$2
 
     jq -cn \
         --argjson primary "$primary" \
         --argjson healthy "$healthy" \
-        --argjson outputValid "$output_valid" \
         '[
             {id: "file-diet-decision-conformance", value: $primary},
-            {id: "largest-file-under-threshold", value: $healthy},
-            {id: "file-diet-output-valid", value: $outputValid}
+            {id: "largest-file-under-threshold", value: $healthy}
         ]'
 }
 
@@ -34,7 +45,7 @@ if ! printf '%s\n' "$request" | jq -e \
         and (.outputs | type == "array")
         and (.config | type == "object")
     ' >/dev/null 2>&1; then
-    emit_metrics null null null
+    emit_metrics null null
     exit 0
 fi
 
@@ -48,7 +59,7 @@ if [[ $subject != null ]]; then
         (.path | type == "string" and test("^pkg/.+\\.go$") and (endswith("_test.go") | not))
         and (.lines | type == "number" and . >= 0 and floor == .)
     ' >/dev/null 2>&1; then
-        emit_metrics null null null
+        emit_metrics null null
         exit 0
     fi
     largest_path=$(printf '%s\n' "$subject" | jq -r '.path')
@@ -79,7 +90,7 @@ else
     fi
 
     if [[ -z $snapshot_root || ! -d $snapshot_root/pkg ]]; then
-        emit_metrics null null null
+        emit_metrics null null
         exit 0
     fi
 
@@ -96,7 +107,7 @@ else
     done < <(find "$snapshot_root/pkg" -type f -name '*.go' ! -name '*_test.go' -print0)
 
     if [[ -z $largest_path || $largest_lines -lt 0 ]]; then
-        emit_metrics null null null
+        emit_metrics null null
         exit 0
     fi
 fi
@@ -140,7 +151,7 @@ else
 fi
 
 if [[ $output_valid == true ]]; then
-    emit_metrics 1 "$healthy" 1
+    emit_metrics 1 "$healthy"
 else
-    emit_metrics 0 "$healthy" 0
+    emit_metrics 0 "$healthy"
 fi

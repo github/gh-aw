@@ -437,6 +437,7 @@ function evaluateThreshold(value, direction, threshold) {
  * @typedef {object} GraderResult
  * @property {string} id
  * @property {string} name
+ * @property {string} [description]
  * @property {number|null} value
  * @property {string} unit
  * @property {boolean|null} passed
@@ -497,7 +498,7 @@ function buildGradersSummaryBody(results) {
  * Normalize a grader result from either built-in number or custom object return.
  * @param {string} id
  * @param {any} rawResult - number or {value, unit?, passed?, severity?, details?, message?}
- * @param {{name: string, unit: string, direction: string, threshold?: number, source: string, digest?: string}} meta
+ * @param {{name: string, description?: string, unit: string, direction: string, threshold?: number, source: string, digest?: string}} meta
  * @returns {GraderResult}
  */
 function normalizeResult(id, rawResult, meta) {
@@ -505,6 +506,7 @@ function normalizeResult(id, rawResult, meta) {
   const base = {
     id,
     name: meta.name || id,
+    ...(meta.description ? { description: meta.description } : {}),
     value: null,
     unit: meta.unit || "",
     passed: null,
@@ -777,6 +779,7 @@ async function main(manifestB64, execSpecB64) {
   for (const grader of enabledGraders) {
     const meta = {
       name: grader.name || grader.id,
+      description: grader.description || "",
       unit: grader.unit || "",
       direction: grader.direction || "",
       threshold: grader.threshold,

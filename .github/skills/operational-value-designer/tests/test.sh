@@ -12,6 +12,13 @@ grep -Fq 'Choose `run` when the Bash is large enough to obscure the workflow' "$
 grep -Fq '65,536 UTF-8 bytes, inclusive' "$skill_dir/SKILL.md"
 grep -Fq '4,096 Unicode characters, inclusive' "$skill_dir/SKILL.md"
 grep -Fq '`run` does not reduce the generated workflow size' "$skill_dir/SKILL.md"
+grep -Fq 'comment the workflow intent and the meaning of every emitted metric' "$skill_dir/SKILL.md"
+grep -Fq 'ultimate operational condition' "$skill_dir/SKILL.md"
+grep -Fq 'Select the furthest downstream rung that satisfies all three' "$skill_dir/SKILL.md"
+grep -Fq 'observable at grading time, attributable to this run or its exact subject, and independently verifiable' "$skill_dir/SKILL.md"
+grep -Fq 'why stronger downstream effects are unavailable' "$skill_dir/SKILL.md"
+grep -Fq 'Never reward output merely for existing' "$skill_dir/SKILL.md"
+grep -Fq 'Missing evidence for the selected rung returns `null`; it never causes runtime fallback to a weaker rung' "$skill_dir/SKILL.md"
 
 evaluator_path=$($skill_dir/scripts/operational-value-evaluator-path.sh daily-file-diet)
 [[ $evaluator_path == .github/graders/daily-file-diet-operational-value.sh ]]
@@ -38,6 +45,7 @@ printf '%s\n' "$request" | jq -e '
     and .run.sha == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     and .run.eventName == "workflow_dispatch"
     and (.event | type == "object")
+    and (.outputs | type == "array")
     and .config.verification == true
 ' >/dev/null
 printf 'verification diagnostic\n' >&2
@@ -75,6 +83,7 @@ jq -n '
             eventName: "workflow_dispatch"
         },
         event: {},
+        outputs: [],
         config: {verification: true, case: $case}
     };
     [

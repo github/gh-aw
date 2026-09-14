@@ -224,11 +224,12 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       const result = runOperationalValueGrader(
         "operational-value",
         evaluator,
-        { name: "Operational Value", unit: "ratio", direction: "higher_is_better", source: "operational-value" },
+        { name: "Operational Value", description: "Whether the run attained its outcome", unit: "ratio", direction: "higher_is_better", source: "operational-value" },
         { env: { ...process.env, GITHUB_RUN_ID: "1", GITHUB_RUN_ATTEMPT: "1" }, event: {}, outputs: [{ type: "noop", message: "nothing to do" }] }
       );
 
       expect(result.value).toBe(0.75);
+      expect(result.description).toBe("Whether the run attained its outcome");
       expect(result.metrics).toEqual([
         { id: "goal-attained", value: 0.75 },
         { id: "evidence-available", value: 1 },
