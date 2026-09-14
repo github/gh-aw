@@ -64,8 +64,13 @@ const ENGINE_RATE_LIMIT_429_RE =
   /(?:\b429\b[\s\S]{0,120}(?:too many requests|rate[\s-]*limit)|\brate_limit_(?:error|exceeded)\b|capierror:\s*429|failed to get response from the ai model[\s\S]{0,120}\b429\b|exceeded your rate limit for utility models)/i;
 const ENGINE_MAX_RUNS_EXCEEDED_RE = /(?:\bmax_runs_exceeded\b|\bmaximum\s+llm\s+invocations\s+exceeded\b)/i;
 const COPILOT_ORG_BILLING_MODE_RE = /API proxy enabled:[^\n]*Copilot=true \(github-token\)/i;
-const COPILOT_ORG_BILLING_ERROR_RE =
-  /(?:awf-reflect: models fetch returned 403\b|Copilot requests authentication failed through the gh-aw API proxy \(HTTP 403\b|Authentication failed with provider at (?:https?:\/\/)?(?:api-proxy|(?:172\.(?:1[6-9]|2\d|3[01])|10|192\.168)\.\d+\.\d+)(?::\d+)?[^\n]*\(HTTP 403\)|Access denied by policy settings|invalid access to inference)/i;
+// Host allowlist kept aligned with isLikelyAWFAPIProxyURL in copilot_harness.cjs:
+// awf_reflect rewrites api-proxy to host-bridge addresses for host execution.
+const AWF_API_PROXY_HOST_RE_SOURCE = "(?:api-proxy|host\\.docker\\.internal|localhost|127(?:\\.\\d{1,3}){3}|10(?:\\.\\d{1,3}){3}|192\\.168(?:\\.\\d{1,3}){2}|172\\.(?:1[6-9]|2\\d|3[01])(?:\\.\\d{1,3}){2})";
+const COPILOT_ORG_BILLING_ERROR_RE = new RegExp(
+  `(?:awf-reflect: models fetch returned 403\\b|Copilot requests authentication failed through the gh-aw API proxy \\(HTTP 403\\b|Authentication failed with provider at (?:https?:\\/\\/)?${AWF_API_PROXY_HOST_RE_SOURCE}(?::\\d+)?[^\\n]*\\(HTTP 403\\))`,
+  "i"
+);
 const ALLOWED_FILES_ERROR_RE = /^(?<summary>.*outside the allowed-files list) \((?<files>.+?)\)\. (?<remediation>Add the files to the allowed-files configuration field or remove them from the (?:patch|bundle)\.)$/;
 
 /**
@@ -276,6 +281,7 @@ function buildFailureMatchCategories(options) {
   if (options.secretVerificationFailed) categories.push("secret_verification_failed");
   if (options.hasDockerSbxSecretsFailed) categories.push("docker_sbx_secrets_missing");
   if (options.inferenceAccessError) categories.push("inference_access_error");
+  if (options.copilotOrgBillingError) categories.push("copilot_org_billing_error");
   if (options.mcpPolicyError) categories.push("mcp_policy_error");
   if (options.modelNotSupportedError) categories.push("model_not_supported_error");
   if (options.http400ResponseError) categories.push("http_400_response_error");
@@ -328,6 +334,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.http400ResponseError
  * @param {boolean} options.unknownModelAICredits
  * @param {boolean} [options.hasDockerSbxSecretsFailed]
+ * @param {boolean} [options.copilotOrgBillingError]
  * @param {boolean} [options.missingModelPricingError]
  * @param {string} [options.missingModelPricingModelName]
  * @param {boolean} [options.shellExpansionGuardRejected]
@@ -358,6 +365,7 @@ function buildFailureIssueTitle(options) {
   if (options.hasStaleLockFileFailed) return `[aw] ${workflowName} has stale lock file`;
   if (options.shellExpansionGuardRejected) return `[aw] ${workflowName} hit shell expansion guard rejection`;
   if (options.hasDockerSbxSecretsFailed) return `[aw] ${workflowName} is missing docker-sbx Docker Hub secrets`;
+  if (options.copilotOrgBillingError) return `[aw] ${workflowName} hit Copilot organization billing error`;
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -3886,6 +3894,7 @@ async function main() {
       missingModelPricingError,
       missingModelPricingModelName,
       hasDockerSbxSecretsFailed,
+      copilotOrgBillingError,
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
@@ -3906,6 +3915,7 @@ async function main() {
       secretVerificationFailed: hasSecretVerificationFailed,
       hasDockerSbxSecretsFailed,
       inferenceAccessError,
+      copilotOrgBillingError,
       mcpPolicyError,
       modelNotSupportedError,
       http400ResponseError,

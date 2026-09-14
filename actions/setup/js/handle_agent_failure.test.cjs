@@ -149,6 +149,7 @@ describe("handle_agent_failure", () => {
       { flag: "hasMissingTool", expected: "[aw] Test Workflow is missing required tool" },
       { flag: "hasMissingData", expected: "[aw] Test Workflow is missing required data" },
       { flag: "hasAssignmentErrors", expected: "[aw] Test Workflow failed to assign agent" },
+      { flag: "copilotOrgBillingError", expected: "[aw] Test Workflow hit Copilot organization billing error" },
     ];
 
     it.each(cases)("returns expected title for isolated $flag", ({ flag, expected }) => {
@@ -3615,6 +3616,20 @@ describe("handle_agent_failure", () => {
       fs.writeFileSync(logPath, "[copilot-harness] awf-reflect: models fetch returned 403 for http://api-proxy:10002/models");
       expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
     });
+
+    it.each(["host.docker.internal", "localhost", "127.0.0.1", "10.1.2.3", "192.168.1.4"])("detects provider auth failures against host-bridge proxy host %s", proxyHost => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\nAuthentication failed with provider at http://${proxyHost}:10002 (HTTP 403).`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(true);
+    });
+
+    it.each(["Access denied by policy settings", "invalid access to inference"])("does not classify generic inference access rejection %s as an organization billing error", errorOutput => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\n${errorOutput}`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
+    });
   });
 
   describe("buildModelNotSupportedErrorContext", () => {
@@ -5691,6 +5706,16 @@ describe("handle_agent_failure", () => {
       for (let i = 1; i < categories.length; i++) {
         expect(categories[i] >= categories[i - 1]).toBe(true);
       }
+    });
+
+    it("returns copilot_org_billing_error category instead of the agent_failure fallback", () => {
+      const categories = buildFailureMatchCategories({
+        agentConclusion: "failure",
+        isTimedOut: false,
+        copilotOrgBillingError: true,
+      });
+      expect(categories).toContain("copilot_org_billing_error");
+      expect(categories).not.toContain("agent_failure");
     });
 
     it("returns http_400_response_error category", () => {

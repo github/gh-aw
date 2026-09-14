@@ -1773,6 +1773,7 @@ safe-outputs:
 | `missing_tool` | Required functionality is not available |
 | `missing_data` | Required data is not accessible |
 | `inference_access_error` | AI inference endpoint authentication or access failures |
+| `copilot_org_billing_error` | Copilot authorization failed because organization billing for Copilot CLI is unavailable |
 | `mcp_policy_error` | MCP server policy violations |
 | `ai_credits_rate_limit_error` | AI credits rate limit exceeded |
 | `max_ai_credits_exceeded` | Maximum AI credits budget exceeded |
