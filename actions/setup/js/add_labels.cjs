@@ -77,13 +77,14 @@ function mergeLabelNames(...labelGroups) {
 /**
  * Preserve provider identifiers for labels returned by GitHub while keeping the
  * requested order and recording labels whose API response omits identifiers.
- * @param {Array<string|{name?: string, id?: string|number, node_id?: string}>} labels
+ * @param {any[]} labels
  * @param {string[]} names
  * @returns {Array<{name: string, database_id?: number, node_id?: string}>}
  */
 function buildLabelRecords(labels, names) {
   const detailsByName = new Map((Array.isArray(labels) ? labels : []).filter(label => label && typeof label === "object" && typeof label.name === "string").map(label => [label.name.toLowerCase(), label]));
   return names.map(name => {
+    /** @type {any} */
     const detail = detailsByName.get(name.toLowerCase());
     return {
       name,

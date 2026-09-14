@@ -609,6 +609,7 @@ function createReviewBuffer() {
      * @param {import("./safe_output_execution_metadata.cjs").ReviewState|null} afterState - Post-submit review state
      */
     async function buildReviewSuccessResult(review, resolvedEvent, commentCount, afterState) {
+      /** @type {Array<Record<string, any>>} */
       let reviewComments = comments.slice(0, commentCount).map(comment => ({
         repo,
         pull_request_number: pullRequestNumber,
