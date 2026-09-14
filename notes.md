@@ -1,5 +1,14 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-14 snapshot
+- 50 sessions; **48.0% raw completion** (24 success, 6 failure, 20 action_required), +32pts vs 09-13 (16%), 2nd-highest recorded (23-day mean 29.1%). **Cascade-adjusted completion 52.2%** (24/46) once the 4 merge-invalidation artifacts below are excluded.
+- **EXPERIMENTAL (roll=0): cascade_multiplicity_dual_merge** — for the first time, TWO independent merge_invalidation_cascade events fired in one day from two separate PR merges: PR #60701 (2m14s lifetime) invalidated 1 run (PR Data Prefetch); PR #60702 (~77min lifetime) invalidated 3 runs (CGO, CWI, Doc Build-Deploy), all at 00:28:19Z. Both verified via `gh api pulls`. Confirms cascade size scales with in-flight-workflow count at merge time and fires per-merge-event, not once/day. Effectiveness High; recommend promote (track cascade count/day + PR lifetime as predictor).
+- 2 genuine (non-cascade) review-bot failures also hit `copilot/update-logs-command-support` while PR #60702 was open: Matt Pocock Skills Reviewer, PR Code Quality Reviewer.
+- Only 2 unique branches fired all 50 sessions (ties 09-10 for lowest diversity): `update-logs-command-support` 43/50 (86%, 60.5% success excl. cascade+genuine failures); `update-release-notes-instructions` 7/50 (14%).
+- True-agentic completions (Addressing comment on PR #60702 x2) = 2/2 = 100%, 8th consecutive 100% day. **provenance_inversion NEW RECORD HIGH**: 22/24 successes (91.7%) bot-driven — first time above the historical 75-86% range.
+- burst_clustering rebounded: isolated 66.7% (2/3) vs burst-fired 46.8% (22/47), 1.42x gap, up from 09-13's cascade-contaminated 1.05x near-parity low.
+- Orphans 0/4 open PRs → 0% NORMAL, 23rd consecutive healthy day. Conv logs empty (23rd+ day).
+
 ## 2026-09-13 snapshot
 - 50 sessions; **16.0% raw completion** (8 success, 16 failure, 26 action_required); 21-day mean (cache-memory) 29.7%. **Cascade-adjusted completion 23.5%** (8/34) once the merge-invalidation artifacts below are excluded.
 - **merge_invalidation_cascade — largest instance recorded (6th occurrence)**: PR #60561 merged at 05:18:27Z invalidated all 16 of today's failures on `copilot/fix-github-actions-job-failure` (incl. 8 reviewer-bot workflows firing/failing in a 4s window), 4x the prior peak of 4 runs. Verified via `gh pr list`. Excluding these, that branch converts 2 success/1 action_required = 66.7% (healthy).
@@ -36,7 +45,9 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - inverse_gate_count_to_conclusiveness: Copilot-assigned ⇒ never orphaned (~38th healthy day).
 - gate_sweep_zero_duration: snapshots routinely catch 45-50 action_required 0-duration runs.
 - recovery_regression_oscillation: saw-tooth persists; spikes (38-40%) between troughs (0-10%).
-- conversation_log_fetch_failure: 35th+ day (longest unresolved risk; behavioral/loop/context analysis unavailable — metrics are CI/infra metadata only).
+- conversation_log_fetch_failure: 23rd+ recorded day (longest unresolved risk; behavioral/loop/context analysis unavailable — metrics are CI/infra metadata only).
+- merge_invalidation_cascade: 7/23 recorded days; on 09-14 fired TWICE independently in one day (two separate PR merges) — cascade size scales with in-flight-workflow count at merge time, not a single-daily-incident.
+- provenance_inversion: 09-14 set a new high (91.7% bot-driven), first time above the historical 75-86% band.
 - gate_footprint_refire_signature (06-20): refire ratio = runs/distinct-workflows distinguishes broad CI from narrow re-fire.
 - per_branch_gate_fanout (06-26): each PR-open fires a gate bundle; gate_count = f(PR-open), not branch health. **Refined 07-03 (GBCD):** bundle composition is change-TYPE-adaptive — code-change branches fire full 4/4 core CI gates, lint/doc branches fire 0/4 (lightweight agentic wf only), spec branches fire 2/4 + moderation. "~8-workflow uniform bundle" was an over-generalization from a code-heavy snapshot.
 - gate_bundle_composition_divergence (07-03, experimental): fraction of open branches deviating from the full core CI gate set; 62.5% (5/8) diverged today. Distinguishes deterministic CI overhead from change-type-specific triggers.
