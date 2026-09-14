@@ -1,13 +1,8 @@
 {
-  "last_run_id": "34673807576",
-  "last_run_date": "2026-09-12",
-  "status": "SECURE",
-  "techniques_tested_this_run": 10,
-  "techniques_blocked_this_run": 10,
-  "cumulative_runs": 47,
-  "cumulative_techniques": 420,
-  "cumulative_escapes": 1,
-  "consecutive_blocks": 419,
-  "squid_version": "7.6-VCS",
-  "key_message": "All 10 escape attempts blocked this run (IDN/punycode encoding, awmg-mcpg endpoint enumeration, HTTP/0.9 legacy smuggling, WebSocket-Upgrade-in-CONNECT, vertical-tab whitespace in CONNECT authority, internal sidecar direct-HTTPS probing, duplicate Host headers, CONNECT+pipelined-request smuggling, read-only nsswitch/hosts tamper attempt, unix socket enumeration). Sandbox secure. Note: transient 403/SERVFAIL observed on allowed domains (api.github.com, github.com, DNS) again this run under Squid CONNECT - same recurring anomaly as many prior runs, flagged for maintainers as reliability issue, not a vulnerability, since example.com was blocked identically (403)."
+  "last_run_id": "34807416060",
+  "last_updated": "2026-09-14T04:59:05Z",
+  "outcome": "VULNERABILITY_DETECTED",
+  "vulnerability": "SNI/domain-fronting bypass via CONNECT tunnel to CDN-shared allowed domain (registry.npmjs.org -> Cloudflare -> example.com/.org/.net reachable)",
+  "total_techniques_tried": 401,
+  "successful_escapes": 1
 }

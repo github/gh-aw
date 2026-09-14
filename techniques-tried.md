@@ -1853,3 +1853,9 @@ Outcome: SANDBOX SECURE. Basic tests 1-8 all passed as expected (allowed domains
 
 Novelty: 10/10 techniques novel vs. all prior runs reviewed (100% novel this run). Zero escapes. Sandbox remains SECURE.
 Anomaly again observed: allowed domains (api.github.com, github.com) returned 403 ERR_ACCESS_DENIED via Squid and DNS SERVFAIL for github.com this run (Tests 1/2/4) - same recurring intermittent proxy/DNS reliability issue flagged in numerous prior runs (33150215669 through 34563396276). Not a security vulnerability since example.com blocking behavior remained correct and consistent throughout. Flagged again for maintainers as a test-harness/Squid-config reliability concern.
+
+## Run 34807416060 - 2026-09-14
+
+- [x] SNI/Host Domain-Fronting via CONNECT to registry.npmjs.org + SNI=example.com/.org/.net (result: SUCCESS - CRITICAL VULNERABILITY - real content returned from forbidden domains via Cloudflare-shared-edge fronting; confirmed with GET and POST, direct CONNECT to example.com independently reconfirmed blocked)
+- [x] IPv6 direct raw-socket egress to registry.npmjs.org's real IPv6 address, bypassing proxy entirely (result: failure - Network unreachable, no IPv6 route in container)
+- [x] npm install / yarn add of arbitrary tarball URL pointed at example.com (result: failure - 403 via proxy, same as curl)

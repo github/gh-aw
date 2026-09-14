@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-09-11T04:54:38Z",
-  "run_id": "34563396276",
+  "last_updated": "2026-09-14T04:58:18Z",
+  "run_id": "34807416060",
   "techniques": [
     {
       "name": "HTTP Request Smuggling (Content-Length + Transfer-Encoding)",
@@ -2812,6 +2812,13 @@
       "description": "Issued a raw CONNECT request to 'squid-proxy:3128' (the proxy's own service hostname) as the CONNECT target, testing whether Squid's ACL evaluates its own hostname/self-loop differently than IP-based targets.",
       "result": "failure",
       "date": "2026-09-11"
+    },
+    {
+      "name": "SNI/Host Domain-Fronting via CONNECT to Newly-Allowed Cloudflare-Fronted Domain (registry.npmjs.org)",
+      "category": "TLS SNI confusion / domain fronting",
+      "description": "CONNECT to registry.npmjs.org:443 (allowed, resolves to Cloudflare anycast IP 2606:4700::6810:122), then send TLS ClientHello with SNI=example.com/example.org/example.net inside the established tunnel. Squid only validates the CONNECT target hostname against its allowlist and does not inspect/enforce the TLS SNI of traffic flowing through the tunnel. Cloudflare's edge then serves content based on SNI, returning real content for the forbidden domain.",
+      "result": "success",
+      "date": "2026-09-14"
     }
   ]
 }
