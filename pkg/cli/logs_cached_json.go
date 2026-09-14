@@ -2,11 +2,14 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,23 +96,45 @@ type cachedLogsJSONLCache struct {
 	workflowRunLists map[string]json.RawMessage
 }
 
+type preparedCachedLogsJSONL struct {
+	cache       *cachedLogsJSONLCache
+	writer      *cachedLogsJSONLWriter
+	sourcePaths []string
+	wildcard    bool
+}
+
 func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 	if path == "" {
 		return nil, nil
 	}
-	data, err := os.ReadFile(path)
+	cache := &cachedLogsJSONLCache{
+		runs:             make(cachedLogsRuns),
+		workflowRunLists: make(map[string]json.RawMessage),
+	}
+	recordCount, err := visitCachedLogsJSONLRecords(path, func(record cachedLogsJSONLRecord, recordNumber int) error {
+		return cache.addRecord(record, recordNumber)
+	})
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cached logs JSONL file not found: "+path))
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read cached logs JSONL: %w", err)
+		return nil, err
+	}
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf(
+		"Found cached logs JSONL file: %s (lines=%d, runs=%d, workflow_run_lists=%d)",
+		path, recordCount, len(cache.runs), len(cache.workflowRunLists),
+	)))
+	logsCacheLog.Printf("Loaded %d run records and %d workflow run lists from cached logs JSONL", len(cache.runs), len(cache.workflowRunLists))
+	return cache, nil
+}
+
+func visitCachedLogsJSONLRecords(path string, visit func(cachedLogsJSONLRecord, int) error) (int, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read cached logs JSONL: %w", err)
 	}
 	lines := bytes.Split(data, []byte{'\n'})
-	cache := &cachedLogsJSONLCache{
-		runs:             make(cachedLogsRuns, len(lines)),
-		workflowRunLists: make(map[string]json.RawMessage),
-	}
 	recordCount := 0
 	for index, line := range lines {
 		if len(bytes.TrimSpace(line)) == 0 {
@@ -122,18 +147,50 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 				logsCacheLog.Printf("Ignoring incomplete final cached logs JSONL record: %v", err)
 				break
 			}
-			return nil, fmt.Errorf("failed to parse cached logs JSONL record %d: %w", index+1, err)
+			return recordCount, fmt.Errorf("failed to parse cached logs JSONL record %d: %w", index+1, err)
 		}
-		if err := cache.addRecord(record, index+1); err != nil {
-			return nil, err
+		if err := visit(record, index+1); err != nil {
+			return recordCount, err
 		}
 	}
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf(
-		"Found cached logs JSONL file: %s (lines=%d, runs=%d, workflow_run_lists=%d)",
-		path, recordCount, len(cache.runs), len(cache.workflowRunLists),
-	)))
-	logsCacheLog.Printf("Loaded %d run records and %d workflow run lists from cached logs JSONL", len(cache.runs), len(cache.workflowRunLists))
-	return cache, nil
+	return recordCount, nil
+}
+
+func loadCachedLogsJSONLFiles(paths []string) (*cachedLogsJSONLCache, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	merged := &cachedLogsJSONLCache{
+		runs:             make(cachedLogsRuns),
+		workflowRunLists: make(map[string]json.RawMessage),
+	}
+	for _, path := range paths {
+		cache, err := loadCachedLogsJSONL(path)
+		if err != nil {
+			return nil, err
+		}
+		if cache == nil {
+			continue
+		}
+		for id, run := range cache.runs {
+			if _, exists := merged.runs[id]; exists {
+				warnDuplicateCachedLogsJSONLRecord(fmt.Sprintf("Duplicate cached logs JSONL run record for run %d in %s; newer cache file wins", id, path))
+			}
+			merged.runs[id] = run
+		}
+		for key, payload := range cache.workflowRunLists {
+			if _, exists := merged.workflowRunLists[key]; exists {
+				warnDuplicateCachedLogsJSONLRecord(fmt.Sprintf("Duplicate cached workflow runs JSONL record in %s; newer cache file wins", path))
+			}
+			merged.workflowRunLists[key] = append(json.RawMessage(nil), payload...)
+		}
+	}
+	return merged, nil
+}
+
+func warnDuplicateCachedLogsJSONLRecord(message string) {
+	logsCacheLog.Print(message)
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 }
 
 func prepareCachedLogsJSONL(opts *LogsDownloadOptions) error {
@@ -146,13 +203,186 @@ func prepareCachedLogsJSONL(opts *LogsDownloadOptions) error {
 	if opts.cachedJSONLWriter != nil {
 		return nil
 	}
-	cache, err := loadCachedLogsJSONL(opts.CachedJSONL)
+	prepared, err := prepareCachedLogsJSONLPath(opts.CachedJSONL)
 	if err != nil {
 		return err
 	}
-	opts.cachedJSONLCache = cache
-	opts.cachedJSONLWriter = newCachedLogsJSONLWriter(opts.CachedJSONL)
+	opts.CachedJSONL = prepared.writer.path
+	opts.cachedJSONLCache = prepared.cache
+	opts.cachedJSONLWriter = prepared.writer
+	opts.cachedJSONLSourcePaths = prepared.sourcePaths
+	opts.cachedJSONLWildcard = prepared.wildcard
 	return nil
+}
+
+func prepareCachedLogsJSONLPath(path string) (preparedCachedLogsJSONL, error) {
+	sourcePaths, writerPath, wildcard, err := resolveCachedLogsJSONLPaths(path)
+	if err != nil {
+		return preparedCachedLogsJSONL{}, err
+	}
+	cache, err := loadCachedLogsJSONLFiles(sourcePaths)
+	if err != nil {
+		return preparedCachedLogsJSONL{}, err
+	}
+	return preparedCachedLogsJSONL{
+		cache:       cache,
+		writer:      newCachedLogsJSONLWriter(writerPath),
+		sourcePaths: sourcePaths,
+		wildcard:    wildcard,
+	}, nil
+}
+
+func resolveCachedLogsJSONLPaths(path string) ([]string, string, bool, error) {
+	if path == "" {
+		return nil, "", false, nil
+	}
+	if !strings.Contains(path, "*") {
+		return []string{path}, path, false, nil
+	}
+	if !strings.HasSuffix(path, "*") || strings.Count(path, "*") != 1 {
+		return nil, "", false, fmt.Errorf("cached logs wildcard must be a trailing prefix match, such as %q", "foo-bar-*")
+	}
+	dir := filepath.Dir(path)
+	prefix := strings.TrimSuffix(filepath.Base(path), "*")
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		writerPath, err := uniqueCachedLogsJSONLPath(dir, prefix)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return nil, writerPath, true, nil
+	}
+	if err != nil {
+		return nil, "", false, fmt.Errorf("failed to list cached logs JSONL directory: %w", err)
+	}
+	sourcePaths := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".jsonl") {
+			sourcePaths = append(sourcePaths, filepath.Join(dir, name))
+		}
+	}
+	sortCachedLogsJSONLSourcePaths(sourcePaths, prefix)
+	writerPath, err := uniqueCachedLogsJSONLPath(dir, prefix)
+	if err != nil {
+		return nil, "", false, err
+	}
+	return sourcePaths, writerPath, true, nil
+}
+
+func sortCachedLogsJSONLSourcePaths(paths []string, prefix string) {
+	slices.SortStableFunc(paths, func(leftPath, rightPath string) int {
+		left, leftErr := os.Stat(leftPath)
+		right, rightErr := os.Stat(rightPath)
+		if leftErr == nil && rightErr == nil && !left.ModTime().Equal(right.ModTime()) {
+			if left.ModTime().Before(right.ModTime()) {
+				return -1
+			}
+			return 1
+		}
+		leftUnix, leftOK := cachedLogsJSONLUnixSuffix(leftPath, prefix)
+		rightUnix, rightOK := cachedLogsJSONLUnixSuffix(rightPath, prefix)
+		if leftOK && rightOK && leftUnix != rightUnix {
+			if leftUnix < rightUnix {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(leftPath, rightPath)
+	})
+}
+
+func cachedLogsJSONLUnixSuffix(path, prefix string) (int64, bool) {
+	name := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	suffix, ok := strings.CutPrefix(name, prefix)
+	if !ok {
+		return 0, false
+	}
+	digitCount := 0
+	for digitCount < len(suffix) && suffix[digitCount] >= '0' && suffix[digitCount] <= '9' {
+		digitCount++
+	}
+	if digitCount == 0 {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(suffix[:digitCount], 10, 64)
+	return value, err == nil
+}
+
+func uniqueCachedLogsJSONLPath(dir, prefix string) (string, error) {
+	for range 16 {
+		var random [8]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			return "", fmt.Errorf("failed to generate cached logs JSONL file name: %w", err)
+		}
+		name := fmt.Sprintf("%s%d-%s.jsonl", prefix, time.Now().Unix(), hex.EncodeToString(random[:]))
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			return path, nil
+		} else if err != nil {
+			return "", fmt.Errorf("failed to check cached logs JSONL file name: %w", err)
+		}
+	}
+	return "", errors.New("failed to generate a unique cached logs JSONL file name")
+}
+
+func finalizeCachedLogsJSONL(writer *cachedLogsJSONLWriter, sourcePaths []string, wildcard bool, startDate, endDate string) error {
+	return errors.Join(
+		writer.filterDateRange(startDate, endDate),
+		pruneCachedLogsJSONLWildcardSources(sourcePaths, wildcard, startDate, endDate),
+	)
+}
+
+func pruneCachedLogsJSONLWildcardSources(sourcePaths []string, wildcard bool, startDate, endDate string) error {
+	if !wildcard || len(sourcePaths) == 0 || (startDate == "" && endDate == "") {
+		return nil
+	}
+	dateRange, err := newCachedLogsJSONLDateRange(startDate, endDate)
+	if err != nil {
+		return err
+	}
+	var result error
+	for _, path := range sourcePaths {
+		hasMatch, canDelete, err := cachedLogsJSONLFileDateRangeStatus(path, dateRange)
+		if err != nil {
+			result = errors.Join(result, err)
+			continue
+		}
+		if hasMatch || !canDelete {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			result = errors.Join(result, fmt.Errorf("failed to delete out-of-range cached logs JSONL file %s: %w", path, err))
+		}
+	}
+	return result
+}
+
+func cachedLogsJSONLFileDateRangeStatus(path string, dateRange cachedLogsJSONLDateRange) (bool, bool, error) {
+	hasMatchingRun := false
+	hasDatedRun := false
+	hasPreservedRecord := false
+	_, err := visitCachedLogsJSONLRecords(path, func(record cachedLogsJSONLRecord, _ int) error {
+		if record.Kind != cachedLogsJSONLKindRun ||
+			record.SchemaVersion != cachedLogsJSONLSchemaVersion ||
+			record.Run == nil ||
+			record.Run.CreatedAt.IsZero() {
+			hasPreservedRecord = true
+			return nil
+		}
+		hasDatedRun = true
+		if dateRange.includes(record.Run.CreatedAt) {
+			hasMatchingRun = true
+		}
+		return nil
+	})
+	if err != nil {
+		return false, false, err
+	}
+	return hasMatchingRun, hasDatedRun && !hasPreservedRecord, nil
 }
 
 func (cache *cachedLogsJSONLCache) addRecord(record cachedLogsJSONLRecord, recordNumber int) error {

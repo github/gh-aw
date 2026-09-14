@@ -276,7 +276,7 @@ For workflows that build, test, publish a GitHub release, and generate release h
 - structure: **Classic + Agent** hybrid — all build/test/release jobs are standard GitHub Actions jobs; the agent job runs last and only updates the release description
 - classic jobs: `config` (compute semver), `build` (compile + upload artifact), `test`, `release` (create prerelease with `--generate-notes --latest=false`); output `release_id` from the release job
 - agent job: depends on `release` job; pre-fetches merged PRs and changelog in `steps:`; uses `tools: cli-proxy: true`; writes highlights via `update-release` with `operation: prepend`
-- safe output: `update-release` with `threat-detection: false` (release bodies contain code snippets)
+- safe output: agent-generated release notes and release-description changes must use `update-release`; never mutate releases directly with `gh`, the GitHub API, or a GitHub write tool; set `threat-detection: false` because release bodies can contain code snippets
 - permissions: global `contents: read`; per-job `contents: write` only on jobs that push tags or create releases
 
 See [release-workflow.md](release-workflow.md) for the full pattern, frontmatter template, job skeletons, and reference implementation pointer.

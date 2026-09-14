@@ -111,6 +111,9 @@ func TestNewLogsCommand(t *testing.T) {
 	cachedJSONLFlag := flags.Lookup("cached-jsonl")
 	require.NotNil(t, cachedJSONLFlag, "Should have 'cached-jsonl' flag")
 	assert.Contains(t, cachedJSONLFlag.Usage, "cached logs JSONL")
+	cachedLogsFlag := flags.Lookup("cached-logs")
+	require.NotNil(t, cachedLogsFlag, "Should have 'cached-logs' flag")
+	assert.Contains(t, cachedLogsFlag.Usage, "wildcard")
 	drain3WeightsFlag := flags.Lookup("drain3-weights")
 	require.NotNil(t, drain3WeightsFlag, "Should have 'drain3-weights' flag")
 	assert.Contains(t, drain3WeightsFlag.Usage, "existing Drain3 weights")
@@ -138,6 +141,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"max-storage", "0"},
 		{"prune-older-runs", "false"},
 		{"cached-jsonl", ""},
+		{"cached-logs", ""},
 		{"drain3-weights", ""},
 	}
 
@@ -172,6 +176,16 @@ func TestLogsCommandCachedJSONLOption(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "current.jsonl", opts.CachedJSONL)
+}
+
+func TestLogsCommandCachedLogsAliasOption(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("cached-logs", "logs-*"))
+
+	opts, err := loadCommonLogsOptions(cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, "logs-*", opts.CachedJSONL)
 }
 
 func TestLogsCommandDrain3WeightsOption(t *testing.T) {

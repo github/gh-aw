@@ -541,3 +541,23 @@ func typeSetKeys(typeSet map[string]struct{}) []string {
 	}
 	return out
 }
+
+func TestGenerateCentralSlashCommandWorkflow_CheckoutDoesNotPersistCredentials(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "central-slash-workflow-persist-creds")
+	data := []*WorkflowData{
+		{
+			WorkflowID:         "triage",
+			Command:            []string{"triage"},
+			CommandEvents:      []string{"issue_comment"},
+			CommandCentralized: true,
+		},
+	}
+
+	require.NoError(t, GenerateCentralSlashCommandWorkflow(context.Background(), data, tmpDir, nil))
+	content, err := os.ReadFile(filepath.Join(tmpDir, centralSlashCommandWorkflowFilename))
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "      - name: Checkout repository\n        uses: "+getActionPin("actions/checkout")+"\n        with:\n          persist-credentials: false\n")
+	require.NotContains(t, text, "persist-credentials: true")
+}

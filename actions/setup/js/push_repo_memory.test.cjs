@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { execSync } from "child_process";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
+import { configureRepoMemoryMergePolicy } from "./push_repo_memory.cjs";
 
 describe("push_repo_memory.cjs - globPatternToRegex helper", () => {
   describe("basic pattern matching", () => {
@@ -1825,6 +1830,62 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       // Must include guidance about unsupported file types in the fallback message
       expect(scriptContent).toContain("symlinks");
     });
+  });
+});
+
+describe("push_repo_memory.cjs - concurrent merge policy", () => {
+  it("keeps rows from both sides of a conflicting JSONL merge", () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-jsonl-merge-"));
+    global.core = { debug: vi.fn(), error: vi.fn() };
+
+    try {
+      execSync("git init -b memory/test", { cwd: repoDir, stdio: "pipe" });
+      execSync("git config user.name test", { cwd: repoDir });
+      execSync("git config user.email test@example.com", { cwd: repoDir });
+
+      fs.writeFileSync(path.join(repoDir, "history.jsonl"), '{"id":"base"}\n');
+      execSync("git add history.jsonl && git commit -m base", { cwd: repoDir, stdio: "pipe" });
+
+      execSync("git switch -c remote-change", { cwd: repoDir, stdio: "pipe" });
+      fs.appendFileSync(path.join(repoDir, "history.jsonl"), '{"id":"remote"}\n');
+      execSync("git commit -am remote", { cwd: repoDir, stdio: "pipe" });
+
+      execSync("git switch memory/test", { cwd: repoDir, stdio: "pipe" });
+      fs.appendFileSync(path.join(repoDir, "history.jsonl"), '{"id":"local"}\n');
+      execSync("git commit -am local", { cwd: repoDir, stdio: "pipe" });
+
+      configureRepoMemoryMergePolicy(repoDir);
+      execSync("git merge --no-edit -X ours remote-change", { cwd: repoDir, stdio: "pipe" });
+
+      const rows = fs.readFileSync(path.join(repoDir, "history.jsonl"), "utf8").trim().split("\n");
+      expect(rows).toHaveLength(3);
+      expect(rows).toContain('{"id":"base"}');
+      expect(rows).toContain('{"id":"local"}');
+      expect(rows).toContain('{"id":"remote"}');
+    } finally {
+      delete global.core;
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it("configures the merge policy before the retry pull, in its own try/catch (source check)", () => {
+    const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = fs.readFileSync(scriptPath, "utf8");
+
+    const policyIndex = scriptContent.indexOf("configureRepoMemoryMergePolicy(workspaceDir)");
+    const pullIndex = scriptContent.indexOf('execGitSync(["pull", "--no-rebase", "-X", "ours"');
+
+    // The merge policy must be wired into the retry path and run before the pull
+    expect(policyIndex).toBeGreaterThan(-1);
+    expect(pullIndex).toBeGreaterThan(-1);
+    expect(policyIndex).toBeLessThan(pullIndex);
+
+    // A merge-policy failure must be reported distinctly instead of being
+    // swallowed by the generic "Pull on retry failed" message
+    const between = scriptContent.slice(policyIndex, pullIndex);
+    expect(between).toContain("catch (mergePolicyError)");
+    expect(between).toContain("core.warning");
+    expect(between).not.toContain("Pull on retry failed");
   });
 });
 

@@ -18,7 +18,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
       target-repo: "owner/repo"       # Optional: cross-repository
   ```
 
-- `update-release:` - Update GitHub release descriptions
+- `update-release:` - Update GitHub release descriptions. Agent-generated release notes and release-description changes must use this safe output; never perform those mutations directly with `gh`, the GitHub API, or a GitHub write tool.
 
   ```yaml
   safe-outputs:

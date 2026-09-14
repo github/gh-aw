@@ -9,6 +9,9 @@ Use this guidance when the user asks to create a workflow that:
 - Builds, tests, and publishes a GitHub release
 - Generates or prepends release highlights / changelog summaries to the release description
 
+> [!IMPORTANT]
+> Agent-generated release notes and all other agent-driven release-description changes must use the `update-release` safe output. The agent must not mutate releases directly with `gh`, the GitHub API, or a GitHub write tool.
+
 ## Pattern Overview
 
 A release workflow follows the **Classic + Agent** hybrid structure:
@@ -226,7 +229,7 @@ Do not replace the auto-generated notes — prepend only.
 
 ## Key Rules
 
-- **Agent job stays read-only** — all writes route through `update-release`
+- **Agent job stays read-only** — all release-note and release-description writes must route through `update-release`; never use direct `gh`, API, or GitHub write-tool mutations
 - **Use `operation: "prepend"`** so highlights appear before the auto-generated GitHub notes; never `replace`
 - **The `release` job must output `release_id`** — the agent needs the database ID to reference the correct release
 - **Pre-fetch all data in `steps:`** before the agent runs; write compact JSON to `/tmp/gh-aw/agent/release-data/`

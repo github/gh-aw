@@ -13,6 +13,37 @@ const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligib
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 
+const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
+
+/**
+ * Configure a checkout-local merge policy that keeps both sides of conflicting
+ * JSONL regions. The info attributes file is not committed to the memory branch.
+ *
+ * @param {string} workspaceDir
+ */
+function configureRepoMemoryMergePolicy(workspaceDir) {
+  const gitAttributesPath = execGitSync(["rev-parse", "--git-path", "info/attributes"], {
+    cwd: workspaceDir,
+    stdio: "pipe",
+  }).trim();
+  const absoluteAttributesPath = path.isAbsolute(gitAttributesPath) ? gitAttributesPath : path.join(workspaceDir, gitAttributesPath);
+
+  try {
+    const existingAttributes = fs.existsSync(absoluteAttributesPath) ? fs.readFileSync(absoluteAttributesPath, "utf8") : "";
+    const attributeLines = existingAttributes.split(/\r?\n/);
+
+    if (attributeLines.includes(JSONL_MERGE_ATTRIBUTE)) {
+      return;
+    }
+
+    fs.mkdirSync(path.dirname(absoluteAttributesPath), { recursive: true });
+    const separator = existingAttributes.length > 0 && !existingAttributes.endsWith("\n") ? "\n" : "";
+    fs.appendFileSync(absoluteAttributesPath, `${separator}${JSONL_MERGE_ATTRIBUTE}\n`, "utf8");
+  } catch (error) {
+    throw new Error(`Failed to configure repo-memory merge attributes: ${getErrorMessage(error)}`, { cause: error });
+  }
+}
+
 /**
  * Push repo-memory changes to git branch
  * Environment variables:
@@ -654,9 +685,15 @@ async function main() {
           if (remoteHead && remoteHead !== currentBaseRef) {
             currentBaseRef = remoteHead;
             core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
-            // Merge the concurrent remote changes (ours wins on conflicts).
+            // Merge concurrent remote changes. JSONL conflicts keep rows from
+            // both sides; other file types retain the local version.
             // Note: this may produce a merge commit; if so, pushSignedCommits
             // will fall back to git push for this retry attempt.
+            try {
+              configureRepoMemoryMergePolicy(workspaceDir);
+            } catch (mergePolicyError) {
+              core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
+            }
             try {
               execGitSync(["pull", "--no-rebase", "-X", "ours", repoUrlWithToken, branchName], { stdio: "inherit", suppressLogs: true });
             } catch (pullError) {
@@ -686,4 +723,4 @@ async function main() {
   }
 }
 
-module.exports = { main };
+module.exports = { configureRepoMemoryMergePolicy, main };

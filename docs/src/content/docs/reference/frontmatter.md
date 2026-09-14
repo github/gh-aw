@@ -22,7 +22,7 @@ tools:
 
 ## Frontmatter Elements
 
-Below is a comprehensive reference to all available frontmatter fields for GitHub Agentic Workflows.
+This page summarizes the available frontmatter fields for GitHub Agentic Workflows.
 
 ### Description (`description:`)
 
@@ -75,27 +75,7 @@ it in generated lock-file metadata without fetching it or changing workflow exec
 
 ### Trigger Events (`on:`)
 
-The `on:` section uses standard GitHub Actions syntax to define workflow triggers, with additional fields for security and approval controls:
-
-- Standard GitHub Actions triggers (push, pull_request, issues, schedule, etc.)
-- `reaction:` - Add emoji reactions to triggering items
-- `status-comment:` - Post a started/completed comment with a workflow run link (automatically enabled for `slash_command` and `label_command` triggers; must be explicitly set to `true` for other trigger types). Accepts a boolean or an object with optional `issues`, `pull-requests`, and `discussions` toggle fields to selectively disable status comments for specific target types.
-- `stop-after:` - Automatically disable triggers after a deadline
-- `manual-approval:` - Require manual approval using environment protection rules
-- `forks:` - Configure fork filtering for pull_request triggers
-- `skip-roles:` - Skip workflow execution for specific repository roles
-- `skip-bots:` - Skip workflow execution for specific GitHub actors
-- `skip-author-associations:` - Skip execution for configured event + `author_association` combinations
-- `roles:` - Restrict which repository roles can trigger the workflow (default: `[admin, maintainer, write]`)
-- `bots:` - Allow specific bot accounts to trigger the workflow
-- `skip-if-match:` - Skip execution when a search query has matches (supports `scope: none`; use top-level `on.github-token` / `on.github-app` for custom auth)
-- `skip-if-no-match:` - Skip execution when a search query has no matches (supports `scope: none`; use top-level `on.github-token` / `on.github-app` for custom auth)
-- `steps:` - Inject custom deterministic steps into the pre-activation job (saves one workflow job vs. multi-job pattern)
-- `restore-memory:` - Opt in to restoring memory stores before `on.steps` in pre-activation (default: `false`)
-- `permissions:` - Grant additional GitHub token scopes to the pre-activation job (for use with `on.steps:` API calls)
-- `needs:` - Add custom job dependencies that both `pre_activation` and `activation` must wait for
-- `github-token:` - Custom token for activation job reactions, status comments, and skip-if search queries
-- `github-app:` - GitHub App for minting a short-lived token used by the activation job and all skip-if search steps
+The `on:` section uses standard GitHub Actions trigger syntax and adds controls for reactions, status comments, deadlines, approval, fork handling, actor filtering, search-based skipping, pre-activation steps, job dependencies, and trigger-specific authentication.
 
 See [Trigger Events](/gh-aw/reference/triggers/) for complete documentation.
 
@@ -285,24 +265,12 @@ Installs Copilot skills in the activation job before the agent runs.
 
 Supported entry formats:
 
-- String form (shared authentication):
-  - `skills/name` or `.github/skills/name` (local development path; installed with `--from-local`)
-  - `owner/repo@<ref>`
-  - `owner/repo/skill/path@<ref>`
-- Object form (per-skill authentication):
-  - `skill` (required)
-  - `github-token` (optional)
-  - `github-app` (optional)
+- String form with shared authentication: `skills/name` or `.github/skills/name` for local development, `owner/repo@<ref>`, or `owner/repo/skill/path@<ref>`
+- Object form with per-skill authentication: `skill` (required), plus optional `github-token` or `github-app`
 
-`github-token` and `github-app` are mutually exclusive for each object entry.
-`github-token` must be an expression such as `${{ secrets.NAME }}` or
-`${{ needs.auth.outputs.token }}`.
-`<ref>` may be a branch, tag, or 40-character lowercase commit SHA. Non-SHA
-refs are resolved and rewritten to the matching commit SHA at compile time.
-If resolution fails (for example, due to missing network access or authentication),
-the compiler keeps the original unpinned ref and emits a warning. Omitting the ref
-(`owner/repo@`) installs from the repository's default branch on every run
-and is not pinned; the compiler emits a warning recommending an explicit ref.
+`github-token` and `github-app` are mutually exclusive for each object entry. `github-token` must be an expression such as `${{ secrets.NAME }}` or `${{ needs.auth.outputs.token }}`.
+
+`<ref>` may be a branch, tag, or 40-character lowercase commit SHA. Non-SHA refs are resolved and rewritten to the matching commit SHA at compile time. If resolution fails (for example, due to missing network access or authentication), the compiler keeps the original unpinned ref and emits a warning. Omitting the ref (`owner/repo@`) installs from the repository's default branch on every run and is not pinned, so the compiler warns and recommends an explicit ref.
 
 ```yaml wrap
 skills:
@@ -348,13 +316,8 @@ Shared agentic workflows may also declare plugins. When the same plugin path is 
 
 Supported entry formats:
 
-- String form (shared authentication):
-  - `owner/repo@<ref>`
-  - `owner/repo/plugins/path@<ref>`
-- Object form (per-plugin authentication):
-  - `plugin` (required)
-  - `github-token` (optional)
-  - `github-app` (optional)
+- String form with shared authentication: `owner/repo@<ref>` or `owner/repo/plugins/path@<ref>`
+- Object form with per-plugin authentication: `plugin` (required), plus optional `github-token` or `github-app`
 
 `github-token` and `github-app` are mutually exclusive for each object entry. By default (string form, or object form without either field), the checkout step uses the workflow's default `github.token`, which cannot read private repositories. Set a per-plugin `github-token` or `github-app` to install a plugin from a private repository:
 
@@ -445,9 +408,9 @@ runs-on-slim: ubuntu-slim            # Defaults to ubuntu-slim (framework jobs o
 timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minutes
 ```
 
-`runs-on` applies to the main agent job only. `runs-on-slim` applies to all framework/generated jobs (activation, safe-outputs, unlock, etc.), accepts the same string, array, or runner-group object forms as `runs-on`, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` also accept the same runner forms and take precedence where applicable.
+`runs-on` applies to the main agent job only. `runs-on-slim` applies to all framework/generated jobs (activation, safe-outputs, unlock, etc.), accepts the same string, array, or runner-group object forms as `runs-on`, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` accept the same runner forms and take precedence where applicable.
 
-`timeout-minutes` accepts an integer or a GitHub Actions expression string (e.g. `${{ inputs.timeout }}`), letting a reusable `workflow_call` workflow parameterize its own timeout from caller inputs. It bounds the `agentic_execution` step and defaults to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` before a 20-minute fallback. The generated jobs are bounded separately: `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}` or 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}` or 10 minutes), each covering every step of its job. It applies to the workflow being compiled, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:` — GitHub rejects `timeout-minutes` there.
+`timeout-minutes` accepts an integer or a GitHub Actions expression string such as `${{ inputs.timeout }}`. It bounds the `agentic_execution` step and defaults to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` before a 20-minute fallback. Generated jobs are bounded separately by `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}` or 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}` or 10 minutes). It applies to the workflow being compiled, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:`.
 
 **Supported runners for `runs-on:`**
 
@@ -647,7 +610,7 @@ observability:
 
 ### Resources (`resources:`)
 
-Declares additional workflow or action files to fetch alongside this workflow when running `gh aw add`. Use this field when the workflow depends on companion workflows or custom actions stored in the same directory.
+Declares additional workflow or action files to fetch alongside this workflow when running `gh aw add`, typically when the workflow depends on companion workflows or custom actions stored in the same directory.
 
 ```yaml wrap
 resources:
@@ -660,9 +623,9 @@ Entries are relative paths from the workflow's location in the source repository
 
 ### Runtimes (`runtimes:`)
 
-Override default runtime versions for languages and tools used in workflows. The compiler detects which runtimes are needed from tool configurations (e.g. `bash: ["node"]`) and workflow steps, then installs the specified versions. Pin versions for reproducibility, opt into preview releases, or point at custom setup actions (forks, enterprise mirrors).
+Override default runtime versions for languages and tools used in workflows. The compiler detects required runtimes from tool configurations (for example `bash: ["node"]`) and workflow steps, then installs the specified versions. Pin versions for reproducibility, opt into preview releases, or point at custom setup actions such as forks or enterprise mirrors.
 
-Each runtime takes a required `version` string, plus optional `action-repo` and `action-version` to override the default setup action:
+Each runtime takes a required `version` string plus optional `action-repo` and `action-version` fields to override the default setup action:
 
 | Runtime | Default Version | Default Setup Action |
 |---------|----------------|---------------------|
@@ -773,7 +736,7 @@ Enable experimental or optional compiler and runtime behaviors as key-value pair
 
 ### Strict Mode (`strict:`)
 
-Enables enhanced security validation for production workflows (default: `true`).
+Enables enhanced security validation for production workflows. Default: `true`.
 
 ```yaml wrap
 strict: false  # Disable enhanced security validation for development/testing
@@ -787,4 +750,4 @@ See [Network Permissions - Strict Mode Validation](/gh-aw/reference/network/#str
 
 ## Learn More
 
-See also: [Trigger Events](/gh-aw/reference/triggers/), [AI Engines](/gh-aw/reference/engines/), [CLI Commands](/gh-aw/setup/cli/), [Workflow Structure](/gh-aw/reference/workflow-structure/), [Network Permissions](/gh-aw/reference/network/), [Feature Flags](/gh-aw/reference/feature-flags/), [Custom Steps and Jobs](/gh-aw/reference/steps-jobs/), [OpenTelemetry Guide](/gh-aw/reference/open-telemetry/), [Command Triggers](/gh-aw/reference/command-triggers/), [MCPs](/gh-aw/guides/mcps/), [Tools](/gh-aw/reference/tools/), [Imports](/gh-aw/reference/imports/)
+See also: [Trigger Events](/gh-aw/reference/triggers/), [AI Engines](/gh-aw/reference/engines/), [CLI Commands](/gh-aw/setup/cli/), [Workflow Structure](/gh-aw/reference/workflow-structure/), [Network Permissions](/gh-aw/reference/network/), [Feature Flags](/gh-aw/reference/feature-flags/), [Custom Steps and Jobs](/gh-aw/reference/steps-jobs/), [OpenTelemetry Guide](/gh-aw/reference/open-telemetry/), [Command Triggers](/gh-aw/reference/command-triggers/), [MCPs](/gh-aw/guides/mcps/), [Tools](/gh-aw/reference/tools/), and [Imports](/gh-aw/reference/imports/).

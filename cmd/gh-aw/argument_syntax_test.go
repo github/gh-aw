@@ -120,7 +120,7 @@ func TestArgumentSyntaxConsistency(t *testing.T) {
 		{
 			name:           "update command has optional workflow",
 			command:        cli.NewUpdateCommand(validateEngine),
-			expectedUse:    "update [workflow]...",
+			expectedUse:    "update [workflow-or-package]...",
 			argsValidator:  "no validator (all optional)",
 			shouldValidate: func(cmd *cobra.Command) error { return nil },
 		},

@@ -305,7 +305,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		return err
 	}
 	defer func() {
-		err = errors.Join(err, opts.cachedJSONLWriter.filterDateRange(opts.StartDate, opts.EndDate))
+		err = errors.Join(err, finalizeCachedLogsJSONL(opts.cachedJSONLWriter, opts.cachedJSONLSourcePaths, opts.cachedJSONLWildcard, opts.StartDate, opts.EndDate))
 	}()
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)

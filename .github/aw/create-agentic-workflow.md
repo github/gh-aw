@@ -28,7 +28,7 @@ Load these topic files only when relevant:
 - [deployment-status.md](deployment-status.md) for external deployment monitoring
 - [charts.md](charts.md) for chart-generation workflows
 - [report.md](report.md) for reporting output structure and recurring report lifecycle
-- [release-workflow.md](release-workflow.md) for release workflows that build, test, publish a GitHub release, and generate release highlights
+- [release-workflow.md](release-workflow.md) whenever a workflow creates or updates release notes, including workflows that also build, test, or publish a GitHub release
 - [linter-workflows.md](linter-workflows.md) for mining, refining, or applying custom linter rules
 - [agent-runtime-instructions.md](agent-runtime-instructions.md) when choosing or debugging Docker, gVisor, Docker sbx, ARC DinD, self-hosted runners, or `sandbox.agent.runtime-install`
 - [skills.md](skills.md) when the user asks for specific skills or agent plugins
@@ -36,6 +36,10 @@ Load these topic files only when relevant:
 ## Skills and Plugins
 
 When the user requests specific skills or agent plugins, declare them in the built-in top-level `skills:` and `plugins:` frontmatter fields — gh-aw installs them before the agent runs. Never generate on-the-fly installation (`steps:` running `gh skill install`, `copilot plugin install`, `npx`, `curl`, or `git clone`) and never instruct the agent to install a skill or plugin from the prompt body. See [skills.md](skills.md).
+
+## Release Notes
+
+Any agent-generated release notes or release-description changes must use the `update-release` safe output. Keep the agent job read-only; never grant it write permissions or direct it to mutate a release with `gh`, the GitHub API, or a GitHub write tool.
 
 ## Modes
 
