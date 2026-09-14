@@ -90,7 +90,10 @@ func fixCreatedItemIDSchema(schema *jsonschema.Schema) {
 	if id, ok := schema.Properties["id"]; ok && isUnconstrainedSchema(id) {
 		id.Types = []string{"string", "integer"}
 	}
-	for _, child := range schema.Properties {
+	for name, child := range schema.Properties {
+		if name == "id" {
+			continue
+		}
 		fixCreatedItemIDSchema(child)
 	}
 	if schema.Items != nil {
