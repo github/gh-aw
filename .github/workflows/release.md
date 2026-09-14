@@ -1052,7 +1052,7 @@ evals:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
+    runtime: docker
 ---
 
 # Release Highlights Generator
