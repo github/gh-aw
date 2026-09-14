@@ -90,6 +90,30 @@ graders:
 	}`, output.String())
 }
 
+func TestRunInlineOperationalValueGraderFromStdin(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, `---
+graders:
+  operational-value:
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      [[ $# -eq 0 ]]
+      request=$(cat)
+      value=$(printf '%s' "$request" | jq -r '.score')
+      printf '[{"id":"score","value":%s}]\n' "$value"
+---
+`)
+	var output bytes.Buffer
+	err := runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID,
+		GraderID: "operational-value",
+		Input:    bytes.NewBufferString(`{"score":0.75}`),
+		Output:   &output,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `[{"id":"score","value":0.75}]`, output.String())
+}
+
 func TestRunScriptFileGraderFromStdin(t *testing.T) {
 	workflowID := writeGraderRunWorkflow(t, `---
 graders:

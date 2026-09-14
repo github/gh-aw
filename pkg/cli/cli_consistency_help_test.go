@@ -85,6 +85,7 @@ func TestCLIDocsReflectStatusAuditExperimentsAndGradersCommands(t *testing.T) {
 	assert.Contains(t, text, "#### `experiments`", "CLI setup docs should include the experiments command")
 	assert.Contains(t, text, "#### `graders`", "CLI setup docs should include the graders command")
 	assert.Contains(t, text, "cat request.json | gh aw graders run daily-file-diet operational-value", "graders docs should show one-shot operational-value execution")
+	assert.Contains(t, text, "graders.operational-value.script", "graders docs should describe embedded operational-value execution")
 	assert.NotContains(t, text, "graders operational-value", "graders docs should not advertise removed historical regrading")
 	assert.Contains(t, text, "#### `doctor`", "CLI setup docs should include the doctor command")
 	assert.Contains(t, text, "The `audit` command has two modes", "audit docs should describe the current two-mode behavior")

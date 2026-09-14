@@ -23,7 +23,8 @@ func newGradersRunCommand() *cobra.Command {
 		Short: "Run one workflow grader with a JSON payload",
 		Long: `Run one grader declared by a local workflow. When run-id is provided, the
 preprocessed payload is downloaded from the run's agent artifact. Otherwise,
-the JSON payload is read from standard input.`,
+the JSON payload is read from standard input. Operational-value graders execute
+either embedded Bash from the script field or a Bash file referenced by run.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` graders run weekly-research loops 123456789
   cat payload.json | ` + string(constants.CLIExtensionPrefix) + ` graders run weekly-research loops`,
 		Args: cobra.RangeArgs(2, 3),

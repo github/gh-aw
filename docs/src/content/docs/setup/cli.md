@@ -589,8 +589,10 @@ The diff output shows: new or removed network domains, status changes (allowed â
 
 Run one grader declared by a local workflow against a saved run payload or JSON
 from standard input. Operational-value evaluators use the same one-shot request
-shape as workflow execution and return an ordered metric array; they require
-standard input because historical replay is not supported.
+shape as workflow execution and return an ordered metric array. The command
+executes either Bash embedded in `graders.operational-value.script` or a Bash
+file referenced by `graders.operational-value.run`; operational-value graders
+require standard input because historical replay is not supported.
 
 ```bash wrap
 gh aw graders run weekly-research loops 123456789
