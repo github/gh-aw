@@ -1355,6 +1355,16 @@ func TestResolveCreatedItems(t *testing.T) {
 		items := resolveCreatedItems(dir, nil)
 		assert.Nil(t, items)
 	})
+
+	t.Run("does not fall back to cached safe outputs when manifest exists but is empty", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, safeOutputItemsManifestFilename), []byte(""), 0600))
+		cached := []CreatedItemReport{{Type: "create_issue", Number: 42, Repo: "owner/repo"}}
+
+		items := resolveCreatedItems(dir, cached)
+
+		assert.Nil(t, items)
+	})
 }
 
 func TestParseStepFilename(t *testing.T) {

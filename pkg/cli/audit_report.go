@@ -658,14 +658,18 @@ func extractCreatedItemsFromManifest(logsPath string) []CreatedItemReport {
 
 // resolveCreatedItems returns created items read from the on-disk safe-output manifest
 // at logsPath, falling back to entities already carried in-memory (e.g. from a cached
-// usage/activity summary) when the manifest file is absent — such as when an
-// `--artifacts usage`-only cache is reused and the manifest was never downloaded.
+// usage/activity summary) only when the manifest file itself is absent — such as when an
+// `--artifacts usage`-only cache is reused and the manifest was never downloaded. A manifest
+// file that exists but legitimately contains no created items is not treated as missing, so
+// runs with no safe outputs are reported as empty rather than falling back to stale cached data.
 func resolveCreatedItems(logsPath string, cachedSafeOutputs []CreatedItemReport) []CreatedItemReport {
-	items := extractCreatedItemsFromManifest(logsPath)
-	if len(items) == 0 && len(cachedSafeOutputs) > 0 {
-		return cachedSafeOutputs
+	if logsPath != "" {
+		manifestPath := filepath.Join(logsPath, safeOutputItemsManifestFilename)
+		if _, err := os.Stat(manifestPath); err == nil {
+			return extractCreatedItemsFromManifest(logsPath)
+		}
 	}
-	return items
+	return cachedSafeOutputs
 }
 
 // describeFile provides a short description for known artifact files
