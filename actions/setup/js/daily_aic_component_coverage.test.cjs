@@ -189,6 +189,8 @@ it("counts missing evals accounting as zero when the successful-path upload step
     ]
   );
   await expect(f.result).resolves.toBe(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"evals"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
 });
 
 it("counts missing evals accounting as zero for a legacy failed evals job", async () => {
@@ -211,7 +213,7 @@ it("counts missing evals accounting as zero for a legacy failed evals job", asyn
   await expect(f.result).resolves.toBe(2);
 });
 
-it("still requires evals accounting when collection did not succeed", async () => {
+it("counts missing evals accounting as zero when collection did not succeed", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
@@ -227,10 +229,10 @@ it("still requires evals accounting when collection did not succeed", async () =
       }),
     ]
   );
-  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+  await expect(f.result).resolves.toBe(2);
 });
 
-it("still requires evals accounting when collection succeeded but the eval artifact upload failed", async () => {
+it("counts missing evals accounting as zero when the eval artifact upload failed", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
@@ -246,10 +248,10 @@ it("still requires evals accounting when collection succeeded but the eval artif
       }),
     ]
   );
-  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+  await expect(f.result).resolves.toBe(2);
 });
 
-it("still requires evals accounting when the current failure upload was skipped", async () => {
+it("counts missing evals accounting as zero when the current failure upload was skipped", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
@@ -266,17 +268,19 @@ it("still requires evals accounting when the current failure upload was skipped"
       }),
     ]
   );
-  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+  await expect(f.result).resolves.toBe(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"evals"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
 });
 
-it("still requires evals accounting when the job failed before any step ran", async () => {
+it("counts missing evals accounting as zero when the job failed before any step ran", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
     },
     [job("agent"), job("evals", { conclusion: "failure", steps: [] })]
   );
-  await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
+  await expect(f.result).resolves.toBe(2);
 });
 
 it("still requires accounting when a failed agent job has no authoritative source", async () => {

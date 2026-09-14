@@ -430,12 +430,6 @@ await main();`
 
 // buildUploadEvalsArtifactStep creates the step that uploads evals.jsonl as the
 // evals artifact for downstream consumption.
-//
-// The step names "Collect evals token usage", "Upload evals results", and
-// "Upload evals accounting after failure" are matched by name in
-// actions/setup/js/daily_aic_component_coverage.cjs (provesFailedEvalsHadNoUsage)
-// to prove a failed evals job had zero billable usage. Renaming these steps
-// requires updating that check too.
 func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
 	proxyLogsDir := constants.AWFProxyLogsDir.String()
