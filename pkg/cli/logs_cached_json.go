@@ -751,6 +751,9 @@ func normalizeCachedLogRun(run *RunData) error {
 	return nil
 }
 
+// cachedJSONLCanSatisfy permits cached records only for the compact usage
+// artifact, whose JSON includes the metadata required for cached reports.
+// Parsing, auditing, training, and tool graphs require raw artifact files.
 func cachedJSONLCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
 	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !audit && !train && !toolGraph
 }
