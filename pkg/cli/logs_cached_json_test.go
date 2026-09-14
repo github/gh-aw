@@ -231,7 +231,8 @@ func TestCachedLogsJSONLWriterIncludesAuditArtifacts(t *testing.T) {
 
 	var safeOutputRecord cachedLogsJSONLRecord
 	require.NoError(t, json.Unmarshal(lines[1], &safeOutputRecord))
-	assert.Equal(t, cachedLogsJSONLKindSafeOutput, safeOutputRecord.Kind)
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
+	assert.Equal(t, wantSafeOutputKind, safeOutputRecord.Kind)
 	require.NotNil(t, safeOutputRecord.SafeOutput)
 	assert.Equal(t, int64(42), safeOutputRecord.SafeOutput.RunID)
 	assert.Equal(t, "create_issue", safeOutputRecord.SafeOutput.Type)
@@ -265,7 +266,8 @@ func TestCachedLogsJSONLWriterIncludesSafeOutputsWithoutAudit(t *testing.T) {
 
 	var safeOutputRecord cachedLogsJSONLRecord
 	require.NoError(t, json.Unmarshal(lines[1], &safeOutputRecord))
-	assert.Equal(t, cachedLogsJSONLKindSafeOutput, safeOutputRecord.Kind)
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
+	assert.Equal(t, wantSafeOutputKind, safeOutputRecord.Kind)
 	require.NotNil(t, safeOutputRecord.SafeOutput)
 	assert.Equal(t, int64(42), safeOutputRecord.SafeOutput.RunID)
 	assert.Equal(t, "linear", safeOutputRecord.SafeOutput.Provider)
@@ -294,14 +296,16 @@ func TestCachedLogsJSONLWriterEmitsOneEventPerSafeOutputItem(t *testing.T) {
 
 	var runRecord cachedLogsJSONLRecord
 	require.NoError(t, json.Unmarshal(lines[0], &runRecord))
-	assert.Equal(t, cachedLogsJSONLKindRun, runRecord.Kind)
+	wantRunKind := cachedLogsJSONLKindRun
+	assert.Equal(t, wantRunKind, runRecord.Kind)
 	require.Len(t, runRecord.Run.SafeOutputs, 3)
 
 	wantTypes := []string{"create_issue", "add_labels", "linear_add_comment"}
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
 	for i, line := range lines[1:] {
 		var record cachedLogsJSONLRecord
 		require.NoError(t, json.Unmarshal(line, &record))
-		assert.Equal(t, cachedLogsJSONLKindSafeOutput, record.Kind)
+		assert.Equal(t, wantSafeOutputKind, record.Kind)
 		require.NotNil(t, record.SafeOutput)
 		assert.Equal(t, int64(99), record.SafeOutput.RunID)
 		assert.Equal(t, wantTypes[i], record.SafeOutput.Type)
@@ -327,7 +331,8 @@ func TestCachedLogsJSONLWriterOmitsSafeOutputEventsWhenNoItems(t *testing.T) {
 	require.Len(t, lines, 1)
 	var record cachedLogsJSONLRecord
 	require.NoError(t, json.Unmarshal(lines[0], &record))
-	assert.Equal(t, cachedLogsJSONLKindRun, record.Kind)
+	wantRunKind := cachedLogsJSONLKindRun
+	assert.Equal(t, wantRunKind, record.Kind)
 }
 
 func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {
