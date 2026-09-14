@@ -34,6 +34,7 @@ import { noExecInterpolatedCommandRule } from "./rules/no-exec-interpolated-comm
 import { requireExecSyncTryCatchRule } from "./rules/require-execsync-try-catch";
 import { requireExecFileSyncTryCatchRule } from "./rules/require-execfilesync-try-catch";
 import { requireFsIoTryCatchRule } from "./rules/require-fs-io-try-catch";
+import { requireFsStatAccessTryCatchRule } from "./rules/require-fs-stat-access-try-catch";
 import { noSetFailedThenExitZeroRule } from "./rules/no-setfailed-then-exit-zero";
 import { noErrStackThenStringFallbackRule } from "./rules/no-err-stack-then-string-fallback";
 import { noCaughtErrorInterpolationRule } from "./rules/no-caught-error-interpolation";
@@ -103,6 +104,7 @@ const plugin = {
     "require-execsync-try-catch": requireExecSyncTryCatchRule,
     "require-execfilesync-try-catch": requireExecFileSyncTryCatchRule,
     "require-fs-io-try-catch": requireFsIoTryCatchRule,
+    "require-fs-stat-access-try-catch": requireFsStatAccessTryCatchRule,
     "no-setfailed-then-exit-zero": noSetFailedThenExitZeroRule,
     "no-err-stack-then-string-fallback": noErrStackThenStringFallbackRule,
     "no-caught-error-interpolation": noCaughtErrorInterpolationRule,

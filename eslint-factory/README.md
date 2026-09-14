@@ -397,6 +397,33 @@ try {
 }
 ```
 
+### `require-fs-stat-access-try-catch`
+
+Require `fs.lstatSync`, `fs.accessSync`, and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: these synchronous filesystem methods throw when the target path is missing, permissions are denied, or (for `readlinkSync`) the path is not a symlink. An unhandled throw crashes the action without surfacing a useful diagnostic message.
+
+**Detected forms:**
+- `fs.lstatSync(path)` — direct call on a known `require("fs")` result.
+- `fs["accessSync"](path, fs.constants.X_OK)` — computed string-literal property access.
+- `const { readlinkSync } = require("fs"); readlinkSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace imports: `import * as fs from "fs"; fs.lstatSync(path)`.
+- ESM named imports: `import { accessSync } from "fs"; accessSync(path)`.
+- Bare unbound identifiers: `lstatSync(path)` when `lstatSync` is not a locally bound variable.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Safe alternative:**
+```js
+try {
+  fs.lstatSync(filePath);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
 ### `require-fs-chmod-try-catch`
 
 Require `fs.chmodSync` and `fs.fchmodSync` calls to be wrapped in `try/catch`.
