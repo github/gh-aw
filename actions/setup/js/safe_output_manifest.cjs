@@ -167,7 +167,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
     let jsonLine;
     try {
       const secretValues = collectArtifactSecretValues();
-      const redactedEntry = /** @type {ManifestEntry} */ redactManifestValue(entry, secretValues);
+      const redactedEntry = /** @type {ManifestEntry} */ (redactManifestValue(entry, secretValues));
       jsonLine = JSON.stringify(redactedEntry);
     } catch {
       jsonLine = JSON.stringify({

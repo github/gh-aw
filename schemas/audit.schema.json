@@ -2107,7 +2107,12 @@
               "provider": {
                 "type": "string"
               },
-              "id": true,
+              "id": {
+                "type": [
+                  "string",
+                  "integer"
+                ]
+              },
               "identifier": {
                 "type": "string"
               },

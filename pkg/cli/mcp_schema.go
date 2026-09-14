@@ -74,7 +74,49 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
 	}
+	fixCreatedItemIDSchema(schema)
 	return MarshalOutputSchema(schema)
+}
+
+// fixCreatedItemIDSchema walks the generated schema tree and narrows any
+// "id" property that was inferred as an unconstrained schema (from a Go
+// `any` field, e.g. CreatedItemReport.ID) down to the set of concrete types
+// that safe-output handlers actually populate: a numeric database ID
+// (GitHub) or a string identifier (Jira, Linear, etc.).
+func fixCreatedItemIDSchema(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if id, ok := schema.Properties["id"]; ok && isUnconstrainedSchema(id) {
+		id.Types = []string{"string", "integer"}
+	}
+	for _, child := range schema.Properties {
+		fixCreatedItemIDSchema(child)
+	}
+	if schema.Items != nil {
+		fixCreatedItemIDSchema(schema.Items)
+	}
+	for _, child := range schema.ItemsArray {
+		fixCreatedItemIDSchema(child)
+	}
+	if schema.AdditionalProperties != nil {
+		fixCreatedItemIDSchema(schema.AdditionalProperties)
+	}
+	for _, child := range schema.OneOf {
+		fixCreatedItemIDSchema(child)
+	}
+	for _, child := range schema.AnyOf {
+		fixCreatedItemIDSchema(child)
+	}
+	for _, child := range schema.AllOf {
+		fixCreatedItemIDSchema(child)
+	}
+}
+
+// isUnconstrainedSchema reports whether a schema imposes no type constraint,
+// which is how jsonschema-go represents a Go `any`/`interface{}` field.
+func isUnconstrainedSchema(schema *jsonschema.Schema) bool {
+	return schema != nil && schema.Type == "" && schema.Types == nil
 }
 
 type cachedLogsJSONLRunItemSchema struct {

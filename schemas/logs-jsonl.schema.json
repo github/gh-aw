@@ -893,7 +893,12 @@
                   "provider": {
                     "type": "string"
                   },
-                  "id": true,
+                  "id": {
+                    "type": [
+                      "string",
+                      "integer"
+                    ]
+                  },
                   "identifier": {
                     "type": "string"
                   },
@@ -3202,7 +3207,12 @@
                       "provider": {
                         "type": "string"
                       },
-                      "id": true,
+                      "id": {
+                        "type": [
+                          "string",
+                          "integer"
+                        ]
+                      },
                       "identifier": {
                         "type": "string"
                       },
