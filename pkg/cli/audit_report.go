@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"os"
@@ -665,8 +666,14 @@ func extractCreatedItemsFromManifest(logsPath string) []CreatedItemReport {
 func resolveCreatedItems(logsPath string, cachedSafeOutputs []CreatedItemReport) []CreatedItemReport {
 	if logsPath != "" {
 		manifestPath := filepath.Join(logsPath, safeOutputItemsManifestFilename)
-		if _, err := os.Stat(manifestPath); err == nil {
+		_, err := os.Stat(manifestPath)
+		switch {
+		case err == nil:
 			return extractCreatedItemsFromManifest(logsPath)
+		case errors.Is(err, os.ErrNotExist):
+			// Manifest genuinely absent (e.g. usage-only cache reuse); fall back below.
+		default:
+			auditReportLog.Printf("Error checking safe-output manifest %s: %v", manifestPath, err)
 		}
 	}
 	return cachedSafeOutputs
