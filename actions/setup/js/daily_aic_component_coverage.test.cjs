@@ -249,7 +249,7 @@ it("still requires evals accounting when collection succeeded but the eval artif
   await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
 });
 
-it("still requires evals accounting when the current failure upload was skipped and redaction did not succeed", async () => {
+it("still requires evals accounting when the current failure upload was skipped", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":2}',
@@ -267,35 +267,6 @@ it("still requires evals accounting when the current failure upload was skipped 
     ]
   );
   await expect(f.result).rejects.toThrow("Missing accounting for executed evals component");
-});
-
-it("counts missing evals accounting as zero for a legacy run where both upload steps were skipped despite successful redaction", async () => {
-  // This reproduces runs compiled before "Upload evals results" gained its
-  // always() condition: an unrelated earlier step (e.g. "Install AWF binary")
-  // failed the job, but redaction still ran and succeeded, so GitHub Actions
-  // implicitly skipped the success-path upload (ANDed with success()) while
-  // the failure-path upload's own condition (outcome != 'success') also
-  // evaluated false, leaving both uploads skipped.
-  const f = evaluate(
-    {
-      "agent/token_usage.jsonl": '{"aic":2}',
-    },
-    [
-      job("agent"),
-      job("evals", {
-        conclusion: "failure",
-        steps: [
-          { name: "Install AWF binary", conclusion: "failure" },
-          { name: "Redact secrets in evals results", conclusion: "success" },
-          { name: "Collect evals token usage", conclusion: "success" },
-          { name: "Upload evals results", conclusion: "skipped" },
-          { name: "Upload evals accounting after failure", conclusion: "skipped" },
-        ],
-      }),
-    ]
-  );
-  await expect(f.result).resolves.toBe(2);
-  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
 });
 
 it("still requires evals accounting when the job failed before any step ran", async () => {

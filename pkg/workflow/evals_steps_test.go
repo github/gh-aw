@@ -233,8 +233,9 @@ func TestBuildEvalsJobStepsRenderSummary(t *testing.T) {
 	if !strings.Contains(allSteps, "render_evals_summary.cjs") {
 		t.Errorf("expected render_evals_summary.cjs reference in evals job steps;\ngot:\n%s", allSteps)
 	}
-	if !strings.Contains(allSteps, "if: always() && steps.redact_evals_results.outcome == 'success'") {
-		t.Errorf("expected redact outcome gating for render/upload steps;\ngot:\n%s", allSteps)
+	const successPathCondition = "if: always() && steps.redact_evals_results.outcome == 'success'"
+	if strings.Count(allSteps, successPathCondition) != 2 {
+		t.Errorf("expected redact outcome gating for both render and upload steps;\ngot:\n%s", allSteps)
 	}
 
 	// The render step must appear after the redact step (redact before publish to step summary).

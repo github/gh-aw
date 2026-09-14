@@ -70,8 +70,7 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
 // steps requires updating this list too, or this check silently stops matching.
 function provesFailedEvalsHadNoUsage(job) {
   if (job.conclusion !== "failure" || !Array.isArray(job.steps)) return false;
-  const conclusionOf = name => job.steps.find(step => step.name === name)?.conclusion;
-  const succeeded = name => conclusionOf(name) === "success";
+  const succeeded = name => job.steps.some(step => step.name === name && step.conclusion === "success");
   const hasFailureUpload = job.steps.some(step => step.name === "Upload evals accounting after failure");
   // Legacy workflows had no failure-path accounting upload. Treat a successful
   // collector with no published file as zero usage for those workflows.
@@ -79,21 +78,7 @@ function provesFailedEvalsHadNoUsage(job) {
   // A successful collector only proves the local shell step ran; the eval
   // artifact upload (whichever of the two mutually exclusive steps applies)
   // must also have succeeded, or a transport failure would be miscounted as zero.
-  if (succeeded("Collect evals token usage") && (succeeded("Upload evals results") || succeeded("Upload evals accounting after failure"))) return true;
-  // Runs compiled before the "Upload evals results" step gained its always()
-  // condition could leave BOTH upload steps skipped whenever an unrelated
-  // earlier step failed even though redaction succeeded: GitHub Actions
-  // implicitly ANDed the success-path condition with success(), and the
-  // failure-path condition explicitly requires redaction to have failed, so
-  // neither ran. That combination is impossible for workflows compiled with
-  // the fix (redaction succeeding always triggers exactly one of the two
-  // uploads), so observing it here proves this is a legacy pre-fix run.
-  // Once such runs age out of the rolling accounting window this branch
-  // becomes dead code, but it unblocks the guardrail for them in the meantime.
-  if (succeeded("Collect evals token usage") && succeeded("Redact secrets in evals results") && conclusionOf("Upload evals results") === "skipped" && conclusionOf("Upload evals accounting after failure") === "skipped") {
-    return true;
-  }
-  return false;
+  return succeeded("Collect evals token usage") && (succeeded("Upload evals results") || succeeded("Upload evals accounting after failure"));
 }
 
 function inspectAccountingFile(directory, file) {
