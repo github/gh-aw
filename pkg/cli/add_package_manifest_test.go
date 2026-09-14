@@ -1057,6 +1057,68 @@ files:
 			".github/workflows/dependabot-orchestrator.md",
 		}, packageInstallableSourcePaths(pkg.InstallationSource))
 	})
+
+	t.Run("nested package manifest self-import is ignored with a warning", func(t *testing.T) {
+		downloadPackageFileFromGitHubForHost = func(_ context.Context, owner, repo, path, ref, host string) ([]byte, error) {
+			switch path {
+			case "packages/child/aw.yml":
+				return []byte(`name: Child
+includes:
+  - ./aw.yml
+  - workflows/child.md
+`), nil
+			case "packages/child/README.md":
+				return []byte("# Child\n"), nil
+			default:
+				return nil, createRepositoryPackageNotFoundError(path)
+			}
+		}
+		listPackageWorkflowFilesForHost = func(_ context.Context, owner, repo, ref, workflowPath, host string) ([]string, error) {
+			t.Fatalf("unexpected scan of %s", workflowPath)
+			return nil, nil
+		}
+
+		pkg, err := resolveRepositoryPackage(t.Context(), &RepoSpec{RepoSlug: "owner/repo", PackagePath: "packages/child"}, "")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"packages/child/workflows/child.md"}, packageInstallableSourcePaths(pkg.InstallationSource))
+		assert.Contains(t, pkg.Warnings, `Ignoring includes entry "aw.yml" in packages/child/aw.yml because a manifest cannot import itself`)
+	})
+
+	t.Run("nested package manifest imports the manifest above it", func(t *testing.T) {
+		// packages/child/aw.yml imports ../../aw.yml (the repository root manifest). The
+		// root manifest does not import the child, so this is a plain upward dependency
+		// rather than a cycle.
+		downloadPackageFileFromGitHubForHost = func(_ context.Context, owner, repo, path, ref, host string) ([]byte, error) {
+			switch path {
+			case "packages/child/aw.yml":
+				return []byte(`name: Child
+includes:
+  - ../../aw.yml
+  - workflows/child.md
+`), nil
+			case "packages/child/README.md":
+				return []byte("# Child\n"), nil
+			case "aw.yml":
+				return []byte(`name: Root
+includes:
+  - workflows/root.md
+`), nil
+			default:
+				return nil, createRepositoryPackageNotFoundError(path)
+			}
+		}
+		listPackageWorkflowFilesForHost = func(_ context.Context, owner, repo, ref, workflowPath, host string) ([]string, error) {
+			t.Fatalf("unexpected scan of %s", workflowPath)
+			return nil, nil
+		}
+
+		pkg, err := resolveRepositoryPackage(t.Context(), &RepoSpec{RepoSlug: "owner/repo", PackagePath: "packages/child"}, "")
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"workflows/root.md",
+			"packages/child/workflows/child.md",
+		}, packageInstallableSourcePaths(pkg.InstallationSource))
+	})
 }
 
 func TestResolveLocalRepositoryPackagePreservesIcon(t *testing.T) {

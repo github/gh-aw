@@ -498,7 +498,7 @@ func resolveLocalRepositoryPackage(source string) (*resolvedRepositoryPackage, e
 	}
 	warnings = append(warnings, importWarnings...)
 
-	assets, err := resolveLocalRepositoryPackageManifestNodes(manifestNodes, packageDir)
+	assets, err := resolveLocalRepositoryPackageManifestNodes(manifestNodes, importRoot)
 	if err != nil {
 		return nil, err
 	}

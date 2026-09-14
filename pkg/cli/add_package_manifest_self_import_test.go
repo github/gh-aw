@@ -194,3 +194,53 @@ func TestResolveLocalRepositoryPackageImportCycleThroughNestedManifest(t *testin
 	require.ErrorContains(t, err, "package manifest import cycle detected")
 	require.ErrorContains(t, err, filepath.Join(packageDir, "child", "aw.yml"))
 }
+
+// TestResolveLocalRepositoryPackageImportAboveRootWithoutGit covers the non-git fallback
+// branch of localPackageImportRoot: outside a git repository, imports remain bounded by the
+// package directory itself, so a nested package reaching above it with "../aw.yml" is
+// rejected the same way it would be if it reached above the git root.
+func TestResolveLocalRepositoryPackageImportAboveRootWithoutGit(t *testing.T) {
+	packageDir := testutil.TempDir(t, "test-no-git-package-*")
+
+	writePackageTestFile(t, packageDir, "README.md", "# Local Package\n")
+	writePackageTestFile(t, packageDir, "aw.yml", "name: Local Package\nincludes:\n  - workflows/root.md\n")
+	writePackageTestFile(t, packageDir, "workflows/root.md", selfImportRootWorkflow)
+	writePackageTestFile(t, packageDir, "child/README.md", "# Child Package\n")
+	writePackageTestFile(t, packageDir, "child/aw.yml", "name: Child\nincludes:\n  - ../aw.yml\n  - workflows/child.md\n")
+	writePackageTestFile(t, packageDir, "child/workflows/child.md", selfImportChildWorkflow)
+
+	_, err := resolveLocalRepositoryPackage(filepath.Join(packageDir, "child"))
+	require.ErrorContains(t, err, `import "../aw.yml" resolves outside the repository root`)
+	require.ErrorContains(t, err, filepath.Join(packageDir, "child", "aw.yml"))
+}
+
+// TestResolveLocalRepositoryPackageChildPackageImportsParentManifestRootRelativeAsset covers
+// a nested package importing a parent manifest that lists a repository-root-relative
+// ".github/workflows/" entry. That entry must resolve against the enclosing git repository
+// root, not against the nested package directory selected for installation.
+func TestResolveLocalRepositoryPackageChildPackageImportsParentManifestRootRelativeAsset(t *testing.T) {
+	repoDir := testutil.TempDir(t, "test-parent-import-root-relative-*")
+	packageDir := filepath.Join(repoDir, "local-package")
+	childDir := filepath.Join(packageDir, "child")
+
+	writePackageTestFile(t, repoDir, ".github/workflows/root.md", selfImportRootWorkflow)
+	writePackageTestFile(t, packageDir, "README.md", "# Local Package\n")
+	writePackageTestFile(t, packageDir, "aw.yml", "name: Local Package\nincludes:\n  - .github/workflows/root.md\n")
+	writePackageTestFile(t, packageDir, "child/README.md", "# Child Package\n")
+	writePackageTestFile(t, packageDir, "child/aw.yml", "name: Child\nincludes:\n  - ../aw.yml\n  - workflows/child.md\n")
+	writePackageTestFile(t, packageDir, "child/workflows/child.md", selfImportChildWorkflow)
+
+	runGitFixtureCommand(t, repoDir, "init")
+	runGitFixtureCommand(t, repoDir, "config", "user.name", "Test User")
+	runGitFixtureCommand(t, repoDir, "config", "user.email", "test@example.com")
+	runGitFixtureCommand(t, repoDir, "add", ".github", "local-package")
+	runGitFixtureCommand(t, repoDir, "commit", "-m", "Add local package fixture")
+
+	pkg, err := resolveLocalRepositoryPackage(childDir)
+	require.NoError(t, err)
+	require.NotNil(t, pkg)
+	assert.Equal(t, []string{
+		filepath.Join(repoDir, ".github", "workflows", "root.md"),
+		filepath.Join(childDir, "workflows", "child.md"),
+	}, packageInstallableSourcePaths(pkg.InstallationSource))
+}
