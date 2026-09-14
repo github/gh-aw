@@ -1,9 +1,10 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 70 active analyzers:
+// All 71 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
+//   - blankassigncomma — flags assignment statements where every result is discarded via 2 or more blank identifiers
 //   - bufferresetbeforereuse — flags bytes.Buffer or strings.Builder reuse after a read without an intervening Reset
 //   - bufioscannererunchecked — flags bufio.Scanner loops that do not check Err after scanning completes
 //   - bytesbufferstring — reports string(buf.Bytes()) calls where buf is a bytes.Buffer value and suggests buf.String() instead

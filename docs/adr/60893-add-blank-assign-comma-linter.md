@@ -8,11 +8,11 @@
 
 ### Context
 
-This pull request adds a new Go static analysis linter in `pkg/linters/blankassigncomma/` and registers it in the shared linter registry. The implementation specifically targets assignment statements with two or more consecutive leading blank identifiers such as `_, _ = f()` and `_, _, _ = g()`, while intentionally allowing single blank assignments and mixed blank/real-variable patterns. The PR description and test data frame this pattern as a code smell that can hide unintentionally ignored return values and reduce clarity about whether results should be checked. The architectural question is whether the lint suite should explicitly enforce this code-quality rule as a first-class analyzer.
+This pull request adds a new Go static analysis linter in `pkg/linters/blankassigncomma/` and registers it in the shared linter registry. The implementation specifically targets assignment statements where every result is discarded via two or more blank identifiers such as `_, _ = f()` and `_, _, _ = g()`, while intentionally allowing single blank assignments and any assignment that retains at least one non-blank identifier (e.g. `_, _, err := f()`). The PR description and test data frame this pattern as a code smell that can hide unintentionally ignored return values and reduce clarity about whether results should be checked. The architectural question is whether the lint suite should explicitly enforce this code-quality rule as a first-class analyzer.
 
 ### Decision
 
-We will add a dedicated `blankassigncomma` analyzer to the repository's Go linter suite and run it through the existing analyzer registry. The analyzer will report assignments with two or more consecutive leading blank identifiers, while skipping generated files and respecting `nolint` directives to stay consistent with existing linter behavior. We chose this because the PR evidence shows a recurring pattern in the codebase that is better handled by a reusable static analysis rule than by ad hoc review comments.
+We will add a dedicated `blankassigncomma` analyzer to the repository's Go linter suite and run it through the existing analyzer registry. The analyzer will report assignments where every left-hand side entry is blank and there are two or more of them, while skipping generated files and respecting `nolint` directives to stay consistent with existing linter behavior. Because the codebase still contains such occurrences, the analyzer is registered but tracked as `notYetEnforced` in CI until those are remediated. We chose this because the PR evidence shows a recurring pattern in the codebase that is better handled by a reusable static analysis rule than by ad hoc review comments.
 
 ### Alternatives Considered
 
@@ -22,7 +22,7 @@ The team could leave detection of `_, _ = ...` patterns to human reviewers inste
 
 #### Alternative 2: Broaden or narrow the rule scope
 
-Another option would be to flag every blank assignment, including single-blank cases, or to restrict checks to only exact two-value assignments. This was considered because broader rules would catch more ignored results and narrower rules would reduce false positives. It was not chosen because the PR evidence intentionally treats single blank assignments and mixed blank/real-variable assignments as acceptable, while also covering three-value cases, so the chosen threshold matches the documented intent most closely.
+Another option would be to flag any assignment with two or more leading blank identifiers regardless of trailing non-blank identifiers (e.g. `_, _, err := f()`). This was considered because it would catch more candidate result-ignoring patterns. It was not chosen because such assignments retain and check a value that cannot be dropped, so requiring every left-hand side entry to be blank avoids flagging these legitimate selective-assignment patterns.
 
 ### Consequences
 
@@ -39,7 +39,7 @@ Another option would be to flag every blank assignment, including single-blank c
 #### Neutral
 - The implementation introduces a new package under `pkg/linters/blankassigncomma/` plus testdata fixtures.
 - Analyzer registration changes in `pkg/linters/registry.go` expand the default linter set.
-- The rule only examines assignment statements and counts consecutive leading blank identifiers, leaving other result-ignoring patterns unchanged.
+- The rule only examines assignment statements where every left-hand side entry is blank, leaving other result-ignoring patterns (such as selective assignments that keep one real identifier) unchanged.
 
 ---
 

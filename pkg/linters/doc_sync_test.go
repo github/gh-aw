@@ -23,6 +23,7 @@ var (
 )
 
 var notYetEnforced = map[string]string{
+	"blankassigncomma":            "existing production violations need remediation before enforcement; nolint suppression already works",
 	"bufferresetbeforereuse":      "new correctness analyzer needs an enforcement-readiness audit before native CI enables it",
 	"bufioscannererunchecked":     "existing scanner loops need Err handling before native CI enables it",
 	"errorfwrapv":                 "requires an enforcement audit after the recent false-positive fix (#51928)",

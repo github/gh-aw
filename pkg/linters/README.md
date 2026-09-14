@@ -8,6 +8,7 @@ This package currently provides custom Go analyzers in the following subpackages
 
 - `appendbytestring` — reports `append(b, []byte(s)...)` calls where `b` is `[]byte` and `s` is a string, which can be simplified to `append(b, s...)`.
 - `appendoneelement` — reports `append(s, []T{x}...)` calls where a single-element slice literal is spread and can be simplified to `append(s, x)`.
+- `blankassigncomma` — reports assignment statements where every result is discarded via 2 or more blank identifiers (e.g. `_, _ = f()`), which may indicate unintended result ignoring.
 - `bufferresetbeforereuse` — reports `bytes.Buffer` or `strings.Builder` writes after a read without an intervening `Reset()`, which can accumulate stale content.
 - `bufioscannererunchecked` — reports `bufio.Scanner` loops that do not check `Err()` after scanning completes.
 - `bytescomparestring` — reports `string(a) == string(b)` and `string(a) != string(b)` comparisons where `a` and `b` are `[]byte` values; use `bytes.Equal(a, b)` for `==` and `!bytes.Equal(a, b)` for `!=`.
@@ -106,6 +107,7 @@ environment variable and gates findings on the recorded execution hit count for 
 |------------|-------------|
 | `appendbytestring` | Custom `go/analysis` analyzer that flags `append(b, []byte(s)...)` calls where `s` is a string that can be simplified to `append(b, s...)` |
 | `appendoneelement` | Custom `go/analysis` analyzer that flags `append(s, []T{x}...)` calls where a single-element slice literal is spread and can be simplified to `append(s, x)` |
+| `blankassigncomma` | Custom `go/analysis` analyzer that flags assignment statements where every result is discarded via 2 or more blank identifiers |
 | `bufferresetbeforereuse` | Custom `go/analysis` analyzer that flags `bytes.Buffer` or `strings.Builder` writes after a read without an intervening `Reset()` |
 | `bufioscannererunchecked` | Custom `go/analysis` analyzer that flags `bufio.Scanner` loops that do not check `Err()` after scanning completes |
 | `bytescomparestring` | Custom `go/analysis` analyzer that flags `string(a) == string(b)` / `!=` comparisons on `[]byte` values; use `bytes.Equal(a, b)` for `==` and `!bytes.Equal(a, b)` for `!=` |
