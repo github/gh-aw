@@ -6,6 +6,9 @@ import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
 import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy } from "./push_repo_memory.cjs";
 
+const mockCore = { info: vi.fn() };
+global.core = mockCore;
+
 describe("push_repo_memory.cjs - temporary ID substitutions", () => {
   it("applies final mappings only to memory files selected for persistence", () => {
     const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
@@ -22,6 +25,24 @@ describe("push_repo_memory.cjs - temporary ID substitutions", () => {
       expect(updated).toEqual(["changed.md"]);
       expect(fs.readFileSync(path.join(memoryDir, "changed.md"), "utf8")).toBe("Tracks #42 and other/issues#99.\n");
       expect(fs.readFileSync(path.join(memoryDir, "untouched.md"), "utf8")).toBe("Tracks #aw_parent.\n");
+      expect(mockCore.info).toHaveBeenCalledWith("Rewrote repo-memory file after temporary ID substitution: changed.md");
+    } finally {
+      fs.rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips binary files", () => {
+    const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
+    const binaryPath = path.join(memoryDir, "attachment.bin");
+    const binaryContent = Buffer.from([0x23, 0x61, 0x77, 0x5f, 0x70, 0x61, 0x72, 0x65, 0x6e, 0x74, 0x00]);
+    try {
+      fs.writeFileSync(binaryPath, binaryContent);
+
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "attachment.bin" }], memoryDir, new Map([["aw_parent", { repo: "owner/memory", number: 42 }]]), "owner/memory");
+
+      expect(updated).toEqual([]);
+      expect(fs.readFileSync(binaryPath)).toEqual(binaryContent);
+      expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("attachment.bin"));
     } finally {
       fs.rmSync(memoryDir, { recursive: true, force: true });
     }

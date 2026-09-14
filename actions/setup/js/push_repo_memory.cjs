@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { isUtf8 } = require("buffer");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getGitAuthEnv } = require("./git_auth_helpers.cjs");
@@ -62,12 +63,16 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
   const updatedFiles = [];
   for (const file of files) {
     const filePath = path.join(memoryDir, file.relativePath);
-    let content;
+    let buffer;
     try {
-      content = fs.readFileSync(filePath, "utf8");
+      buffer = fs.readFileSync(filePath);
     } catch (error) {
       throw new Error(`Failed to read memory file ${file.relativePath}: ${getErrorMessage(error)}`, { cause: error });
     }
+    if (buffer.includes(0) || !isUtf8(buffer)) {
+      continue;
+    }
+    const content = buffer.toString("utf8");
     const updatedContent = replaceTemporaryIdReferences(content, temporaryIdMap, currentRepo);
     if (updatedContent !== content) {
       try {
@@ -75,6 +80,7 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
       } catch (error) {
         throw new Error(`Failed to write memory file ${file.relativePath}: ${getErrorMessage(error)}`, { cause: error });
       }
+      core.info(`Rewrote repo-memory file after temporary ID substitution: ${file.relativePath}`);
       updatedFiles.push(file.relativePath);
     }
   }
