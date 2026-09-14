@@ -19,6 +19,7 @@ const {
   runGrader,
   runBuiltinGrader,
   runCustomGrader,
+  runOperationalValueGrader,
   normalizeResult,
   buildGradersSummaryBody,
   evaluateThreshold,
@@ -209,6 +210,29 @@ describe("trace_graders", () => {
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("runOperationalValueGrader", () => {
+    it("uses the first ordered metric as primary and retains diagnostics", () => {
+      const evaluator = `#!/usr/bin/env bash
+set -euo pipefail
+cat >/dev/null
+printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available","value":1}]'
+`;
+      const result = runOperationalValueGrader(
+        "operational-value",
+        evaluator,
+        { name: "Operational Value", unit: "ratio", direction: "higher_is_better", source: "operational-value" },
+        { env: { ...process.env, GITHUB_RUN_ID: "1", GITHUB_RUN_ATTEMPT: "1" }, event: {} }
+      );
+
+      expect(result.value).toBe(0.75);
+      expect(result.metrics).toEqual([
+        { id: "goal-attained", value: 0.75 },
+        { id: "evidence-available", value: 1 },
+      ]);
+      expect(result.diagnostics).toEqual({ "evidence-available": 1 });
     });
   });
 

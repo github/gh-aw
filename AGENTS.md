@@ -32,6 +32,7 @@ Everything else should be loaded **lazily** through skills only when needed.
 7. **Large-file guard**: before reading any file with `github-mcp-server-get_file_contents`, check its size. Files larger than 20 KB must be read with targeted tools (`grep`, `glob`, `bash`, or `view` with `view_range`) instead of full-file reads. See [token-optimization.md](.github/aw/token-optimization.md) for the full technique.
 8. Never ask the user to confirm the plan. Always execute the plan.
 9. **Autopilot mode**: Never ask for confirmation before taking action. Never prompt the user with "Should I proceed?", "Do you want me to…?", or any equivalent. Always act immediately and autonomously.
+10. **Operational-value contract**: Do not edit an enabled evaluator independently of its workflow. Any necessary evaluator change must be made through `.github/skills/operational-value-designer/SKILL.md`. Semantic changes update both at the same path and commit; evaluator-only corrections are prospective, and prior results are never rewritten. Validate changes with `.github/skills/operational-value-designer/scripts/verify-operational-value-contract-change.sh <base-ref>`; reserve `--correction` for explicit defect fixes.
 
 ## Upstream-managed workflow sources (read-only in this repo)
 

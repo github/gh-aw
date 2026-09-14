@@ -6543,8 +6543,6 @@ describe("buildGraderTelemetry", () => {
             status: "pass",
             source: "builtin",
             severity: "info",
-            baselineValue: 0.5,
-            deltaFromBaseline: 0.25,
           },
           { id: "reliability", name: "Reliability", value: null, passed: false, status: "fail", source: "inline" },
           { id: "broken", status: "error", source: "inline" },
@@ -6575,8 +6573,6 @@ describe("buildGraderTelemetry", () => {
         buildDoubleAttr("gh-aw.grader.value", 0.75),
         buildAttr("gh-aw.grader.passed", true),
         buildAttr("gh-aw.grader.severity", "info"),
-        buildDoubleAttr("gh-aw.grader.baseline_value", 0.5),
-        buildDoubleAttr("gh-aw.grader.delta_from_baseline", 0.25),
       ],
     });
   });

@@ -7,6 +7,12 @@ repo_root=$(CDPATH='' cd -- "$skill_dir/../../.." && pwd)
 work_dir=$(mktemp -d "$repo_root/.operational-value-designer-test.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
+grep -Fq 'Choose `script` for compact, workflow-specific Bash' "$skill_dir/SKILL.md"
+grep -Fq 'Choose `run` when the Bash is large enough to obscure the workflow' "$skill_dir/SKILL.md"
+grep -Fq '65,536 UTF-8 bytes, inclusive' "$skill_dir/SKILL.md"
+grep -Fq '4,096 Unicode characters, inclusive' "$skill_dir/SKILL.md"
+grep -Fq '`run` does not reduce the generated workflow size' "$skill_dir/SKILL.md"
+
 evaluator_path=$($skill_dir/scripts/operational-value-evaluator-path.sh daily-file-diet)
 [[ $evaluator_path == .github/graders/daily-file-diet-operational-value.sh ]]
 if "$skill_dir/scripts/operational-value-evaluator-path.sh" ../escape >/dev/null 2>&1; then
@@ -35,11 +41,101 @@ printf '%s\n' "$request" | jq -e '
     and .config.verification == true
 ' >/dev/null
 printf 'verification diagnostic\n' >&2
-printf '%s\n' '[{"id":"correct-triage","value":1},{"id":"label-confidence","value":null}]'
+case_name=$(printf '%s\n' "$request" | jq -r '.config.case // "attained"')
+case "$case_name" in
+    attained)
+        printf '%s\n' '[{"id":"correct-triage","value":1},{"id":"label-confidence","value":null}]'
+        ;;
+    missed)
+        printf '%s\n' '[{"id":"correct-triage","value":0},{"id":"label-confidence","value":null}]'
+        ;;
+    unavailable|malformed)
+        printf '%s\n' '[{"id":"correct-triage","value":null},{"id":"label-confidence","value":null}]'
+        ;;
+    *)
+        exit 1
+        ;;
+esac
 EOF
 chmod +x "$valid_evaluator"
 
 "$skill_dir/scripts/verify-operational-value-evaluator.sh" "$valid_evaluator" >/dev/null
+
+fixtures="$work_dir/fixtures.json"
+jq -n '
+    def request($case): {
+        schemaVersion: 1,
+        run: {
+            id: "1",
+            attempt: 1,
+            repository: "owner/repo",
+            workflow: "Verification workflow",
+            ref: "refs/heads/main",
+            sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            eventName: "workflow_dispatch"
+        },
+        event: {},
+        config: {verification: true, case: $case}
+    };
+    [
+        {name: "attained", request: request("attained"), expected: [{id: "correct-triage", value: 1}, {id: "label-confidence", value: null}]},
+        {name: "missed", request: request("missed"), expected: [{id: "correct-triage", value: 0}, {id: "label-confidence", value: null}]},
+        {name: "unavailable", request: request("unavailable"), expected: [{id: "correct-triage", value: null}, {id: "label-confidence", value: null}]},
+        {name: "malformed", request: request("malformed"), expected: [{id: "correct-triage", value: null}, {id: "label-confidence", value: null}]}
+    ]
+' > "$fixtures"
+"$skill_dir/scripts/verify-operational-value-evaluator.sh" "$valid_evaluator" "$fixtures" >/dev/null
+
+assert_fixtures_rejected() {
+    local name=$1
+    local invalid_fixtures=$2
+    if "$skill_dir/scripts/verify-operational-value-evaluator.sh" "$valid_evaluator" "$invalid_fixtures" >/dev/null 2>&1; then
+        printf 'invalid evaluator fixtures were accepted: %s\n' "$name" >&2
+        exit 1
+    fi
+}
+
+missing_fixture="$work_dir/missing-fixture.json"
+jq 'map(select(.name != "malformed"))' "$fixtures" > "$missing_fixture"
+assert_fixtures_rejected missing-required-case "$missing_fixture"
+
+mismatched_fixture="$work_dir/mismatched-fixture.json"
+jq 'map(if .name == "attained" then .expected[0].value = 0.5 else . end)' "$fixtures" > "$mismatched_fixture"
+assert_fixtures_rejected mismatched-output "$mismatched_fixture"
+
+reversed_fixture="$work_dir/reversed-fixture.json"
+jq 'map(
+    if .name == "attained" then .request.config.case = "missed" | .expected[0].value = 0
+    elif .name == "missed" then .request.config.case = "attained" | .expected[0].value = 1
+    else . end
+)' "$fixtures" > "$reversed_fixture"
+assert_fixtures_rejected reversed-semantics "$reversed_fixture"
+
+contract_repo="$work_dir/contract-repo"
+mkdir -p "$contract_repo/.github/graders" "$contract_repo/.github/workflows"
+git -C "$contract_repo" init -q
+git -C "$contract_repo" config user.email test@example.com
+git -C "$contract_repo" config user.name "Operational Value Test"
+printf '%s\n' '#!/usr/bin/env bash' > "$contract_repo/.github/graders/example-operational-value.sh"
+printf '%s\n' '# Example' > "$contract_repo/.github/workflows/example.md"
+git -C "$contract_repo" add .
+git -C "$contract_repo" commit -qm baseline
+baseline_commit=$(git -C "$contract_repo" rev-parse HEAD)
+
+printf '%s\n' 'printf changed' >> "$contract_repo/.github/graders/example-operational-value.sh"
+if git -C "$contract_repo" -c advice.detachedHead=false \
+    --no-pager diff --quiet "$baseline_commit" -- .github/graders/example-operational-value.sh; then
+    printf 'contract test evaluator did not change\n' >&2
+    exit 1
+fi
+if (cd "$contract_repo" && "$skill_dir/scripts/verify-operational-value-contract-change.sh" "$baseline_commit") >/dev/null 2>&1; then
+    printf 'unpaired evaluator change was accepted\n' >&2
+    exit 1
+fi
+(cd "$contract_repo" && "$skill_dir/scripts/verify-operational-value-contract-change.sh" --correction "$baseline_commit") >/dev/null
+
+printf '%s\n' 'Updated contract.' >> "$contract_repo/.github/workflows/example.md"
+(cd "$contract_repo" && "$skill_dir/scripts/verify-operational-value-contract-change.sh" "$baseline_commit") >/dev/null
 
 make_evaluator() {
     local name=$1

@@ -746,8 +746,6 @@ function buildGraderTelemetry(graderOutput, eventTimeMs) {
     if (typeof result.value === "number" && Number.isFinite(result.value)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.value", result.value));
     if (typeof result.passed === "boolean") resultAttributes.push(buildAttr("gh-aw.grader.passed", result.passed));
     if (typeof result.severity === "string" && result.severity) resultAttributes.push(buildAttr("gh-aw.grader.severity", result.severity));
-    if (typeof result.baselineValue === "number" && Number.isFinite(result.baselineValue)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.baseline_value", result.baselineValue));
-    if (typeof result.deltaFromBaseline === "number" && Number.isFinite(result.deltaFromBaseline)) resultAttributes.push(buildDoubleAttr("gh-aw.grader.delta_from_baseline", result.deltaFromBaseline));
     return { timeUnixNano, name: "grader.result", attributes: resultAttributes };
   });
 

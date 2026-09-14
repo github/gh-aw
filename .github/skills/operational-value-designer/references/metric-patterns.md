@@ -2,6 +2,8 @@
 
 Use these patterns as reasoning examples, not fixed metrics. The workflow Markdown remains authoritative.
 
+For every pattern, adopt the workflow and evaluator together before the first scored run. Keep the evaluator unchanged while workflow intent and acceptance criteria are unchanged. When those semantics change, replace the evaluator at the same path in the same commit; Git history and the archived digest retain the old pair. Corrections are prospective and never rewrite prior results. Keep the metric ID unless the measured outcome itself changes.
+
 ## Threshold maintenance
 
 Example goal: inspect a repository, identify the largest eligible file, and request refactoring when it exceeds a declared threshold.

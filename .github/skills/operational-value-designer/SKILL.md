@@ -25,13 +25,25 @@ The evaluator belongs to one workflow and runs whenever that workflow is graded.
 
 ## Deliverables
 
-Create one executable evaluator at:
+Choose one evaluator form. For a compact evaluator, embed the complete Bash program in the workflow so it travels with the Markdown:
+
+```yaml
+graders:
+  operational-value:
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      request=$(cat)
+      # Compute and print the ordered metric array.
+```
+
+For a larger evaluator, create one executable file at:
 
 ```text
 .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
 
-Configure the workflow:
+and configure the workflow:
 
 ```yaml
 graders:
@@ -39,7 +51,24 @@ graders:
     run: .github/graders/WORKFLOW-NAME-operational-value.sh
 ```
 
-Before implementation, summarize the design in a compact table containing the intent sentence, primary metric and formula, applicability, success evidence, zero condition, null condition, noop interpretation, and required API calls. Surface unresolved ambiguity instead of hiding it in code. Consult [metric patterns](./references/metric-patterns.md) for calibrated examples across maintenance, routing, triage, reporting, releases, research, and expert review.
+Specify exactly one of `script` or `run`. Use this decision rule:
+
+- Choose `script` for compact, workflow-specific Bash that remains easy to review inside the Markdown and can be covered by the workflow's tests.
+- Choose `run` when the Bash is large enough to obscure the workflow, is maintained or reused independently, or benefits from dedicated semantic fixtures and shell tooling.
+
+The operational-value evaluator limit is **65,536 UTF-8 bytes, inclusive**, for both forms. `run` does not permit a larger evaluator. This differs from ordinary custom inline JavaScript graders, whose limit is **4,096 Unicode characters, inclusive**.
+
+Both forms are frozen into the compiled workflow, archived with the run, and identified by the same SHA-256 digest. They produce the same GitHub Actions execution payload, so `run` does not reduce the generated workflow size; Base64 transport adds roughly 33% to the evaluator bytes in either case. Choose by readability and testability, not Actions payload size. If an evaluator exceeds 65,536 bytes, simplify its evidence logic rather than switching forms to bypass the limit.
+
+For a file-backed evaluator, create exact semantic fixtures at:
+
+```text
+.github/graders/WORKFLOW-NAME-operational-value.fixtures.json
+```
+
+Each fixture contains exactly `name`, `request`, and `expected`. Include `attained`, `missed`, `unavailable`, and `malformed`; also include `noop` and `inapplicable` when those states exist. Expected metrics must be exact, ordered, and deterministic. For inline Bash, encode equivalent cases in the workflow's tests and compile the workflow before adoption.
+
+Before implementation, summarize the design in a compact table containing the intent sentence, primary metric and formula, applicability, success evidence, zero condition, null condition, noop interpretation, adoption point, and required API calls. Surface unresolved ambiguity instead of hiding it in code. Consult [metric patterns](./references/metric-patterns.md) for calibrated examples across maintenance, routing, triage, reporting, releases, research, and expert review.
 
 ## Design Procedure
 
@@ -76,7 +105,7 @@ For every input, the function must define whether the run was applicable and whe
 
 First define the unit being evaluated: one event, one issue or pull request, one repository scan, one batch of eligible items, or another subject named by the workflow. Do not default to “one emitted output.” A scheduled monitoring run can be applicable even when it finds no unhealthy items because the repository scan itself is the subject; an item-processing run with no eligible items is usually not applicable.
 
-If the workflow intentionally samples, caps, or rotates through a larger population, the selected sample is the unit. Name and interpret the metric at that scope; do not extrapolate sample performance to the whole repository.
+If the workflow intentionally samples, caps, or rotates through a larger population, state whether the limit defines the intended sample or is only an execution safety cap. A declared sampling rule defines the unit and denominator; a safety cap does not make unprocessed eligible items disappear. Name and interpret a sample metric at that scope; do not extrapolate it to the whole repository.
 
 For workflows driven by user input, bind the unit to that exact target. An otherwise valid result for a different issue, URL, repository, ref, theme, or requested mode scores `0`.
 
@@ -108,6 +137,8 @@ State:
 
 Use only evidence attributable to the run or its subject. Avoid repository-wide changes that could have been caused by unrelated work. Do not add historical replay, maturity periods, baselines, provenance schemas, caches, or opportunity identifiers unless the workflow's own metric genuinely requires them.
 
+The function must be actor-independent: identical accepted evidence must receive the same score whether it was produced by this agent, another engine, a person, or deterministic automation. Agent identity, tool choice, and execution trace are not operands unless the workflow explicitly tests that capability.
+
 Prefer evidence in this order:
 
 1. the event payload and run subject;
@@ -121,7 +152,9 @@ Whenever the metric judges a workflow decision, derive the expected decision ind
 
 When evidence sources conflict, apply an explicit precedence justified by the workflow or return `null`; never choose whichever source produces a better score. Validate current-run caches and precomputed files for their expected completion marker, count, or schema before using them. If an expected batch snapshot is missing, stale, truncated, capped, or only partially parsed, return `null` rather than silently shrinking the denominator. Apply intentional eligibility filters before fixing the denominator, then count every eligible item whether processed or missed.
 
-A declared processing or output cap bounds the selected set; items outside that set are not misses. Within the selected set, compare the complete expected action set with the complete observed request set. This is mandatory for destructive actions such as closing, deleting, relabeling, or superseding items: an unjustified extra mutation is a miss, not partial credit.
+A declared sampling rule bounds the selected set; items outside that intentional sample are not misses. An execution safety cap does not shrink the eligible denominator: score the complete eligible set when evidence supports it, or return `null` when the cap prevents complete evaluation. Within the selected set, compare the complete expected action set with the complete observed request set. This is mandatory for destructive actions such as closing, deleting, relabeling, or superseding items: an unjustified extra mutation is a miss, not partial credit.
+
+For time-based eligibility, use one declared UTC reference instant and define every boundary as inclusive or exclusive. Do not round to dates, use the evaluator's wall clock, or tolerate clock skew unless the workflow explicitly declares that behavior.
 
 Treat thresholds, tolerances, and policy cutoffs as authoritative only when the workflow or a referenced policy declares them. Do not infer a regression threshold from noisy measurements, tune it against the current result, or invent a historical baseline. If a declared benchmark cannot be reproduced under its required environment and inputs, return `null`.
 
@@ -188,7 +221,19 @@ For creative or aesthetic goals with no objective acceptance criteria, do not ma
 
 Validation supports only the property it checks. A passing formatter proves formatting, a focused test proves the tested behavior, and a successful build proves buildability; none alone proves semantic improvement or absence of regressions. Name the metric after the verified property and include every workflow-required check in the expected decision.
 
-Higher must always mean more value. Keep metric IDs stable after adoption.
+Higher must always mean more value. Keep a metric ID stable while it continues to describe the same outcome.
+
+Freeze the metric prospectively to prevent hindsight bias:
+
+- choose the formula, thresholds, evidence rules, and fixtures before inspecting any scored outcomes;
+- commit the workflow and its inline evaluator, or the workflow and referenced evaluator file, together; that commit is the adoption point for the pair;
+- treat the evaluator as read-only while the workflow's intent and acceptance criteria are unchanged;
+- when those workflow semantics change, update the workflow and evaluator together at the same path and commit; the new pair applies only to future runs;
+- allow an evaluator-only defect correction only prospectively, without changing or regrading prior results;
+- retain the metric ID when the measured outcome still means the same thing; choose a new descriptive ID only when the outcome itself changes;
+- score each run with the evaluator bytes and configuration frozen into that run. Never move adoption backward or tune a function against observed scores.
+
+The workflow commit and evaluator digest preserve each historical pair, including inline Bash extracted from the committed Markdown. The current evaluator may replace the old one in the same field or path. Do not add versioned filenames, registries, or a second provenance service.
 
 ### 7. Implement the evaluator
 
@@ -240,8 +285,12 @@ The evaluator must:
 Run:
 
 ```bash
+.github/skills/operational-value-designer/scripts/verify-operational-value-contract-change.sh BASE-REF
+# File-backed evaluator:
 .github/skills/operational-value-designer/scripts/verify-operational-value-evaluator.sh \
-  .github/graders/WORKFLOW-NAME-operational-value.sh
+  .github/graders/WORKFLOW-NAME-operational-value.sh \
+  .github/graders/WORKFLOW-NAME-operational-value.fixtures.json
+# Both forms:
 gh aw compile .github/workflows/WORKFLOW-NAME.md
 ```
 
@@ -253,9 +302,12 @@ Review the design against these checks:
 - Applicable, successful, missed, correct-restraint, and unavailable cases are distinguishable.
 - Evidence is attributable to the run or its subject.
 - The metric uses only evidence available at the grading boundary and does not treat requested safe outputs as applied mutations.
+- Identical accepted evidence scores identically regardless of actor or engine.
 - Zero means observed non-attainment; `null` means no opportunity or unavailable evidence.
 - The denominator cannot silently reward skipped or missing work.
 - Diagnostics are independently useful and do not duplicate the primary metric.
+- The workflow and evaluator were adopted together, and neither the function nor prior results were changed retroactively.
 - External research, if used, changed a definition rather than adding prestige or complexity.
 - The evaluator makes the minimum necessary API calls.
 - The output is only an ordered array of exact `{id,value}` objects.
+- Exact fixtures prove attained scores above missed, unavailable and malformed evidence return the declared result, and repeated evaluation is deterministic.
