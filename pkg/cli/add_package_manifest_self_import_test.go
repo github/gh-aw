@@ -28,7 +28,8 @@ Workflow installed from a package whose nested manifest imports the package root
 
 // writeSelfImportPackageFixture creates a committed local package whose root manifest
 // declares the package workflow files and imports a nested manifest. The nested manifest
-// points back at the package root using the supplied import path.
+// declares the supplied import path, which authors typically write while intending to
+// reference the package root manifest.
 func writeSelfImportPackageFixture(t *testing.T, rootImport string) string {
 	t.Helper()
 
@@ -62,7 +63,7 @@ func runGitFixtureCommand(t *testing.T, dir string, args ...string) {
 	require.NoError(t, err, "git command failed: %s", string(output))
 }
 
-func TestResolveLocalRepositoryPackageNestedManifestImportsRootWithDotSlash(t *testing.T) {
+func TestResolveLocalRepositoryPackageNestedManifestSelfImport(t *testing.T) {
 	packageDir := writeSelfImportPackageFixture(t, "./aw.yml")
 
 	pkg, err := resolveLocalRepositoryPackage(packageDir)
@@ -74,7 +75,7 @@ func TestResolveLocalRepositoryPackageNestedManifestImportsRootWithDotSlash(t *t
 	assert.Contains(t, pkg.Warnings, "Ignoring includes entry \"aw.yml\" in "+filepath.Join(packageDir, "child", "aw.yml")+" because a manifest cannot import itself")
 }
 
-func TestAddWorkflowsLocalPackageNestedManifestImportsRootWithDotSlash(t *testing.T) {
+func TestAddWorkflowsLocalPackageNestedManifestSelfImport(t *testing.T) {
 	packageDir := writeSelfImportPackageFixture(t, "./aw.yml")
 
 	targetDir := testutil.TempDir(t, "test-self-import-target-*")
@@ -94,7 +95,7 @@ func TestAddWorkflowsLocalPackageNestedManifestImportsRootWithDotSlash(t *testin
 	assert.FileExists(t, filepath.Join(targetDir, ".github", "workflows", "root.lock.yml"))
 }
 
-func TestResolveLocalRepositoryPackageNestedManifestImportsRootWithParentPath(t *testing.T) {
+func TestResolveLocalRepositoryPackageNestedManifestImportsPackageRoot(t *testing.T) {
 	packageDir := writeSelfImportPackageFixture(t, "../aw.yml")
 
 	_, err := resolveLocalRepositoryPackage(packageDir)
