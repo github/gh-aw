@@ -87,6 +87,42 @@ func TestJobsWithRepoMemoryDependencies(t *testing.T) {
 	}
 }
 
+func TestJobsWithRepoMemoryWithoutConsolidatedSafeOutputs(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	data := &WorkflowData{
+		Name:   "Test Workflow",
+		AI:     "copilot",
+		RunsOn: "runs-on: ubuntu-latest",
+		RepoMemoryConfig: &RepoMemoryConfig{
+			Memories: []RepoMemoryEntry{{ID: "test-memory", BranchName: "memory-branch"}},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			UploadAssets: &UploadAssetsConfig{},
+		},
+	}
+
+	compiler.stepOrderTracker = NewStepOrderTracker()
+	activationJob, _ := compiler.buildActivationJob(data, false, "", "test.lock.yml")
+	compiler.jobManager.AddJob(activationJob)
+	agentJob, _ := compiler.buildMainJob(data, true)
+	compiler.jobManager.AddJob(agentJob)
+	if err := compiler.buildSafeOutputsJobs(data, string(constants.AgentJobName), "test.md"); err != nil {
+		t.Fatalf("buildSafeOutputsJobs() error: %v", err)
+	}
+
+	pushRepoMemoryJob, err := compiler.buildPushRepoMemoryJob(data, false)
+	if err != nil {
+		t.Fatalf("buildPushRepoMemoryJob() error: %v", err)
+	}
+	if slices.Contains(pushRepoMemoryJob.Needs, string(constants.SafeOutputsJobName)) {
+		t.Error("push_repo_memory should not depend on a consolidated safe_outputs job that was not created")
+	}
+	if strings.Contains(strings.Join(pushRepoMemoryJob.Steps, "\n"), "GH_AW_TEMPORARY_ID_MAP") {
+		t.Error("push_repo_memory should not reference a temporary ID map from a consolidated safe_outputs job that was not created")
+	}
+}
+
 // TestJobsWithCacheMemoryDependencies tests update_cache_memory job positioning
 // This tests the job creation logic when cache-memory config is present
 func TestJobsWithCacheMemoryDependencies(t *testing.T) {

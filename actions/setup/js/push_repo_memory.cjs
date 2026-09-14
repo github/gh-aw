@@ -13,7 +13,7 @@ const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_
 const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
-const { loadTemporaryIdMap, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { loadTemporaryIdMap, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
@@ -53,9 +53,10 @@ function configureRepoMemoryMergePolicy(workspaceDir) {
  * @param {string} memoryDir
  * @param {Map<string, {repo: string, number: number}>} temporaryIdMap
  * @param {string} currentRepo
+ * @param {number} maxFileSize
  * @returns {string[]} relative paths whose contents were updated
  */
-function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, currentRepo) {
+function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, currentRepo, maxFileSize) {
   if (temporaryIdMap.size === 0) {
     return [];
   }
@@ -74,8 +75,12 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
       continue;
     }
     const content = buffer.toString("utf8");
-    const updatedContent = replaceTemporaryIdReferences(content, temporaryIdMap, currentRepo);
+    const updatedContent = replaceTemporaryIdReferencesInPatch(content, temporaryIdMap, currentRepo);
     if (updatedContent !== content) {
+      const updatedSize = Buffer.byteLength(updatedContent, "utf8");
+      if (updatedSize > maxFileSize) {
+        throw new Error(`Rewritten memory file ${file.relativePath} exceeds size limit (${updatedSize} bytes > ${maxFileSize} bytes)`);
+      }
       try {
         fs.writeFileSync(filePath, updatedContent, "utf8");
       } catch (error) {
@@ -528,7 +533,7 @@ async function main() {
 
   try {
     const currentRepo = targetRepo.endsWith(".wiki") ? targetRepo.slice(0, -".wiki".length) : targetRepo;
-    const substitutedFiles = applyTemporaryIdSubstitutions(filesToCopy, destMemoryPath, temporaryIdMap, currentRepo);
+    const substitutedFiles = applyTemporaryIdSubstitutions(filesToCopy, destMemoryPath, temporaryIdMap, currentRepo, maxFileSize);
     if (substitutedFiles.length > 0) {
       core.info(`Applied temporary ID substitutions to ${substitutedFiles.length} memory file(s):`);
       substitutedFiles.forEach(file => core.info(`  - ${file}`));

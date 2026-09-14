@@ -20,7 +20,7 @@ describe("push_repo_memory.cjs - temporary ID substitutions", () => {
         ["aw_external", { repo: "other/issues", number: 99 }],
       ]);
 
-      const updated = applyTemporaryIdSubstitutions([{ relativePath: "changed.md" }], memoryDir, temporaryIdMap, "owner/memory");
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "changed.md" }], memoryDir, temporaryIdMap, "owner/memory", 1024);
 
       expect(updated).toEqual(["changed.md"]);
       expect(fs.readFileSync(path.join(memoryDir, "changed.md"), "utf8")).toBe("Tracks #42 and other/issues#99.\n");
@@ -38,7 +38,7 @@ describe("push_repo_memory.cjs - temporary ID substitutions", () => {
     try {
       fs.writeFileSync(binaryPath, binaryContent);
 
-      const updated = applyTemporaryIdSubstitutions([{ relativePath: "attachment.bin" }], memoryDir, new Map([["aw_parent", { repo: "owner/memory", number: 42 }]]), "owner/memory");
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "attachment.bin" }], memoryDir, new Map([["aw_parent", { repo: "owner/memory", number: 42 }]]), "owner/memory", 1024);
 
       expect(updated).toEqual([]);
       expect(fs.readFileSync(binaryPath)).toEqual(binaryContent);
@@ -53,10 +53,40 @@ describe("push_repo_memory.cjs - temporary ID substitutions", () => {
     try {
       fs.writeFileSync(path.join(memoryDir, "notes.md"), "Tracks #aw_unknown.\n");
 
-      const updated = applyTemporaryIdSubstitutions([{ relativePath: "notes.md" }], memoryDir, new Map(), "owner/memory");
+      const updated = applyTemporaryIdSubstitutions([{ relativePath: "notes.md" }], memoryDir, new Map(), "owner/memory", 1024);
 
       expect(updated).toEqual([]);
       expect(fs.readFileSync(path.join(memoryDir, "notes.md"), "utf8")).toBe("Tracks #aw_unknown.\n");
+    } finally {
+      fs.rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves temporary IDs in issue URLs", () => {
+    const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
+    try {
+      const filePath = path.join(memoryDir, "notes.md");
+      fs.writeFileSync(filePath, "See https://github.com/owner/memory/issues/#aw_parent.\n");
+
+      applyTemporaryIdSubstitutions([{ relativePath: "notes.md" }], memoryDir, new Map([["aw_parent", { repo: "owner/memory", number: 42 }]]), "owner/memory", 1024);
+
+      expect(fs.readFileSync(filePath, "utf8")).toBe("See https://github.com/owner/memory/issues/42.\n");
+    } finally {
+      fs.rmSync(memoryDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects substitutions that exceed the file size limit", () => {
+    const memoryDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-temp-ids-"));
+    try {
+      const filePath = path.join(memoryDir, "notes.md");
+      const content = "See #aw_parent.\n";
+      fs.writeFileSync(filePath, content);
+
+      expect(() => applyTemporaryIdSubstitutions([{ relativePath: "notes.md" }], memoryDir, new Map([["aw_parent", { repo: "long-owner/long-repository", number: 42 }]]), "owner/memory", Buffer.byteLength(content, "utf8"))).toThrow(
+        "Rewritten memory file notes.md exceeds size limit"
+      );
+      expect(fs.readFileSync(filePath, "utf8")).toBe(content);
     } finally {
       fs.rmSync(memoryDir, { recursive: true, force: true });
     }

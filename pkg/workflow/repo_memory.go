@@ -599,15 +599,16 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data)...)
 
 	useRequire := setupActionRef != ""
+	_, hasConsolidatedSafeOutputsJob := c.jobManager.GetJob(string(constants.SafeOutputsJobName))
 	for _, memory := range data.RepoMemoryConfig.Memories {
-		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire))
+		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire, hasConsolidatedSafeOutputsJob))
 	}
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
 
 	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled)
-	if data.SafeOutputs != nil {
+	if hasConsolidatedSafeOutputsJob {
 		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
 	}
 	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
@@ -669,7 +670,7 @@ func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData) []string
 }
 
 // buildSinglePushRepoMemoryStep builds a single push-repo-memory step for one memory entry.
-func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory RepoMemoryEntry, useRequire bool) string {
+func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory RepoMemoryEntry, useRequire, hasConsolidatedSafeOutputsJob bool) string {
 	targetRepo := memory.TargetRepo
 	if targetRepo == "" {
 		targetRepo = "${{ github.repository }}"
@@ -692,7 +693,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	step.WriteString("        if: always()\n")
 	fmt.Fprintf(&step, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	step.WriteString("        env:\n")
-	step.WriteString(buildRepoMemoryGitHubEnv(data))
+	step.WriteString(buildRepoMemoryGitHubEnv(data, hasConsolidatedSafeOutputsJob))
 	fmt.Fprintf(&step, "          ARTIFACT_DIR: %s\n", artifactDir)
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", memory.ID)
 	fmt.Fprintf(&step, "          TARGET_REPO: %s\n", targetRepo)
@@ -730,11 +731,11 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	return step.String()
 }
 
-func buildRepoMemoryGitHubEnv(data *WorkflowData) string {
+func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob bool) string {
 	env := "          GH_TOKEN: ${{ github.token }}\n" +
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
-	if data.SafeOutputs != nil {
+	if hasConsolidatedSafeOutputsJob {
 		env += fmt.Sprintf("          GH_AW_TEMPORARY_ID_MAP: ${{ needs.%s.outputs.process_safe_outputs_temporary_id_map }}\n", constants.SafeOutputsJobName)
 	}
 	return env
