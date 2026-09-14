@@ -169,7 +169,12 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       const secretValues = collectArtifactSecretValues();
       const redactedEntry = /** @type {ManifestEntry} */ (redactManifestValue(entry, secretValues));
       jsonLine = JSON.stringify(redactedEntry);
-    } catch {
+    } catch (error) {
+      if (typeof core !== "undefined" && typeof core.warning === "function") {
+        core.warning(
+          `Failed to redact safe-output manifest entry (type=${entry.type}); recording minimal fields only to avoid persisting unredacted data: ${getErrorMessage(error)}`
+        );
+      }
       jsonLine = JSON.stringify({
         type: entry.type,
         ...(entry.provider ? { provider: entry.provider } : {}),

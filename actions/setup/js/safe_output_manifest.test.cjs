@@ -241,6 +241,34 @@ describe("safe_output_manifest", () => {
       delete process.env.SECRET_CUSTOM_TEST;
     });
 
+    it("should warn and fall back to minimal fields when redaction fails, without leaking other fields", () => {
+      const warnings = [];
+      global.core = { info: () => {}, warning: message => warnings.push(message) };
+
+      const log = createManifestLogger(testManifestFile);
+      // A circular metadata object makes the recursive redaction walk blow the call
+      // stack, forcing the logger's redaction catch branch to run.
+      const circular = { secretLookingField: "should-not-leak" };
+      circular.self = circular;
+      log({
+        type: "create_issue",
+        number: 7,
+        provider: "github",
+        repo: "owner/repo",
+        url: "https://github.com/owner/repo/issues/7",
+        metadata: circular,
+      });
+
+      const content = fs.readFileSync(testManifestFile, "utf8");
+      const entry = JSON.parse(content.trim());
+      expect(entry).toEqual({ type: "create_issue", provider: "github", number: 7, timestamp: entry.timestamp });
+      expect(content).not.toContain("should-not-leak");
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("create_issue");
+
+      delete global.core;
+    });
+
     it("should throw when the manifest file cannot be written", () => {
       // Create a directory where the file should be to force a write error
       fs.mkdirSync(testManifestFile, { recursive: true });
