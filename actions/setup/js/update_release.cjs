@@ -155,6 +155,7 @@ async function main(config = {}) {
         const errorMessage = getErrorMessage(error);
         if (error?.status === 404 || errorMessage.includes("Not Found")) {
           const repository = `${context.repo.owner}/${context.repo.repo}`;
+          /** @type {Object | undefined} */
           let fallbackRelease;
           let fallbackSearchFailed = false;
           try {
