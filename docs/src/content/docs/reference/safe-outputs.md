@@ -82,7 +82,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 | [Create Project](#project-creation-create-project) | `create-project` | Create new GitHub Projects boards (max: 1, cross-repo) |
 | [Update Project](#project-board-updates-update-project) | `update-project` | Manage GitHub Projects boards (max: 10, same-repo only) |
 | [Create Project Status Update](#project-status-updates-create-project-status-update) | `create-project-status-update` | Create project status updates |
-| [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions (max: 1) |
+| [Update Release](#release-updates-update-release) | `update-release` | Update GitHub release descriptions; requires an existing GitHub Release, not just a Git tag (max: 1) |
 | [Upload Artifact](#artifact-uploads-upload-artifact) | `upload-artifact` | Upload files as run-scoped GitHub Actions artifacts (max: 1 by default) |
 | [Upload Assets](#asset-uploads-upload-asset) | `upload-asset` | Upload files to orphaned git branch (max: 10, same-repo only). **Prefer `upload-artifact` with `skip-archive` instead.** |
 
@@ -1160,6 +1160,8 @@ safe-outputs:
 ```
 
 Agent output format: `{"type": "update_release", "tag": "v1.0.0", "operation": "replace", "body": "..."}`. The `tag` field is optional for release events (inferred from context). Workflow needs read access; only the generated job receives write permissions.
+
+`update-release` requires an existing **GitHub Release** for the given tag — a Git tag alone is not enough. If no release has been published for that tag, the handler fails with a diagnostic that links directly to the release-creation page for the tag.
 
 ### Artifact Uploads (`upload-artifact:`)
 

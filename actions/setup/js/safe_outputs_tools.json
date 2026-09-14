@@ -1587,14 +1587,14 @@
   },
   {
     "name": "update_release",
-    "description": "Update a GitHub release description by replacing, appending to, or prepending to the existing content. Use this to add release notes, changelogs, or additional information to an existing release.",
+    "description": "Update an existing GitHub Release description by replacing, appending to, or prepending to the existing content. Use this to add release notes, changelogs, or additional information to an existing release. Requires a GitHub Release to already exist for the tag; a Git tag alone is not enough.",
     "inputSchema": {
       "type": "object",
       "required": ["tag", "operation", "body"],
       "properties": {
         "tag": {
           "type": "string",
-          "description": "Release tag name (e.g., 'v1.0.0'). REQUIRED - must be provided explicitly as the tag cannot always be inferred from event context."
+          "description": "Release tag name (e.g., 'v1.0.0') of an existing GitHub Release. REQUIRED - must be provided explicitly as the tag cannot always be inferred from event context. The tag must already have a published GitHub Release; a Git tag without a Release will fail."
         },
         "operation": {
           "type": "string",
