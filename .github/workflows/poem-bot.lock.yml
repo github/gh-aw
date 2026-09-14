@@ -2785,7 +2785,6 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
-      process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
       push_commit_sha: ${{ steps.process_safe_outputs.outputs.push_commit_sha }}
       push_commit_url: ${{ steps.process_safe_outputs.outputs.push_commit_url }}
       upload_artifact_count: ${{ steps.process_safe_outputs.outputs.upload_artifact_count }}

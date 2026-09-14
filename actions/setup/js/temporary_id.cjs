@@ -18,6 +18,7 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const fs = require("fs");
 // SEC-004: No sanitize needed - body fields are read-only (temp ID extraction)
 // Actual sanitize happens in create_issue/add_comment handlers that write content
 
@@ -230,6 +231,7 @@ function loadTemporaryIdMap() {
   if (!mapJson || mapJson === "{}") {
     return new Map();
   }
+
   try {
     const mapObject = JSON.parse(mapJson);
     /** @type {Map<string, RepoIssuePair>} */
@@ -250,6 +252,26 @@ function loadTemporaryIdMap() {
   } catch (error) {
     if (typeof core !== "undefined") {
       core.warning(`Failed to parse temporary ID map: ${getErrorMessage(error)}`);
+    }
+    return new Map();
+  }
+}
+
+/**
+ * Load the temporary ID map from an artifact file.
+ * @param {string} filePath - Path to the JSON map file
+ * @returns {Map<string, RepoIssuePair>} Map of temporary ID to repository and issue number
+ */
+function loadTemporaryIdMapFromFile(filePath) {
+  if (!filePath) {
+    return new Map();
+  }
+  try {
+    return loadTemporaryIdMapFromResolved(JSON.parse(fs.readFileSync(filePath, "utf8")));
+  } catch (error) {
+    const isMissingFile = typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+    if (!isMissingFile && typeof core !== "undefined") {
+      core.warning(`Failed to parse temporary ID map artifact: ${getErrorMessage(error)}`);
     }
     return new Map();
   }
@@ -796,6 +818,7 @@ module.exports = {
   replaceTemporaryIdReferencesLegacy,
   replaceArtifactUrlReferences,
   loadTemporaryIdMap,
+  loadTemporaryIdMapFromFile,
   loadTemporaryIdMapFromResolved,
   resolveIssueNumber,
   resolveRepoIssueTarget,

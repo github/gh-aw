@@ -1971,7 +1971,6 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
-      process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
       upload_artifact_count: ${{ steps.process_safe_outputs.outputs.upload_artifact_count }}
       upload_artifact_slot_0_tmp_id: ${{ steps.process_safe_outputs.outputs.slot_0_tmp_id }}
       upload_artifact_slot_1_tmp_id: ${{ steps.process_safe_outputs.outputs.slot_1_tmp_id }}

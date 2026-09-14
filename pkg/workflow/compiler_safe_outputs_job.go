@@ -451,20 +451,19 @@ func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath stri
 // process_safe_outputs handler manager step, plus any conditional per-type outputs.
 func addHandlerManagerOutputs(data *WorkflowData, outputs map[string]string) {
 	maps.Copy(outputs, map[string]string{
-		"process_safe_outputs_temporary_id_map": "${{ steps.process_safe_outputs.outputs.temporary_id_map }}",
-		"process_safe_outputs_processed_count":  "${{ steps.process_safe_outputs.outputs.processed_count }}",
-		"process_safe_outputs_items_succeeded":  "${{ steps.process_safe_outputs.outputs.items_succeeded }}",
-		"process_safe_outputs_items_applied":    "${{ steps.process_safe_outputs.outputs.items_applied }}",
-		"process_safe_outputs_items_skipped":    "${{ steps.process_safe_outputs.outputs.items_skipped }}",
-		"process_safe_outputs_items_warnings":   "${{ steps.process_safe_outputs.outputs.items_warnings }}",
-		"process_safe_outputs_items_cancelled":  "${{ steps.process_safe_outputs.outputs.items_cancelled }}",
-		"process_safe_outputs_items_deferred":   "${{ steps.process_safe_outputs.outputs.items_deferred }}",
-		"process_safe_outputs_items_failed":     "${{ steps.process_safe_outputs.outputs.items_failed }}",
-		"process_safe_outputs_status":           "${{ steps.process_safe_outputs.outputs.status }}",
-		"create_discussion_errors":              "${{ steps.process_safe_outputs.outputs.create_discussion_errors }}",
-		"create_discussion_error_count":         "${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}",
-		"code_push_failure_errors":              "${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}",
-		"code_push_failure_count":               "${{ steps.process_safe_outputs.outputs.code_push_failure_count }}",
+		"process_safe_outputs_processed_count": "${{ steps.process_safe_outputs.outputs.processed_count }}",
+		"process_safe_outputs_items_succeeded": "${{ steps.process_safe_outputs.outputs.items_succeeded }}",
+		"process_safe_outputs_items_applied":   "${{ steps.process_safe_outputs.outputs.items_applied }}",
+		"process_safe_outputs_items_skipped":   "${{ steps.process_safe_outputs.outputs.items_skipped }}",
+		"process_safe_outputs_items_warnings":  "${{ steps.process_safe_outputs.outputs.items_warnings }}",
+		"process_safe_outputs_items_cancelled": "${{ steps.process_safe_outputs.outputs.items_cancelled }}",
+		"process_safe_outputs_items_deferred":  "${{ steps.process_safe_outputs.outputs.items_deferred }}",
+		"process_safe_outputs_items_failed":    "${{ steps.process_safe_outputs.outputs.items_failed }}",
+		"process_safe_outputs_status":          "${{ steps.process_safe_outputs.outputs.status }}",
+		"create_discussion_errors":             "${{ steps.process_safe_outputs.outputs.create_discussion_errors }}",
+		"create_discussion_error_count":        "${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}",
+		"code_push_failure_errors":             "${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}",
+		"code_push_failure_count":              "${{ steps.process_safe_outputs.outputs.code_push_failure_count }}",
 	})
 	addConditionalHandlerManagerOutputs(data, outputs)
 }

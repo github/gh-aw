@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 // Mock core for loadTemporaryIdMap
 const mockCore = {
@@ -19,6 +22,21 @@ describe("temporary_id.cjs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.GH_AW_TEMPORARY_ID_MAP;
+  });
+
+  describe("loadTemporaryIdMapFromFile", () => {
+    it("loads a map from a safe-output artifact file", async () => {
+      const { loadTemporaryIdMapFromFile } = await import("./temporary_id.cjs");
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "temporary-id-map-"));
+      try {
+        const mapPath = path.join(tempDir, "temporary-id-map.json");
+        fs.writeFileSync(mapPath, JSON.stringify({ aw_parent: { repo: "owner/repo", number: 42 } }));
+
+        expect(loadTemporaryIdMapFromFile(mapPath)).toEqual(new Map([["aw_parent", { repo: "owner/repo", number: 42 }]]));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("generateTemporaryId", () => {

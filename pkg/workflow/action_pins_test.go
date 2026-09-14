@@ -1713,7 +1713,7 @@ func TestGeneratedArtifactStepsHonorGHESCompat(t *testing.T) {
 				Memories: []RepoMemoryEntry{{ID: "default"}},
 			},
 		}
-		step := strings.Join(c.buildPushRepoMemoryDownloadSteps(data), "\n")
+		step := strings.Join(c.buildPushRepoMemoryDownloadSteps(data, false), "\n")
 		if !strings.Contains(step, "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0") {
 			t.Fatalf("expected GHES download-artifact pin in repo-memory step, got:\n%s", step)
 		}

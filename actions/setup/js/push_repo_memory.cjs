@@ -13,7 +13,7 @@ const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_
 const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
-const { loadTemporaryIdMap, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
+const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
@@ -167,7 +167,7 @@ async function main() {
   const githubRunId = process.env.GITHUB_RUN_ID || "unknown";
   const githubServerUrl = process.env.GITHUB_SERVER_URL || "https://github.com";
   const serverHost = githubServerUrl.replace(/^https?:\/\//, "");
-  const temporaryIdMap = loadTemporaryIdMap();
+  const temporaryIdMap = loadTemporaryIdMapFromFile(process.env.GH_AW_TEMPORARY_ID_MAP_FILE ?? "");
 
   // Log environment variable configuration for debugging
   core.info("Environment configuration:");

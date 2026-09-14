@@ -2400,7 +2400,6 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
-      process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
       upload_code_coverage_file: ${{ steps.process_safe_outputs.outputs.upload_code_coverage_file }}
       upload_code_coverage_label: ${{ steps.process_safe_outputs.outputs.upload_code_coverage_label }}
       upload_code_coverage_language: ${{ steps.process_safe_outputs.outputs.upload_code_coverage_language }}

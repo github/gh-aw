@@ -596,10 +596,10 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	steps := c.buildPushRepoMemorySetupAndCheckoutSteps(data, setupActionRef)
-	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data)...)
+	_, hasConsolidatedSafeOutputsJob := c.jobManager.GetJob(string(constants.SafeOutputsJobName))
+	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data, hasConsolidatedSafeOutputsJob)...)
 
 	useRequire := setupActionRef != ""
-	_, hasConsolidatedSafeOutputsJob := c.jobManager.GetJob(string(constants.SafeOutputsJobName))
 	for _, memory := range data.RepoMemoryConfig.Memories {
 		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire, hasConsolidatedSafeOutputsJob))
 	}
@@ -648,9 +648,19 @@ func (c *Compiler) buildPushRepoMemorySetupAndCheckoutSteps(data *WorkflowData, 
 }
 
 // buildPushRepoMemoryDownloadSteps builds download-artifact steps for all memory entries.
-func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData) []string {
+func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData, hasConsolidatedSafeOutputsJob bool) []string {
 	repoMemoryPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 	var steps []string
+	if hasConsolidatedSafeOutputsJob {
+		steps = append(steps,
+			"      - name: Download safe-output temporary ID map\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+			"        continue-on-error: true\n",
+			"        with:\n",
+			fmt.Sprintf("          name: %s%s\n", repoMemoryPrefix, constants.SafeOutputItemsArtifactName),
+			"          path: /tmp/gh-aw/safe-outputs-items\n",
+		)
+	}
 	for _, memory := range data.RepoMemoryConfig.Memories {
 		sanitizedID := SanitizeWorkflowIDForCacheKey(memory.ID)
 		var step strings.Builder
@@ -736,7 +746,7 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
 		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
 	if hasConsolidatedSafeOutputsJob {
-		env += fmt.Sprintf("          GH_AW_TEMPORARY_ID_MAP: ${{ needs.%s.outputs.process_safe_outputs_temporary_id_map }}\n", constants.SafeOutputsJobName)
+		env += "          GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/" + constants.TemporaryIdMapFilename.String() + "\n"
 	}
 	return env
 }

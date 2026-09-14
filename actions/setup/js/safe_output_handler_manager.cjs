@@ -1711,7 +1711,6 @@ async function main() {
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");
       if (!isStaged) ensureManifestExists();
-      core.setOutput("temporary_id_map", "{}");
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
@@ -1745,8 +1744,6 @@ async function main() {
       core.info("No handlers loaded - nothing to process");
       // Ensure manifest file exists even when no handlers are loaded (skip in staged mode)
       if (!isStaged) ensureManifestExists();
-      // Set empty outputs for downstream steps
-      core.setOutput("temporary_id_map", "{}");
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
@@ -1897,11 +1894,6 @@ async function main() {
     if (skippedNoHandlerResults.length > 0) {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);
     }
-
-    // Export temporary ID map as output for downstream steps
-    const temporaryIdMapJson = JSON.stringify(processingResult.temporaryIdMap);
-    core.setOutput("temporary_id_map", temporaryIdMapJson);
-    core.info(`Exported temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
 
     // Write temporary ID map to file for inclusion in the safe-outputs-items artifact.
     // This allows reviewers and auditors to inspect the full map of temporary IDs
