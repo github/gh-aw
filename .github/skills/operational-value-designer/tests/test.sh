@@ -20,7 +20,7 @@ grep -Fq 'why stronger downstream effects are unavailable' "$skill_dir/SKILL.md"
 grep -Fq 'Never reward output merely for existing' "$skill_dir/SKILL.md"
 grep -Fq 'Missing evidence for the selected rung returns `null`; it never causes runtime fallback to a weaker rung' "$skill_dir/SKILL.md"
 
-evaluator_path=$($skill_dir/scripts/operational-value-evaluator-path.sh daily-file-diet)
+evaluator_path=$("$skill_dir/scripts/operational-value-evaluator-path.sh" daily-file-diet)
 [[ $evaluator_path == .github/graders/daily-file-diet-operational-value.sh ]]
 if "$skill_dir/scripts/operational-value-evaluator-path.sh" ../escape >/dev/null 2>&1; then
     printf 'invalid workflow name was accepted\n' >&2
@@ -183,6 +183,17 @@ assert_rejected string-value '[{"id":"score","value":"1"}]'
 assert_rejected extra-field '[{"id":"score","value":1,"message":"not allowed"}]'
 assert_rejected multiple-documents $'[{"id":"first","value":1}]\n[{"id":"second","value":0}]'
 assert_rejected invalid-json 'not json'
+
+nul_evaluator="$work_dir/nul-output.sh"
+cat > "$nul_evaluator" <<'EOF'
+#!/usr/bin/env bash
+printf '[{"id":"score","value":1}]\0'
+EOF
+chmod +x "$nul_evaluator"
+if "$skill_dir/scripts/verify-operational-value-evaluator.sh" "$nul_evaluator" >/dev/null 2>&1; then
+    printf 'evaluator output containing a NUL byte was accepted\n' >&2
+    exit 1
+fi
 
 failed_evaluator="$work_dir/failed.sh"
 cat > "$failed_evaluator" <<'EOF'
