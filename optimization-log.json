@@ -264,5 +264,14 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 100
+  },
+  {
+    "date": "2026-09-15",
+    "workflow_name": "Deep Report",
+    "total_aic_analyzed": 1052.21,
+    "runs_audited": 6,
+    "recommendations_count": 3,
+    "subagent_candidates": 1,
+    "estimated_aic_savings_per_run": 60
   }
 ]
