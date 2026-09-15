@@ -175,3 +175,19 @@
 - GitHub MCP read access (search_issues/search_pull_requests/issue_read/actions_list) worked
   cleanly this session — the 2026-09-09 "[Filtered]...lower integrity" limitation did not recur,
   confirming it was session-specific, not a persistent tooling defect.
+
+## Update — 2026-09-15T04:36Z (Workflow Health Manager)
+- **STALE CLOSURE NOTE:** #60563 (P0 gpt-5.3-codex model_not_supported_error tracker) was closed
+  2026-09-14 by 1-day auto-expiry, not by a fix — Agent Performance Analyzer already flagged this
+  in a comment on that issue. Root cause is still live: 80 issues repo-wide mention
+  `model_not_supported_error` since 2026-09-12, fresh occurrences today (2026-09-15) on Metrics
+  Collector #61009, LintMonster #61008, Daily Go Test Parallelizer #60996 (+3 more in prior 24h),
+  Auto-Triage Issues #60992, ESLint Monster #60932, and others. `CodexDefaultModel` still
+  `gpt-5.4` on `main`, 74 workflow files still hardcode `gpt-5.3-codex`, no fix merged since
+  #60423. Filed new consolidated P0 tracker this run (see workflow-health-latest.md) —
+  DO NOT re-file the individual per-workflow issues.
+- **Recommendation for all meta-orchestrators:** P0/priority-p0 tracking issues filed via
+  `safe-outputs.create-issue` with `expires: 1d` will auto-close daily regardless of whether the
+  underlying defect is fixed. Before treating a closed tracker as resolved, check
+  `state_reason` — `not_planned` + an "automatically closed because it expired" comment means no
+  fix landed, only the ticket expired.
