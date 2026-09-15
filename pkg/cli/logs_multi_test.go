@@ -222,48 +222,100 @@ func TestDownloadWorkflowLogsForTargetsUsesOneWallClockTimeout(t *testing.T) {
 		{workflowName: "second"},
 	}, nil)
 
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, int64(1), calls.Load(), "queued targets must not receive a fresh timeout")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), calls.Load(), "every target should share the same wall-clock timeout")
 	assert.Less(t, time.Since(start), 1500*time.Millisecond, "the timeout must bound the entire multi-target operation")
 }
 
-func TestCollectLogsTargetsEmitsContinuationForQueuedTarget(t *testing.T) {
+func TestCollectLogsTargetsStartsEveryTargetBeforeBatchScheduling(t *testing.T) {
 	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
 	original := collectWorkflowLogsForTarget
 	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
 
-	// The running target blocks until the shared deadline fires so the queued
-	// target never gets a worker slot and must be canceled while still waiting
-	// on the semaphore.
-	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
-		<-ctx.Done()
-		return workflowLogsResult{timeoutReached: true}, nil
+	started := make(chan *logsBatchScheduler, 3)
+	release := make(chan struct{})
+	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
+		started <- opts.batchScheduler
+		<-release
+		return workflowLogsResult{}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
+	done := make(chan []logsTargetResult, 1)
+	go func() {
+		done <- collectLogsTargets(context.Background(), LogsDownloadOptions{
+			OutputDir: t.TempDir(),
+		}, []logsWorkflowTarget{
+			{workflowName: "first"},
+			{workflowName: "second"},
+			{workflowName: "third"},
+		})
+	}()
 
-	results := collectLogsTargets(ctx, LogsDownloadOptions{
-		Count:       5,
-		OutputDir:   t.TempDir(),
-		StartDate:   "2024-01-01",
-		BeforeRunID: 999,
-	}, []logsWorkflowTarget{
-		{workflowName: "first"},
-		{workflowName: "second"},
-	})
+	var scheduler *logsBatchScheduler
+	for range 3 {
+		select {
+		case targetScheduler := <-started:
+			require.NotNil(t, targetScheduler)
+			if scheduler == nil {
+				scheduler = targetScheduler
+			} else {
+				assert.Same(t, scheduler, targetScheduler)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("all target collectors must start before batch-level scheduling")
+		}
+	}
+	close(release)
 
-	_, continuations, timeoutReached, _, _, errs := mergeLogsTargetResults(results, nil)
-	require.NotEmpty(t, errs, "the queued target should still surface a context error")
-	assert.True(t, timeoutReached)
-	// The mock only reports timeoutReached (no continuation) for the target that
-	// actually ran; the one still waiting on the semaphore when the deadline fires
-	// is the only one that goes through queuedLogsTargetResult, so exactly one
-	// continuation is expected, regardless of which target won the race for the
-	// worker slot.
-	require.Len(t, continuations, 1, "the queued target must produce a resumable continuation")
-	assert.Equal(t, int64(999), continuations[0].BeforeRunID, "the queued target's continuation must preserve its own resume cursor")
-	assert.Equal(t, "2024-01-01", continuations[0].StartDate)
+	results := <-done
+	_, _, _, _, _, errs := mergeLogsTargetResults(results, nil)
+	assert.Empty(t, errs)
+}
+
+func TestLogsBatchSchedulerDistributesEachRoundAcrossTargets(t *testing.T) {
+	ctx := t.Context()
+	scheduler := newLogsBatchScheduler(ctx, 3, 2)
+
+	require.NoError(t, scheduler.acquire(ctx, 0))
+	require.NoError(t, scheduler.acquire(ctx, 1))
+
+	targetTwoAcquired := make(chan struct{})
+	go func() {
+		if scheduler.acquire(ctx, 2) == nil {
+			close(targetTwoAcquired)
+		}
+	}()
+
+	scheduler.release(0)
+	select {
+	case <-targetTwoAcquired:
+	case <-time.After(time.Second):
+		t.Fatal("the remaining target should receive a slot in the current round")
+	}
+
+	nextRoundAcquired := make(chan struct{})
+	go func() {
+		if scheduler.acquire(ctx, 0) == nil {
+			close(nextRoundAcquired)
+		}
+	}()
+	select {
+	case <-nextRoundAcquired:
+		t.Fatal("a target must not start its next batch before every target completes the current round")
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	scheduler.release(1)
+	scheduler.release(2)
+	select {
+	case <-nextRoundAcquired:
+	case <-time.After(time.Second):
+		t.Fatal("the next batch round should start after every target completes the current round")
+	}
+	scheduler.release(0)
+	scheduler.remove(0)
+	scheduler.remove(1)
+	scheduler.remove(2)
 }
 
 func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
@@ -363,7 +415,11 @@ func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T)
 	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
 		calls.Add(1)
 		assert.Equal(t, -2000, opts.MaxGitHubAPIRateLimit)
-		return workflowLogsResult{}, opts.rateLimitState.check(ctx, false, opts.MaxGitHubAPIRateLimit, 1)
+		err := opts.rateLimitState.check(ctx, false, opts.MaxGitHubAPIRateLimit, 1)
+		if errors.Is(err, context.Canceled) && opts.rateLimitState.isReached() {
+			err = errLogsAPIRateLimitReached
+		}
+		return rateLimitedLogsTargetResult(opts), err
 	}
 
 	results := collectLogsTargets(context.Background(), LogsDownloadOptions{
@@ -376,7 +432,7 @@ func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T)
 		{workflowName: "third"},
 	})
 
-	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared API ceiling is reached")
+	assert.Equal(t, int64(3), calls.Load(), "every target collector starts so batch scheduling can distribute API queries fairly")
 	assert.Equal(t, int64(1), rateLimitCalls.Load(), "the reached reserve limit must be reused without another API check")
 	require.Len(t, results, 3)
 	continuationCount := 0
@@ -390,8 +446,8 @@ func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T)
 	}
 	_, continuations, _, _, _, errs := mergeLogsTargetResults(results, nil)
 	assert.Empty(t, errs, "rate-limit termination must not suppress continuations with a hard error")
-	assert.Equal(t, 2, continuationCount, "each queued target must retain a continuation")
-	assert.Len(t, continuations, 2, "each queued target must retain a continuation after merging")
+	assert.Equal(t, 3, continuationCount, "each target must retain a continuation")
+	assert.Len(t, continuations, 3, "each target must retain a continuation after merging")
 }
 
 func TestCountLimitedLogsTargetResultPreservesDateRangeContinuation(t *testing.T) {

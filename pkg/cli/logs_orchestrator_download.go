@@ -490,6 +490,10 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 }
 
 func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRuntime, opts LogsDownloadOptions) (bool, error) {
+	if err := opts.batchScheduler.acquire(runtime.activeCtx, opts.batchTargetID); err != nil {
+		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, opts.rateLimitState, err)
+	}
+	defer opts.batchScheduler.release(opts.batchTargetID)
 	// Bound this batch by what the shared multi-target budget still allows.
 	// Without this, every concurrent target fetches and downloads artifacts as
 	// if it alone had to satisfy the whole --count, and the surplus is only
