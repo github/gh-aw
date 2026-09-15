@@ -15,7 +15,7 @@ The gh-aw tooling collects and aggregates per-run token usage from the firewall 
 
 ### Decision
 
-We will introduce an `AmbientContextMetrics` struct that captures the token footprint (`input_tokens`, `cached_tokens`, `aic`) of the chronologically first LLM invocation in `token-usage.jsonl`, and expose it as an optional `ambient_context` field in both the `audit` and `logs` JSON output schemas. Chronological ordering is determined by the `timestamp` field (RFC 3339 / RFC 3339 Nano); file order is used as a stable tiebreaker for entries that share a timestamp or lack one. The `aic` value is defined as `input_tokens + cache_read_tokens`, consistent with the existing AI Credits convention in the codebase.
+We will introduce an `AmbientContextMetrics` struct that captures the token footprint (`input_tokens`, `cached_tokens`) of the chronologically first LLM invocation in `token-usage.jsonl`, and expose it as an optional `ambient_context` field in both the `audit` and `logs` JSON output schemas. Chronological ordering is determined by the `timestamp` field (RFC 3339 / RFC 3339 Nano); file order is used as a stable tiebreaker for entries that share a timestamp or lack one.
 
 ### Alternatives Considered
 

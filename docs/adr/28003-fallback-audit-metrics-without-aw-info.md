@@ -40,7 +40,7 @@ Accept `null` metric fields for older runs and document that pre-`aw_info.json` 
 - `agent_usage.json` is treated as a single-request summary, so per-model and per-request breakdowns are not available via this fallback.
 
 #### Neutral
-- The `TokenUsageEntry` struct gains an `aic` field to accommodate `agent_usage.json` data; `token-usage.jsonl` entries omit this field and continue using computed AI Credit totals.
+- `agent_usage.json` fallback data is converted into the same aggregate token and AI Credits summaries as the primary path without adding per-entry fields to `token-usage.jsonl` records.
 - The engine inference function (`inferBestEngineMetricsFromContent`) iterates all registered engines and may add latency proportional to the number of registered parsers for runs without `aw_info.json`.
 
 ---

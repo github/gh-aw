@@ -160,7 +160,7 @@ func TestBuildMainJobOutputs(t *testing.T) {
 		require.NotNil(t, outputs)
 		assert.Contains(t, outputs, "model")
 		assert.Contains(t, outputs, "aic")
-		assert.Contains(t, outputs, "aic")
+		assert.NotContains(t, outputs, "effective_tokens")
 		assert.Contains(t, outputs, "setup-trace-id")
 		assert.Contains(t, outputs, "invocation_cap_exceeded")
 	})

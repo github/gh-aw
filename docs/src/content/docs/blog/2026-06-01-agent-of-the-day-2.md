@@ -30,7 +30,7 @@ The engine is GitHub Copilot, running as an agentic workflow defined in [`archit
 
 ### The June 1 Run
 
-[Run 26766995181](https://github.com/github/gh-aw/actions/runs/26766995181) completed on June 1, 2026 at 16:18 UTC, five minutes and forty seconds after it started. The agent worked through three turns with `claude-sonnet-4.6` via GitHub Copilot, made 10 GitHub API calls, and consumed 125,356 tokens — a number that looks large until you factor in the AI Credits of 1,206,982 once prompt caching is included. Caching is doing real work here.
+[Run 26766995181](https://github.com/github/gh-aw/actions/runs/26766995181) completed on June 1, 2026 at 16:18 UTC, five minutes and forty seconds after it started. The agent worked through three turns with `claude-sonnet-4.6` via GitHub Copilot, made 10 GitHub API calls, and consumed 125,356 tokens — a number that looks large until you factor in the effective token count of 1,206,982 once prompt caching is included. Caching is doing real work here.
 
 The verdict: no violations. Every changed file over the past 24 hours fell within the configured thresholds. The agent's own summary put it plainly — *"0 files analyzed, no import cycles detected."* Nothing to open, nothing to assign.
 
@@ -54,7 +54,7 @@ A few things worth noting if you're thinking about adapting this pattern for you
 
 **Clean runs are data.** The June 1 run found nothing. That's not a failure of the workflow — it's the workflow confirming steady-state health. Over time, a history of clean runs punctuated by occasional issues tells you something real about your team's structural discipline.
 
-**Token efficiency scales.** 1.2 million AI Credits for a daily architectural scan, amortized across a codebase's active lifetime, is not expensive. The cost of a missed import cycle or a 2,000-line God file is.
+**Token efficiency scales.** 1.2 million effective tokens for a daily architectural scan, amortized across a codebase's active lifetime, is not expensive. The cost of a missed import cycle or a 2,000-line God file is.
 
 ---
 

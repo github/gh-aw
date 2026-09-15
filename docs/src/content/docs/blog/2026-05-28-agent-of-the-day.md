@@ -19,7 +19,7 @@ The **Dead Code Removal Agent** is a scheduled GitHub Actions workflow that runs
 
 ### Run #100 — A Quiet Milestone
 
-On May 27, 2026, the agent completed [run #100](https://github.com/github/gh-aw/actions/runs/26520529392). Not a fanfare moment — just another daily run doing exactly what it was built to do. It finished in **11.4 minutes** across **5 turns**, consumed **14.6M AI Credits**, and used **12 GitHub Actions minutes**.
+On May 27, 2026, the agent completed [run #100](https://github.com/github/gh-aw/actions/runs/26520529392). Not a fanfare moment — just another daily run doing exactly what it was built to do. It finished in **11.4 minutes** across **5 turns**, consumed **14.6M effective tokens**, and used **12 GitHub Actions minutes**.
 
 The target this time was `NewValidationErrorWithLocation` in `pkg/workflow/workflow_errors.go`. The function was a constructor wrapper around `WorkflowValidationError` — originally a convenience, but over time it became redundant as callers could initialize the struct directly. The agent identified it, confirmed it had no remaining callers, and started working.
 
@@ -32,7 +32,7 @@ Verification was thorough. Before touching the PR, the agent ran `go build ./...
 Zoom out a week and the picture gets more interesting. Across five runs in the last seven days, the agent logged:
 
 - **35.5 minutes** total duration
-- **38.9M AI Credits**
+- **38.9M effective tokens**
 - **38 GitHub Actions minutes**
 - **21 turns** across all five runs
 - **5 out of 5** high-confidence episodes

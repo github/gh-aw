@@ -75,7 +75,7 @@ This specification covers:
 This specification does NOT cover:
 
 - Engine-specific API call construction (how parameters are forwarded to the provider REST API)
-- Token budgets, cost accounting, or AI Credits billing (see [AI Credits Specification](/gh-aw/specs/ai-credits-specification/) and legacy [AI Credits Specification](/gh-aw/specs/ai-credits-specification/))
+- Token budgets, cost accounting, or AI Credits billing (see [AI Credits Specification](/gh-aw/specs/ai-credits-specification/))
 - Model capability detection at runtime
 - Model routing logic within the Copilot gateway
 

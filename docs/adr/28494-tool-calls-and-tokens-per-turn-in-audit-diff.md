@@ -56,8 +56,8 @@ Extending the JSON struct without adding renderer support would satisfy machine 
 
 ### Tokens-per-Turn Computation
 
-1. Implementations **MUST** compute tokens-per-turn as `aic / turns` where `aic` is `TokenUsageSummary.TotalAIC` when that value is greater than zero.
-2. Implementations **MUST** fall back to the engine-level token count (`WorkflowRun.TokenUsage`) when `TotalAIC` is zero or the `TokenUsageSummary` is absent.
+1. Implementations **MUST** compute tokens-per-turn as `WorkflowRun.TokenUsage / turns` when token usage and turn count are both greater than zero.
+2. Implementations **MUST NOT** use AI Credits totals as token counts when computing tokens per turn.
 3. Implementations **MUST NOT** compute a tokens-per-turn value when the turn count is zero (to avoid division by zero).
 4. Implementations **SHOULD** format the tokens-per-turn change as a percentage string (e.g., `+50%`, `-10%`) using the same `formatVolumeChange` helper applied to other percentage-point metrics.
 
