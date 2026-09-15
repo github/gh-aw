@@ -92,4 +92,3 @@ values by hand.
 - [Cost Management](/gh-aw/reference/cost-management/)
 - [Auditing Workflows](/gh-aw/reference/audit/)
 - [AI Credits Specification](/gh-aw/specs/ai-credits-specification/)
-- [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/)
