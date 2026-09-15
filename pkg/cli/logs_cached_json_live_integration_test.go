@@ -62,6 +62,21 @@ func TestLogsCachedJSONLLiveCaching(t *testing.T) {
 
 	shards, err := filepath.Glob(cachePattern + ".jsonl")
 	require.NoError(t, err)
+	runShards := make(map[int64][]string)
+	for _, shard := range shards {
+		_, err := visitCachedLogsJSONLRecords(shard, func(record cachedLogsJSONLRecord, _ int) error {
+			if record.Kind == cachedLogsJSONLKindRun && record.Run != nil {
+				runShards[record.Run.RunID] = append(runShards[record.Run.RunID], shard)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+	}
+	require.Len(t, runShards, runsPerQuery, "the shards should contain only the queried runs")
+	for _, runID := range expectedRunIDs {
+		require.Len(t, runShards[runID], 1, "run %d should occur in exactly one JSONL cache shard", runID)
+	}
+
 	cache, err := loadCachedLogsJSONLFiles(shards)
 	require.NoError(t, err)
 	require.Len(t, cache.runs, runsPerQuery, "the wildcard cache should contain the queried runs")
