@@ -54,6 +54,10 @@ function allBillableJobsSkipped(components) {
   return [...components.values()].every(job => job.conclusion === "skipped");
 }
 
+function provesJobExecutionNotStarted(job) {
+  return job.conclusion === "failure" && Object.hasOwn(job, "runner_id") && (job.runner_id === null || job.runner_id === 0) && !job.runner_name && (!Array.isArray(job.steps) || job.steps.length === 0);
+}
+
 function provesExecutionNotStarted(directory, name, runId, runAttempt) {
   const evidenceFile = path.join(directory, name, "execution.json");
   if (!fs.existsSync(evidenceFile)) return false;
@@ -95,6 +99,10 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
   for (const [name, job] of components) {
     if (job.conclusion === "skipped") {
       logComponentAIC(runId, name, job, 0, "job_skipped");
+      continue;
+    }
+    if (provesJobExecutionNotStarted(job)) {
+      logComponentAIC(runId, name, job, 0, "runner_not_assigned");
       continue;
     }
     // Failed-only reruns can retain successful jobs from earlier attempts. Such

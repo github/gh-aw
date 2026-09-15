@@ -303,6 +303,12 @@ it("counts missing evals accounting as zero when the job failed before any step 
   await expect(f.result).resolves.toBe(2);
 });
 
+it.each([null, 0])("counts missing agent accounting as zero when a failed job never received a runner (%s)", async runnerId => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure", runner_id: runnerId, runner_name: null, steps: [] })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_assigned"'));
+});
+
 it("still requires accounting when a failed agent job has no authoritative source", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
