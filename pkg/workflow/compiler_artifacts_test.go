@@ -591,9 +591,9 @@ Push some changes.
 }
 
 // TestAgentOutputFallbackArtifact verifies that safe-output processing does not depend on the
-// large "agent" artifact upload succeeding: a small dedicated artifact carries the agent output,
-// and downstream jobs match both artifacts when downloading. See gh-aw#53099, where a timed-out
-// upload of the agent artifact silently dropped every safe output.
+// large "agent" artifact upload succeeding: a small dedicated artifact carries the agent output
+// and accounting evidence, and downstream jobs match both artifacts when downloading. See
+// gh-aw#53099, where a timed-out upload of the agent artifact silently dropped every safe output.
 func TestAgentOutputFallbackArtifact(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "agent-output-fallback-test")
 
@@ -636,6 +636,12 @@ Body.
 		"name: agent-output-fallback\n",
 		"/tmp/gh-aw/agent_output.json",
 		"/tmp/gh-aw/safeoutputs.jsonl",
+		"/tmp/gh-aw/agent_execution.json",
+		"/tmp/gh-aw/agent_usage.jsonl",
+		"/tmp/gh-aw/agent_usage.json",
+		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/agent/graders/grader_manifest.json",
 		"/tmp/gh-aw/agent/graders/grader_results.json",
 		"if-no-files-found: ignore",
