@@ -163,10 +163,10 @@
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.321.0": {
+    "ruby/setup-ruby@v1.322.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.321.0",
-      "sha": "95ef2b042f9d7a56d8268cba8559e2842e2ad01b"
+      "version": "v1.322.0",
+      "sha": "bec3f19a76460dbe12f60def7d1a77585f07516c"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",
