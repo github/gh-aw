@@ -528,6 +528,10 @@ func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T)
 			content: `<script src="//evil.example/payload.js"></script>`,
 		},
 		{
+			name:    "entity-encoded remote script",
+			content: `<script src="&sol;&sol;evil.example/payload.js"></script>`,
+		},
+		{
 			name:    "data URI script",
 			content: `<script src="data:text/javascript,alert(1)"></script>`,
 		},

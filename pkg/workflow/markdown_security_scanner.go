@@ -24,6 +24,7 @@ package workflow
 
 import (
 	"fmt"
+	"html"
 	"net/url"
 	"path"
 	"regexp"
@@ -657,7 +658,7 @@ func hasLocalJavaScriptSource(attributes string) bool {
 	if source == "" {
 		source = matches[0][2]
 	}
-	source = strings.TrimSpace(source)
+	source = strings.TrimSpace(html.UnescapeString(source))
 	if source == "" || strings.HasPrefix(source, "/") || strings.Contains(source, `\`) {
 		return false
 	}
