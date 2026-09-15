@@ -318,6 +318,60 @@ func TestLogsBatchSchedulerDistributesEachRoundAcrossTargets(t *testing.T) {
 	scheduler.remove(2)
 }
 
+func TestLogsBatchSchedulerUnblocksWaitersOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scheduler := newLogsBatchScheduler(ctx, 2, 1)
+	// Fill the only concurrency slot so the second target parks in cond.Wait
+	// rather than failing the cheap pre-check at the top of acquire.
+	require.NoError(t, scheduler.acquire(ctx, 0))
+
+	waitErr := make(chan error, 1)
+	go func() { waitErr <- scheduler.acquire(ctx, 1) }()
+	// Wait until the target is genuinely parked in cond.Wait, otherwise the
+	// cheap ctx pre-check at the top of acquire could satisfy this test without
+	// the cancellation broadcast ever waking a blocked waiter.
+	require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+
+	cancel()
+	select {
+	case err := <-waitErr:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("acquire must unblock when the context is canceled while waiting for a slot")
+	}
+	scheduler.release(0)
+}
+
+func TestLogsBatchSchedulerAdvancesRoundWhenTargetLeavesMidRound(t *testing.T) {
+	ctx := t.Context()
+	scheduler := newLogsBatchScheduler(ctx, 3, 3)
+
+	// Targets 1 and 2 complete the current round while target 0 never takes its
+	// turn, so the round cannot advance until target 0 leaves.
+	require.NoError(t, scheduler.acquire(ctx, 1))
+	scheduler.release(1)
+	require.NoError(t, scheduler.acquire(ctx, 2))
+	scheduler.release(2)
+
+	waitErr := make(chan error, 1)
+	go func() { waitErr <- scheduler.acquire(ctx, 1) }()
+	require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+
+	// Target 0 finishes its collection without ever claiming a turn in this
+	// round; dropping it must advance the round rather than wedge the waiters.
+	scheduler.remove(0)
+	select {
+	case err := <-waitErr:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("dropping a target that never took its turn must advance the round")
+	}
+	scheduler.release(1)
+	scheduler.remove(1)
+	scheduler.remove(2)
+}
+
 func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
 	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "2")
 	original := collectWorkflowLogsForTarget

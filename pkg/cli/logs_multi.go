@@ -45,6 +45,7 @@ type logsBatchScheduler struct {
 	round         int
 	inFlight      int
 	maxInFlight   int
+	waiting       int
 }
 
 func newLogsBatchScheduler(ctx context.Context, targetCount, maxInFlight int) *logsBatchScheduler {
@@ -83,8 +84,22 @@ func (s *logsBatchScheduler) acquire(ctx context.Context, targetID int) error {
 			s.inFlight++
 			return nil
 		}
+		s.waiting++
 		s.cond.Wait()
+		s.waiting--
 	}
+}
+
+// waitingCount reports how many targets are currently parked waiting for a
+// batch turn. It exists so callers can observe that a target has actually
+// blocked rather than inferring it from timing.
+func (s *logsBatchScheduler) waitingCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waiting
 }
 
 func (s *logsBatchScheduler) release(targetID int) {
@@ -391,7 +406,13 @@ type logsTargetSharedState struct {
 }
 
 // collectSingleLogsTarget runs one workflow target's log collection and
-// recovers from panics.
+// recovers from panics. Every target now starts immediately and fairness is
+// enforced per batch by the shared scheduler, so the pre-start cancellation
+// branch below is reached only in the rare race where the shared deadline or
+// cancellation fires before this goroutine is scheduled. That branch is not
+// dead code: it must still build a resumable continuation (or report the
+// shared count/rate-limit outcome) so such a target is not silently dropped
+// from the report.
 func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targetID int, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) { //nolint:largefunc // Existing target collection remains centralized.
 	defer shared.batchScheduler.remove(targetID)
 	defer func() {
