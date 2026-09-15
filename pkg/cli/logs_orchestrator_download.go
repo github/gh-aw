@@ -120,9 +120,11 @@ func gitHubAPIRateLimitCostEstimate(reports []*GitHubAPIRateLimitReport) (int, b
 			continue
 		}
 		diff := report.End.Used - report.Start.Used
-		if diff < 0 {
-			// The rate-limit window reset mid-run; fall back to the ending value as a
-			// lower-bound approximation rather than reporting a negative cost.
+		if diff < 0 || report.End.Reset != report.Start.Reset {
+			// The rate-limit window reset mid-run (Used wrapped back down, or the
+			// reset timestamp itself moved even though Used happened to still be
+			// >= Start.Used); fall back to the ending value as a lower-bound
+			// approximation rather than mixing counters from different windows.
 			diff = report.End.Used
 		}
 		total += diff

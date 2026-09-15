@@ -395,7 +395,14 @@ func downloadAndTimeRunArtifacts(
 ) {
 	writeWorkflowRunFolderLocation(run.DatabaseID, runOutputDir)
 	logsOrchestratorLog.Printf("Downloading artifacts for run %d: owner=%s, repo=%s", run.DatabaseID, perRunParams.dlOwner, perRunParams.dlRepo)
-	downloadStart := time.Now()
+	// sizeBefore/downloadStart bracket only the actual GitHub download calls
+	// (metadata fetch, artifact download, evals fallback) rather than the
+	// preceding rate-limit wait or the trailing artifact analysis, so a long
+	// quota wait or CPU-heavy analysis is never misreported as download
+	// latency, and pre-existing bytes on disk (from an earlier incremental or
+	// cache pass) are excluded from the reported size.
+	var downloadStart time.Time
+	var sizeBefore int64
 	err := params.storageLimit.runDownloadDeferredReserved(ctx, runOutputDir, func() error {
 		if err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, logsRunPreflightAPIReserve, params.rateLimitState); err != nil {
 			return err
@@ -404,6 +411,12 @@ func downloadAndTimeRunArtifacts(
 		if err := os.MkdirAll(runOutputDir, constants.DirPermSensitive); err != nil {
 			return fmt.Errorf("failed to create run output directory: %w", err)
 		}
+		if size, sizeErr := logsDirectorySize(runOutputDir); sizeErr == nil {
+			sizeBefore = size
+		} else {
+			logsOrchestratorLog.Printf("failed to compute pre-download size for run %d: %v", run.DatabaseID, sizeErr)
+		}
+		downloadStart = time.Now()
 		if metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, perRunParams.dlOwner, perRunParams.dlRepo, perRunParams.dlHost, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Failed to fetch workflow run metadata for run %d: %v", run.DatabaseID, err)
 		} else {
@@ -419,6 +432,14 @@ func downloadAndTimeRunArtifacts(
 		if params.evalsArtifactRequested && !runHasEvals(runOutputDir, params.verbose) {
 			tryDownloadEvalsArtifactFallback(ctx, run.DatabaseID, runOutputDir, perRunParams)
 		}
+		result.Run.DownloadDuration = time.Since(downloadStart)
+		if size, sizeErr := logsDirectorySize(runOutputDir); sizeErr == nil {
+			if size > sizeBefore {
+				result.Run.DownloadSizeBytes = size - sizeBefore
+			}
+		} else {
+			logsOrchestratorLog.Printf("failed to compute download size for run %d: %v", run.DatabaseID, sizeErr)
+		}
 		analyzeRunArtifacts(ctx, result, runOutputDir, params.verbose, params.artifactFilter)
 		return nil
 	})
@@ -426,12 +447,6 @@ func downloadAndTimeRunArtifacts(
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
 		return
-	}
-	result.Run.DownloadDuration = time.Since(downloadStart)
-	if size, sizeErr := logsDirectorySize(runOutputDir); sizeErr == nil {
-		result.Run.DownloadSizeBytes = size
-	} else {
-		logsOrchestratorLog.Printf("failed to compute download size for run %d: %v", run.DatabaseID, sizeErr)
 	}
 }
 

@@ -203,11 +203,15 @@ type RunData struct {
 	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
 	SafeOutputs                []CreatedItemReport    `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
 	// DownloadDurationMS is the wall-clock time (milliseconds) spent by `gh aw logs`
-	// downloading this run's artifacts from GitHub. Zero when the run was served
-	// from the on-disk cache instead of being freshly downloaded.
+	// downloading this run's artifacts from GitHub. Zero means no download duration
+	// was recorded for this invocation (for example, an on-disk cache hit); when the
+	// record comes from a cached JSONL file, this preserves whatever value was
+	// measured the first time the run was downloaded, since cached JSONL records are
+	// carried through unchanged rather than re-measured.
 	DownloadDurationMS int64 `json:"download_duration_ms,omitempty" console:"-"`
 	// DownloadSizeBytes is the total on-disk size of the artifacts downloaded for
-	// this run.
+	// this run. See DownloadDurationMS for how this value behaves for cache hits and
+	// cached JSONL records.
 	DownloadSizeBytes int64 `json:"download_size_bytes,omitempty" console:"-"`
 	awInfo            *AwInfo
 }

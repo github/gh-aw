@@ -304,6 +304,9 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
 		return err
 	}
+	if opts.collectionStats == nil {
+		opts.collectionStats = &logsCollectionStats{}
+	}
 	defer func() {
 		err = errors.Join(err, finalizeCachedLogsJSONL(opts.cachedJSONLWriter, opts.cachedJSONLSourcePaths, opts.cachedJSONLWildcard, opts.StartDate, opts.EndDate))
 	}()
