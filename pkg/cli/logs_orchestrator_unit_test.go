@@ -968,7 +968,7 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(diskRunDir, runAPIResponseFileName),
-		[]byte(fmt.Sprintf(`{"id":%d,"status":"completed","conclusion":"success"}`, diskCachedRunID)),
+		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success"}`, diskCachedRunID),
 		0o600,
 	))
 	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
@@ -1217,7 +1217,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(diskRunDir, runAPIResponseFileName),
-		[]byte(fmt.Sprintf(`{"id":%d,"status":"completed","conclusion":"success","repository":{"full_name":"owner/repo"}}`, diskCachedRunID)),
+		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success","repository":{"full_name":"owner/repo"}}`, diskCachedRunID),
 		0o600,
 	))
 	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
