@@ -35,7 +35,7 @@
     "starlight-blog": "^0.29.0",
     "starlight-changelogs": "^0.6.0",
     "starlight-links-validator": "^0.26.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
