@@ -532,6 +532,14 @@ func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T)
 			content: `<script src="&sol;&sol;evil.example/payload.js"></script>`,
 		},
 		{
+			name:    "unquoted remote source before local source",
+			content: `<script src=https://evil.example/payload.js src="./main.js"></script>`,
+		},
+		{
+			name:    "source text inside another attribute",
+			content: `<script data-note='src="./main.js"' src=https://evil.example/payload.js></script>`,
+		},
+		{
 			name:    "data URI script",
 			content: `<script src="data:text/javascript,alert(1)"></script>`,
 		},
@@ -558,6 +566,18 @@ func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T)
 		{
 			name:    "local source with event handler",
 			content: `<script src="./main.js" onload="alert(1)"></script>`,
+		},
+		{
+			name:    "multiline remote script",
+			content: "<script\nsrc=\"https://evil.example/payload.js\"></script>",
+		},
+		{
+			name:    "remote base redirects local script",
+			content: `<base href="https://evil.example/"><script src="./main.js"></script>`,
+		},
+		{
+			name:    "fence-like attribute before inline script",
+			content: "<script defer\n~~~\nsrc=\"./main.js\"></script>\n<script>alert(1)</script>\n~~~",
 		},
 	}
 

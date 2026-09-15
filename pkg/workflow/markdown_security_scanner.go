@@ -23,8 +23,9 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
-	"html"
+	"io"
 	"net/url"
 	"path"
 	"regexp"
@@ -35,6 +36,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"golang.org/x/net/html"
 )
 
 var markdownSecurityLog = logger.New("workflow:markdown_security_scanner")
@@ -236,74 +238,77 @@ func isEmojiLike(r rune) bool {
 		r >= 0x1F000 // supplementary multilingual plane (most modern emoji)
 }
 
-func scanUnicodeAbuse(content string) []SecurityFinding { //nolint:largefunc // The linear character checks are easier to audit together.
+func scanUnicodeAbuse(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
 	markdownSecurityLog.Printf("Scanning %d line(s) for unicode abuse", len(lines))
 
 	for lineNum, line := range lines {
-		lineNo := lineNum + 1
+		findings = append(findings, scanUnicodeAbuseLine(line, lineNum+1)...)
+	}
 
-		// Check for zero-width and invisible characters
-		var prevRune rune
-		for i := 0; i < len(line); {
-			r, size := utf8.DecodeRuneInString(line[i:])
-			if r == utf8.RuneError && size <= 1 {
-				i++
-				continue
-			}
+	return findings
+}
 
-			if name, ok := dangerousUnicodeRunes[r]; ok {
-				// U+200D (ZWJ) is a standard component of emoji sequences such as
-				// 🧑‍🤝‍🧑 (people holding hands) or 👨‍👩‍👧 (family). Only flag it when
-				// it is NOT flanked by emoji-range codepoints on both sides.
-				// prevRune is 0 (null) at the start of each line, so a ZWJ at
-				// the beginning of a line is always flagged (isEmojiLike(0)==false).
-				if r == '\u200D' {
-					var nextRune rune
-					if i+size < len(line) {
-						nextRune, _ = utf8.DecodeRuneInString(line[i+size:])
-					}
-					if isEmojiLike(prevRune) && isEmojiLike(nextRune) {
-						prevRune = r
-						i += size
-						continue
-					}
-				}
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryUnicodeAbuse,
-					Description: "contains invisible character: " + name,
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-				})
-			}
-
-			if name, ok := bidiOverrideRunes[r]; ok {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryUnicodeAbuse,
-					Description: "contains bidirectional override character: " + name,
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-				})
-			}
-
-			// Check for C0/C1 control characters (except common whitespace)
-			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
-				// Skip BOM which is already handled above
-				if r != '\uFEFF' {
-					findings = append(findings, SecurityFinding{
-						Category:    CategoryUnicodeAbuse,
-						Description: fmt.Sprintf("contains control character U+%04X", r),
-						Line:        lineNo,
-						Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-					})
-				}
-			}
-
-			prevRune = r
-			i += size
+func scanUnicodeAbuseLine(line string, lineNo int) []SecurityFinding {
+	var findings []SecurityFinding
+	var prevRune rune
+	for i := 0; i < len(line); {
+		r, size := utf8.DecodeRuneInString(line[i:])
+		if r == utf8.RuneError && size <= 1 {
+			i++
+			continue
 		}
+		if name, ok := dangerousUnicodeRunes[r]; ok {
+			// U+200D (ZWJ) is a standard component of emoji sequences such as
+			// 🧑‍🤝‍🧑 (people holding hands) or 👨‍👩‍👧 (family). Only flag it when
+			// it is NOT flanked by emoji-range codepoints on both sides.
+			// prevRune is 0 (null) at the start of each line, so a ZWJ at
+			// the beginning of a line is always flagged (isEmojiLike(0)==false).
+			if r == '\u200D' {
+				var nextRune rune
+				if i+size < len(line) {
+					nextRune, _ = utf8.DecodeRuneInString(line[i+size:])
+				}
+				if isEmojiLike(prevRune) && isEmojiLike(nextRune) {
+					prevRune = r
+					i += size
+					continue
+				}
+			}
+			findings = append(findings, SecurityFinding{
+				Category:    CategoryUnicodeAbuse,
+				Description: "contains invisible character: " + name,
+				Line:        lineNo,
+				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
+			})
+		}
+
+		if name, ok := bidiOverrideRunes[r]; ok {
+			findings = append(findings, SecurityFinding{
+				Category:    CategoryUnicodeAbuse,
+				Description: "contains bidirectional override character: " + name,
+				Line:        lineNo,
+				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
+			})
+		}
+
+		// Check for C0/C1 control characters (except common whitespace)
+		if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+			// Skip BOM which is already handled above
+			if r != '\uFEFF' {
+				findings = append(findings, SecurityFinding{
+					Category:    CategoryUnicodeAbuse,
+					Description: fmt.Sprintf("contains control character U+%04X", r),
+					Line:        lineNo,
+					Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
+				})
+			}
+		}
+
+		prevRune = r
+		i += size
 	}
 
 	return findings
@@ -433,81 +438,18 @@ var (
 	suspiciousQueryParamPattern = regexp.MustCompile(`(?i)[?&](?:token|key|auth|secret|password|credential|api_key|apikey|access_token)=`)
 )
 
-func scanObfuscatedLinks(content string) []SecurityFinding { //nolint:largefunc // The linear link checks are easier to audit together.
+func scanObfuscatedLinks(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
 
-		// Check markdown links
 		linkMatches := markdownLinkPattern.FindAllStringSubmatch(line, -1)
 		for _, m := range linkMatches {
-			linkURL := m[2]
-
-			// Check for data URIs
-			if dataURIPattern.MatchString(linkURL) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link uses a data: URI which can embed executable content",
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
-
-			// Check for multiple URL encoding
-			if multipleEncodingPattern.MatchString(linkURL) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link URL is multiply-encoded (possible obfuscation)",
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
-
-			// Check for IP address URLs
-			if ipAddressURLPattern.MatchString(linkURL) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link points to an IP address instead of a domain name",
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
-
-			// Check for URL shorteners
-			if urlShortenerPattern.MatchString(linkURL) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link uses a URL shortener which hides the true destination",
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
-
-			// Check for suspicious query parameters
-			if suspiciousQueryParamPattern.MatchString(linkURL) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link URL contains suspicious authentication parameters (token, key, secret)",
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
-
-			// Check for javascript:, vbscript:, or data: protocols
-			lowerURL := strings.ToLower(strings.TrimSpace(linkURL))
-			if strings.HasPrefix(lowerURL, "javascript:") || strings.HasPrefix(lowerURL, "vbscript:") || strings.HasPrefix(lowerURL, "data:") {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryObfuscatedLinks,
-					Description: "markdown link uses dangerous protocol: " + strings.SplitN(lowerURL, ":", 2)[0],
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(m[0]), 80),
-				})
-			}
+			findings = append(findings, scanMarkdownLinkSecurity(m, lineNo)...)
 		}
 
-		// Check markdown image links for data URIs
 		imageMatches := markdownImagePattern.FindAllStringSubmatch(line, -1)
 		for _, m := range imageMatches {
 			imageURL := m[2]
@@ -526,26 +468,75 @@ func scanObfuscatedLinks(content string) []SecurityFinding { //nolint:largefunc 
 	return findings
 }
 
+func scanMarkdownLinkSecurity(match []string, lineNo int) []SecurityFinding {
+	var findings []SecurityFinding
+	linkURL := match[2]
+	addFinding := func(description string) {
+		findings = append(findings, SecurityFinding{
+			Category:    CategoryObfuscatedLinks,
+			Description: description,
+			Line:        lineNo,
+			Snippet:     stringutil.Truncate(strings.TrimSpace(match[0]), 80),
+		})
+	}
+
+	if dataURIPattern.MatchString(linkURL) {
+		addFinding("markdown link uses a data: URI which can embed executable content")
+	}
+	if multipleEncodingPattern.MatchString(linkURL) {
+		addFinding("markdown link URL is multiply-encoded (possible obfuscation)")
+	}
+	if ipAddressURLPattern.MatchString(linkURL) {
+		addFinding("markdown link points to an IP address instead of a domain name")
+	}
+	if urlShortenerPattern.MatchString(linkURL) {
+		addFinding("markdown link uses a URL shortener which hides the true destination")
+	}
+	if suspiciousQueryParamPattern.MatchString(linkURL) {
+		addFinding("markdown link URL contains suspicious authentication parameters (token, key, secret)")
+	}
+
+	lowerURL := strings.ToLower(strings.TrimSpace(linkURL))
+	if strings.HasPrefix(lowerURL, "javascript:") || strings.HasPrefix(lowerURL, "vbscript:") || strings.HasPrefix(lowerURL, "data:") {
+		addFinding("markdown link uses dangerous protocol: " + strings.SplitN(lowerURL, ":", 2)[0])
+	}
+
+	return findings
+}
+
 // --- HTML Abuse Detection ---
 
 var (
 	// Dangerous HTML elements
-	scriptTagPattern          = regexp.MustCompile(`(?i)<\s*script[\s>]`)
-	scriptElementPattern      = regexp.MustCompile(`(?is)<\s*script([^>]*)>(.*?)<\s*/\s*script\s*>`)
-	scriptSrcAttributePattern = regexp.MustCompile(`(?i)(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)')`)
-	iframeTagPattern          = regexp.MustCompile(`(?i)<\s*iframe[\s>]`)
-	objectTagPattern          = regexp.MustCompile(`(?i)<\s*object[\s>]`)
-	embedTagPattern           = regexp.MustCompile(`(?i)<\s*embed[\s>]`)
-	linkTagPattern            = regexp.MustCompile(`(?i)<\s*link\s[^>]*rel\s*=\s*["']stylesheet`)
-	metaRefreshPattern        = regexp.MustCompile(`(?i)<\s*meta\s[^>]*http-equiv\s*=\s*["']refresh`)
-	styleTagPattern           = regexp.MustCompile(`(?i)<\s*style[\s>]`)
-	formTagPattern            = regexp.MustCompile(`(?i)<\s*form[\s>]`)
+	scriptTagPattern           = regexp.MustCompile(`(?i)<\s*script(?:[\s>]|$)`)
+	scriptElementPattern       = regexp.MustCompile(`(?is)<\s*script([^>]*)>(.*?)<\s*/\s*script\s*>`)
+	scriptSrcOccurrencePattern = regexp.MustCompile(`(?i)(?:^|\s)src\s*=`)
+	baseTagPattern             = regexp.MustCompile(`(?i)<\s*base(?:[\s>]|$)`)
+	iframeTagPattern           = regexp.MustCompile(`(?i)<\s*iframe[\s>]`)
+	objectTagPattern           = regexp.MustCompile(`(?i)<\s*object[\s>]`)
+	embedTagPattern            = regexp.MustCompile(`(?i)<\s*embed[\s>]`)
+	linkTagPattern             = regexp.MustCompile(`(?i)<\s*link\s[^>]*rel\s*=\s*["']stylesheet`)
+	metaRefreshPattern         = regexp.MustCompile(`(?i)<\s*meta\s[^>]*http-equiv\s*=\s*["']refresh`)
+	styleTagPattern            = regexp.MustCompile(`(?i)<\s*style[\s>]`)
+	formTagPattern             = regexp.MustCompile(`(?i)<\s*form[\s>]`)
 
 	// Event handlers in HTML attributes
 	eventHandlerPattern = regexp.MustCompile(`(?i)\s+on(?:load|click|error|mouseover|mouseout|focus|blur|submit|change|input|keyup|keydown|keypress|dblclick|contextmenu|drag|drop|copy|paste)\s*=`)
+
+	dangerousHTMLChecks = [...]struct {
+		pattern *regexp.Regexp
+		desc    string
+	}{
+		{iframeTagPattern, "<iframe> tag can embed external content"},
+		{objectTagPattern, "<object> tag can embed executable content"},
+		{embedTagPattern, "<embed> tag can embed executable content"},
+		{linkTagPattern, "<link rel=\"stylesheet\"> can load external resources"},
+		{metaRefreshPattern, "<meta http-equiv=\"refresh\"> can redirect to malicious URLs"},
+		{formTagPattern, "<form> tag can submit data to external servers"},
+	}
 )
 
-func scanHTMLAbuse(content string) []SecurityFinding { //nolint:largefunc // The linear HTML checks are easier to audit together.
+func scanHTMLAbuse(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 	scriptLines := strings.Split(maskSafeLocalScriptElements(content), "\n")
@@ -556,7 +547,7 @@ func scanHTMLAbuse(content string) []SecurityFinding { //nolint:largefunc // The
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(scriptLines[lineNum])
 
 		// Track code blocks to avoid false positives
 		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
@@ -575,67 +566,48 @@ func scanHTMLAbuse(content string) []SecurityFinding { //nolint:largefunc // The
 			continue
 		}
 
-		if scriptTagPattern.MatchString(scriptLines[lineNum]) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategoryHTMLAbuse,
-				Description: "<script> tag can execute arbitrary JavaScript",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-			})
-		}
+		findings = append(findings, scanHTMLLine(line, scriptLines[lineNum], lineNo)...)
+	}
 
-		// Check for other dangerous HTML elements
-		htmlChecks := []struct {
-			pattern *regexp.Regexp
-			desc    string
-		}{
-			{iframeTagPattern, "<iframe> tag can embed external content"},
-			{objectTagPattern, "<object> tag can embed executable content"},
-			{embedTagPattern, "<embed> tag can embed executable content"},
-			{linkTagPattern, "<link rel=\"stylesheet\"> can load external resources"},
-			{metaRefreshPattern, "<meta http-equiv=\"refresh\"> can redirect to malicious URLs"},
-			{formTagPattern, "<form> tag can submit data to external servers"},
-		}
+	return findings
+}
 
-		for _, check := range htmlChecks {
-			if check.pattern.MatchString(line) {
-				findings = append(findings, SecurityFinding{
-					Category:    CategoryHTMLAbuse,
-					Description: check.desc,
-					Line:        lineNo,
-					Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-				})
-			}
-		}
+func scanHTMLLine(line, scriptLine string, lineNo int) []SecurityFinding {
+	var findings []SecurityFinding
+	addFinding := func(description string) {
+		findings = append(findings, SecurityFinding{
+			Category:    CategoryHTMLAbuse,
+			Description: description,
+			Line:        lineNo,
+			Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
+		})
+	}
 
-		// Check for <style> with hiding properties
-		if styleTagPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategoryHTMLAbuse,
-				Description: "<style> tag can be used to hide content or mislead users",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-			})
+	if scriptTagPattern.MatchString(scriptLine) {
+		addFinding("<script> tag can execute arbitrary JavaScript")
+	}
+	for _, check := range dangerousHTMLChecks {
+		if check.pattern.MatchString(line) {
+			addFinding(check.desc)
 		}
-
-		// Check for event handlers
-		if eventHandlerPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategoryHTMLAbuse,
-				Description: "HTML element contains event handler attribute (onclick, onload, onerror, etc.)",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-			})
-		}
+	}
+	if styleTagPattern.MatchString(line) {
+		addFinding("<style> tag can be used to hide content or mislead users")
+	}
+	if eventHandlerPattern.MatchString(line) {
+		addFinding("HTML element contains event handler attribute (onclick, onload, onerror, etc.)")
 	}
 
 	return findings
 }
 
 func maskSafeLocalScriptElements(content string) string {
+	if baseTagPattern.MatchString(content) {
+		return content
+	}
+
 	return scriptElementPattern.ReplaceAllStringFunc(content, func(element string) string {
-		match := scriptElementPattern.FindStringSubmatch(element)
-		if len(match) != 3 || strings.TrimSpace(match[2]) != "" || !hasLocalJavaScriptSource(match[1]) {
+		if !isSafeLocalScriptElement(element) {
 			return element
 		}
 
@@ -648,17 +620,62 @@ func maskSafeLocalScriptElements(content string) string {
 	})
 }
 
-func hasLocalJavaScriptSource(attributes string) bool {
-	matches := scriptSrcAttributePattern.FindAllStringSubmatch(attributes, -1)
-	if len(matches) != 1 {
+func isSafeLocalScriptElement(element string) bool {
+	tokenizer := html.NewTokenizer(strings.NewReader(element))
+	if tokenizer.Next() != html.StartTagToken {
+		return false
+	}
+	if len(scriptSrcOccurrencePattern.FindAll(tokenizer.Raw(), -1)) != 1 {
+		return false
+	}
+	tagName, hasAttribute := tokenizer.TagName()
+	if string(tagName) != "script" {
+		return false
+	}
+	attributes := make([]html.Attribute, 0)
+	for hasAttribute {
+		key, value, moreAttributes := tokenizer.TagAttr()
+		attributes = append(attributes, html.Attribute{Key: string(key), Val: string(value)})
+		hasAttribute = moreAttributes
+	}
+	if !hasLocalJavaScriptSource(attributes) {
 		return false
 	}
 
-	source := matches[0][1]
-	if source == "" {
-		source = matches[0][2]
+	next := tokenizer.Next()
+	if next == html.TextToken {
+		if strings.TrimSpace(string(tokenizer.Raw())) != "" {
+			return false
+		}
+		next = tokenizer.Next()
 	}
-	source = strings.TrimSpace(html.UnescapeString(source))
+	if next != html.EndTagToken {
+		return false
+	}
+	endTagName, _ := tokenizer.TagName()
+	if string(endTagName) != "script" {
+		return false
+	}
+
+	return tokenizer.Next() == html.ErrorToken && errors.Is(tokenizer.Err(), io.EOF)
+}
+
+func hasLocalJavaScriptSource(attributes []html.Attribute) bool {
+	var source string
+	sourceCount := 0
+	for _, attribute := range attributes {
+		if strings.HasPrefix(attribute.Key, "on") {
+			return false
+		}
+		if attribute.Key == "src" {
+			sourceCount++
+			if sourceCount > 1 {
+				return false
+			}
+			source = strings.TrimSpace(attribute.Val)
+		}
+	}
+
 	if source == "" || strings.HasPrefix(source, "/") || strings.Contains(source, `\`) {
 		return false
 	}
@@ -767,7 +784,7 @@ var (
 	longHexPattern = regexp.MustCompile(`(?:0x[0-9a-fA-F]{2}[\s,]*){20,}|\\x[0-9a-fA-F]{2}(?:\\x[0-9a-fA-F]{2}){19,}`)
 )
 
-func scanSocialEngineering(content string) []SecurityFinding { //nolint:largefunc // The linear pattern checks are easier to audit together.
+func scanSocialEngineering(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
@@ -807,45 +824,34 @@ func scanSocialEngineering(content string) []SecurityFinding { //nolint:largefun
 			continue
 		}
 
-		// Base64 encoded payloads in non-code-block context
-		if base64PayloadPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategorySocialEngineering,
-				Description: "contains large base64-encoded payload that may hide malicious content",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 60),
-			})
-		}
+		findings = append(findings, scanNonCodeSocialEngineering(line, lineNo)...)
+	}
 
-		// Shell pipe-to-execute patterns (outside code blocks - in prose/instructions)
-		if pipeToShellPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategorySocialEngineering,
-				Description: "contains pipe-to-shell pattern (curl/wget piped to sh/bash) outside code block",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-			})
-		}
+	return findings
+}
 
-		// Base64 decode and execute
-		if base64ExecPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategorySocialEngineering,
-				Description: "contains base64 decode-and-execute pattern",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
-			})
-		}
+func scanNonCodeSocialEngineering(line string, lineNo int) []SecurityFinding {
+	var findings []SecurityFinding
+	addFinding := func(description string, snippetLength int) {
+		findings = append(findings, SecurityFinding{
+			Category:    CategorySocialEngineering,
+			Description: description,
+			Line:        lineNo,
+			Snippet:     stringutil.Truncate(strings.TrimSpace(line), snippetLength),
+		})
+	}
 
-		// Long hex strings (potential obfuscation)
-		if longHexPattern.MatchString(line) {
-			findings = append(findings, SecurityFinding{
-				Category:    CategorySocialEngineering,
-				Description: "contains long hex-encoded string that may be obfuscating a payload",
-				Line:        lineNo,
-				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 60),
-			})
-		}
+	if base64PayloadPattern.MatchString(line) {
+		addFinding("contains large base64-encoded payload that may hide malicious content", 60)
+	}
+	if pipeToShellPattern.MatchString(line) {
+		addFinding("contains pipe-to-shell pattern (curl/wget piped to sh/bash) outside code block", 80)
+	}
+	if base64ExecPattern.MatchString(line) {
+		addFinding("contains base64 decode-and-execute pattern", 80)
+	}
+	if longHexPattern.MatchString(line) {
+		addFinding("contains long hex-encoded string that may be obfuscating a payload", 60)
 	}
 
 	return findings
