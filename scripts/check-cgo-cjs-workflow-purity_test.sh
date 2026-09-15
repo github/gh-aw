@@ -91,7 +91,7 @@ write_workflow "$T4_CGO" "    permissions:
       contents: \"write\"
     steps:
       - run: echo ok"
-write_workflow "$T4_CJS" "    permissions: { contents: read, actions: 'write' }
+write_workflow "$T4_CJS" "    permissions: { contents: read, issues: 'write' }
     steps:
       - run: echo ok"
 write_workflow "$T4_SCALAR" "    permissions: 'write-all'
@@ -100,7 +100,7 @@ write_workflow "$T4_SCALAR" "    permissions: 'write-all'
 T4_OUT="$TMP_ROOT/t4-output.txt"
 if (cd "$T4" && bash "$PURITY_SCRIPT" block.yml flow.yml scalar.yml >"$T4_OUT" 2>&1); then
   fail "write permissions should exit 1" "$(cat "$T4_OUT")"
-elif grep -q "contents: \"write\"" "$T4_OUT" && grep -q "actions: 'write'" "$T4_OUT" && grep -q "write-all" "$T4_OUT"; then
+elif grep -q "contents: \"write\"" "$T4_OUT" && grep -q "issues: 'write'" "$T4_OUT" && grep -q "write-all" "$T4_OUT"; then
   pass "block, flow, and quoted write permissions fail"
 else
   fail "write permission output was incorrect" "$(cat "$T4_OUT")"

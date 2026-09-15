@@ -702,7 +702,7 @@ func TestCloudHypervisorSetupBundleScriptExecutesAgainstFixtures(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, manifestName), []byte(validManifest), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, bundleName), []byte(cloudHypervisorFixtureBundle), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "latest-release.json"),
-			[]byte(fmt.Sprintf(`{"tag_name": %q}`, cloudHypervisorFixtureReleaseTag)), 0o644))
+			fmt.Appendf(nil, `{"tag_name": %q}`, cloudHypervisorFixtureReleaseTag), 0o644))
 
 		out, err := runCloudHypervisorSetupBundleScriptWithVersion(t, dir, "latest")
 		require.NoError(t, err, out)
