@@ -16,8 +16,10 @@ const job = (name, overrides = {}) => ({
   status: "completed",
   conclusion: "success",
   run_attempt: 1,
+  runner_id: 1,
   started_at: time,
   completed_at: time,
+  steps: [{ name: "Set up job", conclusion: "success" }],
   ...overrides,
 });
 let directory;
@@ -286,6 +288,12 @@ it("counts missing evals accounting as zero when the job failed before any step 
 it("still requires accounting when a failed agent job has no authoritative source", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
+it("counts a failed agent job with no assigned runner or steps as zero usage", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure", runner_id: null, steps: [] })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_started"'));
 });
 
 it("still requires accounting when an agent job succeeds", async () => {

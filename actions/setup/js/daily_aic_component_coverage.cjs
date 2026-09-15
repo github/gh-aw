@@ -65,6 +65,10 @@ function provesExecutionNotStarted(directory, name, runId, runAttempt) {
   }
 }
 
+function provesRunnerNeverStarted(job) {
+  return job.conclusion === "failure" && !Number.isSafeInteger(job.runner_id) && (!Array.isArray(job.steps) || job.steps.length === 0);
+}
+
 function inspectAccountingFile(directory, file) {
   const relativeFile = path.relative(directory, file);
   if (!fs.existsSync(file)) return { file: relativeFile, state: "missing" };
@@ -156,6 +160,10 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       continue;
     }
     if (!selected) {
+      if (provesRunnerNeverStarted(job)) {
+        logComponentAIC(runId, name, job, 0, "runner_not_started");
+        continue;
+      }
       if (provesExecutionNotStarted(directory, name, runId, job.run_attempt)) {
         logComponentAIC(runId, name, job, 0, "execution_not_started");
         continue;
