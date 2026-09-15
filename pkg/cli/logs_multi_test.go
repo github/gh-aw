@@ -361,16 +361,26 @@ func TestCollectLogsTargetsUsesGlobalCount(t *testing.T) {
 	require.NotNil(t, sharedLimit)
 }
 
-func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *testing.T) {
+func TestCollectLogsTargetsStopsStartedTargetsOnceGlobalCountReached(t *testing.T) {
 	t.Setenv("GH_AW_MAX_CONCURRENT_DOWNLOADS", "1")
 	original := collectWorkflowLogsForTarget
 	t.Cleanup(func() { collectWorkflowLogsForTarget = original })
 
 	var calls atomic.Int64
+	// The target that fills the shared count cancels the remaining targets, so
+	// the collectors rendezvous before any of them claims a run to keep the
+	// call count independent of scheduling order.
+	allStarted := make(chan struct{})
 	collectWorkflowLogsForTarget = func(_ context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
-		calls.Add(1)
+		if calls.Add(1) == 3 {
+			close(allStarted)
+		}
+		select {
+		case <-allStarted:
+		case <-time.After(5 * time.Second):
+		}
 		if !opts.countLimit.tryAdd() {
-			return workflowLogsResult{}, errors.New("shared count reached before first target added a run")
+			return countLimitedLogsTargetResult(opts), nil
 		}
 		return workflowLogsResult{processedRuns: []ProcessedRun{{
 			Run: WorkflowRun{DatabaseID: 1, WorkflowName: opts.WorkflowName},
@@ -388,8 +398,8 @@ func TestCollectLogsTargetsDoesNotStartQueuedTargetsAfterGlobalCountReached(t *t
 	processedRuns, _, _, _, _, errs := mergeLogsTargetResults(results, nil)
 
 	assert.Empty(t, errs)
-	assert.Len(t, processedRuns, 1)
-	assert.Equal(t, int64(1), calls.Load(), "queued targets must not start after the shared count is reached")
+	assert.Len(t, processedRuns, 1, "the shared count must be honored across every started target")
+	assert.Equal(t, int64(3), calls.Load(), "every target collector starts so batch scheduling can distribute API queries fairly")
 }
 
 func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T) {
@@ -412,8 +422,19 @@ func TestCollectLogsTargetsClearsQueueWhenNegativeRateLimitReached(t *testing.T)
 		}, nil
 	}
 	var calls atomic.Int64
+	// The first target to observe the ceiling cancels the shared context, so the
+	// collectors rendezvous before any of them performs the check. Without this
+	// barrier the other targets may be canceled before they start and the call
+	// count becomes timing dependent.
+	allStarted := make(chan struct{})
 	collectWorkflowLogsForTarget = func(ctx context.Context, opts LogsDownloadOptions) (workflowLogsResult, error) {
-		calls.Add(1)
+		if calls.Add(1) == 3 {
+			close(allStarted)
+		}
+		select {
+		case <-allStarted:
+		case <-time.After(5 * time.Second):
+		}
 		assert.Equal(t, -2000, opts.MaxGitHubAPIRateLimit)
 		err := opts.rateLimitState.check(ctx, false, opts.MaxGitHubAPIRateLimit, 1)
 		if errors.Is(err, context.Canceled) && opts.rateLimitState.isReached() {
