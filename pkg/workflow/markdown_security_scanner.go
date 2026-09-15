@@ -24,6 +24,8 @@ package workflow
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -233,7 +235,7 @@ func isEmojiLike(r rune) bool {
 		r >= 0x1F000 // supplementary multilingual plane (most modern emoji)
 }
 
-func scanUnicodeAbuse(content string) []SecurityFinding {
+func scanUnicodeAbuse(content string) []SecurityFinding { //nolint:largefunc // The linear character checks are easier to audit together.
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
@@ -430,7 +432,7 @@ var (
 	suspiciousQueryParamPattern = regexp.MustCompile(`(?i)[?&](?:token|key|auth|secret|password|credential|api_key|apikey|access_token)=`)
 )
 
-func scanObfuscatedLinks(content string) []SecurityFinding {
+func scanObfuscatedLinks(content string) []SecurityFinding { //nolint:largefunc // The linear link checks are easier to audit together.
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
@@ -527,22 +529,25 @@ func scanObfuscatedLinks(content string) []SecurityFinding {
 
 var (
 	// Dangerous HTML elements
-	scriptTagPattern   = regexp.MustCompile(`(?i)<\s*script[\s>]`)
-	iframeTagPattern   = regexp.MustCompile(`(?i)<\s*iframe[\s>]`)
-	objectTagPattern   = regexp.MustCompile(`(?i)<\s*object[\s>]`)
-	embedTagPattern    = regexp.MustCompile(`(?i)<\s*embed[\s>]`)
-	linkTagPattern     = regexp.MustCompile(`(?i)<\s*link\s[^>]*rel\s*=\s*["']stylesheet`)
-	metaRefreshPattern = regexp.MustCompile(`(?i)<\s*meta\s[^>]*http-equiv\s*=\s*["']refresh`)
-	styleTagPattern    = regexp.MustCompile(`(?i)<\s*style[\s>]`)
-	formTagPattern     = regexp.MustCompile(`(?i)<\s*form[\s>]`)
+	scriptTagPattern          = regexp.MustCompile(`(?i)<\s*script[\s>]`)
+	scriptElementPattern      = regexp.MustCompile(`(?is)<\s*script([^>]*)>(.*?)<\s*/\s*script\s*>`)
+	scriptSrcAttributePattern = regexp.MustCompile(`(?i)(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	iframeTagPattern          = regexp.MustCompile(`(?i)<\s*iframe[\s>]`)
+	objectTagPattern          = regexp.MustCompile(`(?i)<\s*object[\s>]`)
+	embedTagPattern           = regexp.MustCompile(`(?i)<\s*embed[\s>]`)
+	linkTagPattern            = regexp.MustCompile(`(?i)<\s*link\s[^>]*rel\s*=\s*["']stylesheet`)
+	metaRefreshPattern        = regexp.MustCompile(`(?i)<\s*meta\s[^>]*http-equiv\s*=\s*["']refresh`)
+	styleTagPattern           = regexp.MustCompile(`(?i)<\s*style[\s>]`)
+	formTagPattern            = regexp.MustCompile(`(?i)<\s*form[\s>]`)
 
 	// Event handlers in HTML attributes
 	eventHandlerPattern = regexp.MustCompile(`(?i)\s+on(?:load|click|error|mouseover|mouseout|focus|blur|submit|change|input|keyup|keydown|keypress|dblclick|contextmenu|drag|drop|copy|paste)\s*=`)
 )
 
-func scanHTMLAbuse(content string) []SecurityFinding {
+func scanHTMLAbuse(content string) []SecurityFinding { //nolint:largefunc // The linear HTML checks are easier to audit together.
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
+	scriptLines := strings.Split(maskSafeLocalScriptElements(content), "\n")
 
 	// Track if we're inside a code block (fenced or indented)
 	inCodeBlock := false
@@ -569,12 +574,20 @@ func scanHTMLAbuse(content string) []SecurityFinding {
 			continue
 		}
 
-		// Check for dangerous HTML elements
+		if scriptTagPattern.MatchString(scriptLines[lineNum]) {
+			findings = append(findings, SecurityFinding{
+				Category:    CategoryHTMLAbuse,
+				Description: "<script> tag can execute arbitrary JavaScript",
+				Line:        lineNo,
+				Snippet:     stringutil.Truncate(strings.TrimSpace(line), 80),
+			})
+		}
+
+		// Check for other dangerous HTML elements
 		htmlChecks := []struct {
 			pattern *regexp.Regexp
 			desc    string
 		}{
-			{scriptTagPattern, "<script> tag can execute arbitrary JavaScript"},
 			{iframeTagPattern, "<iframe> tag can embed external content"},
 			{objectTagPattern, "<object> tag can embed executable content"},
 			{embedTagPattern, "<embed> tag can embed executable content"},
@@ -616,6 +629,50 @@ func scanHTMLAbuse(content string) []SecurityFinding {
 	}
 
 	return findings
+}
+
+func maskSafeLocalScriptElements(content string) string {
+	return scriptElementPattern.ReplaceAllStringFunc(content, func(element string) string {
+		match := scriptElementPattern.FindStringSubmatch(element)
+		if len(match) != 3 || strings.TrimSpace(match[2]) != "" || !hasLocalJavaScriptSource(match[1]) {
+			return element
+		}
+
+		return strings.Map(func(r rune) rune {
+			if r == '\n' || r == '\r' {
+				return r
+			}
+			return ' '
+		}, element)
+	})
+}
+
+func hasLocalJavaScriptSource(attributes string) bool {
+	matches := scriptSrcAttributePattern.FindAllStringSubmatch(attributes, -1)
+	if len(matches) != 1 {
+		return false
+	}
+
+	source := matches[0][1]
+	if source == "" {
+		source = matches[0][2]
+	}
+	source = strings.TrimSpace(source)
+	if source == "" || strings.HasPrefix(source, "/") || strings.Contains(source, `\`) {
+		return false
+	}
+
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.Opaque != "" || strings.HasPrefix(parsed.Path, "/") {
+		return false
+	}
+
+	switch strings.ToLower(path.Ext(path.Clean(parsed.Path))) {
+	case ".js", ".mjs", ".cjs":
+		return true
+	default:
+		return false
+	}
 }
 
 // --- Embedded Files Detection ---
@@ -709,7 +766,7 @@ var (
 	longHexPattern = regexp.MustCompile(`(?:0x[0-9a-fA-F]{2}[\s,]*){20,}|\\x[0-9a-fA-F]{2}(?:\\x[0-9a-fA-F]{2}){19,}`)
 )
 
-func scanSocialEngineering(content string) []SecurityFinding {
+func scanSocialEngineering(content string) []SecurityFinding { //nolint:largefunc // The linear pattern checks are easier to audit together.
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 

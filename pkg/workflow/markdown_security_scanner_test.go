@@ -487,6 +487,85 @@ func TestScanMarkdownSecurity_HTMLAbuse_EventHandlers(t *testing.T) {
 	}
 }
 
+func TestScanMarkdownSecurity_HTMLAbuse_AllowsLocalJavaScriptFiles(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "module script used by packaged dashboard",
+			content: `<script type="module" src="./src/main.js"></script>`,
+		},
+		{
+			name:    "bare JavaScript filename",
+			content: `<script src="main.js"></script>`,
+		},
+		{
+			name:    "parent-relative module with query",
+			content: "<script\n  defer\n  src='../shared/main.mjs?sha=abc123'\n></script>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := ScanMarkdownSecurity(tt.content)
+			assert.Empty(t, findings, "should allow an empty script element referencing a local JavaScript file")
+		})
+	}
+}
+
+func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "remote HTTPS script",
+			content: `<script src="https://evil.example/payload.js"></script>`,
+		},
+		{
+			name:    "protocol-relative remote script",
+			content: `<script src="//evil.example/payload.js"></script>`,
+		},
+		{
+			name:    "data URI script",
+			content: `<script src="data:text/javascript,alert(1)"></script>`,
+		},
+		{
+			name:    "root-relative script",
+			content: `<script src="/payload.js"></script>`,
+		},
+		{
+			name:    "encoded root-relative script",
+			content: `<script src="%2Fpayload.js"></script>`,
+		},
+		{
+			name:    "local non-JavaScript file",
+			content: `<script src="./payload.txt"></script>`,
+		},
+		{
+			name:    "local source with inline body",
+			content: `<script src="./main.js">alert(1)</script>`,
+		},
+		{
+			name:    "duplicate source attributes",
+			content: `<script src="./main.js" src="https://evil.example/payload.js"></script>`,
+		},
+		{
+			name:    "local source with event handler",
+			content: `<script src="./main.js" onload="alert(1)"></script>`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := ScanMarkdownSecurity(tt.content)
+			require.NotEmpty(t, findings, "should reject unsafe script element")
+			assert.Equal(t, CategoryHTMLAbuse, findings[0].Category)
+		})
+	}
+}
+
 func TestScanMarkdownSecurity_HTMLAbuse_SkipsCodeBlocks(t *testing.T) {
 	// Fenced code blocks should be skipped for HTML tag detection
 	content := "```html\n<script>alert('this is an example')</script>\n```"
