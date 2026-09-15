@@ -21,35 +21,24 @@ var forecastPeriodDays = map[string]int{
 	"month": 30,
 }
 
+type forecastWindow struct {
+	now                 time.Time
+	start               time.Time
+	anchor              time.Time
+	validationStartDate string
+	validationEndDate   string
+}
+
 // RunForecast is the entry point for the forecast command.
 func RunForecast(config ForecastConfig) error {
 	forecastRunLog.Printf("Running forecast: workflows=%v, days=%d, period=%s, eval=%v", config.WorkflowIDs, config.Days, config.Period, config.EvalMode)
-	if config.TimeoutMinutes < 0 {
-		return fmt.Errorf("invalid timeout value: %d; must be >= 0", config.TimeoutMinutes)
+	periodDays, err := validateForecastConfig(&config)
+	if err != nil {
+		return err
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-	if config.TimeoutMinutes > 0 {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(config.TimeoutMinutes)*time.Minute)
-		defer cancel()
-		ctx = timeoutCtx
-	}
-
-	// Validate period.
-	periodDays, ok := forecastPeriodDays[config.Period]
-	if !ok {
-		return fmt.Errorf("invalid period %q: must be 'week' or 'month'", config.Period)
-	}
-	if config.Days != 7 && config.Days != 30 {
-		return fmt.Errorf("invalid days value: %d; must be 7 or 30", config.Days)
-	}
-	if config.SampleSize <= 0 {
-		config.SampleSize = 100
-	}
-
-	// Resolve the list of workflow IDs to forecast.
-	workflowIDs, err := resolveForecastWorkflows(ctx, config)
+	ctx, cleanup := newForecastContext(config)
+	defer cleanup()
+	workflowIDs, targetByID, err := prepareForecastInputs(ctx, &config)
 	if err != nil {
 		return normalizeForecastRunError(err, config)
 	}
@@ -58,124 +47,182 @@ func RunForecast(config ForecastConfig) error {
 		return nil
 	}
 
-	now := time.Now()
-
-	// In eval mode, shift the entire date range back by one period so we can
-	// compare the forecast against the actual runs in the most recent period.
-	//
-	//  ┌──────────────────────────────────────────────────────────────────┐
-	//  │  [anchor - days ... anchor]  training  │  [anchor ... now]  val  │
-	//  └──────────────────────────────────────────────────────────────────┘
-	//   anchor = now - periodDays
-	//
-	// Normal mode: startDate = now - days (no anchor shift).
-	var anchor time.Time
-	var validationStartDate, validationEndDate string
-	if config.EvalMode {
-		anchor = now.AddDate(0, 0, -periodDays)
-		validationStartDate = anchor.Format("2006-01-02")
-		validationEndDate = now.Format("2006-01-02")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
-			fmt.Sprintf("Eval mode: training window ends %s; validation window %s → %s",
-				anchor.Format("2006-01-02"), validationStartDate, validationEndDate)))
+	window := newForecastWindow(config, periodDays)
+	printForecastStart(config, window, len(workflowIDs))
+	results, sampleTruncated, err := processForecastWorkflows(ctx, workflowIDs, targetByID, config, window, periodDays)
+	if err != nil {
+		return err
 	}
-
-	startDate := now.AddDate(0, 0, -config.Days).Format("2006-01-02")
-	if config.EvalMode {
-		// Training window ends at the anchor, not now.
-		startDate = anchor.AddDate(0, 0, -config.Days).Format("2006-01-02")
-	}
-
-	if !config.Verbose && !config.JSONOutput {
-		label := fmt.Sprintf("Forecasting %d workflow(s) using %d-day history → projecting per %s",
-			len(workflowIDs), config.Days, config.Period)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(label))
-	}
-
-	spinner := console.NewSpinner("Sampling workflow run history…")
-	if !config.Verbose {
-		spinner.Start()
-	}
-
-	results := make([]ForecastWorkflowResult, 0, len(workflowIDs))
-	for _, wfID := range workflowIDs {
-		if err := ctx.Err(); err != nil {
-			if !config.Verbose {
-				spinner.Stop()
-			}
-			emitPartialForecastResults(results, config, now)
-			return normalizeForecastRunError(err, config)
-		}
-		if !config.Verbose {
-			spinner.UpdateMessage(fmt.Sprintf("Sampling %s…", wfID))
-		}
-
-		// forecastWorkflow uses the shifted startDate; in eval mode we also pass the
-		// anchor so the function knows where the training window ends.
-		result, err := forecastWorkflow(ctx, wfID, startDate, config, periodDays)
-		if err != nil {
-			// context.Canceled typically indicates user interruption (Ctrl-C), while
-			// context.DeadlineExceeded indicates the configured forecast timeout.
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				if !config.Verbose {
-					spinner.Stop()
-				}
-				emitPartialForecastResults(results, config, now)
-				return normalizeForecastRunError(err, config)
-			}
-			if !config.Verbose {
-				spinner.Stop()
-			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
-				fmt.Sprintf("Skipping %s: %v", wfID, err)))
-			if !config.Verbose {
-				spinner.Start()
-			}
-			continue
-		}
-
-		// In eval mode, fetch the validation-window runs and attach evaluation metrics.
-		if config.EvalMode {
-			result.Evaluation = evaluateForecast(ctx, wfID, result, validationStartDate, validationEndDate, config)
-		}
-
-		results = append(results, result)
-	}
-
-	if !config.Verbose {
-		spinner.Stop()
-	}
-
-	// Sort results by Monte Carlo P50 (or point estimate when MC unavailable) descending.
-	slices.SortFunc(results, func(a, b ForecastWorkflowResult) int {
-		pi := a.ProjectedAIC
-		if mc := a.MonteCarlo; mc != nil {
-			pi = mc.P50ProjectedAIC
-		}
-		pj := b.ProjectedAIC
-		if mc := b.MonteCarlo; mc != nil {
-			pj = mc.P50ProjectedAIC
-		}
-		if pi > pj {
-			return -1
-		}
-		if pi < pj {
-			return 1
-		}
-		return 0
-	})
-
-	output := ForecastResult{
-		Period:    config.Period,
-		AsOf:      now.UTC().Format(time.RFC3339),
-		EvalMode:  config.EvalMode,
-		Workflows: results,
-	}
-
+	sortForecastResults(results)
+	output := buildForecastOutput(results, config, window, sampleTruncated)
 	if config.JSONOutput {
 		return renderForecastJSON(output)
 	}
 	return renderForecastTable(output, config)
+}
+
+func validateForecastConfig(config *ForecastConfig) (int, error) {
+	if config.TimeoutMinutes < 0 {
+		return 0, fmt.Errorf("invalid timeout value: %d; must be >= 0", config.TimeoutMinutes)
+	}
+	periodDays, ok := forecastPeriodDays[config.Period]
+	if !ok {
+		return 0, fmt.Errorf("invalid period %q: must be 'week' or 'month'", config.Period)
+	}
+	if config.Days != 7 && config.Days != 30 {
+		return 0, fmt.Errorf("invalid days value: %d; must be 7 or 30", config.Days)
+	}
+	if config.SampleSize <= 0 {
+		config.SampleSize = 100
+	}
+	return periodDays, nil
+}
+
+func newForecastContext(config ForecastConfig) (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	if config.TimeoutMinutes == 0 {
+		return ctx, stop
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(config.TimeoutMinutes)*time.Minute)
+	return timeoutCtx, func() {
+		cancel()
+		stop()
+	}
+}
+
+func prepareForecastInputs(ctx context.Context, config *ForecastConfig) ([]string, map[string]forecastWorkflowTarget, error) {
+	if len(config.LogsJSONL) == 0 {
+		ids, err := resolveForecastWorkflows(ctx, *config)
+		return ids, nil, err
+	}
+	history, err := loadForecastJSONLHistory(config.LogsJSONL)
+	if err != nil {
+		return nil, nil, err
+	}
+	config.history = history
+	targets, err := history.targets(config.WorkflowIDs, config.RepoOverride)
+	if err != nil {
+		return nil, nil, err
+	}
+	ids := make([]string, 0, len(targets))
+	targetByID := make(map[string]forecastWorkflowTarget, len(targets))
+	for index, target := range targets {
+		key := fmt.Sprintf("jsonl:%d", index)
+		ids = append(ids, key)
+		targetByID[key] = target
+	}
+	return ids, targetByID, nil
+}
+
+func newForecastWindow(config ForecastConfig, periodDays int) forecastWindow {
+	window := forecastWindow{now: time.Now()}
+	window.start = window.now.AddDate(0, 0, -config.Days)
+	if !config.EvalMode {
+		return window
+	}
+	window.anchor = window.now.AddDate(0, 0, -periodDays)
+	window.start = window.anchor.AddDate(0, 0, -config.Days)
+	window.validationStartDate = window.anchor.Format("2006-01-02")
+	window.validationEndDate = window.now.Format("2006-01-02")
+	return window
+}
+
+func printForecastStart(config ForecastConfig, window forecastWindow, workflowCount int) {
+	if config.EvalMode {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+			"Eval mode: training window ends %s; validation window %s → %s",
+			window.anchor.Format("2006-01-02"), window.validationStartDate, window.validationEndDate)))
+	}
+	if !config.Verbose && !config.JSONOutput {
+		label := fmt.Sprintf("Forecasting %d workflow(s) using %d-day history → projecting per %s",
+			workflowCount, config.Days, config.Period)
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(label))
+	}
+}
+
+func processForecastWorkflows(ctx context.Context, ids []string, targets map[string]forecastWorkflowTarget, config ForecastConfig, window forecastWindow, periodDays int) ([]ForecastWorkflowResult, bool, error) {
+	spinner := console.NewSpinner("Sampling workflow run history…")
+	if !config.Verbose {
+		spinner.Start()
+		defer spinner.Stop()
+	}
+	results := make([]ForecastWorkflowResult, 0, len(ids))
+	sampleTruncated := false
+	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			emitPartialForecastResults(results, config, window.now)
+			return nil, sampleTruncated, normalizeForecastRunError(err, config)
+		}
+		if !config.Verbose {
+			spinner.UpdateMessage(fmt.Sprintf("Sampling %s…", id))
+		}
+		result, truncated, err := forecastOneWorkflow(ctx, id, targets[id], config, window, periodDays)
+		sampleTruncated = sampleTruncated || truncated
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				emitPartialForecastResults(results, config, window.now)
+				return nil, sampleTruncated, normalizeForecastRunError(err, config)
+			}
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", id, err)))
+			continue
+		}
+		results = append(results, result)
+	}
+	return results, sampleTruncated, nil
+}
+
+func forecastOneWorkflow(ctx context.Context, id string, target forecastWorkflowTarget, config ForecastConfig, window forecastWindow, periodDays int) (ForecastWorkflowResult, bool, error) {
+	if config.history != nil {
+		end := time.Time{}
+		if config.EvalMode {
+			end = window.anchor
+		}
+		return forecastWorkflowFromJSONL(ctx, target, window.start, end, config, periodDays)
+	}
+	result, err := forecastWorkflow(ctx, id, window.start.Format("2006-01-02"), config, periodDays)
+	if err == nil && config.EvalMode {
+		result.Evaluation = evaluateForecast(ctx, id, result, window.validationStartDate, window.validationEndDate, config)
+	}
+	return result, false, err
+}
+
+func sortForecastResults(results []ForecastWorkflowResult) {
+	slices.SortFunc(results, func(a, b ForecastWorkflowResult) int {
+		left, right := a.ProjectedAIC, b.ProjectedAIC
+		if a.MonteCarlo != nil {
+			left = a.MonteCarlo.P50ProjectedAIC
+		}
+		if b.MonteCarlo != nil {
+			right = b.MonteCarlo.P50ProjectedAIC
+		}
+		return -cmpFloat64(left, right)
+	})
+}
+
+func cmpFloat64(left, right float64) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func buildForecastOutput(results []ForecastWorkflowResult, config ForecastConfig, window forecastWindow, sampleTruncated bool) ForecastResult {
+	provenance := ForecastHistoryProvenance{Source: "github_api"}
+	if config.history != nil {
+		provenance = config.history.provenance(window.start, sampleTruncated)
+	}
+	return ForecastResult{
+		Period:         config.Period,
+		AsOf:           window.now.UTC().Format(time.RFC3339),
+		EvalMode:       config.EvalMode,
+		History:        provenance,
+		WorkflowRunAPI: aggregateWorkflowRunAPI(results),
+		Workflows:      results,
+	}
 }
 
 func normalizeForecastRunError(err error, config ForecastConfig) error {

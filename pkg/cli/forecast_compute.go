@@ -193,6 +193,8 @@ func populateForecastProjection(result *ForecastWorkflowResult, stats forecastRu
 	result.MonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, result.ObservedRunsPerPeriod, rng)
 	result.WeeklyMonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, weeklyRuns, rng2)
 	result.MonthlyMonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, monthlyRuns, rng3)
+	apiRNG := rand.New(rand.NewSource(seed + 3)) //nolint:gosec
+	result.WorkflowRunAPI, result.apiRunTrials, result.apiRequestTrials = forecastWorkflowRunAPI(n, result.ObservedRunsPerPeriod, apiRNG)
 	if result.MonteCarlo != nil {
 		result.ProjectedAIC = result.MonteCarlo.P50ProjectedAIC
 	}

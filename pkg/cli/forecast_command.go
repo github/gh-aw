@@ -32,6 +32,11 @@ type ForecastConfig struct {
 	// DownloadConcurrency is the maximum number of usage-artifact downloads to run in
 	// parallel. Zero or negative uses the default (defaultForecastDownloadConcurrency).
 	DownloadConcurrency int
+	// LogsJSONL contains files, directories, or glob patterns produced by
+	// `gh aw logs --cached-jsonl`. When set, forecast runs fully offline.
+	LogsJSONL []string
+	// history is populated internally after resolving LogsJSONL.
+	history *forecastJSONLHistory
 }
 
 // NewForecastCommand creates the forecast command.
@@ -48,6 +53,10 @@ previously processed by 'gh aw logs', cached token-usage data is used. The
 observed run frequency is then projected to the target period using a statistical
 simulation that models three sources of uncertainty: run count (Poisson), per-run
 AIC usage (bootstrap resampling), and per-run success (Bernoulli).
+
+The same simulated run counts forecast REST request units for listing workflow
+runs (one unit per 100-result page). Use --logs-jsonl to run fully offline from
+one or more schema-versioned files produced by 'gh aw logs --cached-jsonl'.
 
 All forecasts are estimates derived from historical samples and may be inaccurate.
 
@@ -77,53 +86,49 @@ Backtesting (--eval):
   ` + string(constants.CLIExtensionPrefix) + ` forecast --sample 50            # Sample up to 50 runs per workflow
   ` + string(constants.CLIExtensionPrefix) + ` forecast --timeout 10           # Stop gracefully after 10 minutes
   ` + string(constants.CLIExtensionPrefix) + ` forecast --json                 # Machine-readable JSON output
+  ` + string(constants.CLIExtensionPrefix) + ` forecast --logs-jsonl logs.jsonl # Forecast offline from cached logs
+  ` + string(constants.CLIExtensionPrefix) + ` forecast --logs-jsonl 'logs/*.jsonl' # Merge and deduplicate JSONL shards
   ` + string(constants.CLIExtensionPrefix) + ` forecast --repo owner/repo      # Forecast in another repository
   ` + string(constants.CLIExtensionPrefix) + ` forecast --eval                 # Backtest: evaluate forecast quality against past data`,
 		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			days, _ := cmd.Flags().GetInt("days")
-			period, _ := cmd.Flags().GetString("period")
-			jsonOutput, _ := cmd.Flags().GetBool("json")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			repoOverride, _ := cmd.Flags().GetString("repo")
-			sampleSize, _ := cmd.Flags().GetInt("sample")
-			evalMode, _ := cmd.Flags().GetBool("eval")
-			timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
-			downloadConcurrency, _ := cmd.Flags().GetInt("concurrency")
-
-			forecastRunLog.Printf("Forecast command invoked: workflow_count=%d, days=%d, period=%s, sample_size=%d, eval=%v, timeout_minutes=%d, json=%v, repo=%q",
-				len(args), days, period, sampleSize, evalMode, timeoutMinutes, jsonOutput, repoOverride)
-
-			config := ForecastConfig{
-				WorkflowIDs:         args,
-				Days:                days,
-				Period:              period,
-				JSONOutput:          jsonOutput,
-				Verbose:             verbose,
-				RepoOverride:        repoOverride,
-				SampleSize:          sampleSize,
-				EvalMode:            evalMode,
-				TimeoutMinutes:      timeoutMinutes,
-				DownloadConcurrency: downloadConcurrency,
-			}
-
-			return RunForecast(config)
-		},
+		RunE: runForecastCommand,
 	}
 
+	registerForecastFlags(cmd)
+	cmd.ValidArgsFunction = CompleteWorkflowNames
+	_ = cmd.RegisterFlagCompletionFunc("days", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{"7", "30"}, cobra.ShellCompDirectiveNoFileComp
+	})
+	return cmd
+}
+
+func registerForecastFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("days", 30, "Historical window in days to sample run history (allowed values: 7, 30)")
 	cmd.Flags().String("period", "month", "Aggregation period for projections: week or month")
 	cmd.Flags().Int("sample", 100, "Maximum number of completed runs to sample per workflow")
 	cmd.Flags().Bool("eval", false, "Evaluate forecast quality against past data (backtesting mode)")
 	cmd.Flags().Int("timeout", 0, "Gracefully stop forecast computation after this many minutes (0 = no timeout)")
 	cmd.Flags().Int("concurrency", 0, "Maximum number of concurrent usage-artifact downloads (0 = use default)")
+	cmd.Flags().StringArray("logs-jsonl", nil, "Read history from a cached logs JSONL file, directory, or glob (repeatable)")
 	addRepoFlag(cmd)
 	addJSONFlag(cmd)
+}
 
-	cmd.ValidArgsFunction = CompleteWorkflowNames
-	_ = cmd.RegisterFlagCompletionFunc("days", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{"7", "30"}, cobra.ShellCompDirectiveNoFileComp
-	})
+func runForecastCommand(cmd *cobra.Command, args []string) error {
+	flags := cmd.Flags()
+	config := ForecastConfig{WorkflowIDs: args}
+	config.Days, _ = flags.GetInt("days")
+	config.Period, _ = flags.GetString("period")
+	config.JSONOutput, _ = flags.GetBool("json")
+	config.Verbose, _ = flags.GetBool("verbose")
+	config.RepoOverride, _ = flags.GetString("repo")
+	config.SampleSize, _ = flags.GetInt("sample")
+	config.EvalMode, _ = flags.GetBool("eval")
+	config.TimeoutMinutes, _ = flags.GetInt("timeout")
+	config.DownloadConcurrency, _ = flags.GetInt("concurrency")
+	config.LogsJSONL, _ = flags.GetStringArray("logs-jsonl")
 
-	return cmd
+	forecastRunLog.Printf("Forecast command invoked: workflow_count=%d, days=%d, period=%s, sample_size=%d, eval=%v, timeout_minutes=%d, json=%v, repo=%q",
+		len(args), config.Days, config.Period, config.SampleSize, config.EvalMode, config.TimeoutMinutes, config.JSONOutput, config.RepoOverride)
+	return RunForecast(config)
 }

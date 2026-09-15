@@ -7,7 +7,7 @@ sidebar:
 
 # Forecast Command Specification
 
-**Version**: 1.0.0  
+**Version**: 1.1.0
 **Status**: Draft  
 **Latest Version**: [forecast-specification](/gh-aw/specs/forecast-specification/)  
 **Editor**: GitHub Agentic Workflows Team
@@ -74,6 +74,8 @@ This specification covers:
 - Episode grouping and episode-level metric computation
 - Console table output format
 - Machine-readable JSON output schema (`--json`)
+- Workflow-run listing REST API request-unit forecasts
+- Offline history from schema-versioned `gh aw logs --cached-jsonl` shards
 - Error conditions and graceful-degradation behavior
 
 This specification does NOT cover:
@@ -221,6 +223,13 @@ If a provided `workflow_id` does not match any discovered workflow, the implemen
 | `--repo` | string | (none) | Target a repository other than the current working directory, in `owner/repo` format. Enables remote mode. |
 | `--json` | bool | `false` | Emit machine-readable JSON output instead of console tables. |
 | `--verbose` | bool | `false` | Emit verbose diagnostic output to stderr during processing. |
+| `--logs-jsonl` | string array | (none) | Read history offline from a cached logs JSONL file, directory, or glob. Repeatable; matching shards are merged and deduplicated by run ID. |
+
+When `--logs-jsonl` is present, the implementation MUST NOT query GitHub to
+discover workflows, list runs, download artifacts, or fill missing metadata.
+It MUST apply `--days`, `--sample`, `--repo`, positional workflow filters, and
+`--eval` to the JSONL observations. JSONL and live GitHub API history MUST NOT
+be merged.
 
 ### 4.4 Flag Validation
 

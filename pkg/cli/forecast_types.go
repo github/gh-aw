@@ -22,6 +22,8 @@ type ForecastWorkflowResult struct {
 	// suffix, so WorkflowID equals the GitHub Actions workflow name as returned by
 	// workflow.FindWorkflowName or the GitHub API Name field.
 	WorkflowID string `json:"workflow_id"`
+	// Repository identifies the repository for this workflow when known.
+	Repository string `json:"repository,omitempty"`
 	// WorkflowPath is the workflow file path when available (e.g. ".github/workflows/ci.yml").
 	WorkflowPath string `json:"workflow_path,omitempty"`
 	// Engines lists engine IDs configured by the workflow frontmatter.
@@ -86,6 +88,44 @@ type ForecastWorkflowResult struct {
 	// Each entry records the run ID, raw AIC, and (when available) the run date.
 	// Zero-AIC runs are retained as zero-valued observations.
 	RunSamples []ForecastRunSample `json:"run_samples,omitempty"`
+
+	// WorkflowRunAPI forecasts REST pages required to list projected workflow runs.
+	WorkflowRunAPI *ForecastWorkflowRunAPI `json:"workflow_run_api,omitempty"`
+
+	apiRunTrials     []int
+	apiRequestTrials []int
+}
+
+// ForecastDistribution reports a simulated count distribution.
+type ForecastDistribution struct {
+	Mean   float64 `json:"mean"`
+	StdDev float64 `json:"std_dev"`
+	P10    int     `json:"p10"`
+	P50    int     `json:"p50"`
+	P90    int     `json:"p90"`
+}
+
+// ForecastWorkflowRunAPI forecasts list-workflow-runs result and request counts.
+type ForecastWorkflowRunAPI struct {
+	PageSize                      int                  `json:"page_size"`
+	FilteredSearchResultLimit     int                  `json:"filtered_search_result_limit"`
+	ProjectedRuns                 ForecastDistribution `json:"projected_runs"`
+	RequestUnits                  ForecastDistribution `json:"request_units"`
+	ProbabilityExceedsResultLimit float64              `json:"probability_exceeds_result_limit"`
+	MayExceedResultLimit          bool                 `json:"may_exceed_result_limit"`
+}
+
+// ForecastHistoryProvenance describes the historical observation source.
+type ForecastHistoryProvenance struct {
+	Source              string   `json:"source"`
+	JSONLFiles          []string `json:"jsonl_files,omitempty"`
+	ObservedRuns        int      `json:"observed_runs,omitempty"`
+	DuplicateRuns       int      `json:"duplicate_runs,omitempty"`
+	EarliestObservation string   `json:"earliest_observation,omitempty"`
+	LatestObservation   string   `json:"latest_observation,omitempty"`
+	LowerBound          bool     `json:"lower_bound,omitempty"`
+	PossiblyTruncated   bool     `json:"possibly_truncated,omitempty"`
+	TruncationReason    string   `json:"truncation_reason,omitempty"`
 }
 
 // ForecastVariantResult contains projected metrics split by A/B experiment variant.
@@ -127,10 +167,12 @@ type ForecastEvaluation struct {
 
 // ForecastResult is the top-level output of the forecast command.
 type ForecastResult struct {
-	Period    string                   `json:"period"`
-	AsOf      string                   `json:"as_of"`
-	EvalMode  bool                     `json:"eval_mode,omitempty"`
-	Workflows []ForecastWorkflowResult `json:"workflows"`
+	Period         string                    `json:"period"`
+	AsOf           string                    `json:"as_of"`
+	EvalMode       bool                      `json:"eval_mode,omitempty"`
+	History        ForecastHistoryProvenance `json:"history"`
+	WorkflowRunAPI *ForecastWorkflowRunAPI   `json:"workflow_run_api,omitempty"`
+	Workflows      []ForecastWorkflowResult  `json:"workflows"`
 }
 
 // workflowMeta holds parsed metadata from a workflow's Markdown frontmatter.

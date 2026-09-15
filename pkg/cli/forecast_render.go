@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -27,18 +28,25 @@ func renderForecastJSON(output ForecastResult) error {
 // renderForecastTable renders the forecast result as a human-readable table.
 func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 	forecastRenderLog.Printf("Rendering forecast table: workflows=%d, days=%d, eval_mode=%v", len(output.Workflows), config.Days, output.EvalMode)
-
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 		fmt.Sprintf("Workflow Forecast — weekly & monthly projections (based on last %d days of history)", config.Days)))
 	fmt.Fprintln(os.Stderr, "")
+	rows, anyUnreliable := buildForecastAICRows(output.Workflows)
+	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+	fmt.Fprintln(os.Stderr, "")
+	printWorkflowRunAPIForecast(output)
+	printForecastDetailSections(output, config)
+	printForecastFooter(output, anyUnreliable)
+	return nil
+}
 
+func buildForecastAICRows(workflows []ForecastWorkflowResult) ([]forecastTableRow, bool) {
 	anyUnreliable := false
 	var totalWeeklyP50, totalMonthlyP50 float64
 	var totalRuns int
-	rows := make([]forecastTableRow, 0, len(output.Workflows)+1)
-	for _, wf := range output.Workflows {
+	rows := make([]forecastTableRow, 0, len(workflows)+1)
+	for _, wf := range workflows {
 		unreliableMark := ""
-
 		weeklyP50 := wf.WeeklyProjectedAIC
 		if mc := wf.WeeklyMonteCarlo; mc != nil {
 			weeklyP50 = mc.P50ProjectedAIC
@@ -59,23 +67,18 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 			totalMonthlyP50 += monthlyP50
 		}
 		totalRuns += wf.SampledRuns
-
-		row := forecastTableRow{
-			Workflow:    wf.WorkflowID + unreliableMark,
+		rows = append(rows, forecastTableRow{
+			Workflow:    forecastWorkflowLabel(wf) + unreliableMark,
 			Runs:        wf.SampledRuns,
 			P50PerRun:   formatForecastAIC(wf.P50AIC),
 			P95PerRun:   formatForecastAIC(wf.P95AIC),
 			WeeklyP50:   formatForecastAIC(weeklyP50),
 			MonthlyP50:  formatForecastAIC(monthlyP50),
 			SuccessRate: formatForecastPercent(wf.SuccessRate, wf.SampledRuns > 0),
-		}
-		rows = append(rows, row)
+		})
 	}
-
 	forecastRenderLog.Printf("Forecast aggregates: total_weekly_p50=%.3f, total_monthly_p50=%.3f, any_unreliable=%v", totalWeeklyP50, totalMonthlyP50, anyUnreliable)
-
-	// Append a totals row when more than one workflow is present.
-	if len(output.Workflows) > 1 {
+	if len(workflows) > 1 {
 		rows = append(rows, forecastTableRow{
 			Workflow:   "TOTAL",
 			Runs:       totalRuns,
@@ -83,27 +86,24 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 			MonthlyP50: formatForecastAIC(totalMonthlyP50),
 		})
 	}
+	return rows, anyUnreliable
+}
 
-	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
-	fmt.Fprintln(os.Stderr, "")
-
-	// Show detailed per-run samples section only when specific workflows were requested.
+func printForecastDetailSections(output ForecastResult, config ForecastConfig) {
 	if len(config.WorkflowIDs) > 0 {
 		printRunSamplesSection(output.Workflows)
 	}
-
-	// Show experiment variant details when present.
 	for _, wf := range output.Workflows {
 		if len(wf.ExperimentVariants) > 0 {
 			printVariantBreakdown(wf)
 		}
 	}
-
-	// Show backtesting evaluation table in --eval mode.
 	if output.EvalMode {
 		printEvalBreakdown(output.Workflows)
 	}
+}
 
+func printForecastFooter(output ForecastResult, anyUnreliable bool) {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 		"Cost/projection figures are AI Credits (AIC) — the gh-aw cost metric."))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
@@ -114,9 +114,18 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		"All forecasts are estimates derived from historical samples and may be inaccurate."))
+	if output.History.Source == "jsonl" {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+			fmt.Sprintf("History source: %d JSONL file(s), %d deduplicated run(s).", len(output.History.JSONLFiles), output.History.ObservedRuns)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			"JSONL forecasts are lower-bound estimates because shard completeness cannot be established."))
+		if output.History.PossiblyTruncated {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				"JSONL history may be truncated: "+output.History.TruncationReason+"."))
+		}
+	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 		fmt.Sprintf("Run '%s forecast --json' for full output including P10/P90 confidence intervals.", string(constants.CLIExtensionPrefix))))
-	return nil
 }
 
 // printRunSamplesSection prints a detailed table of the sampled runs used in the forecast,
@@ -144,7 +153,7 @@ func printRunSamplesSection(workflows []ForecastWorkflowResult) {
 		if len(wf.RunSamples) == 0 {
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "  %s (%d run(s)):\n", wf.WorkflowID, len(wf.RunSamples))
+		fmt.Fprintf(os.Stderr, "  %s (%d run(s)):\n", forecastWorkflowLabel(wf), len(wf.RunSamples))
 		rows := make([]runRow, 0, len(wf.RunSamples))
 		for _, s := range wf.RunSamples {
 			rows = append(rows, runRow{
@@ -186,7 +195,7 @@ func printEvalBreakdown(workflows []ForecastWorkflowResult) {
 			inCI = "Yes ✓"
 		}
 		rows = append(rows, evalRow{
-			Workflow:    wf.WorkflowID,
+			Workflow:    forecastWorkflowLabel(wf),
 			ActualRuns:  ev.ActualRuns,
 			ActualAIC:   formatForecastAIC(ev.ActualAIC),
 			ForecastP50: formatForecastAIC(p50),
@@ -209,7 +218,7 @@ func printVariantBreakdown(wf ForecastWorkflowResult) {
 		Fraction   string `json:"fraction"   console:"header:Fraction"`
 	}
 
-	fmt.Fprintf(os.Stderr, "  Experiment variants for %s:\n", wf.WorkflowID)
+	fmt.Fprintf(os.Stderr, "  Experiment variants for %s:\n", forecastWorkflowLabel(wf))
 	varRows := make([]variantRow, 0, len(wf.ExperimentVariants))
 	for _, v := range wf.ExperimentVariants {
 		varRows = append(varRows, variantRow{
@@ -271,4 +280,70 @@ func formatForecastSignedAIC(value float64) string {
 
 func roundForecastAIC(value float64) float64 {
 	return math.Round(value*1000) / 1000
+}
+
+func forecastWorkflowLabel(workflow ForecastWorkflowResult) string {
+	if workflow.Repository == "" {
+		return workflow.WorkflowID
+	}
+	return path.Join(workflow.Repository, workflow.WorkflowID)
+}
+
+func printWorkflowRunAPIForecast(output ForecastResult) {
+	type apiRow struct {
+		Workflow string `console:"header:Workflow"`
+		RunsP10  int    `console:"header:Runs P10"`
+		RunsP50  int    `console:"header:Runs P50"`
+		RunsP90  int    `console:"header:Runs P90"`
+		UnitsP10 int    `console:"header:API Units P10"`
+		UnitsP50 int    `console:"header:API Units P50"`
+		UnitsP90 int    `console:"header:API Units P90"`
+		Mean     string `console:"header:Mean"`
+		StdDev   string `console:"header:Std Dev"`
+	}
+
+	rows := make([]apiRow, 0, len(output.Workflows)+1)
+	for _, workflow := range output.Workflows {
+		api := workflow.WorkflowRunAPI
+		if api == nil {
+			continue
+		}
+		rows = append(rows, apiRow{
+			Workflow: forecastWorkflowLabel(workflow),
+			RunsP10:  api.ProjectedRuns.P10,
+			RunsP50:  api.ProjectedRuns.P50,
+			RunsP90:  api.ProjectedRuns.P90,
+			UnitsP10: api.RequestUnits.P10,
+			UnitsP50: api.RequestUnits.P50,
+			UnitsP90: api.RequestUnits.P90,
+			Mean:     fmt.Sprintf("%.2f", api.RequestUnits.Mean),
+			StdDev:   fmt.Sprintf("%.2f", api.RequestUnits.StdDev),
+		})
+		if api.MayExceedResultLimit {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
+				"%s may exceed GitHub's %d-result filtered workflow-run query limit; use time-partitioned queries.",
+				forecastWorkflowLabel(workflow), api.FilteredSearchResultLimit)))
+		}
+	}
+	if len(rows) == 0 {
+		return
+	}
+	if len(output.Workflows) > 1 && output.WorkflowRunAPI != nil {
+		api := output.WorkflowRunAPI
+		rows = append(rows, apiRow{
+			Workflow: "TOTAL",
+			RunsP10:  api.ProjectedRuns.P10,
+			RunsP50:  api.ProjectedRuns.P50,
+			RunsP90:  api.ProjectedRuns.P90,
+			UnitsP10: api.RequestUnits.P10,
+			UnitsP50: api.RequestUnits.P50,
+			UnitsP90: api.RequestUnits.P90,
+			Mean:     fmt.Sprintf("%.2f", api.RequestUnits.Mean),
+			StdDev:   fmt.Sprintf("%.2f", api.RequestUnits.StdDev),
+		})
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+		"Workflow-run listing API forecast — one unit is one REST GET page:"))
+	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+	fmt.Fprintln(os.Stderr, "")
 }
