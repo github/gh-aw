@@ -5,19 +5,17 @@ sidebar:
   badge: { text: 'Event-triggered', variant: 'success' }
 ---
 
-IssueOps transforms GitHub issues into automation triggers that analyze, categorize, and respond to issues automatically. Use it for auto-triage, smart routing, initial responses, and quality checks. GitHub Agentic Workflows makes this natural through [issue triggers](/gh-aw/reference/triggers/) and [safe-outputs](/gh-aw/reference/safe-outputs/) that handle automated responses securely without write permissions for the main AI job.
-
-When issues are created, workflows activate automatically. The AI analyzes content and provides intelligent responses through automated comments.
+IssueOps turns GitHub issues into automation triggers for triage, routing, responses, and quality checks. In GitHub Agentic Workflows, [issue triggers](/gh-aw/reference/triggers/) start the workflow and [safe-outputs](/gh-aw/reference/safe-outputs/) post automated responses without giving the main AI job write access.
 
 ## Example: Issue Triage Assistant
 
-This workflow responds to new issues with contextual guidance. It analyzes the title and description for bug reports needing information, feature requests to categorize, questions to answer, or potential duplicates. The AI then comments with helpful next steps or immediate assistance.
+This workflow responds to new issues with contextual guidance by analyzing the title and description for missing bug details, feature requests to categorize, questions to answer, or potential duplicates. It then comments with next steps or immediate help.
 
 ```mermaid
 flowchart LR
-    event([Issue opened]) --> agent[AI triage]
-    agent --> label[Labels]
-    agent --> comment[Comment]
+    IssueOpened([Issue opened]) --> AITriage[AI triage]
+    AITriage --> Labels[Labels]
+    AITriage --> Comment[Comment]
 ```
 
 Example workflow:
@@ -42,7 +40,7 @@ safe-outputs:
 Analyze new issue content and provide helpful guidance. Examine the title and description for bug reports needing information, feature requests to categorize, questions to answer, or potential duplicates. Respond with a comment guiding next steps or providing immediate assistance.
 ```
 
-This creates an intelligent triage system that responds to new issues with contextual guidance.
+This creates an automated triage flow for new issues.
 
 ## Organizing Work with Sub-Issues
 
@@ -70,10 +68,5 @@ Create a parent tracking issue, then sub-issues linked via parent field:
 
 ## Learn More
 
-- [ChatOps](/gh-aw/patterns/chat-ops/) — Interactive slash command automation
-- [LabelOps](/gh-aw/patterns/label-ops/) — Label-triggered automation
-- [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) — Sequential queue processing
-- [Safe Outputs](/gh-aw/reference/safe-outputs/) — Secure write operations
-- [GitHub Tools](/gh-aw/reference/github-tools/) — GitHub API toolsets
-- [Concurrency](/gh-aw/reference/concurrency/) — Prevent race conditions
+See related patterns and references for interactive commands, label-driven flows, queue processing, secure write operations, GitHub tools, and race-condition control: [ChatOps](/gh-aw/patterns/chat-ops/), [LabelOps](/gh-aw/patterns/label-ops/), [WorkQueueOps](/gh-aw/patterns/workqueue-ops/), [Safe Outputs](/gh-aw/reference/safe-outputs/), [GitHub Tools](/gh-aw/reference/github-tools/), and [Concurrency](/gh-aw/reference/concurrency/).
 
