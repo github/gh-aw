@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2026-09-15",
+    "workflow_id": "issue-monster",
+    "primary_dimension": "context assembly",
+    "subtype": "remove_redundant_context",
+    "experiment_name": "remove_redundant_context_v1",
+    "pr_or_issue": "issue",
+    "decision": null
+  }
+]
