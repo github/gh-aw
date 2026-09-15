@@ -862,6 +862,90 @@ func TestLogsCollectionStatsReportsDiscoveredDownloadedAndCached(t *testing.T) {
 	assert.Contains(t, stderr, "Runs: 4 discovered; reports: 1 downloaded, 2 skipped because cached analyses were reused")
 }
 
+func TestLogsCollectionStatsRecordsDownloadDurationAndSize(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 2 * time.Second, DownloadSizeBytes: 1000}}})
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 4 * time.Second, DownloadSizeBytes: 3000}}})
+	// A cached hit must not contribute to download duration/size stats.
+	stats.recordResult(DownloadResult{Cached: true, RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 10 * time.Second, DownloadSizeBytes: 999_999}}})
+
+	assert.Equal(t, int64(2), stats.downloadCount.Load())
+	assert.Equal(t, (2*time.Second + 4*time.Second).Nanoseconds(), stats.totalDownloadNanos.Load())
+	assert.Equal(t, (4 * time.Second).Nanoseconds(), stats.maxDownloadNanos.Load())
+	assert.Equal(t, int64(4000), stats.totalDownloadBytes.Load())
+	assert.Equal(t, int64(3000), stats.maxDownloadBytes.Load())
+}
+
+func TestRenderLogsDownloadStatsSummaryReportsAvgMaxAndRateLimitCost(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 2 * time.Second, DownloadSizeBytes: 1024}}})
+	stats.recordResult(DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DownloadDuration: 6 * time.Second, DownloadSizeBytes: 3072}}})
+
+	report := &GitHubAPIRateLimitReport{
+		Start: &GitHubAPIRateLimitState{Used: 10},
+		End:   &GitHubAPIRateLimitState{Used: 30},
+	}
+
+	_, stderr := captureOutput(t, func() error {
+		renderLogsDownloadStatsSummary(stats, report)
+		return nil
+	})
+
+	assert.Contains(t, stderr, "Download stats: avg 4s (max 6s) per run")
+	assert.Contains(t, stderr, "avg size 2.0KiB (max 3.0KiB) per run")
+	assert.Contains(t, stderr, "GitHub API cost estimate: ~10.0 requests/run")
+}
+
+func TestRenderLogsDownloadStatsSummaryNoOpWithoutDownloads(t *testing.T) {
+	stats := &logsCollectionStats{}
+	stats.recordResult(DownloadResult{Cached: true})
+
+	_, stderr := captureOutput(t, func() error {
+		renderLogsDownloadStatsSummary(stats)
+		return nil
+	})
+
+	assert.Empty(t, stderr)
+}
+
+func TestGitHubAPIRateLimitCostEstimateHandlesWindowResetAndMissingReports(t *testing.T) {
+	calls, ok := gitHubAPIRateLimitCostEstimate(nil)
+	assert.False(t, ok)
+	assert.Zero(t, calls)
+
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{nil, {}})
+	assert.False(t, ok)
+	assert.Zero(t, calls)
+
+	// A window reset mid-run (End.Used < Start.Used) falls back to End.Used as a
+	// lower-bound approximation instead of a negative cost.
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{
+		{Start: &GitHubAPIRateLimitState{Used: 4900}, End: &GitHubAPIRateLimitState{Used: 5}},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, 5, calls)
+
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{
+		{Start: &GitHubAPIRateLimitState{Used: 10}, End: &GitHubAPIRateLimitState{Used: 25}},
+		{Start: &GitHubAPIRateLimitState{Used: 0}, End: &GitHubAPIRateLimitState{Used: 5}},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, 20, calls)
+
+	// A window reset can also happen while End.Used is still >= Start.Used (the
+	// window reset and then accumulated enough new usage to exceed the old
+	// value by coincidence). The differing Reset timestamps must still select
+	// the End.Used fallback instead of silently mixing counters across windows.
+	calls, ok = gitHubAPIRateLimitCostEstimate([]*GitHubAPIRateLimitReport{
+		{
+			Start: &GitHubAPIRateLimitState{Used: 4990, Reset: 1000},
+			End:   &GitHubAPIRateLimitState{Used: 5000, Reset: 2000},
+		},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, 5000, calls)
+}
+
 // TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits verifies
 // that the single-target DownloadWorkflowLogs entry point wires --cached-jsonl
 // discovery/download results through to the rendered collection-stats summary,
@@ -943,6 +1027,133 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 	})
 
 	assert.Contains(t, stderr, "Runs: 2 discovered; reports: 0 downloaded, 2 skipped because cached analyses were reused")
+}
+
+// TestDownloadWorkflowLogsRendersDownloadStatsForFreshDownloadWithoutCachedJSONL
+// verifies that the "Download stats: ..." summary is rendered by the
+// single-target DownloadWorkflowLogs entry point when no --cached-jsonl option
+// is set at all -- the common case for a plain `gh aw logs` invocation. It
+// drives a real (non-cached) run through prepareRunDownload /
+// downloadAndTimeRunArtifacts using a fake `gh` binary on PATH so the actual
+// download and stats-recording code paths execute unmocked, instead of only
+// exercising logsCollectionStats/renderLogsDownloadStatsSummary directly.
+func TestDownloadWorkflowLogsRendersDownloadStatsForFreshDownloadWithoutCachedJSONL(t *testing.T) {
+	const runID int64 = 303
+	outputDir := t.TempDir()
+
+	fakeBinDir := t.TempDir()
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ]; then\n" +
+		"  case \"$*\" in\n" +
+		"  *artifacts*) printf '%s\\n' \"usage\" ;;\n" +
+		fmt.Sprintf("  *) printf '%%s\\n' '{\"id\":%d,\"status\":\"completed\",\"conclusion\":\"success\",\"repository\":{\"full_name\":\"owner/repo\"}}' ;;\n", runID) +
+		"  esac\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"run\" ] && [ \"$2\" = \"download\" ]; then\n" +
+		"  dir=\"\"\n" +
+		"  while [ $# -gt 0 ]; do\n" +
+		"    if [ \"$1\" = \"--dir\" ]; then dir=\"$2\"; shift 2; continue; fi\n" +
+		"    shift\n" +
+		"  done\n" +
+		"  mkdir -p \"$dir\"\n" +
+		"  printf '%s' '{\"engine_id\":\"claude\"}' > \"$dir/aw_info.json\"\n" +
+		"  printf '%s' '{\"total_tokens\":100}' > \"$dir/usage.jsonl\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 1\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	originalFetch := logsFetchWorkflowRunBatch
+	t.Cleanup(func() { logsFetchWorkflowRunBatch = originalFetch })
+	batchCalls := 0
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		batchCalls++
+		if batchCalls > 1 {
+			return workflowRunBatch{}, nil
+		}
+		return workflowRunBatch{
+			runs:                   []WorkflowRun{{DatabaseID: runID, Repository: "owner/repo"}},
+			totalFetched:           1,
+			batchSize:              1,
+			oldestFetchedCreatedAt: time.Now(),
+		}, nil
+	}
+
+	_, stderr := captureOutput(t, func() error {
+		return DownloadWorkflowLogs(context.Background(), LogsDownloadOptions{
+			Count:          1,
+			OutputDir:      outputDir,
+			SummaryFile:    "summary.json",
+			ArtifactSets:   []string{"usage"},
+			SuppressRender: true,
+		})
+	})
+
+	assert.Contains(t, stderr, "Runs: 1 discovered; reports: 1 downloaded, 0 skipped because cached analyses were reused")
+	assert.Contains(t, stderr, "Download stats: avg")
+	assert.Contains(t, stderr, "avg size")
+}
+
+// TestDownloadAndTimeRunArtifactsExcludesPreexistingBytes verifies that
+// DownloadSizeBytes reflects only the bytes added by this invocation's
+// download, not the whole run directory. A prior incremental/cache pass (or
+// locally generated metadata already on disk) must not inflate the reported
+// size, and must not make it nonzero when nothing new was actually
+// transferred.
+func TestDownloadAndTimeRunArtifactsExcludesPreexistingBytes(t *testing.T) {
+	const runID int64 = 505
+	runOutputDir := t.TempDir()
+
+	// Simulate leftover bytes from an earlier pass plus locally generated
+	// metadata that already exist on disk before this download runs.
+	preexisting := make([]byte, 5000)
+	require.NoError(t, os.WriteFile(filepath.Join(runOutputDir, "leftover.txt"), preexisting, 0o600))
+
+	const artifactPayloadSize = 123
+	fakeBinDir := t.TempDir()
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	fakeGHScript := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ]; then\n" +
+		"  case \"$*\" in\n" +
+		"  *artifacts*) printf '%s\\n' \"usage\" ;;\n" +
+		fmt.Sprintf("  *) printf '%%s\\n' '{\"id\":%d,\"status\":\"completed\",\"conclusion\":\"success\",\"repository\":{\"full_name\":\"owner/repo\"}}' ;;\n", runID) +
+		"  esac\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"run\" ] && [ \"$2\" = \"download\" ]; then\n" +
+		"  dir=\"\"\n" +
+		"  while [ $# -gt 0 ]; do\n" +
+		"    if [ \"$1\" = \"--dir\" ]; then dir=\"$2\"; shift 2; continue; fi\n" +
+		"    shift\n" +
+		"  done\n" +
+		"  mkdir -p \"$dir\"\n" +
+		"  printf '%s' '{\"engine_id\":\"claude\"}' > \"$dir/aw_info.json\"\n" +
+		fmt.Sprintf("  head -c %d /dev/zero > \"$dir/usage.jsonl\"\n", artifactPayloadSize) +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 1\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: runID, Repository: "owner/repo"}}}
+	params := concurrentRunDownloadParams{
+		outputDir:      filepath.Dir(runOutputDir),
+		artifactFilter: []string{"usage"},
+		dlOwner:        "owner",
+		dlRepo:         "repo",
+	}
+	downloadAndTimeRunArtifacts(context.Background(), result.Run, runOutputDir, params, params, result)
+
+	assert.Greater(t, result.Run.DownloadDuration, time.Duration(0))
+	// The preexisting leftover.txt (5000 bytes) must not be counted: a naive
+	// whole-directory measurement would report at least 5000 bytes, but the
+	// actual artifact payload downloaded here is much smaller.
+	assert.Positive(t, result.Run.DownloadSizeBytes)
+	assert.Less(t, result.Run.DownloadSizeBytes, int64(len(preexisting)),
+		"DownloadSizeBytes must exclude the preexisting leftover.txt bytes already on disk before this download")
 }
 
 // TestDownloadWorkflowLogsFromStdinFiltersCachedJSONLByDateRange verifies that

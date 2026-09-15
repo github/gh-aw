@@ -164,6 +164,9 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
 		return err
 	}
+	if opts.collectionStats == nil {
+		opts.collectionStats = &logsCollectionStats{}
+	}
 	defer func() {
 		err = errors.Join(err, finalizeCachedLogsJSONL(opts.cachedJSONLWriter, opts.cachedJSONLSourcePaths, opts.cachedJSONLWildcard, opts.StartDate, opts.EndDate))
 	}()
@@ -180,6 +183,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	finishGitHubAPIRateLimitReports(activeCtx, allAPIRateLimits, opts.JSONOutput)
 	cacheGitHubAPIRateLimitReports(opts.cachedJSONLWriter, allAPIRateLimits...)
 	apiRateLimit, apiRateLimits := partitionGitHubAPIRateLimitReports(allAPIRateLimits)
+	renderLogsDownloadStatsSummary(opts.collectionStats, allAPIRateLimits...)
 	if len(processedRuns) == 0 {
 		if len(allErrors) > 0 {
 			return errors.Join(allErrors...)

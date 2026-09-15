@@ -96,6 +96,13 @@ type WorkflowRun struct {
 	SafeItemsCount      int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
 	AvgTimeBetweenTurns time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
 	LogsPath            string
+	// DownloadDuration is the wall-clock time spent downloading this run's artifacts
+	// from GitHub. It is zero for runs served from the on-disk cache (no download
+	// was performed).
+	DownloadDuration time.Duration
+	// DownloadSizeBytes is the total on-disk size of the artifacts downloaded for
+	// this run, used to estimate average/maximum transfer volume across a batch.
+	DownloadSizeBytes int64
 }
 
 // LogMetrics represents extracted metrics from log files

@@ -304,6 +304,9 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	if err := prepareCachedLogsJSONL(&opts); err != nil {
 		return err
 	}
+	if opts.collectionStats == nil {
+		opts.collectionStats = &logsCollectionStats{}
+	}
 	defer func() {
 		err = errors.Join(err, finalizeCachedLogsJSONL(opts.cachedJSONLWriter, opts.cachedJSONLSourcePaths, opts.cachedJSONLWildcard, opts.StartDate, opts.EndDate))
 	}()
@@ -314,6 +317,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	}
 	renderLogsCollectionStats(opts.collectionStats)
 	finishGitHubAPIRateLimitReport(ctx, apiRateLimit, opts.JSONOutput)
+	renderLogsDownloadStatsSummary(opts.collectionStats, apiRateLimit)
 	cacheGitHubAPIRateLimitReports(opts.cachedJSONLWriter, apiRateLimit)
 	if handled, err := handleEmptyProcessedRuns(result.processedRuns, opts, result.timeoutReached, result.storageLimitReached, result.continuation, nil, apiRateLimit, nil); handled || err != nil {
 		logsOrchestratorLog.Printf("No processed runs to render (timeoutReached=%v, err=%v)", result.timeoutReached, err)
