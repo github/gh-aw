@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -77,14 +78,18 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
-		constants.AWFProxyLogsDir.String() + "/api-proxy-logs/token-usage.jsonl",
-		constants.AWFAuditDir.String() + "/api-proxy-logs/token-usage.jsonl",
+		filepath.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		filepath.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
 	}
 
 	// Include grader manifest/results in the fallback so detection and downstream
 	// jobs have reliable access even when the large unified artifact times out.
 	if data.Graders != nil && data.Graders.HasGraders() {
 		paths = append(paths, collectGraderArtifactPaths(data.Graders)...)
+	}
+
+	if isArcDindTopology(data) {
+		paths = rewriteTmpGhAwPathsForArcDind(paths)
 	}
 
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent output fallback artifact", paths)

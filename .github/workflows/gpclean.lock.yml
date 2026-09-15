@@ -1252,6 +1252,12 @@ jobs:
           path: |
             /tmp/gh-aw/agent_output.json
             /tmp/gh-aw/safeoutputs.jsonl
+            /tmp/gh-aw/agent_execution.json
+            /tmp/gh-aw/agent_usage.jsonl
+            /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
       - name: Upload agent artifacts
         if: always()

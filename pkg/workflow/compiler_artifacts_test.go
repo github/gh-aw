@@ -675,6 +675,53 @@ Body.
 	}
 }
 
+func TestAgentOutputFallbackArtifactArcDind(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-output-fallback-arc-dind-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+strict: false
+runner:
+  topology: arc-dind
+graders:
+  custom:
+    script: return 1
+safe-outputs:
+  create-issue:
+---
+
+# Test ARC/DinD Agent Output Fallback
+`
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	uploadSection := extractWorkflowStepByName(t, string(lockContent), "Upload agent output fallback artifact")
+
+	for _, expected := range []string{
+		"${{ runner.temp }}/gh-aw/agent_output.json",
+		"${{ runner.temp }}/gh-aw/agent_usage.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
+		"${{ runner.temp }}/gh-aw/agent/graders/grader_manifest.json",
+	} {
+		assert.Contains(t, uploadSection, expected)
+	}
+	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
+}
+
 func TestSampledAgentExecutionEvidenceReachesUsageArtifact(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "sampled-agent-accounting-test")
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
