@@ -726,3 +726,66 @@ func TestLogsTargetContinuationPreservesTimeout(t *testing.T) {
 	require.NotNil(t, queued.continuation)
 	assert.Equal(t, 7, queued.continuation.Timeout)
 }
+
+// TestRunLogsBatchRoundHoldsSchedulerTurnDuringRateLimitCheck pins the ordering
+// that keeps the shared API budget accurate: the rate-limit check must happen
+// inside the scheduler turn. If the check ran before acquiring, a target could
+// reserve budget, park waiting for a slot while other targets spent quota, and
+// then issue its request against stale usage, overshooting the configured
+// ceiling.
+func TestRunLogsBatchRoundHoldsSchedulerTurnDuringRateLimitCheck(t *testing.T) {
+	originalFetchRateLimit := fetchRateLimitFunc
+	originalFetch := logsFetchWorkflowRunBatch
+	originalProcess := logsProcessWorkflowRunBatch
+	t.Cleanup(func() {
+		fetchRateLimitFunc = originalFetchRateLimit
+		logsFetchWorkflowRunBatch = originalFetch
+		logsProcessWorkflowRunBatch = originalProcess
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scheduler := newLogsBatchScheduler(ctx, 2, 1)
+	otherAcquired := make(chan error, 1)
+	var turnHeldDuringCheck atomic.Bool
+
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		// A competing target must not be able to take a turn while this check
+		// is in flight; it has to park until this round's turn is released.
+		go func() { otherAcquired <- scheduler.acquire(ctx, 1) }()
+		require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+		turnHeldDuringCheck.Store(true)
+		return rateLimitResource{Limit: 15000, Remaining: 14000, Reset: time.Now().Add(time.Hour).Unix(), Used: 1000}, nil
+	}
+	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
+		assert.True(t, turnHeldDuringCheck.Load(), "the rate-limit check must precede the batch request inside the same turn")
+		assert.Equal(t, 1, scheduler.waitingCount(), "the competing target must still be parked while this batch runs")
+		return workflowRunBatch{runs: []WorkflowRun{{DatabaseID: 1}}, totalFetched: 1, batchSize: 1}, nil
+	}
+	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {
+		for _, run := range batch.runs {
+			processedRuns = append(processedRuns, ProcessedRun{Run: run})
+		}
+		return processedRuns, len(batch.runs), true, false, false
+	}
+
+	state := logsCollectionState{}
+	_, err := runLogsBatchRound(&state, logsDownloadRuntime{activeCtx: ctx}, LogsDownloadOptions{
+		Count:                 10,
+		MaxGitHubAPIRateLimit: 14000,
+		rateLimitFirstRequest: true,
+		rateLimitState:        newLogsRateLimitState(cancel),
+		batchScheduler:        scheduler,
+		batchTargetID:         0,
+	})
+	require.NoError(t, err)
+	assert.True(t, turnHeldDuringCheck.Load(), "the rate-limit check must run inside the scheduler turn")
+
+	// Releasing the turn at the end of the round lets the parked target proceed.
+	select {
+	case err := <-otherAcquired:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("the competing target must receive a turn once the round is released")
+	}
+}
