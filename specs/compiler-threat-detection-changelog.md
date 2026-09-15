@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.36 | Audit-only review; Opengrep build-reproducibility alerts (`github-actions-npm-install-non-deterministic`, `actions-uv-pip-install-non-deterministic`, `actions-pip-install-inline-no-hash-check`, `github-actions-setup-node-missing-version`, `dockerfile-non-sha-pinned-image`) are external-scanner findings outside conformance scope; no new CTR rule required. |
 | 1.0.35 | Audit-only review; open code-scanning alerts (#681/#678/#676/#675 allocation-overflow, #679 useless-assignment, #674/#669/#668/#667 bad-redirect-check, #663 http-to-file-access, #657 smoke-test dummy, #652/#651 stale GraphQL-injection claim, #680 out-of-context stray commit artifacts) are not new compiler threat classes. |
 | 1.0.34 | Added CTR-027 for trusted same-repository allowlisted bot synchronization and fail-closed confused-deputy handling. |
 | 1.0.33 | Audit-only review; issue #59894's `close_issue.cjs` command-injection claim is a false positive (no `exec`/subprocess call exists in the file). |
@@ -30,6 +31,20 @@ This changelog records the version history and the dated mapping audits for `spe
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-09-15)
+
+No compiler/parser source diff exists beyond the single squashed commit state (`d8e1aa7`); no candidate threat surfaced from `pkg/workflow/`, `pkg/parser/`, or `actions/setup/` source changes in the review window.
+
+Open high-severity code-scanning alerts (0 open critical) were surveyed across the full result set (~260+ alerts) and are dominated by three Opengrep "pr-action" rule families, all concerning build-reproducibility/dependency-pinning rather than the compiler-generated-workflow threat classes in scope:
+
+- `github-actions-npm-install-non-deterministic` (the large majority of alerts) flags `npm install` (as opposed to `npm ci`) across generated `.lock.yml` files. Tracing the source, every compiler-generated instance (`pkg/workflow/codex_engine.go`'s `BuildStandardNpmEngineInstallStepsNoCooldown`/`generateCodexDockerSbxCLIInstallStep`, and `pkg/workflow/copilot_engine_installation.go`) is a global CLI install with an exact pinned version (e.g. `npm install --ignore-scripts -g @openai/codex@0.153.4`, `npm install --ignore-scripts --no-save @github/copilot-sdk@<version>`), which is the scanner's own documented exception case ("Global installs with pinned versions... are acceptable"). No compiler-side gap exists. One hand-authored, non-compiler-generated workflow (`.github/workflows/test-copilot-github-integration.yml`, no `gh-aw-metadata`/`gh-aw-manifest`/generation header) does install `@github/copilot` unpinned; this is a workflow-hygiene issue in a file outside the compiler's conformance scope (specification Section 1: `pkg/workflow/`, `pkg/parser/`, `actions/setup/`), not a `CTR-*` gap.
+- `actions-uv-pip-install-non-deterministic` flags `uv pip install --quiet ... numpy pandas matplotlib seaborn scipy` (no `--frozen`) sourced from the shared markdown snippets `.github/workflows/shared/python-dataviz.md` and `.github/workflows/shared/trending-charts-simple.md`, propagated into several `.lock.yml` files. This concerns third-party visualization dependency reproducibility, not a compiler-injected unsafe behavior; no untrusted input reaches the install command and no privilege-escalation, sandbox-bypass, injection, or unsafe-output-route threat class applies.
+- `dockerfile-non-sha-pinned-image` (1 instance, `FROM alpine:3.24` in the repository `Dockerfile`) and `actions-pip-install-inline-no-hash-check` (`.github/workflows/daily-geo-optimizer.lock.yml`, sourced from documentation-only example text in `pkg/workflow/pip_validation.go`) and `github-actions-setup-node-missing-version` (`.github/workflows/format-and-commit.yml`, a hand-authored maintenance workflow, not compiler output) are repository build-tooling and non-compiler-generated-workflow findings, outside `pkg/workflow/`/`pkg/parser/`/`actions/setup/` conformance scope per specification Section 1, which explicitly excludes "external scanner ecosystems."
+
+None of these findings correspond to the five compiler threat classes in specification Section 3 (privilege escalation, sandbox bypass, injection, unsafe output/supply-chain routes, compile-time drift), and CTR-014 (Supply Chain Attack via Install Scripts) already covers the adjacent, in-scope risk of untrusted pre/postinstall script execution — a distinct concern from install-command determinism. No new `CTR-*` rule is warranted; no implementation change is required.
+
+No live `threat-detection-suppress` annotation exists in any workflow frontmatter (only illustrative documentation examples), so no `SLA_BREACH` applies. No suppression is older than 10 or 20 business days because none exist.
 
 ### Mapping Audit (2026-09-13)
 

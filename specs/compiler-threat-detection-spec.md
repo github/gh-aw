@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.35
+**Version**: 1.0.36
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.36` | `v0.87.9` | Audit-only; Opengrep build-reproducibility findings (non-deterministic `npm`/`uv pip` installs, non-SHA-pinned Dockerfile image) are out of conformance scope per Section 1. |
 | `1.0.35` | `v0.87.9` | Audit-only; #681/#678/#676/#675, #679, #674/#669/#668/#667, #663, #657, #652/#651, and #680 are not new threat classes. |
 | `1.0.34` | `v0.87.9` | Adds CTR-027; allowlisted bot synchronization requires trusted same-repository provenance. |
 | `1.0.33` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
