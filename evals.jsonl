@@ -76,3 +76,5 @@
 {"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"NO","model":"evals","timestamp":"2026-09-13T07:01:49.732Z","runid":"34743784891"}
 {"id":"tidy_completed","question":"Did the agent run code formatting and tidying tools on the codebase?","answer":"NO","model":"evals","timestamp":"2026-09-14T07:16:53.956Z","runid":"34816075563"}
 {"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-14T07:16:53.956Z","runid":"34816075563"}
+{"id":"tidy_completed","question":"Did the agent run code formatting and tidying tools on the codebase?","answer":"YES","model":"evals","timestamp":"2026-09-15T07:05:37.813Z","runid":"34939022987"}
+{"id":"pr_created_or_noop","question":"Was a pull request created with formatting and tidying fixes, or was noop used when no changes were needed?","answer":"YES","model":"evals","timestamp":"2026-09-15T07:05:37.813Z","runid":"34939022987"}
