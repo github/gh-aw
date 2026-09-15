@@ -455,16 +455,16 @@ func codexBYOKAPIKeyExport() string {
 }
 
 func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewallEnabled, modelConfigured bool, modelEnvVar string) map[string]string {
-	effectiveGitHubToken := getEffectiveGitHubToken("")
+	resolvedGitHubToken := resolveGitHubToken("")
 	provider := e.ResolveLLMProvider(workflowData)
 	env := map[string]string{
 		"CODEX_HOME":                   constants.TmpMcpConfigDir,
-		"GH_AW_GITHUB_TOKEN":           effectiveGitHubToken,
+		"GH_AW_GITHUB_TOKEN":           resolvedGitHubToken,
 		"GH_AW_LLM_PROVIDER":           string(provider),
 		"GH_AW_MCP_CONFIG":             constants.CodexMcpConfigTomlPath,
 		"GH_AW_PROMPT":                 constants.AwPromptsFile,
 		"GITHUB_AW":                    "true",
-		"GITHUB_PERSONAL_ACCESS_TOKEN": effectiveGitHubToken,
+		"GITHUB_PERSONAL_ACCESS_TOKEN": resolvedGitHubToken,
 		"GITHUB_STEP_SUMMARY":          AgentStepSummaryPath,
 		"RUNNER_TEMP":                  "${{ runner.temp }}",
 		"RUST_LOG":                     "${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,codex_exec=debug' || 'warn' }}",

@@ -15,6 +15,9 @@ set -uo pipefail
 #   GH_AW_HARNESS_STARTUP_RETRIES      Shared startup retry budget, 0-2.
 #   GH_AW_CLAUDE_STARTUP_RETRIES       Backward-compatible fallback when the shared budget is unset.
 #   GH_AW_HARNESS_INITIAL_DELAY_MS     Retry delay in milliseconds, rounded up to seconds.
+#   GH_AW_AWF_EXECUTION_COMPONENT      Billable component name (agent, detection, evals).
+#   GH_AW_AWF_EXECUTION_EVIDENCE_FILE  Component execution evidence file to downgrade to
+#                                      "not_started" when AWF never reached the harness.
 
 usage() {
   echo "Usage: $0 -- <awf-command> [args...]" >&2
@@ -61,6 +64,32 @@ gh_aw_awf_delay_s=$(((gh_aw_awf_initial_delay_ms + 999) / 1000))
 gh_aw_awf_attempt=0
 gh_aw_awf_attempt_log_name="${GH_AW_AWF_ATTEMPT_LOG_NAME:-agent}"
 
+# The harness marker is emitted before the engine process is spawned, so its
+# absence proves the engine never ran. That is the same signal the startup
+# retries rely on to re-run the component without double-billing, and it is
+# authoritative proof that no billable inference happened: downgrade the
+# component execution evidence to "not_started" so daily AI credits accounting
+# can count zero instead of failing closed on missing usage files.
+gh_aw_awf_record_execution_not_started() {
+  local evidence_file="${GH_AW_AWF_EXECUTION_EVIDENCE_FILE:-}"
+  local component="${GH_AW_AWF_EXECUTION_COMPONENT:-}"
+  local run_id="${GITHUB_RUN_ID:-}"
+  local run_attempt="${GITHUB_RUN_ATTEMPT:-}"
+  local evidence_tmp
+  if [ -z "$evidence_file" ] || [ -z "$component" ]; then
+    return 0
+  fi
+  if ! [[ "$run_id" =~ ^[0-9]+$ ]] || ! [[ "$run_attempt" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$evidence_file")" || return 0
+  evidence_tmp="${evidence_file}.tmp"
+  printf '{"version":1,"component":"%s","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' \
+    "$component" "$run_id" "$run_attempt" >"$evidence_tmp" || return 0
+  mv "$evidence_tmp" "$evidence_file" || return 0
+  echo "[${GH_AW_AWF_ENGINE_NAME}-awf-retry] AWF failed before the ${GH_AW_AWF_ENGINE_NAME} harness started; recorded ${component} execution evidence as not_started"
+}
+
 while true; do
   gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
   "$@" 2>&1 | tee -a "$GH_AW_AWF_LOG_FILE" "$gh_aw_awf_attempt_log"
@@ -77,6 +106,9 @@ while true; do
     rm -f "$gh_aw_awf_attempt_log"
     sleep "$gh_aw_awf_delay_s"
     continue
+  fi
+  if ! grep -Fq "$GH_AW_AWF_HARNESS_MARKER" "$gh_aw_awf_attempt_log"; then
+    gh_aw_awf_record_execution_not_started
   fi
   rm -f "$gh_aw_awf_attempt_log"
   exit "$gh_aw_awf_status"

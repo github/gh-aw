@@ -64,6 +64,8 @@ type LogsDownloadOptions struct {
 	storageLimit           *logsStorageLimit
 	countLimit             *logsCountLimit
 	rateLimitState         *logsRateLimitState
+	batchScheduler         *logsBatchScheduler
+	batchTargetID          int
 	// inheritTimeoutContext suppresses building a per-download timeout context
 	// because the caller (multi-target orchestration) already installed the
 	// shared deadline on the context passed in. TimeoutMinutes/TimeoutSeconds

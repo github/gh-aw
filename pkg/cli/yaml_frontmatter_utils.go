@@ -250,8 +250,3 @@ func removeFieldFromBlock(lines []string, fieldName string, parentBlock string) 
 func isDescendant(childIndent, parentIndent string) bool {
 	return len(childIndent) > len(parentIndent)
 }
-
-// isExpressionValue reports whether value is a GitHub Actions expression (i.e. contains ${{ ... }}).
-func isExpressionValue(value string) bool {
-	return strings.Contains(value, "${{") && strings.Contains(value, "}}")
-}

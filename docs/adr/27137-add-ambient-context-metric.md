@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: pelikhan, Copilot
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -16,7 +15,7 @@ The gh-aw tooling collects and aggregates per-run token usage from the firewall 
 
 ### Decision
 
-We will introduce an `AmbientContextMetrics` struct that captures the token footprint (`input_tokens`, `cached_tokens`, `effective_tokens`) of the chronologically first LLM invocation in `token-usage.jsonl`, and expose it as an optional `ambient_context` field in both the `audit` and `logs` JSON output schemas. Chronological ordering is determined by the `timestamp` field (RFC 3339 / RFC 3339 Nano); file order is used as a stable tiebreaker for entries that share a timestamp or lack one. The `effective_tokens` value is defined as `input_tokens + cache_read_tokens`, consistent with the existing effective-token convention in the codebase.
+We will introduce an `AmbientContextMetrics` struct that captures the token footprint (`input_tokens`, `cached_tokens`) of the chronologically first LLM invocation in `token-usage.jsonl`, and expose it as an optional `ambient_context` field in both the `audit` and `logs` JSON output schemas. Chronological ordering is determined by the `timestamp` field (RFC 3339 / RFC 3339 Nano); file order is used as a stable tiebreaker for entries that share a timestamp or lack one.
 
 ### Alternatives Considered
 
@@ -60,7 +59,7 @@ Using the minimum-input-token invocation as a proxy for ambient context (assumin
 2. Implementations **MUST** sort entries by the `timestamp` field using RFC 3339 Nano format first, falling back to RFC 3339 format, when timestamps are present.
 3. Implementations **MUST** use file-insertion order (entry index) as a stable tiebreaker when two entries share a timestamp or when one or both entries lack a timestamp.
 4. Implementations **MUST NOT** include token counts from any invocation other than the first sorted entry in the `AmbientContextMetrics` calculation.
-5. Implementations **MUST** set `effective_tokens` to `input_tokens + cache_read_tokens` for the ambient context metric.
+5. Implementations **MUST** set `aic` to `input_tokens + cache_read_tokens` for the ambient context metric.
 6. Implementations **SHOULD** return `nil` and omit the field when no token usage entries are available, rather than emitting a zero-value struct.
 
 ### Output Schema

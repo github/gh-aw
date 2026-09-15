@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: pelikhan, Copilot
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -76,7 +75,7 @@ All cross-cutting utilities could be lifted into a `pkg/workflow/helpers/` subpa
 ### Token Resolution Helper Placement and Naming (`pkg/workflow`)
 
 1. Functions that resolve a GitHub token by walking a precedence chain across safe-output configuration **MUST** reside in `pkg/workflow/github_token.go`.
-2. Token-resolution functions **MUST** use the `resolve*` prefix when their primary responsibility is to walk a precedence chain and return an effective token (e.g., `resolvePRCheckoutToken`, `resolveStaticCheckoutToken`, `resolveProjectToken`, `resolveProjectURLAndToken`).
+2. Token-resolution functions **MUST** use the `resolve*` prefix when their primary responsibility is to walk a precedence chain and return a resolved token (e.g., `resolvePRCheckoutToken`, `resolveStaticCheckoutToken`, `resolveProjectToken`, `resolveProjectURLAndToken`).
 3. Token-resolution functions **MUST NOT** use the `compute*` prefix; `compute*` is reserved for pure derivations that do not perform precedence resolution.
 4. `safe_outputs_config_helpers.go` **MUST NOT** contain token-resolution helpers; its scope **MUST** be limited to safe-output config serialization utilities.
 5. New token-precedence resolvers **MUST** be added to `github_token.go` with the `resolve*` prefix.

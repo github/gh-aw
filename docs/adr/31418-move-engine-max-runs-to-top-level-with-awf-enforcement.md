@@ -16,7 +16,7 @@ type: project
 
 ### Context
 
-Run-cap configuration was previously expressed as the nested frontmatter field `engine.max-runs`, and enforcement was handled inconsistently across engines (Copilot/Claude/Codex/Gemini/Crush/OpenCode). The new AWF (Agent Workflow Framework) API proxy already centralizes other invocation-time policies (for example, `apiProxy.maxEffectiveTokens` and `apiProxy.modelMultipliers`), so it is the natural enforcement point for invocation caps as well. Without a single canonical place to declare the cap and a single enforcement point, behavior drifts per engine and the field is effectively unsupported on engines that have not implemented it. The repository already ships a codemod framework that can rewrite deprecated frontmatter automatically, which makes a deprecation path low-friction for existing workflows.
+Run-cap configuration was previously expressed as the nested frontmatter field `engine.max-runs`, and enforcement was handled inconsistently across engines (Copilot/Claude/Codex/Gemini/Crush/OpenCode). The new AWF (Agent Workflow Framework) API proxy already centralizes other invocation-time policies (for example, `apiProxy.maxAiCredits` and `apiProxy.modelMultipliers`), so it is the natural enforcement point for invocation caps as well. Without a single canonical place to declare the cap and a single enforcement point, behavior drifts per engine and the field is effectively unsupported on engines that have not implemented it. The repository already ships a codemod framework that can rewrite deprecated frontmatter automatically, which makes a deprecation path low-friction for existing workflows.
 
 ### Decision
 
@@ -52,7 +52,7 @@ Pick a different top-level name to signal the AWF-routed semantics. Rejected bec
 #### Neutral
 - The omission semantics are preserved: when `max-runs` is unset, no `apiProxy.maxRuns` key is emitted (verified by `TestBuildAWFConfigJSON/max-runs omitted when not configured`).
 - The codemod preserves an already-present top-level value when both nested and top-level forms exist, choosing the top-level value (verified by `TestEngineMaxRunsToTopLevelCodemod_RespectsExistingTopLevel`).
-- Both integer and numeric-string inputs are accepted, matching the existing convention used for `max-effective-tokens`.
+- Both integer and numeric-string inputs are accepted, matching the existing convention used for `max-ai-credits`.
 
 ---
 

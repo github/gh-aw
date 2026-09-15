@@ -44,7 +44,7 @@ experiments:
     variants: [full_bash, minimal_toolset]
     description: "Test whether restricting bash tools reduces cost without compromising GPL detection quality"
     hypothesis: "H0: no change in token consumption. H1: minimal toolset reduces tokens by 10-15% while maintaining issue quality (detection accuracy + alternative research depth)"
-    metric: effective_token_count
+    metric: aic
     secondary_metrics: [run_duration_seconds, tools_invoked_count, issue_completeness_score]
     guardrail_metrics:
       - name: gpl_detection_rate

@@ -48,7 +48,7 @@ func TestResolveEvalMetricReferences(t *testing.T) {
 
 	t.Run("ignores non-eval metrics", func(t *testing.T) {
 		refs, err := resolveEvalMetricReferences(map[string]*workflow.ExperimentConfig{
-			"test": {Metric: "effective_tokens"},
+			"test": {Metric: "aic"},
 		}, evals)
 		require.NoError(t, err)
 		assert.Empty(t, refs)

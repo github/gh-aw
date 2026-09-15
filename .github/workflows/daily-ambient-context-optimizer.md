@@ -214,7 +214,7 @@ Eligibility rules:
   - fallback: the first `user.message` event in `sandbox/agent/logs/copilot-session-state/<session-id>/events.jsonl`
   - use `prompt.txt` only as a compilation-debug cross-check, never as the ambient-context source of truth
 
-Prefer higher-cost runs first by using `aic`, then `effective_tokens`, `token_usage`, `turns`, or first-request size when available.
+Prefer higher-cost runs first by using `aic`, then `token_usage`, `turns`, or first-request size when available.
 
 ### Step 3 — Enrich a subset with audits
 

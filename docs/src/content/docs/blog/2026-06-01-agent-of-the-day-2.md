@@ -10,7 +10,6 @@ metadata:
 ---
 
 > [!NOTE]
-> This post references historical **Effective Tokens (ET)** metrics. gh-aw now uses **AI Credits (AIC)** as the primary cost metric.
 
 ## 🏗️ Agent of the Day: Architecture Guardian
 

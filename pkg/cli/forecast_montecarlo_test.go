@@ -284,7 +284,7 @@ func TestBernoulliGatesETContribution(t *testing.T) {
 	assert.Zero(t, mc.P90ProjectedAIC)
 }
 
-func TestHighEffectiveTokensNoOverflow(t *testing.T) {
+func TestHighAICNoOverflow(t *testing.T) {
 	t.Parallel()
 	rng := deterministicRNG()
 	mc := runMonteCarlo([]int{1_000_000, 1_250_000, 1_500_000}, 3, 20.0, rng)
@@ -328,7 +328,7 @@ func TestRunMonteCarloOrderOfMagnitude(t *testing.T) {
 	mc := runMonteCarlo(etObs, successCount, observedRunsPerPeriod, rng)
 	require.NotNil(t, mc)
 
-	// Deterministic point estimate (ET).
+	// Deterministic point estimate (AIC).
 	var totalAICMilli int
 	for _, aic := range etObs {
 		totalAICMilli += aic
@@ -363,7 +363,7 @@ func TestRunMonteCarloSortedOutputs(t *testing.T) {
 	}
 }
 
-// TestRunMonteCarloDistributionShape verifies that the ET distribution is roughly
+// TestRunMonteCarloDistributionShape verifies that the AIC distribution is roughly
 // unimodal by checking that the mean lies between P10 and P90.
 func TestRunMonteCarloDistributionShape(t *testing.T) {
 	t.Parallel()
@@ -458,15 +458,15 @@ func TestRunMonteCarloIsReliable(t *testing.T) {
 // TestRunMonteCarloGammaPoissonWiderCI verifies that the Gamma–Poisson compound model
 // produces wider confidence intervals for small samples compared to a scenario where
 // the rate is well-estimated (large sample).  With small n the posterior Gamma has
-// higher relative variance, so the simulated ET distribution should be broader.
+// higher relative variance, so the simulated AIC distribution should be broader.
 func TestRunMonteCarloGammaPoissonWiderCI(t *testing.T) {
 	t.Parallel()
 	// Same observed rate (λ = 10) but different sample sizes.
-	etVal := 1_000 // constant ET to isolate run-count variability
+	aicVal := 1_000 // constant AIC to isolate run-count variability
 	const lambda = 10.0
 
 	// Small sample: 3 runs observed → high relative uncertainty in λ.
-	smallObs := []int{etVal, etVal, etVal}
+	smallObs := []int{aicVal, aicVal, aicVal}
 	rngSmall := rand.New(rand.NewSource(7)) //nolint:gosec
 	mcSmall := runMonteCarlo(smallObs, len(smallObs), lambda, rngSmall)
 	require.NotNil(t, mcSmall)
@@ -474,7 +474,7 @@ func TestRunMonteCarloGammaPoissonWiderCI(t *testing.T) {
 	// Large sample: 100 runs observed → low relative uncertainty in λ.
 	largeObs := make([]int, 100)
 	for i := range largeObs {
-		largeObs[i] = etVal
+		largeObs[i] = aicVal
 	}
 	rngLarge := rand.New(rand.NewSource(7)) //nolint:gosec
 	mcLarge := runMonteCarlo(largeObs, len(largeObs), lambda, rngLarge)
@@ -488,7 +488,7 @@ func TestRunMonteCarloGammaPoissonWiderCI(t *testing.T) {
 }
 
 // TestRunMonteCarloFullEpisodePath is a smoke test that exercises runMonteCarlo
-// with a realistic setup and validates ET percentile ordering.
+// with a realistic setup and validates AIC percentile ordering.
 func TestRunMonteCarloFullEpisodePath(t *testing.T) {
 	t.Parallel()
 	rng := deterministicRNG()
@@ -568,14 +568,14 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 		assert.Equal(t, "success", run["conclusion"])
 	})
 
-	t.Run("zero ET fixture", func(t *testing.T) {
+	t.Run("zero AIC fixture", func(t *testing.T) {
 		t.Parallel()
-		fixture := loadFixture(t, "run_summary_zero_et.json")
+		fixture := loadFixture(t, "run_summary_zero_aic.json")
 		usage, ok := fixture["token_usage_summary"].(map[string]any)
 		require.True(t, ok)
-		totalEffectiveTokens, ok := usage["total_effective_tokens"].(float64)
+		totalAIC, ok := usage["total_aic"].(float64)
 		require.True(t, ok)
-		assert.Zero(t, totalEffectiveTokens)
+		assert.Zero(t, totalAIC)
 	})
 
 	t.Run("failed run fixture", func(t *testing.T) {
@@ -586,14 +586,14 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 		assert.Equal(t, "failure", run["conclusion"])
 	})
 
-	t.Run("high ET fixture", func(t *testing.T) {
+	t.Run("high AIC fixture", func(t *testing.T) {
 		t.Parallel()
-		fixture := loadFixture(t, "run_summary_high_et.json")
+		fixture := loadFixture(t, "run_summary_high_aic.json")
 		usage, ok := fixture["token_usage_summary"].(map[string]any)
 		require.True(t, ok)
-		totalEffectiveTokens, ok := usage["total_effective_tokens"].(float64)
+		totalAIC, ok := usage["total_aic"].(float64)
 		require.True(t, ok)
-		assert.GreaterOrEqual(t, totalEffectiveTokens, 1_000_000.0)
+		assert.GreaterOrEqual(t, totalAIC, 1_000_000.0)
 	})
 
 	t.Run("cancelled run fixture", func(t *testing.T) {
@@ -604,17 +604,17 @@ func TestMonteCarloFixtureVariantsAreAvailable(t *testing.T) {
 		assert.Equal(t, "cancelled", run["conclusion"])
 	})
 
-	t.Run("partial ET fixture", func(t *testing.T) {
+	t.Run("partial AIC fixture", func(t *testing.T) {
 		t.Parallel()
-		fixture := loadFixture(t, "run_summary_partial_et.json")
+		fixture := loadFixture(t, "run_summary_partial_aic.json")
 		run, ok := fixture["run"].(map[string]any)
 		require.True(t, ok)
 		assert.Empty(t, run["conclusion"])
 
 		usage, ok := fixture["token_usage_summary"].(map[string]any)
 		require.True(t, ok)
-		totalEffectiveTokens, ok := usage["total_effective_tokens"].(float64)
+		totalAIC, ok := usage["total_aic"].(float64)
 		require.True(t, ok)
-		assert.Positive(t, totalEffectiveTokens)
+		assert.Positive(t, totalAIC)
 	})
 }

@@ -243,7 +243,7 @@ func (c *Compiler) buildStartDIFCProxyStepYAML(data *WorkflowData) string {
 
 	// Get MCP server token (same token the gateway uses for the GitHub MCP server)
 	customGitHubToken := getGitHubToken(githubToolConfig)
-	effectiveToken := getEffectiveGitHubToken(customGitHubToken)
+	resolvedToken := resolveGitHubToken(customGitHubToken)
 
 	// Build the simplified guard policy JSON (static fields only)
 	// (plus reaction fields when integrity-reactions feature flag is enabled)
@@ -261,7 +261,7 @@ func (c *Compiler) buildStartDIFCProxyStepYAML(data *WorkflowData) string {
 	var sb strings.Builder
 	sb.WriteString("      - name: Start DIFC Proxy\n")
 	sb.WriteString("        env:\n")
-	fmt.Fprintf(&sb, "          GH_TOKEN: %s\n", effectiveToken)
+	fmt.Fprintf(&sb, "          GH_TOKEN: %s\n", resolvedToken)
 	writeProxyUpstreamEnv(&sb)
 	if isAWFNetworkIsolationEnabled(data) {
 		sb.WriteString("          GH_AW_NETWORK_ISOLATION: 'true'\n")
@@ -563,7 +563,7 @@ func (c *Compiler) buildStartCliProxyStepYAML(data *WorkflowData) string {
 
 	// Get token for the proxy
 	customGitHubToken := getGitHubToken(githubToolConfig)
-	effectiveToken := getEffectiveGitHubToken(customGitHubToken)
+	resolvedToken := resolveGitHubToken(customGitHubToken)
 
 	// Build the guard policy JSON (static fields only, plus reaction fields when enabled).
 	// The CLI proxy requires a policy to forward requests — without one, all API
@@ -580,7 +580,7 @@ func (c *Compiler) buildStartCliProxyStepYAML(data *WorkflowData) string {
 	var sb strings.Builder
 	sb.WriteString("      - name: Start CLI Proxy\n")
 	sb.WriteString("        env:\n")
-	fmt.Fprintf(&sb, "          GH_TOKEN: %s\n", effectiveToken)
+	fmt.Fprintf(&sb, "          GH_TOKEN: %s\n", resolvedToken)
 	writeProxyUpstreamEnv(&sb)
 	if isAWFNetworkIsolationEnabled(data) {
 		sb.WriteString("          GH_AW_NETWORK_ISOLATION: 'true'\n")

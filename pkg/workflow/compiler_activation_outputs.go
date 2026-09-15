@@ -20,11 +20,11 @@ func (c *Compiler) addActivationFeedbackAndValidationSteps(ctx *activationJobBui
 	c.maybeAddActivationAppTokenMintStep(ctx)
 	if hasMaxDailyAICGuardrail(data) {
 		ctx.steps = append(ctx.steps, c.buildActivationDailyAICGuardrailStep(data)...)
-		ctx.outputs["daily_ai_credits_exceeded"] = "${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}"
-		ctx.outputs["daily_ai_credits_guardrail_status"] = "${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}"
-		ctx.outputs["daily_ai_credits_guardrail_error"] = "${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}"
-		ctx.outputs["daily_ai_credits_total_effective_tokens"] = "${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_total_effective_tokens || '' }}"
-		ctx.outputs["daily_ai_credits_threshold"] = "${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}"
+		ctx.outputs["daily_ai_credits_exceeded"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}"
+		ctx.outputs["daily_ai_credits_guardrail_status"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}"
+		ctx.outputs["daily_ai_credits_guardrail_error"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}"
+		ctx.outputs["daily_ai_credits_total"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}"
+		ctx.outputs["daily_ai_credits_threshold"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}"
 	}
 	c.addActivationReactionStep(ctx)
 	c.addActivationSecretValidationStep(ctx)

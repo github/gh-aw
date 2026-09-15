@@ -2849,6 +2849,25 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("stderr: undefined");
     });
 
+    it("surfaces AWF fatal startup errors instead of a generic transient failure", () => {
+      const lines = [
+        "[INFO] Auto-detected DNS servers from /run/systemd/resolve/resolv.conf: 10.0.0.2",
+        "[INFO] Agent timeout set to 60 minutes",
+        '[ERROR] Fatal error: Error: "/run/awf-cloud-hypervisor/trusted-artifacts/run-xfjXPe/cloud-hypervisor --version" exited with code undefined: ',
+        "    at Object.runVersion (/usr/local/lib/awf/awf-bundle.js:928:11170)",
+        "[INFO] Squid logs available at: /tmp/gh-aw/sandbox/firewall/logs",
+        "Process exiting with code: 1",
+      ];
+      fs.writeFileSync(stdioLogPath, lines.join("\n") + "\n");
+
+      const result = buildEngineFailureContext();
+
+      expect(result).toContain("Engine Failure");
+      expect(result).toContain("Error details:");
+      expect(result).toContain("cloud-hypervisor --version");
+      expect(result).not.toContain("transient infrastructure issue");
+    });
+
     it("detects Fatal: prefix pattern", () => {
       fs.writeFileSync(stdioLogPath, "Fatal: out of memory\n");
       const result = buildEngineFailureContext();

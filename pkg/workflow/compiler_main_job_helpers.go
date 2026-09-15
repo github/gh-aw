@@ -156,10 +156,6 @@ func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
 	}
 	return map[string]string{
 		"model": fmt.Sprintf("${{ needs.%s.outputs.model }}", constants.ActivationJobName),
-		// effective_tokens is the total ET for the run, captured by the MCP gateway log parser step.
-		// It is exposed here so that the safe_outputs job can set GH_AW_EFFECTIVE_TOKENS and render
-		// the {effective_tokens_suffix} template expression in footer templates.
-		"effective_tokens": fmt.Sprintf("${{ steps.%s.outputs.effective_tokens }}", constants.ParseMCPGatewayStepID),
 		// aic is the total AI Credits cost for the run (1 AIC == 0.01 USD), captured by the
 		// MCP gateway log parser step and passed to downstream jobs for footer rendering.
 		"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", usageStepID),
