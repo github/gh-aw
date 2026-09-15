@@ -17,7 +17,7 @@ type: project
 
 ### Context
 
-`gh-aw` embeds the `gh-aw-firewall` (AWF) JSON schema at `pkg/workflow/schemas/awf-config.schema.json` and generates a populated AWF config object at compile time from workflow frontmatter. The embedded schema was last synced against firewall `v0.25.38`; since then, upstream firewall `v0.25.43` introduced new config surface — `apiProxy.modelMultipliers`, `apiProxy.maxRuns`, `apiProxy.auth.*` (GitHub-OIDC → Azure/AWS/GCP exchange), and `container.dockerHostPathPrefix`. Workflow frontmatter already carries a `engine.token-weights.multipliers` map that captures per-model effective-token weights, but the generated AWF config was not emitting it because the schema field did not yet exist. Without a sync, valid AWF capabilities are silently unreachable from `gh-aw`, and `specs/awf-config-sources-spec.md` (which tracks "known drift") goes out of date.
+`gh-aw` embeds the `gh-aw-firewall` (AWF) JSON schema at `pkg/workflow/schemas/awf-config.schema.json` and generates a populated AWF config object at compile time from workflow frontmatter. The embedded schema was last synced against firewall `v0.25.38`; since then, upstream firewall `v0.25.43` introduced new config surface — `apiProxy.modelMultipliers`, `apiProxy.maxRuns`, `apiProxy.auth.*` (GitHub-OIDC → Azure/AWS/GCP exchange), and `container.dockerHostPathPrefix`. Workflow frontmatter already carries a `engine.token-weights.multipliers` map that captures per-model AI Credits weights, but the generated AWF config was not emitting it because the schema field did not yet exist. Without a sync, valid AWF capabilities are silently unreachable from `gh-aw`, and `specs/awf-config-sources-spec.md` (which tracks "known drift") goes out of date.
 
 ### Decision
 
@@ -27,7 +27,7 @@ We will sync the embedded AWF schema to the firewall `main` snapshot covering `v
 
 #### Alternative 1: Introduce a new dedicated frontmatter field for AWF model multipliers
 
-Add a new `firewall.api-proxy.model-multipliers` (or similar) frontmatter block dedicated to AWF enforcement, distinct from `engine.token-weights.multipliers`. Rejected because the multiplier values represent the same domain concept (per-model effective-token weighting), and splitting them into two configuration surfaces would force authors to keep the two in sync manually, with no benefit. The existing `engine.token-weights.multipliers` field is already typed as `map[string]float64` and is structurally identical to what the AWF schema requires.
+Add a new `firewall.api-proxy.model-multipliers` (or similar) frontmatter block dedicated to AWF enforcement, distinct from `engine.token-weights.multipliers`. Rejected because the multiplier values represent the same domain concept (per-model AI Credits weighting), and splitting them into two configuration surfaces would force authors to keep the two in sync manually, with no benefit. The existing `engine.token-weights.multipliers` field is already typed as `map[string]float64` and is structurally identical to what the AWF schema requires.
 
 #### Alternative 2: Defer the schema sync until a user requests one of the new fields
 
@@ -46,7 +46,7 @@ Land the schema update only and treat `modelMultipliers` emission as a follow-up
 - Authors get the new feature without learning a new frontmatter key.
 
 #### Negative
-- `engine.token-weights.multipliers` now has two distinct effects (internal token accounting **and** AWF proxy-side hard enforcement of effective-token budgets), so changing this map can produce 429 responses at runtime rather than purely affecting accounting. This dual semantics is not obvious from the field name.
+- `engine.token-weights.multipliers` now has two distinct effects (internal token accounting **and** AWF proxy-side hard enforcement of AI Credits budgets), so changing this map can produce 429 responses at runtime rather than purely affecting accounting. This dual semantics is not obvious from the field name.
 - Embedded-schema sync coupling: `gh-aw` releases now have a soft dependency on the firewall spec cadence — every firewall schema change requires a corresponding `gh-aw` PR to stay drift-free.
 - The schema sync adds substantial new surface (`apiProxy.auth.*` OIDC config with conditional `if/then/else` validation for Azure/AWS/GCP) that is **not** yet wired through from frontmatter; readers of the schema may incorrectly assume those paths are reachable via `gh-aw`.
 

@@ -154,15 +154,15 @@ func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data 
 	if data.SafeOutputs != nil && data.SafeOutputs.GitHubToken != "" {
 		safeOutputsToken = data.SafeOutputs.GitHubToken
 	}
-	effectiveToken := getEffectiveGitHubToken(safeOutputsToken)
+	resolvedToken := resolveGitHubToken(safeOutputsToken)
 	prLog.Print("PR checkout step configured with GitHub token")
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_TOKEN: %s\n", effectiveToken)
+	fmt.Fprintf(yaml, "          GH_TOKEN: %s\n", resolvedToken)
 
 	yaml.WriteString("        with:\n")
 
 	// Add github-token to make it available to the GitHub API client
-	fmt.Fprintf(yaml, "          github-token: %s\n", effectiveToken)
+	fmt.Fprintf(yaml, "          github-token: %s\n", resolvedToken)
 
 	yaml.WriteString("          script: |\n")
 

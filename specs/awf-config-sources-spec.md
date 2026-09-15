@@ -139,7 +139,7 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `apiProxy.anthropicAutoCache` | `--anthropic-auto-cache` | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.anthropicCacheTailTtl` | `--anthropic-cache-tail-ttl` | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.models` | config-only (model alias rewriting) | `pkg/workflow/awf_config_test.go` |
-| `apiProxy.modelMultipliers` | config-only (effective-token accounting) | `pkg/workflow/awf_config_test.go` |
+| `apiProxy.modelMultipliers` | config-only (AI Credits accounting) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.modelFallback` | config-only (model fallback policy; set `sandbox.agent.model-fallback: false` to prevent deployment-name rewriting for BYOK Azure) | `pkg/workflow/awf_config_test.go` (`TestAWFConfig_ModelFallback*`) |
 | `apiProxy.enableTokenSteering` | config-only (set `sandbox.agent.token-steering: false` to preserve the explicitly configured provider and model) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.maxRuns` | config-only (LLM invocation hard cap) | `pkg/workflow/awf_config_test.go` |

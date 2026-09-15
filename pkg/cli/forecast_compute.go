@@ -40,7 +40,7 @@ var (
 	// forecastDownloadRunArtifacts uses a forecast-specific implementation that downloads
 	// only the usage artifact and skips workflow run log downloads (not needed for AIC computation).
 	forecastDownloadRunArtifacts = forecastDownloadUsageArtifact
-	// Forecast only needs TotalAIC; avoid effective-token computation/logging in this path.
+	// Forecast only needs TotalAIC; avoid AI Credits computation/logging in this path.
 	forecastAnalyzeTokenUsage = analyzeTokenUsageAICOnly
 )
 

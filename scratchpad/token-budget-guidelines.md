@@ -386,7 +386,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
   - Cap sampled outputs to 3 per agent for quality scoring
   - Create at most 3 improvement issues per run
   - Stop immediately after `create_discussion` + issues are filed
-- Prompt compression experiment active (`caveman` — stripped minimal prompt vs `verbose` — full structured prompt; measures `effective_tokens`; see `experiments.prompt_compression` in workflow frontmatter)
+- Prompt compression experiment active (`caveman` — stripped minimal prompt vs `verbose` — full structured prompt; measures `aic`; see `experiments.prompt_compression` in workflow frontmatter)
 
 **Budget Target:**
 - **Target tokens/run**: 5M–15M (verbose variant); 3M–9M (caveman variant — ≥20% reduction goal)

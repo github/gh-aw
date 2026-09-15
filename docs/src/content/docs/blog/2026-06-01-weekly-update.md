@@ -7,7 +7,6 @@ date: 2026-06-01
 ---
 
 > [!NOTE]
-> This post references historical **Effective Tokens (ET)** metrics. gh-aw now uses **AI Credits (AIC)** as the primary cost metric.
 
 It's been a busy week in [github/gh-aw](https://github.com/github/gh-aw)! Five releases landed between May 28 and May 31, capped off by [v0.77.4](https://github.com/github/gh-aw/releases/tag/v0.77.4) — one of the biggest releases in recent memory. Here's everything that shipped.
 
@@ -23,7 +22,7 @@ It's been a busy week in [github/gh-aw](https://github.com/github/gh-aw)! Five r
 
 - **`aw.yml` Manifest: Includes, Skills & Agents** ([#35778](https://github.com/github/gh-aw/pull/35778)): Your repository manifest now supports `includes`, `skills`, and `agents` keys so you can compose and share workflow components across repos.
 
-- **Per-Workflow 24-Hour Effective-Token Guardrail** ([#36042](https://github.com/github/gh-aw/pull/36042)): A configurable token guardrail prevents runaway agent costs with enterprise-grade defaults and handy `ET` shorthand support.
+- **Per-Workflow 24-Hour AI-Credits Guardrail** ([#36042](https://github.com/github/gh-aw/pull/36042)): A configurable token guardrail prevents runaway agent costs with enterprise-grade defaults and handy `AIC` shorthand support.
 
 - **`search_commits` in GitHub MCP Search Toolset** ([#36115](https://github.com/github/gh-aw/pull/36115)): Agents can now search commits directly via the GitHub MCP search toolset.
 
@@ -48,7 +47,7 @@ It's been a busy week in [github/gh-aw](https://github.com/github/gh-aw)! Five r
 
 - **[Add project UTC offset support for rendered timestamps](https://github.com/github/gh-aw/pull/36142)** — Timestamps and expiration messages now render correctly for teams in non-UTC time zones.
 - **[Optimize `api-consumption-report` with inline small-model sub-agents](https://github.com/github/gh-aw/pull/36137)** — The API consumption report workflow is now faster and more efficient thanks to inline sub-agents.
-- **[Add structured diagnostics to the daily workflow ET guardrail](https://github.com/github/gh-aw/pull/36164)** — The effective-token guardrail now emits structured logs with a stable `[daily-workflow-et]` prefix, making debugging much easier.
+- **[Add structured diagnostics to the daily workflow AIC guardrail](https://github.com/github/gh-aw/pull/36164)** — The AI Credits guardrail now emits structured logs with a stable `[daily-workflow-aic]` prefix, making debugging much easier.
 - **[Enable `close_discussion` safe output in Daily Regulatory workflow](https://github.com/github/gh-aw/pull/36155)** — The regulatory compliance workflow can now close discussions as part of its cycle.
 
 ## 🤖 Agent of the Week: api-consumption-report

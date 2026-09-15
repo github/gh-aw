@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: PR author (pelikhan), reviewers of PR #35338
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -12,7 +11,7 @@
 
 ### Context
 
-[ADR-35286](35286-compiler-managed-enterprise-env-controls.md) introduced the `gh aw defaults` command pair (`get` / `update`) backed by a flat YAML file whose keys carried a `default_` prefix (e.g. `default_max_effective_tokens`, `default_model_copilot`) that mirrored the `GH_AW_DEFAULT_*` GitHub Actions variable names. At the same time, `defaults update` performed a mutating batch operation — upserting or deleting GitHub Actions variables at repo, org, or enterprise scope — with no preview and no confirmation step, so a typo or unintended file content silently overwrote shared org-wide configuration. The original ADR's normative section did not constrain either the delete semantics or the update UX, so refining both without superseding the parent ADR is in scope.
+[ADR-35286](35286-compiler-managed-enterprise-env-controls.md) introduced the `gh aw defaults` command pair (`get` / `update`) backed by a flat YAML file whose keys carried a `default_` prefix (e.g. `default_max_aic`, `default_model_copilot`) that mirrored the `GH_AW_DEFAULT_*` GitHub Actions variable names. At the same time, `defaults update` performed a mutating batch operation — upserting or deleting GitHub Actions variables at repo, org, or enterprise scope — with no preview and no confirmation step, so a typo or unintended file content silently overwrote shared org-wide configuration. The original ADR's normative section did not constrain either the delete semantics or the update UX, so refining both without superseding the parent ADR is in scope.
 
 ### Decision
 
@@ -50,7 +49,7 @@ Render the preview as a two-column "before / after" diff by first fetching the c
 
 #### Neutral
 
-- The `GH_AW_DEFAULT_*` GitHub Actions variable names are unchanged; the override chain documented in ADR-35286 (Model Override Chain, Max-Effective-Tokens Override) is untouched, so no compiler or YAML-generation behavior is affected.
+- The `GH_AW_DEFAULT_*` GitHub Actions variable names are unchanged; the override chain documented in ADR-35286 (Model Override Chain, Max-AI-Credits Override) is untouched, so no compiler or YAML-generation behavior is affected.
 - The `defaultsBinding` struct gains a `fieldName` field so the preview renderer can show the file-side key (`max_turns`) rather than the GitHub variable name (`GH_AW_DEFAULT_MAX_TURNS`); the binding list remains the single source of truth for the seven managed variables.
 - File permissions for the generated YAML now go through `constants.FilePermPublic` rather than an inline `0o644` literal — a small consistency cleanup that comes along for the ride.
 - A new `displayName()` method on `defaultsTarget` and two new preview row types (`defaultsUpdatePreview`, `defaultsUpdateRow`) are added strictly for rendering; they have no behavior beyond formatting.
@@ -63,7 +62,7 @@ Render the preview as a two-column "before / after" diff by first fetching the c
 
 ### Defaults File Format
 
-1. The `defaults.yml` file consumed by `gh aw defaults get` and `gh aw defaults update` **MUST** use the trimmed YAML keys `max_effective_tokens`, `max_turns`, `timeout_minutes`, `detection_model`, `model_copilot`, `model_claude`, `model_codex`.
+1. The `defaults.yml` file consumed by `gh aw defaults get` and `gh aw defaults update` **MUST** use the trimmed YAML keys `max_aic`, `max_turns`, `timeout_minutes`, `detection_model`, `model_copilot`, `model_claude`, `model_codex`.
 2. The `defaultsFile` struct **MUST NOT** declare `yaml:"default_*"` tags for any field; legacy `default_*` keys **MUST NOT** be read on unmarshal.
 3. The `gh aw defaults get` subcommand **MUST** serialize using only the trimmed keys.
 4. Each entry in `defaultsBindings` **MUST** carry both its `envName` (the `GH_AW_DEFAULT_*` GitHub Actions variable name) and its `fieldName` (the trimmed file-side key) so the update preview can label rows with the file-side key.

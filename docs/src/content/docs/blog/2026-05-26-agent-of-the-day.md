@@ -10,7 +10,6 @@ metadata:
 ---
 
 > [!NOTE]
-> This post references historical **Effective Tokens (ET)** metrics. gh-aw now uses **AI Credits (AIC)** as the primary cost metric.
 
 Every morning someone at GitHub opens their laptop and wonders: how well did the coding agents do yesterday? Did they ship? Did they stall? Did they create more work than they saved? These questions used to require manual spelunking through dashboards, cross-referencing merged PRs with author names, and guessing at patterns from vibes alone.
 
@@ -28,7 +27,7 @@ What makes this run interesting isn't just the output—it's the mechanics under
 
 From there, the agent orchestrates across 16 different tool types. `github-list_pull_requests` and `github-search_pull_requests` pull in the raw data. `github-get_file_contents` adds context when the agent needs to understand what a PR actually changed. `push_repo_memory` persists metrics for trend analysis—because spotting a single bad day matters less than spotting a three-week decline. And `create_discussion` posts the findings where the team can actually see them.
 
-The token economics tell their own story. Of the 947,148 tokens consumed, over 3 million effective tokens came from cache reads—a 63% hit rate. That's not an accident. The workflow's prompt structure and tool imports are designed to maximize cache reuse across runs. At $1.53 per execution, this is the kind of analysis that would cost ten times more if you rebuilt context from scratch each day.
+The token economics tell their own story. Of the 947,148 tokens consumed, over 3 million AI Credits came from cache reads—a 63% hit rate. That's not an accident. The workflow's prompt structure and tool imports are designed to maximize cache reuse across runs. At $1.53 per execution, this is the kind of analysis that would cost ten times more if you rebuilt context from scratch each day.
 
 Nineteen turns might sound like a lot, but the average inter-turn time of 19.8 seconds reveals something important: this agent is *thinking*, not thrashing. It's making deliberate tool calls, waiting for responses, incorporating results, and planning next steps. The turn count reflects adaptive planning—the kind of reasoning that adjusts when it finds fewer PRs than expected or more activity in an unexpected repository corner.
 

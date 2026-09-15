@@ -64,7 +64,7 @@ This specification covers:
 This specification does NOT cover:
 
 - GitHub Actions minutes billing.
-- ET (Effective Tokens) normalization rules.
+- AIC (AI Credits) normalization rules.
 - Provider-side billing reconciliation and invoice dispute procedures.
 
 ### 1.3 Design Goals

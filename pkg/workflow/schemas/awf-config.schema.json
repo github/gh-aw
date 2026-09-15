@@ -117,7 +117,7 @@
         },
         "enableTokenSteering": {
           "type": "boolean",
-          "description": "Enable effective token budget steering. When true, the proxy injects budget-warning system messages at 80%, 90%, 95%, and 99% usage to nudge the agent to wrap up. Requires maxEffectiveTokens. Default: false."
+          "description": "Enable AI Credits budget steering. When true, the proxy injects budget-warning system messages at 80%, 90%, 95%, and 99% usage to nudge the agent to wrap up. Requires maxAiCredits. Default: false."
         },
         "anthropicAutoCache": {
           "type": "boolean",
@@ -127,11 +127,6 @@
           "type": "string",
           "enum": ["5m", "1h"],
           "description": "TTL for Anthropic cache tail optimization. Only applies when anthropicAutoCache is enabled. Allowed values: \"5m\" or \"1h\"."
-        },
-        "maxEffectiveTokens": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Maximum cumulative effective tokens allowed for a run. When reached, the API proxy rejects subsequent requests with HTTP 403 and error type 'effective_tokens_limit_exceeded'. Tokens are weighted: input ×1, cache-read ×0.1, output ×4, reasoning ×4. See spec §10."
         },
         "maxAiCredits": {
           "type": "number",
@@ -173,7 +168,7 @@
         },
         "modelMultipliers": {
           "type": "object",
-          "description": "Per-model multipliers for effective token accounting. Each model's weighted tokens are multiplied by this value before accumulation. Unlisted models use defaultModelMultiplier when set, otherwise the highest configured multiplier. See spec §10.2.",
+          "description": "Per-model multipliers for AI Credits accounting. Each model's weighted tokens are multiplied by this value before accumulation. Unlisted models use defaultModelMultiplier when set, otherwise the highest configured multiplier. See spec §10.2.",
           "additionalProperties": {
             "type": "number",
             "exclusiveMinimum": 0

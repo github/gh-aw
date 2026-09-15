@@ -708,11 +708,11 @@ safe-outputs:
     expect(commentCall.body).not.toContain("<script>");
   });
 
-  it("should not include effective token count in footer when GH_AW_EFFECTIVE_TOKENS is set", async () => {
+  it("should not include AI Credits in footer when GH_AW_DEPRECATED_COST is set", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "Token Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/123";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
-    process.env.GH_AW_EFFECTIVE_TOKENS = "12500";
+    process.env.GH_AW_DEPRECATED_COST = "12500";
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
@@ -737,11 +737,11 @@ safe-outputs:
     expect(commentCall.body).not.toContain("12.5K");
   });
 
-  it("should not include effective token count in footer when GH_AW_EFFECTIVE_TOKENS is not set", async () => {
+  it("should not include AI Credits in footer when GH_AW_DEPRECATED_COST is not set", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "No Token Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/456";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
-    delete process.env.GH_AW_EFFECTIVE_TOKENS;
+    delete process.env.GH_AW_DEPRECATED_COST;
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");

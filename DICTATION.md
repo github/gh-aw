@@ -79,7 +79,7 @@ docker-host
 domains
 dry-run
 edit
-effective-tokens
+AI Credits
 effort
 engine
 engine.api-target

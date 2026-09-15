@@ -47,7 +47,7 @@ type ExperimentAnalysis struct {
 	AnalysisType string `json:"analysis_type,omitempty"`
 
 	// Metric is the primary metric string declared in the experiment config
-	// (e.g. "effective_tokens" or "evals.builds").
+	// (e.g. "aic" or "evals.builds").
 	Metric string `json:"metric,omitempty"`
 
 	// MetricQuestion is the resolved eval question text when Metric references a declared

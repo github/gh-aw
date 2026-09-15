@@ -271,7 +271,6 @@ jobs:
     outputs:
       agentic_engine_timeout: ${{ steps.detect-copilot-errors.outputs.agentic_engine_timeout || 'false' }}
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
-      effective_tokens: ${{ steps.parse-mcp-gateway.outputs.effective_tokens }}
       inference_access_error: ${{ steps.detect-copilot-errors.outputs.inference_access_error || 'false' }}
       mcp_policy_error: ${{ steps.detect-copilot-errors.outputs.mcp_policy_error || 'false' }}
       model: ${{ needs.activation.outputs.model }}
@@ -557,4 +556,3 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/
             /tmp/gh-aw/sandbox/firewall/audit/
           if-no-files-found: ignore
-

@@ -8,11 +8,11 @@
 
 ### Context
 
-PureLock automated analysis identified two pure Go functions in `pkg/cli` with 0% test coverage: `removeUnsafeEngineEnvKeys` (a YAML-frontmatter line-based state machine that strips unsafe `engine.env:` keys) and `migrateMessagesEffectiveTokensSuffixToAICreditsSuffix` (a single-pass rewriter that migrates `{effective_tokens_suffix}` placeholders to `{ai_credits_suffix}` within `safe-outputs.messages:` blocks). Both functions are non-trivial: they implement multi-state YAML parsers that track block nesting, handle scalar and block-scalar values, skip blank lines and comments, and exit cleanly when they cross block boundaries. The absence of any test coverage made regressions undetectable by CI.
+PureLock automated analysis identified two pure Go functions in `pkg/cli` with 0% test coverage: `removeUnsafeEngineEnvKeys` (a YAML-frontmatter line-based state machine that strips unsafe `engine.env:` keys) and `migrateMessagesAICSuffixToAICreditsSuffix` (a single-pass rewriter that migrates `{ai_credits_suffix}` placeholders to `{ai_credits_suffix}` within `safe-outputs.messages:` blocks). Both functions are non-trivial: they implement multi-state YAML parsers that track block nesting, handle scalar and block-scalar values, skip blank lines and comments, and exit cleanly when they cross block boundaries. The absence of any test coverage made regressions undetectable by CI.
 
 ### Decision
 
-We will test pure functions using a **two-layer test pattern**: a primary table-driven subtest suite that covers every meaningful branch of the state machine using YAML-line fixtures, and a dedicated purity test that asserts no input slice is mutated and that repeated invocations with identical inputs return identical results. This approach was applied to both `removeUnsafeEngineEnvKeys` and `migrateMessagesEffectiveTokensSuffixToAICreditsSuffix`.
+We will test pure functions using a **two-layer test pattern**: a primary table-driven subtest suite that covers every meaningful branch of the state machine using YAML-line fixtures, and a dedicated purity test that asserts no input slice is mutated and that repeated invocations with identical inputs return identical results. This approach was applied to both `removeUnsafeEngineEnvKeys` and `migrateMessagesAICSuffixToAICreditsSuffix`.
 
 ### Alternatives Considered
 
@@ -27,7 +27,7 @@ Use Go's native fuzzer to discover edge cases automatically. The PR body explici
 ### Consequences
 
 #### Positive
-- Coverage jumps from 0% to 93.8% (`removeUnsafeEngineEnvKeys`) and 100% (`migrateMessagesEffectiveTokensSuffixToAICreditsSuffix`), providing a CI safety net for regression.
+- Coverage jumps from 0% to 93.8% (`removeUnsafeEngineEnvKeys`) and 100% (`migrateMessagesAICSuffixToAICreditsSuffix`), providing a CI safety net for regression.
 - The purity test acts as a machine-enforced contract: any future change that introduces input mutation or non-determinism will fail a test immediately.
 - Table-driven fixtures are self-documenting — each subtest name describes a distinct state-machine scenario, making the expected behavior readable without consulting the implementation.
 
