@@ -1,5 +1,12 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-15 snapshot
+- 50 sessions; **52.0% raw completion** (26 success, 2 failure, 21 action_required, 1 cancelled), +4pts vs 09-14 (48%), 3rd-highest of 24 recorded days (24-day mean 30.8%). Zero merge_invalidation_cascade today (no PR merges on either active branch in the 04:07–05:51Z window; verified via `gh api pulls`) — confirms cascades are merge-triggered, not a daily constant.
+- 3 unique branches (vs 09-14/09-10's record-low 2): `copilot/update-logs-command-multi-target` 32/50 (64%, 53.1% success); `copilot/remove-effective-tokens` 17/50 (34%, 47.1% success); `copilot/bump-gh-aw-firewall-to-v02817` 1/50 (100%).
+- True-agentic (Addressing comment on PR #61027 x2, #60997 x2, #60945 x1) = 5/5 = 100%, 9th consecutive 100% day. **provenance_inversion reverted** to 80.8% bot-driven (21/26), back inside the historical 75-86% band after 09-14's record 91.7%.
+- burst_clustering inconclusive: only 1 run temporally isolated vs 49 burst-fired — smallest isolated sample on record, not statistically meaningful this cycle.
+- Orphans 0/7 open PRs → 0% NORMAL, 24th consecutive healthy day. Conv logs empty (24th+ day). Standard run (roll=76).
+
 ## 2026-09-14 snapshot
 - 50 sessions; **48.0% raw completion** (24 success, 6 failure, 20 action_required), +32pts vs 09-13 (16%), 2nd-highest recorded (23-day mean 29.1%). **Cascade-adjusted completion 52.2%** (24/46) once the 4 merge-invalidation artifacts below are excluded.
 - **EXPERIMENTAL (roll=0): cascade_multiplicity_dual_merge** — for the first time, TWO independent merge_invalidation_cascade events fired in one day from two separate PR merges: PR #60701 (2m14s lifetime) invalidated 1 run (PR Data Prefetch); PR #60702 (~77min lifetime) invalidated 3 runs (CGO, CWI, Doc Build-Deploy), all at 00:28:19Z. Both verified via `gh api pulls`. Confirms cascade size scales with in-flight-workflow count at merge time and fires per-merge-event, not once/day. Effectiveness High; recommend promote (track cascade count/day + PR lifetime as predictor).
@@ -51,3 +58,4 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - gate_footprint_refire_signature (06-20): refire ratio = runs/distinct-workflows distinguishes broad CI from narrow re-fire.
 - per_branch_gate_fanout (06-26): each PR-open fires a gate bundle; gate_count = f(PR-open), not branch health. **Refined 07-03 (GBCD):** bundle composition is change-TYPE-adaptive — code-change branches fire full 4/4 core CI gates, lint/doc branches fire 0/4 (lightweight agentic wf only), spec branches fire 2/4 + moderation. "~8-workflow uniform bundle" was an over-generalization from a code-heavy snapshot.
 - gate_bundle_composition_divergence (07-03, experimental): fraction of open branches deviating from the full core CI gate set; 62.5% (5/8) diverged today. Distinguishes deterministic CI overhead from change-type-specific triggers.
+- 09-15 update: provenance_inversion reverted to 80.8% (back in the 75-86% band); merge_invalidation_cascade had a zero-instance day (8/24 recorded days show >=1 cascade); conv logs empty 24th+ day.
