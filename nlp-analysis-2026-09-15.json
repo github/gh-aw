@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-15",
+  "pr_count": 118,
+  "avg_sentiment": -0.0177,
+  "sentiment_counts": {
+    "positive": 31,
+    "negative": 44,
+    "neutral": 43
+  },
+  "cluster_labels": {
+    "0": "fix, actions, job, check, actions job, actions logs",
+    "1": "copilot, model, workflow, codex, enclave, github",
+    "2": "workflow, github, workflows, pull, safe, output",
+    "3": "usage, accounting, evals, failed, token, aic",
+    "4": "target, runs, cached, cache, jsonl, logs"
+  },
+  "cluster_counts": {
+    "2": 40,
+    "1": 33,
+    "4": 23,
+    "3": 15,
+    "0": 7
+  },
+  "top_keywords": ["workflow", "github", "usage", "run", "logs"],
+  "most_positive": {
+    "pr_number": 60789,
+    "pr_title": "Apply safe-output temporary IDs to repo memory",
+    "sentiment_polarity": 0.375
+  },
+  "most_negative": {
+    "pr_number": 60931,
+    "pr_title": "Move release.md back to docker sandbox runtime",
+    "sentiment_polarity": -0.5
+  },
+  "most_discussed": {
+    "pr_number": 60308,
+    "pr_title": "Fix --count/--timeout wiring for multi-target logs downloads",
+    "text_length": 3214
+  },
+  "comment_data_available": false,
+  "run_id": "34957567362"
+}
