@@ -1101,6 +1101,12 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "download_duration_ms": {
+                "type": "integer"
+              },
+              "download_size_bytes": {
+                "type": "integer"
               }
             },
             "required": [
