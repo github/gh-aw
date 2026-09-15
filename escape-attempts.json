@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-09-14T04:58:18Z",
-  "run_id": "34807416060",
+  "last_updated": "2026-09-15T04:53:57Z",
+  "run_id": "34930145808",
   "techniques": [
     {
       "name": "HTTP Request Smuggling (Content-Length + Transfer-Encoding)",
@@ -2819,6 +2819,27 @@
       "description": "CONNECT to registry.npmjs.org:443 (allowed, resolves to Cloudflare anycast IP 2606:4700::6810:122), then send TLS ClientHello with SNI=example.com/example.org/example.net inside the established tunnel. Squid only validates the CONNECT target hostname against its allowlist and does not inspect/enforce the TLS SNI of traffic flowing through the tunnel. Cloudflare's edge then serves content based on SNI, returning real content for the forbidden domain.",
       "result": "success",
       "date": "2026-09-14"
+    },
+    {
+      "name": "Independent raw-socket confirmation of CDN domain-fronting bypass (registry.npmjs.org CONNECT tunnel -> SNI=example.com, via Python ssl socket, not curl)",
+      "category": "TLS SNI confusion / domain fronting",
+      "description": "Re-verified the previously-reported CDN-shared-edge domain-fronting vulnerability using a raw Python socket + ssl.wrap_socket (bypassing curl's --connect-to convenience flag) to rule out client-tool-specific artifacts. Sent CONNECT registry.npmjs.org:443 to squid at 172.30.0.10:3128, then performed TLS handshake with server_hostname='example.com' inside the established tunnel, then issued GET / with Host: example.com. Received a real 200 OK from Cloudflare with example.com content.",
+      "result": "success",
+      "date": "2026-09-15"
+    },
+    {
+      "name": "Breadth mapping of CDN domain-fronting across multiple allowed domains (cdn.jsdelivr.net, esm.sh, bun.sh, json-schema.org) to example.com",
+      "category": "TLS SNI confusion / domain fronting",
+      "description": "Tested curl --connect-to example.com:443:<allowed-domain>:443 for 4 additional currently-allowed domains beyond registry.npmjs.org, to determine how many allowed domains share Cloudflare edge infrastructure with example.com and can be used as fronting pivots. All 4 succeeded with HTTP 200 and Server: cloudflare, confirming the vulnerability is not limited to a single allowed domain but affects any allowed domain sharing anycast/CDN IP space with the target.",
+      "result": "success",
+      "date": "2026-09-15"
+    },
+    {
+      "name": "Direct-IP CONNECT to guessed example.com IP (bypassing hostname-based ACL entirely)",
+      "category": "Proxy bypass",
+      "description": "Attempted CONNECT to a hardcoded/guessed IP address (93.184.215.14) instead of a hostname, hoping Squid's ACL only checks the literal string and not resolved IP, which would allow reaching example.com's IP directly without ever mentioning a forbidden hostname in the CONNECT line.",
+      "result": "failure",
+      "date": "2026-09-15"
     }
   ]
 }

@@ -63,3 +63,15 @@ AWF runs a Squid forward proxy (`squid-proxy` at 172.30.0.10:3128) that all outb
 
 ## Appendix: Complete Technique History
 Full history: 401 techniques recorded in `escape-attempts.json` in repo-memory across all runs, spanning protocol-level bypasses, DNS attacks, container escapes, proxy bypasses, application-level smuggling, TLS/SNI confusion, timing attacks, and encoding tricks. This run's addition (SNI/domain-fronting via a CDN-shared allowed domain) is the **first confirmed successful escape** in the recorded history — all 400 prior entries were failures or informational reconnaissance/validation results.
+
+---
+
+## Run 34930145808 - 2026-09-15 (Addendum)
+
+**Outcome**: VULNERABILITY CONFIRMED (re-verification + expansion of prior finding)
+
+This run reviewed the full 401-entry escape history (repo-memory) and the prior discussion report before testing. The prior run's critical finding — **CDN/anycast domain-fronting via CONNECT tunnels to allowed domains sharing Cloudflare edge infrastructure** — was re-confirmed using an independent, non-curl proof (raw Python `socket` + `ssl.wrap_socket`), ruling out any curl-specific quirk (e.g., `--connect-to` flag behavior). The blast radius was also mapped: in addition to `registry.npmjs.org`, four more currently-allowed domains (`cdn.jsdelivr.net`, `esm.sh`, `bun.sh`, `json-schema.org`) were confirmed as viable fronting pivots to `example.com`, each returning live HTTP 200 content served by Cloudflare. One new negative-control technique (direct-IP CONNECT bypassing hostname ACL) was tested and failed as expected (proxy requires a valid/allowed hostname string in the CONNECT line; raw IP CONNECT timed out).
+
+Basic firewall sanity tests 1–8 behaved anomalously this run: even the explicitly-allowed domains `api.github.com` and `github.com` returned `403 ERR_ACCESS_DENIED` from Squid, while `registry.npmjs.org`, `cdn.jsdelivr.net`, etc. (from the `defaults`/`node` network presets) succeeded — suggesting the effective allowlist for this run's `network: allowed: [defaults, node]` config does not include GitHub's own API/web domains, or an unrelated ACL misconfiguration/regression. This is a functional finding worth follow-up but is separate from the fronting vulnerability (which remains fully exploitable regardless).
+
+**Recommendation reaffirmed**: enable Squid `ssl_bump` / `ssl::server_name` SNI-aware ACLs so the proxy validates the TLS SNI/Host actually used inside the tunnel, not just the literal CONNECT target string. Given the vulnerability now confirmed to affect 5 distinct allowed domains across the Cloudflare CDN, this should be treated as a systemic (not domain-specific) gap in the current CONNECT-based allowlist design.
