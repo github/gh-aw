@@ -267,8 +267,7 @@
           "$ref": "#/definitions/permissions-level"
         },
         "id-token": {
-          "type": "string",
-          "enum": ["write", "none"]
+          "$ref": "#/definitions/permissions-level"
         },
         "issues": {
           "$ref": "#/definitions/permissions-level"
