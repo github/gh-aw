@@ -1083,6 +1083,8 @@ jobs:
           evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
           printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
+          export GH_AW_AWF_EXECUTION_COMPONENT="agent"
+          export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/agent_execution.json"
           GH_AW_AWF_ENGINE_NAME=claude \
           GH_AW_AWF_HARNESS_MARKER='[claude-harness]' \
           GH_AW_AWF_LOG_FILE=/tmp/gh-aw/agent-stdio.log \
@@ -1828,6 +1830,8 @@ jobs:
           evidence_tmp="/tmp/gh-aw/threat-detection/execution.json.tmp"
           printf '{"version":1,"component":"detection","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/threat-detection/execution.json"
+          export GH_AW_AWF_EXECUTION_COMPONENT="detection"
+          export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/threat-detection/execution.json"
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           (umask 177 && touch /tmp/gh-aw/threat-detection/detection.log)
@@ -2078,6 +2082,8 @@ jobs:
           evidence_tmp="/tmp/gh-aw/evals/execution.json.tmp"
           printf '{"version":1,"component":"evals","run_id":%s,"run_attempt":%s,"state":"started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/evals/execution.json"
+          export GH_AW_AWF_EXECUTION_COMPONENT="evals"
+          export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/evals/execution.json"
           GH_AW_AWF_ENGINE_NAME=claude \
           GH_AW_AWF_HARNESS_MARKER='[claude-harness]' \
           GH_AW_AWF_LOG_FILE=/tmp/gh-aw/evals/evals.log \
