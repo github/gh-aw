@@ -2988,6 +2988,16 @@ function buildEngineFailureContext(options = {}) {
         continue;
       }
 
+      // AWF terminal failures are reported as "[ERROR] Fatal error: <message>" (e.g. a
+      // sandbox runtime preflight that never started the agent). Without this the whole
+      // line is filtered as infrastructure noise and the failure is misreported as a
+      // generic transient engine startup failure.
+      const awfFatalErrorMatch = line.match(/^\[ERROR\]\s*Fatal error:\s*(.+)$/);
+      if (awfFatalErrorMatch) {
+        errorMessages.add(awfFatalErrorMatch[1].trim());
+        continue;
+      }
+
       // Fatal errors: "Fatal: <message>" or "FATAL: <message>"
       const fatalMatch = line.match(/^(?:FATAL|Fatal):\s*(.+)$/);
       if (fatalMatch) {
