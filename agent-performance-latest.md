@@ -1,4 +1,69 @@
-# Agent Performance Analyzer — Latest Run (2026-09-13T12:48Z)
+# Agent Performance Analyzer — Latest Run (2026-09-15T12:55Z)
+
+## Summary
+
+Full agent quality/effectiveness ranking deferred a **5th consecutive run** —
+`metrics/latest.json` is still dated 2026-09-01 (14 days stale; timestamp field itself unchanged,
+only the memory-branch file mtime updated). No new agent-behavior scoring is possible without a
+fresh snapshot. GitHub `search_issues`/`list_issues` continue to return heavily
+integrity-filtered/empty results this run (same limitation logged 2026-09-09); only direct
+`issue_read` by number worked reliably, so broad discovery of new agent-attributed issues/PRs was
+not possible — this is a read-tooling limitation, not evidence of zero agent activity.
+
+**P0 codex `gpt-5.3-codex` model_not_supported_error:** confirmed still open and unresolved via
+direct read of **#61030** (filed 2026-09-15T04:41Z by Workflow Health Manager, 4th re-discovery
+after #60563 was auto-closed by its own 1-day `expires` setting rather than by a fix).
+Root cause unchanged: `CodexDefaultModel = "gpt-5.4"` in `pkg/constants/engine_constants.go`
+on `main`, while 74 workflow files still hardcode `gpt-5.3-codex`, which pinned Codex CLI
+`0.153.4` does not recognize. **Deferring entirely to #61030 — not filing a duplicate.**
+Note for WHM/next run: #61030 itself carries the same `expires: 1d` setting as its predecessor, so
+it is at risk of auto-closing again 2026-09-16 without a real fix; recommend exempting
+`priority-p0` issues from expiry, as WHM already proposed in the issue body.
+
+## Prompt-Improvement Initiative — Matt Pocock / Impeccable / Design Decision Gate
+
+Re-audited all three prompts directly against current `.md` source (not just run counts), per this
+run's mandate. Re-confirms the 2026-09-09 conclusion in `shared-alerts.md`: **no deprecation-supporting
+evidence found**, and no new evidence exists this run (no fresh metrics, no new discoverable
+run-log data due to the search-tool limitation above).
+
+- **Matt Pocock Skills Reviewer:** explicit Success Criteria section, `noop`-vs-act rubric ("uses
+  `noop` instead of generic praise when there is nothing useful to say"), skill-selection fallback
+  logic (`pr-triage` sub-agent + documented heuristic fallback), 10-comment cap, tone guidance.
+  No generic framing detected — skill focus areas are enumerated per-skill, not templated.
+- **Impeccable Skills Reviewer:** same structure — explicit Success Criteria, `noop` rubric,
+  fallback table if the skill can't be found, pre-flight file-existence check with a documented
+  `noop` message. No stale tool references (`gh pr diff` explicitly disallowed in favor of
+  pre-fetched files, consistent with current repo convention).
+- **Design Decision Gate:** strongest-structured prompt of the three (per 2026-09-09 audit,
+  reconfirmed) — deterministic pre-fetch script, threshold-based ADR requirement logic,
+  `noop` safe-output configured, `push-to-pull-request-branch` scoped to `docs/adr/**` only.
+
+**Conclusion:** all three remain **not** redesign/deprecation candidates on current prompt
+evidence. Last known run signal (2026-09-01 snapshot) showed 1/1 clean executed runs for each.
+Recommend the next run with a fresh metrics snapshot re-verify actual invocation volume and
+completion outcomes (approve/request-changes rates) before any status change — current blocker is
+purely data staleness, not prompt quality.
+
+## Actions Taken This Run
+
+- Re-verified P0 tracker chain (#60416 → #60563 → #61030) via direct `issue_read`; confirmed
+  #60563 was closed by `expires: 1d` (`not_planned`), not by resolution, consistent with #61030's
+  own account. No duplicate issue filed.
+- Completed the mandated redesign-vs-deprecation prompt audit for Matt Pocock Skills Reviewer,
+  Impeccable Skills Reviewer, and Design Decision Gate; found no new deficiencies, reconfirming the
+  2026-09-09 finding.
+- No new issues/discussion created — nothing new and actionable beyond what #61030 already tracks;
+  called `noop` to avoid a duplicate or low-value write.
+- Flagged for future runs: GitHub `search_issues`/`list_issues` integrity-filtering is now observed
+  across 3+ separate session runs (2026-09-09, and this run) — worth a dedicated WHM check if it
+  persists, since it silently blocks broad agent-output discovery.
+
+> Last updated: 2026-09-15T12:55Z
+
+---
+
+# Agent Performance Analyzer — Prior Run (2026-09-13T12:48Z)
 
 ## Summary
 
