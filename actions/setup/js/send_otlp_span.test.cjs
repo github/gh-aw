@@ -2559,7 +2559,7 @@ describe("sendJobConclusionSpan", () => {
   const envKeys = [
     "GH_AW_OTLP_ENDPOINTS",
     "OTEL_SERVICE_NAME",
-    "GH_AW_EFFECTIVE_TOKENS",
+    "GH_AW_DEPRECATED_COST",
     "GH_AW_AIC",
     "GH_AW_MAX_AI_CREDITS",
     "GH_AW_AI_CREDITS_RATE_LIMIT_ERROR",
@@ -4188,12 +4188,11 @@ describe("sendJobConclusionSpan", () => {
     expect(attrs["gh-aw.otlp.export_errors"]).toBe(2);
   });
 
-  it("never emits effective_tokens and emits gh-aw.aic when GH_AW_EFFECTIVE_TOKENS is set", async () => {
+  it("emits gh-aw.aic from GH_AW_AIC", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);
 
     process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
-    process.env.GH_AW_EFFECTIVE_TOKENS = "9800";
     process.env.GH_AW_AIC = "0.125";
     process.env.INPUT_JOB_NAME = "agent";
 
@@ -4203,7 +4202,6 @@ describe("sendJobConclusionSpan", () => {
     const span = body.resourceSpans[0].scopeSpans[0].spans[0];
     const keys = span.attributes.map(a => a.key);
     const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.intValue ?? a.value.doubleValue ?? a.value.stringValue]));
-    expect(keys).not.toContain("gh-aw.effective_tokens");
     expect(attrs["gh-aw.aic"]).toBe(0.125);
   });
 
@@ -5488,7 +5486,7 @@ describe("sendJobConclusionSpan", () => {
 
       process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
 
-      const usage = { input_tokens: 48200, output_tokens: 1350, cache_read_tokens: 41000, cache_write_tokens: 3100, effective_tokens: 9800, ai_credits: 0.125 };
+      const usage = { input_tokens: 48200, output_tokens: 1350, cache_read_tokens: 41000, cache_write_tokens: 3100, aic: 9800, ai_credits: 0.125 };
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/agent_usage.json") {
           return JSON.stringify(usage);
@@ -5718,7 +5716,7 @@ describe("sendJobConclusionSpan", () => {
 
       process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
 
-      const usage = { input_tokens: 48200, output_tokens: 1350, cache_read_tokens: 41000, cache_write_tokens: 3100, effective_tokens: 9800 };
+      const usage = { input_tokens: 48200, output_tokens: 1350, cache_read_tokens: 41000, cache_write_tokens: 3100, aic: 9800 };
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/agent_usage.json") {
           return JSON.stringify(usage);
@@ -5751,7 +5749,7 @@ describe("sendJobConclusionSpan", () => {
       });
       process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
 
-      const usage = { input_tokens: 5000, output_tokens: 200, cache_read_tokens: 100, cache_write_tokens: 50, effective_tokens: 500, ai_credits: 0.125 };
+      const usage = { input_tokens: 5000, output_tokens: 200, cache_read_tokens: 100, cache_write_tokens: 50, aic: 500, ai_credits: 0.125 };
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/agent_usage.json") {
           return JSON.stringify(usage);
@@ -5779,17 +5777,17 @@ describe("sendJobConclusionSpan", () => {
 
       // Simulate a downstream job (e.g. conclusion, detection, safe_outputs) that
       // has agent_usage.json on disk via artifact download but should NOT emit tokens.
-      // Compiled workflows also propagate GH_AW_EFFECTIVE_TOKENS and GH_AW_AIC from
+      // Compiled workflows also propagate GH_AW_DEPRECATED_COST and GH_AW_AIC from
       // needs.agent.outputs.* — set them here to guard against unconditional env reads.
       process.env.INPUT_JOB_NAME = "conclusion";
-      process.env.GH_AW_EFFECTIVE_TOKENS = "500";
+      process.env.GH_AW_DEPRECATED_COST = "500";
       process.env.GH_AW_AIC = "0.05";
       statSpy.mockImplementation(() => {
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });
       process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
 
-      const usage = { input_tokens: 5000, output_tokens: 200, cache_read_tokens: 100, cache_write_tokens: 50, effective_tokens: 500 };
+      const usage = { input_tokens: 5000, output_tokens: 200, cache_read_tokens: 100, cache_write_tokens: 50, aic: 500 };
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/agent_usage.json") {
           return JSON.stringify(usage);
@@ -5807,7 +5805,7 @@ describe("sendJobConclusionSpan", () => {
       expect(keys).not.toContain("gen_ai.usage.cache_read.input_tokens");
       expect(keys).not.toContain("gen_ai.usage.cache_creation.input_tokens");
       expect(keys).not.toContain("gen_ai.usage.total_tokens");
-      expect(keys).not.toContain("gh-aw.effective_tokens");
+      expect(keys).not.toContain("gh-aw.aic");
       expect(keys).not.toContain("gh-aw.aic");
     });
 

@@ -8,9 +8,9 @@ import (
 	"github.com/github/gh-aw/pkg/typeutil"
 )
 
-var effectiveTokenLimitLog = logger.New("workflow:effective_token_limit_parser")
+var aicLimitLog = logger.New("workflow:aic_limit_parser")
 
-// normalizePositiveEffectiveTokenLimit converts positive integer-like values
+// normalizePositiveAICLimit converts positive integer-like values
 // into a canonical base-10 string.
 //
 // Supported inputs:
@@ -22,15 +22,15 @@ var effectiveTokenLimitLog = logger.New("workflow:effective_token_limit_parser")
 //
 // It returns the normalized base-10 value and true when parsing succeeds.
 // It returns an empty string and false when the value is not a valid positive
-// effective-token limit.
-func normalizePositiveEffectiveTokenLimit(raw any) (string, bool) {
+// AI Credits limit.
+func normalizePositiveAICLimit(raw any) (string, bool) {
 	if val, ok := typeutil.ParseIntValue(raw); ok && val > 0 {
 		return strconv.Itoa(val), true
 	}
 
 	rawStr, ok := raw.(string)
 	if !ok {
-		effectiveTokenLimitLog.Printf("Rejecting effective-token limit: unsupported type %T", raw)
+		aicLimitLog.Printf("Rejecting AI Credits limit: unsupported type %T", raw)
 		return "", false
 	}
 
@@ -41,19 +41,19 @@ func normalizePositiveEffectiveTokenLimit(raw any) (string, bool) {
 
 	normalized, ok := typeutil.NormalizeInt64KMSuffix(trimmed)
 	if !ok {
-		effectiveTokenLimitLog.Printf("Rejecting effective-token limit: %q is not a valid positive value", trimmed)
+		aicLimitLog.Printf("Rejecting AI Credits limit: %q is not a valid positive value", trimmed)
 		return "", false
 	}
-	effectiveTokenLimitLog.Printf("Normalized effective-token limit %q to %s", trimmed, normalized)
+	aicLimitLog.Printf("Normalized AI Credits limit %q to %s", trimmed, normalized)
 	return normalized, true
 }
 
-// parseMaxEffectiveTokenLimitValue parses max-effective-tokens from either an
+// parseMaxAICLimitValue parses an AI Credits limit from either an
 // integer, -1 string sentinel, or positive K/M-suffixed string.
 //
 // It returns the parsed limit value and a success boolean. A false success
-// value means the input was not a supported max-effective-tokens value.
-func parseMaxEffectiveTokenLimitValue(raw any) (int64, bool) {
+// value means the input was not supported.
+func parseMaxAICLimitValue(raw any) (int64, bool) {
 	if val, ok := typeutil.ParseIntValue(raw); ok && val != 0 {
 		return int64(val), true
 	}
@@ -65,13 +65,13 @@ func parseMaxEffectiveTokenLimitValue(raw any) (int64, bool) {
 
 	trimmed := strings.TrimSpace(rawStr)
 	if trimmed == "-1" {
-		effectiveTokenLimitLog.Print("Parsed max-effective-tokens sentinel -1 (unlimited)")
+		aicLimitLog.Print("Parsed AI Credits limit sentinel -1 (unlimited)")
 		return -1, true
 	}
 
 	parsed, ok := typeutil.ParseInt64KMSuffix(trimmed)
 	if !ok {
-		effectiveTokenLimitLog.Printf("Rejecting max-effective-tokens: %q is not a supported value", trimmed)
+		aicLimitLog.Printf("Rejecting AI Credits limit: %q is not a supported value", trimmed)
 		return 0, false
 	}
 	return parsed, true

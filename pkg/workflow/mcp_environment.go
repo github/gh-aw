@@ -83,15 +83,15 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 			if appMap, ok := toolConfig["github-app"].(map[string]any); ok {
 				if appConfig := parseAppConfig(appMap); appConfig.shouldIgnoreMissingKey() {
 					customGitHubToken := getGitHubToken(toolConfig)
-					tokenExpression = combineTokenExpressions(tokenExpression, getEffectiveGitHubToken(customGitHubToken))
+					tokenExpression = combineTokenExpressions(tokenExpression, resolveGitHubToken(customGitHubToken))
 				}
 			}
 			envVars["GITHUB_MCP_SERVER_TOKEN"] = tokenExpression
 		} else {
 			// Otherwise, use custom token or default fallback
 			customGitHubToken := getGitHubToken(toolConfig)
-			effectiveToken := getEffectiveGitHubToken(customGitHubToken)
-			envVars["GITHUB_MCP_SERVER_TOKEN"] = effectiveToken
+			resolvedToken := resolveGitHubToken(customGitHubToken)
+			envVars["GITHUB_MCP_SERVER_TOKEN"] = resolvedToken
 		}
 
 		// Add guard policy env vars if the determine-automatic-lockdown step will be generated

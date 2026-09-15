@@ -130,7 +130,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	steps = append(steps, "        with:\n")
 	// Token precedence for the handler manager step:
 	//   1. Safe-outputs level token (so.GitHubToken)
-	//   2. Magic secret fallback via getEffectiveSafeOutputGitHubToken()
+	//   2. Magic secret fallback via resolveSafeOutputGitHubToken()
 	//
 	// Note: We do NOT fall back to per-output tokens (add-comment, create-issue, etc.)
 	// because those are specific to their operations. The handler manager needs a

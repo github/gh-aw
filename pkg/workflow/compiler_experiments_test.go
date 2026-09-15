@@ -289,7 +289,7 @@ func TestExtractExperimentConfigsFromFrontmatter(t *testing.T) {
 					"prompt_style": map[string]any{
 						"variants":    []any{"concise", "verbose"},
 						"description": "Test prompt styles",
-						"metric":      "effective_tokens",
+						"metric":      "aic",
 						"weight":      []any{60.0, 40.0},
 						"issue":       float64(1234),
 						"start_date":  "2026-05-01",
@@ -303,7 +303,7 @@ func TestExtractExperimentConfigsFromFrontmatter(t *testing.T) {
 				require.NotNil(t, cfg, "prompt_style config should exist")
 				assert.Equal(t, []string{"concise", "verbose"}, cfg.Variants, "variants should match")
 				assert.Equal(t, "Test prompt styles", cfg.Description, "description should match")
-				assert.Equal(t, "effective_tokens", cfg.Metric, "metric should match")
+				assert.Equal(t, "aic", cfg.Metric, "metric should match")
 				assert.Equal(t, []int{60, 40}, cfg.Weight, "weight should match")
 				assert.Equal(t, 1234, cfg.Issue, "issue should match")
 				assert.Equal(t, "2026-05-01", cfg.StartDate, "start_date should match")

@@ -137,7 +137,6 @@ Each element of `.runs` is a `RunData` object with (among others):
 | `workflow_path` | string | `.github/workflows/....lock.yml` |
 | `aic` | float | AI Credits (AIC); preferred cost metric |
 | `token_usage` | int | Historical raw token total (`omitempty`) |
-| `effective_tokens` | int | Legacy metric retained for compatibility (prefer AI Credits) |
 | `action_minutes` | float | Billable GitHub Actions minutes |
 | `turns` | int | Number of agent turns |
 | `duration` | string | Human-readable duration |
@@ -159,7 +158,6 @@ Write a Python script to `/tmp/gh-aw/token-audit/process_audit.py` and run it. T
 2. Filter to `status == "completed"` runs only.
 3. Use each run's `aic` field as the preferred cost metric.
    - Treat missing/null `aic` as `0`.
-   - Keep `effective_tokens` only as a diagnostic legacy field when it is present in the logs.
    - Extract `working_set.rebuild_factor` (WSRF) when `working_set.measurement_state == "measured"`; treat missing or `unavailable`/`partial` states as no data point (do not fabricate a value).
 4. Group by `workflow_name` and compute per-workflow aggregates:
    - `run_count`, `total_aic`, `avg_aic`, `total_turns`, `avg_turns`, `total_action_minutes`, `error_count`, `warning_count`, `avg_wsrf` (mean of available `working_set.rebuild_factor` values; `null` when none available)

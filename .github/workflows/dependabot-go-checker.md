@@ -58,7 +58,7 @@ experiments:
     description: "Tests whether the current exhaustive multi-phase prompt can be trimmed without losing categorization accuracy or issue quality."
     hypothesis: "H0: no change in issue categorization accuracy across prompt styles. H1: concise style reduces token cost by ≥15% with <5% drop in accuracy."
     metric: issue_categorization_accuracy
-    secondary_metrics: [effective_token_count, run_duration_ms, issues_created_count]
+    secondary_metrics: [aic, run_duration_ms, issues_created_count]
     guardrail_metrics:
       - name: empty_output_rate
         threshold: "<=0.05"

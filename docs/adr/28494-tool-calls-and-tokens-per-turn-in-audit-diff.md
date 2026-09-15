@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: pelikhan, Copilot
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -16,7 +15,7 @@ The `audit diff` command compares two workflow runs side-by-side and surfaces me
 
 ### Decision
 
-We will enrich `RunMetricsDiff` with two new data structures — `ToolCallsDiff` and a tokens-per-turn scalar — and render both in the existing pretty-console and markdown diff renderers. Tokens per turn uses effective tokens from the firewall proxy when available, falling back to the engine-level token count. Tool call data is sourced from the already-computed `LogMetrics.ToolCalls` slice; bash-related entries (`bash`, `Bash`, `bash_*`) are separated into a dedicated `BashCommandsDiff` sub-structure to expose the Codex-style per-command granularity. All new types follow the existing JSON-serialisable struct conventions used by `TokenUsageDiff` and `GitHubRateLimitDiff`.
+We will enrich `RunMetricsDiff` with two new data structures — `ToolCallsDiff` and a tokens-per-turn scalar — and render both in the existing pretty-console and markdown diff renderers. Tokens per turn uses AI Credits from the firewall proxy when available, falling back to the engine-level token count. Tool call data is sourced from the already-computed `LogMetrics.ToolCalls` slice; bash-related entries (`bash`, `Bash`, `bash_*`) are separated into a dedicated `BashCommandsDiff` sub-structure to expose the Codex-style per-command granularity. All new types follow the existing JSON-serialisable struct conventions used by `TokenUsageDiff` and `GitHubRateLimitDiff`.
 
 ### Alternatives Considered
 
@@ -57,8 +56,8 @@ Extending the JSON struct without adding renderer support would satisfy machine 
 
 ### Tokens-per-Turn Computation
 
-1. Implementations **MUST** compute tokens-per-turn as `effectiveTokens / turns` where `effectiveTokens` is `TokenUsageSummary.TotalEffectiveTokens` when that value is greater than zero.
-2. Implementations **MUST** fall back to the engine-level token count (`WorkflowRun.TokenUsage`) when `TotalEffectiveTokens` is zero or the `TokenUsageSummary` is absent.
+1. Implementations **MUST** compute tokens-per-turn as `WorkflowRun.TokenUsage / turns` when token usage and turn count are both greater than zero.
+2. Implementations **MUST NOT** use AI Credits totals as token counts when computing tokens per turn.
 3. Implementations **MUST NOT** compute a tokens-per-turn value when the turn count is zero (to avoid division by zero).
 4. Implementations **SHOULD** format the tokens-per-turn change as a percentage string (e.g., `+50%`, `-10%`) using the same `formatVolumeChange` helper applied to other percentage-point metrics.
 
