@@ -36,11 +36,16 @@ echo "Test 1: allowed GITHUB_TOKEN passes in property and bracket syntax..."
 T1="$TMP_ROOT/t1"
 T1_CGO="$T1/.github/workflows/cgo.yml"
 T1_CJS="$T1/.github/workflows/cjs.yml"
+T1_ACTIONS_WRITE="$T1/.github/workflows/actions-write.yml"
 write_workflow "$T1_CGO" "    permissions:
       contents: read
     steps:
       - run: echo \"\${{ secrets.GITHUB_TOKEN }} \${{ condition && secrets['GITHUB_TOKEN'] }}\""
 write_workflow "$T1_CJS" $'    permissions: { contents: read, actions: read }\n    steps:\n      - run: echo "${{ secrets["GITHUB_TOKEN"] }}"'
+write_workflow "$T1_ACTIONS_WRITE" "    permissions:
+      actions: write
+    steps:
+      - run: echo ok"
 T1_OUT="$TMP_ROOT/t1-output.txt"
 if (cd "$T1" && bash "$PURITY_SCRIPT" >"$T1_OUT" 2>&1); then
   pass "allowed GITHUB_TOKEN passes in property and bracket syntax"
