@@ -508,10 +508,10 @@ func scanMarkdownLinkSecurity(match []string, lineNo int) []SecurityFinding {
 
 var (
 	// Dangerous HTML elements
-	scriptTagPattern           = regexp.MustCompile(`(?i)<\s*script(?:[\s>]|$)`)
+	scriptTagPattern           = regexp.MustCompile(`(?i)<\s*script(?:[\s>/]|$)`)
 	scriptElementPattern       = regexp.MustCompile(`(?is)<\s*script([^>]*)>(.*?)<\s*/\s*script\s*>`)
 	scriptSrcOccurrencePattern = regexp.MustCompile(`(?i)(?:^|\s)src\s*=`)
-	baseTagPattern             = regexp.MustCompile(`(?i)<\s*base(?:[\s>]|$)`)
+	baseTagPattern             = regexp.MustCompile(`(?i)<\s*base(?:[\s>/]|$)`)
 	iframeTagPattern           = regexp.MustCompile(`(?i)<\s*iframe[\s>]`)
 	objectTagPattern           = regexp.MustCompile(`(?i)<\s*object[\s>]`)
 	embedTagPattern            = regexp.MustCompile(`(?i)<\s*embed[\s>]`)
@@ -547,10 +547,10 @@ func scanHTMLAbuse(content string) []SecurityFinding {
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
-		trimmed := strings.TrimSpace(scriptLines[lineNum])
+		trimmed, isFence := markdownCodeFence(scriptLines[lineNum])
 
 		// Track code blocks to avoid false positives
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+		if isFence {
 			if !inCodeBlock {
 				inCodeBlock = true
 				codeBlockDelimiter = trimmed[:3]
@@ -714,9 +714,9 @@ func scanEmbeddedFiles(content string) []SecurityFinding {
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
-		trimmed := strings.TrimSpace(line)
+		trimmed, isFence := markdownCodeFence(line)
 
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+		if isFence {
 			if !inCodeBlock {
 				inCodeBlock = true
 				codeBlockDelimiter = trimmed[:3]
@@ -794,9 +794,9 @@ func scanSocialEngineering(content string) []SecurityFinding {
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
-		trimmed := strings.TrimSpace(line)
+		trimmed, isFence := markdownCodeFence(line)
 
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+		if isFence {
 			if !inCodeBlock {
 				inCodeBlock = true
 				codeBlockDelimiter = trimmed[:3]
@@ -858,6 +858,20 @@ func scanNonCodeSocialEngineering(line string, lineNo int) []SecurityFinding {
 }
 
 // --- Helpers ---
+
+func markdownCodeFence(line string) (string, bool) {
+	line = strings.TrimSuffix(line, "\r")
+	indent := 0
+	for indent < len(line) && line[indent] == ' ' {
+		indent++
+	}
+	if indent > 3 || (indent < len(line) && line[indent] == '\t') {
+		return "", false
+	}
+
+	trimmed := strings.TrimSpace(line[indent:])
+	return trimmed, strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
+}
 
 // isClosingCodeFence checks if a trimmed line is a valid closing code fence.
 // In CommonMark, a closing fence must consist only of the fence characters

@@ -572,8 +572,16 @@ func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T)
 			content: "<script\nsrc=\"https://evil.example/payload.js\"></script>",
 		},
 		{
+			name:    "slash-separated remote script attribute",
+			content: `<script/src=https://evil.example/payload.js></script>`,
+		},
+		{
 			name:    "remote base redirects local script",
 			content: `<base href="https://evil.example/"><script src="./main.js"></script>`,
+		},
+		{
+			name:    "slash-separated remote base attribute",
+			content: `<base/href=https://evil.example/><script src="./main.js"></script>`,
 		},
 		{
 			name:    "fence-like attribute before inline script",
@@ -588,6 +596,13 @@ func TestScanMarkdownSecurity_HTMLAbuse_RejectsUnsafeScriptSources(t *testing.T)
 			assert.Equal(t, CategoryHTMLAbuse, findings[0].Category)
 		})
 	}
+}
+
+func TestScanMarkdownSecurity_HTMLAbuse_IndentedFenceDoesNotHideScript(t *testing.T) {
+	content := "    ```\n<script>alert(1)</script>"
+	findings := ScanMarkdownSecurity(content)
+	require.NotEmpty(t, findings, "four-space-indented code must not open a fenced code block")
+	assert.Equal(t, 2, findings[0].Line)
 }
 
 func TestScanMarkdownSecurity_HTMLAbuse_SkipsCodeBlocks(t *testing.T) {
