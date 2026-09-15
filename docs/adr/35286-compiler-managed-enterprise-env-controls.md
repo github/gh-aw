@@ -14,7 +14,7 @@ Enterprise administrators need to set organization- or repository-wide defaults 
 
 ### Decision
 
-We will introduce a dedicated `pkg/workflow/compilerenv` package as the single source of truth for compiler-managed enterprise environment variables, and add a `GH_AW_DEFAULT_*` override chain between the existing `GH_AW_MODEL_*` primary variables and the built-in engine fallbacks. The package exposes the variable names (`GH_AW_DEFAULT_MAX_EFFECTIVE_TOKENS`, `GH_AW_DEFAULT_MODEL_COPILOT`, `GH_AW_DEFAULT_MODEL_CLAUDE`, `GH_AW_DEFAULT_MODEL_CODEX`), an `EnterpriseVariables()` enumeration, a Go-side `ResolveDefaultMaxEffectiveTokens` reader for compile-time consumers, and `BuildModelOverrideExpression` / `BuildModelOverrideExpressionEmptyFallback` builders for generated YAML expressions. All call sites that previously built the legacy two-tier expression are migrated to use these builders so the precedence chain is uniformly `frontmatter → GH_AW_MODEL_* → GH_AW_DEFAULT_MODEL_* → built-in fallback`.
+We will introduce a dedicated `pkg/workflow/compilerenv` package as the single source of truth for compiler-managed enterprise environment variables, and add a `GH_AW_DEFAULT_*` override chain between the existing `GH_AW_MODEL_*` primary variables and the built-in engine fallbacks. The package exposes the variable names (`GH_AW_DEFAULT_MAX_AI_CREDITS`, `GH_AW_DEFAULT_MODEL_COPILOT`, `GH_AW_DEFAULT_MODEL_CLAUDE`, `GH_AW_DEFAULT_MODEL_CODEX`), an `EnterpriseVariables()` enumeration, a Go-side `ResolveDefaultMaxAIC` reader for compile-time consumers, and `BuildModelOverrideExpression` / `BuildModelOverrideExpressionEmptyFallback` builders for generated YAML expressions. All call sites that previously built the legacy two-tier expression are migrated to use these builders so the precedence chain is uniformly `frontmatter → GH_AW_MODEL_* → GH_AW_DEFAULT_MODEL_* → built-in fallback`.
 
 ### Alternatives Considered
 
@@ -24,7 +24,7 @@ Keep the existing pattern of inline `fmt.Sprintf` expressions, and add the `GH_A
 
 #### Alternative 2: YAML-only enterprise overrides (no Go-side resolver)
 
-Implement the override chain purely as a `vars.*` expression injected into generated workflow YAML, and resolve everything at GitHub Actions runtime. This was rejected because `max-ai-credits` is also consumed at compile time inside the Go binary — `BuildAWFConfigJSON` (`pkg/workflow/awf_config_build.go`) and `buildConclusionJob` (`pkg/workflow/notify_comment.go`) need the numeric value to emit into the AWF config JSON and into the failure-reporting env block. A YAML-only solution would leave those compile-time paths unable to honor the enterprise default, so `ResolveDefaultMaxEffectiveTokens` (a Go-side `os.Getenv` reader) is required.
+Implement the override chain purely as a `vars.*` expression injected into generated workflow YAML, and resolve everything at GitHub Actions runtime. This was rejected because `max-ai-credits` is also consumed at compile time inside the Go binary — `BuildAWFConfigJSON` (`pkg/workflow/awf_config_build.go`) and `buildConclusionJob` (`pkg/workflow/notify_comment.go`) need the numeric value to emit into the AWF config JSON and into the failure-reporting env block. A YAML-only solution would leave those compile-time paths unable to honor the enterprise default, so `ResolveDefaultMaxAIC` (a Go-side `os.Getenv` reader) is required.
 
 #### Alternative 3: Config-file-based enterprise overrides (e.g. `.gh-aw-enterprise.yml`)
 
@@ -34,7 +34,7 @@ Store enterprise defaults in a checked-in or repo-configured YAML file rather th
 
 #### Positive
 - Single source of truth (`pkg/workflow/compilerenv`) for compiler-managed enterprise variable names, descriptions, and expression builders.
-- Enterprise admins can set org-wide defaults for model selection and `max-effective-tokens` via `gh variable set --org ...` without editing any workflow frontmatter or repo files.
+- Enterprise admins can set org-wide defaults for model selection and `max-ai-credits` via `gh variable set --org ...` without editing any workflow frontmatter or repo files.
 - The override chain (`primary → enterprise default → built-in`) is now uniform across Copilot, Claude, and Codex engines and across both YAML-expression and Go-side compile-time consumers.
 - Future enterprise knobs can be added by appending one entry to `EnterpriseVariables()` plus the matching builder/resolver — no scatter-edit required.
 
@@ -46,7 +46,7 @@ Store enterprise defaults in a checked-in or repo-configured YAML file rather th
 #### Neutral
 - New package introduces an import edge from `claude_engine.go`, `codex_engine.go`, `copilot_engine_execution.go`, `compiler_yaml.go`, `compiler_yaml_lookups.go`, `awf_config_build.go`, and `notify_comment.go` into `pkg/workflow/compilerenv`.
 - `GH_AW_INFO_MODEL` (run-info metadata) now follows the same override chain as the engine model env vars, so surfaced metadata matches effective model selection.
-- The `EngineConfig.GetMaxEffectiveTokens()` accessor is bypassed at the two compile-time sites that now go through `ResolveDefaultMaxEffectiveTokens` plus a direct field check on `EngineConfig.MaxEffectiveTokens`; the accessor still exists for callers that don't need the enterprise default tier.
+- The `EngineConfig.GetMaxAIC()` accessor is bypassed at the two compile-time sites that now go through `ResolveDefaultMaxAIC` plus a direct field check on `EngineConfig.MaxAIC`; the accessor still exists for callers that don't need the enterprise default tier.
 
 ---
 
@@ -68,18 +68,18 @@ Store enterprise defaults in a checked-in or repo-configured YAML file rather th
 3. Compiler code **MUST NOT** emit the legacy two-tier expression `${{ vars.<PRIMARY> || '<fallback>' }}` for the engine model env vars listed above.
 4. `GH_AW_INFO_MODEL` **MUST** be generated using the same override chain as the corresponding engine model env var so that surfaced run metadata matches effective model selection.
 
-### Max-Effective-Tokens Override
+### Max-AI-Credits Override
 
-1. Compile-time consumers of the AWF `apiProxy.maxEffectiveTokens` default (currently `pkg/workflow/awf_config_build.go` and `pkg/workflow/notify_comment.go`) **MUST** resolve the default through `compilerenv.ResolveDefaultMaxEffectiveTokens(constants.DefaultMaxEffectiveTokens)`.
-2. When workflow frontmatter sets `max-effective-tokens` to a non-zero value, that value **MUST** take precedence over the `GH_AW_DEFAULT_MAX_EFFECTIVE_TOKENS` env var override.
-3. When `GH_AW_DEFAULT_MAX_EFFECTIVE_TOKENS` is unset, empty, or not parseable as a base-10 `int64`, the resolver **MUST** return the supplied fallback unchanged.
+1. Compile-time consumers of the AWF `apiProxy.maxAIC` default (currently `pkg/workflow/awf_config_build.go` and `pkg/workflow/notify_comment.go`) **MUST** resolve the default through `compilerenv.ResolveDefaultMaxAIC(constants.DefaultMaxAIC)`.
+2. When workflow frontmatter sets `max-ai-credits` to a non-zero value, that value **MUST** take precedence over the `GH_AW_DEFAULT_MAX_AI_CREDITS` env var override.
+3. When `GH_AW_DEFAULT_MAX_AI_CREDITS` is unset, empty, or not parseable as a base-10 `int64`, the resolver **MUST** return the supplied fallback unchanged.
 4. The resolver **MUST NOT** panic, log a fatal error, or fail compilation for an invalid value; it **MUST** fall back silently to the supplied default.
 
 ### Package Boundary
 
 1. `pkg/workflow/compilerenv` **MUST NOT** import any other package in `pkg/workflow/...` (it is a leaf utility).
 2. `pkg/workflow/compilerenv` **SHOULD NOT** depend on any package outside the Go standard library except where strictly required for variable identifier reuse (none today).
-3. New enterprise variable resolvers added to `compilerenv` **SHOULD** follow the same shape as `ResolveDefaultMaxEffectiveTokens`: read via `os.Getenv`, trim whitespace, parse with explicit error handling, and return the supplied fallback on any failure.
+3. New enterprise variable resolvers added to `compilerenv` **SHOULD** follow the same shape as `ResolveDefaultMaxAIC`: read via `os.Getenv`, trim whitespace, parse with explicit error handling, and return the supplied fallback on any failure.
 
 ### Documentation
 

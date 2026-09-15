@@ -130,7 +130,7 @@ func pluginTokenExpression(workflowData *WorkflowData, index int) string {
 	if ref.GitHubApp != nil {
 		token := fmt.Sprintf("${{ steps.%s.outputs.token }}", pluginAppTokenStepID(index))
 		if ref.GitHubApp.shouldIgnoreMissingKey() {
-			token = combineTokenExpressions(token, getEffectiveGitHubToken(""))
+			token = combineTokenExpressions(token, resolveGitHubToken(""))
 		}
 		return token
 	}

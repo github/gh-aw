@@ -446,7 +446,7 @@ func (cm *CheckoutManager) ResolveSafeOutputCheckoutTokenExpression(targetRepo s
 	token := fmt.Sprintf("${{ steps.checkout-safe-output-app-token-%d.outputs.token }}", idx)
 	app := cm.ordered[idx].safeOutputApp
 	if app != nil && app.shouldIgnoreMissingKey() {
-		token = combineTokenExpressions(token, getEffectiveSafeOutputGitHubToken(""))
+		token = combineTokenExpressions(token, resolveSafeOutputGitHubToken(""))
 	}
 	return token, true
 }

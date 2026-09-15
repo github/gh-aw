@@ -18,7 +18,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Claude Code", DefaultClaudeCodeVersion, "2.1.266"},
 		{"Codex", DefaultCodexVersion, "0.153.4"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.1"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.21"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.23"},
 	}
 
 	for _, tt := range tests {

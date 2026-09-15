@@ -55,7 +55,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 }
 
 // analyzeTokenUsageAICOnly parses token usage inputs and computes only TotalAIC.
-// It intentionally skips effective-token computation for callers that only need cost.
+// It intentionally skips the full token-usage breakdown for callers that only need cost.
 func analyzeTokenUsageAICOnly(runDir string, verbose bool) (*TokenUsageSummary, error) {
 	tokenUsageLog.Printf("Analyzing token usage (AIC only) in: %s", runDir)
 

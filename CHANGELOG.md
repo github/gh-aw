@@ -1210,7 +1210,7 @@ were updated to match the simplified sanitization behavior.
 
 #### Remove legacy support for the `GH_AW_COPILOT_TOKEN` secret name.
 
-This change removes the legacy fallback to `GH_AW_COPILOT_TOKEN`. The effective token lookup chain is now:
+This change removes the legacy fallback to `GH_AW_COPILOT_TOKEN`. The resolved token lookup chain is now:
 
 - `COPILOT_GITHUB_TOKEN` (recommended)
 - `GH_AW_GITHUB_TOKEN` (legacy)

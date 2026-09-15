@@ -17,7 +17,6 @@ type TokenCoreMetrics struct {
 	CacheReadTokens  int `json:"cache_read_tokens" console:"header:Cache Read,format:number"`
 	CacheWriteTokens int `json:"cache_write_tokens" console:"header:Cache Write,format:number"`
 	ReasoningTokens  int `json:"reasoning_tokens,omitempty"`
-	EffectiveTokens  int `json:"effective_tokens,omitempty"`
 }
 
 // TokenUsageEntry represents a single line from token-usage.jsonl
@@ -41,9 +40,8 @@ type TokenUsageEntry struct {
 
 // AmbientContextMetrics captures token footprint for the first LLM invocation.
 type AmbientContextMetrics struct {
-	InputTokens     int `json:"input_tokens" console:"header:Ambient Input,format:number"`
-	CachedTokens    int `json:"cached_tokens" console:"header:Ambient Cached,format:number"`
-	EffectiveTokens int `json:"effective_tokens,omitempty"`
+	InputTokens  int `json:"input_tokens" console:"header:Ambient Input,format:number"`
+	CachedTokens int `json:"cached_tokens" console:"header:Ambient Cached,format:number"`
 }
 
 // TokenUsageSummary contains aggregated token usage from the firewall proxy
@@ -57,7 +55,6 @@ type TokenUsageSummary struct {
 	TotalDurationMs       int                         `json:"total_duration_ms"`
 	TotalResponseBytes    int                         `json:"total_response_bytes"`
 	CacheEfficiency       float64                     `json:"cache_efficiency"`
-	TotalEffectiveTokens  int                         `json:"total_effective_tokens,omitempty"`
 	TotalAIC              float64                     `json:"total_aic,omitempty"`
 	AICFound              bool                        `json:"-"`
 	AmbientContext        *AmbientContextMetrics      `json:"ambient_context,omitempty"`

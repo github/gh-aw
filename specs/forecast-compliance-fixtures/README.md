@@ -12,7 +12,7 @@ This fixture represents a single successful workflow run (`daily-report`) with:
 
 - `conclusion: "success"` — the run is counted as successful in Bernoulli sampling
 - `token_usage_summary.total_aic: 0.0054` — the AIC observation used in bootstrap resampling
-- `token_usage_summary.total_effective_tokens: 5400` — the corresponding ET fixture value
+- `token_usage_summary.total_aic: 5400` — the corresponding AIC fixture value
 - `run.updatedAt` and `run.startedAt` — used to compute `duration_seconds`
 
 Use this fixture as the baseline for Monte Carlo engine compliance tests (**T-FC-031** through
@@ -36,7 +36,7 @@ The output percentiles satisfy `P10 ≤ P50 ≤ P90`, and the top-level projecte
 P50.
 
 When the sample is empty, the projection is nil and top-level projection fields remain zero.
-High-valued observations (including ET/AIC fixture values at or above the 1,000,000-token boundary)
+High-valued observations (including AIC/AIC fixture values at or above the 1,000,000-token boundary)
 must not produce NaN, infinity, or integer overflow in the simulation result.
 
 ## Behavioral Coverage Map
@@ -45,10 +45,10 @@ must not produce NaN, infinity, or integer overflow in the simulation result.
 |---|---|---|
 | `SampleLimit` (T-FC-020) | `TestSampleLimitRespected` | Table-driven check that `--sample` caps, no-ops when above total, and no-ops when zero |
 | `DateWindowCutoff` (T-FC-021) | `TestDateWindowCutoffRespected` | Confirms only runs within the `--days` window are retained |
-| `MissingArtifactZeroET` (T-FC-022) | `TestMissingArtifactContributesZeroET` | Edge case: missing artifact run counted in sample, contributes zero AIC |
+| `MissingArtifactZeroAIC` (T-FC-022) | `TestMissingArtifactContributesZeroAIC` | Edge case: missing artifact run counted in sample, contributes zero AIC |
 | `EmptySampleNilProjection` (T-FC-023) | `TestEmptySampleProducesNilProjection` | Zero observations yields a nil Monte Carlo projection |
 | `PartialObservation` (T-FC-024) | `TestInProgressRunIsPartialObservation` | Edge case: in-progress run with non-zero AIC is partial, not a Bernoulli success |
-| `HighETNoOverflow` (T-ET-006) | `TestHighEffectiveTokensNoOverflow` | Edge case: high ET/AIC observations do not panic, return NaN, or overflow to Inf |
+| `HighAICNoOverflow` (T-AIC-006) | `TestHighAICNoOverflow` | Edge case: high AIC/AIC observations do not panic, return NaN, or overflow to Inf |
 | `KnuthForLowLambda` (T-FC-031) | `TestKnuthAlgorithmUsedForLowLambda` | lambda in {0.1,1,5,15} selects Knuth's exact algorithm |
 | `NormalForHighLambda` (T-FC-032) | `TestNormalApproximationForHighLambda` | lambda > 15 selects normal approximation; sampled draws are non-negative |
 | `ZeroLambdaZeroTokens` (T-FC-033) | `TestZeroLambdaYieldsZeroSample` | lambda=0 always yields exactly 0 |
@@ -85,7 +85,7 @@ go test -race -run "TestForecast|TestMonteCarlo" ./pkg/cli/
 To run the formal predicates listed above:
 
 ```bash
-go test -v -run "TestSampleLimit|TestDateWindow|TestMissingArtifact|TestEmptySample|TestInProgressRun|TestHighEffectiveTokens|TestKnuthAlgorithm|TestNormalApproximation|TestZeroLambda|TestBootstrapDraws|TestBernoulliGates|TestTrialCount|TestPercentileOrdering|TestProjectedTokens|TestLambdaCrossover" ./pkg/cli/
+go test -v -run "TestSampleLimit|TestDateWindow|TestMissingArtifact|TestEmptySample|TestInProgressRun|TestHighAIC|TestKnuthAlgorithm|TestNormalApproximation|TestZeroLambda|TestBootstrapDraws|TestBernoulliGates|TestTrialCount|TestPercentileOrdering|TestProjectedTokens|TestLambdaCrossover" ./pkg/cli/
 ```
 
 ## Fixture Schema Reference
@@ -99,7 +99,7 @@ The `run_summary_minimal.json` fixture follows the `RunSummary` struct defined i
 | `run.updatedAt` | `Run.UpdatedAt` | Duration computation |
 | `run.startedAt` | `Run.StartedAt` | Duration computation |
 | `token_usage_summary.total_aic` | `TokenUsage.TotalAIC` | Bootstrap AIC sample |
-| `token_usage_summary.total_effective_tokens` | `TokenUsage.TotalEffectiveTokens` | ET fixture conformance |
+| `token_usage_summary.total_aic` | `TokenUsage.TotalAIC` | AIC fixture conformance |
 | `run_id` | `RunID` | Run identification |
 
 ## Adding New Fixtures
@@ -107,17 +107,17 @@ The `run_summary_minimal.json` fixture follows the `RunSummary` struct defined i
 To add a fixture covering a specific compliance scenario:
 
 1. Copy `run_summary_minimal.json` and modify the relevant fields.
-2. Name the fixture descriptively (e.g., `run_summary_zero_et.json` for T-FC-022).
+2. Name the fixture descriptively (e.g., `run_summary_zero_aic.json` for T-FC-022).
 3. Document the fixture purpose and the test IDs it covers in this README.
 
 ### Available Additional Fixtures
 
 | Fixture Name | Purpose | Test IDs |
 |---|---|---|
-| `run_summary_zero_et.json` | Run with missing/zero ET (artifact not downloaded) | [T-FC-022](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
+| `run_summary_zero_aic.json` | Run with missing/zero AIC (artifact not downloaded) | [T-FC-022](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 | `run_summary_failed.json` | Run with `conclusion: "failure"` for Bernoulli sampling | [T-FC-035](../../docs/src/content/docs/specs/forecast-specification.md#1214-monte-carlo-engine-tests) |
-| `run_summary_high_et.json` | Run with very high ET (≥ 1,000,000) for overflow checks | [T-ET-006](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
-| `run_summary_cancelled.json` | Run with `conclusion: "cancelled"` (included in sample but not a Bernoulli success; ET is zero because the run did not complete) | [T-FC-035](../../docs/src/content/docs/specs/forecast-specification.md#1214-monte-carlo-engine-tests) |
-| `run_summary_partial_et.json` | In-progress run with a non-zero token usage snapshot | [T-FC-024](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
+| `run_summary_high_aic.json` | Run with very high AIC (≥ 1,000,000) for overflow checks | [T-AIC-006](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
+| `run_summary_cancelled.json` | Run with `conclusion: "cancelled"` (included in sample but not a Bernoulli success; AIC is zero because the run did not complete) | [T-FC-035](../../docs/src/content/docs/specs/forecast-specification.md#1214-monte-carlo-engine-tests) |
+| `run_summary_partial_aic.json` | In-progress run with a non-zero token usage snapshot | [T-FC-024](../../docs/src/content/docs/specs/forecast-specification.md#1213-data-sampling-tests) |
 
-Sync note: `T-FC-022`, `T-FC-024`, `T-FC-035`, and `T-ET-006` still point to the canonical forecast specification anchors for §12.1.3 Data Sampling Tests and §12.1.4 Monte Carlo Engine Tests. Their fixture assertions are covered by `TestMonteCarloFixtureVariantsAreAvailable` in `pkg/cli/forecast_montecarlo_test.go`, alongside the `TestForecast*` command-path coverage in `pkg/cli/forecast_test.go`. `TestFormal_ForecastSpecSyncNoteAnchorsExist` in `pkg/cli/forecast_compliance_fixtures_formal_test.go` mechanically fails if either anchor heading moves or is renamed in `forecast-specification.md`, so this note no longer needs manual re-dating.
+Sync note: `T-FC-022`, `T-FC-024`, `T-FC-035`, and `T-AIC-006` still point to the canonical forecast specification anchors for §12.1.3 Data Sampling Tests and §12.1.4 Monte Carlo Engine Tests. Their fixture assertions are covered by `TestMonteCarloFixtureVariantsAreAvailable` in `pkg/cli/forecast_montecarlo_test.go`, alongside the `TestForecast*` command-path coverage in `pkg/cli/forecast_test.go`. `TestFormal_ForecastSpecSyncNoteAnchorsExist` in `pkg/cli/forecast_compliance_fixtures_formal_test.go` mechanically fails if either anchor heading moves or is renamed in `forecast-specification.md`, so this note no longer needs manual re-dating.

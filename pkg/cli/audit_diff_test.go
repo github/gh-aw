@@ -1439,41 +1439,6 @@ func TestComputeRunMetricsDiff_TokensPerTurn(t *testing.T) {
 	assert.Equal(t, "+50%", diff.TokensPerTurnChange, "Tokens/turn should increase by 50%")
 }
 
-func TestComputeRunMetricsDiff_TokensPerTurnIgnoresEffectiveTokenTotals(t *testing.T) {
-	t.Parallel()
-	// Tokens/turn should continue to use engine token usage even when effective totals exist.
-	summary1 := &RunSummary{RunAnalysis: RunAnalysis{
-		Run: WorkflowRun{
-			TokenUsage: 10000,
-			Turns:      4,
-		},
-		TokenUsage: &TokenUsageSummary{
-			TotalEffectiveTokens: 8000,
-			TotalInputTokens:     10000,
-			TotalRequests:        4,
-		},
-	},
-	}
-	summary2 := &RunSummary{RunAnalysis: RunAnalysis{
-		Run: WorkflowRun{
-			TokenUsage: 16000,
-			Turns:      4,
-		},
-		TokenUsage: &TokenUsageSummary{
-			TotalEffectiveTokens: 12000,
-			TotalInputTokens:     16000,
-			TotalRequests:        4,
-		},
-	},
-	}
-
-	diff := computeRunMetricsDiff(summary1, summary2)
-	require.NotNil(t, diff, "Should produce metrics diff")
-
-	assert.Equal(t, 2500, diff.Run1TokensPerTurn, "Run1 tokens/turn should use engine tokens: 10000/4=2500")
-	assert.Equal(t, 4000, diff.Run2TokensPerTurn, "Run2 tokens/turn should use engine tokens: 16000/4=4000")
-}
-
 func TestComputeRunMetricsDiff_TokensPerTurnZeroTurns(t *testing.T) {
 	t.Parallel()
 	// When turns = 0, tokens per turn should remain 0 (no division)

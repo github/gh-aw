@@ -26,9 +26,9 @@ func TestGetEffectiveGitHubToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getEffectiveGitHubToken(tt.customToken)
+			result := resolveGitHubToken(tt.customToken)
 			if result != tt.expected {
-				t.Errorf("getEffectiveGitHubToken() = %q, want %q", result, tt.expected)
+				t.Errorf("resolveGitHubToken() = %q, want %q", result, tt.expected)
 			}
 		})
 	}
@@ -54,9 +54,9 @@ func TestGetEffectiveSafeOutputGitHubToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getEffectiveSafeOutputGitHubToken(tt.customToken)
+			result := resolveSafeOutputGitHubToken(tt.customToken)
 			if result != tt.expected {
-				t.Errorf("getEffectiveSafeOutputGitHubToken() = %q, want %q", result, tt.expected)
+				t.Errorf("resolveSafeOutputGitHubToken() = %q, want %q", result, tt.expected)
 			}
 		})
 	}

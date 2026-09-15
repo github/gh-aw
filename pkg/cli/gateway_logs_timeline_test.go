@@ -712,7 +712,7 @@ func TestSteeringEntryToTimelineEvent_TokenWarning(t *testing.T) {
 	t.Parallel()
 	entry := proxyEventsEntry{
 		Event:   tokenSteeringEventName,
-		Message: awfTokenWarningPrefix + " You have used 80% of your effective token budget.",
+		Message: awfTokenWarningPrefix + " You have used 80% of your AI Credits budget.",
 	}
 	evt, ok := steeringEntryToTimelineEvent(entry)
 	if !ok {
@@ -859,7 +859,7 @@ func TestCollectSteeringTimelineEvents_ReadsProxyEvents(t *testing.T) {
 	eventsPath := filepath.Join(logsDir, "events.jsonl")
 
 	lines := strings.Join([]string{
-		`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 80% of your effective token budget."}`,
+		`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 80% of your AI Credits budget."}`,
 		`{"event_name":"timeout_steering","message":"[AWF TIME WARNING] You have used 80% of your allotted run time."}`,
 		`{"event":"request.forwarded"}`,
 		`{"event":"token_steering","message":"warn 95%"}`,
@@ -956,7 +956,7 @@ func TestRenderSteeringRow_TokenWarning(t *testing.T) {
 		Source: TimelineSourceFirewall,
 		Kind:   TimelineKindSteering,
 		Status: "token",
-		Reason: awfTokenWarningPrefix + " You have used 80% of your effective token budget.",
+		Reason: awfTokenWarningPrefix + " You have used 80% of your AI Credits budget.",
 	}
 	row := renderSteeringRow(evt)
 	if len(row) != 5 {
