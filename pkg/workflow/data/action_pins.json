@@ -582,8 +582,8 @@
     },
     "ghcr.io/github/gh-aw-node": {
       "image": "ghcr.io/github/gh-aw-node",
-      "digest": "sha256:87366cb93b06d7a4e3db08a705875efc027b6c394da336119e7a067abacbb39b",
-      "pinned_image": "ghcr.io/github/gh-aw-node@sha256:87366cb93b06d7a4e3db08a705875efc027b6c394da336119e7a067abacbb39b"
+      "digest": "sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23",
+      "pinned_image": "ghcr.io/github/gh-aw-node@sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23"
     },
     "ghcr.io/github/github-mcp-server:v1.12.1": {
       "image": "ghcr.io/github/github-mcp-server:v1.12.1",
@@ -597,8 +597,8 @@
     },
     "ghcr.io/xberg-io/xberg:latest": {
       "image": "ghcr.io/xberg-io/xberg:latest",
-      "digest": "sha256:a2a4307ccaca102a982f684e6713b4bcc1ebec45c27bec087cf21914a2546415",
-      "pinned_image": "ghcr.io/xberg-io/xberg:latest@sha256:a2a4307ccaca102a982f684e6713b4bcc1ebec45c27bec087cf21914a2546415"
+      "digest": "sha256:694d7a16e27152ba7249578491c4dec953535766187c27d709694e3aeb63c08d",
+      "pinned_image": "ghcr.io/xberg-io/xberg:latest@sha256:694d7a16e27152ba7249578491c4dec953535766187c27d709694e3aeb63c08d"
     },
     "grafana/mcp-grafana:1.1.0-alpine": {
       "image": "grafana/mcp-grafana:1.1.0-alpine",
