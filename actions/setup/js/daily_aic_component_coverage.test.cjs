@@ -150,6 +150,26 @@ it("counts empty authoritative agent accounting as zero when the agent job faile
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
 });
 
+it("counts a successful sampled agent as zero when execution evidence proves inference did not start", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": "",
+      "agent/execution.json": JSON.stringify({
+        version: 1,
+        component: "agent",
+        run_id: 1,
+        run_attempt: 1,
+        state: "not_started",
+      }),
+    },
+    [job("agent")]
+  );
+
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"agent"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"execution_not_started"'));
+});
+
 it("counts missing evals accounting as zero when the failed job collected no usage", async () => {
   const f = evaluate(
     {

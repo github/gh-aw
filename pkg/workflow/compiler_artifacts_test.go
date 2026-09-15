@@ -675,6 +675,47 @@ Body.
 	}
 }
 
+func TestSampledAgentExecutionEvidenceReachesUsageArtifact(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "sampled-agent-accounting-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  create-issue:
+    samples:
+      - title: Sampled issue
+        body: Deterministic sample
+---
+
+# Sampled Agent Accounting
+`
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	compiler.SetUseSamples(true)
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	lockYAML := string(lockContent)
+
+	assert.Contains(t, lockYAML, "Replay safe-outputs samples (deterministic)")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Initialize agent execution evidence"), `"state":"not_started"`)
+	assert.NotContains(t, lockYAML, "Mark agent execution started")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact"), agentExecutionEvidencePath)
+	assert.Contains(t, lockYAML, `pattern: "{agent,agent-output-fallback}"`)
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload usage artifact"), "/tmp/gh-aw/usage/agent/execution.json")
+}
+
 func TestAgentArtifactExcludesUserGeneratedDirectory(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "agent-artifact-paths-test")
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
