@@ -23,7 +23,7 @@ func steeringIssueApp(data *WorkflowData) *GitHubAppConfig {
 }
 
 func steeringIssueFallbackToken(data *WorkflowData) string {
-	return getEffectiveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken)
+	return resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken)
 }
 
 func (c *Compiler) buildSteeringIssueTokenSteps(data *WorkflowData, app *GitHubAppConfig, permissions *Permissions, stepName string, stepID string) ([]string, string) {

@@ -2142,7 +2142,7 @@ function buildEngineMaxCacheMissesExceededContext(engineLabel) {
 }
 
 /**
- * Read and render token usage from token-usage.jsonl for inclusion in the ET computation table.
+ * Read and render token usage from token-usage.jsonl for inclusion in the AIC computation table.
  * Returns null gracefully when files are absent, empty, or unparseable.
  * @returns {{ markdown: string, modelNames: string[] } | null} Pre-rendered per-model markdown table data, or null
  */
@@ -3510,7 +3510,7 @@ async function main() {
     const dailyAICGuardrailStatus = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS || "";
     const dailyAICGuardrailError = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR || "";
     const hasDailyAICGuardrailError = dailyAICGuardrailStatus === "structural_error" || dailyAICGuardrailStatus === "transient_error";
-    const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS || "";
+    const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL || "";
     const dailyAICThreshold = process.env.GH_AW_DAILY_AI_CREDITS_THRESHOLD || "";
     // Cache-memory availability flag — set when cache-memory is configured for the workflow.
     // Used to detect cache-miss misconfigurations reported by the agent.

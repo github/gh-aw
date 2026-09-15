@@ -445,36 +445,7 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 			state.countLimitReached = runtime.fetchAllInRange
 			break
 		}
-		if err := waitForLogsRateLimit(runtime.activeCtx, opts.Verbose, state.iteration, opts.rateLimitFirstRequest, opts.MaxGitHubAPIRateLimit, opts.rateLimitState); err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				state.timeoutReached = true
-				break
-			}
-			if errors.Is(err, context.Canceled) {
-				if opts.countLimit.isReached() {
-					markSharedLogsCountReached(&state, runtime.fetchAllInRange, opts.countLimit)
-					break
-				}
-				if opts.rateLimitState.isReached() {
-					return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, errLogsAPIRateLimitReached
-				}
-				return nil, false, false, false, "", err
-			}
-			if errors.Is(err, errLogsAPIRateLimitReached) {
-				return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
-			}
-			if errors.Is(err, errInvalidMaxGitHubAPIRateLimit) {
-				return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
-			}
-			if errors.Is(err, errLogsRateLimitEnforcementFailed) {
-				return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
-			}
-			logsOrchestratorLog.Printf("Rate limit wait failed, retrying iteration: %v", err)
-			state.iteration++
-			continue
-		}
-		state.iteration++
-		stop, err = fetchAndProcessLogsBatch(&state, runtime, opts)
+		stop, err = runLogsBatchRound(&state, runtime, opts)
 		if err != nil {
 			return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, err
 		}
@@ -487,6 +458,55 @@ func collectProcessedWorkflowRuns(runtime logsDownloadRuntime, opts LogsDownload
 		state.countLimitReached = true
 	}
 	return state.processedRuns, state.timeoutReached, state.countLimitReached, state.storageLimitReached, state.beforeDate, nil
+}
+
+// runLogsBatchRound runs one scheduled batch round for this target. The shared
+// rate-limit check and the batch request/processing both run inside a single
+// scheduler turn, so a target can neither reserve API budget in one round and
+// spend it in a later one nor run ahead of the other targets by checking its
+// next round's quota before the current round completes. The turn is released
+// on every exit path.
+func runLogsBatchRound(state *logsCollectionState, runtime logsDownloadRuntime, opts LogsDownloadOptions) (bool, error) {
+	if err := opts.batchScheduler.acquire(runtime.activeCtx, opts.batchTargetID); err != nil {
+		return handleLogsBatchError(state, runtime.fetchAllInRange, opts.countLimit, opts.rateLimitState, err)
+	}
+	defer opts.batchScheduler.release(opts.batchTargetID)
+	if err := waitForLogsRateLimit(runtime.activeCtx, opts.Verbose, state.iteration, opts.rateLimitFirstRequest, opts.MaxGitHubAPIRateLimit, opts.rateLimitState); err != nil {
+		return handleLogsRateLimitWaitError(state, runtime.fetchAllInRange, opts, err)
+	}
+	state.iteration++
+	return fetchAndProcessLogsBatch(state, runtime, opts)
+}
+
+// handleLogsRateLimitWaitError maps a failed pre-batch rate-limit check onto the
+// collection loop's stop/continue decision. A transient check failure only skips
+// this round; every other outcome stops collection.
+func handleLogsRateLimitWaitError(state *logsCollectionState, fetchAllInRange bool, opts LogsDownloadOptions, err error) (bool, error) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		state.timeoutReached = true
+		return true, nil
+	}
+	if errors.Is(err, context.Canceled) {
+		if opts.countLimit.isReached() {
+			markSharedLogsCountReached(state, fetchAllInRange, opts.countLimit)
+			return true, nil
+		}
+		if opts.rateLimitState.isReached() {
+			return true, errLogsAPIRateLimitReached
+		}
+		// A genuine cancellation, so report it without partial results: the
+		// caller returns the (now zeroed) state alongside the error.
+		*state = logsCollectionState{}
+		return true, err
+	}
+	if errors.Is(err, errLogsAPIRateLimitReached) ||
+		errors.Is(err, errInvalidMaxGitHubAPIRateLimit) ||
+		errors.Is(err, errLogsRateLimitEnforcementFailed) {
+		return true, err
+	}
+	logsOrchestratorLog.Printf("Rate limit wait failed, retrying iteration: %v", err)
+	state.iteration++
+	return false, nil
 }
 
 func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRuntime, opts LogsDownloadOptions) (bool, error) {

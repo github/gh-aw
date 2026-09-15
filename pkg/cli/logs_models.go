@@ -94,7 +94,6 @@ type WorkflowRun struct {
 	MissingDataCount    int
 	NoopCount           int
 	SafeItemsCount      int           `json:"safe_items_count,omitempty"` // Count of safe-output items actually written to GitHub
-	EffectiveTokens     int           // Cost-normalized token count computed from per-model multipliers
 	AvgTimeBetweenTurns time.Duration // Average time between consecutive LLM API calls (from per-turn timestamps when available)
 	LogsPath            string
 	// DownloadDuration is the wall-clock time spent downloading this run's artifacts

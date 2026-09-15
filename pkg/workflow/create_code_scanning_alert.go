@@ -80,7 +80,7 @@ func (c *Compiler) parseCodeScanningAlertsConfig(outputMap map[string]any) *Crea
 func (c *Compiler) buildCodeScanningUploadJob(data *WorkflowData) (*Job, error) {
 	createCodeScanningAlertLog.Print("Building upload_code_scanning_sarif job")
 
-	// Compute the effective token for checkout/upload in this job.
+	// Compute the resolved token for checkout/upload in this job.
 	// We cannot pass tokens through job outputs (GitHub Actions masks secret references).
 	// We must either compute the static token directly or mint a fresh GitHub App token.
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
@@ -196,19 +196,19 @@ func (c *Compiler) addUploadSARIFToken(steps *[]string, data *WorkflowData, conf
 	// Choose the first non-empty per-config or safe-outputs-level static PAT.
 	// GitHub App tokens are NOT used here because they are minted and revoked in safe_outputs;
 	// they are unavailable in this separate downstream job.
-	effectiveCustomToken := configToken
-	if effectiveCustomToken == "" {
-		effectiveCustomToken = safeOutputsToken
+	resolvedCustomToken := configToken
+	if resolvedCustomToken == "" {
+		resolvedCustomToken = safeOutputsToken
 	}
 
-	if effectiveCustomToken != "" {
-		effectiveToken := getEffectiveSafeOutputGitHubToken(effectiveCustomToken)
+	if resolvedCustomToken != "" {
+		resolvedToken := resolveSafeOutputGitHubToken(resolvedCustomToken)
 		tokenSource := "per-config github-token"
 		if configToken == "" {
 			tokenSource = "safe-outputs github-token"
 		}
 		createCodeScanningAlertLog.Printf("Using token for SARIF upload from source: %s (upload-sarif uses 'token' not 'github-token')", tokenSource)
-		*steps = append(*steps, fmt.Sprintf("          token: %s\n", effectiveToken))
+		*steps = append(*steps, fmt.Sprintf("          token: %s\n", resolvedToken))
 		return
 	}
 

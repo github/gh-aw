@@ -2385,7 +2385,7 @@ The conclusion span (`gh-aw.job.conclusion`) emitted by `send_otlp_span.cjs` inc
 | `gh-aw.tokens.output` | Output tokens generated |
 | `gh-aw.tokens.cache_read` | Cache read tokens |
 | `gh-aw.tokens.cache_write` | Cache write tokens |
-| `gh-aw.effective_tokens` | Effective token count (model-adjusted) |
+| `gh-aw.aic` | AI Credits consumed |
 | `gh-aw.model` | AI model identifier |
 | `gh-aw.engine.id` | Engine identifier |
 | `gh-aw.agent.conclusion` | Agent job conclusion outcome |

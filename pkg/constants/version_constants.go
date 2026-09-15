@@ -90,7 +90,7 @@ const AWFAllowHostPortsMinVersion Version = "v0.25.24"
 const AWFDockerHostPathPrefixMinVersion Version = "v0.25.43"
 
 // AWFTokenSteeringMinVersion is the minimum AWF version that supports
-// apiProxy.enableTokenSteering (mapped from frontmatter firewall.effective-token-steering).
+// apiProxy.enableTokenSteering (mapped from frontmatter firewall.token-steering).
 const AWFTokenSteeringMinVersion Version = "v0.25.44"
 
 // AWFChrootConfigMinVersion is the minimum AWF version that supports

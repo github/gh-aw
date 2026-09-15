@@ -199,7 +199,7 @@ func logAndMaybeExplainSkip(runID int64, logReason, message string, verbose bool
 }
 
 // buildProcessedRun constructs a ProcessedRun from a DownloadResult, computing
-// duration, action minutes, effective tokens, and job-failure counts.
+// duration, action minutes, and job-failure counts.
 func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logFailedJobs bool) ProcessedRun {
 	run := result.Run
 	run.TokenUsage = result.Metrics.TokenUsage
@@ -208,11 +208,6 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 	run.ErrorCount = 0
 	run.WarningCount = 0
 	run.LogsPath = result.LogsPath
-
-	// Propagate effective tokens from cached firewall proxy summary when available.
-	if result.TokenUsage != nil && result.TokenUsage.TotalEffectiveTokens > 0 {
-		run.EffectiveTokens = result.TokenUsage.TotalEffectiveTokens
-	}
 
 	// Add failed jobs to error count.
 	if failedJobCount, err := fetchJobStatusesForProcessedRun(ctx, run.DatabaseID, verbose); err == nil {

@@ -78,9 +78,6 @@ func extractMCPToolUsageData(logDir string, verbose bool) (*MCPToolUsageData, er
 		if err != nil {
 			return nil, fmt.Errorf("could not read rpc-messages.jsonl; ensure the file exists and contains valid JSONL records, then retry: %w", err)
 		}
-		// Correlate tool calls with effective-token deltas from token-usage.jsonl
-		tokenUsageFile := findTokenUsageFile(logDir)
-		toolCalls = correlateToolCallsWithTokenDelta(toolCalls, tokenUsageFile)
 		mcpData.ToolCalls = toolCalls
 		gatewayLogsLog.Printf("Loaded %d tool calls from rpc-messages.jsonl", len(toolCalls))
 	} else {
@@ -88,9 +85,6 @@ func extractMCPToolUsageData(logDir string, verbose bool) (*MCPToolUsageData, er
 		if err := extractToolCallsFromGatewayLog(gatewayLogPath, mcpData); err != nil {
 			return nil, err
 		}
-		// Correlate tool calls with effective-token deltas from token-usage.jsonl
-		tokenUsageFile := findTokenUsageFile(logDir)
-		mcpData.ToolCalls = correlateToolCallsWithTokenDelta(mcpData.ToolCalls, tokenUsageFile)
 		gatewayLogsLog.Printf("Loaded %d tool calls from gateway.jsonl", len(mcpData.ToolCalls))
 	}
 
@@ -264,10 +258,4 @@ func buildMCPSummaryStats(gatewayMetrics *GatewayMetrics, mcpData *MCPToolUsageD
 			return 0
 		}
 	})
-}
-
-// TODO: Implement token-usage correlation for MCP tool calls.
-func correlateToolCallsWithTokenDelta(toolCalls []MCPToolCall, tokenUsageFile string) []MCPToolCall {
-	_ = tokenUsageFile
-	return toolCalls
 }

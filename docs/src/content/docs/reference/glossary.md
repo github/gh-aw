@@ -1307,10 +1307,6 @@ A CLI command that reads and writes [`GH_AW_DEFAULT_*`](#gh_aw_default_) governa
 
 The primary inference-cost metric for GitHub Agentic Workflows. One AI Credit equals `0.01 USD` and is computed from input, output, cache-read, cache-write, and reasoning tokens multiplied by per-model pricing weights. AIC provides a model-normalized spend unit across all supported engines, enabling consistent budget governance and cost comparison. Reports from `gh aw audit` and `gh aw logs` expose AIC as `total_aic` (per episode or run) and per-request values. Use `max-ai-credits` and `max-daily-ai-credits` in workflow frontmatter to set budget caps. See [AI Credits Specification](/gh-aw/specs/ai-credits-specification/).
 
-### Effective Tokens (ET)
-
-The predecessor cost metric to [AI Credits (AIC)](#ai-credits-aic), computed as a weighted sum of input and output tokens to approximate relative inference cost. Deprecated in 2026 in favor of AI Credits, which provides direct monetary normalization (1 AIC = 0.01 USD) across all supported model providers. The `effective_tokens` field in audit JSON output is retained for backward compatibility; use `total_aic` for cost analysis in new workflows. See [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/).
-
 ### Forecast (`gh aw forecast`)
 
 A CLI command that projects future AI Credits (AIC) consumption using a statistical simulation. It samples historical workflow runs, applies a Poisson-bootstrap algorithm to model run frequency, and returns P10/P50/P90 percentile estimates over a configurable time horizon. Supports both local (`.github/workflows/`) and remote (`--repo`) discovery modes. Output is available as a console table or machine-readable JSON (`--json`). Forecasts are estimates and may be inaccurate. Useful for capacity planning, budget governance, and detecting cost regressions before they occur. See [Forecast Specification](/gh-aw/specs/forecast-specification/).
@@ -1323,7 +1319,7 @@ The elapsed time between consecutive LLM API calls in a workflow run. TBT matter
 
 ### Ambient Context
 
-The token footprint of the first LLM invocation in a workflow run, used as a proxy for the static context loaded at startup (system prompt, tools list, memory). Because the first invocation fires before the agent has accumulated any conversation history, its input token count primarily reflects the overhead of the configured environment rather than task-specific content. Reported as an optional `ambient_context` object in `gh aw audit` and `gh aw logs` JSON output with three fields: `input_tokens`, `cached_tokens`, and `effective_tokens`. Useful for comparing context overhead across different workflow configurations. See [Audit Commands](/gh-aw/reference/audit/).
+The token footprint of the first LLM invocation in a workflow run, used as a proxy for the static context loaded at startup (system prompt, tools list, memory). Because the first invocation fires before the agent has accumulated any conversation history, its input token count primarily reflects the overhead of the configured environment rather than task-specific content. Reported as an optional `ambient_context` object in `gh aw audit` and `gh aw logs` JSON output with two fields: `input_tokens` and `cached_tokens`. Useful for comparing context overhead across different workflow configurations. See [Audit Commands](/gh-aw/reference/audit/).
 
 ### Firewall Analysis
 

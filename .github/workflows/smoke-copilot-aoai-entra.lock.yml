@@ -126,11 +126,11 @@ jobs:
       comment_id: ${{ steps.add-comment.outputs.comment-id }}
       comment_repo: ${{ steps.add-comment.outputs.comment-repo }}
       comment_url: ${{ steps.add-comment.outputs.comment-url }}
-      daily_ai_credits_exceeded: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}
-      daily_ai_credits_guardrail_error: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}
-      daily_ai_credits_guardrail_status: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}
-      daily_ai_credits_threshold: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}
-      daily_ai_credits_total_effective_tokens: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_total_effective_tokens || '' }}
+      daily_ai_credits_exceeded: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}
+      daily_ai_credits_guardrail_error: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}
+      daily_ai_credits_guardrail_status: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}
+      daily_ai_credits_threshold: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}
+      daily_ai_credits_total: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}
       engine_id: ${{ steps.generate_aw_info.outputs.engine_id }}
       experiments: ${{ steps.pick-experiment.outputs.experiments }}
       label_command: ${{ steps.remove_trigger_label.outputs.label_name }}
@@ -219,7 +219,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'restore_aic_scan_cache.cjs'));
             await main();
       - name: Check daily workflow token guardrail
-        id: daily-effective-workflow-guardrail
+        id: daily-ai-credits-workflow-guardrail
         if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -593,7 +593,6 @@ jobs:
       cache_memory_restore_0_cache_hit: ${{ steps.restore_cache_memory_0.outputs.cache-hit || 'false' }}
       cache_memory_restore_0_matched_key: ${{ steps.restore_cache_memory_0.outputs.cache-matched-key || '' }}
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
-      effective_tokens: ${{ steps.parse-mcp-gateway.outputs.effective_tokens }}
       has_patch: ${{ steps.collect_output.outputs.has_patch }}
       http_400_response_error: ${{ steps.detect-agent-errors.outputs.http_400_response_error || 'false' }}
       inference_access_error: ${{ steps.detect-agent-errors.outputs.inference_access_error || 'false' }}
@@ -2854,7 +2853,6 @@ jobs:
           GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
           GH_AW_ENGINE_ID: "copilot"
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
-          GH_AW_EFFECTIVE_TOKENS: ${{ needs.agent.outputs.effective_tokens || '' }}
           GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.agent.outputs.ai_credits_rate_limit_error || 'false' }}
           GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.agent.outputs.unknown_model_ai_credits || 'false' }}
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
@@ -2879,7 +2877,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
-          GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS: ${{ needs.activation.outputs.daily_ai_credits_total_effective_tokens }}
+          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"appendOnlyComments\":true,\"runStarted\":\"📰 BREAKING: [{workflow_name}]({run_url}) is now investigating this {event_type}. Sources say the story is developing...\",\"runSuccess\":\"📰 VERDICT: [{workflow_name}]({run_url}) has concluded. All systems operational. This is a developing story. 🎤\",\"runFailure\":\"📰 DEVELOPING STORY: [{workflow_name}]({run_url}) reports {status}. Our correspondents are investigating the incident...\"}"
           GH_AW_GROUP_REPORTS: "false"
@@ -3824,7 +3822,6 @@ jobs:
       GH_AW_COMMANDS: "[\"smoke-copilot-aoai-entra\"]"
       GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
       GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
-      GH_AW_EFFECTIVE_TOKENS: ${{ needs.agent.outputs.effective_tokens }}
       GH_AW_ENGINE_ID: "copilot"
       GH_AW_ENGINE_MODEL: "o4-mini-aw"
       GH_AW_LABEL_COMMANDS: "[\"smoke\"]"

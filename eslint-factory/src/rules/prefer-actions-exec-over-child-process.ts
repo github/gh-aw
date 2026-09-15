@@ -39,6 +39,20 @@ function isGitHubScriptModule(sourceCode: TSESLint.SourceCode): boolean {
 }
 
 /**
+ * Matches a `require("./shim.cjs")` (or `'./shim.cjs'`) call anywhere in the file's source text.
+ * `shim.cjs` exists specifically so github-script-flavored modules can also run standalone (e.g.
+ * inside the safe-outputs and mcp-scripts MCP servers) — see its own docstring. It only polyfills
+ * `core`/`context`, never `exec`/`io`/`github`/`getOctokit`, so a file that requires it cannot
+ * assume `@actions/exec`'s `exec()` global is available even when it also carries the
+ * `github-script` triple-slash reference marker.
+ */
+const REQUIRES_SHIM_CJS_PATTERN = /require\(\s*["']\.\/shim\.cjs["']\s*\)/;
+
+function requiresShimCjs(sourceCode: TSESLint.SourceCode): boolean {
+  return REQUIRES_SHIM_CJS_PATTERN.test(sourceCode.getText());
+}
+
+/**
  * True when the returned `ChildProcess` handle is retained or directly exposed for streaming or
  * lifecycle control.
  *
@@ -259,7 +273,9 @@ export const preferActionsExecOverChildProcessRule = createRule({
         "actions/github-script steps with the @actions/exec toolkit already available as `exec`; standalone Node entry points (and the modules they load) " +
         "have no such global and are left alone. spawn()/spawnSync() are never flagged, and exec()/execFile() calls whose returned ChildProcess handle is " +
         "retained (for stdin/stdout streaming or lifecycle management) are exempt, since @actions/exec has no equivalent for those. Bindings created through " +
-        "promisify() are resolved to the underlying child_process method.",
+        "promisify() are resolved to the underlying child_process method. Files that also require " +
+      "`./shim.cjs` are dual-mode (they can also run as standalone Node processes, where the " +
+      "@actions/exec toolkit is not available) and are exempt.",
     },
     schema: [],
     messages: {
@@ -273,6 +289,7 @@ export const preferActionsExecOverChildProcessRule = createRule({
   create(context) {
     const sourceCode = context.sourceCode;
     if (!isGitHubScriptModule(sourceCode)) return {};
+    if (requiresShimCjs(sourceCode)) return {};
 
     return {
       CallExpression(node) {

@@ -215,7 +215,7 @@ func generateCommentMemoryRestoreLines(data *WorkflowData) []string {
 	lines = append(lines, "      - name: Prepare comment memory files\n")
 	lines = append(lines, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 	lines = append(lines, "        with:\n")
-	lines = append(lines, fmt.Sprintf("          github-token: %s\n", getEffectiveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
+	lines = append(lines, fmt.Sprintf("          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
 	lines = append(lines, "          script: |\n")
 	lines = append(lines, "            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 	lines = append(lines, "            setupGlobals(core, github, context, exec, io, getOctokit);\n")

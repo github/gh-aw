@@ -279,8 +279,7 @@ const CheckSkipIfCheckFailingStepID StepID = "check_skip_if_check_failing"
 const PreActivationAppTokenStepID StepID = "pre-activation-app-token"
 
 // ParseMCPGatewayStepID is the step ID for the MCP gateway log parsing step in the agent job.
-// Its effective_tokens output is exposed as an agent job output so that the safe_outputs job
-// can pass the value as GH_AW_EFFECTIVE_TOKENS to the footer template renderer.
+// Its aic output is exposed as an agent job output for downstream reporting.
 const ParseMCPGatewayStepID StepID = "parse-mcp-gateway"
 
 // ParseTokenUsageStepID is the step ID for the token usage summary step in the agent job.

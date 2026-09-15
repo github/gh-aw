@@ -77,9 +77,6 @@
                 },
                 "cached_tokens": {
                   "type": "integer"
-                },
-                "effective_tokens": {
-                  "type": "integer"
                 }
               },
               "required": [
@@ -581,9 +578,6 @@
                 "cache_efficiency": {
                   "type": "number"
                 },
-                "total_effective_tokens": {
-                  "type": "integer"
-                },
                 "total_aic": {
                   "type": "number"
                 },
@@ -597,9 +591,6 @@
                       "type": "integer"
                     },
                     "cached_tokens": {
-                      "type": "integer"
-                    },
-                    "effective_tokens": {
                       "type": "integer"
                     }
                   },
@@ -633,9 +624,6 @@
                         "type": "integer"
                       },
                       "reasoning_tokens": {
-                        "type": "integer"
-                      },
-                      "effective_tokens": {
                         "type": "integer"
                       },
                       "requests": {
@@ -1087,9 +1075,6 @@
                       },
                       "status": {
                         "type": "string"
-                      },
-                      "effective_token_delta": {
-                        "type": "integer"
                       }
                     },
                     "required": [
@@ -1515,9 +1500,6 @@
                           "type": "integer"
                         },
                         "cached_tokens": {
-                          "type": "integer"
-                        },
-                        "effective_tokens": {
                           "type": "integer"
                         }
                       },
@@ -2303,9 +2285,6 @@
                     "cache_efficiency": {
                       "type": "number"
                     },
-                    "total_effective_tokens": {
-                      "type": "integer"
-                    },
                     "total_aic": {
                       "type": "number"
                     },
@@ -2319,9 +2298,6 @@
                           "type": "integer"
                         },
                         "cached_tokens": {
-                          "type": "integer"
-                        },
-                        "effective_tokens": {
                           "type": "integer"
                         }
                       },
@@ -2355,9 +2331,6 @@
                             "type": "integer"
                           },
                           "reasoning_tokens": {
-                            "type": "integer"
-                          },
-                          "effective_tokens": {
                             "type": "integer"
                           },
                           "requests": {
@@ -2935,9 +2908,6 @@
                           },
                           "error": {
                             "type": "string"
-                          },
-                          "effective_token_delta": {
-                            "type": "integer"
                           }
                         },
                         "required": [

@@ -75,7 +75,7 @@ This specification covers:
 This specification does NOT cover:
 
 - Engine-specific API call construction (how parameters are forwarded to the provider REST API)
-- Token budgets, cost accounting, or AI Credits billing (see [AI Credits Specification](/gh-aw/specs/ai-credits-specification/) and legacy [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/))
+- Token budgets, cost accounting, or AI Credits billing (see [AI Credits Specification](/gh-aw/specs/ai-credits-specification/))
 - Model capability detection at runtime
 - Model routing logic within the Copilot gateway
 
@@ -968,7 +968,7 @@ Model parameters are compile-time configuration values and are not derived from 
 ### Informative References
 
 - **[AWF-ENGINES]** GitHub Agentic Workflows — AI Engines reference. <https://gh-aw.pages.dev/reference/engines/>
-- **[AWF-ET-SPEC]** GitHub Agentic Workflows — Effective Tokens Specification. <https://gh-aw.pages.dev/specs/effective-tokens-specification/>
+- **[AWF-AIC-SPEC]** GitHub Agentic Workflows — AI Credits Specification. <https://gh-aw.pages.dev/specs/ai-credits-specification/>
 - **[ANTHROPIC-THINKING]** Anthropic — Extended Thinking documentation. <https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking>
 - **[OPENAI-REASONING]** OpenAI — Reasoning models guide. <https://platform.openai.com/docs/guides/reasoning>
 

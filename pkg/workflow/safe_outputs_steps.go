@@ -80,20 +80,20 @@ func (c *Compiler) addCustomActionGitHubToken(steps *[]string, data *WorkflowDat
 	}
 
 	// Choose the first non-empty custom token for precedence
-	effectiveCustomToken := config.CustomToken
-	if effectiveCustomToken == "" {
-		effectiveCustomToken = safeOutputsToken
+	resolvedCustomToken := config.CustomToken
+	if resolvedCustomToken == "" {
+		resolvedCustomToken = safeOutputsToken
 	}
 
 	// Agent token mode: use full precedence chain for agent assignment
 	if config.UseCopilotCodingAgentToken {
-		token = getEffectiveCopilotCodingAgentGitHubToken(effectiveCustomToken)
+		token = getEffectiveCopilotCodingAgentGitHubToken(resolvedCustomToken)
 	} else if config.UseCopilotRequestsToken {
 		// Copilot mode: use getEffectiveCopilotRequestsToken with safe-outputs token precedence
-		token = getEffectiveCopilotRequestsToken(effectiveCustomToken)
+		token = getEffectiveCopilotRequestsToken(resolvedCustomToken)
 	} else {
 		// Standard mode: use safe output token chain
-		token = getEffectiveSafeOutputGitHubToken(effectiveCustomToken)
+		token = resolveSafeOutputGitHubToken(resolvedCustomToken)
 	}
 
 	*steps = append(*steps, fmt.Sprintf("          token: %s\n", token))

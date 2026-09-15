@@ -1062,7 +1062,7 @@ validate-model-alias-chains:
 	@node scripts/validate-model-alias-chains.js
 
 # Validate model_multipliers.json has no placeholder or null multipliers (R-REG-007)
-# See docs/src/content/docs/specs/effective-tokens-specification.md §Model Multiplier Registry
+# See docs/src/content/docs/specs/ai-credits-specification.md §Model Multiplier Registry
 .PHONY: validate-registry
 validate-registry:
 	@echo "Validating model_multipliers.json (R-REG-007: no placeholder or null multipliers)..."
