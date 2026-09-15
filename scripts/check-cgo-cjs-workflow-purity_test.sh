@@ -32,7 +32,7 @@ echo
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-echo "Test 1: allowed GITHUB_TOKEN passes in property and bracket syntax..."
+echo "Test 1: allowed GITHUB_TOKEN syntax and actions write permission pass..."
 T1="$TMP_ROOT/t1"
 T1_CGO="$T1/.github/workflows/cgo.yml"
 T1_CJS="$T1/.github/workflows/cjs.yml"
@@ -48,9 +48,9 @@ write_workflow "$T1_ACTIONS_WRITE" "    permissions:
       - run: echo ok"
 T1_OUT="$TMP_ROOT/t1-output.txt"
 if (cd "$T1" && bash "$PURITY_SCRIPT" >"$T1_OUT" 2>&1); then
-  pass "allowed GITHUB_TOKEN passes in property and bracket syntax"
+  pass "allowed GITHUB_TOKEN syntax and actions write permission pass"
 else
-  fail "allowed secrets should pass" "$(cat "$T1_OUT")"
+  fail "allowed secrets and actions write permission should pass" "$(cat "$T1_OUT")"
 fi
 
 echo "Test 2: forbidden nested and bracket secrets fail..."
