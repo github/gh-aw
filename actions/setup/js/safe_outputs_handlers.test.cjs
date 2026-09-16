@@ -603,17 +603,52 @@ describe("safe_outputs_handlers", () => {
       }
     });
 
-    it("should pass through relative path without copying to staging", () => {
-      // Relative paths reference files already in staging - no copy needed
+    it("should pass through relative path already present in staging without re-copying", () => {
+      // Relative paths that already reference files in staging - no copy needed
+      const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
+      fs.mkdirSync(stagingDir, { recursive: true });
+      const stagedFile = path.join(stagingDir, "already-staged.png");
+      fs.writeFileSync(stagedFile, "staged data");
+
       const result = handlers.uploadArtifactHandler({ path: "already-staged.png" });
 
-      // Staging dir should NOT have been created/written by the handler
-      const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
-      const stagedFile = path.join(stagingDir, "already-staged.png");
-      expect(fs.existsSync(stagedFile)).toBe(false);
+      // The already-staged file should be left untouched
+      expect(fs.readFileSync(stagedFile, "utf8")).toBe("staged data");
 
       // JSONL entry should preserve the relative path as-is
       expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "already-staged.png" }));
+
+      const responseData = JSON.parse(result.content[0].text);
+      expect(responseData.result).toBe("success");
+    });
+
+    it("should throw when relative path is not in staging and cannot be resolved from GITHUB_WORKSPACE", () => {
+      const savedWorkspace = process.env.GITHUB_WORKSPACE;
+      delete process.env.GITHUB_WORKSPACE;
+      try {
+        expect(() => handlers.uploadArtifactHandler({ path: "plan.md" })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
+      } finally {
+        if (savedWorkspace !== undefined) process.env.GITHUB_WORKSPACE = savedWorkspace;
+      }
+    });
+
+    it("should throw when relative path is not staged and does not exist under GITHUB_WORKSPACE either", () => {
+      expect(() => handlers.uploadArtifactHandler({ path: "missing-plan.md" })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
+    });
+
+    it("should resolve and copy a workspace-relative path to staging when not already staged", () => {
+      const workspaceFile = path.join(testWorkspaceDir, "reports", "summary.json");
+      fs.mkdirSync(path.dirname(workspaceFile), { recursive: true });
+      fs.writeFileSync(workspaceFile, '{"ok":true}');
+
+      const result = handlers.uploadArtifactHandler({ path: "reports/summary.json" });
+
+      const stagedPath = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts", "summary.json");
+      expect(fs.existsSync(stagedPath)).toBe(true);
+      expect(fs.readFileSync(stagedPath, "utf8")).toBe('{"ok":true}');
+
+      // JSONL entry should be rewritten to the staging-relative basename
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "summary.json" }));
 
       const responseData = JSON.parse(result.content[0].text);
       expect(responseData.result).toBe("success");
