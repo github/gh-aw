@@ -110,6 +110,12 @@ func (c *Compiler) buildConclusionDetectionRunsStep(data *WorkflowData, mainJobN
 	if !IsDetectionJobEnabled(data.SafeOutputs) {
 		return nil
 	}
+	// Allow opting out of the "[aw] Detection Runs" tracking issue independently of
+	// threat detection itself via safe-outputs.threat-detection.report-as-issue: false.
+	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && !data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
+		notifyCommentLog.Print("Skipping detection runs logging step: report-as-issue is disabled")
+		return nil
+	}
 	envVars := buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))

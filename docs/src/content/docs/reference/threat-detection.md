@@ -101,6 +101,8 @@ safe-outputs:
 | `steps` | array | Additional GitHub Actions steps to run **before** AI analysis (pre-steps) |
 | `post-steps` | array | Additional GitHub Actions steps to run **after** AI analysis (post-steps) |
 | `max-ai-credits` | integer | AI Credits cap for the detection run, independent of the main agent budget. Defaults to `400` when unset, with runtime override via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`. Accepts plain integers; `-1` disables the detection budget. |
+| `continue-on-error` | boolean | When `true` (default), detection warnings/failures produce a caution notice instead of blocking safe outputs. |
+| `report-as-issue` | boolean | When `true` (default), detection warnings/failures create or update the `[aw] Detection Runs` tracking issue. Set to `false` to keep threat detection and its enforcement enabled while skipping the tracking issue; results remain visible in the GitHub Actions run logs. |
 
 ## Detection Budget
 
@@ -377,6 +379,21 @@ If the detection process itself fails (e.g., network issues, tool errors), the w
 **When Detection Returns a Warning:**
 
 A warning is a lower-severity signal than a hard threat: the safe output is allowed to proceed, but human review is required before merge. When `create-pull-request` is the safe output, the handler submits a `REQUEST_CHANGES` pull request review whose body includes the detection reason and a link to the workflow run logs. If a `request_review` protected-files gate also fires in the same run, both signals are composed into a single review body separated by a horizontal rule.
+
+**Opting Out of Tracking Issues:**
+
+By default, a warning or failure conclusion also creates or updates a `[aw] Detection Runs` tracking issue in the repository and posts a comment describing the run. This is useful for auditing automation health, but not every repository wants detector diagnostics (such as `parse_error` reports) surfaced alongside user-facing issues.
+
+Set `report-as-issue: false` to keep threat detection and its enforcement fully active while skipping the tracking issue entirely:
+
+```yaml wrap
+safe-outputs:
+  create-issue:
+  threat-detection:
+    report-as-issue: false
+```
+
+Detection still runs, `continue-on-error` behavior is unchanged, and results remain available in the GitHub Actions run summary and logs.
 
 ## Supply Chain Protection (Protected Files)
 
