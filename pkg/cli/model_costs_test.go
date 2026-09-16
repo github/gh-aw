@@ -54,6 +54,31 @@ func TestFindGPT6AstraPricing(t *testing.T) {
 	}
 }
 
+func TestFindGPT56SolPricing(t *testing.T) {
+	t.Parallel()
+	pricing, ok := findModelPricing("github-copilot", "gpt-5.6-sol")
+	require.True(t, ok)
+	assert.InDelta(t, 0.000004, pricing["input"], 1e-12)
+	assert.InDelta(t, 0.00002, pricing["output"], 1e-12)
+	assert.InDelta(t, 0.0000004, pricing["cache_read"], 1e-12)
+	assert.InDelta(t, 0.000005, pricing["cache_write"], 1e-12)
+}
+
+func TestFindClaudeFable51Pricing(t *testing.T) {
+	t.Parallel()
+	for _, provider := range []string{"anthropic", "github-copilot"} {
+		t.Run(provider, func(t *testing.T) {
+			t.Parallel()
+			pricing, ok := findModelPricing(provider, "claude-fable-5.1")
+			require.True(t, ok)
+			assert.InDelta(t, 0.00001, pricing["input"], 1e-12)
+			assert.InDelta(t, 0.00005, pricing["output"], 1e-12)
+			assert.InDelta(t, 0.00000025, pricing["cache_read"], 1e-12)
+			assert.InDelta(t, 0.0000125, pricing["cache_write"], 1e-12)
+		})
+	}
+}
+
 func TestFindGrok45CacheReadPricing(t *testing.T) {
 	t.Parallel()
 	pricing, ok := findModelPricing("github-copilot", "grok-4.5")
