@@ -94,7 +94,10 @@ function logComponentAIC(runId, name, job, aic, reason, details = {}) {
   );
 }
 
-function sumCoveredComponents(directory, components, artifactCreatedAt, artifacts, usageArtifactName, attempt, runId, legacyPreHarnessAgentFailure = false) {
+/**
+ * @param {{ artifactInspected: boolean, preHarnessFailure: boolean, sampleReplay: boolean } | null} legacyAgentEvidence
+ */
+function sumCoveredComponents(directory, components, artifactCreatedAt, artifacts, usageArtifactName, attempt, runId, legacyAgentEvidence = null) {
   let total = 0;
   for (const [name, job] of components) {
     if (job.conclusion === "skipped") {
@@ -163,13 +166,25 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       });
       continue;
     }
-    if (!selected && name === "agent" && job.conclusion === "failure" && legacyPreHarnessAgentFailure) {
+    if (!selected && name === "agent" && job.conclusion === "failure" && legacyAgentEvidence?.preHarnessFailure) {
       logComponentAIC(runId, name, job, 0, "legacy_pre_harness_failure");
+      continue;
+    }
+    if (!selected && name === "agent" && job.conclusion === "success" && candidateStates[0].state === "empty" && legacyAgentEvidence?.sampleReplay) {
+      logComponentAIC(runId, name, job, 0, "legacy_sample_replay", {
+        source: candidateStates[0].file,
+      });
       continue;
     }
     if (!selected) {
       if (provesExecutionNotStarted(directory, name, runId, job.run_attempt)) {
         logComponentAIC(runId, name, job, 0, "execution_not_started");
+        continue;
+      }
+      if (name === "agent" && job.conclusion === "failure" && candidateStates[0].state === "missing" && !fs.existsSync(path.join(directory, name, "execution.json")) && !legacyAgentEvidence?.artifactInspected) {
+        logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
+          source: candidateStates[0].file,
+        });
         continue;
       }
       if (name === "evals" && job.conclusion === "failure") {

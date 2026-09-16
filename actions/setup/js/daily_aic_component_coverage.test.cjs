@@ -310,9 +310,11 @@ it.each([null, 0])("counts missing agent accounting as zero when a failed job ne
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_assigned"'));
 });
 
-it("still requires accounting when a failed agent job has no authoritative source", async () => {
+it("counts missing agent accounting as zero when the agent job failed", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
-  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
 });
 
 it("counts legacy pre-harness agent failures as zero from the agent artifact", async () => {
@@ -333,6 +335,17 @@ it("still requires accounting when a legacy agent artifact contains a harness ma
     },
   });
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
+it("counts a legacy successful sample replay with empty accounting as zero", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": "" }, [job("agent")], {
+    agentFiles: {
+      "agent-stdio.log": '{"type":"result","subtype":"success","terminal_reason":"completed","num_turns":1,"driver":"apply_samples"}\n',
+    },
+  });
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.downloadArtifact).toHaveBeenCalledTimes(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"legacy_sample_replay"'));
 });
 
 it("still requires accounting when an agent job succeeds", async () => {

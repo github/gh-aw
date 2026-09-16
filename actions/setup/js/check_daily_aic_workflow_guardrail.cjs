@@ -225,24 +225,37 @@ function matchesGuardrailArtifactName(artifactName) {
   return PRIMARY_GUARDRAIL_ARTIFACT_NAMES.some(name => artifactName === name || artifactName.endsWith(`-${name}`));
 }
 
-function provesLegacyPreHarnessFailure(logText) {
-  return AWF_STARTUP_FAILURE_MARKER.test(logText) && !ENGINE_HARNESS_MARKER.test(logText);
+function inspectLegacyAgentLog(logText) {
+  return {
+    artifactInspected: true,
+    preHarnessFailure: AWF_STARTUP_FAILURE_MARKER.test(logText) && !ENGINE_HARNESS_MARKER.test(logText),
+    sampleReplay: /"driver"\s*:\s*"apply_samples"/.test(logText),
+  };
 }
 
-async function inspectLegacyPreHarnessAgentFailure(artifactClient, artifacts, downloadRoot, token, owner, repo, run, components) {
+async function inspectLegacyAgentArtifact(artifactClient, artifacts, downloadRoot, token, owner, repo, run, components) {
   const job = components.get("agent");
-  if (!job || job.conclusion !== "failure") return false;
-  if (["agent/token_usage.jsonl", "agent_usage.jsonl", "agent_usage.json"].some(file => fs.existsSync(path.join(downloadRoot, file)))) return false;
+  const noEvidence = { artifactInspected: false, preHarnessFailure: false, sampleReplay: false };
+  if (!job) return noEvidence;
+  for (const file of ["agent/token_usage.jsonl", "agent_usage.jsonl", "agent_usage.json"]) {
+    const accountingPath = path.join(downloadRoot, file);
+    if (!fs.existsSync(accountingPath)) continue;
+    try {
+      if (fs.readFileSync(accountingPath, "utf8").trim()) return noEvidence;
+    } catch {
+      return noEvidence;
+    }
+  }
 
   const artifact = artifacts.find(item => item?.name === "agent");
   const createdAt = artifact?.createdAt?.getTime();
   const startedAt = Date.parse(job.started_at);
   const completedAt = Date.parse(job.completed_at);
-  if (!artifact?.id || artifact.expired || !Number.isFinite(createdAt)) return false;
-  if (!Number.isFinite(startedAt)) return false;
-  if (!Number.isFinite(completedAt)) return false;
+  if (!artifact?.id || artifact.expired || !Number.isFinite(createdAt)) return noEvidence;
+  if (!Number.isFinite(startedAt)) return noEvidence;
+  if (!Number.isFinite(completedAt)) return noEvidence;
   if (createdAt < startedAt || createdAt >= completedAt + 1000) {
-    return false;
+    return noEvidence;
   }
 
   const agentRoot = path.join(downloadRoot, "legacy-agent-artifact");
@@ -260,14 +273,14 @@ async function inspectLegacyPreHarnessAgentFailure(artifactClient, artifacts, do
   try {
     stat = fs.statSync(logPath);
   } catch {
-    return false;
+    return noEvidence;
   }
-  if (!stat.isFile() || stat.size > MAX_LEGACY_AGENT_LOG_BYTES) return false;
+  if (!stat.isFile() || stat.size > MAX_LEGACY_AGENT_LOG_BYTES) return noEvidence;
 
   try {
-    return provesLegacyPreHarnessFailure(fs.readFileSync(logPath, "utf8"));
+    return inspectLegacyAgentLog(fs.readFileSync(logPath, "utf8"));
   } catch {
-    return false;
+    return noEvidence;
   }
 }
 
@@ -364,8 +377,8 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
       usageJSONLFiles,
     });
     const artifactRoot = download.downloadPath || downloadRoot;
-    const legacyPreHarnessAgentFailure = components ? await inspectLegacyPreHarnessAgentFailure(artifactClient, artifacts, artifactRoot, token, owner, repo, run, components) : false;
-    const aic = components ? sumCoveredComponents(artifactRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id, legacyPreHarnessAgentFailure) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
+    const legacyAgentEvidence = components ? await inspectLegacyAgentArtifact(artifactClient, artifacts, artifactRoot, token, owner, repo, run, components) : null;
+    const aic = components ? sumCoveredComponents(artifactRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id, legacyAgentEvidence) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
     logDailyGuardrail("Computed run AIC from artifact", {
       runId,
       artifactId: artifact.id,
