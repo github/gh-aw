@@ -885,6 +885,7 @@
       "properties": {
         "labels": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "oneOf": [
               {
@@ -917,7 +918,7 @@
               }
             ]
           },
-          "description": "Labels to add (e.g., ['bug', 'priority-high']). Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository. This field is required \u2014 omitting it will cause a validation error."
+          "description": "Labels to add (e.g., ['bug', 'priority-high']). Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository. This field is required and must contain at least one label \u2014 omitting it will cause a validation error."
         },
         "item_number": {
           "type": ["number", "string"],
