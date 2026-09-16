@@ -1654,6 +1654,19 @@ async function main() {
   }
   const { args: toolArgs, json: jsonOutput } = parsedArgs;
 
+  // Fail loudly when arguments were supplied but none of them were recognized
+  // (e.g. `safeoutputs noop 'no action needed'`).  Silently dropping them would
+  // leave the agent believing a safe output was emitted when none was.  Structured
+  // payload modes are exempt: an explicit `{}` payload legitimately yields no arguments.
+  const usedStructuredPayload = shouldReadStdin || findInlineJsonPayloadArg(toolUserArgs) !== null;
+  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && toolUserArgs.length > 0 && !jsonOutput && !usedStructuredPayload) {
+    const message = `no arguments were recognized for '${toolName}' from: ${toolUserArgs.join(" ")}. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
+    auditLog(serverName, { event: "unrecognized_args", tool: toolName });
+    process.stderr.write(`Error: ${message}\n`);
+    core.setFailed(`[${serverName}] ${message}`);
+    return;
+  }
+
   if (shouldShowToolHelpForEmptyArgs(serverName, toolArgs, matchedTool)) {
     core.warning(`[${serverName}] No arguments provided for '${toolName}'; showing command help instead of calling the tool`);
     auditLog(serverName, { event: "show_tool_help_empty_args", tool: toolName });

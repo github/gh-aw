@@ -1793,6 +1793,38 @@ describe("mcp_cli_bridge.cjs", () => {
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Argument parsing failed"));
     });
 
+    it("calls the tool with an inline JSON payload argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", '{"title":"Inline payload"}']);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({ title: "Inline payload" });
+    });
+
+    it("allows an explicit empty inline JSON payload for a zero-input tool", async () => {
+      setupMainCall(zeroInputTools, ["dispatch_code_factory", "{}"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({});
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("fails instead of silently dropping an unrecognized positional argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", "no action needed"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeUndefined();
+      expect(stderrChunks.join("")).toContain("no arguments were recognized for 'create_issue'");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
+    });
+
     it("still shows help for no-flag piped stdin when stdin is truly empty", async () => {
       const origIsTTY = process.stdin.isTTY;
       // @ts-ignore
