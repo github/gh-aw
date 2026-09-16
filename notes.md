@@ -1,5 +1,12 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-16 snapshot
+- 50 sessions; **18.0% raw completion** (9 success, 33 failure, 7 action_required, 1 cancelled), -12.8pts vs 24-day mean 30.8%. **Cascade-adjusted completion 37.5%** (9/24) excluding 26 same-second review-bot failures.
+- **EXPERIMENTAL (roll=5): cross_branch_cascade_synchronization** — 3 DIFFERENT branches (`fix-github-actions-job-failure-again` 8f, `daily-docs-healer-fix` 8f, `model-inventory-update-2026-09-16` 10f) each cascaded within a 23s window (03:26:16-39Z), no commit on main/any branch in that window. Only 2/3 offsets matched their own branch's merge (32-58s prior); the 3rd merged 15m45s later with no intervening push — implies a shared scheduled dispatcher, not a pure per-branch merge race. Refines `merge_invalidation_cascade`. Effectiveness High; recommend promote.
+- CJS failed 6/6 (100%) across all 3 branches — first 100%-failure all-branch single-workflow day; only 2/6 inside the cascades.
+- **true_agentic_100pct_streak BROKE** after 9 consecutive 100% days: "Addressing comment on PR #61232" was cancelled, not success. **provenance_inversion NEW RECORD 100% bot-driven** (9/9: 6 Agentic Commands + 3 Running Copilot Code Review).
+- Orphans 0/20 open PRs → 0% NORMAL, 25th consecutive healthy day. Conv logs empty (25th+ day). Duration figures (mean 40.0m) inflated by a GitHub status-resync artifact, not real exec time — treat as unreliable this cycle.
+
 ## 2026-09-15 snapshot
 - 50 sessions; **52.0% raw completion** (26 success, 2 failure, 21 action_required, 1 cancelled), +4pts vs 09-14 (48%), 3rd-highest of 24 recorded days (24-day mean 30.8%). Zero merge_invalidation_cascade today (no PR merges on either active branch in the 04:07–05:51Z window; verified via `gh api pulls`) — confirms cascades are merge-triggered, not a daily constant.
 - 3 unique branches (vs 09-14/09-10's record-low 2): `copilot/update-logs-command-multi-target` 32/50 (64%, 53.1% success); `copilot/remove-effective-tokens` 17/50 (34%, 47.1% success); `copilot/bump-gh-aw-firewall-to-v02817` 1/50 (100%).
