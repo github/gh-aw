@@ -740,6 +740,24 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
 }
 
 /**
+ * Detect inline JSON payload mode: a single positional argument that is a JSON
+ * object, e.g. `safeoutputs noop '{"message":"done"}'`.
+ *
+ * Returns the trimmed JSON string when the sole argument looks like a JSON
+ * object (starts with `{`), otherwise null.  Detection is intentionally
+ * permissive about validity so malformed JSON produces a loud parse error
+ * instead of being silently skipped as a non-flag argument.
+ *
+ * @param {string[]} args - User arguments after the tool name
+ * @returns {string | null}
+ */
+function findInlineJsonPayloadArg(args) {
+  if (args.length !== 1) return null;
+  const trimmed = args[0].trim();
+  return trimmed.startsWith("{") ? trimmed : null;
+}
+
+/**
  * Parse user-provided --key value pairs into a tool arguments object.
  * Supports both --key value and --key=value styles.
  * Boolean flags (--key without a value) are set to true.
@@ -773,6 +791,29 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   let jsonOutput = false;
   const hasSchemaProperties = Object.keys(schemaProperties).length > 0;
   const { normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys } = buildNormalizedSchemaKeyMap(schemaProperties);
+
+  // Inline JSON payload mode: the whole payload is passed as a single quoted
+  // argument, e.g. `safeoutputs noop '{"message":"done"}'`.  This keeps the
+  // binary first on the command line so a malformed invocation still runs the
+  // CLI and reports an error, unlike the piped `.` sentinel form where a
+  // dropped pipe silently skips the binary entirely.
+  const inlineJsonPayload = findInlineJsonPayloadArg(args);
+  if (inlineJsonPayload !== null) {
+    let parsed;
+    try {
+      parsed = JSON.parse(inlineJsonPayload);
+    } catch (err) {
+      throw new Error(`inline JSON argument is not valid JSON: ${getErrorMessage(err)}. Pass a single quoted JSON object, use --key value flags, or pipe JSON on stdin with '.'.`, { cause: err });
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("inline JSON argument must be a JSON object. Pass a single quoted JSON object, use --key value flags, or pipe JSON on stdin with '.'.");
+    }
+    for (const [key, value] of Object.entries(parsed)) {
+      const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
+      result[canonicalKey] = value;
+    }
+    return { args: result, json: false };
+  }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
   const isJsonPayloadMode = trimmedStdin !== null && (args.length === 0 || (args.length === 1 && args[0] === "."));
@@ -1246,7 +1287,7 @@ function showToolHelp(serverName, toolName, tools) {
     ...renderToolSignature(serverName, tool).split("\n"),
     "Recommended:",
     ...renderToolRecommendedExample(serverName, tool).split("\n"),
-    `JSON mode: printf '{"param":"value",...}' | ${serverName} ${toolName} .`,
+    `JSON mode: ${serverName} ${toolName} '{"param":"value",...}'  (or: printf '{"param":"value",...}' | ${serverName} ${toolName} .)`,
   ];
 
   const props = tool.inputSchema?.properties;
@@ -1697,6 +1738,7 @@ module.exports = {
   showToolHelp,
   shouldShowToolHelpForEmptyArgs,
   hasStdinJsonPayload,
+  findInlineJsonPayloadArg,
   readStdinSync,
   ensureSafeOutputsTools,
   refreshDeferredToolsIfNeeded,

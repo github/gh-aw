@@ -2537,6 +2537,71 @@ describe("handle_agent_failure", () => {
   // buildEngineFailureContext
   // ──────────────────────────────────────────────────────
 
+  describe("buildSafeOutputsCliInvocationContext", () => {
+    let buildSafeOutputsCliInvocationContext;
+    let isDroppedPipeSafeOutputsCommand;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+
+    /** @type {string} */
+    let tmpDir;
+    /** @type {string} */
+    let stdioLogPath;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-"));
+      stdioLogPath = path.join(tmpDir, "agent-stdio.log");
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
+      ({ buildSafeOutputsCliInvocationContext, isDroppedPipeSafeOutputsCommand } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      if (fs.existsSync(tmpDir)) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("returns empty string when the transcript is missing", () => {
+      expect(buildSafeOutputsCliInvocationContext()).toBe("");
+    });
+
+    it("returns empty string when the transcript has no safeoutputs commands", () => {
+      fs.writeFileSync(stdioLogPath, "analysis complete\nnothing to report\n");
+      expect(buildSafeOutputsCliInvocationContext()).toBe("");
+    });
+
+    it("lists safeoutputs commands found in the transcript", () => {
+      fs.writeFileSync(stdioLogPath, `printf '{"message":"no action needed"}' | safeoutputs noop .\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("safeoutputs` commands found in the agent transcript");
+      expect(result).toContain("safeoutputs noop .");
+      expect(result).not.toContain("never ran");
+    });
+
+    it("diagnoses a dropped pipe before safeoutputs", () => {
+      fs.writeFileSync(stdioLogPath, `printf '{"message":"no action needed"}' safeoutputs noop .\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("the CLI never ran");
+      expect(result).toContain('safeoutputs <tool> \'{"key":"value"}\'');
+    });
+
+    it("deduplicates repeated commands", () => {
+      fs.writeFileSync(stdioLogPath, `safeoutputs noop --message "done"\nsafeoutputs noop --message "done"\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      const occurrences = result.split(`safeoutputs noop --message "done"`).length - 1;
+      expect(occurrences).toBe(1);
+    });
+
+    it("classifies piped and unpiped invocations", () => {
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' safeoutputs noop .`)).toBe(true);
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' | safeoutputs noop .`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand(`safeoutputs noop --message "x"`)).toBe(false);
+    });
+  });
+
   describe("buildEngineFailureContext", () => {
     let buildEngineFailureContext;
     const fs = require("fs");

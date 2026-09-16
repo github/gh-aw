@@ -3160,6 +3160,90 @@ function buildEngineFailureContext(options = {}) {
   }
 }
 
+/** Maximum number of safeoutputs CLI command excerpts rendered in the missing-safe-outputs report */
+const SAFEOUTPUTS_CLI_EXCERPT_LIMIT = 10;
+/** Maximum rendered length of a single safeoutputs CLI command excerpt */
+const SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH = 300;
+
+/**
+ * Detect a safeoutputs CLI invocation where the binary never runs because the
+ * pipe into it was dropped, e.g. `printf '{...}' safeoutputs noop .` instead of
+ * `printf '{...}' | safeoutputs noop .`. In the dropped-pipe form `printf`/`echo`
+ * consume `safeoutputs`, the tool name and `.` as trailing arguments, print the
+ * payload and exit 0, so the failure is indistinguishable from success.
+ *
+ * @param {string} line - Single transcript line containing `safeoutputs`
+ * @returns {boolean}
+ */
+function isDroppedPipeSafeOutputsCommand(line) {
+  const match = /(printf|echo)\b([^\n]*?)safeoutputs\b/.exec(line);
+  if (!match) return false;
+  // A pipe (or command separator) between the writer and `safeoutputs` means the
+  // binary does run; only the separator-free form is silently skipped.
+  return !/[|;&><]/.test(match[2]);
+}
+
+/**
+ * Extract `safeoutputs` CLI commands from the agent transcript so that a run
+ * ending with zero safe outputs is self-diagnosing: it distinguishes "the agent
+ * never tried to emit anything" from "the agent tried and the shell command
+ * silently skipped the CLI".
+ *
+ * @param {string} [stdioLogPathOverride] - Optional explicit transcript path (testing)
+ * @returns {string} Markdown context block, or an empty string when nothing was found
+ */
+function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log");
+
+  let logContent;
+  try {
+    logContent = fs.readFileSync(stdioLogPath, "utf8");
+  } catch {
+    core.info(`agent-stdio.log not readable at ${stdioLogPath}; skipping safeoutputs CLI invocation context`);
+    return "";
+  }
+
+  const maskedValues = collectAddMaskedValues(logContent);
+  /** @type {string[]} */
+  const commands = [];
+  const seen = new Set();
+  let hasDroppedPipe = false;
+  for (const rawLine of logContent.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || !line.includes("safeoutputs")) continue;
+    if (isAddMaskCommandLine(line)) continue;
+    // Only keep lines that look like a shell invocation of the CLI.
+    if (!/(^|[|;&(\s"'`])safeoutputs\s+[a-z_][a-z0-9_]*/i.test(line)) continue;
+    const redacted = applyAddMaskRedaction(line, maskedValues);
+    const truncated = redacted.length > SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH ? `${redacted.slice(0, SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH)}…` : redacted;
+    if (isDroppedPipeSafeOutputsCommand(line)) {
+      hasDroppedPipe = true;
+    }
+    if (seen.has(truncated)) continue;
+    seen.add(truncated);
+    if (commands.length < SAFEOUTPUTS_CLI_EXCERPT_LIMIT) {
+      commands.push(truncated);
+    }
+  }
+
+  if (commands.length === 0) {
+    core.info("No safeoutputs CLI commands found in agent-stdio.log");
+    return "";
+  }
+
+  core.info(`Found ${commands.length} safeoutputs CLI command(s) in agent-stdio.log${hasDroppedPipe ? " (dropped-pipe pattern detected)" : ""}`);
+
+  let context = "**`safeoutputs` commands found in the agent transcript:**\n\n```bash\n";
+  context += commands.join("\n");
+  context += "\n```\n\n";
+  if (hasDroppedPipe) {
+    context += "A command writes a JSON payload with `printf`/`echo` but has no `|` before `safeoutputs`, so the payload was printed and the CLI never ran (exit code 0, no safe output). ";
+    context += 'Pass the payload inline instead: `safeoutputs <tool> \'{"key":"value"}\'`.\n\n';
+  }
+  return context;
+}
+
 /** Cascade detection constants */
 const CASCADE_WINDOW_MINUTES = 60;
 const CASCADE_WINDOW_MS = CASCADE_WINDOW_MINUTES * 60 * 1000;
@@ -4077,7 +4161,9 @@ async function main() {
           missingSafeOutputsContext += "\n\nThis typically indicates:\n";
           missingSafeOutputsContext += "- The safe output server failed to run\n";
           missingSafeOutputsContext += "- The prompt failed to generate any meaningful result\n";
-          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n\n";
+          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n";
+          missingSafeOutputsContext += "- A `safeoutputs` CLI command was malformed and never invoked the CLI\n\n";
+          missingSafeOutputsContext += buildSafeOutputsCliInvocationContext();
         }
 
         // Build fork context hint
@@ -4311,7 +4397,9 @@ async function main() {
           missingSafeOutputsContext += "\n\nThis typically indicates:\n";
           missingSafeOutputsContext += "- The safe output server failed to run\n";
           missingSafeOutputsContext += "- The prompt failed to generate any meaningful result\n";
-          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n\n";
+          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n";
+          missingSafeOutputsContext += "- A `safeoutputs` CLI command was malformed and never invoked the CLI\n\n";
+          missingSafeOutputsContext += buildSafeOutputsCliInvocationContext();
         }
 
         // Build fork context hint
@@ -4522,6 +4610,8 @@ module.exports = {
   setFailureIssueOutputs,
   buildAssignCopilotFailureContext,
   buildEngineFailureContext,
+  buildSafeOutputsCliInvocationContext,
+  isDroppedPipeSafeOutputsCommand,
   detectAWFFirewallStartupFailureFromLog,
   buildReportIncompleteContext,
   buildMCPPolicyErrorContext,

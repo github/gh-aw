@@ -8,6 +8,7 @@ import {
   ensureSafeOutputsTools,
   auditLog,
   ensureAuditDir,
+  findInlineJsonPayloadArg,
   formatResponse,
   getToolCallTimeoutMs,
   hasStdinJsonPayload,
@@ -905,6 +906,48 @@ describe("mcp_cli_bridge.cjs", () => {
       } finally {
         readSyncSpy.mockRestore();
       }
+    });
+  });
+
+  describe("inline JSON payload argument", () => {
+    it("detects a single JSON object argument", () => {
+      expect(findInlineJsonPayloadArg(['{"message":"done"}'])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg([' {"message":"done"} '])).toBe('{"message":"done"}');
+    });
+
+    it("does not treat flags, sentinels or plain text as inline JSON", () => {
+      expect(findInlineJsonPayloadArg(["."])).toBeNull();
+      expect(findInlineJsonPayloadArg(["--message", '{"a":1}'])).toBeNull();
+      expect(findInlineJsonPayloadArg(["no action needed"])).toBeNull();
+      expect(findInlineJsonPayloadArg([])).toBeNull();
+    });
+
+    it("parses an inline JSON object into tool arguments", () => {
+      const schemaProperties = { issue_number: { type: "integer" }, body: { type: "string" } };
+
+      const { args } = parseToolArgs(['{"issue-number": 42, "body": "hello"}'], schemaProperties);
+
+      expect(args).toEqual({ issue_number: 42, body: "hello" });
+    });
+
+    it("preserves value types from the inline JSON object", () => {
+      const { args } = parseToolArgs(['{"count": 5, "enabled": true, "tags": ["a"]}'], {});
+
+      expect(args).toEqual({ count: 5, enabled: true, tags: ["a"] });
+    });
+
+    it("prefers the inline JSON argument over stdin content", () => {
+      const { args } = parseToolArgs(['{"message":"inline"}'], {}, '{"message":"stdin"}');
+
+      expect(args).toEqual({ message: "inline" });
+    });
+
+    it("throws a loud error when the inline JSON argument is malformed", () => {
+      expect(() => parseToolArgs(['{"message":'], {})).toThrow(/inline JSON argument is not valid JSON/i);
+    });
+
+    it("throws when the inline JSON argument is not an object", () => {
+      expect(() => parseToolArgs(["{} extra"], {})).toThrow(/inline JSON argument is not valid JSON/i);
     });
   });
 
