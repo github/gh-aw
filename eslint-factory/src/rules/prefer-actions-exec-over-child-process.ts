@@ -274,8 +274,8 @@ export const preferActionsExecOverChildProcessRule = createRule({
         "have no such global and are left alone. spawn()/spawnSync() are never flagged, and exec()/execFile() calls whose returned ChildProcess handle is " +
         "retained (for stdin/stdout streaming or lifecycle management) are exempt, since @actions/exec has no equivalent for those. Bindings created through " +
         "promisify() are resolved to the underlying child_process method. Files that also require " +
-      "`./shim.cjs` are dual-mode (they can also run as standalone Node processes, where the " +
-      "@actions/exec toolkit is not available) and are exempt.",
+        "`./shim.cjs` are dual-mode (they can also run as standalone Node processes, where the " +
+        "@actions/exec toolkit is not available) and are exempt.",
     },
     schema: [],
     messages: {
