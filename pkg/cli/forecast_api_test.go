@@ -14,7 +14,7 @@ func TestPagesForWorkflowRuns(t *testing.T) {
 		runs  int
 		pages int
 	}{
-		{runs: 0, pages: 0},
+		{runs: 0, pages: 1},
 		{runs: 1, pages: 1},
 		{runs: 100, pages: 1},
 		{runs: 101, pages: 2},

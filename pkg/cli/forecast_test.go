@@ -353,6 +353,7 @@ func TestForecastWorkflow_RequestsRecentRuns(t *testing.T) {
 		runs := []WorkflowRun{
 			{DatabaseID: 12, Status: "completed", Conclusion: "success", Duration: 5 * time.Minute, StartedAt: start, UpdatedAt: start.Add(5 * time.Minute)},
 		}
+
 		return runs, len(runs), nil
 	}
 	forecastLoadRunAIC = func(_ context.Context, runID int64, _ bool) (float64, bool) {
@@ -369,6 +370,39 @@ func TestForecastWorkflow_RequestsRecentRuns(t *testing.T) {
 	}, 30)
 	require.NoError(t, err)
 	assert.Empty(t, capturedOpts.Status, "forecast must request all recent run statuses so in-progress partial observations are available")
+}
+
+func TestForecastWorkflow_APIRunRateUsesFullHistoryBeforeAICSampleCap(t *testing.T) {
+	originalList := forecastListWorkflowRunsPaginated
+	originalLoadAIC := forecastLoadRunAIC
+	t.Cleanup(func() {
+		forecastListWorkflowRunsPaginated = originalList
+		forecastLoadRunAIC = originalLoadAIC
+	})
+
+	start := time.Now().Add(-24 * time.Hour)
+	runs := make([]WorkflowRun, 150)
+	for i := range runs {
+		runs[i] = WorkflowRun{
+			DatabaseID: int64(i + 1), Status: "completed", Conclusion: "success",
+			StartedAt: start.Add(time.Duration(i) * time.Minute),
+		}
+	}
+	forecastListWorkflowRunsPaginated = func(opts ListWorkflowRunsOptions) ([]WorkflowRun, int, error) {
+		assert.Equal(t, forecastWorkflowRunsResultLimit, opts.Limit)
+		return runs, len(runs), nil
+	}
+	forecastLoadRunAIC = func(_ context.Context, _ int64, _ bool) (float64, bool) {
+		return 1, true
+	}
+
+	result, err := forecastWorkflow(context.Background(), "build", start.Add(-time.Hour).Format("2006-01-02"), ForecastConfig{
+		Days: 30, Period: "month", SampleSize: 10,
+	}, 30)
+	require.NoError(t, err)
+	assert.Equal(t, 10, result.SampledRuns)
+	require.NotNil(t, result.WorkflowRunAPI)
+	assert.Greater(t, result.WorkflowRunAPI.ProjectedRuns.P50, 100)
 }
 
 func TestMissingArtifactContributesZeroAIC(t *testing.T) {

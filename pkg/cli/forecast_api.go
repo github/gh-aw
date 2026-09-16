@@ -13,7 +13,17 @@ const (
 
 func forecastWorkflowRunAPI(observationCount int, expectedRuns float64, rng *rand.Rand) (*ForecastWorkflowRunAPI, []int, []int) {
 	if observationCount == 0 || expectedRuns <= 0 {
-		return nil, nil, nil
+		runTrials := make([]int, monteCarloIterations)
+		requestTrials := make([]int, monteCarloIterations)
+		for i := range requestTrials {
+			requestTrials[i] = 1
+		}
+		return &ForecastWorkflowRunAPI{
+			PageSize:                  forecastWorkflowRunsPageSize,
+			FilteredSearchResultLimit: forecastWorkflowRunsResultLimit,
+			ProjectedRuns:             summarizeForecastCountDistribution(runTrials),
+			RequestUnits:              summarizeForecastCountDistribution(requestTrials),
+		}, runTrials, requestTrials
 	}
 
 	runTrials := make([]int, monteCarloIterations)
@@ -30,19 +40,20 @@ func forecastWorkflowRunAPI(observationCount int, expectedRuns float64, rng *ran
 		}
 	}
 
+	projectedRuns := summarizeForecastCountDistribution(runTrials)
 	return &ForecastWorkflowRunAPI{
 		PageSize:                      forecastWorkflowRunsPageSize,
 		FilteredSearchResultLimit:     forecastWorkflowRunsResultLimit,
-		ProjectedRuns:                 summarizeForecastCountDistribution(runTrials),
+		ProjectedRuns:                 projectedRuns,
 		RequestUnits:                  summarizeForecastCountDistribution(requestTrials),
 		ProbabilityExceedsResultLimit: float64(exceeds) / float64(monteCarloIterations),
-		MayExceedResultLimit:          exceeds > 0,
+		MayExceedResultLimit:          projectedRuns.P90 > forecastWorkflowRunsResultLimit,
 	}, runTrials, requestTrials
 }
 
 func pagesForWorkflowRuns(runs int) int {
 	if runs <= 0 {
-		return 0
+		return 1
 	}
 	return (runs + forecastWorkflowRunsPageSize - 1) / forecastWorkflowRunsPageSize
 }

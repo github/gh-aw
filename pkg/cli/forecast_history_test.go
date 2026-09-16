@@ -60,17 +60,25 @@ func TestForecastJSONLHistoryDeduplicatesAndKeepsRepositoryScopes(t *testing.T) 
 		RunID: 2, Repository: "octo/two", WorkflowName: "Build", WorkflowPath: ".github/workflows/build.yml",
 		Status: "completed", Conclusion: "success", CreatedAt: when, AIC: 3,
 	})
+	writeForecastJSONLRecord(t, second, RunData{
+		RunID: 3, Repository: "octo/one", WorkflowName: "Build", WorkflowPath: ".github/workflows/other-build.yml",
+		Status: "completed", Conclusion: "success", CreatedAt: when, AIC: 4,
+	})
 
 	history, err := loadForecastJSONLHistory([]string{filepath.Join(dir, "*.jsonl")})
 	require.NoError(t, err)
-	assert.Len(t, history.runs, 2)
+	assert.Len(t, history.runs, 3)
 	assert.Equal(t, 1, history.duplicates)
 	assert.InDelta(t, 2.0, history.runs[1].AIC, 1e-9)
 
 	targets, err := history.targets(nil, "")
 	require.NoError(t, err)
-	require.Len(t, targets, 2)
-	assert.NotEqual(t, targets[0].repository, targets[1].repository)
+	require.Len(t, targets, 3)
+	keys := make(map[string]struct{}, len(targets))
+	for _, target := range targets {
+		keys[forecastTargetKey(target)] = struct{}{}
+	}
+	assert.Len(t, keys, 3)
 }
 
 func TestForecastWorkflowFromJSONLUsesEmbeddedAIC(t *testing.T) {

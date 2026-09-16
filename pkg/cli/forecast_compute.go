@@ -58,7 +58,7 @@ func forecastWorkflow(ctx context.Context, workflowName, startDate string, confi
 	result.ExperimentVariants = meta.variants
 	result.Engines = meta.engines
 
-	sampledRuns, err := loadForecastSampleRuns(ctx, workflowName, startDate, config, result.WorkflowID)
+	sampledRuns, observedRunCount, err := loadForecastSampleRuns(ctx, workflowName, startDate, config, result.WorkflowID)
 	if err != nil {
 		if errorutil.IsRateLimitError(err.Error()) {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
@@ -67,6 +67,7 @@ func forecastWorkflow(ctx context.Context, workflowName, startDate string, confi
 		}
 		return result, err
 	}
+	populateWorkflowRunAPIForecast(&result, observedRunCount, config.Days, periodDays)
 	if len(sampledRuns) == 0 {
 		forecastRunLog.Printf("No sampled runs found for %s in last %d days", workflowName, config.Days)
 		return result, nil
@@ -100,7 +101,7 @@ func forecastWorkflow(ctx context.Context, workflowName, startDate string, confi
 	return result, nil
 }
 
-func loadForecastSampleRuns(ctx context.Context, workflowName, startDate string, config ForecastConfig, workflowID string) ([]WorkflowRun, error) {
+func loadForecastSampleRuns(ctx context.Context, workflowName, startDate string, config ForecastConfig, workflowID string) ([]WorkflowRun, int, error) {
 	apiName := workflowName
 	if lockFile, err := workflow.GetWorkflowLockFileName(workflowName); err == nil {
 		apiName = lockFile
@@ -109,16 +110,21 @@ func loadForecastSampleRuns(ctx context.Context, workflowName, startDate string,
 	opts := ListWorkflowRunsOptions{
 		WorkflowName: apiName,
 		StartDate:    startDate,
-		Limit:        config.SampleSize,
-		TargetCount:  config.SampleSize,
+		Limit:        max(config.SampleSize, forecastWorkflowRunsResultLimit),
+		TargetCount:  max(config.SampleSize, forecastWorkflowRunsResultLimit),
 		RepoOverride: config.RepoOverride,
 		Verbose:      config.Verbose,
 	}
 	runs, _, err := listRunsWithBackoff(ctx, opts, workflowID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return filterForecastSampleRuns(runs, startDate, config.SampleSize), nil
+	eligible := filterForecastSampleRuns(runs, startDate, 0)
+	sampled := eligible
+	if config.SampleSize > 0 && len(sampled) > config.SampleSize {
+		sampled = sampled[:config.SampleSize]
+	}
+	return sampled, len(eligible), nil
 }
 
 type forecastRunStats struct {
@@ -193,11 +199,15 @@ func populateForecastProjection(result *ForecastWorkflowResult, stats forecastRu
 	result.MonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, result.ObservedRunsPerPeriod, rng)
 	result.WeeklyMonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, weeklyRuns, rng2)
 	result.MonthlyMonteCarlo = runMonteCarlo(stats.aicObservations, stats.successCount, monthlyRuns, rng3)
-	apiRNG := rand.New(rand.NewSource(seed + 3)) //nolint:gosec
-	result.WorkflowRunAPI, result.apiRunTrials, result.apiRequestTrials = forecastWorkflowRunAPI(n, result.ObservedRunsPerPeriod, apiRNG)
 	if result.MonteCarlo != nil {
 		result.ProjectedAIC = result.MonteCarlo.P50ProjectedAIC
 	}
+}
+
+func populateWorkflowRunAPIForecast(result *ForecastWorkflowResult, observedRuns, historyDays, periodDays int) {
+	expectedRuns := float64(observedRuns) / float64(historyDays) * float64(periodDays)
+	rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // non-cryptographic simulation RNG
+	result.WorkflowRunAPI, result.apiRunTrials, result.apiRequestTrials = forecastWorkflowRunAPI(observedRuns, expectedRuns, rng)
 }
 
 // parallelLoadRunAICs fetches AIC data for all sampled runs concurrently and returns

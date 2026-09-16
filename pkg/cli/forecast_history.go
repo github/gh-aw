@@ -141,7 +141,7 @@ func (history *forecastJSONLHistory) targets(ids []string, repo string) ([]forec
 			continue
 		}
 		target := forecastWorkflowTarget{repository: run.Repository, name: run.WorkflowName, path: run.WorkflowPath}
-		byKey[strings.ToLower(target.repository)+"\x00"+strings.ToLower(target.name)] = target
+		byKey[forecastTargetKey(target)] = target
 	}
 
 	targets := make([]forecastWorkflowTarget, 0, len(byKey))
@@ -176,15 +176,14 @@ func forecastTargetMatches(target forecastWorkflowTarget, id string) bool {
 	return strings.EqualFold(base, id)
 }
 
-func (history *forecastJSONLHistory) runsFor(target forecastWorkflowTarget, start, end time.Time, limit int) ([]WorkflowRun, map[int64]float64, bool) {
+func (history *forecastJSONLHistory) runsFor(target forecastWorkflowTarget, start, end time.Time, limit int) ([]WorkflowRun, map[int64]float64, bool, int) {
 	type observation struct {
 		run WorkflowRun
 		aic float64
 	}
 	observations := make([]observation, 0)
 	for _, cached := range history.runs {
-		if !strings.EqualFold(cached.Repository, target.repository) ||
-			!strings.EqualFold(cached.WorkflowName, target.name) {
+		if !forecastRunMatchesTarget(cached.RunData, target) {
 			continue
 		}
 		observedAt := forecastJSONLRunTime(cached.RunData)
@@ -218,6 +217,7 @@ func (history *forecastJSONLHistory) runsFor(target forecastWorkflowTarget, star
 		return b.run.StartedAt.Compare(a.run.StartedAt)
 	})
 	truncated := limit > 0 && len(observations) > limit
+	observedCount := len(observations)
 	if truncated {
 		observations = observations[:limit]
 	}
@@ -227,7 +227,21 @@ func (history *forecastJSONLHistory) runsFor(target forecastWorkflowTarget, star
 		runs = append(runs, observation.run)
 		aic[observation.run.DatabaseID] = observation.aic
 	}
-	return filterForecastSampleRuns(runs, start.Format("2006-01-02"), 0), aic, truncated
+	return filterForecastSampleRuns(runs, start.Format("2006-01-02"), 0), aic, truncated, observedCount
+}
+
+func forecastTargetKey(target forecastWorkflowTarget) string {
+	return strings.ToLower(target.repository) + "\x00" + strings.ToLower(target.name) + "\x00" + strings.ToLower(target.path)
+}
+
+func forecastRunMatchesTarget(run RunData, target forecastWorkflowTarget) bool {
+	if !strings.EqualFold(run.Repository, target.repository) || !strings.EqualFold(run.WorkflowName, target.name) {
+		return false
+	}
+	if run.WorkflowPath == "" || target.path == "" {
+		return true
+	}
+	return strings.EqualFold(run.WorkflowPath, target.path)
 }
 
 func forecastJSONLRunTime(run RunData) time.Time {
@@ -277,7 +291,8 @@ func forecastWorkflowFromJSONL(ctx context.Context, target forecastWorkflowTarge
 	result.ExperimentVariants = meta.variants
 	result.Engines = meta.engines
 
-	runs, aicMap, truncated := config.history.runsFor(target, start, end, config.SampleSize)
+	runs, aicMap, truncated, observedRunCount := config.history.runsFor(target, start, end, config.SampleSize)
+	populateWorkflowRunAPIForecast(&result, observedRunCount, config.Days, periodDays)
 	stats := collectForecastRunStats(runs, aicMap, target.name)
 	result.RunSamples = stats.samples
 	result.SampledRuns = len(stats.aicObservations)
@@ -298,7 +313,7 @@ func evaluateForecastFromJSONL(_ context.Context, target forecastWorkflowTarget,
 		TrainingEndDate:   start.Format("2006-01-02"),
 		ValidationEndDate: end.Format("2006-01-02"),
 	}
-	runs, aic, _ := config.history.runsFor(target, start, end.Add(time.Nanosecond), 0)
+	runs, aic, _, _ := config.history.runsFor(target, start, end.Add(time.Nanosecond), 0)
 	for _, run := range runs {
 		if !isCompletedDispatchedRun(run) {
 			continue
