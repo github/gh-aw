@@ -55,6 +55,7 @@
     "gemini-3.5-flash": ["copilot/gemini-3.5*flash*", "google/gemini-3.5*flash*", "gemini/gemini-3.5*flash*"],
     "gemini-3.6-flash": ["copilot/gemini-3.6*flash*", "google/gemini-3.6*flash*", "gemini/gemini-3.6*flash*"],
     "gemini-3.7-flash": ["copilot/gemini-3.7*flash*", "google/gemini-3.7*flash*", "gemini/gemini-3.7*flash*"],
+    "gemini-3.8-flash": ["copilot/gemini-3.8*flash*", "google/gemini-3.8*flash*", "gemini/gemini-3.8*flash*"],
     "antigravity": ["copilot/antigravity*", "google/antigravity*", "gemini/antigravity*"],
     "nano-banana": ["copilot/nano-banana*", "google/nano-banana*", "gemini/nano-banana*"],
     "summarization": ["haiku", "gpt-5-mini", "gemini-flash-lite", "mini"],

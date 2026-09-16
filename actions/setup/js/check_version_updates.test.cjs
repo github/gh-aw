@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
 
-syncRuntimePromptTemplates(import.meta.url);
+const { runtimePromptsDir } = syncRuntimePromptTemplates(import.meta.url);
+const originalPromptsDir = process.env.GH_AW_PROMPTS_DIR;
 
 describe("check_version_updates", () => {
   let mockCore;
@@ -11,6 +12,7 @@ describe("check_version_updates", () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
+    process.env.GH_AW_PROMPTS_DIR = runtimePromptsDir;
 
     mockCore = {
       info: vi.fn(),
@@ -51,6 +53,11 @@ describe("check_version_updates", () => {
     delete global.core;
     delete global.github;
     delete global.context;
+    if (originalPromptsDir === undefined) {
+      delete process.env.GH_AW_PROMPTS_DIR;
+    } else {
+      process.env.GH_AW_PROMPTS_DIR = originalPromptsDir;
+    }
   });
 
   /**

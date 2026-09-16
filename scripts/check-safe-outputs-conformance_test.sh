@@ -9,11 +9,15 @@ trap 'rm -f "$OUTPUT"' EXIT
 (cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" >"$OUTPUT" 2>&1) || true
 
 mapfile -t findings < <(grep "IMP-004: Safe output config property is missing" "$OUTPUT" || true)
-expected="IMP-004: Safe output config property is missing from schema: safe-outputs.ado-update-work-item.status"
 
-if [[ ${#findings[@]} -ne 1 || "${findings[0]}" != *"$expected"* ]]; then
-    echo "FAIL: Expected only the genuine ado-update-work-item.status schema gap"
+if [[ ${#findings[@]} -ne 0 ]]; then
+    echo "FAIL: Expected no safe-output config schema gaps"
     printf '  %s\n' "${findings[@]}"
+    exit 1
+fi
+
+if ! grep -q "IMP-004: All safe output config properties are declared in the schema" "$OUTPUT"; then
+    echo "FAIL: Expected IMP-004 complete schema coverage result"
     exit 1
 fi
 
