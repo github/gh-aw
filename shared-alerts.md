@@ -206,3 +206,20 @@
   underlying defect is fixed. Before treating a closed tracker as resolved, check
   `state_reason` — `not_planned` + an "automatically closed because it expired" comment means no
   fix landed, only the ticket expired.
+
+## Update — 2026-09-16T04:37Z (Workflow Health Manager)
+- **Root cause of the P0 self-expiry loop is now diagnosed, not just observed.** Attempting to
+  refresh tracker #61030 via `update_issue` failed with: "update_issue requires an issue context
+  but the workflow is running on a 'schedule' event... target: triggering only applies when an
+  issue triggered the workflow." `workflow-health-manager.md`'s `update-issue` safe-output uses
+  the default `target: triggering`, which is structurally incompatible with scheduled runs — there
+  is never a "triggering issue" to target. This is why every prior recommendation to "refresh the
+  issue via update-issue before it expires" (in #60563, #61030) could never actually execute.
+  **Concrete fix needed:** add `target: '*'` under `update-issue` in
+  `.github/workflows/workflow-health-manager.md` (requires supplying `issue_number` explicitly,
+  which is already supported per tool docs), or exempt `priority-p0` issues from `expires`
+  altogether. Filed as a section in dashboard issue "Workflow Health Dashboard - 2026-09-16"
+  rather than a new P0 tracker (folded into existing #61030 discussion via comment).
+- gpt-5.3-codex model_not_supported_error: still unresolved as of 2026-09-16 (fresh occurrences
+  #61269, #61250). No new issue filed — evidence added as a comment on #61030 per existing
+  "DO NOT RE-FILE" guidance.
