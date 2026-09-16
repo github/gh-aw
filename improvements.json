@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-14",
+  "last_updated": "2026-09-16",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/mcp-gateway.md",
@@ -18,6 +18,18 @@
       "created": "2026-09-14",
       "status": "pending",
       "issue": "Add a sample JSON snapshot output example to the metrics-collector gallery doc"
+    },
+    {
+      "file": "docs/src/content/docs/reference/footers.md",
+      "created": "2026-09-16",
+      "status": "pending",
+      "issue": "Convert dense 260-word footer variable paragraph (line 107) into a Markdown table"
+    },
+    {
+      "file": "pkg/cli/env_command.go",
+      "created": "2026-09-16",
+      "status": "pending",
+      "issue": "Add Example fields to env get / env update subcommands"
     }
   ]
 }

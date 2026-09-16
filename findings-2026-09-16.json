@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-16",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/model-tables.md",
+      "docs/src/content/docs/reference/footers.md"
+    ],
+    "cli": [
+      "gh aw completion",
+      "gh aw env get / gh aw env update"
+    ],
+    "messages": [
+      ".github/workflows/smoke-copilot.md",
+      ".github/workflows/smoke-cursor.md"
+    ],
+    "validation": [
+      "pkg/workflow/tools_validation_github.go"
+    ]
+  },
+  "overall_quality": "professional",
+  "quality_highlights": [
+    "pkg/workflow/tools_validation_github.go: consistent problem+reason+example error pattern",
+    "pkg/cli/completion_command.go and audit_command.go: rich Example blocks with realistic invocations"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/reference/footers.md",
+      "priority": "high",
+      "issue": "Line 107 is a single ~260-word paragraph listing 15+ template variables inline; convert to a Markdown table for scannability"
+    },
+    {
+      "file": "pkg/cli/env_command.go",
+      "priority": "medium",
+      "issue": "newDefaultsGetCommand and newDefaultsUpdateCommand lack an Example field, unlike most other gh aw commands"
+    }
+  ]
+}
