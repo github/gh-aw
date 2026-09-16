@@ -119,3 +119,28 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 | 2609.11231v1 | Voice-Interactive Multi-Agent System for Smart ORs | 2026-09-10 | N | | |
 | 2609.11190v1 | Agentic Share-of-Search: Multi-Agent E-Commerce | 2026-09-10 | N | | |
 | 2609.11180v1 | SemVerBench: Version-Constraint Resolution Semantics | 2026-09-10 | N | | |
+| 2609.17527v1 | Agentic Societies Need a Social Harness | 2026-09-15 | Y | multi-agent | Add a mediated social-harness validation layer between sub-agents and the orchestrator that sanitizes/validates inter-agent messages before they enter any agent's context, detecting manipulation/prompt-injection attempts from untrusted sub-agent outputs |
+| 2609.17523v1 | ScienceBuddy: Recursive-in-Recursive Self-Improvement | 2026-09-15 | N | | |
+| 2609.17499v1 | ENCP: Episode-Normalized Conformal Prediction for VLN | 2026-09-15 | N | | |
+| 2609.17496v1 | Verifiable Social Reasoning for LLM Assistants | 2026-09-15 | N | | |
+| 2609.17464v1 | Decomposition Buys Integrity, Not Yield | 2026-09-15 | Y | multi-agent | Default sub-agent fan-out to a flat (single-level) topology instead of deep nested hierarchies when maximizing findings retained, reserving multi-level trees only when result integrity/organization outweighs recall |
+| 2609.17439v1 | Evaluating Verified Autonomy in Quantum Engineering | 2026-09-15 | N | | |
+| 2609.17394v1 | Coding Agents Have Converged (SWE-bench Leaderboard) | 2026-09-15 | Y | | |
+| 2609.17391v1 | FlashVector: Hierarchical Model Serving Stack Optimization | 2026-09-15 | N | | |
+| 2609.17331v1 | Self-Emergence Agent Architecture (SEAA) | 2026-09-15 | Y | | |
+| 2609.17325v1 | Intrinsic Motivation in RL: Adaptive Self-Organisation | 2026-09-15 | N | | |
+| 2609.17306v1 | Mo' Models, Mo' Problems: Model Pool Selection for MAS | 2026-09-15 | Y | multi-agent | For sub-agent fan-out with model aliases, default to drawing all sub-agents from a single model family/provider rather than mixing diverse engines, and cap ensemble size instead of maximizing model diversity |
+| 2609.17274v1 | After the Party: Governing a Viral Agent-Skill Ecosystem | 2026-09-15 | Y | | |
+| 2609.17226v1 | Diagnosing a Corrupted Reward Channel from a Verified Record | 2026-09-15 | N | | |
+| 2609.17221v1 | Grounding SWE-Agent Decisions in Architecture-0 Design | 2026-09-15 | Y | | |
+| 2609.17193v1 | Latency-Minimizing Request Scheduling for Edge LLM Inference | 2026-09-15 | N | | |
+| 2609.17123v1 | AI for Science with GPT-6 Astra: Thermal Design of 2D CFET | 2026-09-15 | N | | |
+| 2609.17107v1 | Symbolic Separation: Grounding Deep Agents in Knowledge Graphs | 2026-09-15 | Y | | |
+| 2609.17088v1 | Interactive Memory Learning for Long-Term Conversations | 2026-09-15 | Y | | |
+| 2609.17010v1 | ThinkFlow: Self-Evolving Probabilistic Latent Memory | 2026-09-15 | Y | | |
+| 2609.16936v1 | RepoAtlas: Evolving Multimodal Repository Views | 2026-09-15 | Y | | |
+| 2609.16917v1 | Multi-Agent Learning with Cooperation-Driven Optimization | 2026-09-15 | N | | |
+| 2609.16887v1 | QART: Quantum-Classical Hybrid Long-Horizon Reasoning | 2026-09-15 | N | | |
+| 2609.16884v1 | Bridging Visual Perception and Symbolic Belief-Space Planning | 2026-09-15 | N | | |
+| 2609.16852v1 | CoAdapt: Adaptive Collaborative Perception in IIoT Swarms | 2026-09-15 | N | | |
+| 2609.16824v1 | Adapting to Non-Stationarity in Decentralized Bandits | 2026-09-15 | N | | |
