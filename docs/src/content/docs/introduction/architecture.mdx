@@ -14,7 +14,7 @@ import { Aside } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import safeOutputsIsolation from '../../../assets/diagrams/architecture-2026-08-29.svg';
 
-GitHub Agentic Workflows (gh-aw) runs AI coding agents — GitHub Copilot, Claude Code, OpenAI Codex, or Google Gemini — inside GitHub Actions with a defense-in-depth security architecture that protects against prompt injection, rogue MCP servers, and compromised agents. This document provides an overview of the security model and its key components.
+GitHub Agentic Workflows (gh-aw) runs AI coding agents — GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi — inside GitHub Actions with a defense-in-depth security architecture that protects against prompt injection, rogue MCP servers, and compromised agents. This document provides an overview of the security model and its key components.
 
 ## Security Model
 
@@ -301,7 +301,7 @@ MCP servers execute within isolated containers, enforcing substrate-level separa
 ```mermaid
 flowchart TB
     subgraph Agent["AI Agent"]
-        ENGINE["AI Engine<br/>(Copilot, Claude, Codex)"]
+        ENGINE["AI Engine<br/>(Copilot, Claude, Codex, Gemini, Pi)"]
     end
 
     subgraph MCPLayer["MCP Server Layer"]
