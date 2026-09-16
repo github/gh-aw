@@ -54,6 +54,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
 | [`require-new-url-try-catch`](#require-new-url-try-catch) | Require try/catch around `new URL(variable)` calls |
+| [`require-new-regexp-try-catch`](#require-new-regexp-try-catch) | Require try/catch around `new RegExp(variable)` calls with an opaque pattern source |
 | [`require-parseInt-radix`](#require-parseInt-radix) | Require an explicit radix argument to `parseInt()` |
 | [`require-nan-check-after-env-numeric-parse`](#require-nan-check-after-env-numeric-parse) | Require NaN validation after parsing numeric values from `process.env` |
 | [`require-nan-check-after-split-index-parse`](#require-nan-check-after-split-index-parse) | Require NaN validation after parsing a `split(...)[index]` value |
@@ -613,6 +614,39 @@ try {
   // use u here
 } catch (err) {
   throw new Error("URL constructor call failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-new-regexp-try-catch`
+
+Require `new RegExp(variable)` calls to be wrapped in `try/catch` when the pattern source is an opaque identifier or property access (e.g. config-driven or user-supplied input).
+
+Why: the `RegExp` constructor throws a `SyntaxError` when given an invalid pattern. When the pattern text comes from an opaque runtime value — a bare identifier or a property access like `validation.pattern` — its content cannot be reviewed for regex validity at the call site, so an invalid config/user value can crash the action with an unhelpful uncaught exception.
+
+**Detected forms:**
+- `new RegExp(pattern)` — first argument is a bare identifier.
+- `new RegExp(validation.pattern)` — first argument is a property access other than `.source`.
+- `new RegExp(options.pattern, options.flags)` — dynamic pattern and flags.
+
+**Out of scope (not flagged):**
+- `new RegExp("^foo$")` — compile-time constant string literal.
+- `` new RegExp(`^foo$`) `` — template literal with no expressions.
+- `` new RegExp(`^${escapedName}$`, "i") `` — template literal interpolation (covered separately by `require-escaped-regexp-interpolation`).
+- `new RegExp(/^foo$/)` — regex literal argument.
+- `new RegExp(FOO_RE.source, "g")` — `.source` read off an existing regex, a common "clone this fixed regex" idiom.
+- `new RegExp(patternSources.join("|"), "i")` — a computed string built from an array; treated as an intentional composition, not an opaque single value.
+- `function parse(RegExp, value) { return new RegExp(value); }` — `RegExp` shadowed by a local binding is not the global constructor.
+- Calls already inside a `try` block with a `catch` clause.
+
+**Known limitation — no autofix for `VariableDeclaration`:** same as `require-new-url-try-catch`, only `ExpressionStatement` and `ReturnStatement` positions receive an autofix suggestion; `const re = new RegExp(pattern)` is reported without a suggestion.
+
+**Safe alternative:**
+```js
+try {
+  const regex = new RegExp(validation.pattern);
+  // use regex here
+} catch (err) {
+  throw new Error("RegExp constructor call failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
