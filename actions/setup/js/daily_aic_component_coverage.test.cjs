@@ -44,7 +44,8 @@ function evaluate(files, jobs, overrides = {}) {
       ],
     })),
     downloadArtifact: vi.fn(async (_id, options) => {
-      for (const [name, value] of Object.entries(files)) {
+      const artifactFiles = _id === 1 && overrides.agentFiles ? overrides.agentFiles : files;
+      for (const [name, value] of Object.entries(artifactFiles)) {
         const file = path.join(options.path, ...name.split("/"));
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, value);
@@ -311,6 +312,26 @@ it.each([null, 0])("counts missing agent accounting as zero when a failed job ne
 
 it("still requires accounting when a failed agent job has no authoritative source", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
+it("counts legacy pre-harness agent failures as zero from the agent artifact", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure" })], {
+    agentFiles: {
+      "agent-stdio.log": "[ERROR] Fatal error: cloud-hypervisor --version failed\nProcess exiting with code: 1\n",
+    },
+  });
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.downloadArtifact).toHaveBeenCalledTimes(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"legacy_pre_harness_failure"'));
+});
+
+it("still requires accounting when a legacy agent artifact contains a harness marker", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure" })], {
+    agentFiles: {
+      "agent-stdio.log": "[claude-harness] starting\n[ERROR] Fatal error: agent failed\nProcess exiting with code: 1\n",
+    },
+  });
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
 });
 

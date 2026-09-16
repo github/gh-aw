@@ -21,6 +21,9 @@ const RATE_LIMIT_RESERVE = 100;
 const REQUEST_OVERHEAD_BUDGET = MAX_WORKFLOW_RUN_PAGES + 4;
 const ESTIMATED_API_OPERATIONS_PER_RUN = 2;
 const INTEGER_FORMATTER = new Intl.NumberFormat("en-US");
+const MAX_LEGACY_AGENT_LOG_BYTES = 10 * 1024 * 1024;
+const ENGINE_HARNESS_MARKER = /\[[^\]\r\n]+-harness\]/i;
+const AWF_STARTUP_FAILURE_MARKER = /Fatal error:|Process exiting with code:|Refusing to use symlink as bind mountpoint|mcp gateway[^\r\n]{0,80}(?:startup failed|failed to start|startup error)/i;
 
 /**
  * @returns {Promise<any>}
@@ -222,6 +225,52 @@ function matchesGuardrailArtifactName(artifactName) {
   return PRIMARY_GUARDRAIL_ARTIFACT_NAMES.some(name => artifactName === name || artifactName.endsWith(`-${name}`));
 }
 
+function provesLegacyPreHarnessFailure(logText) {
+  return AWF_STARTUP_FAILURE_MARKER.test(logText) && !ENGINE_HARNESS_MARKER.test(logText);
+}
+
+async function inspectLegacyPreHarnessAgentFailure(artifactClient, artifacts, downloadRoot, token, owner, repo, run, components) {
+  const job = components.get("agent");
+  if (!job || job.conclusion !== "failure") return false;
+  if (["agent/token_usage.jsonl", "agent_usage.jsonl", "agent_usage.json"].some(file => fs.existsSync(path.join(downloadRoot, file)))) return false;
+
+  const artifact = artifacts.find(item => item?.name === "agent");
+  const createdAt = artifact?.createdAt?.getTime();
+  const startedAt = Date.parse(job.started_at);
+  const completedAt = Date.parse(job.completed_at);
+  if (!artifact?.id || artifact.expired || !Number.isFinite(createdAt)) return false;
+  if (!Number.isFinite(startedAt)) return false;
+  if (!Number.isFinite(completedAt)) return false;
+  if (createdAt < startedAt || createdAt >= completedAt + 1000) {
+    return false;
+  }
+
+  const agentRoot = path.join(downloadRoot, "legacy-agent-artifact");
+  const download = await artifactClient.downloadArtifact(artifact.id, {
+    path: agentRoot,
+    findBy: {
+      token,
+      workflowRunId: run.id,
+      repositoryOwner: owner,
+      repositoryName: repo,
+    },
+  });
+  const logPath = path.join(download.downloadPath || agentRoot, "agent-stdio.log");
+  let stat;
+  try {
+    stat = fs.statSync(logPath);
+  } catch {
+    return false;
+  }
+  if (!stat.isFile() || stat.size > MAX_LEGACY_AGENT_LOG_BYTES) return false;
+
+  try {
+    return provesLegacyPreHarnessFailure(fs.readFileSync(logPath, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {{ listArtifacts: Function, downloadArtifact: Function }} artifactClient
  * @param {number} runId
@@ -314,7 +363,9 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
       downloadPath: download.downloadPath || downloadRoot,
       usageJSONLFiles,
     });
-    const aic = components ? sumCoveredComponents(download.downloadPath || downloadRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
+    const artifactRoot = download.downloadPath || downloadRoot;
+    const legacyPreHarnessAgentFailure = components ? await inspectLegacyPreHarnessAgentFailure(artifactClient, artifacts, artifactRoot, token, owner, repo, run, components) : false;
+    const aic = components ? sumCoveredComponents(artifactRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id, legacyPreHarnessAgentFailure) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
     logDailyGuardrail("Computed run AIC from artifact", {
       runId,
       artifactId: artifact.id,

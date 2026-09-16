@@ -94,7 +94,7 @@ function logComponentAIC(runId, name, job, aic, reason, details = {}) {
   );
 }
 
-function sumCoveredComponents(directory, components, artifactCreatedAt, artifacts, usageArtifactName, attempt, runId) {
+function sumCoveredComponents(directory, components, artifactCreatedAt, artifacts, usageArtifactName, attempt, runId, legacyPreHarnessAgentFailure = false) {
   let total = 0;
   for (const [name, job] of components) {
     if (job.conclusion === "skipped") {
@@ -161,6 +161,10 @@ function sumCoveredComponents(directory, components, artifactCreatedAt, artifact
       logComponentAIC(runId, name, job, 0, "failed_before_accounting", {
         source: candidateStates[0].file,
       });
+      continue;
+    }
+    if (!selected && name === "agent" && job.conclusion === "failure" && legacyPreHarnessAgentFailure) {
+      logComponentAIC(runId, name, job, 0, "legacy_pre_harness_failure");
       continue;
     }
     if (!selected) {
