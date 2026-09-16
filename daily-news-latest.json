@@ -1,17 +1,30 @@
 {
-  "date": "2026-06-26",
-  "source": "daily-news-data",
-  "summary_path": "/tmp/gh-aw/agent/daily-news-summary.json",
+  "date": "2026-09-16",
   "date_range": {
-    "start": "2026-05-28",
-    "end": "2026-06-26"
+    "start": "2026-08-18",
+    "end": "2026-09-16"
   },
-  "metrics": {
-    "issue_event_total": 300,
-    "pr_event_total": 140,
-    "commit_total_30d": 100,
-    "active_days_commits": 3,
-    "max_daily_commits": 48,
-    "max_daily_contributors": 3
-  }
+  "highlights": [
+    "Merged fixes concentrated on daily AIC accounting, startup-failure handling, and test/lint stability.",
+    "Issues and PR activity peaked on 2026-09-16 with 147 combined events in the sampled 30-day window.",
+    "Commit activity peaked on 2026-09-12 with 22 commits, with 2-3 contributors active on the busiest recent days.",
+    "Recent discussion traffic is dominated by audit-style posts rather than roadmap or design threads."
+  ],
+  "counts": {
+    "issues": 200,
+    "prs": 99,
+    "commits": 100,
+    "discussions": 50,
+    "releases": 30,
+    "changesets": 666
+  },
+  "discussion_categories": {
+    "Announcements": 4,
+    "General": 5,
+    "Audits": 41
+  },
+  "data_limitations": [
+    "commits.json contained concatenated JSON after the first valid array; analysis used the first valid JSON document only",
+    "issues, PRs, and discussions were limited to the pre-downloaded snapshot sizes"
+  ]
 }
