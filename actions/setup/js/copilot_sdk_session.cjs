@@ -52,6 +52,14 @@ const SDK_SEND_TIMEOUT_MS_DEFAULT = 10 * 60 * 1000;
 // Keep in sync with SDK_SESSION_IDLE_TIMEOUT_PATTERN in copilot_harness.cjs.
 const SDK_IDLE_TIMEOUT_PATTERN = /Timeout after \d+ms waiting for session\.idle/;
 
+// Bounded interval, in milliseconds, that the driver waits after the tool-denial
+// guard (guard.tool_denials_exceeded) fires before forcing sendAndWait to settle,
+// even if session.disconnect() or the in-flight SDK request never resolves on its
+// own. Without this, a stalled disconnect/sendAndWait leaves the process hanging
+// until the surrounding job's own timeout kicks in (observed up to ~49 minutes).
+// Override via the GH_AW_DENIAL_GUARD_TIMEOUT_MS environment variable.
+const DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT = 15 * 1000;
+
 // Default idle period for the post-completion watchdog: 30 seconds.
 // When the agent has produced output and all tracked tool calls have completed,
 // the driver arms a watchdog timer.  If no new SDK events arrive within this
@@ -198,6 +206,32 @@ async function runWithCopilotSDK({
   let catastrophicToolDenialsError = null;
   let catastrophicToolDenialsTriggered = false;
   /**
+   * Rejects `denialGuardPromise` once the tool-denial threshold is exceeded and the
+   * bounded force-exit interval elapses. Declared here so `recordToolDenial` (defined
+   * below) can arm the forced settlement independent of whether `session.disconnect()`
+   * or the in-flight `sendAndWait()` call ever resolves on their own.
+   * @type {((reason: any) => void) | null}
+   */
+  let denialGuardReject = null;
+  /**
+   * Settles (rejects) only when the tool-denial guard forces an early exit after
+   * `DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT` (or `GH_AW_DENIAL_GUARD_TIMEOUT_MS`) elapses
+   * following `guard.tool_denials_exceeded`. Raced against `session.sendAndWait()` so
+   * the driver settles with a nonzero exit within a bounded interval even when
+   * disconnect or the in-flight SDK request stalls.
+   * @type {Promise<never>}
+   */
+  const denialGuardPromise = new Promise((_resolve, reject) => {
+    denialGuardReject = reject;
+  });
+  // Prevent an unhandled-rejection warning when the guard never fires (the common
+  // case): the promise is still raced below, but Node considers a promise
+  // "handled" only once a rejection handler has actually been attached, and the
+  // race only attaches one when sendAndWait settles first. The rejection reason
+  // is already logged and handled via the Promise.race() result below, so this
+  // is an intentional no-op (safe to ignore).
+  denialGuardPromise.catch(() => {});
+  /**
    * Map from toolCallId → {toolName, mcpServerName} for enriching tool.execution_complete
    * events and for tracking in-flight tool calls when the idle-timeout fires.
    * Declared at function scope so the catch block can check pendingToolCalls.size.
@@ -258,6 +292,18 @@ async function runWithCopilotSDK({
         // best-effort early stop
       });
     }
+    // Force sendAndWait to settle within a bounded interval even if disconnect()
+    // or the in-flight SDK request never resolves on its own (observed hosted
+    // failure: the process remained stalled for ~49 minutes after this guard
+    // fired, until the surrounding job's own timeout cancelled it).
+    const denialGuardTimeoutMs = getEnvPositiveIntOrDefault("GH_AW_DENIAL_GUARD_TIMEOUT_MS", DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT);
+    const forceExitTimer = setTimeout(() => {
+      if (denialGuardReject) {
+        log(`warning: denial guard force-exit fired after ${denialGuardTimeoutMs}ms — sendAndWait did not settle on its own`);
+        denialGuardReject(catastrophicToolDenialsError);
+      }
+    }, denialGuardTimeoutMs);
+    if (typeof forceExitTimer.unref === "function") forceExitTimer.unref();
   }
 
   try {
@@ -449,7 +495,11 @@ async function runWithCopilotSDK({
 
     log("sending prompt...");
     const sendTimeoutMs = getEnvPositiveIntOrDefault("COPILOT_SDK_SEND_TIMEOUT_MS", SDK_SEND_TIMEOUT_MS_DEFAULT);
-    const result = await session.sendAndWait({ prompt }, sendTimeoutMs);
+    // Race against denialGuardPromise so that if the tool-denial guard fires and
+    // session.disconnect()/sendAndWait then stall, the driver still settles with a
+    // nonzero exit within a bounded interval instead of hanging until the job's own
+    // timeout intervenes. denialGuardPromise never settles unless the guard fires.
+    const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), denialGuardPromise]);
 
     if (catastrophicToolDenialsError) {
       throw catastrophicToolDenialsError;

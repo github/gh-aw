@@ -1583,6 +1583,75 @@ describe("copilot_sdk_driver.cjs", () => {
         }
       }
     });
+    it("settles with a nonzero exit within a bounded interval when disconnect and sendAndWait stall after the denial guard fires", async () => {
+      // Regression test for the hosted hang: guard.tool_denials_exceeded fired but
+      // session.disconnect() never resolved and the in-flight sendAndWait() call
+      // never settled, leaving the process stalled until the job's own timeout.
+      let sessionConfig;
+      // disconnect() never resolves — simulates a stuck SDK disconnect call.
+      const disconnect = vi.fn().mockImplementation(() => new Promise(() => {}));
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const session = {
+        sessionId: "session-denial-guard-force-exit",
+        on: () => {},
+        sendAndWait: vi.fn().mockImplementation(() => {
+          const denyRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
+          sessionConfig.onPermissionRequest(denyRequest);
+          sessionConfig.onPermissionRequest(denyRequest);
+          // sendAndWait itself never settles — simulates the in-flight SDK request
+          // that never resolves once disconnect() is stuck.
+          return new Promise(() => {});
+        }),
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockImplementation(async config => {
+          sessionConfig = config;
+          return session;
+        });
+        stop = stop;
+      }
+
+      const oldMaxToolDenials = process.env.GH_AW_MAX_TOOL_DENIALS;
+      const oldDenialGuardTimeout = process.env.GH_AW_DENIAL_GUARD_TIMEOUT_MS;
+      process.env.GH_AW_MAX_TOOL_DENIALS = "2";
+      process.env.GH_AW_DENIAL_GUARD_TIMEOUT_MS = "50";
+      try {
+        const startedAt = Date.now();
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          permissionConfig: {
+            allowedTools: ["shell(git:*)"],
+          },
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+        const elapsedMs = Date.now() - startedAt;
+
+        expect(result.exitCode).toBe(1);
+        expect(result.output).toContain("max tool denials threshold reached");
+        // Bounded by the denial-guard force-exit timeout plus the cleanup timeout,
+        // not by the (unreached) 10-minute sendAndWait default or a hosted job timeout.
+        expect(elapsedMs).toBeLessThan(10_000);
+      } finally {
+        if (oldMaxToolDenials === undefined) {
+          delete process.env.GH_AW_MAX_TOOL_DENIALS;
+        } else {
+          process.env.GH_AW_MAX_TOOL_DENIALS = oldMaxToolDenials;
+        }
+        if (oldDenialGuardTimeout === undefined) {
+          delete process.env.GH_AW_DENIAL_GUARD_TIMEOUT_MS;
+        } else {
+          process.env.GH_AW_DENIAL_GUARD_TIMEOUT_MS = oldDenialGuardTimeout;
+        }
+      }
+    });
   });
 
   describe("parsePermissionConfigFromServerArgs", () => {
@@ -1838,6 +1907,43 @@ describe("copilot_sdk_driver.cjs", () => {
         fullCommandText: "gh issue list && echo done",
       });
       expect(result).toEqual({ kind: "approve-once" });
+    });
+
+    it("allows a multiword :* prefix rule (e.g. git checkout:*) regardless of what identifiers the SDK reports", async () => {
+      // Regression test for the auto-granted Git-subcommand rejection reported
+      // upstream: safe-outputs.create-pull-request grants rules like
+      // "shell(git checkout:*)" and "shell(git branch:*)", but the SDK may report
+      // only the executable name ("git"), the entire command text, or no
+      // identifiers at all — none of which exposes the "checkout"/"branch"
+      // subcommand word needed to match a multiword prefix directly.
+      const handler = await makePermissionHandlerViaSDK(["shell(git checkout:*)", "shell(git branch:*)"]);
+      const cases = [
+        { fullCommandText: "git checkout -b automation/repro", identifiers: ["git"] },
+        { fullCommandText: "git checkout -b automation/repro", identifiers: ["git checkout -b automation/repro"] },
+        { fullCommandText: "git checkout -b automation/repro", identifiers: [] },
+        { fullCommandText: "git branch --show-current", identifiers: ["git"] },
+        { fullCommandText: "git branch --show-current", identifiers: ["git branch --show-current"] },
+        { fullCommandText: "git branch --show-current", identifiers: [] },
+      ];
+      for (const { fullCommandText, identifiers } of cases) {
+        const result = handler({
+          kind: "shell",
+          fullCommandText,
+          commands: identifiers.map(identifier => ({ identifier })),
+        });
+        expect(result).toEqual({ kind: "approve-once" });
+      }
+
+      // Ungranted Git subcommands remain denied — this must not be solved by
+      // widening the grant to a blanket "git:*".
+      expect(handler({ kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git push origin main" })).toEqual({
+        kind: "reject",
+        feedback: "Tool invocation is not allowed by workflow tool permissions.",
+      });
+      expect(handler({ kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" })).toEqual({
+        kind: "reject",
+        feedback: "Tool invocation is not allowed by workflow tool permissions.",
+      });
     });
 
     it("denies multiline shell command when required tools are missing", async () => {
