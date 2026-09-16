@@ -107,3 +107,58 @@ imports:
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Unknown properties: role, secret")
 }
+
+func TestImportedEngineAuthPreservedWithTopLevelModelIntegration(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "test-imported-wif-auth-model-*")
+	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
+	sharedDir := filepath.Join(workflowsDir, "shared")
+	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+
+	sharedContent := `---
+engine:
+  id: claude
+  auth:
+    type: github-oidc
+    provider: anthropic
+    federation-rule-id: fr_01ABC
+    organization-id: org_01XYZ
+    service-account-id: sa_01DEF
+    workspace-id: ws_01GHI
+---
+
+# Shared Anthropic WIF engine config
+`
+	sharedFile := filepath.Join(sharedDir, "wif-engine.md")
+	require.NoError(t, os.WriteFile(sharedFile, []byte(sharedContent), 0644))
+
+	mainContent := `---
+name: Test Imported WIF Engine With Model
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+imports:
+  - shared/wif-engine.md
+model: claude-sonnet-4-5
+---
+
+# Test Workflow
+`
+	mainFile := filepath.Join(workflowsDir, "test-wif-model.md")
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(mainFile))
+
+	lockFile := filepath.Join(workflowsDir, "test-wif-model.lock.yml")
+	lockContent, err := os.ReadFile(lockFile)
+	require.NoError(t, err)
+
+	lockStr := string(lockContent)
+	assert.Contains(t, lockStr, "AWF_AUTH_TYPE: github-oidc")
+	assert.Contains(t, lockStr, "AWF_AUTH_PROVIDER: anthropic")
+	assert.Contains(t, lockStr, "AWF_AUTH_ANTHROPIC_FEDERATION_RULE_ID: fr_01ABC")
+	assert.Contains(t, lockStr, "claude-sonnet-4-5")
+	assert.NotContains(t, lockStr, "ANTHROPIC_API_KEY")
+}
