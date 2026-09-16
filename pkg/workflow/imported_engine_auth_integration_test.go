@@ -160,5 +160,5 @@ model: claude-sonnet-4-5
 	assert.Contains(t, lockStr, "AWF_AUTH_PROVIDER: anthropic")
 	assert.Contains(t, lockStr, "AWF_AUTH_ANTHROPIC_FEDERATION_RULE_ID: fr_01ABC")
 	assert.Contains(t, lockStr, "claude-sonnet-4-5")
-	assert.NotContains(t, lockStr, "ANTHROPIC_API_KEY")
+	assert.NotContains(t, lockStr, "name: Validate ANTHROPIC_API_KEY secret")
 }

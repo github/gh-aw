@@ -312,33 +312,9 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 			return "", nil, "", nil, fmt.Errorf("failed to register engine definition from included file: %w", err)
 		}
 	}
-	if engineConfig == nil && len(allEngines) > 0 {
-		orchestratorEngineLog.Printf("Extracting engine config from included file")
-		var extractedModel string
-		engineConfig, extractedModel, err = c.extractEngineConfigFromJSON(allEngines[0])
-		if err != nil {
-			orchestratorEngineLog.Printf("Failed to extract engine config: %v", err)
-			return "", nil, "", nil, fmt.Errorf("failed to extract engine config from included file: %w", err)
-		}
-		// Preserve the model from the main workflow frontmatter if already set;
-		// only fall back to the imported/shared workflow's model when the main
-		// workflow does not specify one (main workflow model takes precedence).
-		if model == "" {
-			model = extractedModel
-		}
-		if err := c.validateAndRegisterInlineEngineConfig(engineConfig); err != nil {
-			return "", nil, "", nil, err
-		}
-	} else if model == "" && len(allEngines) > 0 {
-		// engineConfig is non-nil (e.g. from top-level max-ai-credits or other
-		// budget fields) but model has not been set by the main workflow. Extract
-		// just the model from the imported engine config so that an engine.model
-		// pin in an imported file is not silently dropped.
-		_, extractedModel, extractErr := c.extractEngineConfigFromJSON(allEngines[0])
-		if extractErr == nil && extractedModel != "" {
-			model = extractedModel
-			orchestratorEngineLog.Printf("Applied model from imported engine config: %s", model)
-		}
+	engineConfig, model, err = c.mergeImportedEngineConfig(result.Frontmatter, allEngines, engineConfig, model)
+	if err != nil {
+		return "", nil, "", nil, err
 	}
 	if engineSetting == "" {
 		defaultEngine := c.engineRegistry.GetDefaultEngine()
@@ -352,6 +328,88 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 		orchestratorEngineLog.Printf("Normalized engineConfig.ID from engineSetting: %s", engineSetting)
 	}
 	return engineSetting, engineConfig, model, allEngines, nil
+}
+
+// mergeImportedEngineConfig resolves the engine config contributed by imports and
+// included files. The main workflow frontmatter may produce a non-nil engineConfig
+// without declaring an `engine:` block (top-level `model:`, `max-turns:`, etc.). Such
+// a config only carries top-level overrides, so the imported engine config must still
+// be extracted and the overrides re-applied on top of it; otherwise imported settings
+// such as `engine.auth` would be silently dropped.
+func (c *Compiler) mergeImportedEngineConfig(
+	frontmatter map[string]any,
+	allEngines []string,
+	engineConfig *EngineConfig,
+	model string,
+) (*EngineConfig, string, error) {
+	if len(allEngines) == 0 {
+		return engineConfig, model, nil
+	}
+	topLevelOnlyConfig := engineConfig
+	if engineConfig != nil && frontmatterDeclaresEngine(frontmatter) {
+		topLevelOnlyConfig = nil
+	}
+	if engineConfig != nil && topLevelOnlyConfig == nil {
+		// The main workflow declares its own `engine:` block, which wins. Only adopt
+		// the model from the imported engine config when the main workflow does not
+		// pin one, so that an engine.model pin in an import is not silently dropped.
+		if model == "" {
+			if _, extractedModel, extractErr := c.extractEngineConfigFromJSON(allEngines[0]); extractErr == nil && extractedModel != "" {
+				model = extractedModel
+				orchestratorEngineLog.Printf("Applied model from imported engine config: %s", model)
+			}
+		}
+		return engineConfig, model, nil
+	}
+	orchestratorEngineLog.Printf("Extracting engine config from included file")
+	importedConfig, extractedModel, err := c.extractEngineConfigFromJSON(allEngines[0])
+	if err != nil {
+		orchestratorEngineLog.Printf("Failed to extract engine config: %v", err)
+		return nil, "", fmt.Errorf("failed to extract engine config from included file: %w", err)
+	}
+	applyTopLevelOnlyEngineOverrides(importedConfig, topLevelOnlyConfig)
+	// Preserve the model from the main workflow frontmatter if already set; only fall
+	// back to the imported/shared workflow's model when the main workflow does not
+	// specify one (main workflow model takes precedence).
+	if model == "" {
+		model = extractedModel
+	}
+	if err := c.validateAndRegisterInlineEngineConfig(importedConfig); err != nil {
+		return nil, "", err
+	}
+	return importedConfig, model, nil
+}
+
+// frontmatterDeclaresEngine reports whether the main workflow frontmatter declares
+// an `engine:` key. When it does not, a non-nil engine config extracted from the
+// frontmatter only carries top-level overrides (model, max-turns, budgets).
+func frontmatterDeclaresEngine(frontmatter map[string]any) bool {
+	_, hasEngine := frontmatter["engine"]
+	return hasEngine
+}
+
+// applyTopLevelOnlyEngineOverrides copies the top-level workflow overrides (max-turns,
+// budgets) onto an engine config extracted from an import, so that top-level keys
+// keep taking precedence over imported engine values.
+func applyTopLevelOnlyEngineOverrides(engineConfig, topLevelOnly *EngineConfig) {
+	if engineConfig == nil || topLevelOnly == nil {
+		return
+	}
+	if topLevelOnly.MaxTurns != "" {
+		engineConfig.MaxTurns = topLevelOnly.MaxTurns
+	}
+	if topLevelOnly.MaxToolDenials != "" {
+		engineConfig.MaxToolDenials = topLevelOnly.MaxToolDenials
+	}
+	if topLevelOnly.MaxRuns > 0 {
+		engineConfig.MaxRuns = topLevelOnly.MaxRuns
+	}
+	if topLevelOnly.MaxTurnCacheMisses > 0 {
+		engineConfig.MaxTurnCacheMisses = topLevelOnly.MaxTurnCacheMisses
+	}
+	if topLevelOnly.MaxAICredits != 0 {
+		engineConfig.MaxAICredits = topLevelOnly.MaxAICredits
+	}
 }
 
 type engineImportDefaultsOptions struct {
