@@ -41,6 +41,12 @@ func TestForecastWorkflowRunAPIReportsDistribution(t *testing.T) {
 	assert.Positive(t, forecast.RequestUnits.StdDev)
 }
 
+func TestSummarizeForecastCountDistributionPreservesFractionalMean(t *testing.T) {
+	t.Parallel()
+	summary := summarizeForecastCountDistribution([]int{1, 2})
+	assert.InDelta(t, 1.5, summary.Mean, 1e-9)
+}
+
 func TestForecastWorkflowRunAPIFlagsResultLimitRisk(t *testing.T) {
 	t.Parallel()
 	forecast, _, _ := forecastWorkflowRunAPI(30, 1200, rand.New(rand.NewSource(2)))

@@ -64,9 +64,14 @@ func summarizeForecastCountDistribution(values []int) ForecastDistribution {
 	}
 	sorted := append([]int(nil), values...)
 	sort.Ints(sorted)
-	mean, stddev := meanStdDevInt(sorted)
+	_, stddev := meanStdDevInt(sorted)
+	var sum int64
+	for _, value := range sorted {
+		sum += int64(value)
+	}
+	mean := float64(sum) / float64(len(sorted))
 	return ForecastDistribution{
-		Mean:   math.Round(float64(mean)*1000) / 1000,
+		Mean:   math.Round(mean*1000) / 1000,
 		StdDev: math.Round(stddev*1000) / 1000,
 		P10:    percentileInt(sorted, 10),
 		P50:    percentileInt(sorted, 50),
