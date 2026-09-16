@@ -27,8 +27,7 @@ const TOKEN_USAGE_PATHS = [
 const AGENT_USAGE_PATH = path.join(TMP_GH_AW, "agent_usage.json");
 const MCP_GATEWAY_LOG_PATHS = [path.join(TMP_GH_AW, "mcp-logs/gateway.jsonl"), path.join(TMP_GH_AW, "mcp-logs/mcp-gateway.jsonl"), path.join(TMP_GH_AW, "mcp-logs/rpc-messages.jsonl")];
 const AGENT_OUTPUT_PATH = path.join(TMP_GH_AW, "agent_output.json");
-const AGENT_LOG_PATH = path.join(TMP_GH_AW, "agent.log");
-const AGENT_LOG_JSONL_PATH = path.join(TMP_GH_AW, "agent_log.jsonl");
+const COPILOT_SESSION_STATE_DIR = path.join(TMP_GH_AW, "sandbox", "agent", "logs", "copilot-session-state");
 const EVALS_RESULTS_PATH = path.join(TMP_GH_AW, "evals.jsonl");
 
 // Safety limits
@@ -199,12 +198,212 @@ function readEvalSummary() {
 }
 
 /**
+ * Find staged Copilot `events.jsonl` files (native agent event logs).
+ * Files are returned in sorted order so preprocessing is deterministic.
+ * @param {string} [sessionStateDir]
+ * @returns {string[]}
+ */
+function findAgentEventsFiles(sessionStateDir = COPILOT_SESSION_STATE_DIR) {
+  /** @type {string[]} */
+  const eventPaths = [];
+  try {
+    if (!fs.existsSync(sessionStateDir)) return eventPaths;
+    for (const entry of fs.readdirSync(sessionStateDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name === "events.jsonl") {
+        eventPaths.push(path.join(sessionStateDir, entry.name));
+      } else if (entry.isDirectory()) {
+        const candidate = path.join(sessionStateDir, entry.name, "events.jsonl");
+        if (fs.existsSync(candidate)) eventPaths.push(candidate);
+      }
+    }
+  } catch {
+    // Intentionally ignore unreadable session directories.
+    return eventPaths;
+  }
+  return eventPaths.sort();
+}
+
+/**
+ * Stable JSON stringification (object keys sorted) used for dedupe keys.
+ * @param {any} value
+ * @returns {string}
+ */
+function stableStringify(value) {
+  if (value === undefined) return "";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(",")}}`;
+  }
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Normalize a tool name for dedupe comparisons (case/separator insensitive).
+ * @param {any} name
+ * @returns {string}
+ */
+function normalizeToolName(name) {
+  return typeof name === "string" ? name.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+}
+
+/**
+ * Build the dedupe keys of a tool call record. A native record may be known by
+ * several aliases (bare tool name, MCP tool name, server-prefixed name), so all
+ * candidates are returned and any match counts as the same call.
+ * @param {any} call
+ * @returns {string[]}
+ */
+function toolCallDedupeKeys(call) {
+  const server = typeof call.mcpServerName === "string" ? call.mcpServerName : "";
+  const mcpToolName = typeof call.mcpToolName === "string" ? call.mcpToolName : "";
+  const names = [call.name, call.tool, call.tool_name, mcpToolName, server && mcpToolName ? `${server}-${mcpToolName}` : ""];
+  const argsKey = stableStringify(call.arguments);
+  const keys = new Set();
+  for (const name of names) {
+    const normalized = normalizeToolName(name);
+    if (normalized) keys.add(`${normalized}|${argsKey}`);
+  }
+  return [...keys];
+}
+
+/**
+ * Normalize native agent `events.jsonl` records into grader tool call entries.
+ * `tool.execution_start` produces the entry (name, arguments, toolCallId) and a
+ * matching `tool.execution_complete` supplies the `success` value. Calls without
+ * a completion stay distinguishable through `completed: false`.
+ * @param {any[]} entries
+ * @returns {any[]}
+ */
+function extractNativeToolCalls(entries) {
+  /** @type {any[]} */
+  const calls = [];
+  /** @type {Map<string, any>} */
+  const byCallId = new Map();
+  /** @type {Map<string, any[]>} */
+  const pendingByName = new Map();
+
+  for (const entry of entries) {
+    if (!isRecord(entry)) continue;
+    const data = isRecord(entry.data) ? entry.data : {};
+    const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : "";
+    const mcpServerName = typeof data.mcpServerName === "string" ? data.mcpServerName : "";
+
+    if (entry.type === "tool.execution_start") {
+      const name = typeof data.toolName === "string" ? data.toolName : "";
+      if (!name) continue;
+      /** @type {any} */
+      const call = {
+        source: "agent",
+        name,
+        tool: name,
+        completed: false,
+        ...(data.arguments === undefined ? {} : { arguments: data.arguments }),
+        ...(toolCallId ? { toolCallId } : {}),
+        ...(mcpServerName ? { mcpServerName } : {}),
+        ...(typeof data.mcpToolName === "string" && data.mcpToolName ? { mcpToolName: data.mcpToolName } : {}),
+        ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
+      };
+      calls.push(call);
+      if (toolCallId) {
+        byCallId.set(toolCallId, call);
+      } else {
+        const queue = pendingByName.get(name) ?? [];
+        queue.push(call);
+        pendingByName.set(name, queue);
+      }
+      continue;
+    }
+
+    if (entry.type !== "tool.execution_complete") continue;
+
+    const success = data.success === true;
+    let call = toolCallId ? byCallId.get(toolCallId) : undefined;
+    if (!call) {
+      // Copilot SDK-produced events omit toolCallId; correlate by tool name in order.
+      const name = typeof data.toolName === "string" ? data.toolName : "";
+      const queue = name ? pendingByName.get(name) : undefined;
+      if (queue && queue.length > 0) call = queue.shift();
+    }
+    if (!call) {
+      // Completion without a matching start: keep the record so the call is still visible.
+      const name = typeof data.toolName === "string" ? data.toolName : "";
+      if (!name) continue;
+      call = {
+        source: "agent",
+        name,
+        tool: name,
+        ...(toolCallId ? { toolCallId } : {}),
+        ...(mcpServerName ? { mcpServerName } : {}),
+        ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
+      };
+      calls.push(call);
+    }
+    if (toolCallId) {
+      call.toolCallId = toolCallId;
+      byCallId.delete(toolCallId);
+    }
+    call.completed = true;
+    call.success = success;
+    call.status = success ? "success" : "error";
+    if (!success && isRecord(data.error)) call.error = data.error;
+  }
+
+  return calls;
+}
+
+/**
+ * Merge native agent tool calls with MCP gateway derived ones, dropping gateway
+ * records that duplicate a native record (same tool name and arguments).
+ * @param {any[]} nativeCalls
+ * @param {any[]} gatewayCalls
+ * @returns {any[]}
+ */
+function mergeToolCalls(nativeCalls, gatewayCalls) {
+  if (nativeCalls.length === 0) return gatewayCalls;
+  /** @type {Map<string, number[]>} */
+  const index = new Map();
+  nativeCalls.forEach((call, i) => {
+    for (const key of toolCallDedupeKeys(call)) {
+      const bucket = index.get(key) ?? [];
+      bucket.push(i);
+      index.set(key, bucket);
+    }
+  });
+
+  /** @type {Set<number>} */
+  const consumed = new Set();
+  const merged = [...nativeCalls];
+  for (const gatewayCall of gatewayCalls) {
+    let duplicate = false;
+    for (const key of toolCallDedupeKeys(gatewayCall)) {
+      const bucket = index.get(key);
+      if (!bucket) continue;
+      const match = bucket.find(i => !consumed.has(i));
+      if (match === undefined) continue;
+      consumed.add(match);
+      duplicate = true;
+      break;
+    }
+    if (!duplicate) merged.push(gatewayCall);
+  }
+  return merged;
+}
+
+/**
  * @typedef {object} PreprocessedTrace
  * @property {any[]} tokenUsageEntries - Parsed token-usage JSONL records
  * @property {object|null} agentUsage - Parsed agent_usage.json
  * @property {any[]} mcpGatewayEntries - Parsed MCP gateway log records
  * @property {object|null} agentOutput - Parsed agent_output.json
- * @property {any[]} toolCalls - Extracted tool call records from MCP gateway
+ * @property {any[]} toolCalls - Extracted tool call records (native agent events + MCP gateway)
+ * @property {any[]} [nativeToolCalls] - Tool calls normalized from native agent events.jsonl
  * @property {any[]} gatewayRequests - Request/response pairs from gateway
  * @property {any[]} retryEvents - Detected retry events
  * @property {any[]} errorEvents - Detected error events
@@ -240,7 +439,7 @@ function preprocessTrace() {
 
   // Extract tool calls from MCP gateway entries.
   // Also support rpc fallback records that expose tool_name/payload.tool_name.
-  const toolCalls = mcpGatewayEntries
+  const gatewayToolCalls = mcpGatewayEntries
     .filter(e => {
       const payload = isRecord(e.payload) ? e.payload : null;
       return e.type === "tool_call" || e.method === "tools/call" || e.event === "tool_call" || typeof e.tool_name === "string" || (payload !== null && typeof payload.tool_name === "string");
@@ -256,6 +455,17 @@ function preprocessTrace() {
         arguments: e.arguments ?? args,
       };
     });
+
+  // Native agent tool calls (Copilot events.jsonl), including built-in tools such
+  // as `skill` that never reach the MCP gateway.
+  const nativeToolCalls = [];
+  for (const eventsPath of findAgentEventsFiles()) {
+    const eventsContent = safeReadFile(eventsPath);
+    if (eventsContent === null) continue;
+    nativeToolCalls.push(...extractNativeToolCalls(safeParseJsonl(eventsContent)));
+  }
+
+  const toolCalls = mergeToolCalls(nativeToolCalls, gatewayToolCalls);
 
   // Gateway request/response pairs
   const gatewayRequests = mcpGatewayEntries.filter(e => e.type === "request" || e.type === "response" || e.method);
@@ -296,6 +506,7 @@ function preprocessTrace() {
     mcpGatewayEntries,
     agentOutput,
     toolCalls,
+    nativeToolCalls,
     gatewayRequests,
     retryEvents,
     errorEvents,
@@ -856,6 +1067,10 @@ async function main(manifestB64, execSpecB64) {
 module.exports = {
   main,
   preprocessTrace,
+  findAgentEventsFiles,
+  COPILOT_SESSION_STATE_DIR,
+  extractNativeToolCalls,
+  mergeToolCalls,
   safeReadFile,
   safeParseJsonl,
   safeParseJson,
