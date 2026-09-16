@@ -686,13 +686,13 @@ jobs:
       - name: Install Playwright browsers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_playwright_browsers.sh" chromium
         env:
-          PLAYWRIGHT_BROWSERS_PATH: ${RUNNER_TEMP}/gh-aw/playwright-browsers
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers
         timeout-minutes: 10
       - name: Install Playwright CLI skills
         run: playwright-cli install --skills
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-          PLAYWRIGHT_BROWSERS_PATH: ${RUNNER_TEMP}/gh-aw/playwright-browsers
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers
         timeout-minutes: 10
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
@@ -2070,7 +2070,7 @@ jobs:
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: github-actions[bot]
-          PLAYWRIGHT_BROWSERS_PATH: ${RUNNER_TEMP}/gh-aw/playwright-browsers
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers
           RUNNER_TEMP: ${{ runner.temp }}
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
       - name: Detect agent errors
