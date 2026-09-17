@@ -712,7 +712,7 @@ func buildAWFEnclavesConfig(config EnclavesConfig) []map[string]any {
 			if githubTools := enclaveGitHubToolsConfig(enclave); githubTools != nil {
 				github := map[string]any{
 					"allowed":      stringSliceOrEmpty(githubTools.Allowed),
-					"allowedRepos": stringSliceOrEmpty(githubTools.AllowedRepos),
+					"allowedRepos": stringSliceOrEmpty(enclaveGitHubAllowedRepos(enclave)),
 				}
 				addEnclaveString(github, "minIntegrity", string(githubTools.MinIntegrity))
 				agent["tools"] = map[string]any{"github": github}

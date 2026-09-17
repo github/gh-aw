@@ -336,6 +336,24 @@ func TestBuildAWFConfigJSONEnclaveGitHubTools(t *testing.T) {
 	require.NoError(t, validateAWFConfigJSON(configJSON))
 }
 
+func TestBuildAWFConfigJSONEnclaveGitHubToolsUsesEffectiveRepos(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	data.Enclaves[0].Agent.Tools.GitHub.AllowedRepos = nil
+	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName: "copilot", WorkflowData: data,
+	})
+	require.NoError(t, err)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	enclaves := config["enclaves"].([]any)
+	agent := enclaves[0].(map[string]any)["agent"].(map[string]any)
+	tools := agent["tools"].(map[string]any)
+	github := tools["github"].(map[string]any)
+	assert.Equal(t, []any{"octo-org/private-service"}, github["allowedRepos"])
+	require.NoError(t, validateAWFConfigJSON(configJSON))
+}
+
 func TestBuildAWFConfigJSONDynamicEnclavePolicy(t *testing.T) {
 	data := dynamicEnclaveWorkflowData()
 	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
