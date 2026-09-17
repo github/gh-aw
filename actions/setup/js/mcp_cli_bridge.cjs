@@ -740,8 +740,8 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
 }
 
 /**
- * Detect inline JSON payload mode: a single positional argument that is a JSON
- * object, e.g. `safeoutputs noop '{"message":"done"}'`.
+ * Detect an inline JSON payload candidate: a single positional argument that
+ * is JSON, e.g. `safeoutputs noop '{"message":"done"}'`.
  *
  * Returns the trimmed JSON string when the sole positional argument looks like
  * JSON, otherwise null. The `--json` output flag is ignored regardless of
@@ -821,7 +821,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: args.some(isJsonFlag) };
+    return { args: result, json: args.some(isJsonOutputFlag) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -859,7 +859,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
         // --key=value style
         const key = raw.slice(0, eqIdx);
         if (key === "json") {
-          jsonOutput = true;
+          jsonOutput = parseJsonFlagValue(raw.slice(eqIdx + 1));
         } else {
           const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
           const rawValue = raw.slice(eqIdx + 1);
@@ -899,6 +899,22 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
  */
 function isJsonFlag(arg) {
   return arg === "--json" || arg.startsWith("--json=");
+}
+
+/**
+ * @param {string} value - Value supplied with --json=
+ * @returns {boolean}
+ */
+function parseJsonFlagValue(value) {
+  return !["", "0", "false"].includes(value.toLowerCase());
+}
+
+/**
+ * @param {string} arg - CLI argument
+ * @returns {boolean}
+ */
+function isJsonOutputFlag(arg) {
+  return arg === "--json" || (arg.startsWith("--json=") && parseJsonFlagValue(arg.slice("--json=".length)));
 }
 
 /**
