@@ -950,6 +950,7 @@ describe("mcp_cli_bridge.cjs", () => {
     });
 
     it("throws when the inline JSON argument is not an object", () => {
+      expect(() => parseToolArgs(["{} extra"], {})).toThrow(/inline JSON argument is not valid JSON/i);
       expect(() => parseToolArgs(["[1,2]"], {})).toThrow(/inline JSON argument must be a JSON object/i);
       expect(() => parseToolArgs(["null"], {})).toThrow(/inline JSON argument must be a JSON object/i);
     });

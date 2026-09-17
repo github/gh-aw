@@ -3188,7 +3188,12 @@ function isDroppedPipeSafeOutputsCommand(line) {
       } else i++;
       continue;
     }
-    if (char === "'" || char === '"' || char === "`") {
+    if (char === "`") {
+      writerSeen = false;
+      i++;
+      continue;
+    }
+    if (char === "'" || char === '"') {
       quote = char;
       i++;
       continue;

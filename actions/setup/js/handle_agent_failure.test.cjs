@@ -2602,6 +2602,7 @@ describe("handle_agent_failure", () => {
       expect(isDroppedPipeSafeOutputsCommand(`mkdir -p out; printf '{"message":"x"}' safeoutputs noop .`)).toBe(true);
       expect(isDroppedPipeSafeOutputsCommand(`echo "$(safeoutputs noop .)"`)).toBe(false);
       expect(isDroppedPipeSafeOutputsCommand(`printf '{}' $(safeoutputs noop .)`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand("printf '{}' `safeoutputs noop .`")).toBe(false);
       expect(isDroppedPipeSafeOutputsCommand(`safeoutputs noop --message "x"`)).toBe(false);
     });
 

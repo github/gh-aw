@@ -800,7 +800,6 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   let jsonOutput = false;
   const hasSchemaProperties = Object.keys(schemaProperties).length > 0;
   const { normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys } = buildNormalizedSchemaKeyMap(schemaProperties);
-  args.filter(isJsonFlagToken).forEach(jsonFlagIsEnabled);
 
   // Inline JSON payload mode: the whole payload is passed as a single quoted
   // argument, e.g. `safeoutputs noop '{"message":"done"}'`.  This keeps the
@@ -822,7 +821,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: args.filter(isJsonFlagToken).map(jsonFlagIsEnabled).some(Boolean) };
+    return { args: result, json: resolveJsonFlag(args) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -919,6 +918,18 @@ function parseJsonFlagValue(value) {
  */
 function jsonFlagIsEnabled(arg) {
   return arg === "--json" || (arg.startsWith("--json=") && parseJsonFlagValue(arg.slice("--json=".length)));
+}
+
+/**
+ * @param {string[]} args - CLI arguments
+ * @returns {boolean}
+ */
+function resolveJsonFlag(args) {
+  let enabled = false;
+  for (const arg of args) {
+    if (isJsonFlagToken(arg) && jsonFlagIsEnabled(arg)) enabled = true;
+  }
+  return enabled;
 }
 
 /**
@@ -1696,7 +1707,8 @@ async function main() {
   // leave the agent believing a safe output was emitted when none was.  Structured
   // payload modes are exempt: an explicit `{}` payload legitimately yields no arguments.
   const usedStructuredPayload = shouldReadStdin || findInlineJsonPayloadArg(toolUserArgs) !== null;
-  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && toolUserArgs.length > 0 && !usedStructuredPayload) {
+  const hasUnrecognizedArguments = toolUserArgs.some(arg => !isJsonFlagToken(arg));
+  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && hasUnrecognizedArguments && !usedStructuredPayload) {
     const message = `no arguments were recognized for '${toolName}'. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
     auditLog(serverName, { event: "unrecognized_args", tool: toolName });
     process.stderr.write(`Error: ${message}\n`);
