@@ -226,8 +226,11 @@ func TestRewriteExperimentsReferenceForDownstreamJobs(t *testing.T) {
 }
 
 func TestRewriteActivationOutputsToLocalStepOutputs(t *testing.T) {
-	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.model }}"))
-	assert.Equal(t, "no reference here", RewriteActivationOutputsToLocalStepOutputs("no reference here"))
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.model }}", experiments))
+	assert.Equal(t, "no reference here", RewriteActivationOutputsToLocalStepOutputs("no reference here", experiments))
+	// Undeclared experiment names are left untouched.
+	assert.Equal(t, "${{ needs.activation.outputs.unknown }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.unknown }}", experiments))
 }
 
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────

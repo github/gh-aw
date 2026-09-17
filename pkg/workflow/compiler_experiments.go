@@ -834,13 +834,21 @@ func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[stri
 	return rewriteExperimentsReference(s, experiments, activationOutputsPrefix)
 }
 
-// RewriteActivationOutputsToLocalStepOutputs converts a `needs.activation.outputs.<name>`
-// reference (as produced by RewriteExperimentsReferenceForDownstreamJobs) back into
-// `steps.pick-experiment.outputs.<name>`. Use this when a value already rewritten for
-// downstream jobs must instead be evaluated inside the activation job itself, where a job
-// cannot reference its own outputs via `needs`.
-func RewriteActivationOutputsToLocalStepOutputs(s string) string {
-	return strings.ReplaceAll(s, activationOutputsPrefix, pickExperimentOutputsPrefix)
+// RewriteActivationOutputsToLocalStepOutputs converts `needs.activation.outputs.<name>`
+// references (as produced by RewriteExperimentsReferenceForDownstreamJobs, for names declared
+// in experiments) back into `steps.pick-experiment.outputs.<name>`. Use this when a value
+// already rewritten for downstream jobs must instead be evaluated inside the activation job
+// itself, where a job cannot reference its own outputs via `needs`. Only declared experiment
+// names are rewritten, so an unrelated `needs.activation.outputs.*` reference (not produced by
+// the experiments rewrite) is left untouched.
+func RewriteActivationOutputsToLocalStepOutputs(s string, experiments map[string][]string) string {
+	if len(experiments) == 0 || !strings.Contains(s, activationOutputsPrefix) {
+		return s
+	}
+	for _, name := range sortedExperimentNames(experiments) {
+		s = strings.ReplaceAll(s, activationOutputsPrefix+name, pickExperimentOutputsPrefix+name)
+	}
+	return s
 }
 
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment

@@ -157,7 +157,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 		// (rewritten from engine.model: ${{ experiments.<name> }} for jobs downstream of
 		// activation). This step runs inside the activation job itself, so it must read the
 		// pick-experiment step's output directly rather than via the needs context.
-		infoModel := RewriteActivationOutputsToLocalStepOutputs(data.Model)
+		infoModel := RewriteActivationOutputsToLocalStepOutputs(data.Model, data.Experiments)
 		fmt.Fprintf(yaml, "          GH_AW_INFO_MODEL: \"%s\"\n", infoModel)
 	} else {
 		// Use the engine's default model as fallback when neither explicit model nor
