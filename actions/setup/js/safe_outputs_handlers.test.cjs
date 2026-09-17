@@ -624,13 +624,13 @@ describe("safe_outputs_handlers", () => {
 
     it("should rewrite an absolute path already present in staging to a relative path", () => {
       const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
-      fs.mkdirSync(stagingDir, { recursive: true });
-      const stagedFile = path.join(stagingDir, "already-staged.png");
+      const stagedFile = path.join(stagingDir, "nested", "already-staged.png");
+      fs.mkdirSync(path.dirname(stagedFile), { recursive: true });
       fs.writeFileSync(stagedFile, "staged data");
 
       handlers.uploadArtifactHandler({ path: stagedFile });
 
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "already-staged.png" }));
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "nested/already-staged.png" }));
       expect(fs.readFileSync(stagedFile, "utf8")).toBe("staged data");
     });
 
@@ -638,7 +638,7 @@ describe("safe_outputs_handlers", () => {
       const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
       fs.mkdirSync(stagingDir, { recursive: true });
 
-      expect(() => handlers.uploadArtifactHandler({ path: stagingDir })).toThrow(expect.objectContaining({ message: expect.stringContaining("path must identify a file or directory within the staging directory") }));
+      expect(() => handlers.uploadArtifactHandler({ path: stagingDir })).toThrow(expect.objectContaining({ message: expect.stringContaining("path must not be the staging directory itself") }));
     });
 
     it("should throw when relative path is not in staging and cannot be resolved from GITHUB_WORKSPACE", () => {

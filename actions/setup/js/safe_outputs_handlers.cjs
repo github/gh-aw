@@ -2716,7 +2716,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       if (canonicalFilePath === canonicalStagingDir) {
         throw {
           code: -32602,
-          message: `${ERR_VALIDATION}: upload_artifact: path must identify a file or directory within the staging directory`,
+          message: `${ERR_VALIDATION}: upload_artifact: path must not be the staging directory itself; specify a file or directory inside it`,
         };
       }
       const alreadyStaged = canonicalFilePath.startsWith(canonicalStagingDir + path.sep);
