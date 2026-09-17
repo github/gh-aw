@@ -3212,7 +3212,7 @@ function isDroppedPipeSafeOutputsCommand(line) {
  * @param {string} command - Redacted command excerpt
  * @returns {string}
  */
-function escapeMarkdownCodeFence(command) {
+function escapeBackticksForCodeFence(command) {
   return command.replace(/`/g, "\\`");
 }
 
@@ -3250,7 +3250,7 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
     if (!/(^|[|;&(\s"'`])safeoutputs\s+[a-z_][a-z0-9_]*/i.test(line)) continue;
     const redacted = applyAddMaskRedaction(line, maskedValues);
     const truncated = redacted.length > SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH ? `${redacted.slice(0, SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH)}…` : redacted;
-    const escaped = escapeMarkdownCodeFence(truncated);
+    const escaped = escapeBackticksForCodeFence(truncated);
     if (isDroppedPipeSafeOutputsCommand(line)) {
       hasDroppedPipe = true;
     }

@@ -744,8 +744,8 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
  * object, e.g. `safeoutputs noop '{"message":"done"}'`.
  *
  * Returns the trimmed JSON string when the sole positional argument looks like
- * JSON, otherwise null. Trailing flags (such as `--json`) are ignored when
- * finding the positional argument. Detection is intentionally permissive about
+ * JSON, otherwise null. The `--json` output flag is ignored regardless of
+ * position when finding the positional argument. Detection is intentionally permissive about
  * invalid objects and arrays so they produce a loud parse error instead of
  * being silently skipped as non-flag arguments.
  *
@@ -753,8 +753,8 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
  * @returns {string | null}
  */
 function findInlineJsonPayloadArg(args) {
-  if (args.some(arg => arg.startsWith("--") && arg !== "--json" && !arg.startsWith("--json="))) return null;
-  const positionalArgs = args.filter(arg => arg !== "--json" && !arg.startsWith("--json="));
+  if (args.some(arg => arg.startsWith("--") && !isJsonFlag(arg))) return null;
+  const positionalArgs = args.filter(arg => !isJsonFlag(arg));
   if (positionalArgs.length !== 1) return null;
   const trimmed = positionalArgs[0].trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
@@ -821,7 +821,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: args.some(arg => arg === "--json" || arg.startsWith("--json=")) };
+    return { args: result, json: args.some(isJsonFlag) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -891,6 +891,14 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   }
 
   return { args: result, json: jsonOutput };
+}
+
+/**
+ * @param {string} arg - CLI argument
+ * @returns {boolean}
+ */
+function isJsonFlag(arg) {
+  return arg === "--json" || arg.startsWith("--json=");
 }
 
 /**
