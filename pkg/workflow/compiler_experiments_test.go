@@ -209,6 +209,16 @@ func TestExperimentExpressionMappings(t *testing.T) {
 	assert.Equal(t, "steps.pick-experiment.outputs.style", m2.Content, "content should be the step output expression")
 }
 
+func TestRewriteExperimentsReferenceForActivationJob(t *testing.T) {
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.model }}"))
+	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForActivationJob("no reference here"))
+}
+
+func TestRewriteExperimentsReferenceForDownstreamJobs(t *testing.T) {
+	assert.Equal(t, "${{ needs.activation.outputs.model }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }}"))
+	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForDownstreamJobs("no reference here"))
+}
+
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────
 
 func TestBuildExperimentArtifactDownloadStep_Empty(t *testing.T) {

@@ -954,6 +954,54 @@ safe-outputs:
 	assert.Equal(t, "gpt-5-mini", metadata.DetectionAgentModel)
 }
 
+// TestCompileClaudeWithExperimentsModel ensures that ${{ experiments.<name> }} used as
+// engine.model is rewritten to a valid GitHub Actions expression everywhere it lands in the
+// compiled lock file, instead of the literal (invalid) `experiments` context reference.
+// Regression test for https://github.com/github/gh-aw/issues/61584.
+func TestCompileClaudeWithExperimentsModel(t *testing.T) {
+	workflowPath := filepath.Join(testutil.TempDir(t, "claude-experiments-model-test"), "workflow.md")
+	workflowContent := `---
+on:
+  workflow_dispatch:
+engine:
+  id: claude
+  model: ${{ experiments.model }}
+experiments:
+  model: [sonnet, opus]
+safe-outputs:
+  noop:
+---
+
+# Test Workflow
+
+Write a haiku and say Done.
+`
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+		t.Fatalf("CompileWorkflow failed: %v", err)
+	}
+	lockFile, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	if err != nil {
+		t.Fatalf("ReadFile lock file failed: %v", err)
+	}
+	lock := string(lockFile)
+
+	// The literal (invalid) "experiments" context must never appear in the compiled workflow.
+	assert.NotContains(t, lock, "experiments.model }}", "the raw experiments.model expression must be rewritten")
+
+	// Within the activation job (same job as the pick-experiment step), the info step must
+	// read the step output directly since a job cannot reference its own outputs via needs.
+	assert.Contains(t, lock, `GH_AW_INFO_MODEL: "${{ steps.pick-experiment.outputs.model }}"`)
+
+	// Everywhere else (agent job env, safe-outputs job env), the activation job's output
+	// must be referenced via the needs context.
+	assert.Contains(t, lock, "ANTHROPIC_MODEL: ${{ needs.activation.outputs.model }}")
+	assert.Contains(t, lock, `GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model }}"`)
+}
+
 func TestCompileCodexWithCopilotModel(t *testing.T) {
 	workflowPath := filepath.Join(testutil.TempDir(t, "codex-copilot-model-test"), "workflow.md")
 	workflowContent := `---

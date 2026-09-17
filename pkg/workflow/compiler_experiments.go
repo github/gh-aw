@@ -778,6 +778,31 @@ func sortedExperimentNames(experiments map[string][]string) []string {
 	return names
 }
 
+// experimentsFieldReferenceRegex matches `experiments.<name>` tokens (simple identifier)
+// appearing anywhere inside a raw configuration string, such as an `engine.model` value.
+// Unlike experimentNameRegex/experimentComparisonRegex in expression_extraction.go, this
+// pattern is not anchored, so it can rewrite the reference wherever it appears inside a
+// larger ${{ ... }} expression (e.g. "${{ experiments.model }}").
+var experimentsFieldReferenceRegex = regexp.MustCompile(`\bexperiments\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+
+// RewriteExperimentsReferenceForActivationJob rewrites `experiments.<name>` references in s
+// to `steps.pick-experiment.outputs.<name>`. Use this for expressions evaluated within the
+// activation job itself (e.g. the "Generate agentic run info" step), where the experiment
+// variant was just selected by the earlier pick-experiment step in the same job. A job
+// cannot reference its own outputs via the `needs` context, so `needs.activation.outputs.*`
+// is not valid here.
+func RewriteExperimentsReferenceForActivationJob(s string) string {
+	return experimentsFieldReferenceRegex.ReplaceAllString(s, "steps.pick-experiment.outputs.$1")
+}
+
+// RewriteExperimentsReferenceForDownstreamJobs rewrites `experiments.<name>` references in s
+// to `needs.activation.outputs.<name>`. Use this for expressions evaluated in any job other
+// than activation (agent, detection, conclusion, safe-outputs, etc.), where the experiment
+// variant is exposed via the activation job's outputs (see buildActivationJob).
+func RewriteExperimentsReferenceForDownstreamJobs(s string) string {
+	return experimentsFieldReferenceRegex.ReplaceAllString(s, "needs.activation.outputs.$1")
+}
+
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment
 // artifact from the activation job.
 // For workflow_call workflows the runtime prefix expression is prepended.
