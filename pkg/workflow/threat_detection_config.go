@@ -21,6 +21,7 @@ type ThreatDetectionConfig struct {
 	RunsOn              string        `yaml:"runs-on,omitempty"`           // Runner override for the detection job
 	Environment         string        `yaml:"environment,omitempty"`       // GitHub Actions environment override for the detection job (defaults to top-level environment when OIDC is used)
 	ContinueOnError     *bool         `yaml:"continue-on-error,omitempty"` // When true (default), detection failures produce warnings instead of blocking safe outputs
+	ReportAsIssue       *bool         `yaml:"report-as-issue,omitempty"`   // When true (default), detection warnings/failures create/update the "[aw] Detection Runs" tracking issue
 	EnabledExpr         *string       `yaml:"-"`                           // Expression form of the enabled flag, e.g. "${{ inputs.enable-threat-detection }}"
 	ContinueOnErrorExpr *string       `yaml:"-"`                           // Expression form of continue-on-error, e.g. "${{ inputs.coe }}"
 }
@@ -31,6 +32,13 @@ type ThreatDetectionConfig struct {
 // true as a safe compile-time default (matches the default behaviour).
 func (td *ThreatDetectionConfig) IsContinueOnError() bool {
 	return td.ContinueOnError == nil || *td.ContinueOnError
+}
+
+// IsReportAsIssueEnabled reports whether detection warnings/failures should create
+// or update the "[aw] Detection Runs" tracking issue. Defaults to true (enabled)
+// when not explicitly set, preserving existing behaviour.
+func (td *ThreatDetectionConfig) IsReportAsIssueEnabled() bool {
+	return td == nil || td.ReportAsIssue == nil || *td.ReportAsIssue
 }
 
 // HasRunnableDetection reports whether this config will produce a detection job
@@ -118,6 +126,17 @@ func (c *Compiler) parseThreatDetectionConfig(outputMap map[string]any) *ThreatD
 func (c *Compiler) parseThreatDetectionObjectConfig(configMap map[string]any) *ThreatDetectionConfig {
 	threatConfig := &ThreatDetectionConfig{}
 
+	parseThreatDetectionScalarFields(configMap, threatConfig)
+	c.parseThreatDetectionEngineField(configMap, threatConfig)
+
+	threatLog.Printf("Threat detection configured with custom prompt: %v, custom pre-steps: %v, custom post-steps: %v", threatConfig.Prompt != "", len(threatConfig.Steps) > 0, len(threatConfig.PostSteps) > 0)
+	return threatConfig
+}
+
+// parseThreatDetectionScalarFields parses the non-engine fields of the threat-detection
+// object configuration (prompt, steps, post-steps, budgets, runner, and reporting flags)
+// into threatConfig.
+func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
 	// Parse prompt field
 	if prompt, exists := configMap["prompt"]; exists {
 		if promptStr, ok := prompt.(string); ok {
@@ -170,6 +189,13 @@ func (c *Compiler) parseThreatDetectionObjectConfig(configMap map[string]any) *T
 		threatConfig.RunsOn = renderRunsOnSnippet(runOn)
 	}
 
+	parseThreatDetectionReportingFields(configMap, threatConfig)
+}
+
+// parseThreatDetectionReportingFields parses the fields that control how detection
+// results are enforced and reported (continue-on-error and report-as-issue) into
+// threatConfig.
+func parseThreatDetectionReportingFields(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
 	// Parse continue-on-error field (default: true).
 	// Accepts a literal bool or a GitHub Actions expression string.
 	if coe, exists := configMap["continue-on-error"]; exists {
@@ -185,31 +211,41 @@ func (c *Compiler) parseThreatDetectionObjectConfig(configMap map[string]any) *T
 		}
 	}
 
-	// Parse engine field (supports string, object, and boolean false formats)
-	if engine, exists := configMap["engine"]; exists {
-		// Handle boolean false to disable AI engine
-		if engineBool, ok := engine.(bool); ok {
-			if !engineBool {
-				threatLog.Print("Threat detection AI engine disabled")
-				// engine: false means no AI engine steps
-				threatConfig.EngineConfig = nil
-				threatConfig.EngineDisabled = true
-			}
-		} else if engineStr, ok := engine.(string); ok {
-			threatLog.Printf("Threat detection engine set to: %s", engineStr)
-			// Handle string format
-			threatConfig.EngineConfig = &EngineConfig{ID: engineStr}
-		} else if engineObj, ok := engine.(map[string]any); ok {
-			threatLog.Print("Parsing threat detection engine configuration")
-			// Handle object format - use extractEngineConfig logic
-			_, engineConfig, model := c.ExtractEngineConfig(map[string]any{"engine": engineObj})
-			threatConfig.EngineConfig = engineConfig
-			threatConfig.Model = model
+	// Parse report-as-issue field (default: true).
+	if reportAsIssue, exists := configMap["report-as-issue"]; exists {
+		if boolVal, ok := reportAsIssue.(bool); ok {
+			threatConfig.ReportAsIssue = &boolVal
+			threatLog.Printf("Threat detection report-as-issue set to: %v", boolVal)
 		}
 	}
+}
 
-	threatLog.Printf("Threat detection configured with custom prompt: %v, custom pre-steps: %v, custom post-steps: %v", threatConfig.Prompt != "", len(threatConfig.Steps) > 0, len(threatConfig.PostSteps) > 0)
-	return threatConfig
+// parseThreatDetectionEngineField parses the engine field (supports string, object, and
+// boolean false formats) into threatConfig.
+func (c *Compiler) parseThreatDetectionEngineField(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
+	engine, exists := configMap["engine"]
+	if !exists {
+		return
+	}
+	// Handle boolean false to disable AI engine
+	if engineBool, ok := engine.(bool); ok {
+		if !engineBool {
+			threatLog.Print("Threat detection AI engine disabled")
+			// engine: false means no AI engine steps
+			threatConfig.EngineConfig = nil
+			threatConfig.EngineDisabled = true
+		}
+	} else if engineStr, ok := engine.(string); ok {
+		threatLog.Printf("Threat detection engine set to: %s", engineStr)
+		// Handle string format
+		threatConfig.EngineConfig = &EngineConfig{ID: engineStr}
+	} else if engineObj, ok := engine.(map[string]any); ok {
+		threatLog.Print("Parsing threat detection engine configuration")
+		// Handle object format - use extractEngineConfig logic
+		_, engineConfig, model := c.ExtractEngineConfig(map[string]any{"engine": engineObj})
+		threatConfig.EngineConfig = engineConfig
+		threatConfig.Model = model
+	}
 }
 
 // extractRawExpression strips the "${{" prefix and "}}" suffix from a GitHub Actions

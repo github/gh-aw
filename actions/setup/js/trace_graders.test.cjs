@@ -9,6 +9,10 @@ const crypto = require("crypto");
 const {
   main,
   preprocessTrace,
+  findAgentEventsFiles,
+  extractNativeToolCalls,
+  mergeToolCalls,
+  COPILOT_SESSION_STATE_DIR,
   safeReadFile,
   safeParseJsonl,
   safeParseJson,
@@ -1272,6 +1276,236 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(trace.toolCalls.length).toBeGreaterThan(0);
       expect(trace.toolCalls[0].name).toBe("github-mcp-server-search_code");
       expect(trace.toolCalls[0].arguments).toEqual({ query: "foo" });
+    });
+  });
+
+  // --- Native Copilot events.jsonl tool calls ---
+  describe("native agent tool calls", () => {
+    const mcpLogsDir = "/tmp/gh-aw/mcp-logs";
+    const rpcMessagesPath = path.join(mcpLogsDir, "rpc-messages.jsonl");
+    const sessionDir = path.join(COPILOT_SESSION_STATE_DIR, "session-1");
+    const eventsPath = path.join(sessionDir, "events.jsonl");
+
+    /** @param {any[]} events */
+    function writeEvents(events) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(eventsPath, events.map(e => JSON.stringify(e)).join("\n") + "\n", "utf8");
+    }
+
+    beforeEach(() => {
+      // Session state staged by other runs must not leak into discovery assertions.
+      fs.rmSync(COPILOT_SESSION_STATE_DIR, { recursive: true, force: true });
+    });
+
+    afterEach(() => {
+      if (fs.existsSync(rpcMessagesPath)) fs.unlinkSync(rpcMessagesPath);
+      fs.rmSync(COPILOT_SESSION_STATE_DIR, { recursive: true, force: true });
+    });
+
+    it("finds staged events.jsonl files deterministically", () => {
+      writeEvents([{ type: "user.message", timestamp: "2026-01-01T00:00:00Z", data: {} }]);
+      fs.mkdirSync(path.join(COPILOT_SESSION_STATE_DIR, "session-0"), { recursive: true });
+      fs.writeFileSync(path.join(COPILOT_SESSION_STATE_DIR, "session-0", "events.jsonl"), "", "utf8");
+
+      expect(findAgentEventsFiles()).toEqual([path.join(COPILOT_SESSION_STATE_DIR, "session-0", "events.jsonl"), eventsPath]);
+    });
+
+    it("returns no files when the session directory is missing", () => {
+      expect(findAgentEventsFiles(path.join(COPILOT_SESSION_STATE_DIR, "missing"))).toEqual([]);
+    });
+
+    it("normalizes a native skill invocation with arguments and toolCallId", () => {
+      const calls = extractNativeToolCalls([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", arguments: { skill: "documentation" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: true } },
+      ]);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe("skill");
+      expect(calls[0].toolCallId).toBe("call-1");
+      expect(calls[0].arguments).toEqual({ skill: "documentation" });
+      expect(calls[0].success).toBe(true);
+      expect(calls[0].status).toBe("success");
+      expect(calls[0].completed).toBe(true);
+    });
+
+    it("marks failed completions and keeps error details", () => {
+      const calls = extractNativeToolCalls([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "bash", arguments: { command: "false" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: false, error: { message: "exit 1" } } },
+      ]);
+
+      expect(calls[0].success).toBe(false);
+      expect(calls[0].status).toBe("error");
+      expect(calls[0].error).toEqual({ message: "exit 1" });
+    });
+
+    it("keeps calls without a completion distinguishable from successful calls", () => {
+      const calls = extractNativeToolCalls([{ type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", arguments: { skill: "documentation" } } }]);
+
+      expect(calls[0].completed).toBe(false);
+      expect(calls[0].success).toBeUndefined();
+      expect(calls[0].status).toBeUndefined();
+    });
+
+    it("correlates completions by tool name when toolCallId is absent", () => {
+      const calls = extractNativeToolCalls([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolName: "bash" } },
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:01Z", data: { toolName: "bash" } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:02Z", data: { toolName: "bash", success: true } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:03Z", data: { toolName: "bash", success: false } },
+      ]);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0].success).toBe(true);
+      expect(calls[1].success).toBe(false);
+    });
+
+    it("keeps completions that have no matching start", () => {
+      const calls = extractNativeToolCalls([{ type: "tool.execution_complete", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-9", toolName: "view", success: true } }]);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe("view");
+      expect(calls[0].success).toBe(true);
+    });
+
+    it("deduplicates gateway records that duplicate a native MCP call", () => {
+      const nativeCalls = [{ source: "agent", name: "search_code", tool: "search_code", mcpServerName: "github-mcp-server", mcpToolName: "search_code", arguments: { query: "foo" }, success: true, completed: true }];
+      const gatewayCalls = [
+        { name: "github-mcp-server-search_code", tool: "github-mcp-server-search_code", arguments: { query: "foo" } },
+        { name: "github-mcp-server-search_code", tool: "github-mcp-server-search_code", arguments: { query: "bar" } },
+      ];
+
+      const merged = mergeToolCalls(nativeCalls, gatewayCalls);
+      expect(merged).toHaveLength(2);
+      expect(merged[0].source).toBe("agent");
+      expect(merged[1].arguments).toEqual({ query: "bar" });
+    });
+
+    it("keeps gateway records when there are no native calls", () => {
+      const gatewayCalls = [{ name: "bash", arguments: { command: "ls" } }];
+      expect(mergeToolCalls([], gatewayCalls)).toEqual(gatewayCalls);
+    });
+
+    it("merges native and gateway tool calls during preprocessing", () => {
+      writeEvents([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", arguments: { skill: "documentation" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: true } },
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:02Z", data: { toolCallId: "call-2", toolName: "search_code", mcpServerName: "github-mcp-server", mcpToolName: "search_code", arguments: { query: "foo" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:03Z", data: { toolCallId: "call-2", success: true } },
+      ]);
+      fs.mkdirSync(mcpLogsDir, { recursive: true });
+      fs.writeFileSync(rpcMessagesPath, JSON.stringify({ event: "rpc", tool_name: "github-mcp-server-search_code", payload: { tool_name: "github-mcp-server-search_code", arguments: { query: "foo" } } }) + "\n", "utf8");
+
+      const trace = preprocessTrace();
+      expect(trace.nativeToolCalls).toHaveLength(2);
+      expect(trace.toolCalls).toHaveLength(2);
+      expect(trace.toolCalls.map(call => call.name)).toEqual(["skill", "search_code"]);
+    });
+
+    it("preserves structured input written under the SDK `input` field", () => {
+      const calls = extractNativeToolCalls([{ type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", input: { skill: "documentation" } } }]);
+
+      expect(calls[0].arguments).toEqual({ skill: "documentation" });
+    });
+
+    it("correlates completions when only some events carry a toolCallId", () => {
+      const calls = extractNativeToolCalls([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "bash", input: { command: "first" } } },
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:01Z", data: { toolName: "bash", input: { command: "second" } } },
+        // Completion without an id must consume the oldest pending start, even though
+        // that start carried an id.
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:02Z", data: { toolName: "bash", success: true } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:03Z", data: { toolName: "bash", success: false } },
+      ]);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0].arguments).toEqual({ command: "first" });
+      expect(calls[0].success).toBe(true);
+      expect(calls[1].arguments).toEqual({ command: "second" });
+      expect(calls[1].success).toBe(false);
+    });
+
+    it("does not merge distinct tools whose names differ only by separators", () => {
+      const nativeCalls = [{ source: "agent", name: "list_issues", tool: "list_issues", arguments: { repo: "gh-aw" }, success: true, completed: true }];
+      const gatewayCalls = [{ name: "list-issues", tool: "list-issues", arguments: { repo: "gh-aw" } }];
+
+      expect(mergeToolCalls(nativeCalls, gatewayCalls)).toHaveLength(2);
+    });
+
+    it("deduplicates JSON-RPC tools/call gateway records against native calls", () => {
+      writeEvents([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "list_issues", mcpServerName: "github", mcpToolName: "list_issues", input: { repo: "gh-aw" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: true } },
+      ]);
+      fs.mkdirSync(mcpLogsDir, { recursive: true });
+      fs.writeFileSync(
+        rpcMessagesPath,
+        JSON.stringify({
+          timestamp: "2026-01-01T00:00:00Z",
+          event: "rpc_request",
+          _schema: "rpc-message/v2",
+          direction: "OUT",
+          server_id: "github",
+          method: "tools/call",
+          payload: { jsonrpc: "2.0", method: "tools/call", params: { name: "list_issues", arguments: { repo: "gh-aw" } } },
+        }) + "\n",
+        "utf8"
+      );
+
+      const trace = preprocessTrace();
+      expect(trace.toolCalls).toHaveLength(1);
+      expect(trace.toolCalls[0].source).toBe("agent");
+    });
+
+    it("normalizes JSON-RPC tools/call name and arguments when there is no native call", () => {
+      fs.mkdirSync(mcpLogsDir, { recursive: true });
+      fs.writeFileSync(
+        rpcMessagesPath,
+        JSON.stringify({
+          timestamp: "2026-01-01T00:00:00Z",
+          event: "rpc_request",
+          server_id: "github",
+          method: "tools/call",
+          payload: { jsonrpc: "2.0", method: "tools/call", params: { name: "list_issues", arguments: { repo: "gh-aw" } } },
+        }) + "\n",
+        "utf8"
+      );
+
+      const trace = preprocessTrace();
+      expect(trace.toolCalls).toHaveLength(1);
+      expect(trace.toolCalls[0].name).toBe("list_issues");
+      expect(trace.toolCalls[0].arguments).toEqual({ repo: "gh-aw" });
+    });
+
+    it("scores an incomplete native call as a tool failure", () => {
+      const trace = makeTrace({ toolCalls: [{ source: "agent", name: "skill", arguments: { skill: "documentation" }, completed: false }] });
+
+      expect(BUILTIN_GRADERS["tool-success-rate"](trace)).toBe(0);
+      expect(BUILTIN_GRADERS["tool-failure-count"](trace)).toBe(1);
+    });
+
+    it("does not let an incomplete skill call satisfy skill-constraint-coverage", () => {
+      writeEvents([{ type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", input: { skill: "documentation" } } }]);
+
+      const trace = preprocessTrace();
+      const result = runSkillConstraintCoverage({ toolCalls: trace.toolCalls }, { constraints: [{ id: "uses-documentation-skill", pattern: "skill .*documentation" }] });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("exercised=1 covered=0");
+    });
+
+    it("lets skill-constraint-coverage match a native skill invocation", () => {
+      writeEvents([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", arguments: { skill: "documentation" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: true } },
+      ]);
+
+      const trace = preprocessTrace();
+      const result = runSkillConstraintCoverage({ toolCalls: trace.toolCalls }, { constraints: [{ id: "uses-documentation-skill", pattern: "skill .*documentation" }] });
+
+      expect(result.value).toBe(1);
+      expect(result.details).toContain("exercised=1 covered=1");
     });
   });
 

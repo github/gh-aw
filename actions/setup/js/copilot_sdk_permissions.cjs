@@ -14,7 +14,7 @@
 "use strict";
 
 const path = require("path");
-const { extractCommandNamesFromPipeline } = require("./bash_command_parser.cjs");
+const { extractCommandNamesFromPipeline, splitOnPipelineOperators } = require("./bash_command_parser.cjs");
 
 /** @const {number} Default maximum number of permission denials before the session is stopped. */
 const MAX_TOOL_DENIALS_DEFAULT = 5;
@@ -246,29 +246,76 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
   const readablePathPatterns = shellRules.flatMap(extractReadablePathPatternsFromShellRule);
 
   /**
-   * Returns true if a single command identifier matches any of the shell rules.
+   * Returns true when `segmentText` is exactly `prefix`, or begins with `prefix`
+   * followed by a word boundary (a space). Used to match multiword `:*` rule
+   * prefixes (for example `"git checkout:*"`) against a full pipeline segment
+   * such as `"git checkout -b automation/repro"`, since a subcommand like
+   * `checkout` cannot be captured by a single executable-name identifier.
    *
-   * Three rule formats are recognised:
-   *  - **Wildcard** (`cmd:*`)  — the identifier must equal the prefix before `:*`.
-   *    Example: rule `"safeoutputs:*"` matches identifier `"safeoutputs"`.
-   *  - **Single-word** (`cmd`) — the identifier must equal the rule exactly.
-   *    Example: rule `"ls"` matches identifier `"ls"` only.
-   *  - **Full-command** (`cmd arg …`) — rules that contain a space are intentionally
-   *    **not** tested here.  They represent exact full-command constraints and are
-   *    only meaningful when compared against the whole command text, not against
-   *    individual pipeline stages.
-   *
-   * @param {string} identifier - A single command name (e.g. "ls", "git", "safeoutputs")
-   * @returns {boolean} True when any shell rule permits the identifier
+   * @param {string} segmentText
+   * @param {string} prefix
+   * @returns {boolean}
    */
-  function isIdentifierAllowedByShellRules(identifier) {
+  function segmentStartsWithPrefix(segmentText, prefix) {
+    if (!prefix) return false;
+    if (/[`]|[$][(]|[<>][(]|&/.test(segmentText)) return false;
+    const normalizedSegment = segmentText.trim().replace(/\s+/g, " ");
+    const normalizedPrefix = prefix.trim().replace(/\s+/g, " ");
+    return normalizedSegment === normalizedPrefix || normalizedSegment.startsWith(`${normalizedPrefix} `);
+  }
+
+  /**
+   * @param {string} segmentText
+   * @returns {boolean}
+   */
+  function isNonExecutableShellSegment(segmentText) {
+    if (/[$][(]|[`]|[<>][(]/.test(segmentText)) return false;
+    if (/^(?:[A-Za-z_][A-Za-z0-9_]*=(?:"(?:[^"\\]|\\.)*"|'[^']*'|\S*)\s*)+$/.test(segmentText)) return true;
+    if (/^(?:for|select)\s+[A-Za-z_][A-Za-z0-9_]*(?:\s+in(?:\s+.*)?)?$/.test(segmentText)) return true;
+    if (/^case\s+.+\s+in$/.test(segmentText)) return true;
+    return /^(?:then|else|do|fi|done|esac|\{|\})$/.test(segmentText);
+  }
+
+  /**
+   * Returns true if a single pipeline segment (a full command/subcommand
+   * invocation, e.g. `"git checkout -b automation/repro"`) is allowed by any
+   * shell rule.
+   *
+   * Matches multiword `:*` prefixes (rules whose prefix itself contains a
+   * space, such as `"git checkout:*"` or `"git branch:*"`) against the segment
+   * text, single-word/`:*` rules against the segment's executable name, and
+   * exact full-command rules (rules containing a space with no `:*` suffix)
+   * against the segment text as a whole. This is required regardless of what
+   * the SDK reports as the command `identifier` for the segment: the SDK may
+   * report only the executable name (e.g. `"git"`), the entire segment text,
+   * or no identifier at all — none of which reliably exposes the subcommand
+   * word needed to test a multiword prefix.
+   *
+   * @param {string} segmentText - A single shell segment (no pipeline operators)
+   * @returns {boolean} True when any shell rule permits the segment
+   */
+  function isSegmentAllowedByShellRules(segmentText) {
+    const trimmedSegment = String(segmentText || "").trim();
+    if (!trimmedSegment) return false;
+    const name = extractCommandNamesFromPipeline(trimmedSegment)[0];
+    if (!name) {
+      const keywordMatch = trimmedSegment.match(/^(if|while|until|time|coproc)\b\s*(.*)$/s);
+      if (keywordMatch) {
+        return keywordMatch[2].length > 0 && isSegmentAllowedByShellRules(keywordMatch[2]);
+      }
+      return isNonExecutableShellSegment(trimmedSegment);
+    }
     return shellRules.some(rule => {
       if (rule.endsWith(":*")) {
         const prefix = rule.slice(0, -2).trim();
-        return prefix.length > 0 && identifier === prefix;
+        if (!prefix) return false;
+        if (prefix.includes(" ")) {
+          return segmentStartsWithPrefix(trimmedSegment, prefix);
+        }
+        return name === prefix;
       }
       if (!rule.includes(" ")) {
-        return identifier === rule;
+        return name === rule;
       }
       return false;
     });
@@ -282,68 +329,43 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
     switch (request.kind) {
       case "shell": {
         if (allowedToolEntries.has("shell")) return true;
-        const commandIdentifiers = Array.isArray(request.commands) ? request.commands.map(cmd => cmd?.identifier).filter(Boolean) : [];
-        const normalizedCommandIdentifiers = [
-          ...new Set(
-            commandIdentifiers.flatMap(identifier => {
-              const text = String(identifier || "").trim();
-              if (!text) return [];
-              const parsedNames = extractCommandNamesFromPipeline(text);
-              return parsedNames.length > 0 ? [text, ...parsedNames] : [text];
-            })
-          ),
-        ];
         const fullCommand = String(request.fullCommandText || "").trim();
 
-        // Primary path: the SDK provided command identifiers.
-        // Use original matching logic: single-word and :* rules match identifiers,
-        // rules with spaces are compared against the full command text.
-        if (normalizedCommandIdentifiers.length > 0) {
-          return shellRules.some(rule => {
-            if (rule.endsWith(":*")) {
-              const prefix = rule.slice(0, -2).trim();
-              return prefix.length > 0 && normalizedCommandIdentifiers.includes(prefix);
-            }
-            if (!rule.includes(" ")) {
-              return normalizedCommandIdentifiers.includes(rule);
-            }
-            return fullCommand === rule;
-          });
+        if (shellRules.some(rule => rule.includes(" ") && !rule.endsWith(":*") && fullCommand === rule)) {
+          return true;
         }
 
-        // Fallback path: SDK did not supply command identifiers (common for complex
-        // piped / chained commands such as `ls /tmp && cat file.json || echo "done"`).
-        // Parse fullCommandText to extract the executable name from each pipeline
-        // stage and verify that every stage is individually allowed.
+        // Primary path: split the full command text into pipeline segments and
+        // verify that every segment is individually allowed. This is preferred
+        // over the SDK-provided `commands[].identifier` values because those
+        // identifiers are unreliable for matching multiword `:*` prefixes
+        // (for example `"git checkout:*"`): the SDK may report only the
+        // executable name (`"git"`), the entire segment text, or no identifier
+        // at all — none of which reliably exposes the subcommand word
+        // (`"checkout"`) needed to test the prefix. Parsing fullCommandText
+        // ourselves keeps command-chain matching (all stages must be
+        // individually allowed) and multiword-prefix matching consistent.
         if (fullCommand) {
-          const parsedNames = extractCommandNamesFromPipeline(fullCommand);
-
-          if (parsedNames.length > 1) {
-            // Multi-stage pipeline: ALL stages must be individually allowed.
-            // Exact full-command rules (with spaces) do not apply to individual
-            // pipeline stages — only single-word and :* prefix rules.
-            return parsedNames.every(name => isIdentifierAllowedByShellRules(name));
+          const segments = splitOnPipelineOperators(fullCommand);
+          if (segments.length > 0) {
+            return segments.every(segment => isSegmentAllowedByShellRules(segment));
           }
-
-          if (parsedNames.length === 1) {
-            // Single parsed command: apply the same logic as for a single SDK identifier,
-            // including exact full-command rule matching for rules that contain spaces.
-            const [name] = parsedNames;
-            return shellRules.some(rule => {
-              if (rule.endsWith(":*")) {
-                const prefix = rule.slice(0, -2).trim();
-                return prefix.length > 0 && name === prefix;
-              }
-              if (!rule.includes(" ")) {
-                return name === rule;
-              }
-              return fullCommand === rule;
-            });
-          }
-
-          // Could not extract any command names (e.g. complex subshell-only command).
+          // Could not split into segments (e.g. complex subshell-only command).
           // Last resort: try an exact full-command match against rules with spaces.
           return shellRules.some(rule => rule.includes(" ") && !rule.endsWith(":*") && fullCommand === rule);
+        }
+
+        // Fallback path: no fullCommandText was provided at all. Fall back to
+        // whatever identifiers the SDK did supply, matching each against the
+        // single-word/`:*` rule forms (multiword prefixes cannot be tested
+        // without the full command text).
+        const commandIdentifiers = Array.isArray(request.commands) ? request.commands.map(cmd => cmd?.identifier).filter(Boolean) : [];
+        const normalizedCommandIdentifiers = [...new Set(commandIdentifiers.map(identifier => String(identifier || "").trim()).filter(Boolean))];
+        if (normalizedCommandIdentifiers.length > 0) {
+          return normalizedCommandIdentifiers.every(identifier => {
+            const segments = splitOnPipelineOperators(identifier);
+            return (segments.length > 0 ? segments : [identifier]).every(segment => isSegmentAllowedByShellRules(segment));
+          });
         }
 
         return false;

@@ -22,6 +22,7 @@ const {
   generateTokenUsageSummary,
   formatDurationMs,
   writeStepSummaryWithTokenUsage,
+  hasAICreditsRateLimitError,
 } = require("./parse_mcp_gateway_log.cjs");
 
 describe("parse_mcp_gateway_log", () => {
@@ -2411,5 +2412,15 @@ not-json
       expect(md).not.toContain("Cache efficiency");
       expect(md).not.toContain("deprecated cost");
     });
+  });
+});
+describe("hasAICreditsRateLimitError", () => {
+  test("ignores echoed MCP tool results and distant keywords", () => {
+    expect(hasAICreditsRateLimitError(['... tool_result ... "title":"[aw] Weekly Research hit AI credits rate limit" ...'])).toBe(false);
+    expect(hasAICreditsRateLimitError([`AI credits ${"x".repeat(81)} rate limit`])).toBe(false);
+  });
+
+  test("detects a nearby AI credits rate-limit error", () => {
+    expect(hasAICreditsRateLimitError(["CAPIError: AI credits rate limit exceeded"])).toBe(true);
   });
 });

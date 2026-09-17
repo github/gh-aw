@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, beforeEach } from "vitest";
 const { main } = require("./add_labels.cjs");
+const { classifySafeOutputResult } = require("./safe_outputs_status.cjs");
 
 describe("add_labels", () => {
   let mockCore;
@@ -807,7 +808,7 @@ describe("add_labels", () => {
       expect(result.labelsAdded).toEqual(["bug", "enhancement"]);
     });
 
-    it("should handle empty labels array", async () => {
+    it("should skip empty labels array without failing", async () => {
       const handler = await main({ max: 10 });
 
       const result = await handler(
@@ -818,12 +819,16 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("No labels provided");
-      expect(result.error).toContain("repository's available labels");
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("NO_LABELS_PROVIDED");
+      expect(classifySafeOutputResult(result)).toBe("skipped");
+      expect(result.labelsAdded).toEqual([]);
+      expect(result.message).toContain("No labels provided");
+      expect(result.message).toContain("repository's available labels");
     });
 
-    it("should handle missing labels field", async () => {
+    it("should skip missing labels field without failing", async () => {
       const handler = await main({ max: 10 });
 
       const result = await handler(
@@ -833,12 +838,14 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("No labels provided");
-      expect(result.error).toContain("repository's available labels");
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.labelsAdded).toEqual([]);
+      expect(result.message).toContain("No labels provided");
+      expect(result.message).toContain("repository's available labels");
     });
 
-    it("should return allowed labels list when labels missing and allowed list configured", async () => {
+    it("should report allowed labels list when labels missing and allowed list configured", async () => {
       const handler = await main({
         allowed: ["bug", "enhancement", "documentation"],
         max: 10,
@@ -852,12 +859,14 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("No labels provided");
-      expect(result.error).toContain("allowed list");
-      expect(result.error).toContain("bug");
-      expect(result.error).toContain("enhancement");
-      expect(result.error).toContain("documentation");
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.labelsAdded).toEqual([]);
+      expect(result.message).toContain("No labels provided");
+      expect(result.message).toContain("allowed list");
+      expect(result.message).toContain("bug");
+      expect(result.message).toContain("enhancement");
+      expect(result.message).toContain("documentation");
     });
 
     it("should handle API errors gracefully", async () => {

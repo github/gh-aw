@@ -8,11 +8,16 @@ For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly;
 
 For `safeoutputs`, every successful call is a real write-intent declaration - do not use it for probing, auth checks, or placeholder payloads. Use `noop` or `report_incomplete` if not ready to emit the final action.
 
-For multiple or complex arguments, pipe a JSON object on stdin using `.` as the sentinel:
+For multiple or complex arguments, pass the JSON object inline as a single quoted argument — the binary comes first, so a malformed command still runs the CLI and reports an error:
+```bash
+safeoutputs add_comment '{"item_number":42,"body":"### Title\n\nBody."}'
+```
+Alternatively, pipe a JSON object on stdin using `.` as the sentinel (prefer this only for large bodies built from files):
 ```bash
 printf '{"item_number":42,"body":"### Title\n\nBody."}' | safeoutputs add_comment .
-# or write to a file: safeoutputs create_pull_request . < /tmp/payload.json
+# or read from a file: safeoutputs create_pull_request . < /tmp/payload.json
 ```
+When piping, make sure the `|` is actually present: `printf '{...}' safeoutputs add_comment .` (no pipe) prints the JSON and exits 0 without ever running the CLI, so nothing is emitted.
 
 **Multi-line or long `body` content:** do NOT build the JSON payload with `printf`/`echo` embedding raw newlines or many escaped characters directly in the command line — the sandbox's shell command-injection guard may reject long or complex quoted arguments (reporting "expansion patterns"/"command substitution" even though none are present) and retrying the identical command will fail again. Instead, write the content to a temp file with a heredoc, then use `jq -Rs` to inject it as the `body` field:
 ```bash

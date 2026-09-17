@@ -45,9 +45,9 @@ function getRpcMessageType(entry) {
   return "";
 }
 const AI_CREDITS_RATE_LIMIT_PATTERNS = [
-  /ai[\s_-]*credits?.*(?:rate[\s-]*limit|limit exceeded|budget exceeded|exceeded)/i,
-  /(?:rate[\s-]*limit|too many requests).*(?:ai[\s_-]*credits?)/i,
-  /\b429\b.*(?:rate[\s-]*limit|too many requests|ai[\s_-]*credits?)/i,
+  /ai[\s_-]*credits?.{0,80}(?:rate[\s-]*limit|limit exceeded|budget exceeded|exceeded)/i,
+  /(?:rate[\s-]*limit|too many requests).{0,80}(?:ai[\s_-]*credits?)/i,
+  /\b429\b.{0,80}(?:rate[\s-]*limit|too many requests|ai[\s_-]*credits?)/i,
 ];
 // Detects the AWF API proxy HTTP 400 error emitted when maxAiCredits is active and
 // the requested model is not in the built-in pricing table.
@@ -435,9 +435,7 @@ async function writeStepSummaryWithTokenUsage(coreObj) {
  * @returns {boolean}
  */
 function hasAICreditsRateLimitError(contents) {
-  const joined = contents.filter(Boolean).join("\n");
-  if (!joined) return false;
-  return AI_CREDITS_RATE_LIMIT_PATTERNS.some(pattern => pattern.test(joined));
+  return contents.filter(Boolean).some(content => content.split(/\r?\n/).some(line => !/\btool[_\s-]*result\b/i.test(line) && AI_CREDITS_RATE_LIMIT_PATTERNS.some(pattern => pattern.test(line))));
 }
 
 /**

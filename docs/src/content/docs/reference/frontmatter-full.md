@@ -21314,6 +21314,14 @@ safe-outputs:
     # Format 2: GitHub Actions expression that resolves to a boolean at runtime
     continue-on-error: "example-value"
 
+    # When true (default), detection warnings/failures create or update the '[aw]
+    # Detection Runs' tracking issue and post a comment to it. When false, detection
+    # still runs and enforces its configured continue-on-error behavior, but no
+    # tracking issue is created or updated; results remain available in the GitHub
+    # Actions run diagnostics.
+    # (optional)
+    report-as-issue: true
+
   # Custom safe-output jobs that can be executed based on agentic workflow output.
   # Job names containing dashes will be automatically normalized to underscores
   # (e.g., 'send-notification' becomes 'send_notification').

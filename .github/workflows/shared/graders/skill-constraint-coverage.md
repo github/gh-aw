@@ -50,7 +50,9 @@ graders:
         } catch {
           argsText = "";
         }
-        entries.push({ text: `${name} ${argsText}`, ok: call.success !== false });
+        // An unfinished call (completed: false, no completion event) never produced
+        // a successful result, so it cannot satisfy a requireSuccess constraint.
+        entries.push({ text: `${name} ${argsText}`, ok: call.success !== false && call.completed !== false });
       }
       for (const action of actions) {
         const type = typeof action.type === "string" ? action.type : "";
@@ -116,7 +118,8 @@ requireSuccess }) into a harness-improvement signal: the fraction that were
 both exercised (regex pattern matched at least one toolCalls/actions entry,
 matched case-insensitively against "name arguments" for tool calls and "type
 target" for actions) and passed (all matches succeeded/were valid at issue
-time, unless requireSuccess: false) during the run. Unlike policy-near-miss
+time, unless requireSuccess: false) during the run. A tool call that started
+but never completed (completed: false) counts as unsuccessful. Unlike policy-near-miss
 (keyword-matched guard objectives already declared as IR objectives) or the
 not-yet-implemented objective-coverage (inferred per-run objectives),
 constraints here are stable across runs of the same harness/skill, making the

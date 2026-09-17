@@ -885,6 +885,7 @@
       "properties": {
         "labels": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "oneOf": [
               {
@@ -917,7 +918,7 @@
               }
             ]
           },
-          "description": "Labels to add (e.g., ['bug', 'priority-high']). Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository. This field is required \u2014 omitting it will cause a validation error."
+          "description": "Labels to add (e.g., ['bug', 'priority-high']). Each entry can be either a label name string or an object with name plus optional rationale/confidence/suggest intent metadata. Labels must exist in the repository. This field is required and must contain at least one label \u2014 omitting it will cause a validation error."
         },
         "item_number": {
           "type": ["number", "string"],
@@ -1659,8 +1660,9 @@
       "properties": {
         "message": {
           "type": "string",
-          "description": "Status or completion message to log. Should explain what was analyzed and the outcome (e.g., 'Code review complete - no issues found', 'Analysis complete - all tests passing'). This is the only content field noop accepts. Serialize any metrics or structured run summary into this single string; additional named fields (for example processed, skipped) are not accepted and cause a missing-message error.",
-          "maxLength": 65536
+          "description": "Status or completion message to log. Should explain what was analyzed and the outcome (e.g., 'Code review complete - no issues found', 'Analysis complete - all tests passing'). This is the only content field noop accepts; common aliases (reason, summary, details, text, note, status) are accepted and mapped to message. Serialize any metrics or structured run summary into this single string; other named fields (for example processed, skipped) are not accepted and cause a missing-message error.",
+          "maxLength": 65536,
+          "x-synonyms": ["reason", "summary", "details", "text", "note", "status"]
         },
         "secrecy": {
           "type": "string",

@@ -30,7 +30,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// Build a parent map for each file so we can detect the two-value form.
 	fileParents := make(map[*ast.File]map[ast.Node]ast.Node)
 	for _, f := range pass.Files {
-		fileParents[f] = buildParentMap(f)
+		fileParents[f] = astutil.BuildParentMap(f)
 	}
 
 	nodeFilter := []ast.Node{
@@ -89,43 +89,6 @@ func inspectTypeAssertExpr(pass *analysis.Pass, noLintIndex nolint.DirectiveInde
 }
 
 func isSafeTwoValueAssertion(typeAssert *ast.TypeAssertExpr, parents map[ast.Node]ast.Node) bool {
-	parent := parents[typeAssert]
-	for parent != nil {
-		paren, ok := parent.(*ast.ParenExpr)
-		if !ok {
-			break
-		}
-		parent = parents[paren]
-	}
-
-	switch p := parent.(type) {
-	case *ast.AssignStmt:
-		return len(p.Lhs) == 2 && len(p.Rhs) == 1
-	case *ast.ValueSpec:
-		return len(p.Names) == 2 && len(p.Values) == 1
-	default:
-		return false
-	}
-}
-
-// buildParentMap constructs a map from each AST node to its direct parent node.
-func buildParentMap(root ast.Node) map[ast.Node]ast.Node {
-	parents := make(map[ast.Node]ast.Node)
-	var stack []ast.Node
-
-	ast.Inspect(root, func(n ast.Node) bool {
-		if n == nil {
-			if len(stack) > 0 {
-				stack = stack[:len(stack)-1]
-			}
-			return false
-		}
-		if len(stack) > 0 {
-			parents[n] = stack[len(stack)-1]
-		}
-		stack = append(stack, n)
-		return true
-	})
-
-	return parents
+	_, isTwoValue := astutil.TwoValueTypeAssertionOKIdent(typeAssert, parents)
+	return isTwoValue
 }
