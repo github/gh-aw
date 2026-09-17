@@ -1227,13 +1227,13 @@ describe("pr_review_buffer (factory pattern)", () => {
         });
 
         const lockedError = Object.assign(new Error("lock prevents review"), { status: 422 });
-        const otherError = Object.assign(new Error("internal server error"), { status: 500 });
+        const otherError = Object.assign(new Error("bad request"), { status: 400 });
         mockGithub.rest.pulls.createReview.mockRejectedValueOnce(lockedError).mockRejectedValueOnce(otherError);
 
         const result = await buffer.submitReview();
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain("internal server error");
+        expect(result.error).toContain("bad request");
         expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(2);
       } finally {
         setTimeoutSpy.mockRestore();

@@ -50,7 +50,7 @@ import Video from '../../../components/Video.astro';
 
 ### YAML frontmatter
 
-GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter (the configuration block between the `---` markers at the top of the file) and run AI agents through GitHub Actions. By the end of this guide, you will have a recurring agentic workflow running in your repository with GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi. The stable-engine path takes about 10 minutes and requires only the GitHub CLI.
+GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter (the configuration block between the `---` markers at the top of the file) and run AI agents through GitHub Actions. By the end of this guide, you will have a recurring agentic workflow running in your repository with GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi. This guide takes about 10 minutes and requires only the GitHub CLI.
 
 **⏱️ Estimated time: 10 minutes**
 
@@ -99,7 +99,7 @@ gh extension install github/gh-aw
 
 ### Step 2 - Add the sample workflow and trigger a run
 
-From your repository root, run one of this command:
+From your repository root, run this command:
 
 ```text wrap
 gh aw add-wizard githubnext/agentics/repo-status
@@ -135,6 +135,8 @@ If organization billing is enabled in your organization, you can choose **Use co
 **Setting up `ANTHROPIC_API_KEY`:**
 1. Create an API key in [Anthropic Console](https://console.anthropic.com/settings/keys).
 2. Add it as a repository secret from your repository root with `gh secret set ANTHROPIC_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#anthropic_api_key) for more detail.
+
+Follow [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/) for the complete setup.
 
 **Codex**
 
