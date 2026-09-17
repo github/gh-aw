@@ -1,7 +1,7 @@
-// Package uncheckedtypeassertion implements a Go analysis linter that flags
-// single-value type assertions x.(T) that may panic at runtime if the dynamic
-// type does not match, and where the two-value safe form x.(T) is not used.
-package uncheckedtypeassertion
+// Package typeassertionokdiscarded implements a Go analysis linter that flags
+// type assertions in the two-value form where the ok return is explicitly
+// discarded via blank identifier, which can silently accept a zero value.
+package typeassertionokdiscarded
 
 import (
 	"go/ast"
@@ -12,22 +12,18 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
-	"github.com/github/gh-aw/pkg/logger"
 )
 
-var pkgLog = logger.New("linters:uncheckedtypeassertion")
-
-// Analyzer is the unchecked-type-assertion analysis pass.
-var Analyzer = analyzerutil.New("uncheckedtypeassertion", "reports single-value type assertions that may panic if the dynamic type does not match", run)
+// Analyzer is the type-assertion-ok-discarded analysis pass.
+var Analyzer = analyzerutil.New("typeassertionokdiscarded", "reports type assertions using the two-value form where the ok return is explicitly discarded via blank identifier, which can silently accept a zero value", run)
 
 func run(pass *analysis.Pass) (any, error) {
-	pkgLog.Printf("analyzing package %s", pass.Pkg.Path())
 	noLintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build a parent map for each file so we can detect the two-value form.
+	// Build a parent map for each file so we can detect two-value assignments.
 	fileParents := make(map[*ast.File]map[ast.Node]ast.Node)
 	for _, f := range pass.Files {
 		fileParents[f] = astutil.BuildParentMap(f)
@@ -65,30 +61,28 @@ func inspectTypeAssertExpr(pass *analysis.Pass, noLintIndex nolint.DirectiveInde
 		parents = fileParents[f]
 	}
 
-	// Skip the safe two-value form:  v, ok := x.(T)  or  v, ok = x.(T)
+	// Check if this is a two-value assignment where the ok is blank.
 	if parents != nil {
-		if isSafeTwoValueAssertion(typeAssert, parents) {
-			return
+		if isTwoValueBlankOkAssertion(typeAssert, parents) {
+			if nolint.HasDirectiveForLinter(pos, noLintIndex, "typeassertionokdiscarded") {
+				return
+			}
+
+			t := pass.TypesInfo.TypeOf(typeAssert.Type)
+			if t == nil {
+				return
+			}
+
+			pass.ReportRangef(
+				typeAssert,
+				"type assertion ok value is explicitly discarded with blank identifier; use single-value form x.(%s) or check the ok value instead",
+				t,
+			)
 		}
 	}
-
-	t := pass.TypesInfo.TypeOf(typeAssert.Type)
-	if t == nil {
-		return
-	}
-	if nolint.HasDirectiveForLinter(pos, noLintIndex, "uncheckedtypeassertion") {
-		return
-	}
-
-	pkgLog.Printf("flagging unchecked type assertion to %s at %s", t, pos)
-	pass.ReportRangef(
-		typeAssert,
-		"type assertion x.(%s) is unchecked and may panic; use the two-value form v, ok := x.(%s) instead",
-		t, t,
-	)
 }
 
-func isSafeTwoValueAssertion(typeAssert *ast.TypeAssertExpr, parents map[ast.Node]ast.Node) bool {
-	_, isTwoValue := astutil.TwoValueTypeAssertionOKIdent(typeAssert, parents)
-	return isTwoValue
+func isTwoValueBlankOkAssertion(typeAssert *ast.TypeAssertExpr, parents map[ast.Node]ast.Node) bool {
+	okIdent, isTwoValue := astutil.TwoValueTypeAssertionOKIdent(typeAssert, parents)
+	return isTwoValue && okIdent.Name == "_"
 }
