@@ -19,7 +19,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Copilot CLI", DefaultCopilotVersion, "1.0.85"},
 		{"Codex", DefaultCodexVersion, "0.154.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.1"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.23"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.25"},
 	}
 
 	for _, tt := range tests {
