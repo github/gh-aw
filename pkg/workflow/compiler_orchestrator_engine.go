@@ -332,10 +332,11 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 
 // mergeImportedEngineConfig resolves the engine config contributed by imports and
 // included files. The main workflow frontmatter may produce a non-nil engineConfig
-// without declaring an `engine:` block (top-level `model:`, `max-turns:`, etc.). Such
-// a config only carries top-level overrides, so the imported engine config must still
-// be extracted and the overrides re-applied on top of it; otherwise imported settings
-// such as `engine.auth` would be silently dropped.
+// without selecting an engine: top-level `model:`/`max-turns:`/budgets, or a
+// preference-only `engine:` object (`model`/`mcp` only). Such a config carries only
+// overrides, so the imported engine config must still be extracted and the overrides
+// re-applied on top of it; otherwise imported settings such as `engine.auth` would be
+// silently dropped.
 func (c *Compiler) mergeImportedEngineConfig(
 	frontmatter map[string]any,
 	allEngines []string,
@@ -345,12 +346,12 @@ func (c *Compiler) mergeImportedEngineConfig(
 	if len(allEngines) == 0 {
 		return engineConfig, model, nil
 	}
-	topLevelOnlyConfig := engineConfig
-	if engineConfig != nil && frontmatterDeclaresEngine(frontmatter) {
-		topLevelOnlyConfig = nil
+	overrideConfig := engineConfig
+	if engineConfig != nil && frontmatterSelectsEngine(frontmatter) {
+		overrideConfig = nil
 	}
-	if engineConfig != nil && topLevelOnlyConfig == nil {
-		// The main workflow declares its own `engine:` block, which wins. Only adopt
+	if engineConfig != nil && overrideConfig == nil {
+		// The main workflow selects its own engine, which wins. Only adopt
 		// the model from the imported engine config when the main workflow does not
 		// pin one, so that an engine.model pin in an import is not silently dropped.
 		if model == "" {
@@ -367,7 +368,7 @@ func (c *Compiler) mergeImportedEngineConfig(
 		orchestratorEngineLog.Printf("Failed to extract engine config: %v", err)
 		return nil, "", fmt.Errorf("failed to extract engine config from included file: %w", err)
 	}
-	applyTopLevelOnlyEngineOverrides(importedConfig, topLevelOnlyConfig)
+	applyMainWorkflowEngineOverrides(importedConfig, overrideConfig)
 	// Preserve the model from the main workflow frontmatter if already set; only fall
 	// back to the imported/shared workflow's model when the main workflow does not
 	// specify one (main workflow model takes precedence).
@@ -380,35 +381,73 @@ func (c *Compiler) mergeImportedEngineConfig(
 	return importedConfig, model, nil
 }
 
-// frontmatterDeclaresEngine reports whether the main workflow frontmatter declares
-// an `engine:` key. When it does not, a non-nil engine config extracted from the
-// frontmatter only carries top-level overrides (model, max-turns, budgets).
-func frontmatterDeclaresEngine(frontmatter map[string]any) bool {
-	_, hasEngine := frontmatter["engine"]
-	return hasEngine
+// frontmatterSelectsEngine reports whether the main workflow frontmatter actually
+// selects an engine. A string `engine:` value, or an object carrying `id` or
+// `runtime`, is a selection. An absent `engine:` key, or a preference-only object
+// (only `model`/`mcp` keys, mirroring isModelOnlyEngineJSON), is not: the engine
+// then comes from an import and the frontmatter config only carries overrides.
+func frontmatterSelectsEngine(frontmatter map[string]any) bool {
+	engine, hasEngine := frontmatter["engine"]
+	if !hasEngine {
+		return false
+	}
+	engineObj, ok := engine.(map[string]any)
+	if !ok {
+		return true
+	}
+	return !isPreferenceOnlyEngineObject(engineObj)
 }
 
-// applyTopLevelOnlyEngineOverrides copies the top-level workflow overrides (max-turns,
-// budgets) onto an engine config extracted from an import, so that top-level keys
-// keep taking precedence over imported engine values.
-func applyTopLevelOnlyEngineOverrides(engineConfig, topLevelOnly *EngineConfig) {
-	if engineConfig == nil || topLevelOnly == nil {
+// isPreferenceOnlyEngineObject reports whether an `engine:` object only expresses
+// model/MCP preferences without selecting an engine. It mirrors the semantics of
+// isModelOnlyEngineJSON used when validating included engine specifications.
+func isPreferenceOnlyEngineObject(engineObj map[string]any) bool {
+	if _, hasID := engineObj["id"]; hasID {
+		return false
+	}
+	if _, hasRuntime := engineObj["runtime"]; hasRuntime {
+		return false
+	}
+	hasPreference := false
+	for k := range engineObj {
+		switch k {
+		case "model", "mcp":
+			hasPreference = true
+		default:
+			return false
+		}
+	}
+	return hasPreference
+}
+
+// applyMainWorkflowEngineOverrides copies the overrides declared by the main workflow
+// (top-level max-turns and budgets, plus preference-only `engine.mcp` settings) onto an
+// engine config extracted from an import, so that main-workflow keys keep taking
+// precedence over imported engine values.
+func applyMainWorkflowEngineOverrides(engineConfig, overrides *EngineConfig) {
+	if engineConfig == nil || overrides == nil {
 		return
 	}
-	if topLevelOnly.MaxTurns != "" {
-		engineConfig.MaxTurns = topLevelOnly.MaxTurns
+	if overrides.MaxTurns != "" {
+		engineConfig.MaxTurns = overrides.MaxTurns
 	}
-	if topLevelOnly.MaxToolDenials != "" {
-		engineConfig.MaxToolDenials = topLevelOnly.MaxToolDenials
+	if overrides.MaxToolDenials != "" {
+		engineConfig.MaxToolDenials = overrides.MaxToolDenials
 	}
-	if topLevelOnly.MaxRuns > 0 {
-		engineConfig.MaxRuns = topLevelOnly.MaxRuns
+	if overrides.MaxRuns > 0 {
+		engineConfig.MaxRuns = overrides.MaxRuns
 	}
-	if topLevelOnly.MaxTurnCacheMisses > 0 {
-		engineConfig.MaxTurnCacheMisses = topLevelOnly.MaxTurnCacheMisses
+	if overrides.MaxTurnCacheMisses > 0 {
+		engineConfig.MaxTurnCacheMisses = overrides.MaxTurnCacheMisses
 	}
-	if topLevelOnly.MaxAICredits != 0 {
-		engineConfig.MaxAICredits = topLevelOnly.MaxAICredits
+	if overrides.MaxAICredits != 0 {
+		engineConfig.MaxAICredits = overrides.MaxAICredits
+	}
+	if overrides.MCPSessionTimeout != "" {
+		engineConfig.MCPSessionTimeout = overrides.MCPSessionTimeout
+	}
+	if overrides.MCPToolTimeout != "" {
+		engineConfig.MCPToolTimeout = overrides.MCPToolTimeout
 	}
 }
 

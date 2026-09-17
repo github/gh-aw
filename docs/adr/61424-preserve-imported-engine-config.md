@@ -12,7 +12,7 @@ This pull request fixes workflow compilation when a workflow imports a shared `e
 
 ### Decision
 
-We will always merge imported engine configuration when the main workflow does not declare its own `engine:` block, even if root-level keys like `model:` or budget limits already produced a partial engine config. We will then re-apply the main workflow's top-level override fields on top of the imported engine config so root-level values continue to take precedence while imported settings such as `engine.auth` are preserved. We chose this because the PR evidence shows the current behavior silently discards imported authentication and budget-related settings, which breaks shared engine reuse and changes runtime auth behavior without warning.
+We will always merge imported engine configuration when the main workflow does not actually select an engine, even if root-level keys like `model:` or budget limits already produced a partial engine config. A main workflow selects an engine only with a string `engine:` value or an `engine:` object carrying `id` or `runtime`; preference-only objects (`engine.model` or `engine.mcp` alone) are treated as overrides on top of the imported engine, matching how included preference-only engine specs are handled during engine-conflict validation. We will then re-apply the main workflow's top-level override fields on top of the imported engine config so root-level values continue to take precedence while imported settings such as `engine.auth` are preserved. We chose this because the PR evidence shows the current behavior silently discards imported authentication and budget-related settings, which breaks shared engine reuse and changes runtime auth behavior without warning.
 
 ### Alternatives Considered
 
@@ -32,12 +32,12 @@ Another option was to document that workflows using imported engines must avoid 
 - The new integration test makes this composition behavior explicit by asserting emitted `AWF_AUTH_*` variables and the absence of an API-key validation step.
 
 #### Negative
-- Engine resolution logic becomes more complex by distinguishing a full main-workflow `engine:` declaration from a top-level-only partial config.
+- Engine resolution logic becomes more complex by distinguishing an actual main-workflow engine selection from a preference-only or top-level-only partial config.
 - The compiler now depends on explicit field-by-field reapplication of top-level overrides, which may require maintenance if new override fields are added later.
 - Future changes to engine merge behavior will need careful regression coverage to avoid reintroducing silent precedence bugs.
 
 #### Neutral
-- Workflows that declare their own `engine:` block remain unchanged and still take precedence over imported engine definitions.
+- Workflows that select their own engine (`engine: claude`, `engine.id`, `engine.runtime`) remain unchanged and still take precedence over imported engine definitions.
 - Imported `engine.model` continues to act only as a fallback when the main workflow does not set a model.
 - The decision affects compiler internals and generated workflow auth environment variables without changing the external workflow authoring syntax.
 
