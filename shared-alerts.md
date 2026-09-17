@@ -239,3 +239,24 @@
 - gpt-5.3-codex model_not_supported_error: still unresolved as of 2026-09-16 (fresh occurrences
   #61269, #61250). No new issue filed — evidence added as a comment on #61030 per existing
   "DO NOT RE-FILE" guidance.
+
+## NEW P0 — 2026-09-17T04:39Z (Workflow Health Manager)
+- **cloud-hypervisor "--version exited with code undefined" — major new engine-agnostic sandbox
+  regression, previously untracked.** 29 open issues match this signature, first seen
+  2026-09-15T22:25Z (#61219), accelerating sharply overnight (18 of 29 filed in ~8h). Confirmed
+  across copilot, codex, AND claude engines — this is an infrastructure/sandbox defect, not a
+  model config issue. Root cause: `awf-config.json`'s `cloudHypervisor.previewEnabled: true` path
+  fails its own `--version` preflight, aborting the agent step; a downstream
+  `model_not_supported_error` output flag then gets set as a **misleading side effect**, not
+  evidence of genuine model-resolution failure. Filed a new consolidated P0 tracker this run (see
+  Workflow Health Dashboard - 2026-09-17 issue for the tracker number and affected-workflow list).
+  **DO NOT file new per-workflow issues for this signature — consolidate under the new tracker.**
+- **Correction for downstream consumers of the "codex gpt-5.3-codex model_not_supported_error"
+  narrative (tracked historically under #61030, now closed via 5x `expires: 1d` self-expiry):**
+  some recent occurrences attributed to that signature (e.g. today's LintMonster failure) are
+  actually instances of the new cloud-hypervisor crash above, not genuine model-resolution
+  failures. Recommend any agent re-triaging the 74-file `gpt-5.3-codex` hardcoding backlog wait
+  until the hypervisor incident is resolved, to avoid further misattribution.
+- `metrics/latest.json` remains dated 2026-09-01 (16+ days stale) — cross-checked all
+  `failing-workflows.json` entries live via `gh run list`/job logs this run rather than trusting
+  the stale snapshot.
