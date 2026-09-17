@@ -97,8 +97,79 @@ else
 fi
 rm -f "${FAKE_GITHUB_PATH}"
 
-# Test 6: warning emitted when GITHUB_PATH is unset in rootless mode
-echo "Test 6: warning emitted when GITHUB_PATH is unset in rootless mode..."
+# Test 7: --retry-all-errors is used only when curl supports it
+echo "Test 7: --retry-all-errors is conditional on curl support..."
+test_curl_retry_all_errors() {
+  local curl_help="$1"
+  local expected="$2"
+  local test_dir
+  test_dir=$(mktemp -d)
+  mkdir -p "${test_dir}/bin" "${test_dir}/home"
+  cat > "${test_dir}/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "--help" ]; then
+  printf '%s\n' "${CURL_HELP_OUTPUT}"
+  exit 0
+fi
+printf '%s\n' "$*" >> "${CURL_ARGS_FILE}"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    output="$2"
+    break
+  fi
+  shift
+done
+if [[ "${output}" == *checksums.txt ]]; then
+  printf 'checksum awf-linux-x64\n' > "${output}"
+else
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
+fi
+EOF
+  cat > "${test_dir}/bin/node" <<'EOF'
+#!/usr/bin/env bash
+echo v18.0.0
+EOF
+  cat > "${test_dir}/bin/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+printf 'checksum %s\n' "$1"
+EOF
+  cat > "${test_dir}/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  -s) echo Linux ;;
+  -m) echo x86_64 ;;
+esac
+EOF
+  chmod +x "${test_dir}/bin/"*
+  CURL_HELP_OUTPUT="${curl_help}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
+    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null
+  if grep -q -- '--retry-all-errors' "${test_dir}/curl-args"; then
+    actual=true
+  else
+    actual=false
+  fi
+  if ! grep -q -- '--retry 5 --retry-delay 10 --retry-max-time 180' "${test_dir}/curl-args"; then
+    rm -rf "${test_dir}"
+    return 1
+  fi
+  rm -rf "${test_dir}"
+  [ "${actual}" = "${expected}" ]
+}
+
+if test_curl_retry_all_errors '--retry-all-errors' true; then
+  pass "supported curl receives --retry-all-errors"
+else
+  fail "supported curl did not receive --retry-all-errors" ""
+fi
+if test_curl_retry_all_errors '' false; then
+  pass "unsupported curl omits --retry-all-errors"
+else
+  fail "unsupported curl received --retry-all-errors" ""
+fi
+
+# Test 8: warning emitted when GITHUB_PATH is unset in rootless mode
+echo "Test 8: warning emitted when GITHUB_PATH is unset in rootless mode..."
 warning_output=$(bash -c '
   AWF_INSTALL_DIR="${HOME}/.local/bin"
   ROOTLESS=true

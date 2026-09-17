@@ -118,10 +118,10 @@
       "version": "v2.0.5",
       "sha": "22d081ff2d3a40755e97629de92e3bcbfa7cf2ed"
     },
-    "docker/build-push-action@v7.3.0": {
+    "docker/build-push-action@v7.4.0": {
       "repo": "docker/build-push-action",
-      "version": "v7.3.0",
-      "sha": "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"
+      "version": "v7.4.0",
+      "sha": "c3c9e263c25d99ce0380d002d59b67737d91b0dc"
     },
     "docker/login-action@v4.6.0": {
       "repo": "docker/login-action",
@@ -133,10 +133,10 @@
       "version": "v6.2.0",
       "sha": "dc802804100637a589fabce1cb79ff13a1411302"
     },
-    "docker/setup-buildx-action@v4.3.0": {
+    "docker/setup-buildx-action@v4.4.0": {
       "repo": "docker/setup-buildx-action",
-      "version": "v4.3.0",
-      "sha": "37fe631027851001ddb9b187196cc803df7f5f0e"
+      "version": "v4.4.0",
+      "sha": "594f3bf4285d9ea8dc53c9a0c9c4092420091003"
     },
     "erlef/setup-beam@v1.24.1": {
       "repo": "erlef/setup-beam",
