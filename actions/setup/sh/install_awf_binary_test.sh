@@ -104,6 +104,7 @@ test_curl_retry_all_errors() {
   local expected="$2"
   local help_all_fails="${3:-false}"
   local test_dir
+  local actual
   TEST_FAILURE_REASON=""
   test_dir=$(mktemp -d)
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
