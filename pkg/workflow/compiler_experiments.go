@@ -790,28 +790,32 @@ var experimentsFieldReferenceRegex = regexp.MustCompile(`\bexperiments\.([a-zA-Z
 // the activation job's own output (readable from any other job via `needs`), and the
 // pick-experiment step's output (readable only from within the activation job itself,
 // since a job cannot reference its own outputs via `needs`). Centralizing these prefixes
-// keeps rewriteExperimentsReference and RewriteActivationOutputsToLocalStepOutputs in sync.
+// keeps rewriteDeclaredExperimentNames and RewriteActivationOutputsToLocalStepOutputs in sync.
 const (
 	activationOutputsPrefix     = "needs.activation.outputs."
 	pickExperimentOutputsPrefix = "steps.pick-experiment.outputs."
 )
 
-// rewriteExperimentsReference rewrites `experiments.<name>` references in s to prefix+name,
-// but only for names present in experiments, so that unrelated `experiments.<word>` text
-// (not a declared experiment) is left untouched.
-func rewriteExperimentsReference(s string, experiments map[string][]string, prefix string) string {
-	const matchPrefix = "experiments."
+// activationOutputsReferenceRegex matches `needs.activation.outputs.<name>` tokens (simple
+// identifier), with a trailing word boundary so that a name which is a prefix of another
+// declared name (e.g. "model" vs. "model_variant") is never partially matched.
+var activationOutputsReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+
+// rewriteDeclaredExperimentNames replaces every match of re in s whose captured name (the
+// remainder of the match after matchPrefix) is a key of experiments, with replacementPrefix
+// followed by that name. Matches for undeclared names are left untouched. The regex-based,
+// word-boundary-anchored matching (rather than sequential strings.ReplaceAll per name) avoids
+// one declared name corrupting the occurrence of another name it happens to be a prefix of.
+func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, matchPrefix, replacementPrefix string) string {
 	if len(experiments) == 0 || !strings.Contains(s, matchPrefix) {
 		return s
 	}
-	return experimentsFieldReferenceRegex.ReplaceAllStringFunc(s, func(match string) string {
-		// match is always "experiments.<name>" (per experimentsFieldReferenceRegex), so the
-		// name can be recovered with a simple prefix trim instead of re-running the regex.
+	return re.ReplaceAllStringFunc(s, func(match string) string {
 		name := strings.TrimPrefix(match, matchPrefix)
 		if _, ok := experiments[name]; !ok {
 			return match
 		}
-		return prefix + name
+		return replacementPrefix + name
 	})
 }
 
@@ -822,7 +826,7 @@ func rewriteExperimentsReference(s string, experiments map[string][]string, pref
 // step in the same job. A job cannot reference its own outputs via the `needs` context, so
 // `needs.activation.outputs.*` is not valid here.
 func RewriteExperimentsReferenceForActivationJob(s string, experiments map[string][]string) string {
-	return rewriteExperimentsReference(s, experiments, pickExperimentOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, "experiments.", pickExperimentOutputsPrefix)
 }
 
 // RewriteExperimentsReferenceForDownstreamJobs rewrites `experiments.<name>` references in s
@@ -831,7 +835,7 @@ func RewriteExperimentsReferenceForActivationJob(s string, experiments map[strin
 // safe-outputs, etc.), where the experiment variant is exposed via the activation job's
 // outputs (see buildActivationJob).
 func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[string][]string) string {
-	return rewriteExperimentsReference(s, experiments, activationOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, "experiments.", activationOutputsPrefix)
 }
 
 // RewriteActivationOutputsToLocalStepOutputs converts `needs.activation.outputs.<name>`
@@ -842,13 +846,7 @@ func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[stri
 // names are rewritten, so an unrelated `needs.activation.outputs.*` reference (not produced by
 // the experiments rewrite) is left untouched.
 func RewriteActivationOutputsToLocalStepOutputs(s string, experiments map[string][]string) string {
-	if len(experiments) == 0 || !strings.Contains(s, activationOutputsPrefix) {
-		return s
-	}
-	for _, name := range sortedExperimentNames(experiments) {
-		s = strings.ReplaceAll(s, activationOutputsPrefix+name, pickExperimentOutputsPrefix+name)
-	}
-	return s
+	return rewriteDeclaredExperimentNames(s, experiments, activationOutputsReferenceRegex, activationOutputsPrefix, pickExperimentOutputsPrefix)
 }
 
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment

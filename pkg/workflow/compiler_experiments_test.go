@@ -233,6 +233,22 @@ func TestRewriteActivationOutputsToLocalStepOutputs(t *testing.T) {
 	assert.Equal(t, "${{ needs.activation.outputs.unknown }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.unknown }}", experiments))
 }
 
+// TestRewriteExperimentPrefixCollision guards against one declared experiment name being a
+// prefix of another (e.g. "model" and "model_variant"); the word-boundary-anchored regex
+// rewrite must not partially corrupt the longer name's reference while rewriting the shorter
+// one.
+func TestRewriteExperimentPrefixCollision(t *testing.T) {
+	experiments := map[string][]string{
+		"model":         {"a", "b"},
+		"model_variant": {"x", "y"},
+	}
+	got := RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }} ${{ experiments.model_variant }}", experiments)
+	assert.Equal(t, "${{ needs.activation.outputs.model }} ${{ needs.activation.outputs.model_variant }}", got)
+
+	back := RewriteActivationOutputsToLocalStepOutputs(got, experiments)
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }} ${{ steps.pick-experiment.outputs.model_variant }}", back)
+}
+
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────
 
 func TestBuildExperimentArtifactDownloadStep_Empty(t *testing.T) {
