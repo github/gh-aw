@@ -1,5 +1,14 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-17 snapshot
+- 50 sessions; **36.0% raw completion** (18 success, 8 failure, 22 action_required, 1 cancelled, 1 in_progress), +18pts vs 09-16 (18%), mid-pack vs 26-day mean 30.6%.
+- **provenance_inversion ties record**: 18/18 successes (100%) are CI-gate/review-bot workflows (CWI x4, CGO x2, CJS x2, Code scanning AI findings x4, + 6 single-instance reviewer/gate bots) — 2nd consecutive all-bot day after 09-16's first-ever 100% record.
+- **true_agentic_streak still broken**: the only true-agentic candidate ("Addressing comment on PR #61430") was still `in_progress` at snapshot time — 2nd day without a completed true-agentic success.
+- Non-merge failure cluster (open question): `copilot/allow-opt-out-detection-runs` fired two 3-workflow failure clusters (CGO+CWI+Doc Build-Deploy) at 06:05:30Z and 06:08:23Z, ~3min apart — its PR #61428 didn't merge until 06:44:14Z (36+min later), so this doesn't fit the standing merge_invalidation_cascade mechanic. Branch deleted post-merge, so a double-push couldn't be confirmed via commit history.
+- 5 unique branches (up from 09-16's 3): `fix-copilot-sdk-issues` 26/50 (52%, 42.3% success), `allow-opt-out-detection-runs` 15/50 (30%, 13.3% success), `update-cli-version-checker` 7/50 (71.4% success), 2 singletons at 0%.
+- Duration proxy: mean 6.81m / median 1.15m, tight 46-min window — reliable (no resync-artifact inflation unlike 09-16).
+- Orphans 0/20 open PRs → 0% NORMAL, 26th consecutive healthy day. Conv logs empty (26th+ day). Standard run (roll=70).
+
 ## 2026-09-16 snapshot
 - 50 sessions; **18.0% raw completion** (9 success, 33 failure, 7 action_required, 1 cancelled), -12.8pts vs 24-day mean 30.8%. **Cascade-adjusted completion 37.5%** (9/24) excluding 26 same-second review-bot failures.
 - **EXPERIMENTAL (roll=5): cross_branch_cascade_synchronization** — 3 DIFFERENT branches (`fix-github-actions-job-failure-again` 8f, `daily-docs-healer-fix` 8f, `model-inventory-update-2026-09-16` 10f) each cascaded within a 23s window (03:26:16-39Z), no commit on main/any branch in that window. Only 2/3 offsets matched their own branch's merge (32-58s prior); the 3rd merged 15m45s later with no intervening push — implies a shared scheduled dispatcher, not a pure per-branch merge race. Refines `merge_invalidation_cascade`. Effectiveness High; recommend promote.
@@ -31,13 +40,6 @@
 - Orphans 0/3 open PRs (all Copilot-assigned + human reviewer requested) → 0% NORMAL, 22nd+ consecutive healthy day. Conv logs empty (22nd+ day). Standard run (roll=53).
 - _Note: this repo-memory branch had not been updated since run 28925210910 (~07-08); cache-memory (`/tmp/gh-aw/cache-memory/session-analysis/history.json`) has been the continuously-updated source of truth in the interim (22 entries through today) and remains authoritative for the full daily series._
 
-## 2026-07-08 snapshot
-- 50 sessions; **8% completion** (4 success, 41 action_required, 1 cancelled, 4 in_progress) — floor regime; saw-tooth pullback from 07-07 (18%). Trailing: 20→8→4→**54**→16→8→18→**8**. 30d-mean ~13%.
-- **provenance_inversion holds**: all 4 successes = "Addressing comment on PR" agentic runs (13–23m, on cache-checkout-visibility #44224 ×2, specify-checkout #44225, fix-threat-detection #44202); 0/4 core CI gates. 45 gate stubs 0-dur. Reverts the 07-04 flip; consistent with the floor+inversion regime.
-- 9/50 non-zero; exec mean 8.85m / median 6.45m / max 23.28m (Addressing PR#44225). Overall mean 1.59m, median 0m. 44-min window (06:37–07:21Z). 8 copilot/* branches; gate footprint top: allow-memory-deterministic-job 12, add-runtime-token-check 9, fix-threat-detection 9.
-- Orphans 0/13 (all 13 open PRs Copilot-assigned; max 1 gate/copilot-branch, main=3) → 0% NORMAL, ~42nd healthy day. Conv logs empty (41st day).
-- **EXPERIMENTAL (roll=26): Agentic Work-Time Concentration (AWTC)** — 99% of 79.7 wall-clock-min in 7 agentic comment-addressing runs; 45 gate stubs = 0.28m combined. CARM sub-metric: PR#44224 fired 3× (2 succ + 1 cancelled = retry churn), #44225 2×. Separates "compute spent" from "runs counted." Effectiveness High; recommend Refine.
-
 ## 2026-07-04 snapshot
 - 50 sessions; **54% completion** (27 success, 22 action_required, 1 failure) — **REGIME BREAK**: up sharply from 4%→8%→4% floor; highest in trailing window (prev max 40% on 06-10/06-27).
 - **provenance_inversion FLIPPED**: 20/27 successes are core CI gates (Doc Build/Smoke CI/CWI/CGO) executing to success, not gate-blocked; action_required now dominated by agentic maintenance (PR Description Updater 5 + Label Closed PRs 5) + 12 partial CI. Strongest inversion break yet — echoes the smaller 06-23 gate-green episode (then 20%, 8/10 succ = green CI gates).
@@ -66,3 +68,5 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - per_branch_gate_fanout (06-26): each PR-open fires a gate bundle; gate_count = f(PR-open), not branch health. **Refined 07-03 (GBCD):** bundle composition is change-TYPE-adaptive — code-change branches fire full 4/4 core CI gates, lint/doc branches fire 0/4 (lightweight agentic wf only), spec branches fire 2/4 + moderation. "~8-workflow uniform bundle" was an over-generalization from a code-heavy snapshot.
 - gate_bundle_composition_divergence (07-03, experimental): fraction of open branches deviating from the full core CI gate set; 62.5% (5/8) diverged today. Distinguishes deterministic CI overhead from change-type-specific triggers.
 - 09-15 update: provenance_inversion reverted to 80.8% (back in the 75-86% band); merge_invalidation_cascade had a zero-instance day (8/24 recorded days show >=1 cascade); conv logs empty 24th+ day.
+- 09-16 update: provenance_inversion hit first-ever 100% bot-driven day (9/9); true_agentic_100pct_streak broke after 9 consecutive days; new cross_branch_scheduled_cascade sub-pattern identified (same-second failures across sibling branches not explained by own-branch merge timing).
+- 09-17 update: provenance_inversion ties the 100% record for a 2nd consecutive day (18/18); true-agentic streak remains broken (candidate still in_progress); a same-branch double failure-cluster (3min apart, well before its own merge) doesn't fit merge_invalidation_cascade or cross_branch_scheduled_cascade — open question, watch for recurrence before naming a new pattern. Conv logs empty 26th+ day.
