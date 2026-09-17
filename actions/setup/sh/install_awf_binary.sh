@@ -103,7 +103,12 @@ fi
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 CURL_RETRY_OPTS=(--retry 5 --retry-delay 10 --retry-max-time 180)
-# Detect --retry-all-errors, added in curl 7.71; versions before 7.74 do not support the "all" help category.
+# --retry-all-errors was added in curl 7.71, so it must not be passed to older curl
+# builds found on some self-hosted runners. Probe the help output instead of parsing
+# `curl --version`, which reports vendor-patched version strings that do not reliably
+# indicate option availability. Help categories (`curl --help all`) only exist since
+# curl 7.73, so fall back to plain `curl --help`, which lists every option on
+# older builds.
 if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors' ||
   curl --help 2>/dev/null | grep -q -- '--retry-all-errors'; then
   CURL_RETRY_OPTS+=(--retry-all-errors)

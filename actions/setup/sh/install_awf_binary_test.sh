@@ -187,6 +187,13 @@ EOF
         return 1
       fi
     done
+    # The option list must end here: the next argument is the download target, so any
+    # extra retry flag (such as an unconditional --retry-all-errors) is caught.
+    if [ "${actual_options[${#expected_options[@]}]:-}" != "-o" ]; then
+      TEST_FAILURE_REASON="expected -o at position ${#expected_options[@]}, got ${actual_options[${#expected_options[@]}]:-<none>}"
+      rm -rf "${test_dir}"
+      return 1
+    fi
   done
   rm -rf "${test_dir}"
 }
