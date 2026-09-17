@@ -104,6 +104,7 @@ test_curl_retry_all_errors() {
   local expected="$2"
   local help_all_fails="${3:-false}"
   local test_dir
+  TEST_FAILURE_REASON=""
   test_dir=$(mktemp -d)
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
@@ -154,27 +155,31 @@ EOF
     actual=false
   fi
   if ! grep -q -- '--retry 5 --retry-delay 10 --retry-max-time 180' "${test_dir}/curl-args"; then
+    TEST_FAILURE_REASON="fixed retry options were not passed to curl"
     rm -rf "${test_dir}"
     return 1
   fi
   rm -rf "${test_dir}"
-  [ "${actual}" = "${expected}" ]
+  if [ "${actual}" != "${expected}" ]; then
+    TEST_FAILURE_REASON="expected --retry-all-errors=${expected}, got ${actual}"
+    return 1
+  fi
 }
 
 if test_curl_retry_all_errors '--retry-all-errors' true; then
   pass "supported curl receives --retry-all-errors"
 else
-  fail "supported curl did not receive --retry-all-errors" ""
+  fail "supported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
 fi
 if test_curl_retry_all_errors '--retry-all-errors' true true; then
   pass "curl help fallback detects --retry-all-errors"
 else
-  fail "curl help fallback did not detect --retry-all-errors" ""
+  fail "curl help fallback retry options were incorrect" "${TEST_FAILURE_REASON}"
 fi
 if test_curl_retry_all_errors '' false; then
   pass "unsupported curl omits --retry-all-errors"
 else
-  fail "unsupported curl received --retry-all-errors" ""
+  fail "unsupported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
 fi
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
