@@ -801,29 +801,35 @@ const (
 // declared name (e.g. "model" vs. "model_variant") is never partially matched.
 var activationOutputsReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
 
-// rewriteDeclaredExperimentNames replaces every match of re in s whose captured name (the
-// remainder of the match after matchPrefix) is a key of experiments, with replacementPrefix
-// followed by that name. Matches for undeclared names are left untouched. The regex-based,
-// word-boundary-anchored matching (rather than sequential strings.ReplaceAll per name) avoids
-// one declared name corrupting the occurrence of another name it happens to be a prefix of.
-//
-// Precondition: matchPrefix must be a literal string prefix of every string re can match
-// (true for experimentsFieldReferenceRegex/"experiments." and
-// activationOutputsReferenceRegex/activationOutputsPrefix, the only two callers below). This
-// lets the strings.Contains check below act purely as a fast-path skip; if it were ever
-// violated, re.ReplaceAllStringFunc would still run and produce the correct result, since the
-// fast path is optional (it never returns a rewritten value).
-func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, matchPrefix, replacementPrefix string) string {
-	if len(experiments) == 0 || !strings.Contains(s, matchPrefix) {
+// rewriteDeclaredExperimentNames replaces every match of re in s whose first captured group
+// (the experiment name) is a key of experiments, with replacementPrefix followed by that name.
+// Matches for undeclared names are left untouched. The regex-based, word-boundary-anchored
+// matching (rather than sequential strings.ReplaceAll per name) avoids one declared name
+// corrupting the occurrence of another name it happens to be a prefix of. re must have exactly
+// one capturing group, which captures the experiment name.
+func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, replacementPrefix string) string {
+	if len(experiments) == 0 {
 		return s
 	}
-	return re.ReplaceAllStringFunc(s, func(match string) string {
-		name := strings.TrimPrefix(match, matchPrefix)
+	matches := re.FindAllStringSubmatchIndex(s, -1)
+	if len(matches) == 0 {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, m := range matches {
+		// m[0]:m[1] is the full match span, m[2]:m[3] is the captured name span.
+		name := s[m[2]:m[3]]
 		if _, ok := experiments[name]; !ok {
-			return match
+			continue
 		}
-		return replacementPrefix + name
-	})
+		b.WriteString(s[last:m[0]])
+		b.WriteString(replacementPrefix)
+		b.WriteString(name)
+		last = m[1]
+	}
+	b.WriteString(s[last:])
+	return b.String()
 }
 
 // RewriteExperimentsReferenceForActivationJob rewrites `experiments.<name>` references in s
@@ -833,7 +839,7 @@ func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, r
 // step in the same job. A job cannot reference its own outputs via the `needs` context, so
 // `needs.activation.outputs.*` is not valid here.
 func RewriteExperimentsReferenceForActivationJob(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, "experiments.", pickExperimentOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, pickExperimentOutputsPrefix)
 }
 
 // RewriteExperimentsReferenceForDownstreamJobs rewrites `experiments.<name>` references in s
@@ -842,7 +848,7 @@ func RewriteExperimentsReferenceForActivationJob(s string, experiments map[strin
 // safe-outputs, etc.), where the experiment variant is exposed via the activation job's
 // outputs (see buildActivationJob).
 func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, "experiments.", activationOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, activationOutputsPrefix)
 }
 
 // RewriteActivationOutputsToLocalStepOutputs converts `needs.activation.outputs.<name>`
@@ -853,7 +859,7 @@ func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[stri
 // names are rewritten, so an unrelated `needs.activation.outputs.*` reference (not produced by
 // the experiments rewrite) is left untouched.
 func RewriteActivationOutputsToLocalStepOutputs(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, activationOutputsReferenceRegex, activationOutputsPrefix, pickExperimentOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, activationOutputsReferenceRegex, pickExperimentOutputsPrefix)
 }
 
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment
