@@ -1,0 +1,1 @@
+{"generated_on":"2026-09-17","data_source":"/tmp/gh-aw/agent/daily-news-data","artifacts":["issues_prs_activity.csv","commit_activity.csv","issues_prs_trends.png","commit_trends.png"],"notes":"Daily news trend datasets generated from pre-downloaded repo activity snapshots."}
