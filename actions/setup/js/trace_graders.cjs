@@ -282,13 +282,15 @@ function extractToolArguments(data) {
 function toolCallDedupeKeys(call) {
   const server = normalizeToolName(call.mcpServerName);
   const mcpToolName = typeof call.mcpToolName === "string" ? call.mcpToolName : "";
-  /** @type {string[]} */
-  const names = [call.name, call.tool, call.tool_name, mcpToolName];
+  /** @type {Array<string|undefined>} */
+  const baseNames = [call.name, call.tool, call.tool_name, mcpToolName];
+  /** @type {Array<string|undefined>} */
+  const names = [...baseNames];
   if (server) {
     // MCP calls are named differently by each producer: the gateway logs the bare
     // tool name plus a server id, while agents report `server-tool`, `server__tool`
     // or `mcp__server__tool`. All spellings map onto the same call.
-    for (const bare of [call.name, call.tool, call.tool_name, mcpToolName]) {
+    for (const bare of baseNames) {
       const normalized = normalizeToolName(bare);
       if (!normalized) continue;
       names.push(`${server}-${normalized}`, `${server}__${normalized}`, `mcp__${server}__${normalized}`);
