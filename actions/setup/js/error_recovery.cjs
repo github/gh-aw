@@ -60,6 +60,8 @@ const RATE_LIMIT_RETRY_CONFIG = {
  * @type {string[]}
  */
 const RATE_LIMIT_INDICATORS = ["rate limit", "secondary rate limit", "abuse detection", "too many requests"];
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
 /**
  * @param {string} messageLower - Lower-cased error message
@@ -77,6 +79,7 @@ function hasRateLimitIndicator(messageLower) {
 function isTransientError(error) {
   const errorMsg = getErrorMessage(error);
   const errorMsgLower = errorMsg.trimStart().toLowerCase();
+  const status = error?.response?.status ?? error?.status ?? null;
 
   // GitHub REST APIs may crash and return an HTML error page (e.g. the "Unicorn!"
   // 500 page) instead of JSON. Detect this by checking for an HTML doctype at the
@@ -89,6 +92,12 @@ function isTransientError(error) {
   // not descriptive enough (e.g. Octokit errors with status 429 and a generic
   // "Request failed" message). Must be checked before the text patterns.
   if (isRateLimitError(error)) {
+    return true;
+  }
+
+  // Fetch and Octokit errors do not consistently include the status text in
+  // their message, so classify standard transient HTTP statuses directly.
+  if (TRANSIENT_HTTP_STATUSES.has(Number(status))) {
     return true;
   }
 
@@ -122,18 +131,47 @@ function sleep(ms) {
 }
 
 /**
- * Extract the Retry-After delay in milliseconds from a GitHub API rate-limit error.
+ * Read a response header from either a Fetch Headers instance or a plain object.
+ * @param {Headers|Record<string, any>|null|undefined} headers
+ * @param {string} name
+ * @returns {any}
+ */
+function getHeader(headers, name) {
+  if (!headers) return null;
+  if (typeof headers.get === "function") {
+    return headers.get(name);
+  }
+  const matchingKey = Object.keys(headers).find(key => key.toLowerCase() === name);
+  return matchingKey === undefined ? null : headers[matchingKey];
+}
+
+/**
+ * Determine whether an error response represents a GitHub rate-limit condition.
+ * @param {any} error - The error to classify
+ * @returns {{headers: Headers|Record<string, any>|null, isRateLimit: boolean}}
+ */
+function getRateLimitErrorDetails(error) {
+  const status = error?.response?.status ?? error?.status ?? null;
+  const headers = error?.response?.headers ?? error?.headers ?? null;
+  const remainingHeader = getHeader(headers, "x-ratelimit-remaining");
+  const remainingExhausted = remainingHeader != null && parseInt(remainingHeader, 10) === 0;
+  return { headers, isRateLimit: status === 429 || (status === 403 && remainingExhausted) };
+}
+
+/**
+ * Extract the Retry-After delay in milliseconds from a retryable HTTP error.
  *
- * Only applies when the response status indicates a rate-limit condition:
+ * Applies when the response status indicates a rate-limit condition or service
+ * unavailability:
  *   - HTTP 429 (Too Many Requests)
  *   - HTTP 403 with `x-ratelimit-remaining: 0` (GitHub secondary rate limit)
+ *   - HTTP 503 (Service Unavailable)
  *
  * In those cases GitHub returns one of two headers:
  *   - `retry-after`       – integer seconds OR HTTP-date to wait until
  *   - `x-ratelimit-reset` – Unix timestamp (seconds) when the quota resets
  *
- * For any other status (5xx transient errors, etc.) returns null so normal
- * exponential backoff applies.
+ * For any other status returns null so normal exponential backoff applies.
  *
  * @param {any} error - The error object from a failed GitHub API call
  * @returns {number|null} Milliseconds to wait, or null if not a rate-limit response
@@ -141,19 +179,18 @@ function sleep(ms) {
 function getRetryAfterMs(error) {
   // Octokit surfaces response headers via error.response.headers or error.headers
   const status = error?.response?.status ?? error?.status ?? null;
-  const headers = error?.response?.headers ?? error?.headers ?? null;
+  const { headers, isRateLimit } = getRateLimitErrorDetails(error);
   if (!headers) return null;
 
   // Only honour rate-limit headers for genuine rate-limit responses.
   // GitHub uses 429 for primary rate limits and 403 for secondary rate limits
   // (the latter always sets x-ratelimit-remaining to "0").
-  const remainingHeader = headers["x-ratelimit-remaining"];
-  const isRateLimitStatus = status === 429 || (status === 403 && remainingHeader != null && parseInt(remainingHeader, 10) === 0);
+  const retryAfter = getHeader(headers, "retry-after");
+  const supportsRetryAfter = isRateLimit || status === 503;
 
-  if (!isRateLimitStatus) return null;
+  if (!supportsRetryAfter) return null;
 
   // retry-after: number of seconds OR HTTP-date (highest priority)
-  const retryAfter = headers["retry-after"];
   if (retryAfter != null) {
     const seconds = parseInt(retryAfter, 10);
     if (!Number.isNaN(seconds) && seconds > 0) {
@@ -169,8 +206,8 @@ function getRetryAfterMs(error) {
   }
 
   // x-ratelimit-reset: Unix timestamp — derive wait time from clock delta
-  const resetAt = headers["x-ratelimit-reset"];
-  if (resetAt != null) {
+  const resetAt = getHeader(headers, "x-ratelimit-reset");
+  if (isRateLimit && resetAt != null) {
     const resetTimestampMs = parseInt(resetAt, 10) * 1000;
     if (!Number.isNaN(resetTimestampMs)) {
       const waitMs = resetTimestampMs - Date.now();
@@ -189,12 +226,7 @@ function getRetryAfterMs(error) {
  * @returns {boolean} True when the error indicates primary or secondary rate limiting
  */
 function isRateLimitError(error) {
-  const status = error?.response?.status ?? error?.status ?? null;
-  const headers = error?.response?.headers ?? error?.headers ?? null;
-  const remainingHeader = headers?.["x-ratelimit-remaining"];
-  const retryAfterHeader = headers?.["retry-after"];
-  const hasRateLimitHeaders = status === 403 && (retryAfterHeader != null || (remainingHeader != null && parseInt(remainingHeader, 10) === 0));
-  if (status === 429 || hasRateLimitHeaders) {
+  if (getRateLimitErrorDetails(error).isRateLimit) {
     return true;
   }
 
@@ -213,6 +245,7 @@ function isRateLimitError(error) {
  */
 async function withRetry(operation, config = {}, operationName = "operation") {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
+  validateRetryConfig(operation, fullConfig);
   let lastError;
   let delay = fullConfig.initialDelayMs;
 
@@ -220,7 +253,7 @@ async function withRetry(operation, config = {}, operationName = "operation") {
     try {
       if (attempt > 0) {
         const jitter = fullConfig.jitterMs > 0 ? Math.floor(Math.random() * fullConfig.jitterMs) : 0;
-        const delayWithJitter = delay + jitter;
+        const delayWithJitter = Math.min(delay + jitter, fullConfig.maxDelayMs);
         core.info(`Retry attempt ${attempt}/${fullConfig.maxRetries} for ${operationName} after ${delayWithJitter}ms delay`);
         logRetryEvent(lastError, operationName, attempt, delayWithJitter);
         await sleep(delayWithJitter);
@@ -295,6 +328,35 @@ async function withRetry(operation, config = {}, operationName = "operation") {
 
   // This should never be reached, but TypeScript needs it
   throw lastError;
+}
+
+/**
+ * Reject invalid retry configuration before starting an operation.
+ * @param {unknown} operation
+ * @param {RetryConfig} config
+ */
+function validateRetryConfig(operation, config) {
+  if (typeof operation !== "function") {
+    throw new TypeError("Retry operation must be a function");
+  }
+
+  for (const key of ["maxRetries", "initialDelayMs", "maxDelayMs", "jitterMs"]) {
+    const value = config[key];
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError(`Retry configuration ${key} must be a non-negative safe integer`);
+    }
+  }
+  for (const key of ["initialDelayMs", "maxDelayMs", "jitterMs"]) {
+    if (config[key] > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`Retry configuration ${key} must not exceed ${MAX_TIMER_DELAY_MS}`);
+    }
+  }
+  if (!Number.isFinite(config.backoffMultiplier) || config.backoffMultiplier < 1) {
+    throw new RangeError("Retry configuration backoffMultiplier must be a finite number greater than or equal to 1");
+  }
+  if (typeof config.shouldRetry !== "function") {
+    throw new TypeError("Retry configuration shouldRetry must be a function");
+  }
 }
 
 /**

@@ -57,6 +57,16 @@ describe("error_recovery", () => {
       expect(isTransientError({ response: { status: 429 }, message: "Request failed" })).toBe(true);
     });
 
+    it.each([408, 425, 500, 502, 503, 504])("should identify HTTP %i as transient without relying on message text", status => {
+      expect(isTransientError({ status, message: "Request failed" })).toBe(true);
+      expect(isTransientError({ response: { status }, message: "Request failed" })).toBe(true);
+    });
+
+    it("should not identify non-transient HTTP statuses as transient", () => {
+      expect(isTransientError({ status: 400, message: "Request failed" })).toBe(false);
+      expect(isTransientError({ status: 404, message: "Request failed" })).toBe(false);
+    });
+
     it("should not identify validation errors as transient", () => {
       expect(isTransientError(new Error("Invalid input"))).toBe(false);
       expect(isTransientError(new Error("Field is required"))).toBe(false);
@@ -122,10 +132,10 @@ describe("error_recovery", () => {
       expect(operation).toHaveBeenCalledTimes(4); // Initial + 3 retries
     });
 
-    it("should emit E010 for exhausted retries on 403 with retry-after header", async () => {
+    it("should emit E010 for exhausted retries on a secondary rate limit", async () => {
       const rateLimitError = {
         message: "secondary rate limit",
-        response: { status: 403, headers: { "retry-after": "1" } },
+        response: { status: 403, headers: { "retry-after": "1", "x-ratelimit-remaining": "0" } },
       };
       const operation = vi.fn().mockRejectedValue(rateLimitError);
 
@@ -234,6 +244,41 @@ describe("error_recovery", () => {
 
       // Base delay after first failure: 100 * 2 = 200ms, no jitter
       expect(core.info).toHaveBeenCalledWith(expect.stringContaining("after 200ms delay"));
+    });
+
+    it("should cap the delay after adding jitter", async () => {
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.99);
+      const operation = vi.fn().mockRejectedValueOnce(new Error("Network timeout")).mockResolvedValue("success");
+
+      await withRetry(operation, { maxRetries: 1, initialDelayMs: 1000, backoffMultiplier: 2, maxDelayMs: 2000, jitterMs: 1000 }, "test-operation");
+
+      expect(core.info).toHaveBeenCalledWith(expect.stringContaining("after 2000ms delay"));
+      randomSpy.mockRestore();
+    });
+
+    it.each([
+      ["maxRetries", -1],
+      ["initialDelayMs", Number.NaN],
+      ["maxDelayMs", Number.POSITIVE_INFINITY],
+      ["maxDelayMs", 2 ** 31],
+      ["jitterMs", 1.5],
+      ["backoffMultiplier", 0],
+    ])("should reject invalid %s configuration", async (key, value) => {
+      const operation = vi.fn();
+
+      await expect(withRetry(operation, { [key]: value }, "test-operation")).rejects.toThrow(`Retry configuration ${key}`);
+      expect(operation).not.toHaveBeenCalled();
+    });
+
+    it("should accept the largest supported timer delay", async () => {
+      const operation = vi.fn().mockResolvedValue("success");
+
+      await expect(withRetry(operation, { maxDelayMs: 2 ** 31 - 1 }, "test-operation")).resolves.toBe("success");
+    });
+
+    it("should reject a non-function retry predicate", async () => {
+      // @ts-expect-error Deliberately exercise runtime input validation.
+      await expect(withRetry(vi.fn(), { shouldRetry: true }, "test-operation")).rejects.toThrow("Retry configuration shouldRetry must be a function");
     });
   });
 
@@ -415,11 +460,28 @@ describe("error_recovery", () => {
       // 403 without x-ratelimit-remaining: 0 is not a rate-limit response
       const error403 = { response: { status: 403, headers: { "retry-after": "60", "x-ratelimit-remaining": "100" } } };
       expect(getRetryAfterMs(error403)).toBeNull();
+      const secondaryRateLimitWithoutRemaining = { response: { status: 403, headers: { "retry-after": "60" } } };
+      expect(getRetryAfterMs(secondaryRateLimitWithoutRemaining)).toBeNull();
     });
 
     it("should extract retry-after seconds from response headers on 429", () => {
       const error = { response: { status: 429, headers: { "retry-after": "60" } } };
       expect(getRetryAfterMs(error)).toBe(60000);
+    });
+
+    it("should extract retry-after seconds from a 403 secondary rate-limit response", () => {
+      const error = { response: { status: 403, headers: { "retry-after": "30", "x-ratelimit-remaining": "0" } } };
+      expect(getRetryAfterMs(error)).toBe(30000);
+    });
+
+    it("should extract retry-after seconds from a 503 response", () => {
+      const error = { response: { status: 503, headers: { "retry-after": "15" } } };
+      expect(getRetryAfterMs(error)).toBe(15000);
+    });
+
+    it("should read case-insensitive headers from a Fetch Headers instance", () => {
+      const error = { response: { status: 429, headers: new Headers({ "Retry-After": "20" }) } };
+      expect(getRetryAfterMs(error)).toBe(20000);
     });
 
     it("should extract retry-after seconds from top-level headers on 429", () => {
@@ -508,6 +570,19 @@ describe("error_recovery", () => {
 
       expect(result).toBe("success");
       // The delay used should be 1000ms (from Retry-After: 1) rather than 20ms (10 * 2)
+      expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Retry-After header detected for test-operation: next retry will wait 1000ms"));
+    });
+
+    it("should use Retry-After delay for a status-only 503 response", async () => {
+      const retryAfterError = {
+        message: "Request failed",
+        response: { status: 503, headers: { "retry-after": "1" } },
+      };
+      const operation = vi.fn().mockRejectedValueOnce(retryAfterError).mockResolvedValue("success");
+
+      const result = await withRetry(operation, { maxRetries: 1, initialDelayMs: 10, backoffMultiplier: 2, jitterMs: 0 }, "test-operation");
+
+      expect(result).toBe("success");
       expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Retry-After header detected for test-operation: next retry will wait 1000ms"));
     });
 
