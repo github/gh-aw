@@ -20,9 +20,11 @@ describe("require-spawnsync-error-check", () => {
         // bare spawnSync, checks result.error
         `const result = spawnSync("git", ["status"]); if (result.error) throw result.error; if (result.status !== 0) throw new Error("failed");`,
         // namespaced childProcess.spawnSync, checks result.error
-        `const result = childProcess.spawnSync("git", ["status"]); if (result.error) throw result.error;`,
+        `const childProcess = require("child_process"); const result = childProcess.spawnSync("git", ["status"]); if (result.error) throw result.error;`,
         // child_process.spawnSync, checks result.error
-        `const result = child_process.spawnSync("curl", ["-v"]); if (result.error) { throw result.error; } if (result.status !== 0) throw new Error("x");`,
+        `const child_process = require("child_process"); const result = child_process.spawnSync("curl", ["-v"]); if (result.error) { throw result.error; } if (result.status !== 0) throw new Error("x");`,
+        // arbitrary namespace alias (e.g. const cp = require("child_process")) resolved via scope binding, checks result.error
+        `const cp = require("child_process"); const result = cp.spawnSync("git", ["status"]); if (result.error) throw result.error;`,
         // logging is fine when there is also a guard
         `const result = spawnSync("git", ["status"]); if (result.error) throw result.error; core.info(String(result.error));`,
         // logging before a later guard is still valid
@@ -55,11 +57,16 @@ describe("require-spawnsync-error-check", () => {
           errors: [{ messageId: "missingErrorCheck" }],
         },
         {
-          code: `const result = childProcess.spawnSync("zip", ["-v"], { stdio: "ignore" }); if (result.status !== 0) throw new Error("zip not found");`,
+          code: `const childProcess = require("child_process"); const result = childProcess.spawnSync("zip", ["-v"], { stdio: "ignore" }); if (result.status !== 0) throw new Error("zip not found");`,
           errors: [{ messageId: "missingErrorCheck" }],
         },
         {
-          code: `const result = child_process.spawnSync("curl", ["--version"]); return result.stdout;`,
+          code: `const child_process = require("child_process"); const result = child_process.spawnSync("curl", ["--version"]); return result.stdout;`,
+          errors: [{ messageId: "missingErrorCheck" }],
+        },
+        {
+          // the common `cp` alias (const cp = require("child_process")) must be resolved via scope binding, not name allowlist
+          code: `const cp = require("child_process"); const result = cp.spawnSync("zip", ["-v"]); if (result.status !== 0) throw new Error("zip not found");`,
           errors: [{ messageId: "missingErrorCheck" }],
         },
         {
@@ -106,7 +113,13 @@ describe("require-spawnsync-error-check", () => {
 
   it("valid: non-spawnSync call is ignored", () => {
     cjsRuleTester.run("require-spawnsync-error-check", requireSpawnSyncErrorCheckRule, {
-      valid: [`const result = execSync("git status"); if (!result) throw new Error("failed");`, `const result = spawnSync; result.toString();`],
+      valid: [
+        `const result = execSync("git status"); if (!result) throw new Error("failed");`,
+        `const result = spawnSync; result.toString();`,
+        // an identifier merely named "childProcess" that is not bound to require("child_process")
+        // must not be treated as the child_process module namespace
+        `const childProcess = getFakeApi(); const result = childProcess.spawnSync("git", ["status"]); if (result.status !== 0) throw new Error("failed");`,
+      ],
       invalid: [],
     });
   });
