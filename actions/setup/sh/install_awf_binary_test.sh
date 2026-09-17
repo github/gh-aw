@@ -104,8 +104,13 @@ test_curl_retry_all_errors() {
   local expected="$2"
   local help_all_fails="${3:-false}"
   local test_dir
-  local actual
+  local option_index
+  local -a actual_options
+  local -a expected_options=(-fsSL --retry 5 --retry-delay 10 --retry-max-time 180)
   TEST_FAILURE_REASON=""
+  if [ "${expected}" = true ]; then
+    expected_options+=(--retry-all-errors)
+  fi
   test_dir=$(mktemp -d)
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
@@ -159,30 +164,24 @@ EOF
     return 1
   fi
   local curl_args
-  local curl_args_files=("${test_dir}"/curl-args.[0-9]*)
-  if [ ! -f "${curl_args_files[0]}" ]; then
+  local -a curl_args_files
+  shopt -s nullglob
+  curl_args_files=("${test_dir}"/curl-args.[0-9]*)
+  shopt -u nullglob
+  if [ "${#curl_args_files[@]}" -eq 0 ]; then
     TEST_FAILURE_REASON="installer did not invoke a download"
     rm -rf "${test_dir}"
     return 1
   fi
   for curl_args in "${curl_args_files[@]}"; do
-    if grep -qxF -- '--retry-all-errors' "${curl_args}"; then
-      actual=true
-    else
-      actual=false
-    fi
-    for retry_option in --retry 5 --retry-delay 10 --retry-max-time 180; do
-      if ! grep -qxF -- "${retry_option}" "${curl_args}"; then
-        TEST_FAILURE_REASON="fixed retry option ${retry_option} was not passed to curl"
+    mapfile -t actual_options < "${curl_args}"
+    for option_index in "${!expected_options[@]}"; do
+      if [ "${actual_options[option_index]:-}" != "${expected_options[option_index]}" ]; then
+        TEST_FAILURE_REASON="expected curl argument ${expected_options[option_index]} at position ${option_index}"
         rm -rf "${test_dir}"
         return 1
       fi
     done
-    if [ "${actual}" != "${expected}" ]; then
-      TEST_FAILURE_REASON="expected --retry-all-errors=${expected}, got ${actual}"
-      rm -rf "${test_dir}"
-      return 1
-    fi
   done
   rm -rf "${test_dir}"
 }
