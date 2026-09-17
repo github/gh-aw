@@ -161,7 +161,7 @@ case "$1" in
 esac
 EOF
   chmod +x "${test_dir}/bin/"*
-  if !   CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+  if ! CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null; then
     TEST_FAILURE_REASON="installer exited unsuccessfully"
@@ -196,7 +196,7 @@ if test_curl_retry_all_errors '--retry-all-errors' true; then
 else
   fail "supported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
 fi
-if test_curl_retry_all_errors '--retry-all-errors' true true; then
+if test_curl_retry_all_errors '' true true '--retry-all-errors'; then
   pass "curl help fallback detects --retry-all-errors"
 else
   fail "curl help fallback retry options were incorrect" "${TEST_FAILURE_REASON}"
