@@ -806,6 +806,13 @@ var activationOutputsReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.o
 // followed by that name. Matches for undeclared names are left untouched. The regex-based,
 // word-boundary-anchored matching (rather than sequential strings.ReplaceAll per name) avoids
 // one declared name corrupting the occurrence of another name it happens to be a prefix of.
+//
+// Precondition: matchPrefix must be a literal string prefix of every string re can match
+// (true for experimentsFieldReferenceRegex/"experiments." and
+// activationOutputsReferenceRegex/activationOutputsPrefix, the only two callers below). This
+// lets the strings.Contains check below act purely as a fast-path skip; if it were ever
+// violated, re.ReplaceAllStringFunc would still run and produce the correct result, since the
+// fast path is optional (it never returns a rewritten value).
 func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, matchPrefix, replacementPrefix string) string {
 	if len(experiments) == 0 || !strings.Contains(s, matchPrefix) {
 		return s
