@@ -258,7 +258,21 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
    */
   function segmentStartsWithPrefix(segmentText, prefix) {
     if (!prefix) return false;
-    return segmentText === prefix || segmentText.startsWith(`${prefix} `);
+    const normalizedSegment = segmentText.trim().replace(/\s+/g, " ");
+    const normalizedPrefix = prefix.trim().replace(/\s+/g, " ");
+    return normalizedSegment === normalizedPrefix || normalizedSegment.startsWith(`${normalizedPrefix} `);
+  }
+
+  /**
+   * @param {string} segmentText
+   * @returns {boolean}
+   */
+  function isNonExecutableShellSegment(segmentText) {
+    if (/[$][(]|[`]|[<>][(]/.test(segmentText)) return false;
+    if (/^(?:[A-Za-z_][A-Za-z0-9_]*=(?:"(?:[^"\\]|\\.)*"|'[^']*'|\S*)\s*)+$/.test(segmentText)) return true;
+    if (/^(?:for|select)\s+[A-Za-z_][A-Za-z0-9_]*(?:\s+in(?:\s+.*)?)?$/.test(segmentText)) return true;
+    if (/^case\s+.+\s+in$/.test(segmentText)) return true;
+    return /^(?:then|else|do|fi|done|esac|\{|\})$/.test(segmentText);
   }
 
   /**
@@ -284,13 +298,11 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
     if (!trimmedSegment) return false;
     const name = extractCommandNamesFromPipeline(trimmedSegment)[0];
     if (!name) {
-      // No executable name could be extracted (e.g. a bare shell control-flow
-      // segment such as "for f in $FILES", "if [ ... ]", "fi", or "done" that
-      // resulted from splitting a multi-line script on statement boundaries).
-      // These are not independently executable commands, so they are not
-      // subject to the allow-list — matching prior behavior where such
-      // segments were excluded from the extracted command-name set entirely.
-      return true;
+      const keywordMatch = trimmedSegment.match(/^(if|while|until|time|coproc)\b\s*(.*)$/s);
+      if (keywordMatch) {
+        return keywordMatch[2].length > 0 && isSegmentAllowedByShellRules(keywordMatch[2]);
+      }
+      return isNonExecutableShellSegment(trimmedSegment);
     }
     return shellRules.some(rule => {
       if (rule.endsWith(":*")) {
@@ -304,7 +316,7 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
       if (!rule.includes(" ")) {
         return name === rule;
       }
-      return trimmedSegment === rule;
+      return false;
     });
   }
 
@@ -317,6 +329,10 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
       case "shell": {
         if (allowedToolEntries.has("shell")) return true;
         const fullCommand = String(request.fullCommandText || "").trim();
+
+        if (shellRules.some(rule => rule.includes(" ") && !rule.endsWith(":*") && fullCommand === rule)) {
+          return true;
+        }
 
         // Primary path: split the full command text into pipeline segments and
         // verify that every segment is individually allowed. This is preferred

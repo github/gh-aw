@@ -297,13 +297,12 @@ async function runWithCopilotSDK({
     // failure: the process remained stalled for ~49 minutes after this guard
     // fired, until the surrounding job's own timeout cancelled it).
     const denialGuardTimeoutMs = getEnvPositiveIntOrDefault("GH_AW_DENIAL_GUARD_TIMEOUT_MS", DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT);
-    const forceExitTimer = setTimeout(() => {
+    setTimeout(() => {
       if (denialGuardReject) {
         log(`warning: denial guard force-exit fired after ${denialGuardTimeoutMs}ms — sendAndWait did not settle on its own`);
         denialGuardReject(catastrophicToolDenialsError);
       }
     }, denialGuardTimeoutMs);
-    if (typeof forceExitTimer.unref === "function") forceExitTimer.unref();
   }
 
   try {

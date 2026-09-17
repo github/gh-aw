@@ -2026,6 +2026,28 @@ describe("copilot_sdk_driver.cjs", () => {
         kind: "reject",
         feedback: "Tool invocation is not allowed by workflow tool permissions.",
       });
+
+      expect(handler({ kind: "shell", commands: [], fullCommandText: "git  checkout -b automation/repro" })).toEqual({ kind: "approve-once" });
+      expect(handler({ kind: "shell", commands: [], fullCommandText: "git\tcheckout -b automation/repro" })).toEqual({ kind: "approve-once" });
+    });
+
+    it("denies executable content hidden behind control flow or leading redirection", async () => {
+      const handler = await makePermissionHandlerViaSDK(["shell(echo)"]);
+      for (const fullCommandText of [">/tmp/out rm -rf /workspace", "if rm -rf /tmp/x; then echo ok; fi", "while rm -rf /tmp/x; do echo ok; done"]) {
+        expect(handler({ kind: "shell", commands: [], fullCommandText })).toEqual({
+          kind: "reject",
+          feedback: "Tool invocation is not allowed by workflow tool permissions.",
+        });
+      }
+    });
+
+    it("matches exact shell rules only against the full request", async () => {
+      const handler = await makePermissionHandlerViaSDK(["shell(git status)", "shell(echo done)"]);
+      expect(handler({ kind: "shell", commands: [], fullCommandText: "git status" })).toEqual({ kind: "approve-once" });
+      expect(handler({ kind: "shell", commands: [], fullCommandText: "git status && echo done" })).toEqual({
+        kind: "reject",
+        feedback: "Tool invocation is not allowed by workflow tool permissions.",
+      });
     });
 
     it("denies multiline shell command when required tools are missing", async () => {
@@ -2050,7 +2072,7 @@ for f in $FILES; do wc -l "/home/runner/work/gh-aw/gh-aw/pkg/workflow/$f"; done`
     });
 
     it("approves multiline shell command when all required tools are permitted", async () => {
-      const handler = await makePermissionHandlerViaSDK(["shell(set)", "shell(mkdir)", "shell(git:*)", "shell(sed)", "shell(printf)", "shell(cat)", "shell(wc)"]);
+      const handler = await makePermissionHandlerViaSDK(["shell(set)", "shell(mkdir)", "shell(git:*)", "shell(sed)", "shell(printf)", "shell(cat)", "shell(wc)", "shell([)"]);
       const result = handler({
         kind: "shell",
         commands: [],
