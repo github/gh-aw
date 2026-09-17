@@ -390,12 +390,21 @@ const main = createCountGatedHandler({
         }
       }
 
-      // If no labels provided, return a helpful message with allowed labels if configured
+      // If no labels provided, skip the request with a warning instead of failing the job.
+      // An empty list means there is nothing to add, which is not an error condition.
       if (requestedLabelNames.length === 0) {
         const labelSource = allowedLabels.length > 0 ? `the allowed list: ${JSON.stringify(allowedLabels)}` : "the repository's available labels";
-        const error = `No labels provided. Please provide at least one label from ${labelSource}`;
-        core.info(error);
-        return { success: false, error };
+        const message = `No labels provided. Skipping add_labels. Provide at least one label from ${labelSource}`;
+        core.warning(message);
+        return {
+          success: true,
+          skipped: true,
+          reasonCode: "NO_LABELS_PROVIDED",
+          reason: "No labels provided",
+          number: itemNumber,
+          labelsAdded: [],
+          message,
+        };
       }
 
       // Enforce max limits on labels before validation

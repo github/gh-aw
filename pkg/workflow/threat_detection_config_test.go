@@ -247,6 +247,19 @@ func TestParseThreatDetectionConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "object with report-as-issue false",
+			outputMap: map[string]any{
+				"threat-detection": map[string]any{
+					"continue-on-error": false,
+					"report-as-issue":   false,
+				},
+			},
+			expectedConfig: &ThreatDetectionConfig{
+				ContinueOnError: boolPtr(false),
+				ReportAsIssue:   boolPtr(false),
+			},
+		},
+		{
 			name: "object with max-ai-credits override",
 			outputMap: map[string]any{
 				"threat-detection": map[string]any{

@@ -11911,6 +11911,11 @@
                 "continue-on-error": {
                   "$ref": "#/$defs/templatable_boolean",
                   "description": "When true (default), detection failures produce warnings and allow safe outputs to proceed with a caution notice and 'needs-review' label. When false, detection failures block safe outputs entirely. Accepts a boolean literal or a GitHub Actions expression."
+                },
+                "report-as-issue": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "When true (default), detection warnings/failures create or update the '[aw] Detection Runs' tracking issue and post a comment to it. When false, detection still runs and enforces its configured continue-on-error behavior, but no tracking issue is created or updated; results remain available in the GitHub Actions run diagnostics."
                 }
               },
               "additionalProperties": false

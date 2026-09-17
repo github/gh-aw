@@ -9,8 +9,8 @@
  *
  * Event mapping:
  *   SDK "user.message"            → JSONL "user.message"
- *   SDK "tool.execution_start"    → JSONL "tool.execution_start"  (toolName, mcpServerName, command?)
- *   SDK "tool.execution_complete" → JSONL "tool.execution_complete" (toolName, mcpServerName, success, result)
+ *   SDK "tool.execution_start"    → JSONL "tool.execution_start"  (toolName, mcpServerName, mcpToolName?, toolCallId?, input?, command?)
+ *   SDK "tool.execution_complete" → JSONL "tool.execution_complete" (toolName, mcpServerName, toolCallId?, success, result)
  *   SDK "assistant.message"       → JSONL "assistant.message"     (content)
  *   SDK "assistant.turn_start"    → watchdog disarmed (inAssistantTurn = true)
  *   SDK "assistant.turn_end"      → watchdog re-enabled (inAssistantTurn = false)
@@ -38,7 +38,7 @@ const os = require("os");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
 const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
-const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
+const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // This is intentionally generous — the headless Copilot CLI has its own internal
@@ -374,10 +374,21 @@ async function runWithCopilotSDK({
           const mcpServerName = event.data?.mcpServerName ?? "";
           const toolCallId = event.data?.toolCallId;
           const command = extractShellCommandFromToolData(event.data);
+          // The structured input carries the tool arguments (e.g. the skill name for
+          // the built-in `skill` tool); graders and log parsers need it to identify
+          // what was invoked, so persist it alongside the derived command text.
+          const input = extractStructuredToolInput(event.data);
           if (toolCallId) {
             pendingToolCalls.set(toolCallId, { toolName, mcpServerName });
           }
-          const eventData = command ? { toolName, mcpServerName, command } : { toolName, mcpServerName };
+          const eventData = {
+            toolName,
+            mcpServerName,
+            ...(event.data?.mcpToolName ? { mcpToolName: event.data.mcpToolName } : {}),
+            ...(toolCallId ? { toolCallId } : {}),
+            ...(input === undefined ? {} : { input }),
+            ...(command ? { command } : {}),
+          };
           writeEvent("tool.execution_start", eventData, event.timestamp);
           break;
         }
@@ -395,7 +406,7 @@ async function runWithCopilotSDK({
           const result = event.data?.result ?? undefined;
           // max-tool-denials intentionally tracks permission denials only.
           // Tool execution failures are still logged, but do not increment the guardrail counter.
-          writeEvent("tool.execution_complete", { toolName, mcpServerName, success, result }, event.timestamp);
+          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp);
           break;
         }
 
