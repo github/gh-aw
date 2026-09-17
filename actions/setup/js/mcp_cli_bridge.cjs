@@ -753,8 +753,8 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
  * @returns {string | null}
  */
 function findInlineJsonPayloadArg(args) {
-  if (args.some(arg => arg.startsWith("--") && !isJsonFlag(arg))) return null;
-  const positionalArgs = args.filter(arg => !isJsonFlag(arg));
+  if (args.some(arg => arg.startsWith("--") && !isJsonFlagToken(arg))) return null;
+  const positionalArgs = args.filter(arg => !isJsonFlagToken(arg));
   if (positionalArgs.length !== 1) return null;
   const trimmed = positionalArgs[0].trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
@@ -800,6 +800,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   let jsonOutput = false;
   const hasSchemaProperties = Object.keys(schemaProperties).length > 0;
   const { normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys } = buildNormalizedSchemaKeyMap(schemaProperties);
+  args.filter(isJsonFlagToken).forEach(jsonFlagIsEnabled);
 
   // Inline JSON payload mode: the whole payload is passed as a single quoted
   // argument, e.g. `safeoutputs noop '{"message":"done"}'`.  This keeps the
@@ -821,7 +822,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: args.some(isJsonOutputFlag) };
+    return { args: result, json: args.filter(isJsonFlagToken).map(jsonFlagIsEnabled).some(Boolean) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -897,7 +898,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
  * @param {string} arg - CLI argument
  * @returns {boolean}
  */
-function isJsonFlag(arg) {
+function isJsonFlagToken(arg) {
   return arg === "--json" || arg.startsWith("--json=");
 }
 
@@ -916,7 +917,7 @@ function parseJsonFlagValue(value) {
  * @param {string} arg - CLI argument
  * @returns {boolean}
  */
-function isJsonOutputFlag(arg) {
+function jsonFlagIsEnabled(arg) {
   return arg === "--json" || (arg.startsWith("--json=") && parseJsonFlagValue(arg.slice("--json=".length)));
 }
 

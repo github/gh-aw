@@ -3193,6 +3193,16 @@ function isDroppedPipeSafeOutputsCommand(line) {
       i++;
       continue;
     }
+    if (char === "$" && line[i + 1] === "(") {
+      writerSeen = false;
+      i += 2;
+      continue;
+    }
+    if (char === ")") {
+      writerSeen = false;
+      i++;
+      continue;
+    }
     if ("|;&><".includes(char)) {
       writerSeen = false;
       i++;
@@ -3217,7 +3227,12 @@ function isDroppedPipeSafeOutputsCommand(line) {
  * @returns {string}
  */
 function safeMarkdownCodeFence(commands) {
-  const longestBacktickRun = commands.reduce((longest, command) => (command.match(/`+/g) || []).reduce((currentLongest, run) => Math.max(currentLongest, run.length), longest), 0);
+  let longestBacktickRun = 0;
+  for (const command of commands) {
+    for (const run of command.match(/`+/g) || []) {
+      longestBacktickRun = Math.max(longestBacktickRun, run.length);
+    }
+  }
   return "`".repeat(Math.max(3, longestBacktickRun + 1));
 }
 
@@ -3255,14 +3270,13 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
     if (!/(^|[|;&(\s"'`])safeoutputs\s+[a-z_][a-z0-9_]*/i.test(line)) continue;
     const redacted = applyAddMaskRedaction(line, maskedValues);
     const truncated = redacted.length > SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH ? `${redacted.slice(0, SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH)}…` : redacted;
-    const escaped = truncated;
     if (isDroppedPipeSafeOutputsCommand(line)) {
       hasDroppedPipe = true;
     }
-    if (seen.has(escaped)) continue;
-    seen.add(escaped);
+    if (seen.has(truncated)) continue;
+    seen.add(truncated);
     if (commands.length < SAFEOUTPUTS_CLI_EXCERPT_LIMIT) {
-      commands.push(escaped);
+      commands.push(truncated);
     }
   }
 
