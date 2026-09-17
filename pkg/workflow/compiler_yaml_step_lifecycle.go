@@ -59,7 +59,7 @@ func writeStepsSection(yaml *strings.Builder, stepsYAML string) {
 	}
 }
 
-func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine) {
+func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine) { //nolint:largefunc // Existing aw_info environment rendering remains centralized.
 	// Engine ID (prefer EngineConfig.ID, fallback to AI field for backwards compatibility)
 	engineID := engine.GetID()
 	if data.EngineConfig != nil && data.EngineConfig.ID != "" {
@@ -219,7 +219,10 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	// validateLockdownRequirements is called from generate_aw_info.cjs and uses these vars.
 	githubTool, hasGitHub := data.Tools["github"]
 	if hasGitHub && githubTool != false {
-		toolConfig, _ := githubTool.(map[string]any)
+		toolConfig, ok := githubTool.(map[string]any)
+		if !ok {
+			toolConfig = nil
+		}
 		if hasGitHubLockdownExplicitlySet(toolConfig) && getGitHubLockdown(toolConfig) {
 			yaml.WriteString("          GITHUB_MCP_LOCKDOWN_EXPLICIT: \"true\"\n")
 			yaml.WriteString("          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}\n")
@@ -262,7 +265,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	yaml.WriteString("            await main(core, context);\n")
 }
 
-func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData) error {
+func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData) error { //nolint:largefunc // Existing safe-output collection rendering remains centralized.
 	// Copy the raw safe-output NDJSON to a /tmp/gh-aw/ path so it can be included in the
 	// unified agent artifact together with all other /tmp/gh-aw/ outputs.
 	yaml.WriteString("      - name: Copy Safe Outputs\n")

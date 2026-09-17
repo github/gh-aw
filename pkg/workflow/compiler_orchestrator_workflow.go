@@ -339,7 +339,10 @@ func extractRawObservabilityMap(rawFrontmatter map[string]any) map[string]any {
 	if rawFrontmatter == nil {
 		return nil
 	}
-	obs, _ := rawFrontmatter["observability"].(map[string]any)
+	obs, ok := rawFrontmatter["observability"].(map[string]any)
+	if !ok {
+		return nil
+	}
 	return obs
 }
 
@@ -347,7 +350,7 @@ func mergeRawOTLPEndpoints(mainObs map[string]any, importedObs map[string]any) (
 	seen := make(map[string]struct {
 	})
 	for _, ep := range extractRawOTLPEndpointMaps(mainObs) {
-		if url, _ := ep["url"].(string); url != "" && !setutil.Contains(seen, url) {
+		if url, ok := ep["url"].(string); ok && url != "" && !setutil.Contains(seen, url) {
 			seen[url] = struct {
 			}{}
 			mergedEndpoints = append(mergedEndpoints, ep)
@@ -355,7 +358,7 @@ func mergeRawOTLPEndpoints(mainObs map[string]any, importedObs map[string]any) (
 	}
 	mainCount = len(mergedEndpoints)
 	for _, ep := range extractRawOTLPEndpointMaps(importedObs) {
-		if url, _ := ep["url"].(string); url != "" && !setutil.Contains(seen, url) {
+		if url, ok := ep["url"].(string); ok && url != "" && !setutil.Contains(seen, url) {
 			seen[url] = struct {
 			}{}
 			mergedEndpoints = append(mergedEndpoints, ep)
@@ -573,7 +576,10 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// between types the user explicitly configured and types that were auto-defaulted by
 	// extractSafeOutputsConfig. Without this, auto-defaults (e.g. threat-detection) would
 	// prevent imported configurations for those types from being merged.
-	rawSafeOutputsMap, _ := frontmatter["safe-outputs"].(map[string]any)
+	rawSafeOutputsMap, ok := frontmatter["safe-outputs"].(map[string]any)
+	if !ok {
+		rawSafeOutputsMap = nil
+	}
 	mergedSafeOutputs, err := c.MergeSafeOutputs(workflowData.SafeOutputs, allSafeOutputsConfigs, rawSafeOutputsMap)
 	if err != nil {
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)

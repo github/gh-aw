@@ -304,7 +304,10 @@ func extractFloat(raw any) (float64, bool) {
 }
 
 func extractContinualExperimentConfig(raw map[string]any) *ContinualExperimentConfig {
-	seed, _ := raw["seed"].(string)
+	seed, ok := raw["seed"].(string)
+	if !ok {
+		return nil
+	}
 	ramp := extractIntSlice(raw["ramp"])
 	if seed == "" || len(ramp) == 0 {
 		return nil
@@ -356,8 +359,14 @@ func extractGuardrailMetrics(raw any) []GuardrailMetric {
 		if !ok {
 			continue
 		}
-		name, _ := m["name"].(string)
-		direction, _ := m["direction"].(string)
+		name, ok := m["name"].(string)
+		if !ok {
+			continue
+		}
+		direction := ""
+		if rawDirection, ok := m["direction"].(string); ok {
+			direction = rawDirection
+		}
 		threshold := extractGuardrailThreshold(m["threshold"])
 		if name == "" || threshold == "" {
 			continue

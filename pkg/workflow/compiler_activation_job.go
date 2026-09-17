@@ -375,7 +375,7 @@ func (c *Compiler) generateResolveHostRepoStep(data *WorkflowData) string {
 // the checkout when the agent job will have a full repository checkout, because the activation job
 // runs before the agent job and needs independent access to workflow files for runtime imports during
 // prompt generation.
-func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData) []string {
+func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData) []string { //nolint:largefunc // Existing activation checkout rendering remains centralized.
 	// Check if action-tag is specified - if so, skip checkout
 	if data != nil && data.Features != nil {
 		if actionTagVal, exists := data.Features["action-tag"]; exists {
