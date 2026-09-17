@@ -258,6 +258,7 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
    */
   function segmentStartsWithPrefix(segmentText, prefix) {
     if (!prefix) return false;
+    if (/[`]|[$][(]|[<>][(]|&/.test(segmentText)) return false;
     const normalizedSegment = segmentText.trim().replace(/\s+/g, " ");
     const normalizedPrefix = prefix.trim().replace(/\s+/g, " ");
     return normalizedSegment === normalizedPrefix || normalizedSegment.startsWith(`${normalizedPrefix} `);
@@ -361,7 +362,10 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
         const commandIdentifiers = Array.isArray(request.commands) ? request.commands.map(cmd => cmd?.identifier).filter(Boolean) : [];
         const normalizedCommandIdentifiers = [...new Set(commandIdentifiers.map(identifier => String(identifier || "").trim()).filter(Boolean))];
         if (normalizedCommandIdentifiers.length > 0) {
-          return normalizedCommandIdentifiers.every(identifier => isSegmentAllowedByShellRules(identifier));
+          return normalizedCommandIdentifiers.every(identifier => {
+            const segments = splitOnPipelineOperators(identifier);
+            return (segments.length > 0 ? segments : [identifier]).every(segment => isSegmentAllowedByShellRules(segment));
+          });
         }
 
         return false;
