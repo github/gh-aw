@@ -118,6 +118,11 @@
       "version": "v2.0.5",
       "sha": "22d081ff2d3a40755e97629de92e3bcbfa7cf2ed"
     },
+    "docker/build-push-action@v7.3.0": {
+      "repo": "docker/build-push-action",
+      "version": "v7.3.0",
+      "sha": "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"
+    },
     "docker/build-push-action@v7.4.0": {
       "repo": "docker/build-push-action",
       "version": "v7.4.0",
@@ -132,6 +137,11 @@
       "repo": "docker/metadata-action",
       "version": "v6.2.0",
       "sha": "dc802804100637a589fabce1cb79ff13a1411302"
+    },
+    "docker/setup-buildx-action@v4.3.0": {
+      "repo": "docker/setup-buildx-action",
+      "version": "v4.3.0",
+      "sha": "37fe631027851001ddb9b187196cc803df7f5f0e"
     },
     "docker/setup-buildx-action@v4.4.0": {
       "repo": "docker/setup-buildx-action",
