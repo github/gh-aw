@@ -399,6 +399,7 @@ const main = createCountGatedHandler({
         return {
           success: true,
           skipped: true,
+          reasonCode: "NO_LABELS_PROVIDED",
           reason: "No labels provided",
           number: itemNumber,
           labelsAdded: [],

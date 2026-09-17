@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, beforeEach } from "vitest";
 const { main } = require("./add_labels.cjs");
+const { classifySafeOutputResult } = require("./safe_outputs_status.cjs");
 
 describe("add_labels", () => {
   let mockCore;
@@ -820,6 +821,8 @@ describe("add_labels", () => {
 
       expect(result.success).toBe(true);
       expect(result.skipped).toBe(true);
+      expect(result.reasonCode).toBe("NO_LABELS_PROVIDED");
+      expect(classifySafeOutputResult(result)).toBe("skipped");
       expect(result.labelsAdded).toEqual([]);
       expect(result.message).toContain("No labels provided");
       expect(result.message).toContain("repository's available labels");
