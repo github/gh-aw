@@ -393,7 +393,7 @@ safe-outputs:
     report-as-issue: false
 ```
 
-Detection still runs, `continue-on-error` behavior is unchanged, and results remain available in the GitHub Actions run summary and logs.
+Detection still runs, `continue-on-error` behavior is unchanged, and results remain available in GitHub Actions diagnostics and logs.
 
 ## Supply Chain Protection (Protected Files)
 
