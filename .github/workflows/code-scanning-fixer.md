@@ -39,7 +39,7 @@ imports:
   - shared/graders.md
 tools:
   cli-proxy: true
-  bash: ["cat:*", "git diff:*", "git restore:*", "git status:*", "head:*", "sed:*", wc]
+  bash: ["cat:*", "git diff:*", "git restore:*", "git status:*", grep, "head:*", jq, ls, "sed:*", tail, wc]
   github:
     mode: local
     github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -56,7 +56,7 @@ safe-outputs:
     labels: [security, automated-fix, agentic-campaign, z_campaign_security-alert-burndown]
     expires: "3d"
     max: 1
-timeout-minutes: 40
+timeout-minutes: 50
 features:
   gh-aw-detection: true
 sandbox:
@@ -94,6 +94,7 @@ You are a security-focused code analysis agent that automatically fixes code sca
 - Do not use shell commands to fetch or parse GitHub API responses.
 - Edit files: use the `edit` tool
 - Do not use the Copilot `read` tool for temporary files; use allowed shell readers such as `cat`, `head`, or `sed`
+- If a tool output is saved to a temporary file because it is too large, inspect it with `view_range` or simple allowed shell commands such as `grep`, `head`, `jq`, `sed`, or `tail`; do not use `python3` or compound shell assignment snippets for JSON parsing
 - Create pull request: emit a `create-pull-request` safe output after edits
 - Report a stalled prior attempt: emit a `create-issue` safe output (diagnostic only, never a fix)
 
