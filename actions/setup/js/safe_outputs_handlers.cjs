@@ -2713,7 +2713,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       }
 
       const canonicalStagingDir = canonicalizeAllowedRoot(stagingDir);
-      const alreadyStaged = canonicalFilePath === canonicalStagingDir || canonicalFilePath.startsWith(canonicalStagingDir + path.sep);
+      if (canonicalFilePath === canonicalStagingDir) {
+        throw {
+          code: -32602,
+          message: `${ERR_VALIDATION}: upload_artifact: path must identify a file or directory within the staging directory`,
+        };
+      }
+      const alreadyStaged = canonicalFilePath.startsWith(canonicalStagingDir + path.sep);
       const destName = path.basename(filePath);
 
       if (!alreadyStaged) {
@@ -2736,7 +2742,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
       // Rewrite to a staging-relative path so upload_artifact.cjs never receives
       // the agent job's absolute RUNNER_TEMP path.
-      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath) || "." : destName;
+      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath) : destName;
     }
 
     appendSafeOutputCounted(entry);

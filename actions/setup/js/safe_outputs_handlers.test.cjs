@@ -634,6 +634,13 @@ describe("safe_outputs_handlers", () => {
       expect(fs.readFileSync(stagedFile, "utf8")).toBe("staged data");
     });
 
+    it("should reject the staging directory itself as an artifact path", () => {
+      const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
+      fs.mkdirSync(stagingDir, { recursive: true });
+
+      expect(() => handlers.uploadArtifactHandler({ path: stagingDir })).toThrow(expect.objectContaining({ message: expect.stringContaining("path must identify a file or directory within the staging directory") }));
+    });
+
     it("should throw when relative path is not in staging and cannot be resolved from GITHUB_WORKSPACE", () => {
       const savedWorkspace = process.env.GITHUB_WORKSPACE;
       delete process.env.GITHUB_WORKSPACE;
