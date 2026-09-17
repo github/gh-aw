@@ -97,17 +97,21 @@ else
 fi
 rm -f "${FAKE_GITHUB_PATH}"
 
-# Test 7: --retry-all-errors is used only when curl supports it
-echo "Test 7: --retry-all-errors is conditional on curl support..."
+# Test 6: --retry-all-errors is used only when curl supports it
+echo "Test 6: --retry-all-errors is conditional on curl support..."
 test_curl_retry_all_errors() {
   local curl_help="$1"
   local expected="$2"
+  local help_all_fails="${3:-false}"
   local test_dir
   test_dir=$(mktemp -d)
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "--help" ]; then
+  if [ "$2" = "all" ] && [ "${CURL_HELP_ALL_FAILS}" = "true" ]; then
+    exit 1
+  fi
   printf '%s\n' "${CURL_HELP_OUTPUT}"
   exit 0
 fi
@@ -141,7 +145,7 @@ case "$1" in
 esac
 EOF
   chmod +x "${test_dir}/bin/"*
-  CURL_HELP_OUTPUT="${curl_help}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+  CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null
   if grep -q -- '--retry-all-errors' "${test_dir}/curl-args"; then
@@ -162,14 +166,19 @@ if test_curl_retry_all_errors '--retry-all-errors' true; then
 else
   fail "supported curl did not receive --retry-all-errors" ""
 fi
+if test_curl_retry_all_errors '--retry-all-errors' true true; then
+  pass "curl help fallback detects --retry-all-errors"
+else
+  fail "curl help fallback did not detect --retry-all-errors" ""
+fi
 if test_curl_retry_all_errors '' false; then
   pass "unsupported curl omits --retry-all-errors"
 else
   fail "unsupported curl received --retry-all-errors" ""
 fi
 
-# Test 8: warning emitted when GITHUB_PATH is unset in rootless mode
-echo "Test 8: warning emitted when GITHUB_PATH is unset in rootless mode..."
+# Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
+echo "Test 7: warning emitted when GITHUB_PATH is unset in rootless mode..."
 warning_output=$(bash -c '
   AWF_INSTALL_DIR="${HOME}/.local/bin"
   ROOTLESS=true

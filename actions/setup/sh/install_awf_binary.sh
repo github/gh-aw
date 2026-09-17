@@ -103,7 +103,7 @@ fi
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 CURL_RETRY_ALL_ERRORS=()
-if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors'; then
+if { curl --help all || curl --help; } 2>/dev/null | grep -q -- '--retry-all-errors'; then
   CURL_RETRY_ALL_ERRORS=(--retry-all-errors)
 fi
 
