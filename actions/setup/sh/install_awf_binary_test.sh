@@ -117,7 +117,11 @@ if [ "$1" = "--help" ]; then
   printf '%s\n' "${CURL_HELP_OUTPUT}"
   exit 0
 fi
-printf '%s\n' "$@" >> "${CURL_ARGS_FILE}"
+count_file="${CURL_ARGS_FILE}.count"
+count=$(cat "${count_file}" 2>/dev/null || echo 0)
+count=$((count + 1))
+printf '%s\n' "${count}" > "${count_file}"
+printf '%s\n' "$@" > "${CURL_ARGS_FILE}.${count}"
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "-o" ]; then
     output="$2"
@@ -147,31 +151,40 @@ case "$1" in
 esac
 EOF
   chmod +x "${test_dir}/bin/"*
-  CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+  if ! CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
-    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null
-  if [ ! -f "${test_dir}/curl-args" ]; then
+    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null; then
+    TEST_FAILURE_REASON="installer exited unsuccessfully"
+    rm -rf "${test_dir}"
+    return 1
+  fi
+  local curl_args
+  local curl_args_files=("${test_dir}"/curl-args.[0-9]*)
+  if [ ! -f "${curl_args_files[0]}" ]; then
     TEST_FAILURE_REASON="installer did not invoke a download"
     rm -rf "${test_dir}"
     return 1
   fi
-  if grep -qxF -- '--retry-all-errors' "${test_dir}/curl-args"; then
-    actual=true
-  else
-    actual=false
-  fi
-  for retry_option in --retry 5 --retry-delay 10 --retry-max-time 180; do
-    if ! grep -qxF -- "${retry_option}" "${test_dir}/curl-args"; then
-      TEST_FAILURE_REASON="fixed retry option ${retry_option} was not passed to curl"
+  for curl_args in "${curl_args_files[@]}"; do
+    if grep -qxF -- '--retry-all-errors' "${curl_args}"; then
+      actual=true
+    else
+      actual=false
+    fi
+    for retry_option in --retry 5 --retry-delay 10 --retry-max-time 180; do
+      if ! grep -qxF -- "${retry_option}" "${curl_args}"; then
+        TEST_FAILURE_REASON="fixed retry option ${retry_option} was not passed to curl"
+        rm -rf "${test_dir}"
+        return 1
+      fi
+    done
+    if [ "${actual}" != "${expected}" ]; then
+      TEST_FAILURE_REASON="expected --retry-all-errors=${expected}, got ${actual}"
       rm -rf "${test_dir}"
       return 1
     fi
   done
   rm -rf "${test_dir}"
-  if [ "${actual}" != "${expected}" ]; then
-    TEST_FAILURE_REASON="expected --retry-all-errors=${expected}, got ${actual}"
-    return 1
-  fi
 }
 
 if test_curl_retry_all_errors '--retry-all-errors' true; then
