@@ -97,7 +97,7 @@ describe("mcp_cli_schema_docs.cjs", () => {
     };
 
     const signature = renderToolSignature("safeoutputs", tool);
-    expect(signature).toContain("printf '%s' '<json object>' | safeoutputs add_labels .");
+    expect(signature).toContain("safeoutputs add_labels '<json object>'");
 
     const docs = renderSafeOutputsPromptDocs("safeoutputs", [tool]);
     expect(docs).toContain('"name": "bug"');

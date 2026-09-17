@@ -740,6 +740,33 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
 }
 
 /**
+ * Detect an inline JSON payload candidate: a single positional argument that
+ * is JSON, e.g. `safeoutputs noop '{"message":"done"}'`.
+ *
+ * Returns the trimmed JSON string when the sole positional argument looks like
+ * JSON, otherwise null. The `--json` output flag is ignored regardless of
+ * position when finding the positional argument. Detection is intentionally permissive about
+ * invalid objects and arrays so they produce a loud parse error instead of
+ * being silently skipped as non-flag arguments.
+ *
+ * @param {string[]} args - User arguments after the tool name
+ * @returns {string | null}
+ */
+function findInlineJsonPayloadArg(args) {
+  if (args.some(arg => arg.startsWith("--") && !isJsonFlagToken(arg))) return null;
+  const positionalArgs = args.filter(arg => !isJsonFlagToken(arg));
+  if (positionalArgs.length !== 1) return null;
+  const trimmed = positionalArgs[0].trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse user-provided --key value pairs into a tool arguments object.
  * Supports both --key value and --key=value styles.
  * Boolean flags (--key without a value) are set to true.
@@ -773,6 +800,29 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   let jsonOutput = false;
   const hasSchemaProperties = Object.keys(schemaProperties).length > 0;
   const { normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys } = buildNormalizedSchemaKeyMap(schemaProperties);
+
+  // Inline JSON payload mode: the whole payload is passed as a single quoted
+  // argument, e.g. `safeoutputs noop '{"message":"done"}'`.  This keeps the
+  // binary first on the command line so a malformed invocation still runs the
+  // CLI and reports an error, unlike the piped `.` sentinel form where a
+  // dropped pipe silently skips the binary entirely.
+  const inlineJsonPayload = findInlineJsonPayloadArg(args);
+  if (inlineJsonPayload !== null) {
+    let parsed;
+    try {
+      parsed = JSON.parse(inlineJsonPayload);
+    } catch (err) {
+      throw new Error(`inline JSON argument is not valid JSON: ${getErrorMessage(err)}. Pass a single quoted JSON object, use --key value flags, or pipe JSON on stdin with '.'.`, { cause: err });
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("inline JSON argument must be a JSON object. Pass a single quoted JSON object, use --key value flags, or pipe JSON on stdin with '.'.");
+    }
+    for (const [key, value] of Object.entries(parsed)) {
+      const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
+      result[canonicalKey] = value;
+    }
+    return { args: result, json: resolveJsonFlag(args) };
+  }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
   const isJsonPayloadMode = trimmedStdin !== null && (args.length === 0 || (args.length === 1 && args[0] === "."));
@@ -809,7 +859,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
         // --key=value style
         const key = raw.slice(0, eqIdx);
         if (key === "json") {
-          jsonOutput = true;
+          jsonOutput = parseJsonFlagValue(raw.slice(eqIdx + 1));
         } else {
           const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
           const rawValue = raw.slice(eqIdx + 1);
@@ -841,6 +891,45 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
   }
 
   return { args: result, json: jsonOutput };
+}
+
+/**
+ * @param {string} arg - CLI argument
+ * @returns {boolean}
+ */
+function isJsonFlagToken(arg) {
+  return arg === "--json" || arg.startsWith("--json=");
+}
+
+/**
+ * @param {string} value - Value supplied with --json=
+ * @returns {boolean}
+ */
+function parseJsonFlagValue(value) {
+  const normalizedValue = value.toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalizedValue)) return true;
+  if (["false", "0", "no", "off"].includes(normalizedValue)) return false;
+  throw new Error(`invalid value for --json: '${value}'. Use --json, --json=true, or --json=false.`);
+}
+
+/**
+ * @param {string} arg - CLI argument
+ * @returns {boolean}
+ */
+function jsonFlagIsEnabled(arg) {
+  return arg === "--json" || (arg.startsWith("--json=") && parseJsonFlagValue(arg.slice("--json=".length)));
+}
+
+/**
+ * @param {string[]} args - CLI arguments
+ * @returns {boolean}
+ */
+function resolveJsonFlag(args) {
+  let enabled = false;
+  for (const arg of args) {
+    if (isJsonFlagToken(arg)) enabled = jsonFlagIsEnabled(arg);
+  }
+  return enabled;
 }
 
 /**
@@ -1246,7 +1335,7 @@ function showToolHelp(serverName, toolName, tools) {
     ...renderToolSignature(serverName, tool).split("\n"),
     "Recommended:",
     ...renderToolRecommendedExample(serverName, tool).split("\n"),
-    `JSON mode: printf '{"param":"value",...}' | ${serverName} ${toolName} .`,
+    `JSON mode: ${serverName} ${toolName} '{"param":"value",...}'  (or: printf '{"param":"value",...}' | ${serverName} ${toolName} .)`,
   ];
 
   const props = tool.inputSchema?.properties;
@@ -1613,6 +1702,20 @@ async function main() {
   }
   const { args: toolArgs, json: jsonOutput } = parsedArgs;
 
+  // Fail loudly when arguments were supplied but none of them were recognized
+  // (e.g. `safeoutputs noop 'no action needed'`).  Silently dropping them would
+  // leave the agent believing a safe output was emitted when none was.  Structured
+  // payload modes are exempt: an explicit `{}` payload legitimately yields no arguments.
+  const usedStructuredPayload = shouldReadStdin || findInlineJsonPayloadArg(toolUserArgs) !== null;
+  const hasUnrecognizedArguments = toolUserArgs.some(arg => !isJsonFlagToken(arg));
+  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && hasUnrecognizedArguments && !usedStructuredPayload) {
+    const message = `no arguments were recognized for '${toolName}'. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
+    auditLog(serverName, { event: "unrecognized_args", tool: toolName });
+    process.stderr.write(`Error: ${message}\n`);
+    core.setFailed(`[${serverName}] ${message}`);
+    return;
+  }
+
   if (shouldShowToolHelpForEmptyArgs(serverName, toolArgs, matchedTool)) {
     core.warning(`[${serverName}] No arguments provided for '${toolName}'; showing command help instead of calling the tool`);
     auditLog(serverName, { event: "show_tool_help_empty_args", tool: toolName });
@@ -1697,6 +1800,7 @@ module.exports = {
   showToolHelp,
   shouldShowToolHelpForEmptyArgs,
   hasStdinJsonPayload,
+  findInlineJsonPayloadArg,
   readStdinSync,
   ensureSafeOutputsTools,
   refreshDeferredToolsIfNeeded,

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -233,6 +234,64 @@ Create an issue.
 	// Verify the step uses handle_detection_runs.cjs
 	if !strings.Contains(conclusionSection, "handle_detection_runs.cjs") {
 		t.Error("Detection runs step should use handle_detection_runs.cjs")
+	}
+}
+
+func TestDetectionRunsStepOmittedWhenReportAsIssueDisabled(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "test-*")
+	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
+
+	frontmatter := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: claude
+safe-outputs:
+  create-issue:
+  threat-detection:
+    report-as-issue: false
+---
+
+# Test
+
+Create an issue.
+`
+
+	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0644); err != nil {
+		t.Fatalf("Failed to write workflow file: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowPath); err != nil {
+		t.Fatalf("Failed to compile: %v", err)
+	}
+
+	// Read the compiled YAML
+	lockPath := stringutil.MarkdownToLockFile(workflowPath)
+	yamlBytes, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("Failed to read compiled YAML: %v", err)
+	}
+	yaml := string(yamlBytes)
+
+	// Verify conclusion job exists (other conclusion steps still run)
+	conclusionSection := extractJobSection(yaml, "conclusion")
+	if conclusionSection == "" {
+		t.Fatal("Conclusion job not found in compiled YAML")
+	}
+
+	// The detection runs tracking issue step must be omitted entirely.
+	if strings.Contains(conclusionSection, "Log detection run") {
+		t.Error("Conclusion job should not contain 'Log detection run' step when report-as-issue is disabled")
+	}
+	if strings.Contains(conclusionSection, "handle_detection_runs.cjs") {
+		t.Error("Conclusion job should not reference handle_detection_runs.cjs when report-as-issue is disabled")
+	}
+
+	// Detection job itself must still be present since threat detection remains enabled.
+	detectionSection := extractJobSection(yaml, string(constants.DetectionJobName))
+	if detectionSection == "" {
+		t.Error("Detection job should still be compiled when only report-as-issue is disabled")
 	}
 }
 
