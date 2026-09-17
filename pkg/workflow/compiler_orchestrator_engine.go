@@ -423,7 +423,10 @@ func isPreferenceOnlyEngineObject(engineObj map[string]any) bool {
 // applyMainWorkflowEngineOverrides copies the overrides declared by the main workflow
 // (top-level max-turns and budgets, plus preference-only `engine.mcp` settings) onto an
 // engine config extracted from an import, so that main-workflow keys keep taking
-// precedence over imported engine values.
+// precedence over imported engine values. The copied fields must stay in sync with the
+// preference keys accepted by isPreferenceOnlyEngineObject (currently `model`, handled via
+// the returned model, and `mcp`); adding a preference key there requires copying the
+// corresponding EngineConfig fields here so the override is not silently dropped.
 func applyMainWorkflowEngineOverrides(engineConfig, overrides *EngineConfig) {
 	if engineConfig == nil || overrides == nil {
 		return
