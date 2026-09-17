@@ -39,7 +39,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
     - name: Setup uv
       # zizmor: ignore[github_action_from_unverified_creator_used]
-      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+      uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
     - name: Install Go language server (gopls)
       run: go install golang.org/x/tools/gopls@latest
     - name: Install TypeScript language server
