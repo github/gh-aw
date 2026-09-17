@@ -1033,3 +1033,18 @@ unchanged at 216. This is 26 consecutive identical halts (08-16 through 09-16).
 Standing recommendation unchanged: a human maintainer should pause/retire/redesign
 this workflow (target a disposable sandbox repo, not github/gh-aw) rather than have
 it re-evaluate the same conflict daily.
+
+## HALTED 2026-09-17 (27th consecutive run) — no change, no re-litigation
+
+Reconfirmed the same structural blocker without re-deriving from scratch: the
+outer safe-outputs policy bans real write-once safe-output calls used for
+probing/placeholder-content/"let me see if this works" experiments, and this
+workflow's entire method (real create_pull_request/push_to_pull_request_branch/
+create_issue against github/gh-aw filled with synthetic stuff.md/history.md/probe
+content solely to observe safe-output enforcement) still matches that forbidden
+pattern exactly. No steering issue number given this run. No create_issue/
+create_pull_request/push_to_pull_request_branch calls attempted; next_index
+unchanged at 216. This is 27 consecutive identical halts (08-16 through 09-17).
+Standing recommendation unchanged: a human maintainer should pause/retire/redesign
+this workflow (target a disposable sandbox repo, not github/gh-aw) rather than have
+it re-evaluate the same conflict daily.
