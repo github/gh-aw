@@ -151,6 +151,7 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `apiProxy.targets.copilot.sessionId` | config-only (frontmatter: `sandbox.agent.targets.copilot.sessionId`; maps to `AWF_PROVIDER_SESSION_ID`) | `pkg/workflow/copilot_byok_extra_fields_compilation_test.go` (`TestCopilotBYOKExtraFieldsInCompiledWorkflow`) |
 | `apiProxy.caCert` | config-only (frontmatter: `sandbox.agent.ca-cert`; gated to AWF v0.28.10+ via `AWFAPIProxyCACertMinVersion`) | `pkg/workflow/awf_config_test.go` |
 | `container.dockerHostPathPrefix` | `--docker-host-path-prefix` | `pkg/workflow/awf_config_test.go` |
+| `enclaves[].agent.tools.github` | config-only (frontmatter: `enclaves[].agent.tools.github`; gated to AWF v0.28.20+ via `AWFEnclaveAgentToolsMinVersion`) | `pkg/workflow/enclaves_test.go` |
 
 Agents SHOULD treat this class of mismatch as a regression signal and open a corrective PR when detected.
 

@@ -65,7 +65,7 @@ func enclaveGitHubToolsWorkflowData() *WorkflowData {
 			MinIntegrity: GitHubIntegrityNone,
 		},
 	}
-	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)
+	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveAgentToolsMinVersion)
 	data.SandboxConfig.MCP = &MCPGatewayRuntimeConfig{
 		Container: constants.DefaultMCPGatewayContainer,
 		Version:   string(constants.MCPGEnclaveAgentToolsMinVersion),
@@ -325,8 +325,33 @@ func TestBuildAWFConfigJSONEnclaveGitHubTools(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
 	enclaves := config["enclaves"].([]any)
 	agent := enclaves[0].(map[string]any)["agent"].(map[string]any)
-	assert.Equal(t, map[string]any{"cli": enclaveGitHubIssuesProfile}, agent["github"])
-	assert.NotContains(t, agent, "tools")
+	assert.NotContains(t, agent, "github")
+	assert.Equal(t, map[string]any{
+		"github": map[string]any{
+			"allowed":      []any{"list_issues", "issue_read"},
+			"allowedRepos": []any{"octo-org/private-service"},
+			"minIntegrity": string(GitHubIntegrityNone),
+		},
+	}, agent["tools"])
+	require.NoError(t, validateAWFConfigJSON(configJSON))
+}
+
+func TestBuildAWFConfigJSONEnclaveGitHubToolsUsesEffectiveRepos(t *testing.T) {
+	data := enclaveGitHubToolsWorkflowData()
+	data.Enclaves[0].Agent.Tools.GitHub.AllowedRepos = nil
+	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName: "copilot", WorkflowData: data,
+	})
+	require.NoError(t, err)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	enclaves := config["enclaves"].([]any)
+	agent := enclaves[0].(map[string]any)["agent"].(map[string]any)
+	tools := agent["tools"].(map[string]any)
+	github := tools["github"].(map[string]any)
+	assert.Equal(t, []any{"octo-org/private-service"}, github["allowedRepos"])
+	require.NoError(t, validateAWFConfigJSON(configJSON))
 }
 
 func TestBuildAWFConfigJSONDynamicEnclavePolicy(t *testing.T) {

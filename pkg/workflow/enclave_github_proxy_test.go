@@ -608,13 +608,13 @@ func TestDynamicEnclaveMCPVersionGatesAndDefaults(t *testing.T) {
 
 func TestEnclaveGitHubToolsVersionGates(t *testing.T) {
 	data := enclaveGitHubToolsWorkflowData()
-	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveGitHubIssuesMinVersion)
+	data.NetworkPermissions.Firewall.Version = string(constants.AWFEnclaveAgentToolsMinVersion)
 	require.NoError(t, validateEnclavesConfig(data))
 
-	data.NetworkPermissions.Firewall.Version = "v0.28.8"
+	data.NetworkPermissions.Firewall.Version = "v0.28.19"
 	err := validateEnclavesConfig(data)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), string(constants.AWFEnclaveGitHubIssuesMinVersion))
+	assert.Contains(t, err.Error(), string(constants.AWFEnclaveAgentToolsMinVersion))
 
 	data = enclaveGitHubToolsWorkflowData()
 	data.SandboxConfig.MCP.Version = "v0.4.14"
