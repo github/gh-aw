@@ -126,6 +126,29 @@ describe("handle_agent_failure", () => {
     }
   });
 
+  it("handles an AI credits rate-limit signal when the agent failed", async () => {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const agentOutputPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aw-agent-output-")), "output.json");
+    fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_discussion" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+    process.env.GH_AW_AGENT_CONCLUSION = "failure";
+    process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
+    process.env.GH_AW_AIC = "1";
+
+    try {
+      await main();
+      expect(global.core.info).toHaveBeenCalledWith("AI credits rate-limit error: true");
+    } finally {
+      fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_AGENT_CONCLUSION;
+      delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+      delete process.env.GH_AW_AIC;
+    }
+  });
+
   describe("buildFailureIssueTitle", () => {
     const baseOptions = {
       workflowName: "Test Workflow",

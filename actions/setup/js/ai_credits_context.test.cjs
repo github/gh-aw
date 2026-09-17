@@ -611,6 +611,21 @@ describe("ai_credits_context parseAICreditsErrorInfoFromAuditLog", () => {
     expect(parseAICreditsErrorInfoFromAuditLog().rateLimitError).toBe(true);
   });
 
+  it("ignores rate-limit text echoed in an MCP tool result", () => {
+    writeAuditLog([{ message: 'tool_result: {"title":"[aw] Workflow hit AI credits rate limit"}' }]);
+    expect(parseAICreditsErrorInfoFromAuditLog().rateLimitError).toBe(false);
+  });
+
+  it("ignores rate-limit keywords farther than 80 characters apart", () => {
+    writeAuditLog([{ message: `AI credits ${"x".repeat(79)} rate limit exceeded` }]);
+    expect(parseAICreditsErrorInfoFromAuditLog().rateLimitError).toBe(false);
+  });
+
+  it("detects nearby rate-limit keywords", () => {
+    writeAuditLog([{ message: `AI credits ${"x".repeat(78)} rate limit exceeded` }]);
+    expect(parseAICreditsErrorInfoFromAuditLog().rateLimitError).toBe(true);
+  });
+
   it("detects rate limit from code field with ai_credits_limit_exceeded", () => {
     writeAuditLog([{ code: "ai_credits_limit_exceeded" }]);
     expect(parseAICreditsErrorInfoFromAuditLog().rateLimitError).toBe(true);
