@@ -1865,3 +1865,12 @@ Anomaly again observed: allowed domains (api.github.com, github.com) returned 40
 - [x] Independent raw-socket (Python ssl, not curl) confirmation of CDN domain-fronting bypass via registry.npmjs.org CONNECT tunnel + SNI=example.com (result: success — CRITICAL, re-confirms prior finding with a different tool/protocol path)
 - [x] Breadth mapping: domain-fronting to example.com via 4 additional allowed CDN domains (cdn.jsdelivr.net, esm.sh, bun.sh, json-schema.org) (result: success for all 4 — expands known blast radius of the vulnerability)
 - [x] Direct-IP CONNECT to guessed example.com IP, bypassing hostname ACL entirely (result: failure — connection timed out, proxy correctly requires resolvable/allowed hostname in CONNECT line)
+
+## Run 35183214814 - 2026-09-17
+
+- [x] Re-confirmation of SNI/domain-fronting bypass via registry.npmjs.org CONNECT tunnel + SNI=example.com (raw Python ssl socket, independent of curl) (result: success — CRITICAL, still exploitable)
+- [x] NEW: POST method with body via the domain-fronting tunnel to example.com (bidirectional data path / exfiltration capability test) (result: success — request was tunneled and reached Cloudflare edge for example.com, returned 405 from origin but Squid did not block the smuggled POST; confirms attacker can both send arbitrary data out and receive arbitrary data in via this channel)
+- [x] NEW: Breadth test with additional Cloudflare-fronted targets example.org, example.net (result: success for both — expands confirmed blast radius)
+- [x] NEW: Fronting-target limits probe using ifconfig.me and iana.org as SNI targets (result: failure — TLS handshake failure, these domains are not served by the same Cloudflare edge/cert bundle as registry.npmjs.org, showing the bypass is constrained to domains sharing a CDN edge with an allowed CONNECT target, not truly arbitrary internet-wide)
+
+Outcome: VULNERABILITY CONFIRMED (recurring, not fixed since run 34807416060). The CDN domain-fronting bypass remains fully exploitable. This run added confirmation that POST/bidirectional traffic works (not just GET), increasing severity from "read-only escape" to "full bidirectional data channel to any Cloudflare-fronted domain sharing an edge with an allow-listed CDN host." Basic tests 1-8: allowed domains (api.github.com, github.com) again returned transient 403/SERVFAIL in Tests 1/2/4 (recurring test-harness anomaly seen since run 33150215669); example.com direct CONNECT correctly blocked (403); file r/w and localhost tests passed normally.

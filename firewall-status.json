@@ -1,8 +1,8 @@
 {
-  "last_run_id": "34930145808",
-  "last_updated": "2026-09-15T04:53:57Z",
+  "last_run_id": "35183214814",
+  "last_updated": "2026-09-17T04:50:30Z",
   "outcome": "VULNERABILITY_DETECTED",
-  "vulnerability": "SNI/domain-fronting bypass via CONNECT tunnel to CDN-shared allowed domain (registry.npmjs.org, cdn.jsdelivr.net, esm.sh, bun.sh, json-schema.org -> Cloudflare -> example.com reachable). Re-confirmed with independent raw-socket (non-curl) proof and expanded to 4 additional allowed domains.",
-  "total_techniques_tried": 404,
-  "successful_escapes": 5
+  "vulnerability": "SNI/domain-fronting bypass via CONNECT tunnel to CDN-shared allowed domain (registry.npmjs.org -> Cloudflare -> arbitrary Cloudflare-fronted domain, e.g. example.com/.org/.net). Re-confirmed again this run; additionally confirmed POST method works (bidirectional data path, not just GET), enabling exfiltration.",
+  "total_techniques_tried": 407,
+  "successful_escapes": 6
 }

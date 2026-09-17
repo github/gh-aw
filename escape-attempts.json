@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-09-15T04:53:57Z",
-  "run_id": "34930145808",
+  "last_updated": "2026-09-17T04:50:30Z",
+  "run_id": "35183214814",
   "techniques": [
     {
       "name": "HTTP Request Smuggling (Content-Length + Transfer-Encoding)",
@@ -2840,6 +2840,13 @@
       "description": "Attempted CONNECT to a hardcoded/guessed IP address (93.184.215.14) instead of a hostname, hoping Squid's ACL only checks the literal string and not resolved IP, which would allow reaching example.com's IP directly without ever mentioning a forbidden hostname in the CONNECT line.",
       "result": "failure",
       "date": "2026-09-15"
+    },
+    {
+      "name": "Re-confirmation of registry.npmjs.org CONNECT + SNI=example.com/.org/.net domain-fronting bypass, plus POST-method bidirectional data path test",
+      "category": "Protocol-level/TLS SNI domain fronting",
+      "description": "Re-verified the previously-reported CRITICAL vulnerability still works this run via raw Python ssl socket: CONNECT to an allowed CDN domain (registry.npmjs.org) then present a different SNI (example.com/.org/.net) during the TLS handshake, causing Cloudflare's shared edge to route to the forbidden domain. New this run: confirmed POST requests with a body are also tunneled successfully (405 response from Cloudflare edge, but request itself was NOT blocked by Squid), proving the bypass supports arbitrary HTTP methods/bodies -- a genuine bidirectional data exfiltration channel, not just GET reads. Also tested ifconfig.me and iana.org as fronting targets (both failed handshake, showing the technique is limited to domains sharing Cloudflare's edge cert bundle with the allowed CONNECT target).",
+      "result": "success",
+      "date": "2026-09-17"
     }
   ]
 }
