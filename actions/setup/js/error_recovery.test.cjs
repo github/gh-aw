@@ -132,10 +132,10 @@ describe("error_recovery", () => {
       expect(operation).toHaveBeenCalledTimes(4); // Initial + 3 retries
     });
 
-    it("should emit E010 for exhausted retries on 403 with retry-after header", async () => {
+    it("should emit E010 for exhausted retries on a secondary rate limit", async () => {
       const rateLimitError = {
         message: "secondary rate limit",
-        response: { status: 403, headers: { "retry-after": "1" } },
+        response: { status: 403, headers: { "retry-after": "1", "x-ratelimit-remaining": "0" } },
       };
       const operation = vi.fn().mockRejectedValue(rateLimitError);
 
@@ -260,6 +260,7 @@ describe("error_recovery", () => {
       ["maxRetries", -1],
       ["initialDelayMs", Number.NaN],
       ["maxDelayMs", Number.POSITIVE_INFINITY],
+      ["maxDelayMs", 2 ** 31],
       ["jitterMs", 1.5],
       ["backoffMultiplier", 0],
     ])("should reject invalid %s configuration", async (key, value) => {
@@ -267,6 +268,12 @@ describe("error_recovery", () => {
 
       await expect(withRetry(operation, { [key]: value }, "test-operation")).rejects.toThrow(`Retry configuration ${key}`);
       expect(operation).not.toHaveBeenCalled();
+    });
+
+    it("should accept the largest supported timer delay", async () => {
+      const operation = vi.fn().mockResolvedValue("success");
+
+      await expect(withRetry(operation, { maxDelayMs: 2 ** 31 - 1 }, "test-operation")).resolves.toBe("success");
     });
 
     it("should reject a non-function retry predicate", async () => {
@@ -453,6 +460,8 @@ describe("error_recovery", () => {
       // 403 without x-ratelimit-remaining: 0 is not a rate-limit response
       const error403 = { response: { status: 403, headers: { "retry-after": "60", "x-ratelimit-remaining": "100" } } };
       expect(getRetryAfterMs(error403)).toBeNull();
+      const secondaryRateLimitWithoutRemaining = { response: { status: 403, headers: { "retry-after": "60" } } };
+      expect(getRetryAfterMs(secondaryRateLimitWithoutRemaining)).toBeNull();
     });
 
     it("should extract retry-after seconds from response headers on 429", () => {
@@ -461,7 +470,7 @@ describe("error_recovery", () => {
     });
 
     it("should extract retry-after seconds from a 403 secondary rate-limit response", () => {
-      const error = { response: { status: 403, headers: { "retry-after": "30" } } };
+      const error = { response: { status: 403, headers: { "retry-after": "30", "x-ratelimit-remaining": "0" } } };
       expect(getRetryAfterMs(error)).toBe(30000);
     });
 

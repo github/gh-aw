@@ -61,6 +61,7 @@ const RATE_LIMIT_RETRY_CONFIG = {
  */
 const RATE_LIMIT_INDICATORS = ["rate limit", "secondary rate limit", "abuse detection", "too many requests"];
 const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
 /**
  * @param {string} messageLower - Lower-cased error message
@@ -145,6 +146,19 @@ function getHeader(headers, name) {
 }
 
 /**
+ * Determine whether an error response represents a GitHub rate-limit condition.
+ * @param {any} error - The error to classify
+ * @returns {{headers: Headers|Record<string, any>|null, isRateLimit: boolean}}
+ */
+function getRateLimitErrorDetails(error) {
+  const status = error?.response?.status ?? error?.status ?? null;
+  const headers = error?.response?.headers ?? error?.headers ?? null;
+  const remainingHeader = getHeader(headers, "x-ratelimit-remaining");
+  const remainingExhausted = remainingHeader != null && parseInt(remainingHeader, 10) === 0;
+  return { headers, isRateLimit: status === 429 || (status === 403 && remainingExhausted) };
+}
+
+/**
  * Extract the Retry-After delay in milliseconds from a retryable HTTP error.
  *
  * Applies when the response status indicates a rate-limit condition or service
@@ -165,17 +179,14 @@ function getHeader(headers, name) {
 function getRetryAfterMs(error) {
   // Octokit surfaces response headers via error.response.headers or error.headers
   const status = error?.response?.status ?? error?.status ?? null;
-  const headers = error?.response?.headers ?? error?.headers ?? null;
+  const { headers, isRateLimit } = getRateLimitErrorDetails(error);
   if (!headers) return null;
 
   // Only honour rate-limit headers for genuine rate-limit responses.
   // GitHub uses 429 for primary rate limits and 403 for secondary rate limits
   // (the latter always sets x-ratelimit-remaining to "0").
-  const remainingHeader = getHeader(headers, "x-ratelimit-remaining");
   const retryAfter = getHeader(headers, "retry-after");
-  const remainingExhausted = remainingHeader != null && parseInt(remainingHeader, 10) === 0;
-  const isRateLimitStatus = status === 429 || (status === 403 && (remainingExhausted || (remainingHeader == null && retryAfter != null)));
-  const supportsRetryAfter = isRateLimitStatus || status === 503;
+  const supportsRetryAfter = isRateLimit || status === 503;
 
   if (!supportsRetryAfter) return null;
 
@@ -196,7 +207,7 @@ function getRetryAfterMs(error) {
 
   // x-ratelimit-reset: Unix timestamp — derive wait time from clock delta
   const resetAt = getHeader(headers, "x-ratelimit-reset");
-  if (isRateLimitStatus && resetAt != null) {
+  if (isRateLimit && resetAt != null) {
     const resetTimestampMs = parseInt(resetAt, 10) * 1000;
     if (!Number.isNaN(resetTimestampMs)) {
       const waitMs = resetTimestampMs - Date.now();
@@ -215,13 +226,7 @@ function getRetryAfterMs(error) {
  * @returns {boolean} True when the error indicates primary or secondary rate limiting
  */
 function isRateLimitError(error) {
-  const status = error?.response?.status ?? error?.status ?? null;
-  const headers = error?.response?.headers ?? error?.headers ?? null;
-  const remainingHeader = getHeader(headers, "x-ratelimit-remaining");
-  const retryAfterHeader = getHeader(headers, "retry-after");
-  const remainingExhausted = remainingHeader != null && parseInt(remainingHeader, 10) === 0;
-  const hasRateLimitHeaders = status === 403 && (remainingExhausted || (remainingHeader == null && retryAfterHeader != null));
-  if (status === 429 || hasRateLimitHeaders) {
+  if (getRateLimitErrorDetails(error).isRateLimit) {
     return true;
   }
 
@@ -339,6 +344,11 @@ function validateRetryConfig(operation, config) {
     const value = config[key];
     if (!Number.isSafeInteger(value) || value < 0) {
       throw new RangeError(`Retry configuration ${key} must be a non-negative safe integer`);
+    }
+  }
+  for (const key of ["initialDelayMs", "maxDelayMs", "jitterMs"]) {
+    if (config[key] > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`Retry configuration ${key} must not exceed ${MAX_TIMER_DELAY_MS}`);
     }
   }
   if (!Number.isFinite(config.backoffMultiplier) || config.backoffMultiplier < 1) {
