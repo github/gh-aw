@@ -2055,8 +2055,20 @@ describe("copilot_sdk_driver.cjs", () => {
     });
 
     it("denies executable content hidden behind control flow or leading redirection", async () => {
-      const handler = await makePermissionHandlerViaSDK(["shell(echo)"]);
-      for (const fullCommandText of [">/tmp/out rm -rf /workspace", "if rm -rf /tmp/x; then echo ok; fi", "while rm -rf /tmp/x; do echo ok; done"]) {
+      const handler = await makePermissionHandlerViaSDK(["shell(echo)", "shell(git:*)"]);
+      // A segment whose first token is a redirection yields no extractable
+      // command name; it must be denied rather than falling open, including
+      // numeric file-descriptor forms and redirections in a later stage of a
+      // chain whose earlier stages are individually granted.
+      for (const fullCommandText of [
+        ">/tmp/out rm -rf /workspace",
+        "> /tmp/pwn",
+        "2>&1 rm -rf /important",
+        "echo hi; > /tmp/pwn",
+        "git status && 2>/dev/null rm -rf /important",
+        "if rm -rf /tmp/x; then echo ok; fi",
+        "while rm -rf /tmp/x; do echo ok; done",
+      ]) {
         expect(handler({ kind: "shell", commands: [], fullCommandText })).toEqual({
           kind: "reject",
           feedback: "Tool invocation is not allowed by workflow tool permissions.",
