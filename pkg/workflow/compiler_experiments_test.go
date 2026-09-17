@@ -209,14 +209,6 @@ func TestExperimentExpressionMappings(t *testing.T) {
 	assert.Equal(t, "steps.pick-experiment.outputs.style", m2.Content, "content should be the step output expression")
 }
 
-func TestRewriteExperimentsReferenceForActivationJob(t *testing.T) {
-	experiments := map[string][]string{"model": {"sonnet", "opus"}}
-	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.model }}", experiments))
-	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForActivationJob("no reference here", experiments))
-	// Undeclared experiment names are left untouched.
-	assert.Equal(t, "${{ experiments.unknown }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.unknown }}", experiments))
-}
-
 func TestRewriteExperimentsReferenceForDownstreamJobs(t *testing.T) {
 	experiments := map[string][]string{"model": {"sonnet", "opus"}}
 	assert.Equal(t, "${{ needs.activation.outputs.model }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }}", experiments))
@@ -247,6 +239,36 @@ func TestRewriteExperimentPrefixCollision(t *testing.T) {
 
 	back := RewriteActivationOutputsToLocalStepOutputs(got, experiments)
 	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }} ${{ steps.pick-experiment.outputs.model_variant }}", back)
+}
+
+// TestRewriteExperimentsReferenceOnlyRewritesExpressionTokens guards against the rewrite
+// mutating text that merely looks like an experiment reference: plain text outside an
+// expression, string literals inside an expression, and property chains where
+// `experiments.<name>` is not a standalone reference.
+func TestRewriteExperimentsReferenceOnlyRewritesExpressionTokens(t *testing.T) {
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+
+	// Plain text outside ${{ }} is not an expression.
+	assert.Equal(t, "experiments.model", RewriteExperimentsReferenceForDownstreamJobs("experiments.model", experiments))
+
+	// String literals inside an expression are data, not references.
+	literal := "${{ format('experiments.model-{0}', inputs.suffix) }}"
+	assert.Equal(t, literal, RewriteExperimentsReferenceForDownstreamJobs(literal, experiments))
+
+	// A literal containing an escaped quote must not desynchronize literal detection.
+	escaped := "${{ format('it''s experiments.model', experiments.model) }}"
+	assert.Equal(t, "${{ format('it''s experiments.model', needs.activation.outputs.model) }}",
+		RewriteExperimentsReferenceForDownstreamJobs(escaped, experiments))
+
+	// Property chains are not experiment placeholders.
+	nested := "${{ fromJSON(inputs.config).experiments.model }}"
+	assert.Equal(t, nested, RewriteExperimentsReferenceForDownstreamJobs(nested, experiments))
+	suffixed := "${{ experiments.model.foo }}"
+	assert.Equal(t, suffixed, RewriteExperimentsReferenceForDownstreamJobs(suffixed, experiments))
+
+	// Composite expressions still rewrite the standalone reference.
+	assert.Equal(t, "${{ needs.activation.outputs.model || 'sonnet' }}",
+		RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model || 'sonnet' }}", experiments))
 }
 
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────

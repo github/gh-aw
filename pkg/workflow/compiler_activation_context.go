@@ -76,12 +76,16 @@ func (c *Compiler) newActivationJobBuildContext(
 		return nil, err
 	}
 	c.addActivationSetupAndWorkflowCallSteps(ctx, setupActionRef)
+	// Experiment variants must be selected before the aw_info step, which reads
+	// steps.pick-experiment.outputs.<name> when engine.model references an experiment.
+	c.addActivationExperimentSteps(ctx)
 
 	engine, err := c.getAgenticEngine(data.AI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get agentic engine: %w", err)
 	}
 	c.addActivationEngineOutputs(ctx, engine)
+	addActivationExperimentOutputs(ctx)
 
 	return ctx, nil
 }
@@ -175,6 +179,36 @@ func (c *Compiler) addActivationWorkflowCallResolutionSteps(ctx *activationJobBu
 		compilerActivationJobLog.Print("Adding artifact prefix computation step for workflow_call trigger")
 		ctx.steps = append(ctx.steps, generateArtifactPrefixStep()...)
 		ctx.outputs[constants.ArtifactPrefixOutputName] = "${{ steps.artifact-prefix.outputs.prefix }}"
+	}
+}
+
+// addActivationExperimentSteps appends the experiment selection steps when experiments are
+// declared in the frontmatter. These steps run early in the activation job so that the selected
+// variants are available both to the aw_info step (which resolves an engine.model that
+// references an experiment) and to the prompt substitute_placeholders step later in the job.
+func (c *Compiler) addActivationExperimentSteps(ctx *activationJobBuildContext) {
+	experimentSteps := c.generateExperimentSteps(ctx.data)
+	if len(experimentSteps) == 0 {
+		return
+	}
+	compilerActivationJobLog.Printf("Adding %d experiment step(s) for %d experiment(s)", len(experimentSteps), len(ctx.data.Experiments))
+	ctx.steps = append(ctx.steps, experimentSteps...)
+}
+
+// addActivationExperimentOutputs exposes the selected experiment variants as activation job
+// outputs. It is called after addActivationEngineOutputs so that a declared experiment name
+// keeps precedence over a same-named built-in output.
+func addActivationExperimentOutputs(ctx *activationJobBuildContext) {
+	if len(ctx.data.Experiments) == 0 {
+		return
+	}
+	// Expose the combined experiment JSON as a job output so downstream jobs can access
+	// the variant assignments via needs.activation.outputs.experiments.
+	ctx.outputs["experiments"] = "${{ steps.pick-experiment.outputs.experiments }}"
+	// Also expose each experiment variant individually so downstream jobs can reference
+	// needs.activation.outputs.<name> in timeout-minutes or other expressions.
+	for _, name := range sortedExperimentNames(ctx.data.Experiments) {
+		ctx.outputs[name] = "${{ steps.pick-experiment.outputs." + name + " }}"
 	}
 }
 

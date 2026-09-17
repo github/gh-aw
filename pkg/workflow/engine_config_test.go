@@ -996,6 +996,13 @@ Write a haiku and say Done.
 	// read the step output directly since a job cannot reference its own outputs via needs.
 	assert.Contains(t, lock, `GH_AW_INFO_MODEL: "${{ steps.pick-experiment.outputs.model }}"`)
 
+	// The pick-experiment step must run before the info step, otherwise its output is not
+	// yet available and the resolved model would be empty at run time.
+	pickIdx := strings.Index(lock, "id: pick-experiment")
+	infoIdx := strings.Index(lock, "id: generate_aw_info")
+	assert.NotEqual(t, -1, pickIdx, "pick-experiment step should be present")
+	assert.NotEqual(t, -1, infoIdx, "generate_aw_info step should be present")
+	assert.Less(t, pickIdx, infoIdx, "experiment selection must precede the agentic run info step")
 	// Everywhere else (agent job env, safe-outputs job env), the activation job's output
 	// must be referenced via the needs context.
 	assert.Contains(t, lock, "ANTHROPIC_MODEL: ${{ needs.activation.outputs.model }}")

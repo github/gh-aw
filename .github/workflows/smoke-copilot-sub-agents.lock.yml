@@ -131,6 +131,45 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "copilot"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Restore experiment state from git
+        id: restore-experiment-state
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_EXPERIMENT_BRANCH: experiments/smokecopilotsubagents
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
+            await main();
+      - name: Pick experiment variants
+        id: pick-experiment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["inline_strict","delegated_sequential","single_agent_control"],"description":"Measure whether inline sub-agent orchestration is the best reliability/cost tradeoff for a model-identity smoke test.","hypothesis":"H0: no change in pass_rate between inline_strict and delegated_sequential. H1: delegated_sequential improves pass_rate by \u003e= 0.15 absolute versus inline_strict. Note: single_agent_control is a synthetic negative baseline (always FAIL by design) excluded from H1 comparisons.","metric":"pass_rate","secondary_metrics":["run_duration_seconds","output_validity_rate"],"guardrail_metrics":[{"name":"empty_output_rate","direction":"min","threshold":"0.01"},{"name":"false_pass_rate","direction":"min","threshold":"0.05"}],"min_samples":30,"weight":[34,33,33],"issue":47551,"start_date":"2026-07-23","end_date":"2026-10-23"}}'
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_HARNESS_VERSION: 0dd72ffb01323e81349046f7b6e28d59de210a47ec0399aa9b614816cdd5cd0f:0daed06ad9ab37f712e54a71683b2f3c690ab0cce61735ab8ecf312216a2f4ec
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
+            await main();
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smokecopilotsubagents-experiment
+          path: /tmp/gh-aw/experiments
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -252,45 +291,6 @@ jobs:
       - name: Log runtime features
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
-      - name: Restore experiment state from git
-        id: restore-experiment-state
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_EXPERIMENT_BRANCH: experiments/smokecopilotsubagents
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
-            await main();
-      - name: Pick experiment variants
-        id: pick-experiment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["inline_strict","delegated_sequential","single_agent_control"],"description":"Measure whether inline sub-agent orchestration is the best reliability/cost tradeoff for a model-identity smoke test.","hypothesis":"H0: no change in pass_rate between inline_strict and delegated_sequential. H1: delegated_sequential improves pass_rate by \u003e= 0.15 absolute versus inline_strict. Note: single_agent_control is a synthetic negative baseline (always FAIL by design) excluded from H1 comparisons.","metric":"pass_rate","secondary_metrics":["run_duration_seconds","output_validity_rate"],"guardrail_metrics":[{"name":"empty_output_rate","direction":"min","threshold":"0.01"},{"name":"false_pass_rate","direction":"min","threshold":"0.05"}],"min_samples":30,"weight":[34,33,33],"issue":47551,"start_date":"2026-07-23","end_date":"2026-10-23"}}'
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 0dd72ffb01323e81349046f7b6e28d59de210a47ec0399aa9b614816cdd5cd0f:0daed06ad9ab37f712e54a71683b2f3c690ab0cce61735ab8ecf312216a2f4ec
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
-            await main();
-      - name: Upload experiment artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: smokecopilotsubagents-experiment
-          path: /tmp/gh-aw/experiments
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

@@ -145,6 +145,45 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "codex"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Restore experiment state from git
+        id: restore-experiment-state
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_EXPERIMENT_BRANCH: experiments/dailydocupdater
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
+            await main();
+      - name: Pick experiment variants
+        id: pick-experiment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_SPEC: '{"model_size":{"variants":["claude-sonnet-5","claude-haiku-4.5"],"description":"Tests whether Claude Haiku achieves similar documentation update quality at lower token cost compared to Claude Sonnet.","hypothesis":"H0: no change in PR creation rate or run success rate. H1: Claude Haiku reduces AI credit usage \u003e=30% with equivalent run success rate (\u003e=0.90).","metric":"ai_credits_total","secondary_metrics":["run_success_rate","run_duration_ms"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.90"},{"name":"empty_output_rate","threshold":"\u003c=0.10"}],"min_samples":20,"weight":[50,50],"start_date":"2026-06-04"}}'
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_HARNESS_VERSION: ffdb97b8d4b3d38bad4b9e9cf0797290593fe9ca3a1e1c2c4d75bf9ee2e6c115:b898e6b5d2da1f804457d017c16cd6676092700ae07c60c0ae69df31a8c132b7
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
+            await main();
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dailydocupdater-experiment
+          path: /tmp/gh-aw/experiments
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -288,45 +327,6 @@ jobs:
       - name: Log runtime features
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
-      - name: Restore experiment state from git
-        id: restore-experiment-state
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_EXPERIMENT_BRANCH: experiments/dailydocupdater
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
-            await main();
-      - name: Pick experiment variants
-        id: pick-experiment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_SPEC: '{"model_size":{"variants":["claude-sonnet-5","claude-haiku-4.5"],"description":"Tests whether Claude Haiku achieves similar documentation update quality at lower token cost compared to Claude Sonnet.","hypothesis":"H0: no change in PR creation rate or run success rate. H1: Claude Haiku reduces AI credit usage \u003e=30% with equivalent run success rate (\u003e=0.90).","metric":"ai_credits_total","secondary_metrics":["run_success_rate","run_duration_ms"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.90"},{"name":"empty_output_rate","threshold":"\u003c=0.10"}],"min_samples":20,"weight":[50,50],"start_date":"2026-06-04"}}'
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: ffdb97b8d4b3d38bad4b9e9cf0797290593fe9ca3a1e1c2c4d75bf9ee2e6c115:b898e6b5d2da1f804457d017c16cd6676092700ae07c60c0ae69df31a8c132b7
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
-            await main();
-      - name: Upload experiment artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: dailydocupdater-experiment
-          path: /tmp/gh-aw/experiments
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

@@ -152,6 +152,45 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "claude"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Restore experiment state from git
+        id: restore-experiment-state
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_EXPERIMENT_BRANCH: experiments/dailysafeoutputoptimizer
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
+            await main();
+      - name: Pick experiment variants
+        id: pick-experiment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_SPEC: '{"log_fetch_strategy":{"variants":["eager","lazy"],"description":"Tests whether using a pre-fetched 24h log bundle (eager) vs. forcing on-demand gh-aw MCP log downloads (lazy) affects run duration and AI credit consumption","hypothesis":"H0: no change in run_duration_ms. H1: eager reduces run duration by \u003e=15% by avoiding MCP log-fetch turns","metric":"run_duration_ms","secondary_metrics":["ai_credits_consumed","mcp_tool_call_count"],"guardrail_metrics":[{"name":"issue_creation_success_rate","direction":"min","threshold":"0.8"}],"min_samples":20,"issue":38094,"start_date":"2026-06-09","analysis_type":"mann_whitney","tags":["daily","log-fetching","efficiency","claude"],"continual":{"seed":"daily-safe-output-log-fetch-v1","ramp":[10,25,50]}}}'
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_HARNESS_VERSION: 272a489fc433c09984a61d8f709e16e74d5395b56302ff124669af699b447307:85e630101dca304a0a6190480c4d4b2d977bf0daa7a3eb3837acd2b801edb771
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
+            await main();
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dailysafeoutputoptimizer-experiment
+          path: /tmp/gh-aw/experiments
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -280,45 +319,6 @@ jobs:
       - name: Log runtime features
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
-      - name: Restore experiment state from git
-        id: restore-experiment-state
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_EXPERIMENT_BRANCH: experiments/dailysafeoutputoptimizer
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
-            await main();
-      - name: Pick experiment variants
-        id: pick-experiment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_SPEC: '{"log_fetch_strategy":{"variants":["eager","lazy"],"description":"Tests whether using a pre-fetched 24h log bundle (eager) vs. forcing on-demand gh-aw MCP log downloads (lazy) affects run duration and AI credit consumption","hypothesis":"H0: no change in run_duration_ms. H1: eager reduces run duration by \u003e=15% by avoiding MCP log-fetch turns","metric":"run_duration_ms","secondary_metrics":["ai_credits_consumed","mcp_tool_call_count"],"guardrail_metrics":[{"name":"issue_creation_success_rate","direction":"min","threshold":"0.8"}],"min_samples":20,"issue":38094,"start_date":"2026-06-09","analysis_type":"mann_whitney","tags":["daily","log-fetching","efficiency","claude"],"continual":{"seed":"daily-safe-output-log-fetch-v1","ramp":[10,25,50]}}}'
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 272a489fc433c09984a61d8f709e16e74d5395b56302ff124669af699b447307:85e630101dca304a0a6190480c4d4b2d977bf0daa7a3eb3837acd2b801edb771
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
-            await main();
-      - name: Upload experiment artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: dailysafeoutputoptimizer-experiment
-          path: /tmp/gh-aw/experiments
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

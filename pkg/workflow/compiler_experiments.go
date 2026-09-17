@@ -801,45 +801,124 @@ const (
 // declared name (e.g. "model" vs. "model_variant") is never partially matched.
 var activationOutputsReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
 
-// rewriteDeclaredExperimentNames replaces every match of re in s whose first captured group
-// (the experiment name) is a key of experiments, with replacementPrefix followed by that name.
-// Matches for undeclared names are left untouched. The regex-based, word-boundary-anchored
-// matching (rather than sequential strings.ReplaceAll per name) avoids one declared name
-// corrupting the occurrence of another name it happens to be a prefix of. re must have exactly
-// one capturing group, which captures the experiment name.
-func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, replacementPrefix string) string {
-	if len(experiments) == 0 {
-		return s
+// byteSpan is a half-open [start, end) byte range within a string.
+type byteSpan struct {
+	start int
+	end   int
+}
+
+// expressionBodySpans returns the spans of the bodies of the `${{ ... }}` expressions in s.
+// GitHub Actions does not support nested interpolation, so the first `}}` terminates a body.
+// Text outside these spans is plain literal text and must never be rewritten.
+func expressionBodySpans(s string) []byteSpan {
+	var spans []byteSpan
+	for i := 0; i < len(s); {
+		open := strings.Index(s[i:], "${{")
+		if open < 0 {
+			break
+		}
+		start := i + open + len("${{")
+		closeOffset := strings.Index(s[start:], "}}")
+		if closeOffset < 0 {
+			break
+		}
+		end := start + closeOffset
+		spans = append(spans, byteSpan{start: start, end: end})
+		i = end + len("}}")
 	}
-	matches := re.FindAllStringSubmatchIndex(s, -1)
-	if len(matches) == 0 {
+	return spans
+}
+
+// unquotedSpans splits an expression body span into the sub-spans that lie outside string
+// literals. GitHub Actions expressions quote string literals with single quotes and escape an
+// embedded quote by doubling it, so both forms are skipped: text inside a literal (e.g.
+// the format string in `format('experiments.model-{0}', inputs.suffix)`) is data, not an
+// expression reference, and must be preserved verbatim.
+func unquotedSpans(s string, span byteSpan) []byteSpan {
+	var spans []byteSpan
+	segStart := span.start
+	i := span.start
+	for i < span.end {
+		if s[i] != '\'' {
+			i++
+			continue
+		}
+		if segStart < i {
+			spans = append(spans, byteSpan{start: segStart, end: i})
+		}
+		i++ // opening quote
+		for i < span.end {
+			if s[i] != '\'' {
+				i++
+				continue
+			}
+			if i+1 < span.end && s[i+1] == '\'' {
+				i += 2 // escaped quote inside the literal
+				continue
+			}
+			i++ // closing quote
+			break
+		}
+		segStart = i
+	}
+	if segStart < span.end {
+		spans = append(spans, byteSpan{start: segStart, end: span.end})
+	}
+	return spans
+}
+
+// rewriteDeclaredExperimentNames replaces every match of re whose first captured group (the
+// experiment name) is a key of experiments with replacementPrefix followed by that name.
+// Matches for undeclared names are left untouched. re must have exactly one capturing group,
+// which captures the experiment name.
+//
+// Rewriting is deliberately narrow because `engine.model` accepts arbitrary composite
+// expressions:
+//   - only the bodies of `${{ ... }}` expressions are considered, so plain text is untouched;
+//   - string literals inside those bodies are skipped, so `format('experiments.model-{0}', x)`
+//     keeps its literal intact;
+//   - a match adjacent to a `.` on either side is skipped, since `fromJSON(x).experiments.model`
+//     and `experiments.model.foo` are property chains, not experiment placeholders.
+//
+// The regex-based, word-boundary-anchored matching (rather than sequential strings.ReplaceAll
+// per name) additionally avoids one declared name corrupting the occurrence of another name it
+// happens to be a prefix of.
+func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, replacementPrefix string) string {
+	if len(experiments) == 0 || !strings.Contains(s, "${{") {
 		return s
 	}
 	var b strings.Builder
 	last := 0
-	for _, m := range matches {
-		// m[0]:m[1] is the full match span, m[2]:m[3] is the captured name span.
-		name := s[m[2]:m[3]]
-		if _, ok := experiments[name]; !ok {
-			continue
+	rewritten := false
+	for _, body := range expressionBodySpans(s) {
+		for _, seg := range unquotedSpans(s, body) {
+			for _, m := range re.FindAllStringSubmatchIndex(s[seg.start:seg.end], -1) {
+				// m[0]:m[1] is the full match span and m[2]:m[3] the captured name span,
+				// both relative to the segment; translate them to absolute offsets in s.
+				start, end := seg.start+m[0], seg.start+m[1]
+				name := s[seg.start+m[2] : seg.start+m[3]]
+				if _, ok := experiments[name]; !ok {
+					continue
+				}
+				if start > 0 && s[start-1] == '.' {
+					continue // property of another value, e.g. fromJSON(x).experiments.model
+				}
+				if end < len(s) && s[end] == '.' {
+					continue // property of the variant value, e.g. experiments.model.foo
+				}
+				b.WriteString(s[last:start])
+				b.WriteString(replacementPrefix)
+				b.WriteString(name)
+				last = end
+				rewritten = true
+			}
 		}
-		b.WriteString(s[last:m[0]])
-		b.WriteString(replacementPrefix)
-		b.WriteString(name)
-		last = m[1]
+	}
+	if !rewritten {
+		return s
 	}
 	b.WriteString(s[last:])
 	return b.String()
-}
-
-// RewriteExperimentsReferenceForActivationJob rewrites `experiments.<name>` references in s
-// (for names declared in experiments) to `steps.pick-experiment.outputs.<name>`. Use this for
-// expressions evaluated within the activation job itself (e.g. the "Generate agentic run
-// info" step), where the experiment variant was just selected by the earlier pick-experiment
-// step in the same job. A job cannot reference its own outputs via the `needs` context, so
-// `needs.activation.outputs.*` is not valid here.
-func RewriteExperimentsReferenceForActivationJob(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, pickExperimentOutputsPrefix)
 }
 
 // RewriteExperimentsReferenceForDownstreamJobs rewrites `experiments.<name>` references in s

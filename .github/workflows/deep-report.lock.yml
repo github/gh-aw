@@ -149,6 +149,45 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "claude"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Restore experiment state from git
+        id: restore-experiment-state
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_EXPERIMENT_BRANCH: experiments/deepreport
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
+            await main();
+      - name: Pick experiment variants
+        id: pick-experiment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_SPEC: '{"output_format":{"variants":["full_briefing","executive_brief","annotated_brief","ste"],"description":"Tests whether report verbosity, structure, or Simplified Technical English (STE) phrasing affect token cost and discussion engagement","hypothesis":"H0: no change in discussion engagement or token cost. H1: executive_brief reduces token usage by ≥20% without reducing engagement; annotated_brief improves actionability; ste improves clarity while reducing token usage.","metric":"token_count","secondary_metrics":["discussion_reactions","discussion_replies","output_char_length","run_duration_ms","eval:output_format_goal_met"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"==0"},{"name":"issue_creation_success_rate","threshold":"\u003e=0.8"}],"min_samples":15,"weight":[25,25,25,25],"start_date":"2026-05-06","analysis_type":"mann_whitney","tags":["output-format","token-cost","engagement","daily"]}}'
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_HARNESS_VERSION: ceef0fafb8b4b549797fe7d6dcd75968102734479655f78a1b98c9a6ba1888ba:7aa5825429028c94295540bd35472aabcfc6581d25bd588944e5ded6882b2c21
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
+            await main();
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deepreport-experiment
+          path: /tmp/gh-aw/experiments
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -276,45 +315,6 @@ jobs:
       - name: Log runtime features
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
-      - name: Restore experiment state from git
-        id: restore-experiment-state
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_EXPERIMENT_BRANCH: experiments/deepreport
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
-            await main();
-      - name: Pick experiment variants
-        id: pick-experiment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_SPEC: '{"output_format":{"variants":["full_briefing","executive_brief","annotated_brief","ste"],"description":"Tests whether report verbosity, structure, or Simplified Technical English (STE) phrasing affect token cost and discussion engagement","hypothesis":"H0: no change in discussion engagement or token cost. H1: executive_brief reduces token usage by ≥20% without reducing engagement; annotated_brief improves actionability; ste improves clarity while reducing token usage.","metric":"token_count","secondary_metrics":["discussion_reactions","discussion_replies","output_char_length","run_duration_ms","eval:output_format_goal_met"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"==0"},{"name":"issue_creation_success_rate","threshold":"\u003e=0.8"}],"min_samples":15,"weight":[25,25,25,25],"start_date":"2026-05-06","analysis_type":"mann_whitney","tags":["output-format","token-cost","engagement","daily"]}}'
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: ceef0fafb8b4b549797fe7d6dcd75968102734479655f78a1b98c9a6ba1888ba:7aa5825429028c94295540bd35472aabcfc6581d25bd588944e5ded6882b2c21
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
-            await main();
-      - name: Upload experiment artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: deepreport-experiment
-          path: /tmp/gh-aw/experiments
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

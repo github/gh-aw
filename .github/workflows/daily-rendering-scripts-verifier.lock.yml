@@ -157,6 +157,45 @@ jobs:
           GH_AW_INFO_ENGINE_ID: "claude"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Restore experiment state from git
+        id: restore-experiment-state
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_EXPERIMENT_BRANCH: experiments/dailyrenderingscriptsverifier
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
+            await main();
+      - name: Pick experiment variants
+        id: pick-experiment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_EXPERIMENT_SPEC: '{"remove_redundant_context_v1":{"variants":["control","candidate"],"description":"Remove four bullets in the final ''Guidelines'' section (Use real data / Minimal changes / Test before committing / No PR if no issues) that restate instructions already given earlier in the prompt (Phase 1''s real-artifact requirement, Phase 6''s no-issues exit, Phase 7''s apply/verify steps) — the ''Be safe'' bullet, the only rule not stated elsewhere, is kept in both variants.","hypothesis":"H0: No meaningful difference in execution-duration between control and candidate. H1: Removing the four redundant Guidelines bullets decreases execution-duration without lowering the correct_verification_outcome eval pass rate.","metric":"grader:execution-duration","guardrail_metrics":[{"name":"eval:correct_verification_outcome","threshold":"\u003e=0.90"}],"min_samples":20,"analysis_type":"mann_whitney","decision":{"minimum_effect":3000,"regression_tolerance":3000,"confidence":0.95},"tags":["harness_dimension:context assembly","harness_subtype:remove_redundant_context"]}}'
+          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
+          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
+          GH_AW_HARNESS_VERSION: def56c2cf65642844362a0fe7a660ac83be184b52b7dc076455c7271f95b7c0e:e9fe8aebc84bbb8c490d5cd9706c21c243ed9bb9dc7c02e785a140efa6c5860a
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
+            await main();
+      - name: Upload experiment artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dailyrenderingscriptsverifier-experiment
+          path: /tmp/gh-aw/experiments
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -299,45 +338,6 @@ jobs:
       - name: Log runtime features
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
-      - name: Restore experiment state from git
-        id: restore-experiment-state
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_EXPERIMENT_BRANCH: experiments/dailyrenderingscriptsverifier
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'load_experiment_state_from_repo.cjs'));
-            await main();
-      - name: Pick experiment variants
-        id: pick-experiment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_EXPERIMENT_SPEC: '{"remove_redundant_context_v1":{"variants":["control","candidate"],"description":"Remove four bullets in the final ''Guidelines'' section (Use real data / Minimal changes / Test before committing / No PR if no issues) that restate instructions already given earlier in the prompt (Phase 1''s real-artifact requirement, Phase 6''s no-issues exit, Phase 7''s apply/verify steps) — the ''Be safe'' bullet, the only rule not stated elsewhere, is kept in both variants.","hypothesis":"H0: No meaningful difference in execution-duration between control and candidate. H1: Removing the four redundant Guidelines bullets decreases execution-duration without lowering the correct_verification_outcome eval pass rate.","metric":"grader:execution-duration","guardrail_metrics":[{"name":"eval:correct_verification_outcome","threshold":"\u003e=0.90"}],"min_samples":20,"analysis_type":"mann_whitney","decision":{"minimum_effect":3000,"regression_tolerance":3000,"confidence":0.95},"tags":["harness_dimension:context assembly","harness_subtype:remove_redundant_context"]}}'
-          GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
-          GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: def56c2cf65642844362a0fe7a660ac83be184b52b7dc076455c7271f95b7c0e:e9fe8aebc84bbb8c490d5cd9706c21c243ed9bb9dc7c02e785a140efa6c5860a
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'pick_experiment.cjs'));
-            await main();
-      - name: Upload experiment artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: dailyrenderingscriptsverifier-experiment
-          path: /tmp/gh-aw/experiments
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

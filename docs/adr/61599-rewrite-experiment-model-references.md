@@ -12,7 +12,7 @@ This pull request fixes a workflow-compilation bug where `${{ experiments.model 
 
 ### Decision
 
-We will rewrite declared `${{ experiments.<name> }}` references in model configuration to valid job-scoped expressions during workflow compilation. For jobs downstream of activation, gh-aw will emit `needs.activation.outputs.<name>`, and for the activation job's own info step it will emit `steps.pick-experiment.outputs.<name>`. We chose this because experiment-selected model values are already materialized by the activation job, and expressing them through existing step and job outputs fixes runtime validity without introducing a new workflow context model.
+We will rewrite declared `${{ experiments.<name> }}` references in model configuration to valid job-scoped expressions during workflow compilation. For jobs downstream of activation, gh-aw will emit `needs.activation.outputs.<name>`, and for the activation job's own info step it will emit `steps.pick-experiment.outputs.<name>`. Because the info step consumes that step output, experiment selection is emitted early in the activation job, before the info step. Rewriting is restricted to standalone references inside `${{ ... }}` bodies: string literals and property chains are left untouched so that composite model expressions keep their original meaning. We chose this because experiment-selected model values are already materialized by the activation job, and expressing them through existing step and job outputs fixes runtime validity without introducing a new workflow context model.
 
 ### Alternatives Considered
 
@@ -32,7 +32,8 @@ Another option would be to invent a separate mechanism for carrying the chosen e
 - Regression coverage now verifies helper rewrites, prefix-collision safety, and end-to-end compilation for both `engine.model` and top-level `model:` forms.
 
 #### Negative
-- The compiler now contains additional regex-based rewrite logic that must remain aligned with experiment-name parsing rules.
+- The compiler now contains additional regex-based rewrite logic that must remain aligned with experiment-name parsing rules, including expression-body and string-literal scanning.
+- Experiment selection now runs earlier in the activation job, so a variant is assigned even when a later activation step fails.
 - Model handling becomes more context-sensitive because the activation job and downstream jobs require different rewritten expressions.
 - Future changes to experiment output naming or job structure will need corresponding updates to the rewrite helpers and tests.
 
