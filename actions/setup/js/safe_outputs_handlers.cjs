@@ -2731,10 +2731,12 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           }
         }
 
-        // Rewrite to staging-relative path so upload_artifact.cjs resolves it from staging.
-        entry.path = destName;
         server.debug(`upload_artifact: staged ${filePath} as ${destName}`);
       }
+
+      // Rewrite to a staging-relative path so upload_artifact.cjs never receives
+      // the agent job's absolute RUNNER_TEMP path.
+      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath) || "." : destName;
     }
 
     appendSafeOutputCounted(entry);

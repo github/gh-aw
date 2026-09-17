@@ -622,6 +622,18 @@ describe("safe_outputs_handlers", () => {
       expect(responseData.result).toBe("success");
     });
 
+    it("should rewrite an absolute path already present in staging to a relative path", () => {
+      const stagingDir = path.join(testStagingDir, "gh-aw", "safeoutputs", "upload-artifacts");
+      fs.mkdirSync(stagingDir, { recursive: true });
+      const stagedFile = path.join(stagingDir, "already-staged.png");
+      fs.writeFileSync(stagedFile, "staged data");
+
+      handlers.uploadArtifactHandler({ path: stagedFile });
+
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "upload_artifact", path: "already-staged.png" }));
+      expect(fs.readFileSync(stagedFile, "utf8")).toBe("staged data");
+    });
+
     it("should throw when relative path is not in staging and cannot be resolved from GITHUB_WORKSPACE", () => {
       const savedWorkspace = process.env.GITHUB_WORKSPACE;
       delete process.env.GITHUB_WORKSPACE;
