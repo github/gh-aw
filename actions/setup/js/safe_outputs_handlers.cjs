@@ -2742,7 +2742,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
       // Rewrite to a staging-relative path so upload_artifact.cjs never receives
       // the agent job's absolute RUNNER_TEMP path.
-      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath) : destName;
+      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath).split(path.sep).join("/") : destName;
     }
 
     appendSafeOutputCounted(entry);
