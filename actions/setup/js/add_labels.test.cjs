@@ -819,6 +819,7 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
       expect(result.labelsAdded).toEqual([]);
       expect(result.message).toContain("No labels provided");
       expect(result.message).toContain("repository's available labels");
@@ -835,6 +836,7 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
       expect(result.labelsAdded).toEqual([]);
       expect(result.message).toContain("No labels provided");
       expect(result.message).toContain("repository's available labels");
@@ -855,6 +857,7 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
       expect(result.labelsAdded).toEqual([]);
       expect(result.message).toContain("No labels provided");
       expect(result.message).toContain("allowed list");

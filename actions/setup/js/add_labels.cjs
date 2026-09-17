@@ -398,6 +398,8 @@ const main = createCountGatedHandler({
         core.warning(message);
         return {
           success: true,
+          skipped: true,
+          reason: message,
           number: itemNumber,
           labelsAdded: [],
           message,
