@@ -38,6 +38,7 @@ var notYetEnforced = map[string]string{
 	"sprintferrdot":               "has not yet completed an enforcement-readiness audit",
 	"ssljson":                     "has not yet completed an enforcement-readiness audit",
 	"stringsconcatloop":           "has not yet completed an enforcement-readiness audit",
+	"typeassertionokdiscarded":    "existing production violations need remediation before enforcement; nolint suppression already works",
 }
 
 // TestDocGo_CountMatchesBullets validates that the "All N active analyzers:"
