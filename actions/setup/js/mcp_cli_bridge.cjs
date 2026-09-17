@@ -927,7 +927,7 @@ function jsonFlagIsEnabled(arg) {
 function resolveJsonFlag(args) {
   let enabled = false;
   for (const arg of args) {
-    if (isJsonFlagToken(arg) && jsonFlagIsEnabled(arg)) enabled = true;
+    if (isJsonFlagToken(arg)) enabled = jsonFlagIsEnabled(arg);
   }
   return enabled;
 }

@@ -3198,6 +3198,10 @@ function isDroppedPipeSafeOutputsCommand(line) {
       i++;
       continue;
     }
+    if (char === "\\" && i + 1 < line.length) {
+      i += 2;
+      continue;
+    }
     if (char === "$" && line[i + 1] === "(") {
       writerSeen = false;
       i += 2;
