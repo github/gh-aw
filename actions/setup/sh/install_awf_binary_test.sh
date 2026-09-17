@@ -100,9 +100,10 @@ rm -f "${FAKE_GITHUB_PATH}"
 # Test 6: --retry-all-errors is used only when curl supports it
 echo "Test 6: --retry-all-errors is conditional on curl support..."
 test_curl_retry_all_errors() {
-  local curl_help="$1"
+  local curl_help_all="$1"
   local expected="$2"
   local help_all_fails="${3:-false}"
+  local curl_help="${4:-${curl_help_all}}"
   local test_dir
   local option_index
   local -a actual_options
@@ -119,7 +120,11 @@ if [ "$1" = "--help" ]; then
   if [ "$2" = "all" ] && [ "${CURL_HELP_ALL_FAILS}" = "true" ]; then
     exit 1
   fi
-  printf '%s\n' "${CURL_HELP_OUTPUT}"
+  if [ "$2" = "all" ]; then
+    printf '%s\n' "${CURL_HELP_ALL_OUTPUT}"
+  else
+    printf '%s\n' "${CURL_HELP_OUTPUT}"
+  fi
   exit 0
 fi
 count_file="${CURL_ARGS_FILE}.count"
@@ -156,7 +161,7 @@ case "$1" in
 esac
 EOF
   chmod +x "${test_dir}/bin/"*
-  if ! CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+  if !   CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
     HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null; then
     TEST_FAILURE_REASON="installer exited unsuccessfully"
@@ -195,6 +200,11 @@ if test_curl_retry_all_errors '--retry-all-errors' true true; then
   pass "curl help fallback detects --retry-all-errors"
 else
   fail "curl help fallback retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '' true false '--retry-all-errors'; then
+  pass "curl help fallback detects an option missing from help all"
+else
+  fail "curl help fallback did not detect an option missing from help all" "${TEST_FAILURE_REASON}"
 fi
 if test_curl_retry_all_errors '' false; then
   pass "unsupported curl omits --retry-all-errors"
