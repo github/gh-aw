@@ -1002,6 +1002,46 @@ Write a haiku and say Done.
 	assert.Contains(t, lock, `GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model }}"`)
 }
 
+// TestCompileClaudeWithExperimentsModelSplitField is like TestCompileClaudeWithExperimentsModel
+// but uses the split top-level `model:` field (rather than `engine.model`) to confirm both
+// paths funnel through the same rewrite before the compiled workflow is emitted.
+func TestCompileClaudeWithExperimentsModelSplitField(t *testing.T) {
+	workflowPath := filepath.Join(testutil.TempDir(t, "claude-experiments-model-split-test"), "workflow.md")
+	workflowContent := `---
+on:
+  workflow_dispatch:
+engine:
+  id: claude
+model: ${{ experiments.model }}
+experiments:
+  model: [sonnet, opus]
+safe-outputs:
+  noop:
+---
+
+# Test Workflow
+
+Write a haiku and say Done.
+`
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+		t.Fatalf("CompileWorkflow failed: %v", err)
+	}
+	lockFile, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	if err != nil {
+		t.Fatalf("ReadFile lock file failed: %v", err)
+	}
+	lock := string(lockFile)
+
+	assert.NotContains(t, lock, "experiments.model }}", "the raw experiments.model expression must be rewritten")
+	assert.Contains(t, lock, `GH_AW_INFO_MODEL: "${{ steps.pick-experiment.outputs.model }}"`)
+	assert.Contains(t, lock, "ANTHROPIC_MODEL: ${{ needs.activation.outputs.model }}")
+	assert.Contains(t, lock, `GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model }}"`)
+}
+
 func TestCompileCodexWithCopilotModel(t *testing.T) {
 	workflowPath := filepath.Join(testutil.TempDir(t, "codex-copilot-model-test"), "workflow.md")
 	workflowContent := `---

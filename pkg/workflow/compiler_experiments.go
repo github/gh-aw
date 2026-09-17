@@ -800,11 +800,14 @@ const (
 // but only for names present in experiments, so that unrelated `experiments.<word>` text
 // (not a declared experiment) is left untouched.
 func rewriteExperimentsReference(s string, experiments map[string][]string, prefix string) string {
-	if len(experiments) == 0 || !strings.Contains(s, "experiments.") {
+	const matchPrefix = "experiments."
+	if len(experiments) == 0 || !strings.Contains(s, matchPrefix) {
 		return s
 	}
 	return experimentsFieldReferenceRegex.ReplaceAllStringFunc(s, func(match string) string {
-		name := experimentsFieldReferenceRegex.FindStringSubmatch(match)[1]
+		// match is always "experiments.<name>" (per experimentsFieldReferenceRegex), so the
+		// name can be recovered with a simple prefix trim instead of re-running the regex.
+		name := strings.TrimPrefix(match, matchPrefix)
 		if _, ok := experiments[name]; !ok {
 			return match
 		}
