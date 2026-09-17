@@ -9,6 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
 const { executeOperationalValueEvaluator } = require("./operational_value_grader.cjs");
+const { extractStructuredToolInput } = require("./tool_call_details.cjs");
 
 // --- Constants ---
 const TMP_GH_AW = "/tmp/gh-aw";
@@ -245,12 +246,30 @@ function stableStringify(value) {
 }
 
 /**
- * Normalize a tool name for dedupe comparisons (case/separator insensitive).
+ * Normalize a tool name for dedupe comparisons. Only case and surrounding
+ * whitespace are ignored: separators are meaningful (`list_issues` and
+ * `list-issues` may be different tools), so they are preserved.
  * @param {any} name
  * @returns {string}
  */
 function normalizeToolName(name) {
-  return typeof name === "string" ? name.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  return typeof name === "string" ? name.trim().toLowerCase() : "";
+}
+
+/**
+ * Structured arguments of a native agent tool event. Copilot CLI and the Copilot
+ * SDK spell the payload differently (`input`, `arguments`, `parameters`, ...); a
+ * bare `command` string is wrapped so that shell invocations still carry their
+ * command text.
+ * @param {any} data
+ * @returns {any}
+ */
+function extractToolArguments(data) {
+  if (!isRecord(data)) return undefined;
+  const input = extractStructuredToolInput(data);
+  if (input !== undefined) return input;
+  if (typeof data.command === "string" && data.command !== "") return { command: data.command };
+  return undefined;
 }
 
 /**
@@ -261,9 +280,25 @@ function normalizeToolName(name) {
  * @returns {string[]}
  */
 function toolCallDedupeKeys(call) {
-  const server = typeof call.mcpServerName === "string" ? call.mcpServerName : "";
+  const server = normalizeToolName(call.mcpServerName);
   const mcpToolName = typeof call.mcpToolName === "string" ? call.mcpToolName : "";
-  const names = [call.name, call.tool, call.tool_name, mcpToolName, server && mcpToolName ? `${server}-${mcpToolName}` : ""];
+  /** @type {string[]} */
+  const names = [call.name, call.tool, call.tool_name, mcpToolName];
+  if (server) {
+    // MCP calls are named differently by each producer: the gateway logs the bare
+    // tool name plus a server id, while agents report `server-tool`, `server__tool`
+    // or `mcp__server__tool`. All spellings map onto the same call.
+    for (const bare of [call.name, call.tool, call.tool_name, mcpToolName]) {
+      const normalized = normalizeToolName(bare);
+      if (!normalized) continue;
+      names.push(`${server}-${normalized}`, `${server}__${normalized}`, `mcp__${server}__${normalized}`);
+      for (const separator of ["-", "__"]) {
+        const prefix = `${server}${separator}`;
+        if (normalized.startsWith(prefix)) names.push(normalized.slice(prefix.length));
+      }
+      if (normalized.startsWith(`mcp__${server}__`)) names.push(normalized.slice(`mcp__${server}__`.length));
+    }
+  }
   const argsKey = stableStringify(call.arguments);
   const keys = new Set();
   for (const name of names) {
@@ -289,35 +324,48 @@ function extractNativeToolCalls(entries) {
   /** @type {Map<string, any[]>} */
   const pendingByName = new Map();
 
+  /**
+   * Drop a started call from the name-ordered pending queue once it completes.
+   * @param {string} name
+   * @param {any} call
+   */
+  const removePending = (name, call) => {
+    const queue = pendingByName.get(name);
+    if (!queue) return;
+    const index = queue.indexOf(call);
+    if (index >= 0) queue.splice(index, 1);
+  };
+
   for (const entry of entries) {
     if (!isRecord(entry)) continue;
     const data = isRecord(entry.data) ? entry.data : {};
     const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : "";
     const mcpServerName = typeof data.mcpServerName === "string" ? data.mcpServerName : "";
+    const name = typeof data.toolName === "string" ? data.toolName : "";
 
     if (entry.type === "tool.execution_start") {
-      const name = typeof data.toolName === "string" ? data.toolName : "";
       if (!name) continue;
+      const args = extractToolArguments(data);
       /** @type {any} */
       const call = {
         source: "agent",
         name,
         tool: name,
         completed: false,
-        ...(data.arguments === undefined ? {} : { arguments: data.arguments }),
+        ...(args === undefined ? {} : { arguments: args }),
         ...(toolCallId ? { toolCallId } : {}),
         ...(mcpServerName ? { mcpServerName } : {}),
         ...(typeof data.mcpToolName === "string" && data.mcpToolName ? { mcpToolName: data.mcpToolName } : {}),
         ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
       };
       calls.push(call);
-      if (toolCallId) {
-        byCallId.set(toolCallId, call);
-      } else {
-        const queue = pendingByName.get(name) ?? [];
-        queue.push(call);
-        pendingByName.set(name, queue);
-      }
+      if (toolCallId) byCallId.set(toolCallId, call);
+      // Every pending start is also queued by name so that a completion without a
+      // toolCallId can still be correlated when starts and completions disagree
+      // about whether ids are present.
+      const queue = pendingByName.get(name) ?? [];
+      queue.push(call);
+      pendingByName.set(name, queue);
       continue;
     }
 
@@ -326,14 +374,14 @@ function extractNativeToolCalls(entries) {
     const success = data.success === true;
     let call = toolCallId ? byCallId.get(toolCallId) : undefined;
     if (!call) {
-      // Copilot SDK-produced events omit toolCallId; correlate by tool name in order.
-      const name = typeof data.toolName === "string" ? data.toolName : "";
+      // Copilot SDK-produced events may omit toolCallId; correlate by tool name in order.
       const queue = name ? pendingByName.get(name) : undefined;
       if (queue && queue.length > 0) call = queue.shift();
+    } else {
+      removePending(typeof call.name === "string" ? call.name : name, call);
     }
     if (!call) {
       // Completion without a matching start: keep the record so the call is still visible.
-      const name = typeof data.toolName === "string" ? data.toolName : "";
       if (!name) continue;
       call = {
         source: "agent",
@@ -341,6 +389,7 @@ function extractNativeToolCalls(entries) {
         tool: name,
         ...(toolCallId ? { toolCallId } : {}),
         ...(mcpServerName ? { mcpServerName } : {}),
+        ...(typeof data.mcpToolName === "string" && data.mcpToolName ? { mcpToolName: data.mcpToolName } : {}),
         ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
       };
       calls.push(call);
@@ -438,7 +487,9 @@ function preprocessTrace() {
   const agentOutput = agentOutputContent ? safeParseJson(agentOutputContent) : null;
 
   // Extract tool calls from MCP gateway entries.
-  // Also support rpc fallback records that expose tool_name/payload.tool_name.
+  // Also support rpc fallback records that expose tool_name/payload.tool_name and
+  // the standard JSON-RPC `tools/call` shape (payload.params.name/arguments) used
+  // by rpc-messages.jsonl.
   const gatewayToolCalls = mcpGatewayEntries
     .filter(e => {
       const payload = isRecord(e.payload) ? e.payload : null;
@@ -446,13 +497,19 @@ function preprocessTrace() {
     })
     .map(e => {
       const payload = isRecord(e.payload) ? e.payload : null;
-      const toolName = typeof e.tool_name === "string" ? e.tool_name : payload !== null && typeof payload.tool_name === "string" ? payload.tool_name : undefined;
-      const args = payload !== null ? (payload.arguments ?? payload.params) : undefined;
+      const params = payload !== null && isRecord(payload.params) ? payload.params : null;
+      const rpcToolName = params !== null && typeof params.name === "string" ? params.name : undefined;
+      const toolName = typeof e.tool_name === "string" ? e.tool_name : payload !== null && typeof payload.tool_name === "string" ? payload.tool_name : rpcToolName;
+      // For standard JSON-RPC requests the arguments live in params.arguments; only
+      // fall back to the whole params envelope for non-standard payloads.
+      const args = payload === null ? undefined : (payload.arguments ?? (params !== null && rpcToolName !== undefined ? params.arguments : payload.params));
+      const serverName = e.mcpServerName ?? e.server_id;
       return {
         ...e,
         name: e.name || e.tool || toolName,
         tool: e.tool || toolName,
         arguments: e.arguments ?? args,
+        ...(typeof serverName === "string" && serverName ? { mcpServerName: serverName } : {}),
       };
     });
 
@@ -537,11 +594,14 @@ const BUILTIN_META = {
 };
 
 /**
+ * A tool call counts as failed when it reported an explicit failure, or when it
+ * started but never completed (`completed: false`) — an unfinished call never
+ * produced a successful result and must not be scored as a success.
  * @param {any} toolCall
  * @returns {boolean}
  */
 function isToolFailure(toolCall) {
-  return toolCall.success === false || toolCall.status === "error" || toolCall.status === "failure" || toolCall.error !== undefined;
+  return toolCall.success === false || toolCall.completed === false || toolCall.status === "error" || toolCall.status === "failure" || toolCall.error !== undefined;
 }
 
 /**

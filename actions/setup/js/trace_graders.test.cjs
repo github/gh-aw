@@ -1292,6 +1292,11 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       fs.writeFileSync(eventsPath, events.map(e => JSON.stringify(e)).join("\n") + "\n", "utf8");
     }
 
+    beforeEach(() => {
+      // Session state staged by other runs must not leak into discovery assertions.
+      fs.rmSync(COPILOT_SESSION_STATE_DIR, { recursive: true, force: true });
+    });
+
     afterEach(() => {
       if (fs.existsSync(rpcMessagesPath)) fs.unlinkSync(rpcMessagesPath);
       fs.rmSync(COPILOT_SESSION_STATE_DIR, { recursive: true, force: true });
@@ -1396,6 +1401,98 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(trace.nativeToolCalls).toHaveLength(2);
       expect(trace.toolCalls).toHaveLength(2);
       expect(trace.toolCalls.map(call => call.name)).toEqual(["skill", "search_code"]);
+    });
+
+    it("preserves structured input written under the SDK `input` field", () => {
+      const calls = extractNativeToolCalls([{ type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", input: { skill: "documentation" } } }]);
+
+      expect(calls[0].arguments).toEqual({ skill: "documentation" });
+    });
+
+    it("correlates completions when only some events carry a toolCallId", () => {
+      const calls = extractNativeToolCalls([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "bash", input: { command: "first" } } },
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:01Z", data: { toolName: "bash", input: { command: "second" } } },
+        // Completion without an id must consume the oldest pending start, even though
+        // that start carried an id.
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:02Z", data: { toolName: "bash", success: true } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:03Z", data: { toolName: "bash", success: false } },
+      ]);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0].arguments).toEqual({ command: "first" });
+      expect(calls[0].success).toBe(true);
+      expect(calls[1].arguments).toEqual({ command: "second" });
+      expect(calls[1].success).toBe(false);
+    });
+
+    it("does not merge distinct tools whose names differ only by separators", () => {
+      const nativeCalls = [{ source: "agent", name: "list_issues", tool: "list_issues", arguments: { repo: "gh-aw" }, success: true, completed: true }];
+      const gatewayCalls = [{ name: "list-issues", tool: "list-issues", arguments: { repo: "gh-aw" } }];
+
+      expect(mergeToolCalls(nativeCalls, gatewayCalls)).toHaveLength(2);
+    });
+
+    it("deduplicates JSON-RPC tools/call gateway records against native calls", () => {
+      writeEvents([
+        { type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "list_issues", mcpServerName: "github", mcpToolName: "list_issues", input: { repo: "gh-aw" } } },
+        { type: "tool.execution_complete", timestamp: "2026-01-01T00:00:01Z", data: { toolCallId: "call-1", success: true } },
+      ]);
+      fs.mkdirSync(mcpLogsDir, { recursive: true });
+      fs.writeFileSync(
+        rpcMessagesPath,
+        JSON.stringify({
+          timestamp: "2026-01-01T00:00:00Z",
+          event: "rpc_request",
+          _schema: "rpc-message/v2",
+          direction: "OUT",
+          server_id: "github",
+          method: "tools/call",
+          payload: { jsonrpc: "2.0", method: "tools/call", params: { name: "list_issues", arguments: { repo: "gh-aw" } } },
+        }) + "\n",
+        "utf8"
+      );
+
+      const trace = preprocessTrace();
+      expect(trace.toolCalls).toHaveLength(1);
+      expect(trace.toolCalls[0].source).toBe("agent");
+    });
+
+    it("normalizes JSON-RPC tools/call name and arguments when there is no native call", () => {
+      fs.mkdirSync(mcpLogsDir, { recursive: true });
+      fs.writeFileSync(
+        rpcMessagesPath,
+        JSON.stringify({
+          timestamp: "2026-01-01T00:00:00Z",
+          event: "rpc_request",
+          server_id: "github",
+          method: "tools/call",
+          payload: { jsonrpc: "2.0", method: "tools/call", params: { name: "list_issues", arguments: { repo: "gh-aw" } } },
+        }) + "\n",
+        "utf8"
+      );
+
+      const trace = preprocessTrace();
+      expect(trace.toolCalls).toHaveLength(1);
+      expect(trace.toolCalls[0].name).toBe("list_issues");
+      expect(trace.toolCalls[0].arguments).toEqual({ repo: "gh-aw" });
+    });
+
+    it("scores an incomplete native call as a tool failure", () => {
+      const trace = makeTrace({ toolCalls: [{ source: "agent", name: "skill", arguments: { skill: "documentation" }, completed: false }] });
+
+      expect(BUILTIN_GRADERS["tool-success-rate"](trace)).toBe(0);
+      expect(BUILTIN_GRADERS["tool-failure-count"](trace)).toBe(1);
+    });
+
+    it("does not let an incomplete skill call satisfy skill-constraint-coverage", () => {
+      writeEvents([{ type: "tool.execution_start", timestamp: "2026-01-01T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", input: { skill: "documentation" } } }]);
+
+      const trace = preprocessTrace();
+      const result = runSkillConstraintCoverage({ toolCalls: trace.toolCalls }, { constraints: [{ id: "uses-documentation-skill", pattern: "skill .*documentation" }] });
+
+      expect(result.value).toBe(0);
+      expect(result.details).toContain("exercised=1 covered=0");
     });
 
     it("lets skill-constraint-coverage match a native skill invocation", () => {
