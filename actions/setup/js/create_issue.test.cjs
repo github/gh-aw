@@ -1517,7 +1517,7 @@ describe("create_issue", () => {
       expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(6);
     });
 
-    it("should have retry delays that never exceed maxDelayMs + jitterMs", async () => {
+    it("should have retry delays that never exceed maxDelayMs", async () => {
       const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
       mockGithub.rest.issues.create = vi
@@ -1541,9 +1541,8 @@ describe("create_issue", () => {
       await vi.runAllTimersAsync();
       await resultPromise;
 
-      // create_issue uses RATE_LIMIT_RETRY_CONFIG: { initialDelayMs: 15000, maxDelayMs: 240000, jitterMs: 5000 }
-      // Maximum possible delay per retry = maxDelayMs + jitterMs = 245000ms
-      const maxBound = 245000;
+      // create_issue uses RATE_LIMIT_RETRY_CONFIG with maxDelayMs = 240000.
+      const maxBound = 240000;
       // Filter out short setTimeout calls (e.g. from test infrastructure) to isolate retry delays
       const sleepDelays = setTimeoutSpy.mock.calls.filter(([, ms]) => ms > 1000).map(([, ms]) => ms);
 
