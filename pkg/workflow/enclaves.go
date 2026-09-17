@@ -600,6 +600,7 @@ func validateEnclaveGitHubIssuesVersions(workflowData *WorkflowData) error {
 		mcpgMinVersion := constants.MCPGEnclaveGitHubIssuesMinVersion
 		fieldPath := fmt.Sprintf("enclaves[].agent.github.cli %q", enclaveGitHubIssuesProfile)
 		if enclaveGitHubToolsConfig(enclave) != nil {
+			awfMinVersion = constants.AWFEnclaveAgentToolsMinVersion
 			mcpgMinVersion = constants.MCPGEnclaveAgentToolsMinVersion
 			fieldPath = "enclaves[].agent.tools.github"
 		}
@@ -708,11 +709,15 @@ func buildAWFEnclavesConfig(config EnclavesConfig) []map[string]any {
 			addEnclaveInt(agent, "maxTaskBytes", enclave.Agent.MaxTaskBytes)
 			addEnclaveInt(agent, "maxModelRequests", enclave.Agent.MaxModelRequests)
 			addEnclaveInt(agent, "maxModelTokens", enclave.Agent.MaxModelTokens)
-			if enclave.Agent.GitHub != nil {
+			if githubTools := enclaveGitHubToolsConfig(enclave); githubTools != nil {
+				github := map[string]any{
+					"allowed":      stringSliceOrEmpty(githubTools.Allowed),
+					"allowedRepos": stringSliceOrEmpty(githubTools.AllowedRepos),
+				}
+				addEnclaveString(github, "minIntegrity", string(githubTools.MinIntegrity))
+				agent["tools"] = map[string]any{"github": github}
+			} else if enclave.Agent.GitHub != nil {
 				agent["github"] = map[string]any{"cli": enclave.Agent.GitHub.CLI}
-			}
-			if enclaveGitHubToolsConfig(enclave) != nil {
-				agent["github"] = map[string]any{"cli": enclaveGitHubIssuesProfile}
 			}
 			values["agent"] = agent
 		}
