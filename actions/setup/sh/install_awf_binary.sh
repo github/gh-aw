@@ -103,7 +103,7 @@ fi
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 CURL_RETRY_OPTS=(--retry 5 --retry-delay 10 --retry-max-time 180)
-# curl versions before 7.74 do not support the "all" help category.
+# Detect --retry-all-errors, added in curl 7.71; versions before 7.74 do not support the "all" help category.
 if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors' ||
   curl --help 2>/dev/null | grep -q -- '--retry-all-errors'; then
   CURL_RETRY_OPTS+=(--retry-all-errors)
