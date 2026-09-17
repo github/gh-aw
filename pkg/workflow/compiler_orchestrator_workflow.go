@@ -623,7 +623,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// jobs downstream of activation, so they resolve via `needs.activation.outputs.<name>`.
 	// The one exception (the activation job's own info step) rewrites this again locally.
 	if workflowData.Model != "" && len(workflowData.Experiments) > 0 {
-		workflowData.Model = RewriteExperimentsReferenceForDownstreamJobs(workflowData.Model)
+		workflowData.Model = RewriteExperimentsReferenceForDownstreamJobs(workflowData.Model, workflowData.Experiments)
 	}
 
 	// Extract BinEval evals configuration.

@@ -785,22 +785,59 @@ func sortedExperimentNames(experiments map[string][]string) []string {
 // larger ${{ ... }} expression (e.g. "${{ experiments.model }}").
 var experimentsFieldReferenceRegex = regexp.MustCompile(`\bexperiments\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
 
+// activationOutputsPrefix and pickExperimentOutputsPrefix are the two forms an experiment
+// variant reference can take once rewritten out of the `experiments.<name>` placeholder:
+// the activation job's own output (readable from any other job via `needs`), and the
+// pick-experiment step's output (readable only from within the activation job itself,
+// since a job cannot reference its own outputs via `needs`). Centralizing these prefixes
+// keeps rewriteExperimentsReference and RewriteActivationOutputsToLocalStepOutputs in sync.
+const (
+	activationOutputsPrefix     = "needs.activation.outputs."
+	pickExperimentOutputsPrefix = "steps.pick-experiment.outputs."
+)
+
+// rewriteExperimentsReference rewrites `experiments.<name>` references in s to prefix+name,
+// but only for names present in experiments, so that unrelated `experiments.<word>` text
+// (not a declared experiment) is left untouched.
+func rewriteExperimentsReference(s string, experiments map[string][]string, prefix string) string {
+	if len(experiments) == 0 || !strings.Contains(s, "experiments.") {
+		return s
+	}
+	return experimentsFieldReferenceRegex.ReplaceAllStringFunc(s, func(match string) string {
+		name := experimentsFieldReferenceRegex.FindStringSubmatch(match)[1]
+		if _, ok := experiments[name]; !ok {
+			return match
+		}
+		return prefix + name
+	})
+}
+
 // RewriteExperimentsReferenceForActivationJob rewrites `experiments.<name>` references in s
-// to `steps.pick-experiment.outputs.<name>`. Use this for expressions evaluated within the
-// activation job itself (e.g. the "Generate agentic run info" step), where the experiment
-// variant was just selected by the earlier pick-experiment step in the same job. A job
-// cannot reference its own outputs via the `needs` context, so `needs.activation.outputs.*`
-// is not valid here.
-func RewriteExperimentsReferenceForActivationJob(s string) string {
-	return experimentsFieldReferenceRegex.ReplaceAllString(s, "steps.pick-experiment.outputs.$1")
+// (for names declared in experiments) to `steps.pick-experiment.outputs.<name>`. Use this for
+// expressions evaluated within the activation job itself (e.g. the "Generate agentic run
+// info" step), where the experiment variant was just selected by the earlier pick-experiment
+// step in the same job. A job cannot reference its own outputs via the `needs` context, so
+// `needs.activation.outputs.*` is not valid here.
+func RewriteExperimentsReferenceForActivationJob(s string, experiments map[string][]string) string {
+	return rewriteExperimentsReference(s, experiments, pickExperimentOutputsPrefix)
 }
 
 // RewriteExperimentsReferenceForDownstreamJobs rewrites `experiments.<name>` references in s
-// to `needs.activation.outputs.<name>`. Use this for expressions evaluated in any job other
-// than activation (agent, detection, conclusion, safe-outputs, etc.), where the experiment
-// variant is exposed via the activation job's outputs (see buildActivationJob).
-func RewriteExperimentsReferenceForDownstreamJobs(s string) string {
-	return experimentsFieldReferenceRegex.ReplaceAllString(s, "needs.activation.outputs.$1")
+// (for names declared in experiments) to `needs.activation.outputs.<name>`. Use this for
+// expressions evaluated in any job other than activation (agent, detection, conclusion,
+// safe-outputs, etc.), where the experiment variant is exposed via the activation job's
+// outputs (see buildActivationJob).
+func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[string][]string) string {
+	return rewriteExperimentsReference(s, experiments, activationOutputsPrefix)
+}
+
+// RewriteActivationOutputsToLocalStepOutputs converts a `needs.activation.outputs.<name>`
+// reference (as produced by RewriteExperimentsReferenceForDownstreamJobs) back into
+// `steps.pick-experiment.outputs.<name>`. Use this when a value already rewritten for
+// downstream jobs must instead be evaluated inside the activation job itself, where a job
+// cannot reference its own outputs via `needs`.
+func RewriteActivationOutputsToLocalStepOutputs(s string) string {
+	return strings.ReplaceAll(s, activationOutputsPrefix, pickExperimentOutputsPrefix)
 }
 
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment

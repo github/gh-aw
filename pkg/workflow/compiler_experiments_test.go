@@ -210,13 +210,24 @@ func TestExperimentExpressionMappings(t *testing.T) {
 }
 
 func TestRewriteExperimentsReferenceForActivationJob(t *testing.T) {
-	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.model }}"))
-	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForActivationJob("no reference here"))
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.model }}", experiments))
+	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForActivationJob("no reference here", experiments))
+	// Undeclared experiment names are left untouched.
+	assert.Equal(t, "${{ experiments.unknown }}", RewriteExperimentsReferenceForActivationJob("${{ experiments.unknown }}", experiments))
 }
 
 func TestRewriteExperimentsReferenceForDownstreamJobs(t *testing.T) {
-	assert.Equal(t, "${{ needs.activation.outputs.model }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }}"))
-	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForDownstreamJobs("no reference here"))
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+	assert.Equal(t, "${{ needs.activation.outputs.model }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }}", experiments))
+	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForDownstreamJobs("no reference here", experiments))
+	// Undeclared experiment names are left untouched.
+	assert.Equal(t, "${{ experiments.unknown }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.unknown }}", experiments))
+}
+
+func TestRewriteActivationOutputsToLocalStepOutputs(t *testing.T) {
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.model }}"))
+	assert.Equal(t, "no reference here", RewriteActivationOutputsToLocalStepOutputs("no reference here"))
 }
 
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────
