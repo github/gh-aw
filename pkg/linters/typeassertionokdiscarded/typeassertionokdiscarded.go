@@ -1,6 +1,6 @@
 // Package typeassertionokdiscarded implements a Go analysis linter that flags
 // type assertions in the two-value form where the ok return is explicitly
-// discarded via blank identifier, which can hide runtime panics.
+// discarded via blank identifier, which can silently accept a zero value.
 package typeassertionokdiscarded
 
 import (
@@ -15,7 +15,7 @@ import (
 )
 
 // Analyzer is the type-assertion-ok-discarded analysis pass.
-var Analyzer = analyzerutil.New("typeassertionokdiscarded", "reports type assertions using the two-value form where the ok return is explicitly discarded via blank identifier, which can hide runtime panics", run)
+var Analyzer = analyzerutil.New("typeassertionokdiscarded", "reports type assertions using the two-value form where the ok return is explicitly discarded via blank identifier, which can silently accept a zero value", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	noLintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
@@ -26,7 +26,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// Build a parent map for each file so we can detect two-value assignments.
 	fileParents := make(map[*ast.File]map[ast.Node]ast.Node)
 	for _, f := range pass.Files {
-		fileParents[f] = buildParentMap(f)
+		fileParents[f] = astutil.BuildParentMap(f)
 	}
 
 	nodeFilter := []ast.Node{
@@ -83,54 +83,6 @@ func inspectTypeAssertExpr(pass *analysis.Pass, noLintIndex nolint.DirectiveInde
 }
 
 func isTwoValueBlankOkAssertion(typeAssert *ast.TypeAssertExpr, parents map[ast.Node]ast.Node) bool {
-	parent := parents[typeAssert]
-	for parent != nil {
-		paren, ok := parent.(*ast.ParenExpr)
-		if !ok {
-			break
-		}
-		parent = parents[paren]
-	}
-
-	switch p := parent.(type) {
-	case *ast.AssignStmt:
-		// Check for two-value assignment where second value is blank identifier.
-		if len(p.Lhs) == 2 && len(p.Rhs) == 1 {
-			// The second LHS must be a blank identifier.
-			if ident, ok := p.Lhs[1].(*ast.Ident); ok && ident.Name == "_" {
-				return true
-			}
-		}
-	case *ast.ValueSpec:
-		// Check for two-value var/const declaration where second value is blank identifier.
-		if len(p.Names) == 2 && len(p.Values) == 1 {
-			// The second name must be a blank identifier.
-			if p.Names[1].Name == "_" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// buildParentMap constructs a map from each AST node to its direct parent node.
-func buildParentMap(root ast.Node) map[ast.Node]ast.Node {
-	parents := make(map[ast.Node]ast.Node)
-	var stack []ast.Node
-
-	ast.Inspect(root, func(n ast.Node) bool {
-		if n == nil {
-			if len(stack) > 0 {
-				stack = stack[:len(stack)-1]
-			}
-			return false
-		}
-		if len(stack) > 0 {
-			parents[n] = stack[len(stack)-1]
-		}
-		stack = append(stack, n)
-		return true
-	})
-
-	return parents
+	okIdent, isTwoValue := astutil.TwoValueTypeAssertionOKIdent(typeAssert, parents)
+	return isTwoValue && okIdent.Name == "_"
 }
