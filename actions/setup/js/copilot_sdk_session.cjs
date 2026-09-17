@@ -213,6 +213,8 @@ async function runWithCopilotSDK({
    * @type {((reason: any) => void) | null}
    */
   let denialGuardReject = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let denialGuardTimer = null;
   /**
    * Settles (rejects) only when the tool-denial guard forces an early exit after
    * `DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT` (or `GH_AW_DENIAL_GUARD_TIMEOUT_MS`) elapses
@@ -297,7 +299,7 @@ async function runWithCopilotSDK({
     // failure: the process remained stalled for ~49 minutes after this guard
     // fired, until the surrounding job's own timeout cancelled it).
     const denialGuardTimeoutMs = getEnvPositiveIntOrDefault("GH_AW_DENIAL_GUARD_TIMEOUT_MS", DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT);
-    setTimeout(() => {
+    denialGuardTimer = setTimeout(() => {
       if (denialGuardReject) {
         log(`warning: denial guard force-exit fired after ${denialGuardTimeoutMs}ms — sendAndWait did not settle on its own`);
         denialGuardReject(catastrophicToolDenialsError);
@@ -564,6 +566,10 @@ async function runWithCopilotSDK({
       durationMs,
     };
   } finally {
+    if (denialGuardTimer) {
+      clearTimeout(denialGuardTimer);
+      denialGuardTimer = null;
+    }
     // Clear the post-completion watchdog if it has not already fired.
     if (postCompletionWatchdog) {
       clearTimeout(postCompletionWatchdog);
