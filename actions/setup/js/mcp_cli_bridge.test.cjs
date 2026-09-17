@@ -913,6 +913,9 @@ describe("mcp_cli_bridge.cjs", () => {
     it("detects a single JSON object argument", () => {
       expect(findInlineJsonPayloadArg(['{"message":"done"}'])).toBe('{"message":"done"}');
       expect(findInlineJsonPayloadArg([' {"message":"done"} '])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg(['{"message":"done"}', "--json"])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg(["[1,2]"])).toBe("[1,2]");
+      expect(findInlineJsonPayloadArg(["null"])).toBe("null");
     });
 
     it("does not treat flags, sentinels or plain text as inline JSON", () => {
@@ -947,7 +950,14 @@ describe("mcp_cli_bridge.cjs", () => {
     });
 
     it("throws when the inline JSON argument is not an object", () => {
-      expect(() => parseToolArgs(["{} extra"], {})).toThrow(/inline JSON argument is not valid JSON/i);
+      expect(() => parseToolArgs(["[1,2]"], {})).toThrow(/inline JSON argument must be a JSON object/i);
+      expect(() => parseToolArgs(["null"], {})).toThrow(/inline JSON argument must be a JSON object/i);
+    });
+
+    it("preserves --json when used with an inline payload", () => {
+      const { args, json } = parseToolArgs(['{"message":"done"}', "--json"], {});
+      expect(args).toEqual({ message: "done" });
+      expect(json).toBe(true);
     });
   });
 
@@ -1803,6 +1813,16 @@ describe("mcp_cli_bridge.cjs", () => {
       expect(toolsCallBody.params.arguments).toEqual({ title: "Inline payload" });
     });
 
+    it("calls the tool with inline JSON followed by --json", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", '{"title":"Inline payload"}', "--json"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({ title: "Inline payload" });
+    });
+
     it("allows an explicit empty inline JSON payload for a zero-input tool", async () => {
       setupMainCall(zeroInputTools, ["dispatch_code_factory", "{}"]);
 
@@ -1822,6 +1842,16 @@ describe("mcp_cli_bridge.cjs", () => {
       const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
       expect(toolsCallBody).toBeUndefined();
       expect(stderrChunks.join("")).toContain("no arguments were recognized for 'create_issue'");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
+    });
+
+    it("fails when --json accompanies an unrecognized positional argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", "--json", "no action needed"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeUndefined();
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
     });
 

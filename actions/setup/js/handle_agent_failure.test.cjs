@@ -2598,7 +2598,16 @@ describe("handle_agent_failure", () => {
     it("classifies piped and unpiped invocations", () => {
       expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' safeoutputs noop .`)).toBe(true);
       expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' | safeoutputs noop .`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":">"}' safeoutputs noop .`)).toBe(true);
+      expect(isDroppedPipeSafeOutputsCommand(`echo "$(safeoutputs noop .)"`)).toBe(false);
       expect(isDroppedPipeSafeOutputsCommand(`safeoutputs noop --message "x"`)).toBe(false);
+    });
+
+    it("does not render Markdown fence delimiters from command excerpts", () => {
+      fs.writeFileSync(stdioLogPath, "safeoutputs noop --message '```\\n'");
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("\\`\\`\\`");
+      expect(result).not.toContain("\n```\n`\n");
     });
   });
 

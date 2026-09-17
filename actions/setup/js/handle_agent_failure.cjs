@@ -3176,11 +3176,44 @@ const SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH = 300;
  * @returns {boolean}
  */
 function isDroppedPipeSafeOutputsCommand(line) {
-  const match = /(printf|echo)\b([^\n]*?)safeoutputs\b/.exec(line);
-  if (!match) return false;
-  // A pipe (or command separator) between the writer and `safeoutputs` means the
-  // binary does run; only the separator-free form is silently skipped.
-  return !/[|;&><]/.test(match[2]);
+  let quote = "";
+  let writerSeen = false;
+  for (let i = 0; i < line.length;) {
+    const char = line[i];
+    if (quote) {
+      if (char === "\\" && quote === '"' && i + 1 < line.length) i += 2;
+      else if (char === quote) {
+        quote = "";
+        i++;
+      } else i++;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      i++;
+      continue;
+    }
+    if ("|;&><".includes(char)) return false;
+    if (/\s/.test(char)) {
+      i++;
+      continue;
+    }
+    const start = i;
+    while (i < line.length && !/\s/.test(line[i]) && !"'\"`|;&><".includes(line[i])) i++;
+    const word = line.slice(start, i);
+    if (word === "printf" || word === "echo") writerSeen = true;
+    else if (word === "safeoutputs") return writerSeen;
+  }
+  return false;
+}
+
+/**
+ * Escape command text before inserting it in a fenced Markdown block.
+ * @param {string} command - Redacted command excerpt
+ * @returns {string}
+ */
+function escapeMarkdownCodeFence(command) {
+  return command.replace(/`/g, "\\`");
 }
 
 /**
@@ -3217,13 +3250,14 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
     if (!/(^|[|;&(\s"'`])safeoutputs\s+[a-z_][a-z0-9_]*/i.test(line)) continue;
     const redacted = applyAddMaskRedaction(line, maskedValues);
     const truncated = redacted.length > SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH ? `${redacted.slice(0, SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH)}…` : redacted;
+    const escaped = escapeMarkdownCodeFence(truncated);
     if (isDroppedPipeSafeOutputsCommand(line)) {
       hasDroppedPipe = true;
     }
-    if (seen.has(truncated)) continue;
-    seen.add(truncated);
+    if (seen.has(escaped)) continue;
+    seen.add(escaped);
     if (commands.length < SAFEOUTPUTS_CLI_EXCERPT_LIMIT) {
-      commands.push(truncated);
+      commands.push(escaped);
     }
   }
 

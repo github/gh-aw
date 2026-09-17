@@ -743,18 +743,27 @@ function tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperti
  * Detect inline JSON payload mode: a single positional argument that is a JSON
  * object, e.g. `safeoutputs noop '{"message":"done"}'`.
  *
- * Returns the trimmed JSON string when the sole argument looks like a JSON
- * object (starts with `{`), otherwise null.  Detection is intentionally
- * permissive about validity so malformed JSON produces a loud parse error
- * instead of being silently skipped as a non-flag argument.
+ * Returns the trimmed JSON string when the sole positional argument looks like
+ * JSON, otherwise null. Trailing flags (such as `--json`) are ignored when
+ * finding the positional argument. Detection is intentionally permissive about
+ * invalid objects and arrays so they produce a loud parse error instead of
+ * being silently skipped as non-flag arguments.
  *
  * @param {string[]} args - User arguments after the tool name
  * @returns {string | null}
  */
 function findInlineJsonPayloadArg(args) {
-  if (args.length !== 1) return null;
-  const trimmed = args[0].trim();
-  return trimmed.startsWith("{") ? trimmed : null;
+  if (args.some(arg => arg.startsWith("--") && arg !== "--json" && !arg.startsWith("--json="))) return null;
+  const positionalArgs = args.filter(arg => arg !== "--json" && !arg.startsWith("--json="));
+  if (positionalArgs.length !== 1) return null;
+  const trimmed = positionalArgs[0].trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -812,7 +821,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: false };
+    return { args: result, json: args.some(arg => arg === "--json" || arg.startsWith("--json=")) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -1659,8 +1668,8 @@ async function main() {
   // leave the agent believing a safe output was emitted when none was.  Structured
   // payload modes are exempt: an explicit `{}` payload legitimately yields no arguments.
   const usedStructuredPayload = shouldReadStdin || findInlineJsonPayloadArg(toolUserArgs) !== null;
-  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && toolUserArgs.length > 0 && !jsonOutput && !usedStructuredPayload) {
-    const message = `no arguments were recognized for '${toolName}' from: ${toolUserArgs.join(" ")}. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
+  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && toolUserArgs.length > 0 && !usedStructuredPayload) {
+    const message = `no arguments were recognized for '${toolName}'. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
     auditLog(serverName, { event: "unrecognized_args", tool: toolName });
     process.stderr.write(`Error: ${message}\n`);
     core.setFailed(`[${serverName}] ${message}`);
