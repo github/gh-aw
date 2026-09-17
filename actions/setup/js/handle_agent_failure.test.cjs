@@ -136,10 +136,26 @@ describe("handle_agent_failure", () => {
     process.env.GH_AW_AGENT_CONCLUSION = "failure";
     process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
     process.env.GH_AW_AIC = "1";
+    const createIssueMock = vi.fn(async () => ({
+      data: { number: 99, html_url: "https://github.com/owner/repo/issues/99", node_id: "I_99" },
+    }));
+    global.github = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })),
+        },
+        issues: {
+          create: createIssueMock,
+          createComment: vi.fn(),
+        },
+        pulls: { get: vi.fn() },
+      },
+      graphql: vi.fn(),
+    };
 
     try {
       await main();
-      expect(global.core.info).toHaveBeenCalledWith("AI credits rate-limit error: true");
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] unknown hit AI credits rate limit" }));
     } finally {
       fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
       delete process.env.GH_AW_AGENT_OUTPUT;
