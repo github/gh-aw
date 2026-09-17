@@ -2620,18 +2620,42 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * safe-outputs-upload-artifacts artifact, and the safe_outputs job downloads it before
    * processing.
    *
-   * For path-based requests with an absolute path the handler also rewrites entry.path to
-   * the staging-relative basename so that upload_artifact.cjs on the safe_outputs runner
-   * resolves the file from staging rather than trying the (non-existent) absolute path.
+   * For path-based requests with an absolute path (or a workspace-relative path that
+   * does not already exist in staging) the handler also rewrites entry.path to the
+   * staging-relative basename so that upload_artifact.cjs on the safe_outputs runner
+   * resolves the file from staging rather than trying the (non-existent) original path.
    *
-   * Relative paths and filter-based requests are passed through unchanged because the
+   * A bare filename or relative path that already exists in the staging directory is
+   * left unchanged. Filter-based requests are passed through unchanged because the
    * agent is expected to have placed those files in staging directly.
+   *
+   * Critically, every path-based request is verified to resolve to an existing file or
+   * directory before the entry is recorded: silently succeeding for a path that was
+   * never actually staged would leave the workflow with a dangling reference to an
+   * artifact that is never produced.
    */
   const uploadArtifactHandler = args => {
     const entry = { ...(args || {}), type: "upload_artifact" };
 
-    if (typeof entry.path === "string" && path.isAbsolute(entry.path)) {
-      const filePath = entry.path;
+    if (typeof entry.path === "string") {
+      // Enforce allowed canonical source roots: staging dir and GITHUB_WORKSPACE.
+      // RUNNER_TEMP is intentionally excluded — only the specific staging subdirectory is allowed.
+      const stagingDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+
+      let filePath = entry.path;
+      if (!path.isAbsolute(filePath)) {
+        const stagedCandidate = path.resolve(stagingDir, filePath);
+        if (fs.existsSync(stagedCandidate)) {
+          filePath = stagedCandidate;
+        } else if (process.env.GITHUB_WORKSPACE) {
+          filePath = path.resolve(process.env.GITHUB_WORKSPACE, filePath);
+        } else {
+          throw {
+            code: -32602,
+            message: `${ERR_VALIDATION}: upload_artifact: file not found: ${entry.path} (not present in staging directory ${stagingDir}, and GITHUB_WORKSPACE is not set)`,
+          };
+        }
+      }
 
       if (!fs.existsSync(filePath)) {
         throw {
@@ -2668,9 +2692,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         };
       }
 
-      // Enforce allowed canonical source roots: staging dir and GITHUB_WORKSPACE.
-      // RUNNER_TEMP is intentionally excluded — only the specific staging subdirectory is allowed.
-      const stagingDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
       const allowedRoots = [canonicalizeAllowedRoot(stagingDir)];
       if (process.env.GITHUB_WORKSPACE) {
         allowedRoots.push(canonicalizeAllowedRoot(process.env.GITHUB_WORKSPACE));
@@ -2691,25 +2712,37 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         }
       }
 
+      const canonicalStagingDir = canonicalizeAllowedRoot(stagingDir);
+      if (canonicalFilePath === canonicalStagingDir) {
+        throw {
+          code: -32602,
+          message: `${ERR_VALIDATION}: upload_artifact: path must not be the staging directory itself; specify a file or directory inside it`,
+        };
+      }
+      const alreadyStaged = canonicalFilePath.startsWith(canonicalStagingDir + path.sep);
       const destName = path.basename(filePath);
 
-      if (stat.isDirectory()) {
-        copyDirectoryRecursive(filePath, path.join(stagingDir, destName));
-      } else {
-        const destPath = path.join(stagingDir, destName);
-        if (!fs.existsSync(destPath)) {
-          try {
-            fs.copyFileSync(filePath, destPath);
-            fs.chmodSync(destPath, 0o600);
-          } catch (err) {
-            throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
+      if (!alreadyStaged) {
+        if (stat.isDirectory()) {
+          copyDirectoryRecursive(filePath, path.join(stagingDir, destName));
+        } else {
+          const destPath = path.join(stagingDir, destName);
+          if (!fs.existsSync(destPath)) {
+            try {
+              fs.copyFileSync(filePath, destPath);
+              fs.chmodSync(destPath, 0o600);
+            } catch (err) {
+              throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${destPath}: ${getErrorMessage(err)}`, { cause: err });
+            }
           }
         }
+
+        server.debug(`upload_artifact: staged ${filePath} as ${destName}`);
       }
 
-      // Rewrite to staging-relative path so upload_artifact.cjs resolves it from staging.
-      entry.path = destName;
-      server.debug(`upload_artifact: staged ${filePath} as ${destName}`);
+      // Rewrite to a staging-relative path so upload_artifact.cjs never receives
+      // the agent job's absolute RUNNER_TEMP path.
+      entry.path = alreadyStaged ? path.relative(canonicalStagingDir, canonicalFilePath).split(path.sep).join("/") : destName;
     }
 
     appendSafeOutputCounted(entry);

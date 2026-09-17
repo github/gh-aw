@@ -32,7 +32,13 @@ import (
 
 var playwrightCLILog = logger.New("workflow:playwright_cli")
 
-const playwrightBrowsersPath = "${RUNNER_TEMP}/gh-aw/playwright-browsers"
+// playwrightBrowsersPath is the shared browser download location used by both the
+// browser install step and the agent execution step. It must use the GitHub Actions
+// ${{ runner.temp }} expression rather than the shell form ${RUNNER_TEMP}: values in
+// an `env:` map are never shell-expanded, so the shell form would reach the install
+// step as a literal relative path (a directory literally named "${RUNNER_TEMP}")
+// while being expanded elsewhere, making install and launch disagree on the path.
+const playwrightBrowsersPath = "${{ runner.temp }}/gh-aw/playwright-browsers"
 
 // isPlaywrightCLIMode returns true when the built-in Playwright tool is enabled.
 // The built-in integration is CLI-only, so all valid built-in configurations use
