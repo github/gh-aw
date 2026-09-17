@@ -29,13 +29,13 @@ func TestGeneratePlaywrightCLIInstallSteps_DefaultVersionUsesCooldown(t *testing
 
 	browserStep := strings.Join(steps[1], "\n")
 	assert.Contains(t, browserStep, `bash "${RUNNER_TEMP}/gh-aw/actions/install_playwright_browsers.sh" chromium`)
-	assert.Contains(t, browserStep, "PLAYWRIGHT_BROWSERS_PATH: ${RUNNER_TEMP}/gh-aw/playwright-browsers")
+	assert.Contains(t, browserStep, "PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers")
 	assert.Contains(t, browserStep, "timeout-minutes: 10")
 
 	skillsStep := strings.Join(steps[2], "\n")
 	assert.Contains(t, skillsStep, "playwright-cli install --skills")
 	assert.Contains(t, skillsStep, "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'")
-	assert.Contains(t, skillsStep, "PLAYWRIGHT_BROWSERS_PATH: ${RUNNER_TEMP}/gh-aw/playwright-browsers")
+	assert.Contains(t, skillsStep, "PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/gh-aw/playwright-browsers")
 }
 
 func TestGeneratePlaywrightCLIInstallSteps_ModeOmitted(t *testing.T) {

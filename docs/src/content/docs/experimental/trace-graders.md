@@ -56,6 +56,8 @@ graders:
 
 Custom scripts must return a value and stay within 4096 characters (no `require`, `import`, `fetch`, `eval`, or `process.exit`).
 
+`trace.toolCalls` merges native agent tool calls parsed from the Copilot `events.jsonl` session log with the MCP gateway records. Native entries always expose `name` and `source: "agent"`, plus `arguments`, `toolCallId`, `mcpServerName`, and `mcpToolName` when the underlying event provides them, so built-in tools such as `skill` are visible to graders. A matching `tool.execution_complete` event sets `success` and `completed: true`; calls that never complete keep `completed: false` and no `success` value, and are scored as failures by the built-in `tool-success-rate` and `tool-failure-count` graders. Gateway records that duplicate a native call (same tool name and arguments) are dropped, and `trace.nativeToolCalls` holds the native records on their own.
+
 ## Operational value grader
 
 Configure the reserved `operational-value` grader with either inline Bash:

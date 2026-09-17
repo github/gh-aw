@@ -103,6 +103,68 @@ describe("handle_agent_failure", () => {
     });
   });
 
+  it("does not handle an AI credits rate-limit signal when the agent succeeded", async () => {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const agentOutputPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aw-agent-output-")), "output.json");
+    fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_discussion" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
+    process.env.GH_AW_AIC = "1";
+
+    try {
+      await main();
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("skipping failure handling"));
+    } finally {
+      fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_AGENT_CONCLUSION;
+      delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+      delete process.env.GH_AW_AIC;
+    }
+  });
+
+  it("handles an AI credits rate-limit signal when the agent failed", async () => {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const agentOutputPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aw-agent-output-")), "output.json");
+    fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_discussion" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+    process.env.GH_AW_AGENT_CONCLUSION = "failure";
+    process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
+    process.env.GH_AW_AIC = "1";
+    const createIssueMock = vi.fn(async () => ({
+      data: { number: 99, html_url: "https://github.com/owner/repo/issues/99", node_id: "I_99" },
+    }));
+    global.github = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })),
+        },
+        issues: {
+          create: createIssueMock,
+          createComment: vi.fn(),
+        },
+        pulls: { get: vi.fn() },
+      },
+      graphql: vi.fn(),
+    };
+
+    try {
+      await main();
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] unknown hit AI credits rate limit" }));
+    } finally {
+      fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_AGENT_CONCLUSION;
+      delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+      delete process.env.GH_AW_AIC;
+    }
+  });
+
   describe("buildFailureIssueTitle", () => {
     const baseOptions = {
       workflowName: "Test Workflow",

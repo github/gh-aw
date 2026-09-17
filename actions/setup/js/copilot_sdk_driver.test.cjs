@@ -250,6 +250,88 @@ describe("copilot_sdk_driver.cjs", () => {
       }
     });
 
+    it("serializes tool.execution_start structured input and toolCallId", async () => {
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        let onEvent = () => {};
+        const session = {
+          sessionId: "session-tool-start-input",
+          on: handler => {
+            onEvent = handler;
+          },
+          sendAndWait: vi.fn().mockImplementation(async () => {
+            onEvent({
+              type: "tool.execution_start",
+              ephemeral: false,
+              timestamp: new Date().toISOString(),
+              data: {
+                toolCallId: "call-1",
+                toolName: "skill",
+                mcpServerName: "",
+                input: { skill: "documentation" },
+              },
+            });
+            onEvent({
+              type: "tool.execution_complete",
+              ephemeral: false,
+              timestamp: new Date().toISOString(),
+              data: { toolCallId: "call-1", success: true },
+            });
+            onEvent({
+              type: "assistant.message",
+              ephemeral: false,
+              timestamp: new Date().toISOString(),
+              data: { content: "ok" },
+            });
+            return { data: { content: "ok" } };
+          }),
+          disconnect,
+        };
+        class FakeCopilotClient {
+          start = vi.fn().mockResolvedValue(undefined);
+          createSession = vi.fn().mockResolvedValue(session);
+          stop = stop;
+        }
+
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => "allow",
+          },
+        });
+
+        expect(result.exitCode).toBe(0);
+        const parsedEvents = stderrWriteSpy.mock.calls
+          .map(([message]) => {
+            if (typeof message !== "string" || !message.endsWith("\n")) return null;
+            try {
+              return JSON.parse(message.trimEnd());
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+        const startEvent = parsedEvents.find(event => event.type === "tool.execution_start");
+        expect(startEvent).toMatchObject({
+          type: "tool.execution_start",
+          data: { toolName: "skill", toolCallId: "call-1", input: { skill: "documentation" } },
+        });
+        const completeEvent = parsedEvents.find(event => event.type === "tool.execution_complete");
+        expect(completeEvent).toMatchObject({
+          type: "tool.execution_complete",
+          data: { toolName: "skill", toolCallId: "call-1", success: true },
+        });
+      } finally {
+        stderrWriteSpy.mockRestore();
+      }
+    });
+
     it("resolves exitCode 0 on SDK idle-timeout when output collected and all tool calls complete", async () => {
       // Regression test: when sendAndWait throws an idle-timeout error but the agent
       // produced output and all tool calls completed, the driver must return exitCode 0.

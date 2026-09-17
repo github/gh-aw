@@ -32,6 +32,25 @@ function extractShellCommandFromToolData(data) {
   return "";
 }
 
+/**
+ * Best-effort extraction of the structured tool input from a tool event payload.
+ * Copilot CLI events.jsonl and the Copilot SDK spell the payload differently
+ * (`input`, `arguments`, `parameters`, ...), so the first populated candidate wins.
+ * Returns undefined when the payload carries no structured input.
+ * @param {any} data
+ * @returns {any}
+ */
+function extractStructuredToolInput(data) {
+  if (!data || typeof data !== "object") return undefined;
+  for (const key of ["input", "arguments", "parameters", "args", "toolInput"]) {
+    const candidate = data[key];
+    if (candidate !== null && typeof candidate === "object") return candidate;
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  return undefined;
+}
+
 module.exports = {
   extractShellCommandFromToolData,
+  extractStructuredToolInput,
 };
