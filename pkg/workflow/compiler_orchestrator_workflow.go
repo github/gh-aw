@@ -622,9 +622,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// context. Most consumers (agent job model env vars, GH_AW_ENGINE_MODEL, etc.) run in
 	// jobs downstream of activation, so they resolve via `needs.activation.outputs.<name>`.
 	// The one exception (the activation job's own info step) rewrites this again locally.
-	if workflowData.Model != "" && len(workflowData.Experiments) > 0 {
-		workflowData.Model = RewriteExperimentsReferenceForDownstreamJobs(workflowData.Model, workflowData.Experiments)
-	}
+	// RewriteExperimentsReferenceForDownstreamJobs is a no-op when there are no experiments
+	// or workflowData.Model is empty, so no extra guard is needed here.
+	workflowData.Model = RewriteExperimentsReferenceForDownstreamJobs(workflowData.Model, workflowData.Experiments)
 
 	// Extract BinEval evals configuration.
 	evalsConfig, err := c.parseEvalsFromFrontmatter(frontmatter)
