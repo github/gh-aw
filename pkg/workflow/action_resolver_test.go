@@ -317,6 +317,27 @@ func TestActionResolverGetUsedCacheKeysReturnsCopy(t *testing.T) {
 	}
 }
 
+func TestActionResolverMarksCompilerGeneratedDockerActionsAsUsed(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "test-*")
+	cache := NewActionCache(tmpDir)
+	resolver := NewActionResolver(cache)
+
+	cache.Set("docker/build-push-action", "v7.4.0", "build_push_sha")
+	cache.Set("docker/setup-buildx-action", "v4.4.0", "setup_buildx_sha")
+
+	resolver.MarkCompilerGeneratedActionsAsUsed()
+
+	usedKeys := resolver.GetUsedCacheKeys()
+	for _, key := range []string{
+		"docker/build-push-action@v7.4.0",
+		"docker/setup-buildx-action@v4.4.0",
+	} {
+		if _, ok := usedKeys[key]; !ok {
+			t.Errorf("Expected compiler-generated Docker action %s to be marked used", key)
+		}
+	}
+}
+
 // TestForceGHHostEnvWithPresetCmdEnv verifies the non-nil cmd.Env branch of
 // ForceGHHostEnv: a stale GH_HOST in a pre-populated cmd.Env is replaced,
 // other env entries are preserved, and there is exactly one GH_HOST entry.
