@@ -906,7 +906,10 @@ function isJsonFlag(arg) {
  * @returns {boolean}
  */
 function parseJsonFlagValue(value) {
-  return !["", "0", "false"].includes(value.toLowerCase());
+  const normalizedValue = value.toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalizedValue)) return true;
+  if (["false", "0", "no", "off"].includes(normalizedValue)) return false;
+  throw new Error(`invalid value for --json: '${value}'. Use --json, --json=true, or --json=false.`);
 }
 
 /**

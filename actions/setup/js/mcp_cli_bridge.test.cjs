@@ -965,6 +965,10 @@ describe("mcp_cli_bridge.cjs", () => {
       expect(args).toEqual({ message: "done" });
       expect(json).toBe(false);
     });
+
+    it("rejects an invalid --json value with an inline payload", () => {
+      expect(() => parseToolArgs(['{"message":"done"}', "--json=flase"], {})).toThrow(/invalid value for --json/i);
+    });
   });
 
   describe("stdin JSON payload support", () => {

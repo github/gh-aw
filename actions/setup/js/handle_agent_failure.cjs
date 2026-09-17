@@ -3193,7 +3193,11 @@ function isDroppedPipeSafeOutputsCommand(line) {
       i++;
       continue;
     }
-    if ("|;&><".includes(char)) return false;
+    if ("|;&><".includes(char)) {
+      writerSeen = false;
+      i++;
+      continue;
+    }
     if (/\s/.test(char)) {
       i++;
       continue;
@@ -3208,12 +3212,13 @@ function isDroppedPipeSafeOutputsCommand(line) {
 }
 
 /**
- * Escape command text before inserting it in a fenced Markdown block.
- * @param {string} command - Redacted command excerpt
+ * Choose a Markdown fence that cannot be closed by the command excerpts.
+ * @param {string[]} commands - Redacted command excerpts
  * @returns {string}
  */
-function escapeBackticksForCodeFence(command) {
-  return command.replace(/`/g, "\\`");
+function safeMarkdownCodeFence(commands) {
+  const longestBacktickRun = commands.reduce((longest, command) => (command.match(/`+/g) || []).reduce((currentLongest, run) => Math.max(currentLongest, run.length), longest), 0);
+  return "`".repeat(Math.max(3, longestBacktickRun + 1));
 }
 
 /**
@@ -3250,7 +3255,7 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
     if (!/(^|[|;&(\s"'`])safeoutputs\s+[a-z_][a-z0-9_]*/i.test(line)) continue;
     const redacted = applyAddMaskRedaction(line, maskedValues);
     const truncated = redacted.length > SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH ? `${redacted.slice(0, SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH)}…` : redacted;
-    const escaped = escapeBackticksForCodeFence(truncated);
+    const escaped = truncated;
     if (isDroppedPipeSafeOutputsCommand(line)) {
       hasDroppedPipe = true;
     }
@@ -3268,9 +3273,10 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
 
   core.info(`Found ${commands.length} safeoutputs CLI command(s) in agent-stdio.log${hasDroppedPipe ? " (dropped-pipe pattern detected)" : ""}`);
 
-  let context = "**`safeoutputs` commands found in the agent transcript:**\n\n```bash\n";
+  const fence = safeMarkdownCodeFence(commands);
+  let context = `**\`safeoutputs\` commands found in the agent transcript:**\n\n${fence}bash\n`;
   context += commands.join("\n");
-  context += "\n```\n\n";
+  context += `\n${fence}\n\n`;
   if (hasDroppedPipe) {
     context += "A command writes a JSON payload with `printf`/`echo` but has no `|` before `safeoutputs`, so the payload was printed and the CLI never ran (exit code 0, no safe output). ";
     context += 'Pass the payload inline instead: `safeoutputs <tool> \'{"key":"value"}\'`.\n\n';
