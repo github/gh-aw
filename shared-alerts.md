@@ -260,3 +260,20 @@
 - `metrics/latest.json` remains dated 2026-09-01 (16+ days stale) — cross-checked all
   `failing-workflows.json` entries live via `gh run list`/job logs this run rather than trusting
   the stale snapshot.
+
+## Update — 2026-09-18T04:36Z (Workflow Health Manager)
+- **cloud-hypervisor P0 (#61528) NOT resolved — failure signature mutated to `EACCES`.** The
+  `--version exited with code undefined` crash from 2026-09-15→17 has changed to
+  `EACCES: Unable to execute "/run/awf-cloud-hypervisor/trusted-artifacts/.../cloud-hypervisor --version"`
+  — permission denied on the same trusted-artifact binary. First EACCES occurrence 2026-09-17T14:59Z
+  (#61627); 30 open issues match this new signature as of 2026-09-18T04:36Z. Confirmed via direct
+  job-log inspection of LintMonster (run 35300195220) and Daily Firewall Logs Collector and
+  Reporter (run 35299593898). Suspected cause: trusted-artifact extraction not preserving the
+  executable bit, or a `noexec` mount at `/run/awf-cloud-hypervisor/trusted-artifacts`. **Still
+  consolidate under #61528 — do not file new per-workflow issues.** Added evidence comment there
+  this run; also commented on dashboard #61529 (its `update_issue` call failed because this
+  `schedule`-triggered workflow has no issue context — used `add_comment` as fallback; note for
+  future runs of this workflow).
+- `metrics/latest.json` is still dated 2026-09-01 (17+ days stale); continue cross-checking
+  `failing-workflows.json` entries against live `gh run list`/job logs rather than trusting the
+  stale snapshot.
