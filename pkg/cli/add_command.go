@@ -204,6 +204,7 @@ func rejectBootstrapProfileForRegularAdd(sources []string, profile *resolvedBoot
 		requestedSources = profile.PackageID
 	}
 
+	addLog.Printf("Rejecting plain add for package %s: aw.yml config requires add-wizard", profile.PackageID)
 	return fmt.Errorf("package %s declares aw.yml config, so 'gh aw add' cannot run its interactive setup. Expected interactive setup via add-wizard for packages with aw.yml config. Example: gh aw add-wizard %s", profile.PackageID, requestedSources)
 }
 

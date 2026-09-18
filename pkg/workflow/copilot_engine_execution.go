@@ -652,12 +652,12 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil && workflowData.ParsedTools.GitHub.GitHubApp != nil {
 		tokenExpression := "${{ steps.github-mcp-app-token.outputs.token }}"
 		if workflowData.ParsedTools.GitHub.GitHubApp.shouldIgnoreMissingKey() {
-			tokenExpression = combineTokenExpressions(tokenExpression, getEffectiveGitHubToken(customGitHubToken))
+			tokenExpression = combineTokenExpressions(tokenExpression, resolveGitHubToken(customGitHubToken))
 		}
 		env["GITHUB_MCP_SERVER_TOKEN"] = tokenExpression
 		return
 	}
-	env["GITHUB_MCP_SERVER_TOKEN"] = getEffectiveGitHubToken(customGitHubToken)
+	env["GITHUB_MCP_SERVER_TOKEN"] = resolveGitHubToken(customGitHubToken)
 }
 
 func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {

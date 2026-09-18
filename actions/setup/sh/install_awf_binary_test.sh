@@ -97,8 +97,130 @@ else
 fi
 rm -f "${FAKE_GITHUB_PATH}"
 
-# Test 6: warning emitted when GITHUB_PATH is unset in rootless mode
-echo "Test 6: warning emitted when GITHUB_PATH is unset in rootless mode..."
+# Test 6: --retry-all-errors is used only when curl supports it
+echo "Test 6: --retry-all-errors is conditional on curl support..."
+test_curl_retry_all_errors() {
+  local curl_help_all="$1"
+  local expected="$2"
+  local help_all_fails="${3:-false}"
+  local curl_help="${4:-${curl_help_all}}"
+  local test_dir
+  local option_index
+  local -a actual_options
+  local -a expected_options=(-fsSL --retry 5 --retry-delay 10 --retry-max-time 180)
+  TEST_FAILURE_REASON=""
+  if [ "${expected}" = true ]; then
+    expected_options+=(--retry-all-errors)
+  fi
+  test_dir=$(mktemp -d)
+  mkdir -p "${test_dir}/bin" "${test_dir}/home"
+  cat > "${test_dir}/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "--help" ]; then
+  if [ "$2" = "all" ] && [ "${CURL_HELP_ALL_FAILS}" = "true" ]; then
+    exit 1
+  fi
+  if [ "$2" = "all" ]; then
+    printf '%s\n' "${CURL_HELP_ALL_OUTPUT}"
+  else
+    printf '%s\n' "${CURL_HELP_OUTPUT}"
+  fi
+  exit 0
+fi
+count_file="${CURL_ARGS_FILE}.count"
+count=$(cat "${count_file}" 2>/dev/null || echo 0)
+count=$((count + 1))
+printf '%s\n' "${count}" > "${count_file}"
+printf '%s\n' "$@" > "${CURL_ARGS_FILE}.${count}"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    output="$2"
+    break
+  fi
+  shift
+done
+if [[ "${output}" == *checksums.txt ]]; then
+  printf 'checksum awf-linux-x64\n' > "${output}"
+else
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
+fi
+EOF
+  cat > "${test_dir}/bin/node" <<'EOF'
+#!/usr/bin/env bash
+echo v18.0.0
+EOF
+  cat > "${test_dir}/bin/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+printf 'checksum %s\n' "$1"
+EOF
+  cat > "${test_dir}/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  -s) echo Linux ;;
+  -m) echo x86_64 ;;
+esac
+EOF
+  chmod +x "${test_dir}/bin/"*
+  if ! CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
+    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null; then
+    TEST_FAILURE_REASON="installer exited unsuccessfully"
+    rm -rf "${test_dir}"
+    return 1
+  fi
+  local curl_args
+  local -a curl_args_files
+  shopt -s nullglob
+  curl_args_files=("${test_dir}"/curl-args.[0-9]*)
+  shopt -u nullglob
+  if [ "${#curl_args_files[@]}" -eq 0 ]; then
+    TEST_FAILURE_REASON="installer did not invoke a download"
+    rm -rf "${test_dir}"
+    return 1
+  fi
+  for curl_args in "${curl_args_files[@]}"; do
+    mapfile -t actual_options < "${curl_args}"
+    for option_index in "${!expected_options[@]}"; do
+      if [ "${actual_options[option_index]:-}" != "${expected_options[option_index]}" ]; then
+        TEST_FAILURE_REASON="expected curl argument ${expected_options[option_index]} at position ${option_index}"
+        rm -rf "${test_dir}"
+        return 1
+      fi
+    done
+    # The option list must end here: the next argument is the download target, so any
+    # extra retry flag (such as an unconditional --retry-all-errors) is caught.
+    if [ "${actual_options[${#expected_options[@]}]:-}" != "-o" ]; then
+      TEST_FAILURE_REASON="expected -o at position ${#expected_options[@]}, got ${actual_options[${#expected_options[@]}]:-<none>}"
+      rm -rf "${test_dir}"
+      return 1
+    fi
+  done
+  rm -rf "${test_dir}"
+}
+
+if test_curl_retry_all_errors '--retry-all-errors' true; then
+  pass "supported curl receives --retry-all-errors"
+else
+  fail "supported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '' true true '--retry-all-errors'; then
+  pass "curl help fallback detects --retry-all-errors"
+else
+  fail "curl help fallback retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '' true false '--retry-all-errors'; then
+  pass "curl help fallback detects an option missing from help all"
+else
+  fail "curl help fallback did not detect an option missing from help all" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '' false; then
+  pass "unsupported curl omits --retry-all-errors"
+else
+  fail "unsupported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+
+# Test 7: warning emitted when GITHUB_PATH is unset in rootless mode
+echo "Test 7: warning emitted when GITHUB_PATH is unset in rootless mode..."
 warning_output=$(bash -c '
   AWF_INSTALL_DIR="${HOME}/.local/bin"
   ROOTLESS=true

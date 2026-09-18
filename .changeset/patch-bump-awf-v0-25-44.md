@@ -2,4 +2,4 @@
 "gh-aw": patch
 ---
 
-Token steering (`apiProxy.enableTokenSteering`) is now enabled by default; the `firewall.effective-token-steering` frontmatter key has been removed. Set `max-ai-credits` to a negative value to disable both budget enforcement and token steering.
+Token steering (`apiProxy.enableTokenSteering`) is now enabled by default; the `firewall.token-steering` frontmatter key has been removed. Set `max-ai-credits` to a negative value to disable both budget enforcement and token steering.

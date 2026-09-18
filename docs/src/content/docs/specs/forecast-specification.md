@@ -12,14 +12,9 @@ sidebar:
 **Latest Version**: [forecast-specification](/gh-aw/specs/forecast-specification/)  
 **Editor**: GitHub Agentic Workflows Team
 
-> [!IMPORTANT]
-> AI Credits (AIC) is the primary cost metric in gh-aw. This document still references legacy Effective Tokens (ET) field names where command output and schema compatibility require them.
-
----
-
 ## Abstract
 
-This specification defines the `gh aw forecast` command for the GitHub Agentic Workflows project. The command performs historical sampling of completed agentic workflow runs and applies a Monte Carlo simulation engine to project future AI Credits (AIC) and legacy Effective Token (ET) consumption over a configurable time horizon. The specification covers workflow discovery (local and remote modes), data sampling via the GitHub Actions API, the Poisson–bootstrap Monte Carlo projection algorithm, episode-level analysis, and both console-table and machine-readable JSON output formats. Implementations conforming to this specification provide operators with probabilistic token-consumption forecasts suitable for capacity planning, cost estimation, and budget governance.
+This specification defines the `gh aw forecast` command for the GitHub Agentic Workflows project. The command performs historical sampling of completed agentic workflow runs and applies a Monte Carlo simulation engine to project future AI Credits (AIC) consumption over a configurable time horizon. The specification covers workflow discovery (local and remote modes), data sampling via the GitHub Actions API, the Poisson–bootstrap Monte Carlo projection algorithm, episode-level analysis, and both console-table and machine-readable JSON output formats. Implementations conforming to this specification provide operators with probabilistic cost forecasts suitable for capacity planning, cost estimation, and budget governance.
 
 ---
 
@@ -83,7 +78,7 @@ This specification covers:
 
 This specification does NOT cover:
 
-- The Effective Tokens (ET) computation algorithm (defined in the [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/))
+- The AI Credits (AIC) computation algorithm (defined in the [AI Credits Specification](/gh-aw/specs/ai-credits-specification/))
 - The `aw_info.json` artifact schema
 - A/B experiment frontmatter schema (defined in the [A/B Experiments Specification](/gh-aw/experimental/experiments-specification/))
 - Billing, pricing, or financial modeling beyond token projections
@@ -125,9 +120,9 @@ Implementations MUST support:
 
 ## 3. Terminology
 
-### 3.1 Effective Tokens (ET)
+### 3.1 AI Credits (AIC)
 
-A normalized unit of LLM token consumption defined in the [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/). ET accounts for token class weights and model multipliers to produce a single comparable scalar across heterogeneous LLM invocations.
+A normalized unit of LLM token consumption defined in the [AI Credits Specification](/gh-aw/specs/ai-credits-specification/). AIC accounts for token class weights and model multipliers to produce a single comparable scalar across heterogeneous LLM invocations.
 
 ### 3.2 Workflow Run
 
@@ -143,7 +138,7 @@ The subset of completed and in-progress workflow runs within the historical wind
 
 ### 3.5 Monte Carlo Trial
 
-A single independent simulation that draws stochastic values for run count, per-run token usage, and per-run success, combining them to produce one projected Effective Token total for the projection period.
+A single independent simulation that draws stochastic values for run count, per-run token usage, and per-run success, combining them to produce one projected AI Credit total for the projection period.
 
 ### 3.6 Projection Period
 
@@ -353,20 +348,20 @@ For each sampled run, the implementation MUST derive:
 
 | Metric | Source | Description |
 |---|---|---|
-| `effective_tokens` | `aw_info.json` artifact | Total ET for this run as defined in the Effective Tokens Specification. |
+| `aic` | `aw_info.json` artifact | Total AIC for this run as defined in the AI Credits Specification. |
 | `duration_seconds` | Run start/end timestamps | Wall-clock duration of the run in seconds. |
 | `success` | Run conclusion field | `true` if conclusion is `"success"`, `false` otherwise. |
 
-#### 6.2.1 Effective Token Retrieval
+#### 6.2.1 AI Credit Retrieval
 
-Effective token counts are obtained from locally-cached run summaries when available.  The `gh aw logs` command stores a `run_summary.json` file for each processed run under `{output_dir}/run-{run_id}/`.  During forecasting the implementation:
+AI Credits are obtained from locally-cached run summaries when available. The `gh aw logs` command stores a `run_summary.json` file for each processed run under `{output_dir}/run-{run_id}/`. During forecasting the implementation:
 
 - **R-SAMP-010**: MUST attempt to load the cached `run_summary.json` for each sampled run using the default logs output directory (`.github/aw/logs`).
-- **R-SAMP-011**: MUST extract the `TotalEffectiveTokens` field from the cached `TokenUsage` summary when present.
-- **R-SAMP-012**: If no cached summary exists or the ET field is zero, the run's ET contribution MUST be treated as zero and the run MUST still be counted in `sampled_runs`.  The implementation SHOULD log a debug-level warning.
+- **R-SAMP-011**: MUST extract the `TotalAIC` field from the cached `TokenUsage` summary when present.
+- **R-SAMP-012**: If no cached summary exists or the AIC field is zero, the run's AIC contribution MUST be treated as zero and the run MUST still be counted in `sampled_runs`.  The implementation SHOULD log a debug-level warning.
 - **R-SAMP-013**: When no `run_summary.json` is available, the implementation SHOULD consult a forecast-specific `forecast_aic.json` cache in the run directory before downloading the usage artifact, and after computing a positive AIC from a freshly downloaded artifact it SHOULD persist that value to `forecast_aic.json` (version-gated by CLI version) so repeated forecast runs reuse the cached AIC without re-scanning or re-parsing artifacts. A dedicated file is used because `run_summary.json` is a "fully processed" marker for `gh aw logs`/`audit`.
 
-This lightweight approach avoids re-downloading artifacts while still providing accurate ET observations for runs that have already been processed locally by `gh aw logs`.
+This lightweight approach avoids re-downloading artifacts while still providing accurate AIC observations for runs that have already been processed locally by `gh aw logs`.
 
 #### 6.2.2 Duration Derivation
 
@@ -396,7 +391,7 @@ Where:
 
 ### 7.1 Overview
 
-The Monte Carlo engine runs **10,000 independent simulation trials** per workflow to produce a probability distribution over projected Effective Token consumption in the next projection period. The engine models three independent sources of uncertainty per trial.
+The Monte Carlo engine runs **10,000 independent simulation trials** per workflow to produce a probability distribution over projected AI Credit consumption in the next projection period. The engine models three independent sources of uncertainty per trial.
 
 Implementations MUST use exactly 10,000 trials. The trial count is a normative requirement to ensure consistency of P10/P50/P90 estimates across implementations.
 
@@ -448,8 +443,8 @@ The implementation MUST use:
 
 Token usage per run is modeled empirically using bootstrap resampling:
 
-- **R-MC-010**: For each run in a trial, the implementation MUST draw one observation uniformly at random **with replacement** from the set of historical ET observations in the sample.
-- **R-MC-011**: If the sample contains zero ET observations (all runs had missing artifacts), the per-run token draw MUST return 0.
+- **R-MC-010**: For each run in a trial, the implementation MUST draw one observation uniformly at random **with replacement** from the set of historical AIC observations in the sample.
+- **R-MC-011**: If the sample contains zero AIC observations (all runs had missing artifacts), the per-run token draw MUST return 0.
 
 This non-parametric approach preserves the empirical distribution of token usage, including multi-modal distributions and heavy tails, without imposing a parametric form.
 
@@ -475,7 +470,7 @@ trial_tokens = Σ_{i=1}^{k} (success_i × token_draw_i)
 
 Where:
 - `success_i` is `1` if the Bernoulli draw for run `i` succeeds, `0` otherwise
-- `token_draw_i` is the bootstrapped ET observation for run `i`
+- `token_draw_i` is the bootstrapped AIC observation for run `i`
 
 ### 7.4 Output Statistics
 
@@ -483,15 +478,15 @@ After completing all 10,000 trials, the implementation MUST compute and report:
 
 | Statistic | Definition |
 |---|---|
-| `mean_projected_effective_tokens` | Arithmetic mean of all trial totals |
-| `std_dev_effective_tokens` | Population or sample standard deviation of all trial totals |
-| `p10_projected_effective_tokens` | 10th percentile of trial totals (lower bound of 80% CI) |
-| `p50_projected_effective_tokens` | 50th percentile of trial totals (median projection) |
-| `p90_projected_effective_tokens` | 90th percentile of trial totals (upper bound of 80% CI) |
+| `mean_projected_aic` | Arithmetic mean of all trial totals |
+| `std_dev_aic` | Population or sample standard deviation of all trial totals |
+| `p10_projected_aic` | 10th percentile of trial totals (lower bound of 80% CI) |
+| `p50_projected_aic` | 50th percentile of trial totals (median projection) |
+| `p90_projected_aic` | 90th percentile of trial totals (upper bound of 80% CI) |
 
 Percentile computation MUST use the nearest-rank method or an equivalent method that produces results consistent with a 10,000-element sorted array.
 
-The `projected_effective_tokens` top-level field MUST equal `p50_projected_effective_tokens`.
+The `projected_aic` top-level field MUST equal `p50_projected_aic`.
 
 ### 7.5 Nil Projection Condition
 
@@ -499,11 +494,11 @@ If no historical runs are available for a workflow, the implementation MUST retu
 
 ### 7.6 Minimum Sample Size for Percentile Validity
 
-The P10 and P90 estimates produced by the Monte Carlo engine are only statistically reliable when the bootstrap sample contains a sufficient number of distinct ET observations.
+The P10 and P90 estimates produced by the Monte Carlo engine are only statistically reliable when the bootstrap sample contains a sufficient number of distinct AIC observations.
 
-- **R-MC-030**: Implementations SHOULD require a minimum of **10** ET observations (i.e., runs with non-zero `effective_tokens`) before treating P10 and P90 as reliable estimates. When `n < 10`, implementations SHOULD emit a warning to stderr indicating that the confidence interval may be unreliable due to insufficient sample size. _Rationale: Bootstrap resampling with fewer than 10 observations produces percentile estimates that are highly sensitive to individual outliers. With n < 10, the P10 and P90 bounds collapse toward the single minimum and maximum observations, making the 80% confidence interval misleadingly precise. The threshold of 10 is consistent with standard statistical practice for non-parametric bootstrapping._
+- **R-MC-030**: Implementations SHOULD require a minimum of **10** AIC observations (i.e., runs with non-zero `aic`) before treating P10 and P90 as reliable estimates. When `n < 10`, implementations SHOULD emit a warning to stderr indicating that the confidence interval may be unreliable due to insufficient sample size. _Rationale: Bootstrap resampling with fewer than 10 observations produces percentile estimates that are highly sensitive to individual outliers. With n < 10, the P10 and P90 bounds collapse toward the single minimum and maximum observations, making the 80% confidence interval misleadingly precise. The threshold of 10 is consistent with standard statistical practice for non-parametric bootstrapping._
 - **R-MC-031**: Implementations MUST still run the Monte Carlo simulation and return P10/P50/P90 values even when `n < 10`. The simulation MUST NOT be suppressed solely on the basis of sample size; the warning in **R-MC-030** is advisory only.
-- **R-MC-032**: When `n = 0` (no ET observations in the sample), the **Nil Projection Condition** in §7.5 applies and the simulation MUST NOT run. This is a separate condition from the low-sample warning.
+- **R-MC-032**: When `n = 0` (no AIC observations in the sample), the **Nil Projection Condition** in §7.5 applies and the simulation MUST NOT run. This is a separate condition from the low-sample warning.
 
 ---
 
@@ -537,7 +532,7 @@ For each workflow, the implementation MUST compute:
 |---|---|
 | `sampled_episodes` | Count of distinct episodes identified in the sample |
 | `runs_per_episode` | `sampled_run_count / sampled_episodes` |
-| `avg_effective_tokens_per_episode` | Mean ET summed across all runs within each episode |
+| `avg_aic_per_episode` | Mean AIC summed across all runs within each episode |
 | `observed_episodes_per_period` | `(sampled_episodes / history_days) × period_days` |
 
 ### 8.4 Episode Table Display
@@ -558,23 +553,23 @@ When `--json` is not specified, the implementation MUST render a formatted conso
 | `Sampled Runs` | Count of completed and in-progress runs included in the sample |
 | `Success Rate` | Fraction of sampled runs concluding with `success`, formatted as a percentage; `N/A` when no runs were sampled |
 | `Yield/Period` | Effective throughput rate (`success_rate × observed_runs_per_period`) formatted to one decimal place |
-| `Avg ET` | `avg_effective_tokens` formatted as K/M abbreviations (e.g. `12.5K`, `1.20M`); `-` when zero |
-| `Proj. ET (P50)` | Median projected effective tokens from Monte Carlo (P50), formatted as K/M abbreviations |
+| `Avg AIC` | `avg_aic` formatted as K/M abbreviations (e.g. `12.5K`, `1.20M`); `-` when zero |
+| `Proj. AIC (P50)` | Median projected AI Credits from Monte Carlo (P50), formatted as K/M abbreviations |
 | `80% CI (P10–P90)` | Confidence interval range `p10–p90`, both formatted as K/M abbreviations |
 | `Triggers` | Comma-separated list of active trigger event names from frontmatter (up to 3, remainder shown as `+N`) |
 
 #### 9.1.1 Table Formatting Requirements
 
 - **R-OUT-001**: Column widths MUST be auto-fitted to the widest value in each column.
-- **R-OUT-002**: ET values MUST be formatted as K/M abbreviations (e.g. `12.5K`, `1.20M`); raw integer values of zero MUST be rendered as `-`.
-- **R-OUT-003**: Rows MUST be sorted by Monte Carlo P50 projected effective tokens in descending order; when Monte Carlo data is unavailable, sort by `projected_effective_tokens`.
+- **R-OUT-002**: AIC values MUST be formatted as K/M abbreviations (e.g. `12.5K`, `1.20M`); raw integer values of zero MUST be rendered as `-`.
+- **R-OUT-003**: Rows MUST be sorted by Monte Carlo P50 projected AI Credits in descending order; when Monte Carlo data is unavailable, sort by `projected_aic`.
 - **R-OUT-004**: A workflow with zero sampled runs MUST appear in the table with `-` in projection columns and `N/A` in rate columns.
 - **R-OUT-005**: When episode analysis is applicable (Section 8.4), a second table with episode metrics MUST be printed below the main table, separated by a blank line.
 
 #### 9.1.2 Example Console Output
 
 ```
-Workflow          Sampled Runs  Success Rate  Yield/Period  Avg ET  Proj. ET (P50)  80% CI (P10–P90)  Triggers
+Workflow          Sampled Runs  Success Rate  Yield/Period  Avg AIC  Proj. AIC (P50)  80% CI (P10–P90)  Triggers
 ci-doctor                   42         92%          35.4   12.5K         480.0K       430.0K–535.0K   pull_request, workflow_dispatch
 daily-planner               18         89%          14.4    8.2K         131.0K       105.0K–158.0K   schedule
 ```
@@ -597,7 +592,7 @@ When `--json` is specified, the implementation MUST emit a single JSON object to
 |---|---|---|---|
 | `period` | string | MUST | Projection period: `"week"` or `"month"`. |
 | `as_of` | string | MUST | ISO 8601 / RFC 3339 UTC timestamp at which the forecast was computed. |
-| `workflows` | array | MUST | Ordered array of per-workflow forecast objects. MUST be sorted by `projected_effective_tokens` (P50) descending. |
+| `workflows` | array | MUST | Ordered array of per-workflow forecast objects. MUST be sorted by `projected_aic` (P50) descending. |
 
 #### 9.2.2 WorkflowForecast Object
 
@@ -610,9 +605,9 @@ When `--json` is specified, the implementation MUST emit a single JSON object to
   "observed_runs_per_period": <number>,
   "success_rate": <number>,
   "yield": <number>,
-  "avg_effective_tokens": <number>,
+  "avg_aic": <number>,
   "avg_duration_seconds": <number>,
-  "projected_effective_tokens": <number>,
+  "projected_aic": <number>,
   "active_triggers": [ "<string>", ... ],
   "concurrency_limit": <integer>,
   "monte_carlo": { <MonteCarlo> },
@@ -630,9 +625,9 @@ When `--json` is specified, the implementation MUST emit a single JSON object to
 | `observed_runs_per_period` | number | MUST | Extrapolated run rate for the projection period. |
 | `success_rate` | number | MUST | Fraction of sampled runs that concluded successfully, in `[0.0, 1.0]`. |
 | `yield` | number | MUST | Effective throughput rate: `success_rate × observed_runs_per_period`. |
-| `avg_effective_tokens` | number | MUST | Mean ET per sampled run. `0` when no ET data is available. |
+| `avg_aic` | number | MUST | Mean AIC per sampled run. `0` when no AIC data is available. |
 | `avg_duration_seconds` | number | MUST | Mean wall-clock duration per sampled run in seconds. |
-| `projected_effective_tokens` | number | MUST | P50 Monte Carlo projection. Equals `monte_carlo.p50_projected_effective_tokens`. |
+| `projected_aic` | number | MUST | P50 Monte Carlo projection. Equals `monte_carlo.p50_projected_aic`. |
 | `active_triggers` | array of strings | SHOULD | Trigger event types from workflow frontmatter. Empty array when frontmatter is unavailable. |
 | `concurrency_limit` | integer | SHOULD | Concurrency group limit from frontmatter. `0` indicates unlimited or unavailable. |
 | `monte_carlo` | object | MUST | Monte Carlo simulation results. See Section 9.2.3. |
@@ -644,22 +639,22 @@ When `--json` is specified, the implementation MUST emit a single JSON object to
 ```json
 {
   "iterations": 10000,
-  "mean_projected_effective_tokens": <number>,
-  "std_dev_effective_tokens": <number>,
-  "p10_projected_effective_tokens": <number>,
-  "p50_projected_effective_tokens": <number>,
-  "p90_projected_effective_tokens": <number>
+  "mean_projected_aic": <number>,
+  "std_dev_aic": <number>,
+  "p10_projected_aic": <number>,
+  "p50_projected_aic": <number>,
+  "p90_projected_aic": <number>
 }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `iterations` | integer | MUST | Always `10000`. |
-| `mean_projected_effective_tokens` | number | MUST | Arithmetic mean of trial totals. |
-| `std_dev_effective_tokens` | number | MUST | Standard deviation of trial totals. |
-| `p10_projected_effective_tokens` | number | MUST | 10th percentile of trial totals. |
-| `p50_projected_effective_tokens` | number | MUST | 50th percentile (median) of trial totals. |
-| `p90_projected_effective_tokens` | number | MUST | 90th percentile of trial totals. |
+| `mean_projected_aic` | number | MUST | Arithmetic mean of trial totals. |
+| `std_dev_aic` | number | MUST | Standard deviation of trial totals. |
+| `p10_projected_aic` | number | MUST | 10th percentile of trial totals. |
+| `p50_projected_aic` | number | MUST | 50th percentile (median) of trial totals. |
+| `p90_projected_aic` | number | MUST | 90th percentile of trial totals. |
 
 When `sampled_runs = 0`, all numeric fields in this object MUST be `0` and `iterations` MUST be `0`.
 
@@ -670,7 +665,7 @@ When `sampled_runs = 0`, all numeric fields in this object MUST be `0` and `iter
   "sampled_episodes": <integer>,
   "episode_count_is_lower_bound": <boolean>,
   "runs_per_episode": <number>,
-  "avg_effective_tokens_per_episode": <number>,
+  "avg_aic_per_episode": <number>,
   "observed_episodes_per_period": <number>
 }
 ```
@@ -680,7 +675,7 @@ When `sampled_runs = 0`, all numeric fields in this object MUST be `0` and `iter
 | `sampled_episodes` | integer | MUST | Distinct episode count. Lower-bound estimate when artifact linkage is unavailable. |
 | `episode_count_is_lower_bound` | boolean | SHOULD | `true` when episode linkage data is incomplete (for example, remote mode without artifacts); otherwise `false`. |
 | `runs_per_episode` | number | MUST | Mean runs per episode. |
-| `avg_effective_tokens_per_episode` | number | MUST | Mean ET per episode. |
+| `avg_aic_per_episode` | number | MUST | Mean AIC per episode. |
 | `observed_episodes_per_period` | number | MUST | Extrapolated episode rate for the projection period. |
 
 #### 9.2.5 ExperimentVariant Object
@@ -716,24 +711,24 @@ When `sampled_runs = 0`, all numeric fields in this object MUST be `0` and `iter
       "observed_runs_per_period": 38.5,
       "success_rate": 0.92,
       "yield": 0.92,
-      "avg_effective_tokens": 12500,
+      "avg_aic": 12500,
       "avg_duration_seconds": 145.3,
-      "projected_effective_tokens": 480000,
+      "projected_aic": 480000,
       "active_triggers": ["pull_request", "workflow_dispatch"],
       "concurrency_limit": 0,
       "monte_carlo": {
         "iterations": 10000,
-        "mean_projected_effective_tokens": 481250,
-        "std_dev_effective_tokens": 32000.5,
-        "p10_projected_effective_tokens": 430000,
-        "p50_projected_effective_tokens": 480000,
-        "p90_projected_effective_tokens": 535000
+        "mean_projected_aic": 481250,
+        "std_dev_aic": 32000.5,
+        "p10_projected_aic": 430000,
+        "p50_projected_aic": 480000,
+        "p90_projected_aic": 535000
       },
       "episode_analysis": {
         "sampled_episodes": 40,
         "episode_count_is_lower_bound": true,
         "runs_per_episode": 1.05,
-        "avg_effective_tokens_per_episode": 13100,
+        "avg_aic_per_episode": 13100,
         "observed_episodes_per_period": 36.7
       },
       "experiment_variants": [
@@ -758,7 +753,7 @@ When `sampled_runs = 0`, all numeric fields in this object MUST be `0` and `iter
 ### 9.3 Output Ordering
 
 - **R-OUT-010**: In both console and JSON output, workflows MUST be ordered by
-  `projected_effective_tokens` (P50 value) in descending order.
+  `projected_aic` (P50 value) in descending order.
 - **R-OUT-011**: Workflows with zero projected tokens MUST appear after all workflows with non-zero projections.
 - **R-OUT-012**: Among workflows with equal projected tokens, the ordering SHOULD be deterministic (e.g., alphabetical by workflow ID).
 - **R-OUT-013**: JSON output SHOULD disclose episode lower-bound semantics by including
@@ -805,7 +800,7 @@ When `--verbose` is specified, the implementation SHOULD emit the following addi
 
 - The list of discovered workflows and their identifiers
 - The number of runs fetched per workflow
-- The number of runs with valid ET data versus missing artifacts
+- The number of runs with valid AIC data versus missing artifacts
 - The computed `λ` (Poisson rate) for each workflow
 - Timing information for API calls and simulation execution
 
@@ -842,7 +837,7 @@ workflows):
 #### 10.7.1 Threat Model
 
 - **Credential scope abuse**: Over-scoped credentials could allow unauthorized repository access.
-- **Artifact privacy leakage**: `aw_info.json` artifacts may contain operationally sensitive ET
+- **Artifact privacy leakage**: `aw_info.json` artifacts may contain operationally sensitive AIC
   metadata and prompt-adjacent context.
 - **Rate-limit abuse**: Aggressive polling or unrestricted retries can amplify API pressure and
   trigger organizational throttling.
@@ -888,9 +883,9 @@ visibility and access-governance controls.
 
 ### 11.4 Numeric Precision
 
-- **R-IMPL-030**: All intermediate ET computations MUST use 64-bit floating-point arithmetic (IEEE 754 double precision).
+- **R-IMPL-030**: All intermediate AIC computations MUST use 64-bit floating-point arithmetic (IEEE 754 double precision).
 - **R-IMPL-031**: JSON serialization of numeric fields MUST NOT produce non-finite values (`NaN`, `+Inf`, `-Inf`). If a computation produces a non-finite value, it MUST be replaced with `0` and a warning MUST be emitted.
-- **R-IMPL-032**: Implementations MUST NOT round projected ET values in intermediate computations; rounding for display purposes MUST occur only at serialization time.
+- **R-IMPL-032**: Implementations MUST NOT round projected AIC values in intermediate computations; rounding for display purposes MUST occur only at serialization time.
 
 ### 11.5 Accuracy Disclosure Behavior
 
@@ -929,21 +924,21 @@ and adding new fixtures.
 
 - **T-FC-020**: Sampling respects `--sample` limit.
 - **T-FC-021**: Sampling respects `--days` historical window cutoff.
-- **T-FC-022**: Run with missing `aw_info.json` artifact contributes zero ET and is still counted in `sampled_runs`.
+- **T-FC-022**: Run with missing `aw_info.json` artifact contributes zero AIC and is still counted in `sampled_runs`.
 - **T-FC-023**: Workflow with zero sampled runs produces nil projection with zero fields.
 - **T-FC-024**: An in-progress run with a non-zero token usage snapshot is represented as a partial observation.
-- **T-ET-006**: A run with total effective tokens of at least 1,000,000 is handled without overflow.
+- **T-AIC-006**: A run with total AI Credits of at least 1,000,000 is handled without overflow.
 
 #### 12.1.4 Monte Carlo Engine Tests
 
 - **T-FC-031**: With `λ ≤ 15`, Knuth's algorithm is used for Poisson draw (verifiable by seeded PRNG in test mode).
 - **T-FC-032**: With `λ > 15`, Normal approximation is used; drawn value is non-negative.
 - **T-FC-033**: With `λ = 0`, projected tokens is exactly `0` for all trials.
-- **T-FC-034**: Bootstrap resampling draws with replacement from historical ET observations.
-- **T-FC-035**: Only successful Bernoulli draws contribute ET to the trial total.
+- **T-FC-034**: Bootstrap resampling draws with replacement from historical AIC observations.
+- **T-FC-035**: Only successful Bernoulli draws contribute AIC to the trial total.
 - **T-FC-036**: 10,000 trials are executed per workflow.
 - **T-FC-037**: P10 ≤ P50 ≤ P90 for all non-zero projections.
-- **T-FC-038**: `projected_effective_tokens` equals `p50_projected_effective_tokens`.
+- **T-FC-038**: `projected_aic` equals `p50_projected_aic`.
 - **T-FC-039**: Boundary crossover: `λ = 15` uses Knuth's exact branch.
 - **T-FC-040**: Boundary crossover: `λ > 15` uses Normal approximation branch.
 
@@ -959,7 +954,7 @@ and adding new fixtures.
 - **T-FC-050**: Console output contains all required columns.
 - **T-FC-051**: JSON output is valid JSON conforming to the schema in Section 9.2.
 - **T-FC-052**: JSON `as_of` field is a valid RFC 3339 UTC timestamp.
-- **T-FC-053**: JSON `workflows` array is sorted by `projected_effective_tokens` descending.
+- **T-FC-053**: JSON `workflows` array is sorted by `projected_aic` descending.
 - **T-FC-054**: No stdout output (other than JSON) when `--json` is specified.
 - **T-FC-055**: Accuracy note emitted to stderr unless `--json` is specified.
 
@@ -1031,8 +1026,8 @@ Sync procedure:
 
 Sync follow-up tasks:
 
-- **[Open]** Add and verify explicit AIC-primary / ET-legacy migration assertions for forecast
-  reporting paths so that ET-facing surfaces remain compatibility-only where applicable.
+- **[Open]** Add and verify explicit AIC-primary / AIC-legacy migration assertions for forecast
+  reporting paths so that AIC-facing surfaces remain compatibility-only where applicable.
 - **[Open]** Track promotion-gate evidence until three confirmed production runs are documented in
   the Promotion Tracking table (§Status of This Document, criterion 1).
 - **[Open]** Close the forecast compliance-test gap for promotion criterion 3 by recording sustained
@@ -1067,8 +1062,8 @@ Sync follow-up tasks:
 A workflow named `ci-doctor` has the following historical sample over 30 days:
 
 - 42 completed runs
-- 5 runs missing `aw_info.json` (treated as 0 ET)
-- ET observations (for the 37 runs with artifacts): range from 8,000 to 18,000, mean ≈ 12,500
+- 5 runs missing `aw_info.json` (treated as 0 AIC)
+- AIC observations (for the 37 runs with artifacts): range from 8,000 to 18,000, mean ≈ 12,500
 - 38 successful runs (yield = 38/42 ≈ 0.905)
 - Projection period: `month` (30 days)
 
@@ -1087,10 +1082,10 @@ Draw `k ~ round(Normal(42, 6.48)) = 44` (example).
 
 For each of the 44 runs:
 1. Draw success: `Bernoulli(0.905)` → say 40 succeed.
-2. For each of the 40 successful runs, draw one ET observation from the 37-item historical pool (bootstrap).
-3. Sum the 40 ET draws.
+2. For each of the 40 successful runs, draw one AIC observation from the 37-item historical pool (bootstrap).
+3. Sum the 40 AIC draws.
 
-One trial might yield: 40 × 12,200 (average draw) ≈ 488,000 ET.
+One trial might yield: 40 × 12,200 (average draw) ≈ 488,000 AIC.
 
 #### A.4 After 10,000 Trials
 
@@ -1112,7 +1107,7 @@ The threshold of λ = 15 is chosen as the crossover point where Normal approxima
 
 ### Appendix C: Bootstrap Resampling Rationale
 
-Traditional projection models assume a parametric distribution (e.g., log-normal) for per-run token usage. Agentic workflow token usage is frequently multi-modal (e.g., simple tasks versus complex multi-step tasks) and exhibits heavy tails due to recursive sub-agent chains. Bootstrap resampling avoids distributional misspecification by directly sampling from the empirical distribution, preserving these characteristics faithfully. The tradeoff is that projections are bounded by observed extremes; extrapolation beyond observed maximum ET requires explicit assumption and is out of scope for this specification.
+Traditional projection models assume a parametric distribution (e.g., log-normal) for per-run token usage. Agentic workflow token usage is frequently multi-modal (e.g., simple tasks versus complex multi-step tasks) and exhibits heavy tails due to recursive sub-agent chains. Bootstrap resampling avoids distributional misspecification by directly sampling from the empirical distribution, preserving these characteristics faithfully. The tradeoff is that projections are bounded by observed extremes; extrapolation beyond observed maximum AIC requires explicit assumption and is out of scope for this specification.
 
 ### Appendix D: Episode Count Lower-Bound Semantics
 
@@ -1141,7 +1136,7 @@ Safeguard requirements for this specification are now defined in §10.7.
 
 - **[RFC 2119]** Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14, RFC 2119, March 1997. <https://www.ietf.org/rfc/rfc2119.txt>
 - **[RFC 3339]** Klyne, G. and Newman, C., "Date and Time on the Internet: Timestamps", RFC 3339, July 2002. <https://www.ietf.org/rfc/rfc3339.txt>
-- **[ET-SPEC]** GitHub Agentic Workflows Team, "Effective Tokens Specification". [effective-tokens-specification](/gh-aw/specs/effective-tokens-specification/)
+- **[AIC-SPEC]** GitHub Agentic Workflows Team, "AI Credits Specification". [AI Credits-specification](/gh-aw/specs/ai-credits-specification/)
 - **[EXP-SPEC]** GitHub Agentic Workflows Team, "A/B Experiments Specification". [experiments-specification](/gh-aw/experimental/experiments-specification/)
 
 ### Informative References

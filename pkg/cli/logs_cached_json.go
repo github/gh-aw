@@ -70,16 +70,15 @@ type cachedLogsJSONLMCPToolUsageData struct {
 }
 
 type cachedLogsJSONLMCPToolCall struct {
-	ToolCallID          string `json:"tool_call_id,omitempty"`
-	Timestamp           string `json:"timestamp"`
-	ServerName          string `json:"server_name"`
-	ToolName            string `json:"tool_name"`
-	Method              string `json:"method,omitempty"`
-	InputSize           int    `json:"input_size"`
-	OutputSize          int    `json:"output_size"`
-	Duration            string `json:"duration,omitempty"`
-	Status              string `json:"status"`
-	EffectiveTokenDelta int    `json:"effective_token_delta,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
+	Timestamp  string `json:"timestamp"`
+	ServerName string `json:"server_name"`
+	ToolName   string `json:"tool_name"`
+	Method     string `json:"method,omitempty"`
+	InputSize  int    `json:"input_size"`
+	OutputSize int    `json:"output_size"`
+	Duration   string `json:"duration,omitempty"`
+	Status     string `json:"status"`
 }
 
 type cachedLogsJSONLRecord struct {
@@ -581,16 +580,15 @@ func projectCachedLogsJSONLMCPToolUsage(usage *MCPToolUsageData) *cachedLogsJSON
 
 func (call MCPToolCall) cachedLogsJSONLProjection() cachedLogsJSONLMCPToolCall {
 	return cachedLogsJSONLMCPToolCall{
-		ToolCallID:          call.ToolCallID,
-		Timestamp:           call.Timestamp,
-		ServerName:          call.ServerName,
-		ToolName:            call.ToolName,
-		Method:              call.Method,
-		InputSize:           call.InputSize,
-		OutputSize:          call.OutputSize,
-		Duration:            call.Duration,
-		Status:              call.Status,
-		EffectiveTokenDelta: call.EffectiveTokenDelta,
+		ToolCallID: call.ToolCallID,
+		Timestamp:  call.Timestamp,
+		ServerName: call.ServerName,
+		ToolName:   call.ToolName,
+		Method:     call.Method,
+		InputSize:  call.InputSize,
+		OutputSize: call.OutputSize,
+		Duration:   call.Duration,
+		Status:     call.Status,
 	}
 }
 

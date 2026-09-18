@@ -179,10 +179,10 @@ type ExperimentConfig struct {
 	Description string `json:"description,omitempty"`
 
 	// Hypothesis states the null and alternative hypotheses for the experiment.
-	// e.g. "H0: no change in effective_tokens. H1: concise reduces tokens by >=15%"
+	// e.g. "H0: no change in aic. H1: concise reduces tokens by >=15%"
 	Hypothesis string `json:"hypothesis,omitempty"`
 
-	// Metric names the primary metric that should be observed (e.g. "effective_tokens").
+	// Metric names the primary metric that should be observed (e.g. "aic").
 	Metric string `json:"metric,omitempty"`
 
 	// SecondaryMetrics lists additional metrics to track alongside the primary metric.
@@ -442,7 +442,7 @@ type FrontmatterConfig struct {
 	// ModelCosts holds model pricing data in the same structure as models.json.
 	// Declared in frontmatter as the `models` field (json:"models,omitempty") using a top-level
 	// `providers` key. At runtime the activation job merges this with the built-in models.json
-	// so that custom or adjusted cost values are reflected in effective-token accounting.
+	// so that custom or adjusted cost values are reflected in AI Credits accounting.
 	// Structure: {"providers": {"<provider>": {"models": {"<model>": {"cost": {...}}}}}}
 	ModelCosts map[string]any `json:"models,omitempty"`
 	// ModelPolicyAllowed is the experimental frontmatter models.allowed (allowlist), merged as a union across imports.

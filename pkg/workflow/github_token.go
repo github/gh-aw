@@ -20,10 +20,10 @@ func combineTokenExpressions(primaryExpression, fallbackExpression string) strin
 	return wrapGitHubExpression(RenderCondition(combined))
 }
 
-// getEffectiveGitHubToken returns the GitHub token to use, with precedence:
+// resolveGitHubToken returns the GitHub token to use, with precedence:
 // 1. Custom token passed as parameter (e.g., from tool-specific config)
 // 2. Default fallback: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-func getEffectiveGitHubToken(customToken string) string {
+func resolveGitHubToken(customToken string) string {
 	if customToken != "" {
 		tokenLog.Print("Using custom GitHub token")
 		return customToken
@@ -32,11 +32,11 @@ func getEffectiveGitHubToken(customToken string) string {
 	return "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
 }
 
-// getEffectiveSafeOutputGitHubToken returns the GitHub token to use for safe output operations, with precedence:
+// resolveSafeOutputGitHubToken returns the GitHub token to use for safe output operations, with precedence:
 // 1. Custom token passed as parameter (e.g., from per-output config)
 // 2. Default fallback: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 // This simpler chain ensures safe outputs use: safe outputs token -> GH_AW_GITHUB_TOKEN -> GitHub Actions token
-func getEffectiveSafeOutputGitHubToken(customToken string) string {
+func resolveSafeOutputGitHubToken(customToken string) string {
 	if customToken != "" {
 		tokenLog.Print("Using custom safe output GitHub token")
 		return customToken
@@ -120,7 +120,7 @@ func getEffectiveProjectGitHubToken(customToken string) string {
 //  3. Checkout-scoped safe-output GitHub App token (if configured for matching checkout)
 //  4. safe-outputs GitHub App minted token (if a safe-outputs github-app is configured)
 //  5. safe-outputs level PAT: safe-outputs.github-token
-//  6. Default fallback via getEffectiveSafeOutputGitHubToken()
+//  6. Default fallback via resolveSafeOutputGitHubToken()
 //
 // Per-config tokens take precedence over the GitHub App so that individual operations
 // can override the app-wide authentication with a dedicated PAT when needed.
@@ -130,7 +130,7 @@ func getEffectiveProjectGitHubToken(customToken string) string {
 //   - isCustom: true when a custom non-default token was explicitly configured (per-config PAT, app, or safe-outputs PAT)
 func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *CheckoutManager) (token string, isCustom bool) {
 	if safeOutputs == nil {
-		return getEffectiveSafeOutputGitHubToken(""), false
+		return resolveSafeOutputGitHubToken(""), false
 	}
 
 	var createPRToken string
@@ -151,7 +151,7 @@ func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Checkou
 		perConfigToken = pushToPRBranchToken
 	}
 	if perConfigToken != "" {
-		return getEffectiveSafeOutputGitHubToken(perConfigToken), true
+		return resolveSafeOutputGitHubToken(perConfigToken), true
 	}
 
 	if checkoutMgr != nil {
@@ -166,7 +166,7 @@ func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Checkou
 		if safeOutputs.GitHubApp.shouldIgnoreMissingKey() {
 			return combineTokenExpressions(
 				"${{ steps.safe-outputs-app-token.outputs.token }}",
-				getEffectiveSafeOutputGitHubToken(safeOutputs.GitHubToken),
+				resolveSafeOutputGitHubToken(safeOutputs.GitHubToken),
 			), true
 		}
 		//nolint:gosec // G101: False positive - this is a GitHub Actions expression template placeholder, not a hardcoded credential
@@ -174,10 +174,10 @@ func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Checkou
 	}
 
 	if safeOutputs.GitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.GitHubToken), true
+		return resolveSafeOutputGitHubToken(safeOutputs.GitHubToken), true
 	}
 
-	return getEffectiveSafeOutputGitHubToken(""), false
+	return resolveSafeOutputGitHubToken(""), false
 }
 
 func resolvePRCheckoutTargetRepo(safeOutputs *SafeOutputsConfig) string {
@@ -218,31 +218,31 @@ func resolveStaticCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Che
 	if checkoutMgr != nil {
 		override := checkoutMgr.GetDefaultCheckoutOverride()
 		if override != nil && override.token != "" {
-			return getEffectiveSafeOutputGitHubToken(override.token)
+			return resolveSafeOutputGitHubToken(override.token)
 		}
 	}
 
 	if safeOutputs == nil {
-		return getEffectiveSafeOutputGitHubToken("")
+		return resolveSafeOutputGitHubToken("")
 	}
 
 	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.HeadGitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.CreatePullRequests.HeadGitHubToken)
+		return resolveSafeOutputGitHubToken(safeOutputs.CreatePullRequests.HeadGitHubToken)
 	}
 	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.GitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.CreatePullRequests.GitHubToken)
+		return resolveSafeOutputGitHubToken(safeOutputs.CreatePullRequests.GitHubToken)
 	}
 	if safeOutputs.PushToPullRequestBranch != nil && safeOutputs.PushToPullRequestBranch.HeadGitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.PushToPullRequestBranch.HeadGitHubToken)
+		return resolveSafeOutputGitHubToken(safeOutputs.PushToPullRequestBranch.HeadGitHubToken)
 	}
 	if safeOutputs.PushToPullRequestBranch != nil && safeOutputs.PushToPullRequestBranch.GitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.PushToPullRequestBranch.GitHubToken)
+		return resolveSafeOutputGitHubToken(safeOutputs.PushToPullRequestBranch.GitHubToken)
 	}
 	if safeOutputs.GitHubToken != "" {
-		return getEffectiveSafeOutputGitHubToken(safeOutputs.GitHubToken)
+		return resolveSafeOutputGitHubToken(safeOutputs.GitHubToken)
 	}
 
-	return getEffectiveSafeOutputGitHubToken("")
+	return resolveSafeOutputGitHubToken("")
 }
 
 // resolveProjectToken resolves the project token using precedence:

@@ -103,6 +103,68 @@ describe("handle_agent_failure", () => {
     });
   });
 
+  it("does not handle an AI credits rate-limit signal when the agent succeeded", async () => {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const agentOutputPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aw-agent-output-")), "output.json");
+    fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_discussion" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
+    process.env.GH_AW_AIC = "1";
+
+    try {
+      await main();
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("skipping failure handling"));
+    } finally {
+      fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_AGENT_CONCLUSION;
+      delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+      delete process.env.GH_AW_AIC;
+    }
+  });
+
+  it("handles an AI credits rate-limit signal when the agent failed", async () => {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const agentOutputPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aw-agent-output-")), "output.json");
+    fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_discussion" }] }));
+    process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+    process.env.GH_AW_AGENT_CONCLUSION = "failure";
+    process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
+    process.env.GH_AW_AIC = "1";
+    const createIssueMock = vi.fn(async () => ({
+      data: { number: 99, html_url: "https://github.com/owner/repo/issues/99", node_id: "I_99" },
+    }));
+    global.github = {
+      rest: {
+        search: {
+          issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })),
+        },
+        issues: {
+          create: createIssueMock,
+          createComment: vi.fn(),
+        },
+        pulls: { get: vi.fn() },
+      },
+      graphql: vi.fn(),
+    };
+
+    try {
+      await main();
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] unknown hit AI credits rate limit" }));
+    } finally {
+      fs.rmSync(path.dirname(agentOutputPath), { recursive: true, force: true });
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_AGENT_CONCLUSION;
+      delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+      delete process.env.GH_AW_AIC;
+    }
+  });
+
   describe("buildFailureIssueTitle", () => {
     const baseOptions = {
       workflowName: "Test Workflow",
@@ -2537,6 +2599,83 @@ describe("handle_agent_failure", () => {
   // buildEngineFailureContext
   // ──────────────────────────────────────────────────────
 
+  describe("buildSafeOutputsCliInvocationContext", () => {
+    let buildSafeOutputsCliInvocationContext;
+    let isDroppedPipeSafeOutputsCommand;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+
+    /** @type {string} */
+    let tmpDir;
+    /** @type {string} */
+    let stdioLogPath;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-"));
+      stdioLogPath = path.join(tmpDir, "agent-stdio.log");
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
+      ({ buildSafeOutputsCliInvocationContext, isDroppedPipeSafeOutputsCommand } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      if (fs.existsSync(tmpDir)) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("returns empty string when the transcript is missing", () => {
+      expect(buildSafeOutputsCliInvocationContext()).toBe("");
+    });
+
+    it("returns empty string when the transcript has no safeoutputs commands", () => {
+      fs.writeFileSync(stdioLogPath, "analysis complete\nnothing to report\n");
+      expect(buildSafeOutputsCliInvocationContext()).toBe("");
+    });
+
+    it("lists safeoutputs commands found in the transcript", () => {
+      fs.writeFileSync(stdioLogPath, `printf '{"message":"no action needed"}' | safeoutputs noop .\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("safeoutputs` commands found in the agent transcript");
+      expect(result).toContain("safeoutputs noop .");
+      expect(result).not.toContain("never ran");
+    });
+
+    it("diagnoses a dropped pipe before safeoutputs", () => {
+      fs.writeFileSync(stdioLogPath, `printf '{"message":"no action needed"}' safeoutputs noop .\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("the CLI never ran");
+      expect(result).toContain('safeoutputs <tool> \'{"key":"value"}\'');
+    });
+
+    it("deduplicates repeated commands", () => {
+      fs.writeFileSync(stdioLogPath, `safeoutputs noop --message "done"\nsafeoutputs noop --message "done"\n`);
+      const result = buildSafeOutputsCliInvocationContext();
+      const occurrences = result.split(`safeoutputs noop --message "done"`).length - 1;
+      expect(occurrences).toBe(1);
+    });
+
+    it("classifies piped and unpiped invocations", () => {
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' safeoutputs noop .`)).toBe(true);
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":"x"}' | safeoutputs noop .`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{"message":">"}' safeoutputs noop .`)).toBe(true);
+      expect(isDroppedPipeSafeOutputsCommand(`mkdir -p out; printf '{"message":"x"}' safeoutputs noop .`)).toBe(true);
+      expect(isDroppedPipeSafeOutputsCommand(`echo "$(safeoutputs noop .)"`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand(`printf '{}' $(safeoutputs noop .)`)).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand("printf '{}' `safeoutputs noop .`")).toBe(false);
+      expect(isDroppedPipeSafeOutputsCommand(`safeoutputs noop --message "x"`)).toBe(false);
+    });
+
+    it("does not render Markdown fence delimiters from command excerpts", () => {
+      fs.writeFileSync(stdioLogPath, "safeoutputs noop --message '```\\n'");
+      const result = buildSafeOutputsCliInvocationContext();
+      expect(result).toContain("````bash");
+      expect(result).toContain("'```");
+    });
+  });
+
   describe("buildEngineFailureContext", () => {
     let buildEngineFailureContext;
     const fs = require("fs");
@@ -2847,6 +2986,25 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("Last agent output");
       expect(result).not.toContain("stdout: undefined");
       expect(result).not.toContain("stderr: undefined");
+    });
+
+    it("surfaces AWF fatal startup errors instead of a generic transient failure", () => {
+      const lines = [
+        "[INFO] Auto-detected DNS servers from /run/systemd/resolve/resolv.conf: 10.0.0.2",
+        "[INFO] Agent timeout set to 60 minutes",
+        '[ERROR] Fatal error: Error: "/run/awf-cloud-hypervisor/trusted-artifacts/run-xfjXPe/cloud-hypervisor --version" exited with code undefined: ',
+        "    at Object.runVersion (/usr/local/lib/awf/awf-bundle.js:928:11170)",
+        "[INFO] Squid logs available at: /tmp/gh-aw/sandbox/firewall/logs",
+        "Process exiting with code: 1",
+      ];
+      fs.writeFileSync(stdioLogPath, lines.join("\n") + "\n");
+
+      const result = buildEngineFailureContext();
+
+      expect(result).toContain("Engine Failure");
+      expect(result).toContain("Error details:");
+      expect(result).toContain("cloud-hypervisor --version");
+      expect(result).not.toContain("transient infrastructure issue");
     });
 
     it("detects Fatal: prefix pattern", () => {

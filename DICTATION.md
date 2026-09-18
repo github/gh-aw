@@ -79,7 +79,6 @@ docker-host
 domains
 dry-run
 edit
-effective-tokens
 effort
 engine
 engine.api-target

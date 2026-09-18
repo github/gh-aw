@@ -17,8 +17,8 @@ experiments:
   sub_agent_strategy:
     variants: [per_scenario, batch]
     description: "Test whether batch scenario testing reduces token costs vs. per-scenario sub-agent calls"
-    hypothesis: "H0: no change in effective_tokens or duration. H1: batch reduces tokens by ≥20% and duration by ≥15% without quality loss"
-    metric: effective_tokens
+    hypothesis: "H0: no change in aic or duration. H1: batch reduces tokens by ≥20% and duration by ≥15% without quality loss"
+    metric: aic
     secondary_metrics: [run_duration_minutes, scenarios_tested, output_quality_score]
     guardrail_metrics:
       - name: issue_created

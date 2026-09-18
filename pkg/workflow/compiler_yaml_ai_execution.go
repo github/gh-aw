@@ -36,12 +36,21 @@ func generateComponentExecutionEvidenceStep(component, state, filePath, conditio
 }
 
 func componentExecutionEvidenceShellLines(component, state, filePath string) []string {
-	return []string{
+	lines := []string{
 		fmt.Sprintf("mkdir -p %q", path.Dir(filePath)),
 		fmt.Sprintf("evidence_tmp=%q", filePath+".tmp"),
 		fmt.Sprintf("printf '{\"version\":1,\"component\":\"%s\",\"run_id\":%%s,\"run_attempt\":%%s,\"state\":\"%s\"}\\n' \"$GITHUB_RUN_ID\" \"$GITHUB_RUN_ATTEMPT\" > \"$evidence_tmp\"", component, state),
 		fmt.Sprintf("mv \"$evidence_tmp\" %q", filePath),
 	}
+	if state == "started" {
+		// run_awf_with_startup_retries.sh downgrades this evidence back to
+		// "not_started" when AWF fails before the engine harness starts.
+		lines = append(lines,
+			fmt.Sprintf("export GH_AW_AWF_EXECUTION_COMPONENT=%q", component),
+			fmt.Sprintf("export GH_AW_AWF_EXECUTION_EVIDENCE_FILE=%q", filePath),
+		)
+	}
+	return lines
 }
 
 func injectComponentExecutionStartedInShellScript(command, component, filePath string) string {

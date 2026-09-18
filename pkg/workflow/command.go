@@ -61,6 +61,8 @@ func buildEventAwareCommandCondition(commandNames []string, commandEvents []stri
 			commandText := "/" + commandName
 			commandWithSpace := fmt.Sprintf("/%s ", commandName)
 			commandWithNewline := fmt.Sprintf("/%s\n", commandName)
+			// Covers both "\r\n" (CRLF, as used by the GitHub web editor) and a bare "\r"
+			commandWithCR := fmt.Sprintf("/%s\r", commandName)
 
 			// Check for exact match (command without arguments)
 			exactMatch := BuildEquals(
@@ -80,11 +82,20 @@ func buildEventAwareCommandCondition(commandNames []string, commandEvents []stri
 				BuildStringLiteral(commandWithNewline),
 			)
 
-			// Combine: exact match OR starts with space OR starts with newline
+			// Check for command followed by a carriage return (CRLF line endings, e.g. GitHub web editor)
+			startsWithCRMatch := BuildFunctionCall("startsWith",
+				BuildPropertyAccess(bodyAccessor),
+				BuildStringLiteral(commandWithCR),
+			)
+
+			// Combine: exact match OR starts with space OR starts with newline OR starts with carriage return
 			commandCheck := &OrNode{
 				Left: &OrNode{
-					Left:  startsWithMatch,
-					Right: startsWithNewlineMatch,
+					Left: &OrNode{
+						Left:  startsWithMatch,
+						Right: startsWithNewlineMatch,
+					},
+					Right: startsWithCRMatch,
 				},
 				Right: exactMatch,
 			}

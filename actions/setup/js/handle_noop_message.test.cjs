@@ -708,65 +708,6 @@ safe-outputs:
     expect(commentCall.body).not.toContain("<script>");
   });
 
-  it("should not include effective token count in footer when GH_AW_EFFECTIVE_TOKENS is set", async () => {
-    process.env.GH_AW_WORKFLOW_NAME = "Token Test Workflow";
-    process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/123";
-    process.env.GH_AW_AGENT_CONCLUSION = "success";
-    process.env.GH_AW_EFFECTIVE_TOKENS = "12500";
-
-    // Create agent output file with only noop outputs
-    const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(
-      outputFile,
-      JSON.stringify({
-        items: [{ type: "noop", message: "No action needed" }],
-      })
-    );
-    process.env.GH_AW_AGENT_OUTPUT = outputFile;
-
-    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
-      data: { total_count: 1, items: [{ number: 1, node_id: "ID", html_url: "url" }] },
-    });
-
-    mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
-
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
-    await main();
-
-    const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).not.toContain("12.5K");
-  });
-
-  it("should not include effective token count in footer when GH_AW_EFFECTIVE_TOKENS is not set", async () => {
-    process.env.GH_AW_WORKFLOW_NAME = "No Token Workflow";
-    process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/456";
-    process.env.GH_AW_AGENT_CONCLUSION = "success";
-    delete process.env.GH_AW_EFFECTIVE_TOKENS;
-
-    // Create agent output file with only noop outputs
-    const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(
-      outputFile,
-      JSON.stringify({
-        items: [{ type: "noop", message: "Nothing to do" }],
-      })
-    );
-    process.env.GH_AW_AGENT_OUTPUT = outputFile;
-
-    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
-      data: { total_count: 1, items: [{ number: 1, node_id: "ID", html_url: "url" }] },
-    });
-
-    mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
-
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
-    await main();
-
-    const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).not.toContain("●");
-    expect(commentCall.body).toContain("> Generated from [No Token Workflow](https://github.com/test/test/actions/runs/456)");
-  });
-
   it("should include AIC suffix in comment footer when GH_AW_AIC is set", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "AIC Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/123";

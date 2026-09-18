@@ -54,8 +54,8 @@ experiments:
   prompt_compression:
     variants: [verbose, caveman]
     description: "Test whether extreme prompt compression preserves output quality for meta-orchestrator workflows"
-    hypothesis: "H0: no change in effective_tokens. H1: caveman reduces tokens by ≥20% while maintaining quality ≥90%"
-    metric: effective_tokens
+    hypothesis: "H0: no change in aic. H1: caveman reduces tokens by ≥20% while maintaining quality ≥90%"
+    metric: aic
     secondary_metrics: [run_duration_seconds, issues_created, discussion_engagement_score, assessment_completeness_score]
     guardrail_metrics:
       - name: run_success_rate

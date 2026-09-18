@@ -105,7 +105,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 			CustomArgs:            customArgs,
 			IncludeTypeField:      r.options.IncludeCopilotFields,
 			AllowedTools:          getGitHubAllowedTools(githubTool),
-			EffectiveToken:        "", // Token passed via env
+			ResolvedToken:         "", // Token passed via env
 			GuardPolicies:         explicitGuardPolicies,
 			EmitRequiredFalse:     emitRequiredFalse,
 			ContainerPinMappings:  r.options.ContainerPinMappings,

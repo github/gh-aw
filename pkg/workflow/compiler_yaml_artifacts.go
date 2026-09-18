@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -58,9 +59,9 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	compilerYamlArtifactsLog.Printf("Generated unified artifact upload step with %d paths", len(paths))
 }
 
-// generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing only
-// the processed agent output JSON and the raw safe-output NDJSON. These files are also part of the
-// unified "agent" artifact, but that artifact is large and its upload is best-effort
+// generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing
+// processed agent output and accounting evidence. These files are also part of the unified
+// "agent" artifact, but that artifact is large and its upload is best-effort
 // (continue-on-error). When the upload times out, downstream jobs cannot download the agent
 // artifact and every safe output is silently dropped. Uploading the few-KB payload separately
 // gives those jobs a reliable fallback source.
@@ -73,12 +74,22 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 	paths := []string{
 		constants.TmpGhAwDirSlash + constants.AgentOutputFilename.String(),
 		constants.TmpGhAwDirSlash + constants.SafeOutputsFilename.String(),
+		agentExecutionEvidencePath,
+		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
+		constants.TmpGhAwDirSlash + "agent_usage.json",
+		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		filepath.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		filepath.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
 	}
 
 	// Include grader manifest/results in the fallback so detection and downstream
 	// jobs have reliable access even when the large unified artifact times out.
 	if data.Graders != nil && data.Graders.HasGraders() {
 		paths = append(paths, collectGraderArtifactPaths(data.Graders)...)
+	}
+
+	if isArcDindTopology(data) {
+		paths = rewriteTmpGhAwPathsForArcDind(paths)
 	}
 
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent output fallback artifact", paths)

@@ -32,20 +32,25 @@ echo
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-echo "Test 1: allowed GITHUB_TOKEN passes in property and bracket syntax..."
+echo "Test 1: allowed GITHUB_TOKEN syntax and actions write permission pass..."
 T1="$TMP_ROOT/t1"
 T1_CGO="$T1/.github/workflows/cgo.yml"
 T1_CJS="$T1/.github/workflows/cjs.yml"
+T1_ACTIONS_WRITE="$T1/.github/workflows/actions-write.yml"
 write_workflow "$T1_CGO" "    permissions:
       contents: read
     steps:
       - run: echo \"\${{ secrets.GITHUB_TOKEN }} \${{ condition && secrets['GITHUB_TOKEN'] }}\""
 write_workflow "$T1_CJS" $'    permissions: { contents: read, actions: read }\n    steps:\n      - run: echo "${{ secrets["GITHUB_TOKEN"] }}"'
+write_workflow "$T1_ACTIONS_WRITE" "    permissions:
+      actions: write
+    steps:
+      - run: echo ok"
 T1_OUT="$TMP_ROOT/t1-output.txt"
 if (cd "$T1" && bash "$PURITY_SCRIPT" >"$T1_OUT" 2>&1); then
-  pass "allowed GITHUB_TOKEN passes in property and bracket syntax"
+  pass "allowed GITHUB_TOKEN syntax and actions write permission pass"
 else
-  fail "allowed secrets should pass" "$(cat "$T1_OUT")"
+  fail "allowed secrets and actions write permission should pass" "$(cat "$T1_OUT")"
 fi
 
 echo "Test 2: forbidden nested and bracket secrets fail..."
@@ -91,7 +96,7 @@ write_workflow "$T4_CGO" "    permissions:
       contents: \"write\"
     steps:
       - run: echo ok"
-write_workflow "$T4_CJS" "    permissions: { contents: read, actions: 'write' }
+write_workflow "$T4_CJS" "    permissions: { contents: read, issues: 'write' }
     steps:
       - run: echo ok"
 write_workflow "$T4_SCALAR" "    permissions: 'write-all'
@@ -100,7 +105,7 @@ write_workflow "$T4_SCALAR" "    permissions: 'write-all'
 T4_OUT="$TMP_ROOT/t4-output.txt"
 if (cd "$T4" && bash "$PURITY_SCRIPT" block.yml flow.yml scalar.yml >"$T4_OUT" 2>&1); then
   fail "write permissions should exit 1" "$(cat "$T4_OUT")"
-elif grep -q "contents: \"write\"" "$T4_OUT" && grep -q "actions: 'write'" "$T4_OUT" && grep -q "write-all" "$T4_OUT"; then
+elif grep -q "contents: \"write\"" "$T4_OUT" && grep -q "issues: 'write'" "$T4_OUT" && grep -q "write-all" "$T4_OUT"; then
   pass "block, flow, and quoted write permissions fail"
 else
   fail "write permission output was incorrect" "$(cat "$T4_OUT")"

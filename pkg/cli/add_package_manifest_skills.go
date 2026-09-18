@@ -126,6 +126,7 @@ func resolvePackageSkillDirFiles(ctx context.Context, owner, repo, ref, host, sk
 // auto-scanned for .md files.
 func resolvePackageAgentFiles(ctx context.Context, owner, repo, packagePath, ref, host string, explicitAgentFiles []string) ([]string, []string, error) {
 	if len(explicitAgentFiles) > 0 {
+		addPackageManifestLog.Printf("Using %d explicit agent file(s) from manifest for %s/%s", len(explicitAgentFiles), owner, repo)
 		var agentFiles []string
 		for _, f := range explicitAgentFiles {
 			if strings.HasPrefix(filepath.ToSlash(f), constants.GithubDir) {
@@ -153,6 +154,7 @@ func resolvePackageAgentFiles(ctx context.Context, owner, repo, packagePath, ref
 			}
 		}
 	}
+	addPackageManifestLog.Printf("Auto-scanned %d agent file(s) for %s/%s (path=%q)", len(agentFiles), owner, repo, packagePath)
 	return agentFiles, nil, nil
 }
 
@@ -214,6 +216,7 @@ func scanRepositoryPackageInstallablePaths(ctx context.Context, owner, repo, pac
 		}
 	}
 
+	addPackageManifestLog.Printf("Scanned %d installable path(s) under %s/%s (path=%q)", len(collected), owner, repo, packagePath)
 	return collected, nil
 }
 
@@ -224,6 +227,7 @@ func resolveRepositoryPackageDocsPath(ctx context.Context, owner, repo, packageP
 	if _, err := downloadPackageFileFromGitHubForHost(ctx, owner, repo, readmePath, ref, host); err == nil {
 		return readmePath, nil
 	} else if isRepositoryFileNotFound(err) {
+		addPackageManifestLog.Printf("Package %s missing required README.md at %q", packageID, readmePath)
 		return "", fmt.Errorf("repository %q is not a valid Agentic Workflow package: missing required README.md at %q. Add a README.md describing the package. Example:\n# My Package\n\nDescribe what this package does", packageID, readmePath)
 	} else {
 		return "", fmt.Errorf("failed to read package README %q from %s/%s@%s (check the repository, ref, and network connectivity): %w", readmePath, owner, repo, ref, err)

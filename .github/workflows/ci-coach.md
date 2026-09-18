@@ -17,6 +17,7 @@ network:
   allowed:
     - defaults
     - node
+    - go
 engine:
   id: copilot
   copilot-sdk: true

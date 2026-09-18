@@ -45,6 +45,8 @@ safe-outputs:
 
 When someone types /review in a pull request comment, perform a thorough analysis of the changes.
 
+Triggering comment (sanitized): "${{ steps.sanitized.outputs.text }}"
+
 Examine the diff for potential bugs, security vulnerabilities, performance implications, code style issues, and missing tests or documentation.
 
 Create specific review comments on relevant lines of code and add a summary comment with overall observations and recommendations.

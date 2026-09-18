@@ -8,7 +8,7 @@ func generateAgenticWorkflowsInstallStep(c *Compiler, yaml *strings.Builder, has
 	}
 
 	cliVersion := resolveAgenticWorkflowsCLIVersion(c, workflowData)
-	effectiveToken := getEffectiveGitHubToken("")
+	resolvedToken := resolveGitHubToken("")
 	actionRepo := GitHubActionsOrgRepo + "/setup-cli"
 	installStep, err := generateGhAwSetupStep(ghAwSetupStepConfig{
 		actionMode:           c.actionMode,
@@ -17,7 +17,7 @@ func generateAgenticWorkflowsInstallStep(c *Compiler, yaml *strings.Builder, has
 		fallbackActionRefTag: cliVersion,
 		workflowData:         workflowData,
 		withFields: map[string]string{
-			"github-token": effectiveToken,
+			"github-token": resolvedToken,
 		},
 	})
 	if err != nil {

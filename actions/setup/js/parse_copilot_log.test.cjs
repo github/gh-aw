@@ -513,7 +513,7 @@ describe("parse_copilot_log.cjs", () => {
             content: [
               {
                 type: "text",
-                text: "[AWF TOKEN WARNING] You have used 90% of your effective token budget. Complete your current task and prepare final output.",
+                text: "[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output.",
               },
             ],
           },
@@ -524,7 +524,7 @@ describe("parse_copilot_log.cjs", () => {
       const result = parseCopilotLog(structuredLog);
 
       expect(result.markdown).toContain("Firewall Steering");
-      expect(result.markdown).toContain("[AWF TOKEN WARNING] You have used 90% of your effective token budget.");
+      expect(result.markdown).toContain("[AWF TOKEN WARNING] You have used 90% of your AI Credits budget.");
     });
   });
 

@@ -42,6 +42,10 @@ describe("prefer-actions-exec-over-child-process", () => {
         // Modules without the github-script marker have no `exec` global available
         { code: `const { execSync } = require("child_process"); execSync("git status");` },
         { code: `const { execFileSync } = require("child_process"); execFileSync("git", ["status"]);` },
+        // Dual-mode modules that also require ./shim.cjs can run standalone, where shim.cjs only
+        // polyfills core/context — never exec — so the @actions/exec global cannot be assumed
+        { code: ghScript(`require("./shim.cjs"); const { execFileSync } = require("child_process"); execFileSync("git", ["status"]);`) },
+        { code: ghScript(`require('./shim.cjs'); const { execSync } = require("child_process"); execSync("git status");`) },
         // exec() / execFile() calls that retain the ChildProcess handle for streaming or lifecycle control
         { code: ghScript(`const { execFile } = require("child_process"); const child = execFile("git", ["status"], cb); child.stdin.end();`) },
         { code: ghScript(`const { exec } = require("child_process"); const child = exec("git status"); child.kill();`) },

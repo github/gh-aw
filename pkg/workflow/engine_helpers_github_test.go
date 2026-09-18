@@ -15,7 +15,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 		notFound []string // Substrings that should NOT be in the output
 	}{
 		{
-			name: "Claude engine configuration (no type field, with effective token)",
+			name: "Claude engine configuration (no type field, with resolved token)",
 			options: GitHubMCPDockerOptions{
 				ReadOnly:           false,
 				Toolsets:           "default",
@@ -23,7 +23,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         nil,
 				IncludeTypeField:   false,
 				AllowedTools:       nil,
-				EffectiveToken:     "${{ secrets.GITHUB_TOKEN }}",
+				ResolvedToken:      "${{ secrets.GITHUB_TOKEN }}",
 			},
 			expected: []string{
 				`"container": "ghcr.io/github/github-mcp-server:latest"`,
@@ -40,7 +40,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "Copilot engine configuration (with type field, no effective token)",
+			name: "Copilot engine configuration (with type field, no resolved token)",
 			options: GitHubMCPDockerOptions{
 				ReadOnly:           false,
 				Toolsets:           "default",
@@ -48,7 +48,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         nil,
 				IncludeTypeField:   true,
 				AllowedTools:       []string{"create_issue", "issue_read"},
-				EffectiveToken:     "",
+				ResolvedToken:      "",
 			},
 			expected: []string{
 				`"type": "stdio"`,
@@ -73,7 +73,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         nil,
 				IncludeTypeField:   false,
 				AllowedTools:       nil,
-				EffectiveToken:     "",
+				ResolvedToken:      "",
 			},
 			expected: []string{
 				`"container": "ghcr.io/github/github-mcp-server:v1.0.0"`,
@@ -96,7 +96,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         []string{"--verbose", "--debug"},
 				IncludeTypeField:   false,
 				AllowedTools:       nil,
-				EffectiveToken:     "",
+				ResolvedToken:      "",
 			},
 			expected: []string{
 				`"container": "ghcr.io/github/github-mcp-server:latest"`,
@@ -117,7 +117,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         nil,
 				IncludeTypeField:   true,
 				AllowedTools:       nil, // When nil, should default to wildcard
-				EffectiveToken:     "",
+				ResolvedToken:      "",
 			},
 			expected: []string{
 				`"type": "stdio"`,
@@ -137,7 +137,7 @@ func TestRenderGitHubMCPDockerConfig(t *testing.T) {
 				CustomArgs:         nil,
 				IncludeTypeField:   false,
 				AllowedTools:       nil,
-				EffectiveToken:     "",
+				ResolvedToken:      "",
 			},
 			expected: []string{
 				`"container": "ghcr.io/github/github-mcp-server:latest"`,
@@ -182,7 +182,7 @@ func TestRenderGitHubMCPDockerConfig_OutputStructure(t *testing.T) {
 		CustomArgs:         []string{"--test"},
 		IncludeTypeField:   true,
 		AllowedTools:       []string{"tool1", "tool2"},
-		EffectiveToken:     "",
+		ResolvedToken:      "",
 	})
 
 	output := yaml.String()

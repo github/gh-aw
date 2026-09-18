@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: Unknown (PR authored by `app/copilot-swe-agent`; human deciders TBD)
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -12,17 +11,17 @@
 
 ### Context
 
-Users of `gh-aw` want to project the future cost and yield of their agentic workflows before scheduling them at higher cadence or rolling them out organization-wide. Historical run data is highly variable: per-run effective token usage can vary by an order of magnitude depending on agent decisions, runs per period follow a counting process, and not every run succeeds. A naive point estimate (e.g. `avg(tokens) × avg(runs/period)`) hides this uncertainty and tends to under-state tail risk. The command must also integrate with existing analysis infrastructure (episode classification, A/B experiment variant tracking, JSON output for agent consumers) and remain useful on small samples (≤30 days of history).
+Users of `gh-aw` want to project the future cost and yield of their agentic workflows before scheduling them at higher cadence or rolling them out organization-wide. Historical run data is highly variable: per-run AI Credit usage can vary by an order of magnitude depending on agent decisions, runs per period follow a counting process, and not every run succeeds. A naive point estimate (e.g. `avg(tokens) × avg(runs/period)`) hides this uncertainty and tends to under-state tail risk. The command must also integrate with existing analysis infrastructure (episode classification, A/B experiment variant tracking, JSON output for agent consumers) and remain useful on small samples (≤30 days of history).
 
 ### Decision
 
-We will introduce a new **experimental** `gh aw forecast` CLI command that projects per-workflow effective token usage using **Monte Carlo simulation** (10 000 trials) rather than a single point estimate. Each trial composes three independent sources of uncertainty — Poisson-distributed run counts, bootstrap-resampled per-run effective tokens, and Bernoulli-distributed success — and the aggregated trials yield P10/P50/P90 confidence intervals. The command lives in `pkg/cli/forecast*.go`, reuses the existing `buildEpisodeData` engine from `logs_episode.go` for episode analysis, supports remote repositories via `--repo`, and is gated as experimental (stderr warning + `(experimental)` short description) because the interface and statistical assumptions may change.
+We will introduce a new **experimental** `gh aw forecast` CLI command that projects per-workflow AI Credit usage using **Monte Carlo simulation** (10 000 trials) rather than a single point estimate. Each trial composes three independent sources of uncertainty — Poisson-distributed run counts, bootstrap-resampled per-run AI Credits, and Bernoulli-distributed success — and the aggregated trials yield P10/P50/P90 confidence intervals. The command lives in `pkg/cli/forecast*.go`, reuses the existing `buildEpisodeData` engine from `logs_episode.go` for episode analysis, supports remote repositories via `--repo`, and is gated as experimental (stderr warning + `(experimental)` short description) because the interface and statistical assumptions may change.
 
 ### Alternatives Considered
 
 #### Alternative 1: Point estimates from historical averages
 
-Compute `mean(effective_tokens) × mean(runs_per_period) × success_rate` and report a single projected number per workflow. Simple, deterministic, and cheap. Rejected because it hides variance, gives users no way to reason about tail risk (which is the operationally interesting question for cost budgeting), and makes side-by-side comparisons across workflows misleading when their variance profiles differ.
+Compute `mean(aic) × mean(runs_per_period) × success_rate` and report a single projected number per workflow. Simple, deterministic, and cheap. Rejected because it hides variance, gives users no way to reason about tail risk (which is the operationally interesting question for cost budgeting), and makes side-by-side comparisons across workflows misleading when their variance profiles differ.
 
 #### Alternative 2: Closed-form analytical distribution (e.g. compound Poisson)
 
@@ -61,11 +60,11 @@ Extend the audit command instead of creating a new top-level command. Rejected b
 
 ### Projection Algorithm
 
-1. The `forecast` command **MUST** project per-workflow effective token usage using Monte Carlo simulation, not a single point estimate.
+1. The `forecast` command **MUST** project per-workflow AI Credit usage using Monte Carlo simulation, not a single point estimate.
 2. The simulation **MUST** run at least 10 000 independent trials per workflow per forecast invocation.
-3. Each trial **MUST** compose three independent random variables: run count drawn from a Poisson process, per-run effective tokens drawn by bootstrap resampling of historical observations, and per-run success drawn as a Bernoulli with the historical success rate.
+3. Each trial **MUST** compose three independent random variables: run count drawn from a Poisson process, per-run AI Credits drawn by bootstrap resampling of historical observations, and per-run success drawn as a Bernoulli with the historical success rate.
 4. The Poisson sampler **MUST** use Knuth's exact algorithm when λ ≤ 15 and **MUST** use a Normal approximation when λ > 15.
-5. The command **MUST** report P10, P50, and P90 effective-token percentiles in both the console table and JSON output.
+5. The command **MUST** report P10, P50, and P90 AI Credits percentiles in both the console table and JSON output.
 6. The command **MUST NOT** emit only a point estimate without accompanying P10/P90 bounds.
 
 ### Command Interface
@@ -73,7 +72,7 @@ Extend the audit command instead of creating a new top-level command. Rejected b
 1. The command **MUST** be registered in the `analysis` command group as `gh aw forecast`.
 2. The command **MUST** be marked experimental: its Cobra short description **MUST** include the literal substring `(experimental)`, and it **MUST** print an experimental warning to stderr at runtime.
 3. The `--days` flag **MUST** accept only the values `7` and `30`; values outside this set **MUST** be rejected with a clear error.
-4. The `--json` flag **MUST** emit the full `ForecastResult` struct including a `monte_carlo` object with `mean_projected_effective_tokens`, `std_dev_effective_tokens`, and P10/P50/P90 fields.
+4. The `--json` flag **MUST** emit the full `ForecastResult` struct including a `monte_carlo` object with `mean_projected_aic`, `std_dev_aic`, and P10/P50/P90 fields.
 5. The command **MAY** accept multiple workflow IDs as positional arguments; when omitted, it **MUST** forecast all agentic workflows discoverable in the target repository.
 6. When `--repo owner/repo` is supplied, workflow discovery **MUST** use the GitHub API (`fetchGitHubWorkflows`) and **MUST NOT** read local `.lock.yml` files for that invocation.
 7. Workflow ID matching against remote repositories **MUST** be case-insensitive against both display names and file-path basenames.

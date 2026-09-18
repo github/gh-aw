@@ -427,8 +427,8 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 		if trialLogicalRepoSlug != "" {
 			fmt.Fprintf(&sb, "          repository: %s\n", trialLogicalRepoSlug)
 		}
-		effectiveToken := getEffectiveGitHubToken("")
-		fmt.Fprintf(&sb, "          token: %s\n", effectiveToken)
+		resolvedToken := resolveGitHubToken("")
+		fmt.Fprintf(&sb, "          token: %s\n", resolvedToken)
 		tokenEmitted = true
 	}
 
@@ -454,8 +454,8 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 			sb.WriteString("          filter: 'blob:limit=1073741824'\n")
 		}
 
-		// Determine effective token: github-app-minted token takes precedence
-		effectiveOverrideToken := override.token
+		// Determine resolved token: github-app-minted token takes precedence
+		resolvedOverrideToken := override.token
 		if override.githubApp != nil {
 			// Determine the actual index of the default checkout to reference the correct
 			// app-token step ID. Do not assume it is always at index 0.
@@ -464,13 +464,13 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 				defaultIdx = idx
 			}
 			//nolint:gosec // G101: False positive - this is a GitHub Actions expression template placeholder, not a hardcoded credential
-			effectiveOverrideToken = fmt.Sprintf("${{ steps.checkout-app-token-%d.outputs.token }}", defaultIdx)
+			resolvedOverrideToken = fmt.Sprintf("${{ steps.checkout-app-token-%d.outputs.token }}", defaultIdx)
 			if override.githubApp.shouldIgnoreMissingKey() {
-				effectiveOverrideToken = combineTokenExpressions(effectiveOverrideToken, getEffectiveGitHubToken(override.token))
+				resolvedOverrideToken = combineTokenExpressions(resolvedOverrideToken, resolveGitHubToken(override.token))
 			}
 		}
-		if effectiveOverrideToken != "" {
-			fmt.Fprintf(&sb, "          token: %s\n", effectiveOverrideToken)
+		if resolvedOverrideToken != "" {
+			fmt.Fprintf(&sb, "          token: %s\n", resolvedOverrideToken)
 			tokenEmitted = true
 		}
 		if override.fetchDepth != nil {
@@ -562,16 +562,16 @@ func generateCheckoutStepLines(entry *resolvedCheckout, index int, keepCredentia
 	if entry.key.path != "" {
 		fmt.Fprintf(&sb, "          path: %s\n", entry.key.path)
 	}
-	// Determine effective token: github-app-minted token takes precedence
-	effectiveToken := resolveCheckoutTokenExpression(entry, index, false)
+	// Determine resolved token: github-app-minted token takes precedence
+	resolvedToken := resolveCheckoutTokenExpression(entry, index, false)
 	// safe_outputs job: when this checkout declares no token/app of its own, persist the
 	// resolved push token so the retained .git/config credential matches the token the
 	// safe-output handlers use to fetch/push.
-	if effectiveToken == "" && keepCredentialsForPush && pushToken != "" {
-		effectiveToken = pushToken
+	if resolvedToken == "" && keepCredentialsForPush && pushToken != "" {
+		resolvedToken = pushToken
 	}
-	if effectiveToken != "" {
-		fmt.Fprintf(&sb, "          token: %s\n", effectiveToken)
+	if resolvedToken != "" {
+		fmt.Fprintf(&sb, "          token: %s\n", resolvedToken)
 	}
 	if entry.fetchDepth != nil {
 		fmt.Fprintf(&sb, "          fetch-depth: %d\n", *entry.fetchDepth)
@@ -737,11 +737,11 @@ func resolveCheckoutTokenExpression(entry *resolvedCheckout, checkoutIndex int, 
 		//nolint:gosec // G101: False positive - this is a GitHub Actions expression template placeholder, not a hardcoded credential
 		token = fmt.Sprintf("${{ steps.checkout-app-token-%d.outputs.token }}", checkoutIndex)
 		if entry.githubApp.shouldIgnoreMissingKey() {
-			token = combineTokenExpressions(token, getEffectiveGitHubToken(entry.token))
+			token = combineTokenExpressions(token, resolveGitHubToken(entry.token))
 		}
 	}
 	if token == "" && defaultWhenEmpty {
-		token = getEffectiveGitHubToken("")
+		token = resolveGitHubToken("")
 	}
 	return token
 }

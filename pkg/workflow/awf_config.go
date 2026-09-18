@@ -161,7 +161,7 @@ type AWFAPIProxyConfig struct {
 	// for backward compatibility with older AWF versions.
 	Enabled bool `json:"enabled"`
 
-	// EnableTokenSteering enables budget-warning system message injection near ET budget exhaustion.
+	// EnableTokenSteering enables budget-warning system message injection near AIC budget exhaustion.
 	EnableTokenSteering *bool `json:"enableTokenSteering,omitempty"`
 
 	// MaxRuns is the maximum number of LLM invocations allowed for a run.
@@ -179,7 +179,7 @@ type AWFAPIProxyConfig struct {
 	// is needed for BYOK Azure OpenAI deployments where rewriting causes HTTP 404.
 	ModelFallback *AWFModelFallbackConfig `json:"modelFallback,omitempty"`
 
-	// ModelMultipliers configures per-model ET accounting multipliers in AWF.
+	// ModelMultipliers configures per-model AIC accounting multipliers in AWF.
 	ModelMultipliers map[string]float64 `json:"modelMultipliers,omitempty"`
 
 	// DefaultAiCreditsPricing is the fallback per-token pricing ($/1M tokens) for

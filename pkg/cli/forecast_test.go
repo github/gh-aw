@@ -146,7 +146,7 @@ func TestObservedRunsPerPeriodConsistency(t *testing.T) {
 		ObservedRunsPerPeriod: observedRunsPerPeriod,
 	}
 
-	// Build deterministic ET observations.
+	// Build deterministic AIC observations.
 	etObs := make([]int, sampledRuns)
 	for i := range etObs {
 		etObs[i] = 10_000 + i*500
@@ -371,7 +371,7 @@ func TestForecastWorkflow_RequestsRecentRuns(t *testing.T) {
 	assert.Empty(t, capturedOpts.Status, "forecast must request all recent run statuses so in-progress partial observations are available")
 }
 
-func TestMissingArtifactContributesZeroET(t *testing.T) {
+func TestMissingArtifactContributesZeroAIC(t *testing.T) {
 	originalList := forecastListWorkflowRunsPaginated
 	originalLoadAIC := forecastLoadRunAIC
 	t.Cleanup(func() {

@@ -12,7 +12,7 @@ experiments:
     variants: [concise, detailed]
     description: "Test whether concise prompts reduce token consumption"
     hypothesis: "H0: no change in tokens. H1: concise reduces by >=15%"
-    metric: effective_tokens
+    metric: aic
     secondary_metrics: [duration_ms, discussion_word_count]
     guardrail_metrics:
       - name: success_rate

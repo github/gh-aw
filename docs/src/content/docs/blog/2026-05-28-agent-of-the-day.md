@@ -10,7 +10,6 @@ metadata:
 ---
 
 > [!NOTE]
-> This post references historical **Effective Tokens (ET)** metrics. gh-aw now uses **AI Credits (AIC)** as the primary cost metric.
 
 Every codebase accumulates sediment. A helper function that made sense six months ago. A wrapper that lost its reason to exist after a refactor. Nobody deletes it on purpose — it just lingers. In Go, that lingering costs you: extra surface area to maintain, test coverage for code that does nothing new, and cognitive overhead for every engineer who reads the file.
 

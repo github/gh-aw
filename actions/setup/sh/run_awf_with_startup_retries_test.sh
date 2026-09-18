@@ -70,4 +70,51 @@ set -e
 [ "$STATUS" -eq 7 ] || fail "expected original post-harness failure status, got $STATUS"
 [ "$(cat "$ATTEMPT_FILE")" = "1" ] || fail "expected no retry after harness marker"
 
+run_with_evidence_env() {
+  GH_AW_AWF_ENGINE_NAME="codex" \
+    GH_AW_AWF_HARNESS_MARKER="[codex-harness]" \
+    GH_AW_AWF_LOG_FILE="$WORKDIR/agent.log" \
+    GH_AW_AWF_ATTEMPT_LOG_NAME="codex" \
+    GH_AW_HARNESS_STARTUP_RETRIES="0" \
+    GH_AW_HARNESS_INITIAL_DELAY_MS="0" \
+    GH_AW_AWF_EXECUTION_COMPONENT="agent" \
+    GH_AW_AWF_EXECUTION_EVIDENCE_FILE="$EVIDENCE_FILE" \
+    GITHUB_RUN_ID="12345" \
+    GITHUB_RUN_ATTEMPT="1" \
+    bash "$SCRIPT" -- "$@"
+}
+
+EVIDENCE_FILE="$WORKDIR/evidence/agent_execution.json"
+mkdir -p "$(dirname "$EVIDENCE_FILE")"
+printf '{"version":1,"component":"agent","run_id":12345,"run_attempt":1,"state":"started"}\n' > "$EVIDENCE_FILE"
+OUTPUT="$WORKDIR/evidence-output.log"
+set +e
+run_with_evidence_env bash -c '
+  echo "Fatal error: cloud-hypervisor --version exited with code undefined"
+  echo "Process exiting with code: 1"
+  exit 1
+' > "$OUTPUT" 2>&1
+STATUS=$?
+set -e
+
+[ "$STATUS" -eq 1 ] || fail "expected original startup failure status, got $STATUS"
+grep -Fq '"state":"not_started"' "$EVIDENCE_FILE" || fail "expected execution evidence downgraded to not_started"
+grep -Fq '"run_id":12345' "$EVIDENCE_FILE" || fail "expected run id in downgraded evidence"
+grep -Fq "recorded agent execution evidence as not_started" "$OUTPUT" || fail "expected evidence diagnostic"
+[ ! -f "${EVIDENCE_FILE}.tmp" ] || fail "expected temporary evidence file to be moved"
+
+printf '{"version":1,"component":"agent","run_id":12345,"run_attempt":1,"state":"started"}\n' > "$EVIDENCE_FILE"
+OUTPUT="$WORKDIR/evidence-marker-output.log"
+set +e
+run_with_evidence_env bash -c '
+  echo "[codex-harness] started"
+  echo "Fatal error: post-harness failure"
+  exit 3
+' > "$OUTPUT" 2>&1
+STATUS=$?
+set -e
+
+[ "$STATUS" -eq 3 ] || fail "expected original post-harness failure status, got $STATUS"
+grep -Fq '"state":"started"' "$EVIDENCE_FILE" || fail "expected execution evidence to remain started after harness ran"
+
 echo "run_awf_with_startup_retries.sh tests passed"

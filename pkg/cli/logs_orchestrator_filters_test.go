@@ -331,32 +331,6 @@ func TestBuildProcessedRun(t *testing.T) {
 		assert.InDelta(t, 0.0, pr.Run.ActionMinutes, 0.001)
 	})
 
-	t.Run("effective tokens are propagated", func(t *testing.T) {
-		stubFetchJobStatusesForProcessedRun(t, func(context.Context, int64, bool) (int, error) { return 0, nil })
-		usage := &TokenUsageSummary{TotalEffectiveTokens: 5000}
-		result := DownloadResult{RunAnalysis: RunAnalysis{
-			Run:        WorkflowRun{DatabaseID: 3},
-			TokenUsage: usage,
-		},
-			LogsPath: t.TempDir(),
-		}
-		pr := buildProcessedRun(context.Background(), result, false, false)
-		assert.Equal(t, 5000, pr.Run.EffectiveTokens)
-	})
-
-	t.Run("zero effective tokens not propagated", func(t *testing.T) {
-		stubFetchJobStatusesForProcessedRun(t, func(context.Context, int64, bool) (int, error) { return 0, nil })
-		usage := &TokenUsageSummary{TotalEffectiveTokens: 0}
-		result := DownloadResult{RunAnalysis: RunAnalysis{
-			Run:        WorkflowRun{DatabaseID: 4},
-			TokenUsage: usage,
-		},
-			LogsPath: t.TempDir(),
-		}
-		pr := buildProcessedRun(context.Background(), result, false, false)
-		assert.Equal(t, 0, pr.Run.EffectiveTokens)
-	})
-
 	t.Run("failed job count is added via test seam", func(t *testing.T) {
 		type ctxKey string
 		const key ctxKey = "request-id"

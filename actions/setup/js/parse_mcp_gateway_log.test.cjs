@@ -22,6 +22,7 @@ const {
   generateTokenUsageSummary,
   formatDurationMs,
   writeStepSummaryWithTokenUsage,
+  hasAICreditsRateLimitError,
 } = require("./parse_mcp_gateway_log.cjs");
 
 describe("parse_mcp_gateway_log", () => {
@@ -496,7 +497,7 @@ Some content here.`;
             type: "token_steering",
             request_id: "req-124",
             provider: "copilot",
-            message: "[AWF TOKEN WARNING] You have used 95% of your effective token budget. Finalize and submit your work now.",
+            message: "[AWF TOKEN WARNING] You have used 95% of your AI Credits budget. Finalize and submit your work now.",
           })
         );
 
@@ -575,7 +576,7 @@ Some content here.`;
               type: "token_steering",
               request_id: "req-123",
               provider: "copilot",
-              message: "[AWF TOKEN WARNING] You have used 90% of your effective token budget. Complete your current task and prepare final output.",
+              message: "[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output.",
             }),
           ].join("\n")
         );
@@ -1331,7 +1332,7 @@ Some content here.`;
           event: "token_steering",
           request_id: "req-123",
           provider: "copilot",
-          message: "[AWF TOKEN WARNING] You have used 90% of your effective token budget. Complete your current task and prepare final output.",
+          message: "[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output.",
         }),
         JSON.stringify({ timestamp: "2026-03-18T17:30:01Z", level: "info", event: "request_start", request_id: "req-124" }),
         JSON.stringify({
@@ -1339,7 +1340,7 @@ Some content here.`;
           type: "token_steering",
           request_id: "req-125",
           provider: "anthropic",
-          message: "[AWF TOKEN WARNING] You have used 95% of your effective token budget. Finalize and submit your work now.",
+          message: "[AWF TOKEN WARNING] You have used 95% of your AI Credits budget. Finalize and submit your work now.",
         }),
       ].join("\n");
 
@@ -1522,7 +1523,7 @@ Some content here.`;
           timestamp: "2026-03-18T17:30:00.123456789Z",
           provider: "copilot",
           request_id: "req-123",
-          message: "[AWF TOKEN WARNING] You have used 90% of your effective token budget. Complete your current task and prepare final output.",
+          message: "[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output.",
         },
       ]);
 
@@ -1531,7 +1532,7 @@ Some content here.`;
       expect(summary).toContain("2026-03-18 17:30:00Z");
       expect(summary).toContain("copilot");
       expect(summary).toContain("req-123");
-      expect(summary).toContain("[AWF TOKEN WARNING] You have used 90% of your effective token budget.");
+      expect(summary).toContain("[AWF TOKEN WARNING] You have used 90% of your AI Credits budget.");
     });
   });
 
@@ -2355,12 +2356,12 @@ not-json
       expect(firstIdx).toBeLessThan(secondIdx);
     });
 
-    test("does not include effective token columns in table", () => {
+    test("does not include deprecated cost columns in table", () => {
       const content = JSON.stringify({ model: "m", input_tokens: 100, output_tokens: 200, cache_read_tokens: 0, cache_write_tokens: 0, duration_ms: 1000 });
       const summary = parseTokenUsageJsonl(content);
       const md = generateTokenUsageSummary(summary);
       expect(md).not.toContain("| ΔET |");
-      expect(md).not.toContain("| ET |");
+      expect(md).not.toContain("| AIC |");
     });
 
     test("includes AI credits columns in table header", () => {
@@ -2369,7 +2370,7 @@ not-json
       const md = generateTokenUsageSummary(summary);
       expect(md).toContain("| ΔAI Credits |");
       expect(md).toContain("| AI Credits |");
-      expect(md).not.toContain("effective token");
+      expect(md).not.toContain("deprecated cost");
     });
 
     test("renders AIC value in totals row for known model with pricing", () => {
@@ -2400,16 +2401,26 @@ not-json
       const md = generateTokenUsageSummary(summary);
       expect(md).toContain("Legend:");
       expect(md).toContain("current AI credits pricing model");
-      expect(md).not.toContain("effective token");
+      expect(md).not.toContain("deprecated cost");
     });
 
-    test("does not include cache efficiency or effective token wording", () => {
+    test("does not include cache efficiency or deprecated cost wording", () => {
       const content = JSON.stringify({ model: "m", input_tokens: 100, output_tokens: 10, cache_read_tokens: 900, cache_write_tokens: 0, duration_ms: 100 });
       const summary = parseTokenUsageJsonl(content);
       const md = generateTokenUsageSummary(summary);
       expect(md).not.toContain("●");
       expect(md).not.toContain("Cache efficiency");
-      expect(md).not.toContain("effective token");
+      expect(md).not.toContain("deprecated cost");
     });
+  });
+});
+describe("hasAICreditsRateLimitError", () => {
+  test("ignores echoed MCP tool results and distant keywords", () => {
+    expect(hasAICreditsRateLimitError(['... tool_result ... "title":"[aw] Weekly Research hit AI credits rate limit" ...'])).toBe(false);
+    expect(hasAICreditsRateLimitError([`AI credits ${"x".repeat(81)} rate limit`])).toBe(false);
+  });
+
+  test("detects a nearby AI credits rate-limit error", () => {
+    expect(hasAICreditsRateLimitError(["CAPIError: AI credits rate limit exceeded"])).toBe(true);
   });
 });

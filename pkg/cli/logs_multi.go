@@ -37,6 +37,104 @@ type logsCountLimit struct {
 	cancelOnce sync.Once
 }
 
+type logsBatchScheduler struct {
+	mu            sync.Mutex
+	cond          *sync.Cond
+	active        map[int]struct{}
+	lastCompleted map[int]int
+	round         int
+	inFlight      int
+	maxInFlight   int
+	waiting       int
+}
+
+func newLogsBatchScheduler(ctx context.Context, targetCount, maxInFlight int) *logsBatchScheduler {
+	scheduler := &logsBatchScheduler{
+		active:        make(map[int]struct{}, targetCount),
+		lastCompleted: make(map[int]int, targetCount),
+		maxInFlight:   maxInFlight,
+	}
+	scheduler.cond = sync.NewCond(&scheduler.mu)
+	for targetID := range targetCount {
+		scheduler.active[targetID] = struct{}{}
+		scheduler.lastCompleted[targetID] = -1
+	}
+	context.AfterFunc(ctx, func() {
+		scheduler.mu.Lock()
+		scheduler.cond.Broadcast()
+		scheduler.mu.Unlock()
+	})
+	return scheduler
+}
+
+func (s *logsBatchScheduler) acquire(ctx context.Context, targetID int) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, active := s.active[targetID]; !active {
+			return context.Canceled
+		}
+		if s.lastCompleted[targetID] < s.round && s.inFlight < s.maxInFlight {
+			s.inFlight++
+			return nil
+		}
+		s.waiting++
+		s.cond.Wait()
+		s.waiting--
+	}
+}
+
+// waitingCount reports how many targets are currently parked waiting for a
+// batch turn. It exists so callers can observe that a target has actually
+// blocked rather than inferring it from timing.
+func (s *logsBatchScheduler) waitingCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waiting
+}
+
+func (s *logsBatchScheduler) release(targetID int) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inFlight--
+	s.lastCompleted[targetID] = s.round
+	s.advanceRoundIfComplete()
+	s.cond.Broadcast()
+}
+
+func (s *logsBatchScheduler) remove(targetID int) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.active, targetID)
+	delete(s.lastCompleted, targetID)
+	s.advanceRoundIfComplete()
+	s.cond.Broadcast()
+}
+
+func (s *logsBatchScheduler) advanceRoundIfComplete() {
+	for targetID := range s.active {
+		if s.lastCompleted[targetID] < s.round {
+			return
+		}
+	}
+	s.round++
+}
+
 func (l *logsCountLimit) tryAdd() bool {
 	if l == nil {
 		return true
@@ -267,7 +365,7 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 		countLimit.cancel = cancelTargets
 	}
 	shared := logsTargetSharedState{
-		sem:                make(chan struct{}, workerCount),
+		batchScheduler:     newLogsBatchScheduler(targetsCtx, len(targets), workerCount),
 		perTargetDownloads: max(1, getMaxConcurrentDownloads()/workerCount),
 		cleanupErrors:      make(map[string]error, len(targets)),
 		storageLimit:       newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns),
@@ -281,9 +379,9 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 			shared.cleanupErrors[target.displayName()] = err
 		}
 	}
-	for _, target := range targets {
+	for targetID, target := range targets {
 		wg.Go(func() {
-			resultChannel <- collectSingleLogsTarget(targetsCtx, opts, target, shared)
+			resultChannel <- collectSingleLogsTarget(targetsCtx, opts, targetID, target, shared)
 		})
 	}
 	wg.Wait()
@@ -296,10 +394,10 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 }
 
 // logsTargetSharedState bundles the resources shared by every concurrent
-// target worker: the semaphore bounding parallel downloads, the per-target
-// download share, and the storage/count budgets shared across all targets.
+// target worker: the fair batch scheduler, the per-target download share, and
+// the storage/count budgets shared across all targets.
 type logsTargetSharedState struct {
-	sem                chan struct{}
+	batchScheduler     *logsBatchScheduler
 	perTargetDownloads int
 	cleanupErrors      map[string]error
 	storageLimit       *logsStorageLimit
@@ -307,10 +405,16 @@ type logsTargetSharedState struct {
 	rateLimitState     *logsRateLimitState
 }
 
-// collectSingleLogsTarget runs one workflow target's log collection, recovering
-// from panics and building a resumable continuation when the target is still
-// waiting for a worker slot when the shared deadline or cancellation fires.
-func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) { //nolint:largefunc // Existing target collection remains centralized.
+// collectSingleLogsTarget runs one workflow target's log collection and
+// recovers from panics. Every target now starts immediately and fairness is
+// enforced per batch by the shared scheduler, so the pre-start cancellation
+// branch below is reached only in the rare race where the shared deadline or
+// cancellation fires before this goroutine is scheduled. That branch is not
+// dead code: it must still build a resumable continuation (or report the
+// shared count/rate-limit outcome) so such a target is not silently dropped
+// from the report.
+func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targetID int, target logsWorkflowTarget, shared logsTargetSharedState) (targetResult logsTargetResult) { //nolint:largefunc // Existing target collection remains centralized.
+	defer shared.batchScheduler.remove(targetID)
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			targetResult = logsTargetResult{target: target, err: fmt.Errorf("workflow collector panicked: %v", recovered)}
@@ -333,6 +437,8 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	targetOpts.storageLimit = shared.storageLimit
 	targetOpts.countLimit = shared.countLimit
 	targetOpts.rateLimitState = shared.rateLimitState
+	targetOpts.batchScheduler = shared.batchScheduler
+	targetOpts.batchTargetID = targetID
 	// The shared deadline is already installed on ctx by the caller, so the
 	// target must not build a second timeout context of its own. TimeoutMinutes
 	// and TimeoutSeconds are deliberately preserved (rather than zeroed) so the
@@ -343,30 +449,6 @@ func collectSingleLogsTarget(ctx context.Context, opts LogsDownloadOptions, targ
 	if shared.countLimit.isReached() {
 		logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached", target.displayName())
 		return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
-	}
-	select {
-	case shared.sem <- struct{}{}:
-		defer func() { <-shared.sem }()
-	case <-ctx.Done():
-		if shared.countLimit.isReached() {
-			// ctx was canceled because another target already filled the
-			// shared budget, not because of a real timeout/cancellation;
-			// treat this exactly like the ordinary pre-start check above.
-			logsOrchestratorLog.Printf("Skipping workflow target %s: shared maximum run count reached while queued", target.displayName())
-			return logsTargetResult{target: target, result: countLimitedLogsTargetResult(targetOpts)}
-		}
-		if shared.rateLimitState.isReached() {
-			return logsTargetResult{target: target, result: rateLimitedLogsTargetResult(targetOpts), err: errLogsAPIRateLimitReached}
-		}
-		// The target never started (e.g. it was still queued behind the
-		// semaphore when the shared deadline or cancellation fired). Build a
-		// continuation from its own options so a resumable date-range target
-		// is not silently dropped from the report.
-		return logsTargetResult{
-			target: target,
-			result: queuedLogsTargetResult(targetOpts, ctx),
-			err:    ctx.Err(),
-		}
 	}
 	if err := ctx.Err(); err != nil {
 		if shared.countLimit.isReached() {

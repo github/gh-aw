@@ -209,6 +209,68 @@ func TestExperimentExpressionMappings(t *testing.T) {
 	assert.Equal(t, "steps.pick-experiment.outputs.style", m2.Content, "content should be the step output expression")
 }
 
+func TestRewriteExperimentsReferenceForDownstreamJobs(t *testing.T) {
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+	assert.Equal(t, "${{ needs.activation.outputs.model }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }}", experiments))
+	assert.Equal(t, "no reference here", RewriteExperimentsReferenceForDownstreamJobs("no reference here", experiments))
+	// Undeclared experiment names are left untouched.
+	assert.Equal(t, "${{ experiments.unknown }}", RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.unknown }}", experiments))
+}
+
+func TestRewriteActivationOutputsToLocalStepOutputs(t *testing.T) {
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.model }}", experiments))
+	assert.Equal(t, "no reference here", RewriteActivationOutputsToLocalStepOutputs("no reference here", experiments))
+	// Undeclared experiment names are left untouched.
+	assert.Equal(t, "${{ needs.activation.outputs.unknown }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.unknown }}", experiments))
+}
+
+// TestRewriteExperimentPrefixCollision guards against one declared experiment name being a
+// prefix of another (e.g. "model" and "model_variant"); the word-boundary-anchored regex
+// rewrite must not partially corrupt the longer name's reference while rewriting the shorter
+// one.
+func TestRewriteExperimentPrefixCollision(t *testing.T) {
+	experiments := map[string][]string{
+		"model":         {"a", "b"},
+		"model_variant": {"x", "y"},
+	}
+	got := RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model }} ${{ experiments.model_variant }}", experiments)
+	assert.Equal(t, "${{ needs.activation.outputs.model }} ${{ needs.activation.outputs.model_variant }}", got)
+
+	back := RewriteActivationOutputsToLocalStepOutputs(got, experiments)
+	assert.Equal(t, "${{ steps.pick-experiment.outputs.model }} ${{ steps.pick-experiment.outputs.model_variant }}", back)
+}
+
+// TestRewriteExperimentsReferenceOnlyRewritesExpressionTokens guards against the rewrite
+// mutating text that merely looks like an experiment reference: plain text outside an
+// expression, string literals inside an expression, and property chains where
+// `experiments.<name>` is not a standalone reference.
+func TestRewriteExperimentsReferenceOnlyRewritesExpressionTokens(t *testing.T) {
+	experiments := map[string][]string{"model": {"sonnet", "opus"}}
+
+	// Plain text outside ${{ }} is not an expression.
+	assert.Equal(t, "experiments.model", RewriteExperimentsReferenceForDownstreamJobs("experiments.model", experiments))
+
+	// String literals inside an expression are data, not references.
+	literal := "${{ format('experiments.model-{0}', inputs.suffix) }}"
+	assert.Equal(t, literal, RewriteExperimentsReferenceForDownstreamJobs(literal, experiments))
+
+	// A literal containing an escaped quote must not desynchronize literal detection.
+	escaped := "${{ format('it''s experiments.model', experiments.model) }}"
+	assert.Equal(t, "${{ format('it''s experiments.model', needs.activation.outputs.model) }}",
+		RewriteExperimentsReferenceForDownstreamJobs(escaped, experiments))
+
+	// Property chains are not experiment placeholders.
+	nested := "${{ fromJSON(inputs.config).experiments.model }}"
+	assert.Equal(t, nested, RewriteExperimentsReferenceForDownstreamJobs(nested, experiments))
+	suffixed := "${{ experiments.model.foo }}"
+	assert.Equal(t, suffixed, RewriteExperimentsReferenceForDownstreamJobs(suffixed, experiments))
+
+	// Composite expressions still rewrite the standalone reference.
+	assert.Equal(t, "${{ needs.activation.outputs.model || 'sonnet' }}",
+		RewriteExperimentsReferenceForDownstreamJobs("${{ experiments.model || 'sonnet' }}", experiments))
+}
+
 // ── buildExperimentArtifactDownloadSteps ──────────────────────────────────
 
 func TestBuildExperimentArtifactDownloadStep_Empty(t *testing.T) {
@@ -289,7 +351,7 @@ func TestExtractExperimentConfigsFromFrontmatter(t *testing.T) {
 					"prompt_style": map[string]any{
 						"variants":    []any{"concise", "verbose"},
 						"description": "Test prompt styles",
-						"metric":      "effective_tokens",
+						"metric":      "aic",
 						"weight":      []any{60.0, 40.0},
 						"issue":       float64(1234),
 						"start_date":  "2026-05-01",
@@ -303,7 +365,7 @@ func TestExtractExperimentConfigsFromFrontmatter(t *testing.T) {
 				require.NotNil(t, cfg, "prompt_style config should exist")
 				assert.Equal(t, []string{"concise", "verbose"}, cfg.Variants, "variants should match")
 				assert.Equal(t, "Test prompt styles", cfg.Description, "description should match")
-				assert.Equal(t, "effective_tokens", cfg.Metric, "metric should match")
+				assert.Equal(t, "aic", cfg.Metric, "metric should match")
 				assert.Equal(t, []int{60, 40}, cfg.Weight, "weight should match")
 				assert.Equal(t, 1234, cfg.Issue, "issue should match")
 				assert.Equal(t, "2026-05-01", cfg.StartDate, "start_date should match")

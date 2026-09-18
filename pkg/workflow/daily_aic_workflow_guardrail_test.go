@@ -83,7 +83,7 @@ func TestResolveMaxDailyAIC(t *testing.T) {
 }
 
 func TestDailyAICWorkflowGuardrailInCompiledWorkflow(t *testing.T) {
-	testDir := testutil.TempDir(t, "daily-effective-workflow-guardrail-*")
+	testDir := testutil.TempDir(t, "daily-ai-credits-workflow-guardrail-*")
 	workflowFile := filepath.Join(testDir, "daily-guardrail.md")
 
 	workflow := `---
@@ -122,7 +122,7 @@ Guardrail test workflow`
 		activationSection = activationSection[:nextJob]
 	}
 
-	if !strings.Contains(lockStr, "id: daily-effective-workflow-guardrail") {
+	if !strings.Contains(lockStr, "id: daily-ai-credits-workflow-guardrail") {
 		t.Fatal("expected activation job to include the daily AI Credits guardrail step")
 	}
 	if !strings.Contains(lockStr, "if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}") {
@@ -134,16 +134,16 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, `GH_AW_MAX_DAILY_AI_CREDITS: "100000000"`) {
 		t.Fatal("expected activation job env to include normalized guardrail threshold")
 	}
-	if !strings.Contains(lockStr, "daily_ai_credits_exceeded: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}") {
+	if !strings.Contains(lockStr, "daily_ai_credits_exceeded: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}") {
 		t.Fatal("expected activation job to expose daily_ai_credits_exceeded output")
 	}
-	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_status: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}") {
+	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_status: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}") {
 		t.Fatal("expected activation job to expose daily_ai_credits_guardrail_status output for structural vs transient failure distinction")
 	}
-	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_error: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}") {
+	if !strings.Contains(lockStr, "daily_ai_credits_guardrail_error: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}") {
 		t.Fatal("expected activation job to expose the daily AI Credits guardrail error")
 	}
-	if !strings.Contains(lockStr, "daily_ai_credits_total_effective_tokens: ${{ steps.daily-effective-workflow-guardrail.outputs.daily_ai_credits_total_effective_tokens || '' }}") {
+	if !strings.Contains(lockStr, "daily_ai_credits_total: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}") {
 		t.Fatal("expected activation job to expose the aggregated AI Credits total output")
 	}
 	if strings.Contains(lockStr, "daily_ai_credits_issue_url") {
@@ -251,7 +251,7 @@ Pre-agent failure accounting test`
 	}
 }
 
-func TestDailyETGuardrailDynamicGate(t *testing.T) {
+func TestDailyAICGuardrailDynamicGate(t *testing.T) {
 	testDir := testutil.TempDir(t, "daily-effective-workflow-no-guardrail-*")
 	workflowFile := filepath.Join(testDir, "no-daily-guardrail.md")
 
@@ -282,7 +282,7 @@ No daily guardrail`
 	}
 
 	lockStr := string(lockContent)
-	if !strings.Contains(lockStr, "id: daily-effective-workflow-guardrail") {
+	if !strings.Contains(lockStr, "id: daily-ai-credits-workflow-guardrail") {
 		t.Fatal("expected activation job to emit the daily AI Credits guardrail step even when threshold is unset")
 	}
 	if !strings.Contains(lockStr, "if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}") {
@@ -329,7 +329,7 @@ Daily guardrail via env var`
 	}
 	lockStr := string(lockContent)
 
-	if !strings.Contains(lockStr, "id: daily-effective-workflow-guardrail") {
+	if !strings.Contains(lockStr, "id: daily-ai-credits-workflow-guardrail") {
 		t.Fatal("expected activation job to include the daily AI Credits guardrail step when env var is configured")
 	}
 	if !strings.Contains(lockStr, "if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}") {
@@ -340,7 +340,7 @@ Daily guardrail via env var`
 	}
 }
 
-func TestDailyETGuardrailNegativeValueRejected(t *testing.T) {
+func TestDailyAICGuardrailNegativeValueRejected(t *testing.T) {
 	testDir := testutil.TempDir(t, "daily-effective-workflow-explicit-disable-*")
 	workflowFile := filepath.Join(testDir, "daily-guardrail-explicit-disable.md")
 

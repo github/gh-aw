@@ -78,7 +78,7 @@ func extractMaxDailyAICGitHubApp(frontmatter map[string]any) *GitHubAppConfig {
 // Returns a pointer to the normalized runtime string when valid; nil means the
 // field is unset, explicitly disabled, or invalid for runtime use.
 func parseMaxDailyAICValue(raw any) *string {
-	if normalized, ok := normalizePositiveEffectiveTokenLimit(raw); ok {
+	if normalized, ok := normalizePositiveAICLimit(raw); ok {
 		s := normalized
 		return &s
 	}
@@ -98,15 +98,15 @@ func parseMaxDailyAICValue(raw any) *string {
 	return nil
 }
 
-// isEffectiveDisabledValue reports whether an already-extracted scalar value
+// isDisabledAICValue reports whether an already-extracted scalar value
 // represents an explicit disable (i.e. equals -1). Call this when the value
 // has already been unwrapped by extractMaxDailyAICObjectValue to avoid
 // a redundant extraction pass.
-func isEffectiveDisabledValue(effective any) bool {
-	if val, ok := typeutil.ParseIntValue(effective); ok {
+func isDisabledAICValue(value any) bool {
+	if val, ok := typeutil.ParseIntValue(value); ok {
 		return val == -1
 	}
-	rawStr, ok := effective.(string)
+	rawStr, ok := value.(string)
 	if !ok {
 		return false
 	}
@@ -114,16 +114,16 @@ func isEffectiveDisabledValue(effective any) bool {
 }
 
 func isMaxDailyAICDisabled(raw any) bool {
-	return isEffectiveDisabledValue(extractMaxDailyAICObjectValue(raw))
+	return isDisabledAICValue(extractMaxDailyAICObjectValue(raw))
 }
 
 func resolveMaxDailyAICFromRaw(raw any) (*string, bool) {
-	effective := extractMaxDailyAICObjectValue(raw)
-	if isEffectiveDisabledValue(effective) {
+	value := extractMaxDailyAICObjectValue(raw)
+	if isDisabledAICValue(value) {
 		return nil, true
 	}
-	if value := parseMaxDailyAICValue(effective); value != nil {
-		return value, true
+	if parsed := parseMaxDailyAICValue(value); parsed != nil {
+		return parsed, true
 	}
 	return nil, false
 }
@@ -154,7 +154,7 @@ func resolveMaxDailyAIC(frontmatter map[string]any, importedJSON string) *string
 }
 
 // hasMaxDailyAICGuardrail reports whether compiler should emit the
-// daily effective-token guardrail wiring. The guardrail is enabled by default.
+// daily AI Credits guardrail wiring. The guardrail is enabled by default.
 func hasMaxDailyAICGuardrail(data *WorkflowData) bool {
 	return !hasWorkflowExplicitMaxDailyAICDisable(data)
 }
@@ -166,7 +166,7 @@ func hasWorkflowExplicitMaxDailyAICDisable(data *WorkflowData) bool {
 	return isMaxDailyAICDisabled(data.RawFrontmatter[maxDailyAICreditsField])
 }
 
-// hasMaxDailyAICFrontmatterConfig reports whether the daily ET threshold
+// hasMaxDailyAICFrontmatterConfig reports whether the daily AI Credits threshold
 // is configured via the max-daily-ai-credits frontmatter/import/default resolution.
 // The resolved value is propagated to activation job env so runtime expressions can gate
 // setup and guardrail execution consistently.

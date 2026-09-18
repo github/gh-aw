@@ -591,9 +591,9 @@ Push some changes.
 }
 
 // TestAgentOutputFallbackArtifact verifies that safe-output processing does not depend on the
-// large "agent" artifact upload succeeding: a small dedicated artifact carries the agent output,
-// and downstream jobs match both artifacts when downloading. See gh-aw#53099, where a timed-out
-// upload of the agent artifact silently dropped every safe output.
+// large "agent" artifact upload succeeding: a small dedicated artifact carries the agent output
+// and accounting evidence, and downstream jobs match both artifacts when downloading. See
+// gh-aw#53099, where a timed-out upload of the agent artifact silently dropped every safe output.
 func TestAgentOutputFallbackArtifact(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "agent-output-fallback-test")
 
@@ -636,6 +636,12 @@ Body.
 		"name: agent-output-fallback\n",
 		"/tmp/gh-aw/agent_output.json",
 		"/tmp/gh-aw/safeoutputs.jsonl",
+		"/tmp/gh-aw/agent_execution.json",
+		"/tmp/gh-aw/agent_usage.jsonl",
+		"/tmp/gh-aw/agent_usage.json",
+		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/agent/graders/grader_manifest.json",
 		"/tmp/gh-aw/agent/graders/grader_results.json",
 		"if-no-files-found: ignore",
@@ -667,6 +673,94 @@ Body.
 	if !strings.Contains(lockYAML, "merge-multiple: true") {
 		t.Error("Expected 'merge-multiple: true' so both artifacts extract into the same directory")
 	}
+}
+
+func TestAgentOutputFallbackArtifactArcDind(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-output-fallback-arc-dind-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+strict: false
+runner:
+  topology: arc-dind
+graders:
+  custom:
+    script: return 1
+safe-outputs:
+  create-issue:
+---
+
+# Test ARC/DinD Agent Output Fallback
+`
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	uploadSection := extractWorkflowStepByName(t, string(lockContent), "Upload agent output fallback artifact")
+
+	for _, expected := range []string{
+		"${{ runner.temp }}/gh-aw/agent_output.json",
+		"${{ runner.temp }}/gh-aw/agent_usage.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
+		"${{ runner.temp }}/gh-aw/agent/graders/grader_manifest.json",
+	} {
+		assert.Contains(t, uploadSection, expected)
+	}
+	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
+}
+
+func TestSampledAgentExecutionEvidenceReachesUsageArtifact(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "sampled-agent-accounting-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  create-issue:
+    samples:
+      - title: Sampled issue
+        body: Deterministic sample
+---
+
+# Sampled Agent Accounting
+`
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	compiler.SetUseSamples(true)
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	lockYAML := string(lockContent)
+
+	assert.Contains(t, lockYAML, "Replay safe-outputs samples (deterministic)")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Initialize agent execution evidence"), `"state":"not_started"`)
+	assert.NotContains(t, lockYAML, "Mark agent execution started")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact"), agentExecutionEvidencePath)
+	assert.Contains(t, lockYAML, `pattern: "{agent,agent-output-fallback}"`)
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload usage artifact"), "/tmp/gh-aw/usage/agent/execution.json")
 }
 
 func TestAgentArtifactExcludesUserGeneratedDirectory(t *testing.T) {

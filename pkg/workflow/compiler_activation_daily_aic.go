@@ -124,7 +124,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, "            await main();\n")
 	}
 	steps = append(steps, "      - name: Check daily workflow token guardrail\n")
-	steps = append(steps, "        id: daily-effective-workflow-guardrail\n")
+	steps = append(steps, "        id: daily-ai-credits-workflow-guardrail\n")
 	steps = append(steps, fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr))
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 	steps = append(steps, "        env:\n")

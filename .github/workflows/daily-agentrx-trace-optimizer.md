@@ -270,7 +270,7 @@ Expected input format:
 Read the file at `run_data_path` and create `/tmp/gh-aw/agent/agentrx/trajectory.json`.
 Use the last 24h of data and prioritize failed or high-latency runs.
 Map `runs[]` session records to ordered workflow steps.
-Include when present: step index, `github.workflow_ref`, `github.run_id`, status/error signal, `duration`, `effective_tokens`, `estimated_cost`, `turns`, `agentic_assessments`, `behavior_fingerprint`, `missing_tool_count`.
+Include when present: step index, `github.workflow_ref`, `github.run_id`, status/error signal, `duration`, `aic`, `estimated_cost`, `turns`, `agentic_assessments`, `behavior_fingerprint`, `missing_tool_count`.
 Output valid JSON only and write it to `/tmp/gh-aw/agent/agentrx/trajectory.json`.
 
 ## agent: `artifacts-summarizer`

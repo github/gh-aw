@@ -7,7 +7,6 @@ date: 2026-05-11
 ---
 
 > [!NOTE]
-> This post references historical **Effective Tokens (ET)** metrics. gh-aw now uses **AI Credits (AIC)** as the primary cost metric.
 
 It was a busy week in [github/gh-aw](https://github.com/github/gh-aw)! Four releases landed between May 4 and May 7, paired with a wave of pull requests that delivered new commands, security hardening, and developer-experience polish. Here's everything that shipped.
 
@@ -37,7 +36,7 @@ These patch releases addressed Claude engine stability (no more mid-session cras
 
 Beyond the releases, several PRs merged this week are worth highlighting:
 
-- **[`gh aw forecast` command (experimental)](https://github.com/github/gh-aw/pull/31377)** — A new command for projecting workflow effective token usage before you run it. Useful for budgeting and capacity planning.
+- **[`gh aw forecast` command (experimental)](https://github.com/github/gh-aw/pull/31377)** — A new command for projecting workflow AI Credit usage before you run it. Useful for budgeting and capacity planning.
 - **[Grant Claude default `/tmp` read/write in sandboxed workflows](https://github.com/github/gh-aw/pull/31357)** — Claude-engine workflows can now read and write to `/tmp` by default in sandboxed environments, eliminating a common pain point when agents need temporary scratch space.
 - **[Rename `rate-limit` → `user-rate-limit` and `max-runs` → `max-runs-per-window`](https://github.com/github/gh-aw/pull/31390)** — Clearer naming for rate-limiting configuration fields.
 - **[OTel `gen_ai.response.finish_reasons`](https://github.com/github/gh-aw/pull/31332)** — Agent spans now emit finish reasons (e.g., `stop`, `length`, `tool_calls`) as an OpenTelemetry attribute, improving observability dashboards.

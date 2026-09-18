@@ -736,10 +736,6 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 	}
 	result.TokenUsage = tokenUsage
 	backfillRunTokenUsageFromFirewall(metrics, result, tokenUsage)
-	if tokenUsage != nil && tokenUsage.TotalEffectiveTokens > 0 {
-		result.Run.EffectiveTokens = tokenUsage.TotalEffectiveTokens
-	}
-
 	rateLimitUsage, rlErr := analyzeGitHubRateLimits(runOutputDir, verbose)
 	if rlErr != nil && verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze GitHub rate limit usage for run %d: %v", result.Run.DatabaseID, rlErr)))

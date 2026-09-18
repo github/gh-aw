@@ -5,7 +5,7 @@ sidebar:
   order: 100
 ---
 
-Each workflow has two parts: YAML frontmatter wrapped in `---` for configuration, and a markdown body for the agent instructions. See [Frontmatter](/gh-aw/reference/frontmatter/) and [Markdown](/gh-aw/reference/markdown/) for details.
+Each workflow has two parts: YAML frontmatter wrapped in `---` for configuration and a markdown body for agent instructions. See [Frontmatter](/gh-aw/reference/frontmatter/) and [Markdown](/gh-aw/reference/markdown/) for the full format.
 
 For example:
 
@@ -25,11 +25,11 @@ tools:
 Read the issue #${{ github.event.issue.number }}. Add a comment to the issue listing useful resources and links.
 ```
 
-A workflow file may optionally include one or more inline sub-agent definitions after the main markdown body. See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/) for details.
+A workflow file can also include inline sub-agent definitions after the main markdown body. See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/).
 
 ## File Organization
 
-Agentic workflows live in `.github/workflows` as Markdown files (`*.md`) and compile to GitHub Actions workflow files (`*.lock.yml`). Run `gh aw compile` to generate the lock file.
+Agentic workflows live in `.github/workflows` as Markdown files (`*.md`) and compile to GitHub Actions workflow files (`*.lock.yml`). Run `gh aw compile` to generate or refresh the lock file.
 
 ```text
 .github/
@@ -60,13 +60,11 @@ Each compiled lock file begins with a machine-readable metadata line followed by
 #   - actions/upload-artifact@bbbca2... # v4
 ```
 
-The `gh-aw-metadata` line is always first, enabling reliable machine parsing. The `Secrets used` and `Custom actions used` sections list all `secrets.*` references and external `uses:` dependencies (excluding local `./` refs) found in the compiled workflow, sorted and deduplicated.
+The `gh-aw-metadata` line is always first so tools can parse it reliably. The `Secrets used` and `Custom actions used` sections list sorted, deduplicated `secrets.*` references and external `uses:` dependencies, excluding local `./` refs.
 
 ## Editing Workflows
 
-The **markdown body** is loaded at runtime and can be edited directly on GitHub.com without recompilation. Only **frontmatter changes** require recompilation.
-
-See [Editing Workflows](/gh-aw/guides/working-with-workflows/#editing-workflows) for complete guidance on when and how to recompile workflows.
+The **markdown body** is loaded at runtime and can be edited directly on GitHub.com without recompilation. Only **frontmatter changes** require recompilation. See [Editing Workflows](/gh-aw/guides/working-with-workflows/#editing-workflows) for when to recompile.
 
 ## Best Practices
 
@@ -74,4 +72,4 @@ Use descriptive kebab-case names such as `issue-responder.md` or `weekly-summary
 
 ## Learn More
 
-See also [Editing Workflows](/gh-aw/guides/working-with-workflows/#editing-workflows) for recompilation guidance, [Frontmatter](/gh-aw/reference/frontmatter/) for configuration, [Markdown](/gh-aw/reference/markdown/) for the body format, [Imports](/gh-aw/reference/imports/) for shared content, [CLI Commands](/gh-aw/setup/cli/) for workflow management, and [MCPs](/gh-aw/guides/mcps/) for Model Context Protocol configuration.
+For related details, see [Editing Workflows](/gh-aw/guides/working-with-workflows/#editing-workflows), [Frontmatter](/gh-aw/reference/frontmatter/), [Markdown](/gh-aw/reference/markdown/), [Imports](/gh-aw/reference/imports/), [CLI Commands](/gh-aw/setup/cli/), and [MCPs](/gh-aw/guides/mcps/).

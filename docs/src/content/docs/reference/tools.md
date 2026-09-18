@@ -40,34 +40,28 @@ See **[GitHub Tools Reference](/gh-aw/reference/github-tools/)** for complete co
 
 ### Linear Tools (`linear:`)
 
-Connect to [Linear's official hosted MCP server](https://linear.app/docs/mcp) using the well-known `LINEAR_API_KEY` GitHub Actions secret:
+Connect to [Linear's official hosted MCP server](https://linear.app/docs/mcp) with the `LINEAR_API_KEY` GitHub Actions secret:
 
 ```yaml wrap
 tools:
   linear: {}
 ```
 
-Set `token` to use a different secret containing a Linear API key or OAuth access token. The integration uses Streamable HTTP through the MCP gateway and always uses Linear's server-enforced read-only endpoint. Use `allowed` to restrict tool names and `required: false` to make Linear connectivity best-effort:
+Set `token` to use a different secret, `toolsets` to enable groups such as `issues` and `projects`, `allowed` to further restrict tool names, and `required: false` to make connectivity best-effort:
 
 ```yaml wrap
 tools:
   linear:
     token: ${{ secrets.CUSTOM_LINEAR_TOKEN }}
+    toolsets: [issues, projects]
     allowed: ["*"]
     required: true
 ```
 
-Use `toolsets` to enable related groups of tools without maintaining individual tool names:
+Supported toolsets are `all`, `attachments`, `comments`, `customers`, `cycles`, `diffs`, `documentation`, `documents`, `initiatives`, `issues`, `milestones`, `projects`, `status_updates`, `teams`, and `users`. The compiler expands toolsets into the gateway's allowed-tool list, and any `allowed` names or wildcards must match a tool in the selected toolsets.
 
-```yaml wrap
-tools:
-  linear:
-    toolsets: [issues, projects]
-```
+Linear always uses Linear's server-enforced read-only endpoint. The credential is passed to the gateway as an environment variable and sent as an `Authorization: Bearer` header, not embedded in MCP configuration. Like other remote MCP servers, Linear also works with `tools.cli-proxy: true`.
 
-Supported toolsets are `all`, `attachments`, `comments`, `customers`, `cycles`, `diffs`, `documentation`, `documents`, `initiatives`, `issues`, `milestones`, `projects`, `status_updates`, `teams`, and `users`. The compiler expands toolsets into the gateway's allowed-tool list. If `allowed` is also set, each name or wildcard must match a tool in the selected toolsets.
-
-The Linear credential is passed to the gateway as an environment variable and sent as an `Authorization: Bearer` header. It is not embedded in MCP configuration. Linear works with `tools.cli-proxy: true` like other remote MCP servers.
 ### Jira Tools (`jira:`)
 
 Connect to Atlassian's official remote Rovo MCP endpoint from non-interactive GitHub Actions workloads. Browser OAuth, device login, and user-consent flows are not supported.
@@ -99,19 +93,9 @@ tools:
       - searchJiraIssuesUsingJql
 ```
 
-The `allowed` list is required and accepts only these read-only Jira tools:
+The `allowed` list is required and accepts only these read-only Jira tools: `getIssueLinkTypes`, `getJiraIssue`, `getJiraIssueRemoteIssueLinks`, `getJiraIssueTypeMetaWithFields`, `getJiraProjectIssueTypesMetadata`, `getTransitionsForJiraIssue`, `getVisibleJiraProjects`, `lookupJiraAccountId`, and `searchJiraIssuesUsingJql`.
 
-- `getIssueLinkTypes`
-- `getJiraIssue`
-- `getJiraIssueRemoteIssueLinks`
-- `getJiraIssueTypeMetaWithFields`
-- `getJiraProjectIssueTypesMetadata`
-- `getTransitionsForJiraIssue`
-- `getVisibleJiraProjects`
-- `lookupJiraAccountId`
-- `searchJiraIssuesUsingJql`
-
-`allowed: ["*"]` is also accepted as shorthand for enabling all nine tools above; it is expanded to that fixed list at compile time and never grants access to the full, unrestricted MCP tool set. Omitting `allowed` or naming a write-capable tool is rejected.
+`allowed: ["*"]` is shorthand for enabling that fixed list at compile time; it never grants access to the full, unrestricted MCP tool set. Omitting `allowed` or naming a write-capable tool is rejected.
 
 The endpoint defaults to `https://mcp.atlassian.com/v1/mcp`. Set `url` only when your organization uses another HTTPS Atlassian MCP endpoint. Credentials must be direct GitHub Actions secret expressions; service account keys use the HTTP bearer scheme while API tokens use HTTP Basic authentication generated at runtime.
 
@@ -214,29 +198,25 @@ See [GH-AW as an MCP Server](/gh-aw/reference/gh-aw-as-mcp-server/) for availabl
 
 ### MCP CLI Mounting (`cli-proxy:`)
 
-Set `tools.cli-proxy: true` to mount each user-facing MCP server as a standalone CLI tool on `PATH`. When enabled, the agent can invoke MCP servers as shell commands rather than through the MCP protocol:
+Set `tools.cli-proxy: true` to mount each user-facing MCP server as a standalone CLI tool on `PATH`, so the agent can invoke it from shell instead of through the MCP protocol:
 
 ```yaml wrap
 tools:
   cli-proxy: true
 ```
 
-With CLI mounting enabled, MCP servers accessible to the workflow (such as `safeoutputs` and `mcpscripts`) are wrapped as executable commands. For example:
+With CLI mounting enabled, workflow-accessible servers such as `safeoutputs` and `mcpscripts` are wrapped as executables:
 
 ```bash
 safeoutputs add_comment --item_number 42 --body "Analysis complete"
 mcpscripts mcpscripts-gh --args "issue list --limit 5"
 ```
 
-The safe-output `add_comment` tool uses `--item_number` (not `--issue_number`) to target the issue or pull request — passing `--issue_number` is silently stripped by schema validation.
-
-The MCP gateway configuration is unchanged — servers still start as normal. Only the agent's view changes: servers registered for CLI mounting are removed from the MCP tool list and accessed via shell instead.
-
-This reduces token consumption from large MCP tool schemas and can simplify workflow prompts when shell-style invocation is preferred.
+For `add_comment`, use `--item_number` rather than `--issue_number`; schema validation strips the latter. CLI mounting changes only the agent-facing interface: the MCP gateway still starts normally, but mounted servers are removed from the MCP tool list and accessed via shell. This can reduce token use from large tool schemas and simplify prompts when shell-style invocation is preferred.
 
 Defaults to `false`.
 
-CLI mounting requires shell access: the wrappers are ordinary executables invoked from bash. GitHub `gh-proxy` mode is also shell-backed because GitHub reads are performed with the `gh` CLI. When `tools.bash` is disabled (`bash: false` or `bash: []`), `cli-proxy: true` and `tools.github.mode: gh-proxy` are rejected at compile time, and strict mode requires `cli-proxy: false` to be stated explicitly:
+CLI mounting requires shell access because the wrappers are ordinary executables invoked from bash. GitHub `gh-proxy` mode is also shell-backed because GitHub reads are performed with the `gh` CLI. When `tools.bash` is disabled (`bash: false` or `bash: []`), `cli-proxy: true` and `tools.github.mode: gh-proxy` are rejected at compile time, and strict mode requires `cli-proxy: false` to be stated explicitly:
 
 ```yaml wrap
 tools:
@@ -323,9 +303,4 @@ mcp-servers:
 
 ## Learn More
 
-- [GitHub Tools](/gh-aw/reference/github-tools/) - GitHub API operations, toolsets, and modes
-- [Playwright](/gh-aw/reference/playwright/) - Browser automation and testing configuration
-- [Cache Memory](/gh-aw/reference/cache-memory/) - Persistent memory across workflow runs
-- [Repo Memory](/gh-aw/reference/repo-memory/) - Repository-specific memory storage
-- [MCP Scripts](/gh-aw/reference/mcp-scripts/) - Define custom inline tools with JavaScript or shell scripts
-- [MCPs](/gh-aw/guides/mcps/) - Complete Model Context Protocol setup and usage
+See [GitHub Tools](/gh-aw/reference/github-tools/) for GitHub API operations, toolsets, and modes; [Playwright](/gh-aw/reference/playwright/) for browser automation; [Cache Memory](/gh-aw/reference/cache-memory/) and [Repo Memory](/gh-aw/reference/repo-memory/) for persistent context; [MCP Scripts](/gh-aw/reference/mcp-scripts/) for custom inline tools; and [MCPs](/gh-aw/guides/mcps/) for end-to-end Model Context Protocol setup.

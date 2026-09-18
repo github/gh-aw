@@ -170,7 +170,7 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 		effectiveStaticToken = data.SafeOutputs.GitHubToken
 	}
 	if effectiveStaticToken != "" {
-		coverageToken = getEffectiveSafeOutputGitHubToken(effectiveStaticToken)
+		coverageToken = resolveSafeOutputGitHubToken(effectiveStaticToken)
 	} else {
 		var coverageApp *GitHubAppConfig
 		if cfg.GitHubApp != nil {
@@ -188,13 +188,13 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 			if coverageApp.shouldIgnoreMissingKey() {
 				coverageToken = combineTokenExpressions(
 					fmt.Sprintf("${{ steps.%s.outputs.token }}", appTokenStepID),
-					getEffectiveSafeOutputGitHubToken(""),
+					resolveSafeOutputGitHubToken(""),
 				)
 			} else {
 				coverageToken = fmt.Sprintf("${{ steps.%s.outputs.token }}", appTokenStepID)
 			}
 		} else {
-			coverageToken = getEffectiveSafeOutputGitHubToken("")
+			coverageToken = resolveSafeOutputGitHubToken("")
 		}
 	}
 

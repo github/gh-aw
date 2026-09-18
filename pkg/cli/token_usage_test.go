@@ -318,7 +318,6 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NotNil(t, summary.AmbientContext, "ambient context should be present")
 		assert.Equal(t, 7, summary.AmbientContext.InputTokens, "ambient input tokens should come from first invocation")
 		assert.Equal(t, 3, summary.AmbientContext.CachedTokens, "ambient cached tokens should come from first invocation")
-		assert.Equal(t, 0, summary.AmbientContext.EffectiveTokens, "ambient effective tokens are no longer computed")
 	})
 
 	t.Run("ambient context defaults cached tokens to zero when absent", func(t *testing.T) {
@@ -334,7 +333,6 @@ func TestParseTokenUsageFile(t *testing.T) {
 		require.NotNil(t, summary.AmbientContext, "ambient context should be present")
 		assert.Equal(t, 11, summary.AmbientContext.InputTokens, "ambient input tokens should match")
 		assert.Equal(t, 0, summary.AmbientContext.CachedTokens, "missing cached tokens should default to zero")
-		assert.Equal(t, 0, summary.AmbientContext.EffectiveTokens, "ambient effective tokens are no longer computed")
 	})
 
 	t.Run("empty file returns nil", func(t *testing.T) {
@@ -678,7 +676,6 @@ func TestTokenUsageSummaryMethods(t *testing.T) {
 						CacheReadTokens:  5000,
 						CacheWriteTokens: 3000,
 						ReasoningTokens:  30,
-						EffectiveTokens:  8330,
 					},
 					Requests:   5,
 					DurationMs: 5000,
@@ -692,12 +689,10 @@ func TestTokenUsageSummaryMethods(t *testing.T) {
 		assert.Equal(t, "small-model", rows[1].Model, "second row should be model with fewer tokens")
 		assert.Equal(t, "1.0s", rows[0].AvgDuration, "avg duration for large model")
 		assert.Equal(t, 30, summary.ByModel["large-model"].ReasoningTokens, "reasoning tokens should remain tracked in model core metrics")
-		assert.Equal(t, 8330, summary.ByModel["large-model"].EffectiveTokens, "effective tokens should remain tracked in model core metrics")
 
 		encoded, err := json.Marshal(rows[0])
 		require.NoError(t, err)
 		assert.NotContains(t, string(encoded), "reasoning_tokens", "row JSON should preserve legacy shape")
-		assert.NotContains(t, string(encoded), "effective_tokens", "row JSON should preserve legacy shape")
 
 		rendered := console.RenderStruct(rows)
 		assert.Contains(t, rendered, "Input", "row table should keep quartet columns")
@@ -705,7 +700,6 @@ func TestTokenUsageSummaryMethods(t *testing.T) {
 		assert.Contains(t, rendered, "Cache Read", "row table should keep quartet columns")
 		assert.Contains(t, rendered, "Cache Write", "row table should keep quartet columns")
 		assert.NotContains(t, rendered, "ReasoningTokens", "row table should preserve legacy columns")
-		assert.NotContains(t, rendered, "EffectiveTokens", "row table should preserve legacy columns")
 	})
 }
 
@@ -770,8 +764,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 
 		eventsFile := filepath.Join(logsDir, "events.jsonl")
 		eventsContent := strings.Join([]string{
-			`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 80% of your effective token budget. Begin planning to wrap up your current work."}`,
-			`{"type":"token_steering","message":"[AWF TOKEN WARNING] You have used 90% of your effective token budget. Complete your current task and prepare final output."}`,
+			`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 80% of your AI Credits budget. Begin planning to wrap up your current work."}`,
+			`{"type":"token_steering","message":"[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output."}`,
 			`{"event_name":"timeout_steering","message":"[AWF TIME WARNING] You have used 80% of your allotted run time. Begin planning to wrap up your current work."}`,
 			`{"eventName":"timeout_steering","message":"[AWF TIME WARNING] You have used 90% of your allotted run time. Complete your current task and prepare final output."}`,
 			`{"event":"request.forwarded"}`,
@@ -795,7 +789,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NoError(t, os.WriteFile(tokenFile, []byte(tokenContent+"\n"), 0o644))
 
 		eventsFile := filepath.Join(logsDir, "events.jsonl")
-		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 95% of your effective token budget. Finalize and submit your work now."}`+"\n"), 0o644))
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 95% of your AI Credits budget. Finalize and submit your work now."}`+"\n"), 0o644))
 
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
@@ -806,7 +800,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 	t.Run("falls back to agent_usage.json when token-usage.jsonl is missing", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "analyze-agent-usage")
 		agentUsageFile := filepath.Join(tmpDir, "agent_usage.json")
-		content := `{"provider":"anthropic","model":"claude-sonnet-4-6","input_tokens":5944,"output_tokens":8698,"cache_read_tokens":1170605,"cache_write_tokens":86049,"effective_tokens":243846}`
+		content := `{"provider":"anthropic","model":"claude-sonnet-4-6","input_tokens":5944,"output_tokens":8698,"cache_read_tokens":1170605,"cache_write_tokens":86049}`
 		require.NoError(t, os.WriteFile(agentUsageFile, []byte(content), 0o644))
 
 		summary, err := analyzeTokenUsage(tmpDir, false)
@@ -814,26 +808,11 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NotNil(t, summary, "should return summary from agent_usage.json")
 		assert.Equal(t, 5944, summary.TotalInputTokens, "input tokens should match agent usage")
 		assert.Equal(t, 8698, summary.TotalOutputTokens, "output tokens should match agent usage")
-		assert.Equal(t, 0, summary.TotalEffectiveTokens, "effective tokens are no longer computed")
 		assert.Greater(t, summary.TotalAIC, 0.0, "AI Credits should be recomputed from raw usage")
 		assert.Equal(t, 1, summary.TotalRequests, "agent usage fallback should synthesize one request")
 	})
 
-	t.Run("does not recompute ET from raw usage", func(t *testing.T) {
-		tmpDir := testutil.TempDir(t, "analyze-agent-usage-recompute")
-		agentUsageFile := filepath.Join(tmpDir, "agent_usage.json")
-		content := `{"model":"unknown","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cache_write_tokens":0,"effective_tokens":9999}`
-		require.NoError(t, os.WriteFile(agentUsageFile, []byte(content), 0o644))
-
-		summary, err := analyzeTokenUsage(tmpDir, false)
-		require.NoError(t, err, "should parse agent_usage.json without error")
-		require.NotNil(t, summary, "should return summary from agent_usage.json")
-		assert.Equal(t, 0, summary.TotalEffectiveTokens, "ET should not be recomputed")
-		require.Contains(t, summary.ByModel, "unknown")
-		assert.Equal(t, 0, summary.ByModel["unknown"].EffectiveTokens, "per-model ET should remain unset")
-	})
-
-	t.Run("unknown model keeps ET unset", func(t *testing.T) {
+	t.Run("unknown model still reports raw usage", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "analyze-agent-usage-unknown-model")
 		awInfoFile := filepath.Join(tmpDir, "aw_info.json")
 		awInfoContent := `{"token_weights":{"multipliers":{"known-model":5}}}`
@@ -846,12 +825,10 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err, "should parse agent_usage.json with unknown model")
 		require.NotNil(t, summary, "should return summary from agent_usage.json")
-		assert.Equal(t, 0, summary.TotalEffectiveTokens, "effective tokens should remain unset")
 		require.Contains(t, summary.ByModel, "mystery-model")
-		assert.Equal(t, 0, summary.ByModel["mystery-model"].EffectiveTokens, "per-model ET should remain unset")
 	})
 
-	t.Run("custom weights do not affect ET because ET is disabled", func(t *testing.T) {
+	t.Run("custom weights do not affect raw usage", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "analyze-agent-usage-custom-weights")
 		awInfoFile := filepath.Join(tmpDir, "aw_info.json")
 		awInfoContent := `{"token_weights":{"multipliers":{"unknown":2}}}`
@@ -864,9 +841,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err, "should parse agent_usage.json with custom weights")
 		require.NotNil(t, summary, "should return summary from agent_usage.json")
-		assert.Equal(t, 0, summary.TotalEffectiveTokens, "effective tokens should remain unset")
 		require.Contains(t, summary.ByModel, "unknown", "unknown model bucket should be present")
-		assert.Equal(t, 0, summary.ByModel["unknown"].EffectiveTokens, "per-model effective tokens should remain unset")
 	})
 
 	t.Run("records requested sub-agent models and mismatch when token logs do not show requested model", func(t *testing.T) {
@@ -963,98 +938,6 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 	})
 }
 
-func TestCorrelateToolCallsWithTokenDelta(t *testing.T) {
-	t.Run("does not assign deltas from token usage", func(t *testing.T) {
-		tmpDir := testutil.TempDir(t, "token-delta")
-		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
-		// Two API calls; tool call happens between them.
-		// ET for first entry (model "unknown", default weights, m=1):
-		//   1.0*1000 + 4.0*50 = 1200
-		// ET for second entry:
-		//   1.0*1500 + 4.0*80 = 1820
-		// Expected delta = 1820 - 1200 = 620
-		content := `{"timestamp":"2026-05-19T21:10:00.000Z","model":"unknown","provider":"test","input_tokens":1000,"output_tokens":50,"cache_read_tokens":0,"cache_write_tokens":0}
-{"timestamp":"2026-05-19T21:10:10.000Z","model":"unknown","provider":"test","input_tokens":1500,"output_tokens":80,"cache_read_tokens":0,"cache_write_tokens":0}`
-		require.NoError(t, os.WriteFile(filePath, []byte(content+"\n"), 0o644))
-
-		toolCalls := []MCPToolCall{
-			{
-				Timestamp:  "2026-05-19T21:10:05.000Z",
-				ServerName: "test-server",
-				ToolName:   "test-tool",
-			},
-		}
-		result := correlateToolCallsWithTokenDelta(toolCalls, filePath)
-		require.Len(t, result, 1)
-		assert.Equal(t, 0, result[0].EffectiveTokenDelta, "effective-token deltas are no longer computed")
-	})
-
-	t.Run("leaves delta zero when tool call has no preceding API call", func(t *testing.T) {
-		tmpDir := testutil.TempDir(t, "token-delta-no-prev")
-		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
-		content := `{"timestamp":"2026-05-19T21:10:10.000Z","model":"unknown","provider":"test","input_tokens":1000,"output_tokens":50,"cache_read_tokens":0,"cache_write_tokens":0}`
-		require.NoError(t, os.WriteFile(filePath, []byte(content+"\n"), 0o644))
-
-		toolCalls := []MCPToolCall{
-			{
-				Timestamp:  "2026-05-19T21:10:05.000Z", // before the only API call
-				ServerName: "test-server",
-				ToolName:   "test-tool",
-			},
-		}
-		result := correlateToolCallsWithTokenDelta(toolCalls, filePath)
-		require.Len(t, result, 1)
-		assert.Equal(t, 0, result[0].EffectiveTokenDelta, "no delta when no preceding API call")
-	})
-
-	t.Run("leaves delta zero when tool call has no following API call", func(t *testing.T) {
-		tmpDir := testutil.TempDir(t, "token-delta-no-next")
-		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
-		content := `{"timestamp":"2026-05-19T21:10:00.000Z","model":"unknown","provider":"test","input_tokens":1000,"output_tokens":50,"cache_read_tokens":0,"cache_write_tokens":0}`
-		require.NoError(t, os.WriteFile(filePath, []byte(content+"\n"), 0o644))
-
-		toolCalls := []MCPToolCall{
-			{
-				Timestamp:  "2026-05-19T21:10:05.000Z", // after the only API call
-				ServerName: "test-server",
-				ToolName:   "test-tool",
-			},
-		}
-		result := correlateToolCallsWithTokenDelta(toolCalls, filePath)
-		require.Len(t, result, 1)
-		assert.Equal(t, 0, result[0].EffectiveTokenDelta, "no delta when no following API call")
-	})
-
-	t.Run("handles empty token usage file path", func(t *testing.T) {
-		toolCalls := []MCPToolCall{{Timestamp: "2026-05-19T21:10:05.000Z", ToolName: "t"}}
-		result := correlateToolCallsWithTokenDelta(toolCalls, "")
-		require.Len(t, result, 1)
-		assert.Equal(t, 0, result[0].EffectiveTokenDelta, "no delta with empty file path")
-	})
-
-	t.Run("keeps deltas zero for multiple sequential tool calls", func(t *testing.T) {
-		tmpDir := testutil.TempDir(t, "token-delta-multi")
-		filePath := filepath.Join(tmpDir, "token-usage.jsonl")
-		// Three API calls, two tool calls between consecutive pairs.
-		content := `{"timestamp":"2026-05-19T21:10:00.000Z","model":"unknown","provider":"test","input_tokens":1000,"output_tokens":50,"cache_read_tokens":0,"cache_write_tokens":0}
-{"timestamp":"2026-05-19T21:10:10.000Z","model":"unknown","provider":"test","input_tokens":1500,"output_tokens":80,"cache_read_tokens":0,"cache_write_tokens":0}
-{"timestamp":"2026-05-19T21:10:20.000Z","model":"unknown","provider":"test","input_tokens":2000,"output_tokens":100,"cache_read_tokens":0,"cache_write_tokens":0}`
-		require.NoError(t, os.WriteFile(filePath, []byte(content+"\n"), 0o644))
-		// ET[0] = 1000 + 4*50 = 1200
-		// ET[1] = 1500 + 4*80 = 1820  → delta1 = 620
-		// ET[2] = 2000 + 4*100 = 2400 → delta2 = 580
-
-		toolCalls := []MCPToolCall{
-			{Timestamp: "2026-05-19T21:10:05.000Z", ServerName: "s", ToolName: "tool-a"},
-			{Timestamp: "2026-05-19T21:10:15.000Z", ServerName: "s", ToolName: "tool-b"},
-		}
-		result := correlateToolCallsWithTokenDelta(toolCalls, filePath)
-		require.Len(t, result, 2)
-		assert.Equal(t, 0, result[0].EffectiveTokenDelta, "delta for tool-a")
-		assert.Equal(t, 0, result[1].EffectiveTokenDelta, "delta for tool-b")
-	})
-}
-
 func TestCacheEfficiency(t *testing.T) {
 	t.Run("remains zero to avoid transforming raw token counts", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "cache-eff")
@@ -1083,7 +966,7 @@ func TestModelTokenUsageReasoningTokensJSONRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	var encoded map[string]any
 	require.NoError(t, json.Unmarshal(raw, &encoded))
-	assert.EqualValues(t, 30, encoded["reasoning_tokens"], "reasoning tokens should be persisted for ET recomputation")
+	assert.EqualValues(t, 30, encoded["reasoning_tokens"], "reasoning tokens should be persisted for AIC recomputation")
 
 	var decoded ModelTokenUsage
 	require.NoError(t, json.Unmarshal(raw, &decoded))

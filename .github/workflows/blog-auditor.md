@@ -17,7 +17,7 @@ experiments:
     variants: [detailed, concise]
     description: "Tests whether a high-level goal-oriented prompt produces the same audit quality as the current step-by-step detailed instructions"
     hypothesis: "H0: no change in audit correctness or discussion quality. H1: concise variant reduces token cost ≥20% with no degradation in validation accuracy"
-    metric: effective_token_count
+    metric: aic
     secondary_metrics: [run_duration_ms, discussion_created, validation_pass_rate]
     guardrail_metrics:
       - name: empty_output_rate

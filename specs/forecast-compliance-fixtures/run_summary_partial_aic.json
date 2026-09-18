@@ -37,7 +37,6 @@
     "total_duration_ms": 8500,
     "total_response_bytes": 12000,
     "cache_efficiency": 0.1154,
-    "total_effective_tokens": 2750,
     "total_aic": 0.00275,
     "by_model": {
       "claude-3-7-sonnet": {
@@ -49,7 +48,7 @@
         "requests": 2,
         "duration_ms": 8500,
         "response_bytes": 12000,
-        "effective_tokens": 2750
+        "aic": 0.00275
       }
     }
   }

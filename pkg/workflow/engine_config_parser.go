@@ -19,7 +19,7 @@ import (
 // passed through as-is and signal that budget enforcement and token steering
 // should be disabled.
 func parseMaxAICreditsValue(raw any) int64 {
-	if parsed, ok := parseMaxEffectiveTokenLimitValue(raw); ok {
+	if parsed, ok := parseMaxAICLimitValue(raw); ok {
 		return parsed
 	}
 	if raw != nil {

@@ -32,20 +32,20 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.266"
+const DefaultClaudeCodeVersion Version = "2.1.273"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.83"
+const DefaultCopilotVersion Version = "1.0.85"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.13"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.153.4"
+const DefaultCodexVersion Version = "0.154.0"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.59.0"
@@ -64,7 +64,7 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.1"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.16"
+const DefaultFirewallVersion Version = "v0.28.20"
 
 // AWFExcludeEnvMinVersion is the minimum AWF version that supports the --exclude-env flag.
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
@@ -90,7 +90,7 @@ const AWFAllowHostPortsMinVersion Version = "v0.25.24"
 const AWFDockerHostPathPrefixMinVersion Version = "v0.25.43"
 
 // AWFTokenSteeringMinVersion is the minimum AWF version that supports
-// apiProxy.enableTokenSteering (mapped from frontmatter firewall.effective-token-steering).
+// apiProxy.enableTokenSteering (mapped from frontmatter firewall.token-steering).
 const AWFTokenSteeringMinVersion Version = "v0.25.44"
 
 // AWFChrootConfigMinVersion is the minimum AWF version that supports
@@ -162,6 +162,10 @@ const AWFCloudHypervisorFilesystemAllowWriteMinVersion Version = "v0.28.6"
 // config schema accepts enclaves[].agent.github.cli = "issues-read-v1".
 const AWFEnclaveGitHubIssuesMinVersion Version = "v0.28.9"
 
+// AWFEnclaveAgentToolsMinVersion is the first AWF version whose
+// config schema accepts enclaves[].agent.tools.github.
+const AWFEnclaveAgentToolsMinVersion Version = "v0.28.20"
+
 // AWFEnclaveTrustedSensitivityMinVersion is the first AWF version whose
 // enclave response schema permits free-form string values for trusted repositories.
 const AWFEnclaveTrustedSensitivityMinVersion Version = "v0.28.14"
@@ -210,7 +214,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.21"
+const DefaultMCPGatewayVersion Version = "v0.4.25"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

@@ -4,7 +4,6 @@
 **Status**: Draft
 **Deciders**: pelikhan
 
-> **Migration note:** This ADR references the legacy Effective Tokens (ET) terminology for historical context. gh-aw now uses AI Credits (AIC) as the primary cost metric.
 
 ---
 
@@ -33,7 +32,7 @@ Accept `null` metric fields for older runs and document that pre-`aw_info.json` 
 #### Positive
 - Audit reports are populated for legacy runs, enabling accurate historical fleet analysis.
 - The fallback chain is additive and non-destructive: runs with `aw_info.json` are unaffected.
-- `agent_usage.json` token data (including `effective_tokens`) is surfaced through the same `TokenUsageSummary` abstraction already used by the primary path.
+- `agent_usage.json` token data (including `aic`) is surfaced through the same `TokenUsageSummary` abstraction already used by the primary path.
 
 #### Negative
 - The audit pipeline now has three distinct code paths for metric acquisition, increasing complexity and surface area for bugs.
@@ -41,7 +40,7 @@ Accept `null` metric fields for older runs and document that pre-`aw_info.json` 
 - `agent_usage.json` is treated as a single-request summary, so per-model and per-request breakdowns are not available via this fallback.
 
 #### Neutral
-- The `TokenUsageEntry` struct gains an `effective_tokens` field to accommodate `agent_usage.json` data; `token-usage.jsonl` entries omit this field and continue using computed effective token totals.
+- `agent_usage.json` fallback data is converted into the same aggregate token and AI Credits summaries as the primary path without adding per-entry fields to `token-usage.jsonl` records.
 - The engine inference function (`inferBestEngineMetricsFromContent`) iterates all registered engines and may add latency proportional to the number of registered parsers for runs without `aw_info.json`.
 
 ---

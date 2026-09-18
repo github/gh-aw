@@ -444,10 +444,10 @@ func TestComputeExperimentAnalysis(t *testing.T) {
 		}
 		cfg := &workflow.ExperimentConfig{
 			Variants: []string{"A", "B"},
-			Metric:   "effective_tokens",
+			Metric:   "aic",
 		}
 		a := computeExperimentAnalysisWithObservationBundle(exp, cfg, nil, nil, nil, nil)
-		assert.Equal(t, "effective_tokens", a.Metric, "metric should be set")
+		assert.Equal(t, "aic", a.Metric, "metric should be set")
 		assert.Empty(t, a.MetricQuestion, "MetricQuestion empty for plain metric")
 	})
 

@@ -569,7 +569,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("true");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("exceeded");
-      expect(coreOutputs["daily_ai_credits_total_effective_tokens"]).toBe("100");
+      expect(coreOutputs["daily_ai_credits_total"]).toBe("100");
       expect(coreOutputs["daily_ai_credits_threshold"]).toBe("100");
       expect(setFailed).not.toHaveBeenCalled();
     } finally {

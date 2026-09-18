@@ -21,6 +21,9 @@ const RATE_LIMIT_RESERVE = 100;
 const REQUEST_OVERHEAD_BUDGET = MAX_WORKFLOW_RUN_PAGES + 4;
 const ESTIMATED_API_OPERATIONS_PER_RUN = 2;
 const INTEGER_FORMATTER = new Intl.NumberFormat("en-US");
+const MAX_LEGACY_AGENT_LOG_BYTES = 10 * 1024 * 1024;
+const ENGINE_HARNESS_MARKER = /\[[^\]\r\n]+-harness\]/i;
+const AWF_STARTUP_FAILURE_MARKER = /Fatal error:|Process exiting with code:|Refusing to use symlink as bind mountpoint|mcp gateway[^\r\n]{0,80}(?:startup failed|failed to start|startup error)/i;
 
 /**
  * @returns {Promise<any>}
@@ -222,6 +225,65 @@ function matchesGuardrailArtifactName(artifactName) {
   return PRIMARY_GUARDRAIL_ARTIFACT_NAMES.some(name => artifactName === name || artifactName.endsWith(`-${name}`));
 }
 
+function inspectLegacyAgentLog(logText) {
+  return {
+    artifactInspected: true,
+    preHarnessFailure: AWF_STARTUP_FAILURE_MARKER.test(logText) && !ENGINE_HARNESS_MARKER.test(logText),
+    sampleReplay: /"driver"\s*:\s*"apply_samples"/.test(logText),
+  };
+}
+
+async function inspectLegacyAgentArtifact(artifactClient, artifacts, downloadRoot, token, owner, repo, run, components) {
+  const job = components.get("agent");
+  const noEvidence = { artifactInspected: false, preHarnessFailure: false, sampleReplay: false };
+  if (!job) return noEvidence;
+  for (const file of ["agent/token_usage.jsonl", "agent_usage.jsonl", "agent_usage.json"]) {
+    const accountingPath = path.join(downloadRoot, file);
+    if (!fs.existsSync(accountingPath)) continue;
+    try {
+      if (fs.readFileSync(accountingPath, "utf8").trim()) return noEvidence;
+    } catch {
+      return noEvidence;
+    }
+  }
+
+  const artifact = artifacts.find(item => item?.name === "agent");
+  const createdAt = artifact?.createdAt?.getTime();
+  const startedAt = Date.parse(job.started_at);
+  const completedAt = Date.parse(job.completed_at);
+  if (!artifact?.id || artifact.expired || !Number.isFinite(createdAt)) return noEvidence;
+  if (!Number.isFinite(startedAt)) return noEvidence;
+  if (!Number.isFinite(completedAt)) return noEvidence;
+  if (createdAt < startedAt || createdAt >= completedAt + 1000) {
+    return noEvidence;
+  }
+
+  const agentRoot = path.join(downloadRoot, "legacy-agent-artifact");
+  const download = await artifactClient.downloadArtifact(artifact.id, {
+    path: agentRoot,
+    findBy: {
+      token,
+      workflowRunId: run.id,
+      repositoryOwner: owner,
+      repositoryName: repo,
+    },
+  });
+  const logPath = path.join(download.downloadPath || agentRoot, "agent-stdio.log");
+  let stat;
+  try {
+    stat = fs.statSync(logPath);
+  } catch {
+    return noEvidence;
+  }
+  if (!stat.isFile() || stat.size > MAX_LEGACY_AGENT_LOG_BYTES) return noEvidence;
+
+  try {
+    return inspectLegacyAgentLog(fs.readFileSync(logPath, "utf8"));
+  } catch {
+    return noEvidence;
+  }
+}
+
 /**
  * @param {{ listArtifacts: Function, downloadArtifact: Function }} artifactClient
  * @param {number} runId
@@ -314,7 +376,9 @@ async function getRunAIC(artifactClient, runId, token, owner, repo, run, inspect
       downloadPath: download.downloadPath || downloadRoot,
       usageJSONLFiles,
     });
-    const aic = components ? sumCoveredComponents(download.downloadPath || downloadRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
+    const artifactRoot = download.downloadPath || downloadRoot;
+    const legacyAgentEvidence = components ? await inspectLegacyAgentArtifact(artifactClient, artifacts, artifactRoot, token, owner, repo, run, components) : null;
+    const aic = components ? sumCoveredComponents(artifactRoot, components, artifact.createdAt.getTime(), artifacts, artifact.name, run.run_attempt, run.id, legacyAgentEvidence) : sumAICFromUsageJSONLFiles(usageJSONLFiles);
     logDailyGuardrail("Computed run AIC from artifact", {
       runId,
       artifactId: artifact.id,
@@ -564,7 +628,7 @@ async function appendDailyAICSummary(workflowName, actorLogin, threshold, counte
  */
 async function main(options = {}) {
   core.setOutput("daily_ai_credits_exceeded", "false");
-  core.setOutput("daily_ai_credits_total_effective_tokens", "");
+  core.setOutput("daily_ai_credits_total", "");
   core.setOutput("daily_ai_credits_threshold", "");
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
   core.setOutput("daily_ai_credits_guardrail_error", "");
@@ -609,7 +673,7 @@ async function main(options = {}) {
     const actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || current.triggering_actor?.login || current.actor?.login || process.env.GITHUB_ACTOR || "";
     const rateLimit = budget.snapshot();
 
-    core.setOutput("daily_ai_credits_total_effective_tokens", String(totalAIC));
+    core.setOutput("daily_ai_credits_total", String(totalAIC));
     core.setOutput("daily_ai_credits_threshold", String(threshold));
 
     /** @type {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} */

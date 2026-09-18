@@ -44,7 +44,8 @@ function evaluate(files, jobs, overrides = {}) {
       ],
     })),
     downloadArtifact: vi.fn(async (_id, options) => {
-      for (const [name, value] of Object.entries(files)) {
+      const artifactFiles = _id === 1 && overrides.agentFiles ? overrides.agentFiles : files;
+      for (const [name, value] of Object.entries(artifactFiles)) {
         const file = path.join(options.path, ...name.split("/"));
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, value);
@@ -148,6 +149,26 @@ it("counts empty authoritative agent accounting as zero when the agent job faile
   await expect(f.result).resolves.toBe(0);
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
+});
+
+it("counts a successful sampled agent as zero when execution evidence proves inference did not start", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": "",
+      "agent/execution.json": JSON.stringify({
+        version: 1,
+        component: "agent",
+        run_id: 1,
+        run_attempt: 1,
+        state: "not_started",
+      }),
+    },
+    [job("agent")]
+  );
+
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"agent"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"execution_not_started"'));
 });
 
 it("counts missing evals accounting as zero when the failed job collected no usage", async () => {
@@ -283,9 +304,48 @@ it("counts missing evals accounting as zero when the job failed before any step 
   await expect(f.result).resolves.toBe(2);
 });
 
-it("still requires accounting when a failed agent job has no authoritative source", async () => {
+it.each([null, 0])("counts missing agent accounting as zero when a failed job never received a runner (%s)", async runnerId => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure", runner_id: runnerId, runner_name: null, steps: [] })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_assigned"'));
+});
+
+it("counts missing agent accounting as zero when the agent job failed", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
+  await expect(f.result).resolves.toBe(0);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"failed_before_accounting"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"agent/token_usage.jsonl"'));
+});
+
+it("counts legacy pre-harness agent failures as zero from the agent artifact", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure" })], {
+    agentFiles: {
+      "agent-stdio.log": "[ERROR] Fatal error: cloud-hypervisor --version failed\nProcess exiting with code: 1\n",
+    },
+  });
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.downloadArtifact).toHaveBeenCalledTimes(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"legacy_pre_harness_failure"'));
+});
+
+it("still requires accounting when a legacy agent artifact contains a harness marker", async () => {
+  const f = evaluate({}, [job("agent", { conclusion: "failure" })], {
+    agentFiles: {
+      "agent-stdio.log": "[claude-harness] starting\n[ERROR] Fatal error: agent failed\nProcess exiting with code: 1\n",
+    },
+  });
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
+it("counts a legacy successful sample replay with empty accounting as zero", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": "" }, [job("agent")], {
+    agentFiles: {
+      "agent-stdio.log": '{"type":"result","subtype":"success","terminal_reason":"completed","num_turns":1,"driver":"apply_samples"}\n',
+    },
+  });
+  await expect(f.result).resolves.toBe(0);
+  expect(f.client.downloadArtifact).toHaveBeenCalledTimes(2);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"legacy_sample_replay"'));
 });
 
 it("still requires accounting when an agent job succeeds", async () => {

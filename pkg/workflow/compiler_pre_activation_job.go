@@ -286,7 +286,7 @@ func (c *Compiler) buildPreActivationMemoryRestoreSteps(data *WorkflowData, step
 			commentMemorySteps.WriteString("      - name: Prepare comment memory files\n")
 			fmt.Fprintf(&commentMemorySteps, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 			commentMemorySteps.WriteString("        with:\n")
-			fmt.Fprintf(&commentMemorySteps, "          github-token: %s\n", getEffectiveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken))
+			fmt.Fprintf(&commentMemorySteps, "          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken))
 			commentMemorySteps.WriteString("          script: |\n")
 			commentMemorySteps.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 			commentMemorySteps.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")

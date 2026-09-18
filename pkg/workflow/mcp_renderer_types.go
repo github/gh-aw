@@ -86,8 +86,8 @@ type GitHubMCPDockerOptions struct {
 	IncludeTypeField bool
 	// AllowedTools specifies the list of allowed tools (Copilot uses this, Claude doesn't)
 	AllowedTools []string
-	// EffectiveToken is the GitHub token to use (Claude uses this, Copilot uses env passthrough)
-	EffectiveToken string
+	// ResolvedToken is the GitHub token to use (Claude uses this, Copilot uses env passthrough)
+	ResolvedToken string
 	// GuardPolicies specifies access control policies for the MCP gateway (e.g., allow-only repos/integrity)
 	GuardPolicies map[string]any
 	// EmitRequiredFalse writes `"required": false` for delegation-only backends whose startup
@@ -116,7 +116,7 @@ type GitHubMCPRemoteOptions struct {
 	// Emitted as X-MCP-Features header for the hosted endpoint.
 	Features string
 	// AuthorizationValue is the value for the Authorization header
-	// For Claude: "Bearer {effectiveToken}"
+	// For Claude: "Bearer {resolvedToken}"
 	// For Copilot: "Bearer \\${GITHUB_PERSONAL_ACCESS_TOKEN}"
 	AuthorizationValue string
 	// IncludeToolsField indicates whether to include the "tools" field (Copilot needs it, Claude doesn't)

@@ -616,6 +616,16 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.Experiments = experimentVariantsFromConfigs(workflowData.ExperimentConfigs)
 	workflowData.ExperimentsStorage = extractExperimentsStorageFromFrontmatter(frontmatter)
 
+	// Rewrite ${{ experiments.<name> }} references that ended up in engine.model (e.g.
+	// `engine: { model: ${{ experiments.model }} }`) so the compiled workflow reads the
+	// variant from the activation job's output instead of the non-existent `experiments`
+	// context. Most consumers (agent job model env vars, GH_AW_ENGINE_MODEL, etc.) run in
+	// jobs downstream of activation, so they resolve via `needs.activation.outputs.<name>`.
+	// The one exception (the activation job's own info step) rewrites this again locally.
+	// RewriteExperimentsReferenceForDownstreamJobs is a no-op when there are no experiments
+	// or workflowData.Model is empty, so no extra guard is needed here.
+	workflowData.Model = RewriteExperimentsReferenceForDownstreamJobs(workflowData.Model, workflowData.Experiments)
+
 	// Extract BinEval evals configuration.
 	evalsConfig, err := c.parseEvalsFromFrontmatter(frontmatter)
 	if err != nil {

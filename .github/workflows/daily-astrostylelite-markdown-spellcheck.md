@@ -262,7 +262,7 @@ experiments:
     variants: [concise, detailed]
     description: "Test whether a concise agent prompt achieves the same fix quality as the current detailed prompt while reducing token usage"
     hypothesis: "Concise prompt reduces token consumption ≥20% without degrading fix precision. H0: no difference in fix rate."
-    metric: effective_tokens
+    metric: aic
     secondary_metrics: [pr_acceptance_rate, output_length_chars]
     guardrail_metrics:
       - name: empty_output_rate

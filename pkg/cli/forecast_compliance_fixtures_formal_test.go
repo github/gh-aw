@@ -17,8 +17,8 @@ package cli
 //   - Z3-SMT schema gap: P12, P13
 //
 // Fixture-level predicates (issue behavioral coverage map):
-//   - FC-P3: run_summary_zero_et.json has total_effective_tokens == 0 (T-FC-022)
-//   - FC-P4: run_summary_high_et.json has total_effective_tokens >= 1,000,000 (T-ET-006)
+//   - FC-P3: run_summary_zero_aic.json has total_aic == 0 (T-FC-022)
+//   - FC-P4: run_summary_high_aic.json has total_aic >= 1,000,000
 //   - FC-P6: run_summary_failed.json has conclusion == "failure" (T-FC-035)
 //   - FC-P7: run_summary_cancelled.json has conclusion == "cancelled" (T-FC-036)
 //   - FC-P8: RunSummary JSON round-trip serialization is lossless
@@ -77,11 +77,10 @@ func TestFormal_P1_FixtureFieldMapping(t *testing.T) {
 		assert.Contains(t, run, field, "P1: run.%s must be present for forecast inputs", field)
 	}
 
-	// token_usage_summary must contain total_effective_tokens and total_aic.
+	// token_usage_summary must contain total_aic.
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "P1: 'token_usage_summary' must be a JSON object")
-	assert.Contains(t, usage, "total_effective_tokens", "P1: token_usage_summary.total_effective_tokens required")
-	assert.Contains(t, usage, "total_aic", "P1: token_usage_summary.total_aic required (AIC is what the engine reads)")
+	assert.Contains(t, usage, "total_aic", "P1: token_usage_summary.total_aic required")
 }
 
 // TestFormal_P2_BernoulliSuccess verifies the Bernoulli success model:
@@ -369,9 +368,9 @@ func TestFormal_P11_FlagValidation_Days(t *testing.T) {
 
 // TestFormal_P12_FixtureAICGap verifies that the canonical fixture exposes a
 // positive total_aic, closing the gap where the engine reads TotalAIC but the
-// original fixture only set total_effective_tokens.
+// canonical fixture includes a positive total_aic.
 //
-// Formal predicate (Z3-SMT gap): total_aic > 0 ∧ total_effective_tokens > 0
+// Formal predicate: total_aic > 0
 // Specification reference: forecast.go:593 (runAIC ≤ 0 → continue skips run)
 func TestFormal_P12_FixtureAICGap(t *testing.T) {
 	t.Parallel()
@@ -380,19 +379,12 @@ func TestFormal_P12_FixtureAICGap(t *testing.T) {
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "P12: token_usage_summary must be a JSON object")
 
-	// total_effective_tokens must remain non-zero (pre-existing invariant).
-	et, hasET := usage["total_effective_tokens"]
-	require.True(t, hasET, "P12: total_effective_tokens must be present")
-	etVal, ok := et.(float64)
-	require.True(t, ok, "P12: total_effective_tokens must be a number")
-	assert.Greater(t, etVal, 0.0, "P12: total_effective_tokens must be > 0")
-
-	// total_aic must now be present and positive so the forecast engine does not
+	// total_aic must be present and positive so the forecast engine does not
 	// skip the run at forecast.go:593 (runAIC ≤ 0 → continue).
 	aic, hasAIC := usage["total_aic"]
 	require.True(t, hasAIC,
 		"P12 (gap): total_aic must be present in token_usage_summary — "+
-			"engine reads TotalAIC, not total_effective_tokens")
+			"engine reads TotalAIC, not total_aic")
 	aicVal, ok := aic.(float64)
 	require.True(t, ok, "P12: total_aic must be a number")
 	assert.Greater(t, aicVal, 0.0,
@@ -434,52 +426,52 @@ func TestFormal_P13_FixtureJSONConformance(t *testing.T) {
 	// token_usage_summary required fields.
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "P13: 'token_usage_summary' must be a JSON object")
-	usageRequired := []string{"total_effective_tokens", "total_aic"}
+	usageRequired := []string{"total_aic"}
 	for _, field := range usageRequired {
 		assert.Contains(t, usage, field,
 			"P13: token_usage_summary.%q must be present", field)
 	}
 }
 
-// TestFormal_FC_P3_ZeroETFixture verifies that run_summary_zero_et.json
-// models a missing-artifact scenario: total_effective_tokens must equal 0.
+// TestFormal_FC_P3_ZeroAICFixture verifies that run_summary_zero_aic.json
+// models a missing-artifact scenario: total_aic must equal 0.
 //
-// Formal predicate (FC-P3): fixture["token_usage_summary"]["total_effective_tokens"] = 0
+// Formal predicate (FC-P3): fixture["token_usage_summary"]["total_aic"] = 0
 // Specification reference: T-FC-022; specs/forecast-compliance-fixtures/README.md
-func TestFormal_FC_P3_ZeroETFixture(t *testing.T) {
+func TestFormal_FC_P3_ZeroAICFixture(t *testing.T) {
 	t.Parallel()
-	fixture := loadFixture(t, "run_summary_zero_et.json")
+	fixture := loadFixture(t, "run_summary_zero_aic.json")
 
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "FC-P3: token_usage_summary must be a JSON object")
 
-	et, hasET := usage["total_effective_tokens"]
-	require.True(t, hasET, "FC-P3: total_effective_tokens must be present")
-	etVal, ok := et.(float64)
-	require.True(t, ok, "FC-P3: total_effective_tokens must be a number")
-	assert.InDelta(t, 0.0, etVal, 0.0,
-		"FC-P3 (T-FC-022): run_summary_zero_et.json must have total_effective_tokens == 0 "+
-			"to model a missing-artifact / no-ET scenario")
+	aic, hasAIC := usage["total_aic"]
+	require.True(t, hasAIC, "FC-P3: total_aic must be present")
+	aicVal, ok := aic.(float64)
+	require.True(t, ok, "FC-P3: total_aic must be a number")
+	assert.InDelta(t, 0.0, aicVal, 0.0,
+		"FC-P3 (T-FC-022): run_summary_zero_aic.json must have total_aic == 0 "+
+			"to model a missing-artifact scenario")
 }
 
-// TestFormal_FC_P4_HighETFixture verifies that run_summary_high_et.json
-// represents an overflow-boundary scenario: total_effective_tokens >= 1,000,000.
+// TestFormal_FC_P4_HighAICFixture verifies that run_summary_high_aic.json
+// represents an overflow-boundary scenario: total_aic >= 1,000,000.
 //
-// Formal predicate (FC-P4): fixture["token_usage_summary"]["total_effective_tokens"] >= 1_000_000
-// Specification reference: T-ET-006; specs/forecast-compliance-fixtures/README.md
-func TestFormal_FC_P4_HighETFixture(t *testing.T) {
+// Formal predicate (FC-P4): fixture["token_usage_summary"]["total_aic"] >= 1_000_000
+// Specification reference: specs/forecast-compliance-fixtures/README.md
+func TestFormal_FC_P4_HighAICFixture(t *testing.T) {
 	t.Parallel()
-	fixture := loadFixture(t, "run_summary_high_et.json")
+	fixture := loadFixture(t, "run_summary_high_aic.json")
 
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "FC-P4: token_usage_summary must be a JSON object")
 
-	et, hasET := usage["total_effective_tokens"]
-	require.True(t, hasET, "FC-P4: total_effective_tokens must be present")
-	etVal, ok := et.(float64)
-	require.True(t, ok, "FC-P4: total_effective_tokens must be a number")
-	assert.GreaterOrEqual(t, etVal, 1_000_000.0,
-		"FC-P4 (T-ET-006): run_summary_high_et.json must have total_effective_tokens >= 1,000,000 "+
+	aic, hasAIC := usage["total_aic"]
+	require.True(t, hasAIC, "FC-P4: total_aic must be present")
+	aicVal, ok := aic.(float64)
+	require.True(t, ok, "FC-P4: total_aic must be a number")
+	assert.GreaterOrEqual(t, aicVal, 1_000_000.0,
+		"FC-P4: run_summary_high_aic.json must have total_aic >= 1,000,000 "+
 			"to represent the overflow-boundary test case")
 }
 
@@ -522,13 +514,13 @@ func TestFormal_FC_P7_CancelledRunFixture(t *testing.T) {
 			"so it is included in the sample but not counted as a Bernoulli success")
 }
 
-// TestFormal_FC_P11_PartialETFixture verifies that run_summary_partial_et.json
+// TestFormal_FC_P11_PartialAICFixture verifies that run_summary_partial_aic.json
 // represents an in-progress run with a non-zero token usage snapshot.
 //
 // Specification reference: T-FC-024; specs/forecast-compliance-fixtures/README.md
-func TestFormal_FC_P11_PartialETFixture(t *testing.T) {
+func TestFormal_FC_P11_PartialAICFixture(t *testing.T) {
 	t.Parallel()
-	fixture := loadFixture(t, "run_summary_partial_et.json")
+	fixture := loadFixture(t, "run_summary_partial_aic.json")
 
 	run, ok := fixture["run"].(map[string]any)
 	require.True(t, ok, "FC-P11: 'run' must be a JSON object")
@@ -537,9 +529,9 @@ func TestFormal_FC_P11_PartialETFixture(t *testing.T) {
 
 	usage, ok := fixture["token_usage_summary"].(map[string]any)
 	require.True(t, ok, "FC-P11: token_usage_summary must be a JSON object")
-	et, ok := usage["total_effective_tokens"].(float64)
-	require.True(t, ok, "FC-P11: total_effective_tokens must be a number")
-	assert.Greater(t, et, 0.0,
+	aic, ok := usage["total_aic"].(float64)
+	require.True(t, ok, "FC-P11: total_aic must be a number")
+	assert.Greater(t, aic, 0.0,
 		"FC-P11 (T-FC-024): partial fixture must contain a non-zero token usage snapshot")
 }
 
@@ -600,11 +592,11 @@ func TestFormal_FC_P9_TimestampOrdering(t *testing.T) {
 	t.Parallel()
 	fixtures := []string{
 		"run_summary_minimal.json",
-		"run_summary_zero_et.json",
+		"run_summary_zero_aic.json",
 		"run_summary_failed.json",
-		"run_summary_high_et.json",
+		"run_summary_high_aic.json",
 		"run_summary_cancelled.json",
-		"run_summary_partial_et.json",
+		"run_summary_partial_aic.json",
 	}
 
 	for _, name := range fixtures {
@@ -645,11 +637,11 @@ func TestFormal_FC_P10_MonteCarloInputCompleteness(t *testing.T) {
 
 	cases := []fixtureExpectation{
 		{name: "run_summary_minimal.json", wantConclusion: "success", aicMustBeGT0: true},
-		{name: "run_summary_zero_et.json", wantConclusion: "success", aicMustBeGT0: false},
+		{name: "run_summary_zero_aic.json", wantConclusion: "success", aicMustBeGT0: false},
 		{name: "run_summary_failed.json", wantConclusion: "failure", aicMustBeGT0: false},
-		{name: "run_summary_high_et.json", wantConclusion: "success", aicMustBeGT0: true},
+		{name: "run_summary_high_aic.json", wantConclusion: "success", aicMustBeGT0: true},
 		{name: "run_summary_cancelled.json", wantConclusion: "cancelled", aicMustBeGT0: false},
-		{name: "run_summary_partial_et.json", wantConclusion: "", aicMustBeGT0: true},
+		{name: "run_summary_partial_aic.json", wantConclusion: "", aicMustBeGT0: true},
 	}
 
 	for _, tc := range cases {
@@ -703,11 +695,11 @@ func TestFormal_FC_P10_MonteCarloInputCompleteness(t *testing.T) {
 // README, the fixture directory, or this test has drifted out of sync.
 var documentedForecastFixtures = []string{
 	"run_summary_minimal.json",
-	"run_summary_zero_et.json",
+	"run_summary_zero_aic.json",
 	"run_summary_failed.json",
-	"run_summary_high_et.json",
+	"run_summary_high_aic.json",
 	"run_summary_cancelled.json",
-	"run_summary_partial_et.json",
+	"run_summary_partial_aic.json",
 }
 
 // TestFormal_FixtureCountConsistency verifies that the fixture files documented in

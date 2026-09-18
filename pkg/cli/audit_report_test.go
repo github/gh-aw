@@ -940,7 +940,6 @@ func TestBuildAuditDataFallbackMetricsWithoutAwInfo(t *testing.T) {
 		TokenUsage: &TokenUsageSummary{
 			TotalInputTokens:      5944,
 			TotalOutputTokens:     8698,
-			TotalEffectiveTokens:  243846,
 			TotalCacheReadTokens:  1170605,
 			TotalCacheWriteTokens: 86049,
 		},

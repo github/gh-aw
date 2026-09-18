@@ -209,7 +209,7 @@ export default defineConfig({
     "/reference/experiments-specification/": "/gh-aw/experimental/experiments-specification/",
     "/reference/ai-credits-specification/": "/gh-aw/specs/ai-credits-specification/",
     "/reference/copilot-sdk-driver-specification/": "/gh-aw/specs/copilot-sdk-driver-specification/",
-    "/reference/effective-tokens-specification/": "/gh-aw/specs/effective-tokens-specification/",
+    "/reference/effective-tokens-specification/": "/gh-aw/specs/ai-credits-specification/",
     "/reference/forecast-specification/": "/gh-aw/specs/forecast-specification/",
     "/reference/frontmatter-hash-specification/": "/gh-aw/specs/frontmatter-hash-specification/",
     "/reference/fuzzy-schedule-specification/": "/gh-aw/specs/fuzzy-schedule-specification/",

@@ -182,7 +182,7 @@ count := typeutil.ConvertToInt(jsonData["count"])
 // Safe uint64 to int conversion
 n := typeutil.SafeUint64ToInt(uint64Value)
 
-// Parse an effective token limit string with optional K/M suffix
+// Parse an AI Credit limit string with optional K/M suffix
 limit, ok := typeutil.ParseInt64KMSuffix("128K")
 if !ok {
     return errors.New("invalid token limit value")

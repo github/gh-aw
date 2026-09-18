@@ -311,7 +311,7 @@ safe-outputs:
     - "!inference_access_error"
 ```
 
-Common categories include `agent_failure`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
+Common categories include `agent_failure`, `timed_out`, `missing_safe_outputs`, `report_incomplete`, `missing_tool`, `missing_data`, `inference_access_error`, `copilot_org_billing_error`, and `ai_credits_rate_limit_error`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for the full list.
 
 ### Report Failed Jobs (`report-failed-jobs:`)
 
@@ -403,6 +403,10 @@ A repository secret name used to authenticate Copilot inference with a specific 
 ### Copilot Org Billing Opt-Out (`copilot-requests: none`)
 
 A frontmatter setting, `permissions: copilot-requests: none`, that explicitly declines centralized organization billing for the Copilot engine. Without it, `gh aw compile` emits an informational tip on every compilation suggesting `copilot-requests: write` when the conditions for org billing are otherwise met; setting `none` silences that tip for workflows intentionally using individual/seat billing via `COPILOT_GITHUB_TOKEN`. See [Billing Reference](/gh-aw/reference/billing/).
+
+### Copilot Org Billing Error (`copilot_org_billing_error`)
+
+A failure category recorded when Copilot authorization fails because organization billing for Copilot CLI is unavailable, distinct from other credential problems captured by `inference_access_error`. It can be included or excluded from automatic failure-issue creation via [Failure Issue Reporting (`report-failure-as-issue:`)](#failure-issue-reporting-report-failure-as-issue). See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/).
 
 ### Per-Handler GitHub App Override (`safe-outputs.<type>.github-app`)
 
@@ -1287,6 +1291,10 @@ Passing two or more run IDs to `gh aw audit` activates diff mode: the first ID i
 
 A compact artifact produced by the conclusion job, containing workflow-run metadata and aggregated token-usage data used by lightweight reporting and forecasting paths. Unlike the full `agent` artifact, `usage` carries only summarized usage summaries — making it faster to download when detailed agent logs are not needed. Download with `gh aw logs <run-id> --artifacts usage`. See [Artifacts Reference](/gh-aw/reference/artifacts/).
 
+### Download Stats Summary (`gh aw logs`)
+
+An end-of-run informational line printed by `gh aw logs` across single-target, multi-target, and stdin-driven invocations, reporting average and maximum per-run artifact download duration and size across runs actually downloaded during the invocation, plus an estimated GitHub API request cost per run derived from collected rate-limit reports. Cache hits are excluded from the aggregate so the summary reflects only real transfer work. Per-run duration and size are also persisted as `download_duration_ms` and `download_size_bytes` in cached `RunData`/JSONL records for later analysis. See [CLI Reference](/gh-aw/setup/cli/).
+
 ### Behavior Fingerprint
 
 A multi-dimensional characterization of a single workflow run produced by `gh aw audit`. Captures the task domain, network access patterns, tool usage profile, token consumption, and agentic assessments in a compact summary. Two runs with the same fingerprint exhibit identical observable behavior; diverging fingerprints signal regressions or unexpected changes. See [Audit Commands](/gh-aw/reference/audit/).
@@ -1307,10 +1315,6 @@ A CLI command that reads and writes [`GH_AW_DEFAULT_*`](#gh_aw_default_) governa
 
 The primary inference-cost metric for GitHub Agentic Workflows. One AI Credit equals `0.01 USD` and is computed from input, output, cache-read, cache-write, and reasoning tokens multiplied by per-model pricing weights. AIC provides a model-normalized spend unit across all supported engines, enabling consistent budget governance and cost comparison. Reports from `gh aw audit` and `gh aw logs` expose AIC as `total_aic` (per episode or run) and per-request values. Use `max-ai-credits` and `max-daily-ai-credits` in workflow frontmatter to set budget caps. See [AI Credits Specification](/gh-aw/specs/ai-credits-specification/).
 
-### Effective Tokens (ET)
-
-The predecessor cost metric to [AI Credits (AIC)](#ai-credits-aic), computed as a weighted sum of input and output tokens to approximate relative inference cost. Deprecated in 2026 in favor of AI Credits, which provides direct monetary normalization (1 AIC = 0.01 USD) across all supported model providers. The `effective_tokens` field in audit JSON output is retained for backward compatibility; use `total_aic` for cost analysis in new workflows. See [Effective Tokens Specification](/gh-aw/specs/effective-tokens-specification/).
-
 ### Forecast (`gh aw forecast`)
 
 A CLI command that projects future AI Credits (AIC) consumption using a statistical simulation. It samples historical workflow runs, applies a Poisson-bootstrap algorithm to model run frequency, and returns P10/P50/P90 percentile estimates over a configurable time horizon. Supports both local (`.github/workflows/`) and remote (`--repo`) discovery modes. Output is available as a console table or machine-readable JSON (`--json`). Forecasts are estimates and may be inaccurate. Useful for capacity planning, budget governance, and detecting cost regressions before they occur. See [Forecast Specification](/gh-aw/specs/forecast-specification/).
@@ -1323,7 +1327,7 @@ The elapsed time between consecutive LLM API calls in a workflow run. TBT matter
 
 ### Ambient Context
 
-The token footprint of the first LLM invocation in a workflow run, used as a proxy for the static context loaded at startup (system prompt, tools list, memory). Because the first invocation fires before the agent has accumulated any conversation history, its input token count primarily reflects the overhead of the configured environment rather than task-specific content. Reported as an optional `ambient_context` object in `gh aw audit` and `gh aw logs` JSON output with three fields: `input_tokens`, `cached_tokens`, and `effective_tokens`. Useful for comparing context overhead across different workflow configurations. See [Audit Commands](/gh-aw/reference/audit/).
+The token footprint of the first LLM invocation in a workflow run, used as a proxy for the static context loaded at startup (system prompt, tools list, memory). Because the first invocation fires before the agent has accumulated any conversation history, its input token count primarily reflects the overhead of the configured environment rather than task-specific content. Reported as an optional `ambient_context` object in `gh aw audit` and `gh aw logs` JSON output with two fields: `input_tokens` and `cached_tokens`. Useful for comparing context overhead across different workflow configurations. See [Audit Commands](/gh-aw/reference/audit/).
 
 ### Firewall Analysis
 
@@ -1381,6 +1385,10 @@ A custom Go static-analysis linter (`pkg/linters/ssljson`) that validates Schedu
 ### manualpathconcat
 
 A custom Go static-analysis linter (`pkg/linters/manualpathconcat`) that flags manual `"/"`-based path concatenation (for example, `dir + "/" + name`) in favor of `filepath.Join`. Part of the gh-aw linter registry used in CI to enforce internal Go code-quality conventions. See [Linters README](https://github.com/github/gh-aw/blob/main/pkg/linters/README.md).
+
+### blankassigncomma
+
+A custom Go static-analysis linter (`pkg/linters/blankassigncomma`) that reports assignment statements where every result is discarded via two or more blank identifiers (for example, `_, _ = f()`), a pattern that can hide unintentionally ignored return values. Single blank assignments and assignments retaining at least one non-blank identifier (for example, `_, _, err := f()`) are not flagged. Registered in the gh-aw linter registry but tracked as `notYetEnforced` in CI until existing occurrences are remediated. See [Linters README](https://github.com/github/gh-aw/blob/main/pkg/linters/README.md).
 
 ### Validation
 
@@ -1688,7 +1696,7 @@ Deterministic, non-LLM checks that compute metrics from a workflow run's post-ag
 
 ### Operational Value Grader (`graders.operational-value`)
 
-A reserved grader that evaluates operational repository outcomes using inline Bash or a repository-relative Bash file, frozen at compile time with its SHA-256 digest recorded for reproducibility. It runs once with no arguments, reads the current run request from standard input, and writes an ordered array of normalized metrics. The first metric is primary and later metrics are diagnostics. The evaluator receives the workflow token via `GH_TOKEN` with the agent job's declared permissions, but not workflow secrets, and enabling the grader does not add evidence permissions to the agent job. See [Graders Reference](/gh-aw/experimental/trace-graders/#operational-value-grader) and the `operational value designer` skill (`/operational-value-designer`) for inferring operational value from an agentic workflow.
+A reserved grader that evaluates operational repository outcomes using inline Bash or a repository-relative Bash file, frozen at compile time with its SHA-256 digest recorded for reproducibility. It runs once with no arguments, reads the current run request from standard input, and writes an ordered array of `{id,value}` metrics. The first metric is primary and later metrics are diagnostics. Values are finite numbers or `null` and retain their native scale — gh-aw validates but does not normalize, clamp, or convert them to pass/fail; `unit` and `direction` describe each metric's meaning. The evaluator receives the workflow token via `GH_TOKEN` with the agent job's declared permissions, but not workflow secrets, and enabling the grader does not add evidence permissions to the agent job. See [Graders Reference](/gh-aw/experimental/trace-graders/#operational-value-grader) and the `operational value designer` skill (`/operational-value-designer`) for inferring operational value from an agentic workflow.
 
 ### Recurrence Trapping Time (RQA TT) (`graders.recurrence-trapping-time`)
 

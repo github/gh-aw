@@ -8,6 +8,7 @@ import {
   ensureSafeOutputsTools,
   auditLog,
   ensureAuditDir,
+  findInlineJsonPayloadArg,
   formatResponse,
   getToolCallTimeoutMs,
   hasStdinJsonPayload,
@@ -908,6 +909,69 @@ describe("mcp_cli_bridge.cjs", () => {
     });
   });
 
+  describe("inline JSON payload argument", () => {
+    it("detects a single JSON object argument", () => {
+      expect(findInlineJsonPayloadArg(['{"message":"done"}'])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg([' {"message":"done"} '])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg(['{"message":"done"}', "--json"])).toBe('{"message":"done"}');
+      expect(findInlineJsonPayloadArg(["[1,2]"])).toBe("[1,2]");
+      expect(findInlineJsonPayloadArg(["null"])).toBe("null");
+    });
+
+    it("does not treat flags, sentinels or plain text as inline JSON", () => {
+      expect(findInlineJsonPayloadArg(["."])).toBeNull();
+      expect(findInlineJsonPayloadArg(["--message", '{"a":1}'])).toBeNull();
+      expect(findInlineJsonPayloadArg(["no action needed"])).toBeNull();
+      expect(findInlineJsonPayloadArg([])).toBeNull();
+    });
+
+    it("parses an inline JSON object into tool arguments", () => {
+      const schemaProperties = { issue_number: { type: "integer" }, body: { type: "string" } };
+
+      const { args } = parseToolArgs(['{"issue-number": 42, "body": "hello"}'], schemaProperties);
+
+      expect(args).toEqual({ issue_number: 42, body: "hello" });
+    });
+
+    it("preserves value types from the inline JSON object", () => {
+      const { args } = parseToolArgs(['{"count": 5, "enabled": true, "tags": ["a"]}'], {});
+
+      expect(args).toEqual({ count: 5, enabled: true, tags: ["a"] });
+    });
+
+    it("prefers the inline JSON argument over stdin content", () => {
+      const { args } = parseToolArgs(['{"message":"inline"}'], {}, '{"message":"stdin"}');
+
+      expect(args).toEqual({ message: "inline" });
+    });
+
+    it("throws a loud error when the inline JSON argument is malformed", () => {
+      expect(() => parseToolArgs(['{"message":'], {})).toThrow(/inline JSON argument is not valid JSON/i);
+    });
+
+    it("throws when the inline JSON argument is not an object", () => {
+      expect(() => parseToolArgs(["{} extra"], {})).toThrow(/inline JSON argument is not valid JSON/i);
+      expect(() => parseToolArgs(["[1,2]"], {})).toThrow(/inline JSON argument must be a JSON object/i);
+      expect(() => parseToolArgs(["null"], {})).toThrow(/inline JSON argument must be a JSON object/i);
+    });
+
+    it("preserves --json when used with an inline payload", () => {
+      const { args, json } = parseToolArgs(['{"message":"done"}', "--json"], {});
+      expect(args).toEqual({ message: "done" });
+      expect(json).toBe(true);
+    });
+
+    it("honors false --json values with an inline payload", () => {
+      const { args, json } = parseToolArgs(['{"message":"done"}', "--json=false"], {});
+      expect(args).toEqual({ message: "done" });
+      expect(json).toBe(false);
+    });
+
+    it("rejects an invalid --json value with an inline payload", () => {
+      expect(() => parseToolArgs(['{"message":"done"}', "--json=flase"], {})).toThrow(/invalid value for --json/i);
+    });
+  });
+
   describe("stdin JSON payload support", () => {
     it("returns true for '.' sentinel", () => {
       expect(hasStdinJsonPayload(["."])).toBe(true);
@@ -1748,6 +1812,58 @@ describe("mcp_cli_bridge.cjs", () => {
       expect(global.core.warning).not.toHaveBeenCalledWith(expect.stringContaining("No arguments provided for 'create_issue'"));
       expect(stderrChunks.join("")).toContain("stdin is not valid JSON");
       expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Argument parsing failed"));
+    });
+
+    it("calls the tool with an inline JSON payload argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", '{"title":"Inline payload"}']);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({ title: "Inline payload" });
+    });
+
+    it("calls the tool with inline JSON followed by --json", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", '{"title":"Inline payload"}', "--json"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({ title: "Inline payload" });
+    });
+
+    it("allows an explicit empty inline JSON payload for a zero-input tool", async () => {
+      setupMainCall(zeroInputTools, ["dispatch_code_factory", "{}"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeDefined();
+      expect(toolsCallBody.params.arguments).toEqual({});
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("fails instead of silently dropping an unrecognized positional argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", "no action needed"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeUndefined();
+      expect(stderrChunks.join("")).toContain("no arguments were recognized for 'create_issue'");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
+    });
+
+    it("fails when --json accompanies an unrecognized positional argument", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", "--json", "no action needed"]);
+
+      await main();
+
+      const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
+      expect(toolsCallBody).toBeUndefined();
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
     });
 
     it("still shows help for no-flag piped stdin when stdin is truly empty", async () => {

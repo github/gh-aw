@@ -110,6 +110,12 @@ func (c *Compiler) buildConclusionDetectionRunsStep(data *WorkflowData, mainJobN
 	if !IsDetectionJobEnabled(data.SafeOutputs) {
 		return nil
 	}
+	// Allow opting out of the "[aw] Detection Runs" tracking issue independently of
+	// threat detection itself via safe-outputs.threat-detection.report-as-issue: false.
+	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && !data.SafeOutputs.ThreatDetection.IsReportAsIssueEnabled() {
+		notifyCommentLog.Print("Skipping detection runs logging step: report-as-issue is disabled")
+		return nil
+	}
 	envVars := buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_DETECTION_CONCLUSION: ${{ needs.%s.outputs.detection_conclusion }}\n", constants.DetectionJobName))
@@ -238,7 +244,6 @@ func (c *Compiler) buildAgentFailureCoreVars(data *WorkflowData, mainJobName str
 	if ShouldGeneratePRCheckoutStep(data) {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.%s.outputs.checkout_pr_success }}\n", mainJobName))
 	}
-	envVars = append(envVars, fmt.Sprintf("          GH_AW_EFFECTIVE_TOKENS: ${{ needs.%s.outputs.effective_tokens || '' }}\n", mainJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.%s.outputs.ai_credits_rate_limit_error || 'false' }}\n", mainJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.%s.outputs.unknown_model_ai_credits || 'false' }}\n", mainJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_AIC: ${{ needs.%s.outputs.aic }}\n", mainJobName))
@@ -328,7 +333,7 @@ func buildAgentFailureActivationStatusVars(data *WorkflowData) []string {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.%s.outputs.daily_ai_credits_exceeded }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.%s.outputs.daily_ai_credits_guardrail_status }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.%s.outputs.daily_ai_credits_guardrail_error }}\n", constants.ActivationJobName))
-		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_TOTAL_EFFECTIVE_TOKENS: ${{ needs.%s.outputs.daily_ai_credits_total_effective_tokens }}\n", constants.ActivationJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.%s.outputs.daily_ai_credits_total }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.%s.outputs.daily_ai_credits_threshold }}\n", constants.ActivationJobName))
 	}
 	return envVars

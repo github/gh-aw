@@ -259,14 +259,14 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 		githubApp = data.SafeOutputs.GitHubApp
 	}
 
-	effectiveCustomToken := configToken
-	if effectiveCustomToken == "" {
-		effectiveCustomToken = safeOutputsToken
+	resolvedCustomToken := configToken
+	if resolvedCustomToken == "" {
+		resolvedCustomToken = safeOutputsToken
 	}
 
 	if allowGitHubApp && githubApp != nil {
 		if githubApp.shouldIgnoreMissingKey() {
-			fallbackToken := resolver(effectiveCustomToken)
+			fallbackToken := resolver(resolvedCustomToken)
 			*steps = append(*steps, fmt.Sprintf("          github-token: %s\n", combineTokenExpressions("${{ steps.safe-outputs-app-token.outputs.token }}", fallbackToken)))
 			return
 		}
@@ -274,8 +274,8 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 		return
 	}
 
-	effectiveToken := resolver(effectiveCustomToken)
-	*steps = append(*steps, fmt.Sprintf("          github-token: %s\n", effectiveToken))
+	resolvedToken := resolver(resolvedCustomToken)
+	*steps = append(*steps, fmt.Sprintf("          github-token: %s\n", resolvedToken))
 }
 
 // addSafeOutputGitHubTokenForConfig adds github-token to the with section for standard safe-output operations.
@@ -284,7 +284,7 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 //   - when safe-outputs.github-app ignores missing keys, the app token is primary and the resolved custom token is fallback
 //   - otherwise: config token > safe-outputs global github-token > GH_AW_GITHUB_TOKEN || GITHUB_TOKEN
 func (c *Compiler) addSafeOutputGitHubTokenForConfig(steps *[]string, data *WorkflowData, configToken string) {
-	c.addResolvedSafeOutputGitHubTokenForConfig(steps, data, configToken, getEffectiveSafeOutputGitHubToken, true)
+	c.addResolvedSafeOutputGitHubTokenForConfig(steps, data, configToken, resolveSafeOutputGitHubToken, true)
 }
 
 // addSafeOutputCopilotGitHubTokenForConfig adds github-token to the with section for Copilot-related operations
@@ -304,7 +304,7 @@ func (c *Compiler) addSafeOutputCopilotGitHubTokenForConfig(steps *[]string, dat
 // The Copilot assignment API only accepts PATs (fine-grained or classic), not GitHub App
 // installation tokens. Callers must provide an explicit github-token or rely on GH_AW_AGENT_TOKEN.
 func (c *Compiler) addSafeOutputAgentGitHubTokenForConfig(steps *[]string, data *WorkflowData, configToken string) {
-	// Get effective token - falls back to ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+	// Get resolved token - falls back to ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 	// when no explicit token is provided. GitHub App tokens are never used here because the
 	// Copilot assignment API rejects them.
 	c.addResolvedSafeOutputGitHubTokenForConfig(steps, data, configToken, getEffectiveCopilotCodingAgentGitHubToken, false)

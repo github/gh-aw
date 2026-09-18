@@ -37,8 +37,7 @@
     "total_duration_ms": 18500,
     "total_response_bytes": 24680,
     "cache_efficiency": 0.1778,
-    "total_effective_tokens": 0,
-    "total_aic": 0.0054,
+    "total_aic": 0.0,
     "by_model": {
       "claude-3-7-sonnet": {
         "provider": "anthropic",
@@ -49,7 +48,7 @@
         "requests": 3,
         "duration_ms": 18500,
         "response_bytes": 24680,
-        "effective_tokens": 0
+        "aic": 0.0
       }
     }
   }

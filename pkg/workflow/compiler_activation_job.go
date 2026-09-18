@@ -55,22 +55,6 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	}
 	ctx.steps = append(ctx.steps, buildRuntimeFeaturesSummaryStep()...)
 
-	// Generate experiment selection steps when experiments are declared in the frontmatter.
-	// These steps run before the prompt is built so that experiments.name expressions
-	// can be resolved by the substitute_placeholders step.
-	if experimentSteps := c.generateExperimentSteps(data); len(experimentSteps) > 0 {
-		compilerActivationJobLog.Printf("Adding %d experiment step(s) for %d experiment(s)", len(experimentSteps), len(data.Experiments))
-		ctx.steps = append(ctx.steps, experimentSteps...)
-		// Expose the combined experiment JSON as a job output so downstream jobs can access
-		// the variant assignments via needs.activation.outputs.experiments.
-		ctx.outputs["experiments"] = "${{ steps.pick-experiment.outputs.experiments }}"
-		// Also expose each experiment variant individually so downstream jobs can reference
-		// needs.activation.outputs.<name> in timeout-minutes or other expressions.
-		for _, name := range sortedExperimentNames(data.Experiments) {
-			ctx.outputs[name] = "${{ steps.pick-experiment.outputs." + name + " }}"
-		}
-	}
-
 	c.configureActivationNeedsAndCondition(ctx)
 	compilerActivationJobLog.Print("Generating prompt in activation job")
 	c.generatePromptInActivationJob(&ctx.steps, data, preActivationJobCreated, ctx.customJobsBeforeActivation)

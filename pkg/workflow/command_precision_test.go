@@ -42,6 +42,7 @@ tools:
 				"github.event_name == 'issues'",
 				"startsWith(github.event.issue.body, '/test-bot ')",
 				"startsWith(github.event.issue.body, '/test-bot\\n')",
+				"startsWith(github.event.issue.body, '/test-bot\\r')",
 				"github.event.issue.body == '/test-bot'",
 			},
 			shouldNotContain: []string{
@@ -65,6 +66,7 @@ tools:
 				"github.event_name == 'issue_comment'",
 				"startsWith(github.event.comment.body, '/test-bot ')",
 				"startsWith(github.event.comment.body, '/test-bot\\n')",
+				"startsWith(github.event.comment.body, '/test-bot\\r')",
 				"github.event.comment.body == '/test-bot'",
 				"github.event.issue.pull_request == null",
 			},

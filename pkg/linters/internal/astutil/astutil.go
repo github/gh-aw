@@ -463,6 +463,54 @@ func FileForPos(files []*ast.File, pos token.Pos) *ast.File {
 	return nil
 }
 
+// BuildParentMap constructs a map from each AST node to its direct parent node.
+func BuildParentMap(root ast.Node) map[ast.Node]ast.Node {
+	parents := make(map[ast.Node]ast.Node)
+	var stack []ast.Node
+
+	ast.Inspect(root, func(n ast.Node) bool {
+		if n == nil {
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
+			}
+			return false
+		}
+		if len(stack) > 0 {
+			parents[n] = stack[len(stack)-1]
+		}
+		stack = append(stack, n)
+		return true
+	})
+
+	return parents
+}
+
+// TwoValueTypeAssertionOKIdent returns the ok identifier for a two-value type
+// assertion assignment or variable declaration.
+func TwoValueTypeAssertionOKIdent(typeAssert *ast.TypeAssertExpr, parents map[ast.Node]ast.Node) (*ast.Ident, bool) {
+	parent := parents[typeAssert]
+	for {
+		paren, ok := parent.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		parent = parents[paren]
+	}
+
+	switch p := parent.(type) {
+	case *ast.AssignStmt:
+		if len(p.Lhs) == 2 && len(p.Rhs) == 1 {
+			okIdent, ok := p.Lhs[1].(*ast.Ident)
+			return okIdent, ok
+		}
+	case *ast.ValueSpec:
+		if len(p.Names) == 2 && len(p.Values) == 1 {
+			return p.Names[1], true
+		}
+	}
+	return nil, false
+}
+
 // CountPkgUsesInFile returns the number of times the package at pkgPath is
 // referenced as a selector base within file (e.g. each "fmt.X" call counts
 // as one use of the "fmt" package).

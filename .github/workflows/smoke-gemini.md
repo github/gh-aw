@@ -23,8 +23,8 @@ experiments:
   sub_agent_strategy:
     variants: [single_agent, sub_agents]
     description: "Test whether decomposing smoke test tasks to sub-agents reduces cost without losing reliability"
-    hypothesis: "H0: no change in effective_tokens. H1: sub_agents reduces tokens by >=20%"
-    metric: effective_tokens
+    hypothesis: "H0: no change in aic. H1: sub_agents reduces tokens by >=20%"
+    metric: aic
     secondary_metrics: [run_duration_seconds, success_rate]
     guardrail_metrics:
       - name: success_rate

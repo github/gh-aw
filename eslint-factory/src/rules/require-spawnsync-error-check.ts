@@ -1,12 +1,10 @@
 import { AST_NODE_TYPES, ESLintUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { isChildProcessObjectBinding } from "./try-catch-rule-utils";
 
 const createRule = ESLintUtils.RuleCreator(name => `https://github.com/github/gh-aw/tree/main/eslint-factory#${name}`);
 
 // Unqualified function name used when spawnSync is destructured from child_process.
 const SPAWNSYNC_NAME = "spawnSync";
-
-// Known namespace aliases for the child_process module.
-const CHILD_PROCESS_OBJECTS = new Set(["childProcess", "child_process"]);
 const CONDITIONAL_TEST_PARENTS = new Set([AST_NODE_TYPES.IfStatement, AST_NODE_TYPES.WhileStatement, AST_NODE_TYPES.DoWhileStatement, AST_NODE_TYPES.ForStatement]);
 
 function isConditionalTestParent(node: TSESTree.Node): node is TSESTree.IfStatement | TSESTree.WhileStatement | TSESTree.DoWhileStatement | TSESTree.ForStatement {
@@ -137,10 +135,13 @@ function getErrorBindingNames(node: TSESTree.ObjectPattern): string[] {
  * Returns true when the expression is a call to spawnSync (either bare or namespaced).
  * Matched forms:
  *   spawnSync(cmd, args, opts)
- *   childProcess.spawnSync(cmd, args, opts)
- *   child_process.spawnSync(cmd, args, opts)
+ *   childProcess.spawnSync(cmd, args, opts)   // any identifier bound to require("child_process")
+ *   cp.spawnSync(cmd, args, opts)             // e.g. const cp = require("child_process")
+ *
+ * The namespace object is resolved through scope analysis (isChildProcessObjectBinding)
+ * rather than a fixed name allowlist, so arbitrary local aliases are recognized.
  */
-function isSpawnSyncCall(node: TSESTree.Expression): boolean {
+function isSpawnSyncCall(node: TSESTree.Expression, sourceCode: Readonly<TSESLint.SourceCode>): boolean {
   if (node.type !== AST_NODE_TYPES.CallExpression) return false;
   const callee = node.callee;
 
@@ -152,9 +153,9 @@ function isSpawnSyncCall(node: TSESTree.Expression): boolean {
     callee.type === AST_NODE_TYPES.MemberExpression &&
     !callee.computed &&
     callee.object.type === AST_NODE_TYPES.Identifier &&
-    CHILD_PROCESS_OBJECTS.has(callee.object.name) &&
     callee.property.type === AST_NODE_TYPES.Identifier &&
-    callee.property.name === SPAWNSYNC_NAME
+    callee.property.name === SPAWNSYNC_NAME &&
+    isChildProcessObjectBinding(callee.object.name, callee.object, sourceCode)
   ) {
     return true;
   }
@@ -190,7 +191,7 @@ export const requireSpawnSyncErrorCheckRule = createRule({
     return {
       VariableDeclarator(node: TSESTree.VariableDeclarator) {
         if (!node.init) return;
-        if (!isSpawnSyncCall(node.init)) return;
+        if (!isSpawnSyncCall(node.init, sourceCode)) return;
 
         if (node.id.type === AST_NODE_TYPES.ObjectPattern) {
           const errorBindingNames = getErrorBindingNames(node.id);

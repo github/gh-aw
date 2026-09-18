@@ -27,7 +27,7 @@ experiments:
     variants: [detailed, concise]
     description: "Tests whether a concise directive produces equivalent discussion quality to the current verbose 5-phase prompt"
     hypothesis: "H0: no change in output quality. H1: concise prompt reduces token usage by ≥20% with no significant drop in output completeness score"
-    metric: effective_token_count
+    metric: aic
     secondary_metrics: [output_length_chars, run_duration_ms, chart_generated]
     guardrail_metrics:
       - name: discussion_creation_success_rate

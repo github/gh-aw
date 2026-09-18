@@ -297,6 +297,38 @@ Available codemods include:
 
 Run `gh aw fix --list-codemods` to see all available codemods.
 
+#### `format`
+
+Apply all available codemods and normalize YAML frontmatter. Formatting uses two-space indentation and deterministic field ordering while retaining comments and Markdown content. If no workflow is specified, all Markdown files in `.github/workflows` are formatted.
+
+```bash wrap
+gh aw format                           # Format all workflows
+gh aw format my-workflow               # Format specific workflow
+gh aw format --dir custom/workflows    # Format a different directory
+```
+
+**Options:** `--dir/-d`
+
+#### `edit`
+
+Edit schema-validated workflow frontmatter and recompile the generated file. Changes are validated before writing.
+
+This command is experimental. Frontmatter is re-serialized whenever it changes, so YAML comments, key ordering, and quoting styles are not preserved. Edits that change nothing leave the workflow untouched.
+
+```bash wrap
+gh aw edit repo-assist "max-turns: 20"
+gh aw edit repo-assist --schedule "every 6h"
+gh aw edit repo-assist --set model=small --unset engine.model
+gh aw edit repo-assist --add-import shared/common.md
+gh aw edit repo-assist --add-skill shared/review
+```
+
+The workflow argument accepts a workflow name, a Markdown filename, or a path. Workflows managed by a `source:` declaration can be edited locally, and future updates merge in those local changes by default.
+
+**Options:** `--set`, `--unset`, `--add`, `--remove`, `--add-import`, `--remove-import`, `--add-skill`, `--remove-skill`, `--schedule`, `--dry-run`, `--dir/-d`
+
+The `--set`, `--unset`, `--add`, and `--remove` flags are repeatable and take a frontmatter path, such as `--set engine.model=small`. Use `--schedule off` to remove an existing schedule.
+
 #### `compile`
 
 Compile Markdown workflows to GitHub Actions YAML. Remote imports cached in `.github/aw/imports/`.
@@ -908,7 +940,7 @@ gh aw mcp-server --validate-actor     # Enable actor validation
 
 **Options:** `--port/-p` (HTTP server port), `--cmd` (custom subprocess command), `--validate-actor` (enforce actor validation for logs and audit tools)
 
-**Available Tools:** status, compile, logs, audit, checks, mcp-inspect, add, update, fix
+**Available Tools:** status, compile, logs, audit, audit-diff, checks, mcp-inspect, add, update, fix
 
 When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
 

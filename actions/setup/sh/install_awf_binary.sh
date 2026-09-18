@@ -102,6 +102,17 @@ fi
 # Download URLs
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
+CURL_RETRY_OPTS=(--retry 5 --retry-delay 10 --retry-max-time 180)
+# --retry-all-errors was added in curl 7.71, so it must not be passed to older curl
+# builds found on some self-hosted runners. Probe the help output instead of parsing
+# `curl --version`, which reports vendor-patched version strings that do not reliably
+# indicate option availability. Help categories (`curl --help all`) only exist since
+# curl 7.73, so fall back to plain `curl --help`, which lists every option on
+# older builds.
+if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors' ||
+  curl --help 2>/dev/null | grep -q -- '--retry-all-errors'; then
+  CURL_RETRY_OPTS+=(--retry-all-errors)
+fi
 
 # Platform-portable SHA256 function
 sha256_hash() {
@@ -122,7 +133,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Download checksums
 echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
-curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
+curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
 
 verify_checksum() {
   local file="$1"
@@ -174,7 +185,7 @@ install_bundle() {
 
   echo "Node.js >= 20 detected ($(node --version)), using lightweight bundle..."
   echo "Downloading bundle from ${bundle_url@Q}..."
-  if ! curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
+  if ! curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
     echo "⚠ Bundle download failed (asset may not exist for this version)"
     return 1
   fi
@@ -213,7 +224,7 @@ install_linux_binary() {
 
   local binary_url="${BASE_URL}/${awf_binary}"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"
@@ -238,7 +249,7 @@ install_darwin_binary() {
 
   local binary_url="${BASE_URL}/${awf_binary}"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"
