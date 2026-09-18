@@ -48,6 +48,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fs-chmod-try-catch`](#require-fs-chmod-try-catch) | Require try/catch around `fs.chmodSync` and `fs.fchmodSync` |
 | [`require-fs-close-sync`](#require-fs-close-sync) | Require `fs.openSync(...)` file descriptors to be closed with `fs.closeSync(fd)` in the same function |
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
+| [`require-fs-stat-access-try-catch`](#require-fs-stat-access-try-catch) | Require try/catch around `fs.lstatSync`, `fs.accessSync`, and `fs.readlinkSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
@@ -394,6 +395,35 @@ try {
   fs.statSync(filePath);
 } catch (err) {
   throw new Error("fs.statSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-fs-stat-access-try-catch`
+
+Require `fs.lstatSync`, `fs.accessSync`, and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: these synchronous filesystem methods throw on missing paths, broken symlinks, and permission errors (`ENOENT`, `EACCES`). They are commonly used in symlink-guard and path-validation helpers (e.g., `lstatGuard()`), where an unhandled throw crashes the action without surfacing a useful diagnostic message.
+
+**Detected forms:**
+- `fs.lstatSync(path)` — direct call on a known `require("fs")` result.
+- `fs.accessSync(path, fs.constants.F_OK)`.
+- `fs["readlinkSync"](path)` — computed string-literal property access.
+- `const { lstatSync } = require("fs"); lstatSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace imports: `import * as fs from "fs"; fs.accessSync(path)`.
+- ESM named imports: `import { readlinkSync } from "fs"; readlinkSync(path)`.
+- Bare unbound identifiers: `lstatSync(path)` when `lstatSync` is not a locally bound variable.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- `fs.statSync`, `fs.realpathSync` — covered by `require-fs-io-try-catch` and `require-realpathsync-try-catch` respectively.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Safe alternative:**
+```js
+try {
+  const stat = fs.lstatSync(filePath);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
