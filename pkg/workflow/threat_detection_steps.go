@@ -609,6 +609,7 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 
 	steps := []string{
 		"      - name: Install threat-detect binary\n",
+		"        id: threat_detect_install\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 	}
 	if continueOnErrorExpr != nil {

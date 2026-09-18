@@ -513,7 +513,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	steps := []string{
 		"      - name: Execute threat detection with AWF\n",
 		"        id: detection_agentic_execution\n",
-		fmt.Sprintf("        if: %s\n", detectionStepCondition),
+		fmt.Sprintf("        if: %s && steps.threat_detect_install.outcome == 'success'\n", detectionStepCondition),
 		"        continue-on-error: true\n",
 		// Bound the step at the workflow level as well as through
 		// GH_AW_TIMEOUT_MINUTES: the env var is only honoured once the binary is

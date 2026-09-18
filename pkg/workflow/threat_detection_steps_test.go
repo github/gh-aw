@@ -459,6 +459,7 @@ func TestBuildInstallThreatDetectStepEmbedsReviewedPins(t *testing.T) {
 
 	step := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
 	for _, expected := range []string{
+		"id: threat_detect_install",
 		string(constants.DefaultThreatDetectVersion),
 		constants.DefaultThreatDetectArtifactBaseURL,
 		"--sha256-amd64 " + constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"],
