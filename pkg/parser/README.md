@@ -40,6 +40,7 @@ The package is designed for use both in the main CLI binary and in WebAssembly c
 | `InlineSkill` | struct | A single inline skill definition extracted via the `## skill: \`name\`` syntax |
 | `BodyLevelImport` | struct | A `{{#runtime-import}}` directive found in the markdown body, with `Path` (workspace-root-relative) and `Optional` flag |
 | `PromptImportEntry` | struct | A single import contribution to prompt assembly; either a runtime-import path or inlined markdown |
+| `ValidationError` | struct | Structured input-validation error for parser package checks; embeds `validationerror.Payload` so callers can uniformly detect it via `errors.As(err, &validationerror.ValidationError)` |
 
 ### Functions
 
@@ -154,6 +155,7 @@ The package is designed for use both in the main CLI binary and in WebAssembly c
 | `FormatImportCycleError` | `func(*ImportCycleError) error` | Formats a cycle error with the import chain |
 | `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context |
 | `NewFormattedParserError` | `func(formatted string) *FormattedParserError` | Creates a pre-formatted parser error |
+| `NewValidationError` | `func(field, value, reason, suggestion string) *ValidationError` | Creates a new parser validation error carrying field/value/reason/suggestion context for uniform error formatting |
 | `FormatYAMLError` | `func(err error, frontmatterLineOffset int, sourceYAML string) string` | Formats a YAML error with source code context, adjusting line numbers by the frontmatter offset |
 | `TranslateYAMLMessage` | `func(message string) string` | Translates a cryptic YAML parser message to a user-friendly description |
 
@@ -304,6 +306,7 @@ Import caching is crucial for performance and cycle detection. The `ImportCache`
 - `github.com/github/gh-aw/pkg/sliceutil` — slice helper utilities for validation and merging
 - `github.com/github/gh-aw/pkg/stringutil` — string normalization and ANSI/format helpers
 - `github.com/github/gh-aw/pkg/syncutil` — thread-safe one-shot caching (used for lazy JSON schema compilation)
+- `github.com/github/gh-aw/pkg/validationerror` — shared structured validation-error payload and formatting (`ValidationError` embeds `validationerror.Payload`)
 
 **Test-only**:
 - `github.com/github/gh-aw/pkg/testutil` — shared test fixtures and assertion helpers used by parser package tests
@@ -327,10 +330,10 @@ This appendix is generated from the current non-test Go source files in this pac
 
 | Category | Count |
 |----------|------:|
-| Types | 24 |
+| Types | 25 |
 | Constants | 10 |
 | Variables | 5 |
-| Functions and methods | 96 |
+| Functions and methods | 97 |
 | Additional symbols documented in this appendix | 19 |
 
 ### Additional types
@@ -374,7 +377,7 @@ This appendix is generated from the current non-test Go source files in this pac
 
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review.
+Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review. Re-verified on 2026-09-18; added the previously undocumented `ValidationError` type and `NewValidationError` constructor (structured field/value/reason/suggestion validation errors backed by `pkg/validationerror`) to the Types, Error Formatting Functions, and Dependencies sections.
 
 ---
 
