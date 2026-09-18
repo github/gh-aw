@@ -27,6 +27,8 @@ For the full list of ecosystem identifiers and the domains they include, see the
 
 ## Common Configuration Patterns
 
+Choose the smallest set of ecosystems that matches your workflow:
+
 ```yaml
 # Python project with containers
 network:
@@ -65,13 +67,10 @@ network:
     - "*.cdn.example.com"      # Wildcard: matches any subdomain of cdn.example.com
 ```
 
-**Wildcard pattern behavior:**
-
-- `*.example.com` matches `sub.example.com`, `deep.nested.example.com`, and `example.com`
-- Only single wildcards at the start are supported (e.g., `*.*.example.com` is invalid)
+`*.example.com` matches `sub.example.com`, `deep.nested.example.com`, and `example.com`. Only a single leading wildcard is supported, so patterns such as `*.*.example.com` are invalid.
 
 > [!TIP]
-> Both `example.com` and `*.example.com` match subdomains. Use wildcards when you want to explicitly document that subdomain access is expected.
+> `example.com` and `*.example.com` both match subdomains. Use the wildcard form when you want to make that expectation explicit.
 
 ## Protocol-Specific Filtering
 
@@ -113,15 +112,13 @@ network:
 
 ### Error Messages
 
-When strict mode rejects a domain that belongs to a known ecosystem, the error message suggests the ecosystem identifier:
+Strict mode errors explain whether you should switch to an ecosystem identifier or disable strict mode for a custom domain:
 
 ````text
 error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
 'python', 'node') for all engines in strict mode. Custom domains are not allowed for
 security. Did you mean: 'pypi.org' belongs to ecosystem 'python'?
 ````
-
-When strict mode rejects a custom domain:
 
 ````text
 error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
@@ -147,10 +144,7 @@ network:
 
 ## Security Best Practices
 
-1. **Start minimal** - Only add ecosystems you actually use
-2. **Use ecosystem identifiers** - Don't list individual domains (use `python` instead of `pypi.org`, `files.pythonhosted.org`, etc.)
-3. **Keep strict mode enabled** - Provides enhanced security validation (enabled by default)
-4. **Add incrementally** - Start with `defaults`, add ecosystems as needed based on firewall denials
+Start with `defaults`, add only the ecosystems you need, prefer ecosystem identifiers over individual domains, and keep strict mode enabled unless you explicitly need custom domains. When a workflow is blocked, add access incrementally based on firewall denials.
 
 ## Troubleshooting Firewall Blocking
 
@@ -163,7 +157,7 @@ Blocked Domains:
   ✗ pypi.org:443 (2 requests) → Add `python` ecosystem
 ```
 
-Common mappings: npm/Node.js → `node`, PyPI/Python → `python`, Docker → `containers`, Go modules → `go`.
+Common mappings are `node` for npm, `python` for PyPI, `containers` for Docker, and `go` for Go modules.
 
 ## Advanced Options
 
@@ -177,7 +171,7 @@ View complete ecosystem domain lists in the [ecosystem domains source](https://g
 
 ## Learn More
 
-- [Network Permissions Reference](/gh-aw/reference/network/) - Complete network configuration reference
-- [Playwright Reference](/gh-aw/reference/playwright/) - Browser automation and network requirements
-- [Security Guide](/gh-aw/introduction/architecture/) - Security best practices
-- [Troubleshooting](/gh-aw/troubleshooting/common-issues/) - Common issues and solutions
+- [Network Permissions Reference](/gh-aw/reference/network/) for complete network configuration details
+- [Playwright Reference](/gh-aw/reference/playwright/) for browser automation requirements
+- [Security Guide](/gh-aw/introduction/architecture/) for broader security guidance
+- [Troubleshooting](/gh-aw/troubleshooting/common-issues/) for common issues and fixes
