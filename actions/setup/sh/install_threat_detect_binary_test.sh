@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set +o histexpand
 
-# Tests for install_threat_detect_binary.sh platform detection and asset-name mapping.
+# Tests for compiler-pinned threat-detect installation.
 # Run: bash install_threat_detect_binary_test.sh
-#
-# The tests run the real script with a stubbed `uname` (to fake the platform) and a
-# stubbed `curl` (to record the requested asset URL and serve a fake binary plus a
-# matching checksums.txt), so no network access is required.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SCRIPT="${SCRIPT_DIR}/install_threat_detect_binary.sh"
@@ -17,19 +13,19 @@ TESTS_FAILED=0
 pass() { echo "PASS: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo "FAIL: $1"; echo "  $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
 
-# run_installer OS ARCH VERSION -> runs the installer in an isolated sandbox.
-# Sets globals: RUN_OUTPUT (stdout+stderr), RUN_STATUS (exit code), RUN_ASSET (downloaded asset name).
+# run_installer OS ARCH MODE [BASE_URL] [EXTRA_ARGS...]
+# MODE is valid, tampered, missing, malformed, or uppercase.
 run_installer() {
   local fake_os="$1"
   local fake_arch="$2"
-  local version="$3"
+  local mode="$3"
+  local base_url="${4:-https://github.com/github/gh-aw-threat-detection/releases/download}"
+  shift 4 || true
 
   local sandbox
   sandbox=$(mktemp -d)
+  mkdir -p "${sandbox}/bin" "${sandbox}/home/.local/bin"
 
-  mkdir -p "${sandbox}/bin"
-
-  # Stubbed uname reports the platform under test.
   cat >"${sandbox}/bin/uname" <<EOF
 #!/usr/bin/env bash
 case "\$1" in
@@ -39,7 +35,6 @@ case "\$1" in
 esac
 EOF
 
-  # Stubbed curl records the requested asset and serves a fake binary + checksums.txt.
   cat >"${sandbox}/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 out=""
@@ -53,125 +48,144 @@ for arg in "$@"; do
   fi
   prev="$arg"
 done
-
-payload='#!/usr/bin/env bash
-echo "fake threat-detect"'
-
-name="${url##*/}"
-echo "${url}" >>"${SANDBOX_URL_LOG}"
-if [ "$name" = "checksums.txt" ]; then
-  hash=$(printf '%s\n' "$payload" | sha256sum | awk '{print $1}')
-  for asset in threat-detect-linux-amd64 threat-detect-linux-arm64; do
-    echo "${hash}  ${asset}"
-  done >"$out"
-else
-  echo "$name" >>"${SANDBOX_ASSET_LOG}"
-  printf '%s\n' "$payload" >"$out"
-fi
+echo "$url" >>"${SANDBOX_URL_LOG}"
+printf '%s\n' '#!/usr/bin/env bash' 'echo verified >>"${SANDBOX_EXECUTION_LOG}"' >"$out"
 EOF
 
-  chmod +x "${sandbox}/bin/uname" "${sandbox}/bin/curl"
+  # A pre-existing unverified binary must never run after an install failure.
+  cat >"${sandbox}/bin/threat-detect" <<'EOF'
+#!/usr/bin/env bash
+echo unverified >>"${SANDBOX_EXECUTION_LOG}"
+EOF
+  chmod +x "${sandbox}/bin/uname" "${sandbox}/bin/curl" "${sandbox}/bin/threat-detect"
 
-  local asset_log="${sandbox}/asset.log"
+  local payload_hash
+  payload_hash=$(printf '%s\n' '#!/usr/bin/env bash' 'echo verified >>"${SANDBOX_EXECUTION_LOG}"' | sha256sum | awk '{print $1}')
+  local bad_hash
+  bad_hash=$(printf '0%.0s' {1..64})
+  local amd64_hash="$payload_hash"
+  local arm64_hash="$payload_hash"
+  local pin_args=(--sha256-amd64 "$amd64_hash" --sha256-arm64 "$arm64_hash")
+  case "$mode" in
+    tampered) pin_args=(--sha256-amd64 "$bad_hash" --sha256-arm64 "$bad_hash") ;;
+    missing) pin_args=() ;;
+    malformed) pin_args=(--sha256-amd64 abc --sha256-arm64 "$arm64_hash") ;;
+    uppercase) pin_args=(--sha256-amd64 "${amd64_hash^^}" --sha256-arm64 "$arm64_hash") ;;
+  esac
+
   local url_log="${sandbox}/url.log"
-  : >"${asset_log}"
-  : >"${url_log}"
+  local execution_log="${sandbox}/execution.log"
+  local github_path="${sandbox}/github-path"
+  : >"$url_log"
+  : >"$execution_log"
+  : >"$github_path"
 
-  RUN_OUTPUT=$(cd "${sandbox}" && env PATH="${sandbox}/bin:${PATH}" HOME="${sandbox}" \
-    SANDBOX_ASSET_LOG="${asset_log}" SANDBOX_URL_LOG="${url_log}" GITHUB_PATH="" \
-    bash "${INSTALL_SCRIPT}" "${version}" --rootless 2>&1)
+  RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin:${PATH}" HOME="${sandbox}/home" \
+    SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" \
+    bash "$INSTALL_SCRIPT" v0.5.2 --rootless --artifact-base-url "$base_url" "${pin_args[@]}" "$@" 2>&1)
   RUN_STATUS=$?
-  RUN_ASSET=$(cat "${asset_log}")
-  RUN_URLS=$(cat "${url_log}")
+  RUN_URLS=$(cat "$url_log")
+  RUN_EXECUTIONS=$(cat "$execution_log")
 
-  rm -rf "${sandbox}"
+  # Simulate the subsequent detection step after a failed tolerated install.
+  if [ "$RUN_STATUS" -ne 0 ] && [ -x "${sandbox}/home/.local/bin/threat-detect" ]; then
+    env PATH="${sandbox}/home/.local/bin:${sandbox}/bin:${PATH}" \
+      SANDBOX_EXECUTION_LOG="$execution_log" threat-detect >/dev/null 2>&1 || true
+    RUN_EXECUTIONS_AFTER_FAILURE=$(cat "$execution_log")
+  else
+    RUN_EXECUTIONS_AFTER_FAILURE="$RUN_EXECUTIONS"
+  fi
+
+  rm -rf "$sandbox"
 }
 
-assert_asset() {
+assert_success() {
   local description="$1"
-  local fake_os="$2"
-  local fake_arch="$3"
-  local expected="$4"
-
-  run_installer "${fake_os}" "${fake_arch}" v0.4.0
-  if [ "${RUN_STATUS}" -ne 0 ]; then
-    fail "${description}" "installer exited with ${RUN_STATUS}: ${RUN_OUTPUT}"
-  elif [ "${RUN_ASSET}" = "${expected}" ]; then
-    pass "${description}"
+  shift
+  run_installer "$@"
+  if [ "$RUN_STATUS" -ne 0 ]; then
+    fail "$description" "installer exited with ${RUN_STATUS}: ${RUN_OUTPUT}"
   else
-    fail "${description}" "expected asset ${expected}, got '${RUN_ASSET}'"
+    pass "$description"
   fi
 }
 
-assert_failure() {
+assert_failure_before_download() {
   local description="$1"
-  local fake_os="$2"
-  local fake_arch="$3"
-  local expected_msg="$4"
-
-  run_installer "${fake_os}" "${fake_arch}" v0.4.0
-  if [ "${RUN_STATUS}" -eq 0 ]; then
-    fail "${description}" "installer unexpectedly succeeded: ${RUN_OUTPUT}"
-  elif ! echo "${RUN_OUTPUT}" | grep -qF "${expected_msg}"; then
-    fail "${description}" "expected message '${expected_msg}' in: ${RUN_OUTPUT}"
-  elif [ -n "${RUN_ASSET}" ]; then
-    fail "${description}" "installer attempted a binary download: ${RUN_ASSET}"
+  local expected="$2"
+  shift 2
+  run_installer "$@"
+  if [ "$RUN_STATUS" -eq 0 ]; then
+    fail "$description" "installer unexpectedly succeeded"
+  elif ! grep -qF "$expected" <<<"$RUN_OUTPUT"; then
+    fail "$description" "expected '${expected}' in: ${RUN_OUTPUT}"
+  elif [ -n "$RUN_URLS" ]; then
+    fail "$description" "installer downloaded before rejecting input: ${RUN_URLS}"
   else
-    pass "${description}"
+    pass "$description"
   fi
 }
 
 echo "Running install_threat_detect_binary.sh tests..."
-echo
 
-# Test 1-3: Linux architecture mapping
-echo "Test 1: Linux/x86_64 maps to threat-detect-linux-amd64..."
-assert_asset "Linux/x86_64 -> threat-detect-linux-amd64" Linux x86_64 threat-detect-linux-amd64
-
-echo "Test 2: Linux/aarch64 maps to threat-detect-linux-arm64..."
-assert_asset "Linux/aarch64 -> threat-detect-linux-arm64" Linux aarch64 threat-detect-linux-arm64
-
-echo "Test 3: Linux/arm64 maps to threat-detect-linux-arm64..."
-assert_asset "Linux/arm64 -> threat-detect-linux-arm64" Linux arm64 threat-detect-linux-arm64
-
-# Test 4-5: macOS is not supported and must fail fast without downloading anything
-echo "Test 4: Darwin/arm64 fails fast as unsupported..."
-assert_failure "Darwin/arm64 is rejected" Darwin arm64 "macOS is not a supported platform"
-
-echo "Test 5: Darwin/x86_64 fails fast as unsupported..."
-assert_failure "Darwin/x86_64 is rejected" Darwin x86_64 "macOS is not a supported platform"
-
-# Test 6: unknown OS fails fast
-echo "Test 6: unknown operating system fails fast..."
-assert_failure "Unknown OS is rejected" FreeBSD x86_64 "Unsupported operating system"
-
-# Test 7: unknown architecture fails with an actionable message
-echo "Test 7: unknown Linux architecture fails fast..."
-assert_failure "Unknown Linux architecture is rejected" Linux riscv64 "Unsupported Linux architecture"
-
-# Test 8: latest release assets must be downloaded directly without the GitHub API.
-echo "Test 8: latest release assets use direct downloads without the GitHub API..."
-run_installer Linux x86_64 latest
-if [ "${RUN_STATUS}" -ne 0 ]; then
-  fail "Latest release installer succeeds" "installer exited with ${RUN_STATUS}: ${RUN_OUTPUT}"
-elif ! echo "${RUN_URLS}" | grep -qF "https://github.com/github/gh-aw-threat-detection/releases/latest/download/checksums.txt"; then
-  fail "Latest release installer downloads checksums directly" "expected latest release checksum URL, got: ${RUN_URLS}"
-elif ! echo "${RUN_URLS}" | grep -qF "https://github.com/github/gh-aw-threat-detection/releases/latest/download/threat-detect-linux-amd64"; then
-  fail "Latest release installer downloads the binary directly" "expected latest release binary URL, got: ${RUN_URLS}"
-elif echo "${RUN_URLS}" | grep -qF "api.github.com"; then
-  fail "Latest release installer avoids GitHub API" "unexpected API URL: ${RUN_URLS}"
+assert_success "Linux/x86_64 verifies amd64 pin" Linux x86_64 valid \
+  https://github.com/github/gh-aw-threat-detection/releases/download
+if ! grep -qF "/v0.5.2/threat-detect-linux-amd64" <<<"$RUN_URLS"; then
+  fail "Default source selects amd64 asset" "unexpected URL: ${RUN_URLS}"
+elif grep -qF "checksums.txt" <<<"$RUN_URLS"; then
+  fail "Installer avoids runtime checksums" "unexpected URL: ${RUN_URLS}"
 else
-  pass "Latest release installer uses direct downloads without GitHub API"
+  pass "Default source selects amd64 asset without checksums.txt"
 fi
 
+assert_success "Linux/aarch64 verifies arm64 pin" Linux aarch64 valid \
+  https://github.com/github/gh-aw-threat-detection/releases/download
+if grep -qF "/v0.5.2/threat-detect-linux-arm64" <<<"$RUN_URLS"; then
+  pass "Linux/aarch64 selects arm64 asset"
+else
+  fail "Linux/aarch64 selects arm64 asset" "unexpected URL: ${RUN_URLS}"
+fi
+
+assert_success "HTTPS mirror supplies pinned asset" Linux arm64 valid \
+  https://mirror.example.com/detector
+if grep -qF "https://mirror.example.com/detector/v0.5.2/threat-detect-linux-arm64" <<<"$RUN_URLS"; then
+  pass "HTTPS mirror URL retains pinned tag and asset"
+else
+  fail "HTTPS mirror URL retains pinned tag and asset" "unexpected URL: ${RUN_URLS}"
+fi
+
+assert_failure_before_download "HTTP mirror is rejected" "must use HTTPS" \
+  Linux x86_64 valid http://mirror.example.com/detector
+assert_failure_before_download "Missing pins are rejected" "pin is required for linux-amd64" \
+  Linux x86_64 missing https://mirror.example.com/detector
+assert_failure_before_download "Malformed pins are rejected" "pin is required for linux-amd64" \
+  Linux x86_64 malformed https://mirror.example.com/detector
+assert_failure_before_download "Uppercase pins are rejected" "pin is required for linux-amd64" \
+  Linux x86_64 uppercase https://mirror.example.com/detector
+assert_failure_before_download "Duplicate pins are rejected" "Duplicate threat-detect SHA256 pin" \
+  Linux x86_64 valid https://mirror.example.com/detector --sha256-amd64 "$(printf '1%.0s' {1..64})"
+
+run_installer Linux x86_64 tampered https://mirror.example.com/detector
+if [ "$RUN_STATUS" -eq 0 ]; then
+  fail "Tampered bytes are rejected" "installer unexpectedly succeeded"
+elif ! grep -qF "Checksum verification failed" <<<"$RUN_OUTPUT"; then
+  fail "Tampered bytes are rejected" "unexpected output: ${RUN_OUTPUT}"
+elif [ -n "$RUN_EXECUTIONS" ]; then
+  fail "Tampered bytes are not executed" "execution log: ${RUN_EXECUTIONS}"
+elif grep -qF "unverified" <<<"$RUN_EXECUTIONS_AFTER_FAILURE"; then
+  fail "Failed verification blocks PATH fallback" "execution log: ${RUN_EXECUTIONS_AFTER_FAILURE}"
+else
+  pass "Tampered bytes fail closed without PATH fallback"
+fi
+
+assert_failure_before_download "Darwin remains unsupported" "macOS is not a supported platform" \
+  Darwin arm64 valid https://mirror.example.com/detector
+assert_failure_before_download "Unknown Linux architecture is rejected" "Unsupported Linux architecture" \
+  Linux riscv64 valid https://mirror.example.com/detector
+
 echo
-echo "==============================="
 echo "Tests passed: $TESTS_PASSED"
 echo "Tests failed: $TESTS_FAILED"
-echo "==============================="
-
-if [ $TESTS_FAILED -gt 0 ]; then
+if [ "$TESTS_FAILED" -gt 0 ]; then
   exit 1
 fi
-
-exit 0

@@ -3,6 +3,7 @@
 package constants
 
 import (
+	"regexp"
 	"testing"
 	"time"
 )
@@ -30,6 +31,33 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 				t.Fatalf("%s default version = %q, want %q", tt.name, tt.got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDefaultThreatDetectReleasePins(t *testing.T) {
+	t.Parallel()
+
+	if DefaultThreatDetectVersion != "v0.5.2" {
+		t.Fatalf("DefaultThreatDetectVersion = %q, want v0.5.2; update the version and reviewed digest table together", DefaultThreatDetectVersion)
+	}
+
+	expectedAssets := []string{
+		"threat-detect-linux-amd64",
+		"threat-detect-linux-arm64",
+		"threat-detect-darwin-x64",
+		"threat-detect-darwin-arm64",
+	}
+	if len(DefaultThreatDetectSHA256) != len(expectedAssets) {
+		t.Fatalf("DefaultThreatDetectSHA256 has %d entries, want the complete %d-asset release matrix", len(DefaultThreatDetectSHA256), len(expectedAssets))
+	}
+	digestPattern := regexp.MustCompile(`^[0-9a-f]{64}$`)
+	for _, asset := range expectedAssets {
+		digest, ok := DefaultThreatDetectSHA256[asset]
+		if !ok {
+			t.Errorf("DefaultThreatDetectSHA256 is missing %q", asset)
+		} else if !digestPattern.MatchString(digest) {
+			t.Errorf("DefaultThreatDetectSHA256[%q] is not a lowercase SHA-256 digest", asset)
+		}
 	}
 }
 

@@ -263,11 +263,19 @@ const DefaultMCPSDKVersion Version = "1.30.0"
 // DefaultGitHubScriptVersion is the default version of the actions/github-script action
 const DefaultGitHubScriptVersion Version = "v9"
 
-// DefaultThreatDetectVersion is the version of the gh-aw-threat-detection binary to install.
-// This is used by the default external threat-detection path and when
-// `features: gh-aw-detection: true` is set in the workflow frontmatter, enabling the external
-// threat-detect binary path instead of the inline engine execution path.
-const DefaultThreatDetectVersion Version = "v0.5.1"
+// DefaultThreatDetectVersion and DefaultThreatDetectSHA256 are the reviewed
+// gh-aw-threat-detection release pins. Treat the version and complete digest table
+// as one review unit whenever updating the detector release.
+const DefaultThreatDetectVersion Version = "v0.5.2"
+
+const DefaultThreatDetectArtifactBaseURL = "https://github.com/github/gh-aw-threat-detection/releases/download"
+
+var DefaultThreatDetectSHA256 = map[string]string{
+	"threat-detect-linux-amd64":  "b4ecda6a8f1ee09913c40b58e5e9d3337d2173618d41b1bfdef9207e4e7959b9",
+	"threat-detect-linux-arm64":  "f6260a0f9ad72bcb67c7af19c4ce262ca34e2c3d5ccbf912832a8bd277200904",
+	"threat-detect-darwin-x64":   "7ed0a68ffbdd927eb2e25f862864602af289ad9cfc85f1385d83d4d52f11251c",
+	"threat-detect-darwin-arm64": "0d4f41134a0839a496ca34f5fbbce44ba89ca0be6d681f960e7c06070b8b04c6",
+}
 
 // GhSkillsMinVersion is the minimum gh CLI version required for frontmatter skill support
 // (installing gh extensions via `gh extension install`). Workflows that install frontmatter

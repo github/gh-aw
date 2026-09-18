@@ -271,6 +271,17 @@ func TestParseThreatDetectionConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "object with artifact mirror",
+			outputMap: map[string]any{
+				"threat-detection": map[string]any{
+					"artifact-base-url": "https://artifacts.example.com/threat-detect/releases/download",
+				},
+			},
+			expectedConfig: &ThreatDetectionConfig{
+				ArtifactBaseURL: "https://artifacts.example.com/threat-detect/releases/download",
+			},
+		},
+		{
 			name: "expression string for max-ai-credits is treated as unset (schema disallows expressions; parser returns 0)",
 			outputMap: map[string]any{
 				"threat-detection": map[string]any{

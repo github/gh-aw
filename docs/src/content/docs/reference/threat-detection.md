@@ -67,7 +67,9 @@ safe-outputs:
 The `features.gh-aw-detection` flag controls the detection implementation, not
 whether threat detection runs. The external `threat-detect` implementation is
 the default; set `features.gh-aw-detection: false` to select the legacy inline
-engine implementation.
+engine implementation. Compiled workflows embed the reviewed detector release
+tag and per-architecture SHA-256 digests. Installation verifies the downloaded
+binary against those compiler-controlled pins instead of a runtime checksum file.
 
 > [!NOTE]
 > When a workflow explicitly sets `threat-detection: false`, that setting takes precedence over any imported fragments. Imported shared workflows that configure safe outputs without a `threat-detection` key will not re-enable threat detection in the importing workflow.
@@ -98,11 +100,36 @@ safe-outputs:
 | `prompt` | string | Custom instructions appended to default detection prompt |
 | `engine` | string/object/false | AI engine config (`"copilot"`, full config object, or `false` for no AI) |
 | `runs-on` | string/array/object | Runner for the detection job (default: inherits from workflow `runs-on`) |
+| `artifact-base-url` | string | HTTPS base URL for a mirror of the pinned detector release assets. The compiler appends the pinned release tag and asset name; the embedded digest cannot be overridden. |
 | `steps` | array | Additional GitHub Actions steps to run **before** AI analysis (pre-steps) |
 | `post-steps` | array | Additional GitHub Actions steps to run **after** AI analysis (post-steps) |
 | `max-ai-credits` | integer | AI Credits cap for the detection run, independent of the main agent budget. Defaults to `400` when unset, with runtime override via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`. Accepts plain integers; `-1` disables the detection budget. |
 | `continue-on-error` | boolean | When `true` (default), detection warnings/failures produce a caution notice instead of blocking safe outputs. |
 | `report-as-issue` | boolean | When `true` (default), detection warnings/failures create or update the `[aw] Detection Runs` tracking issue. Set to `false` to keep threat detection and its enforcement enabled while skipping the tracking issue; results remain visible in the GitHub Actions run logs. |
+
+### Use an artifact mirror
+
+Set `artifact-base-url` when detector binaries must be downloaded through an
+approved HTTPS mirror:
+
+```yaml wrap
+safe-outputs:
+  create-issue:
+  threat-detection:
+    artifact-base-url: https://artifacts.example.com/gh-aw-threat-detection/releases/download
+```
+
+The mirror changes only the source of the bytes. The compiler still controls the
+release tag and expected digest.
+
+### Maintain detector release pins
+
+When updating the default detector release:
+
+1. Review the promoted `gh-aw-threat-detection` release and its validated release manifest.
+2. Copy the complete release digest matrix into `DefaultThreatDetectSHA256`.
+3. Update `DefaultThreatDetectVersion` and all digests in the same pull request.
+4. Recompile affected workflow fixtures and lock files.
 
 ## Detection Budget
 
