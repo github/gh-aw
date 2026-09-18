@@ -904,7 +904,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	}
 	if result.CachedRun != nil {
 		if c.opts.countLimit.tryAdd() {
-			c.candidates[index] = processedRunFromCachedData(*result.CachedRun)
+			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
 			c.accepted[index] = true
 			c.acceptedCount++
 		}

@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -692,12 +694,19 @@ func TestCachedJSONLCanSatisfy(t *testing.T) {
 	assert.False(t, cachedJSONLCanSatisfy(agentFilter, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(nil, false, false, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, true, false, false, false))
-	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, true, false, false))
+	assert.True(t, cachedJSONLCanSatisfy(usageFilter, false, true, false, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, false, true, false))
 	assert.False(t, cachedJSONLCanSatisfy(usageFilter, false, false, false, true))
 }
 
 func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
+	originalProcess := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = originalProcess })
+	processConcurrentRunDownload = func(context.Context, WorkflowRun, concurrentRunDownloadParams, *atomic.Int64, *console.ProgressBar) (DownloadResult, error) {
+		t.Fatal("cached run should not be downloaded")
+		return DownloadResult{}, nil
+	}
+
 	cached := RunData{
 		RunID:        42,
 		WorkflowName: "cached-workflow",
@@ -708,11 +717,12 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 		UpdatedAt:    time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
 		LogsPath:     "/previous/run-42",
 	}
+	cachedAudit := &AuditData{Overview: OverviewData{RunID: 42}}
 
 	results := downloadRunArtifactsConcurrent(context.Background(), []WorkflowRun{{DatabaseID: 42, Repository: "github/gh-aw", Status: "completed", Conclusion: "success", Attempt: 1, UpdatedAt: cached.UpdatedAt}}, runArtifactsConcurrentOptions{
 		outputDir:    t.TempDir(),
 		maxRuns:      1,
-		cachedRuns:   cachedLogsRuns{42: {RunData: cached}},
+		cachedRuns:   cachedLogsRuns{42: {RunData: cached, Audit: cachedAudit}},
 		storageLimit: newLogsStorageLimit(t.TempDir(), 0, false),
 	})
 
@@ -720,6 +730,39 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 	require.NotNil(t, results[0].CachedRun)
 	assert.True(t, results[0].Cached)
 	assert.Equal(t, cached, *results[0].CachedRun)
+	assert.Same(t, cachedAudit, results[0].cachedAudit)
+}
+
+func TestPrepareLogsDataAuditUsesCachedDataBestEffort(t *testing.T) {
+	outputDir := t.TempDir()
+	cached := RunData{
+		RunID:      42,
+		Status:     "completed",
+		Conclusion: "success",
+		UpdatedAt:  time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
+	}
+	cachedAudit := &AuditData{
+		CacheSource: auditCacheSourceLogs,
+		Overview: OverviewData{
+			RunID:      cached.RunID,
+			Status:     cached.Status,
+			Conclusion: cached.Conclusion,
+			UpdatedAt:  cached.UpdatedAt,
+		},
+	}
+	processedRun := processedRunFromCachedData(cached, cachedAudit, outputDir)
+
+	logsData, err := prepareLogsData([]ProcessedRun{processedRun}, renderLogsOutputOptions{
+		audit:     true,
+		outputDir: outputDir,
+	})
+	require.NoError(t, err)
+	require.Len(t, logsData.Runs, 1)
+	assert.Equal(t, filepath.Join(outputDir, "run-42", auditFileName), logsData.Runs[0].AuditPath)
+
+	written, ok := loadCachedAuditData(processedRun.Run.LogsPath, processedRun.Run, auditCacheSourceLogs)
+	require.True(t, ok)
+	assert.Equal(t, cachedAudit.Overview, written.Overview)
 }
 
 func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
@@ -747,10 +790,11 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 		IntentionalFailure:         true,
 	}
 
-	processedRun := processedRunFromCachedData(cached)
-	assert.Empty(t, processedRun.Run.LogsPath)
+	outputDir := t.TempDir()
+	processedRun := processedRunFromCachedData(cached, nil, outputDir)
+	assert.Equal(t, filepath.Join(outputDir, "run-42"), processedRun.Run.LogsPath)
 
-	data := buildLogsData([]ProcessedRun{processedRun}, t.TempDir(), nil)
+	data := buildLogsData([]ProcessedRun{processedRun}, outputDir, nil)
 
 	require.Equal(t, []RunData{cached}, data.Runs)
 	assert.Equal(t, 1, data.Summary.TotalRuns)

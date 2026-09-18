@@ -799,12 +799,13 @@ func normalizeCachedLogRun(run *RunData) error {
 
 // cachedJSONLCanSatisfy permits cached records only for the compact usage
 // artifact, whose JSON includes the metadata required for cached reports.
-// Parsing, auditing, training, and tool graphs require raw artifact files.
-func cachedJSONLCanSatisfy(artifactFilter []string, parse, audit, train, toolGraph bool) bool {
-	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !audit && !train && !toolGraph
+// Audit mode uses the available cached data on a best-effort basis. Parsing,
+// explicit training, and tool graphs require raw artifact files.
+func cachedJSONLCanSatisfy(artifactFilter []string, parse, _ bool, train, toolGraph bool) bool {
+	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !train && !toolGraph
 }
 
-func processedRunFromCachedData(data RunData) ProcessedRun {
+func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string) ProcessedRun {
 	return ProcessedRun{
 		Run: WorkflowRun{
 			DatabaseID:       data.RunID,
@@ -832,6 +833,7 @@ func processedRunFromCachedData(data RunData) ProcessedRun {
 			MissingToolCount: data.MissingToolCount,
 			MissingDataCount: data.MissingDataCount,
 			SafeItemsCount:   data.SafeItemsCount,
+			LogsPath:         filepath.Join(outputDir, fmt.Sprintf("run-%d", data.RunID)),
 		},
 		AwContext:           data.AwContext,
 		TaskDomain:          data.TaskDomain,
@@ -840,5 +842,6 @@ func processedRunFromCachedData(data RunData) ProcessedRun {
 		TokenUsage:          data.TokenUsageSummary,
 		WorkingSet:          data.WorkingSet,
 		cachedData:          &data,
+		cachedAudit:         audit,
 	}
 }

@@ -80,7 +80,13 @@ func writeLogsAuditFiles(processedRuns []ProcessedRun, verbose bool) {
 
 func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun, verbose bool) {
 	runOutputDir := processedRun.Run.LogsPath
-	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceLogs)
+	var auditData AuditData
+	ok := processedRun.cachedAudit != nil
+	if ok {
+		auditData = *processedRun.cachedAudit
+	} else {
+		auditData, ok = loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceLogs)
+	}
 	if !ok {
 		metrics := LogMetrics{}
 		if summary, ok := loadRunSummary(runOutputDir, verbose); ok {
@@ -92,5 +98,9 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 	auditData.Comparison = buildAuditComparisonForProcessedRuns(processedRun, processedRuns)
 	if err := writeAuditData(runOutputDir, auditData); err != nil {
 		logsOrchestratorLog.Printf("Failed to write audit file for run %d: %v", processedRun.Run.DatabaseID, err)
+		return
+	}
+	if processedRun.cachedData != nil {
+		processedRun.cachedData.AuditPath = auditPath(runOutputDir)
 	}
 }
