@@ -115,6 +115,7 @@ func RunAddInteractive(ctx context.Context, config *AddInteractiveConfig) error 
 		// Local writes stop before remote-only follow-up: repository secret updates,
 		// bootstrap mutations, workflow status polling, and optional dispatch all require
 		// the workflow changes to be present on GitHub.
+		addInteractiveLog.Print("User chose to write files locally; skipping PR and remote follow-up steps")
 		printBootstrapConfigTODO(os.Stderr, remainingBootstrapProfile)
 		config.showLocalWriteInstructions()
 		return nil
@@ -162,8 +163,10 @@ func (c *AddInteractiveConfig) applyBootstrapConfigIfNeeded(ctx context.Context,
 		return nil
 	}
 	if c.hasWriteAccess {
+		addInteractiveLog.Print("Applying bootstrap config: user has write access")
 		return executeBootstrapConfigForAdd(ctx, c.RepoOverride, c.WorkflowSpecs, profile, c.UseCopilotRequests, c.Verbose, c.DisableGitHubAppPermissionInference)
 	}
+	addInteractiveLog.Print("Skipping bootstrap config application: user lacks write access")
 	printBootstrapConfigTODO(os.Stderr, profile)
 	return nil
 }
@@ -240,6 +243,7 @@ func (c *AddInteractiveConfig) prepareAndConfirmAddInteractive() (workflowFiles 
 	}
 
 	if !createPR {
+		addInteractiveLog.Print("Wizard stopping before init/secret steps: user declined PR creation")
 		return workflowFiles, nil, "", "", false, nil
 	}
 

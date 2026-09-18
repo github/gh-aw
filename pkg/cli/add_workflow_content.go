@@ -37,14 +37,17 @@ func validateWorkflowDestination(githubWorkflowsDir, workflowName, sourceRepo st
 	if sourceRepo != "" {
 		existingSourceRepo := readSourceRepoFromFile(existingFile)
 		if existingSourceRepo == sourceRepo {
+			addLog.Printf("Destination %s already exists from same source repo %s, skipping", existingFile, sourceRepo)
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Workflow from same source already exists, skipping: "+existingFile))
 			return true, nil
 		}
 	}
 	if opts.FromWildcard {
+		addLog.Printf("Destination %s already exists, skipping due to wildcard add", existingFile)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Workflow '%s' already exists in .github/workflows/. Skipping.", workflowName)))
 		return true, nil
 	}
+	addLog.Printf("Destination %s already exists and force/wildcard not set, rejecting", existingFile)
 	return false, fmt.Errorf("workflow '%s' already exists in .github/workflows/. Use a different name with -n flag, remove the existing workflow first, or use --force to overwrite", workflowName)
 }
 
@@ -85,6 +88,7 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error {
 	if !opts.DisableSecurityScanner {
 		if findings := workflow.ScanMarkdownSecurity(string(resolved.Content)); len(findings) > 0 {
+			addLog.Printf("Security scan failed for %s: %d finding(s)", resolved.Spec.WorkflowPath, len(findings))
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for workflow"))
 			fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings, resolved.Spec.WorkflowPath))
 			return fmt.Errorf("workflow '%s' failed security scan: %d issue(s) detected", resolved.Spec.WorkflowPath, len(findings))
@@ -92,8 +96,11 @@ func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error
 		if opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
 		}
-	} else if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Security scanning disabled"))
+	} else {
+		addLog.Print("Security scanning disabled for this add")
+		if opts.Verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Security scanning disabled"))
+		}
 	}
 	return nil
 }
@@ -121,9 +128,11 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	// For remote workflows, fetch and save all dependencies (includes, imports, dispatch workflows, resources)
 	if workflowSpec.RawURL != "" {
 		// Generic URL imports carry no GitHub repo context; dependency fetching is skipped.
+		addLog.Print("Skipping dependency fetch: raw URL workflow spec")
 		return nil
 	}
 	if !isLocalWorkflowPath(workflowSpec.WorkflowPath) {
+		addLog.Printf("Fetching remote dependencies for %s", workflowSpec.WorkflowPath)
 		return fetchAllRemoteDependencies(ctx, string(sourceContent), workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
 	}
 	if sourceInfo == nil || !sourceInfo.IsLocal {
@@ -325,6 +334,7 @@ func trackAndWriteWorkflowFile(destFile string, content string, fileExists bool,
 	if err != nil {
 		return fmt.Errorf("failed to read back destination file '%s': %w", destFile, err)
 	}
+	addLog.Printf("Wrote workflow file %s (%d bytes, existed=%t)", destFile, len(writtenContent), fileExists)
 	if !opts.Quiet {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added workflow: "+filepath.Base(destFile)))
 		if opts.Verbose {
