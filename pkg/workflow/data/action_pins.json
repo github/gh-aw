@@ -118,11 +118,6 @@
       "version": "v2.0.5",
       "sha": "22d081ff2d3a40755e97629de92e3bcbfa7cf2ed"
     },
-    "docker/build-push-action@v7.3.0": {
-      "repo": "docker/build-push-action",
-      "version": "v7.3.0",
-      "sha": "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"
-    },
     "docker/build-push-action@v7.4.0": {
       "repo": "docker/build-push-action",
       "version": "v7.4.0",
@@ -138,15 +133,10 @@
       "version": "v6.2.0",
       "sha": "dc802804100637a589fabce1cb79ff13a1411302"
     },
-    "docker/setup-buildx-action@v4.3.0": {
+    "docker/setup-buildx-action@v4.4.1": {
       "repo": "docker/setup-buildx-action",
-      "version": "v4.3.0",
-      "sha": "37fe631027851001ddb9b187196cc803df7f5f0e"
-    },
-    "docker/setup-buildx-action@v4.4.0": {
-      "repo": "docker/setup-buildx-action",
-      "version": "v4.4.0",
-      "sha": "594f3bf4285d9ea8dc53c9a0c9c4092420091003"
+      "version": "v4.4.1",
+      "sha": "f87e5991a6d7451dcb8d9637bfbc97413f497069"
     },
     "erlef/setup-beam@v1.24.1": {
       "repo": "erlef/setup-beam",
@@ -158,10 +148,10 @@
       "version": "v4.38.0",
       "sha": "b96794f015dfd88f77b49b1c93e0fa7110f94c63"
     },
-    "github/stale-repos@v9.0.17": {
+    "github/stale-repos@v9.0.18": {
       "repo": "github/stale-repos",
-      "version": "v9.0.17",
-      "sha": "589e3f5e9aca6ec6c2bd978e6c181348907ccbac"
+      "version": "v9.0.18",
+      "sha": "c42a2821e3ef0cee1b1bc20b7eecbb2bfa7a83b4"
     },
     "haskell-actions/setup@v2.11.0": {
       "repo": "haskell-actions/setup",
@@ -173,10 +163,10 @@
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.323.0": {
+    "ruby/setup-ruby@v1.324.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.323.0",
-      "sha": "984c0c890880bbf811283d6f09c4607c62d210a4"
+      "version": "v1.324.0",
+      "sha": "a0102e0972be65f351c307e2d64b9314a57c8073"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",

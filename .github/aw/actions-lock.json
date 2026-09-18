@@ -118,6 +118,11 @@
       "version": "v2.0.5",
       "sha": "22d081ff2d3a40755e97629de92e3bcbfa7cf2ed"
     },
+    "docker/build-push-action@v7.3.0": {
+      "repo": "docker/build-push-action",
+      "version": "v7.3.0",
+      "sha": "53b7df96c91f9c12dcc8a07bcb9ccacbed38856a"
+    },
     "docker/build-push-action@v7.4.0": {
       "repo": "docker/build-push-action",
       "version": "v7.4.0",
@@ -133,6 +138,11 @@
       "version": "v6.2.0",
       "sha": "dc802804100637a589fabce1cb79ff13a1411302"
     },
+    "docker/setup-buildx-action@v4.3.0": {
+      "repo": "docker/setup-buildx-action",
+      "version": "v4.3.0",
+      "sha": "37fe631027851001ddb9b187196cc803df7f5f0e"
+    },
     "docker/setup-buildx-action@v4.4.1": {
       "repo": "docker/setup-buildx-action",
       "version": "v4.4.1",
@@ -147,6 +157,11 @@
       "repo": "github/codeql-action/upload-sarif",
       "version": "v4.38.0",
       "sha": "b96794f015dfd88f77b49b1c93e0fa7110f94c63"
+    },
+    "github/stale-repos@v9.0.17": {
+      "repo": "github/stale-repos",
+      "version": "v9.0.17",
+      "sha": "589e3f5e9aca6ec6c2bd978e6c181348907ccbac"
     },
     "github/stale-repos@v9.0.18": {
       "repo": "github/stale-repos",
