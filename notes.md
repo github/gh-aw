@@ -1,5 +1,16 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-18 snapshot
+- 50 sessions; **58.0% raw completion** (29 success, 8 failure, 10 action_required, 3 cancelled), +22pts vs 09-17 (36%), **2nd-highest of 27 recorded days** (behind 09-02's 78%), 27-day mean 31.6%.
+- **EXPERIMENTAL (roll=8): human_batch_merge_cascade_control** — 3 independent merge_invalidation_cascades (PRs #61599, #61600, #61602) clustered within a 67s window (15:48:15–15:49:22Z) across 3 branches, superficially resembling 09-16's cross_branch_scheduled_cascade. Verified via `gh api pulls`: all 3 PRs were `merged_by` the SAME human (pelikhan) back-to-back, and all 3 offsets were tight (1-2s) matching each branch's own merge time exactly. Clean positive control confirming the 09-16 diagnostic: same human + consistent tight offsets = ordinary `human_batch_merge_cascade` (new named sub-pattern), not a dispatcher. Effectiveness High; recommend promote.
+- **true_agentic_streak still not restored**: 10 true-agentic runs (9x "Addressing comment on PR" + 1x "Running Copilot cloud agent"), 8 success / 2 cancelled (80%) — best since the 09-16 break but 3rd consecutive day without full 100% recovery.
+- **provenance_inversion reverted**: 21/29 successes (72.4%) bot-driven, lower edge of the 72-86% historical band, ending the 2-day 100% streak (09-16/09-17).
+- **burst_vs_isolated_success_gap INVERTED for the first time** (8/8 prior days had isolated ≥ burst-fired): today isolated 53.8% (7/13) vs burst-fired 59.5% (22/37) — burst-fired slightly ahead. Needs a 2nd inversion to confirm this isn't noise.
+- 4 unique branches: `bump-mcpg-version-0425` 23/50 (46%, 82.6% success — highest single-branch success rate on record), `fix-install-awf-binary-failure` 14/50 (28.6% success), `fix-claude-engine-experiments-model` 7/50 (42.9% success), `fix-slash-command-crlf-activation` 6/50 (50% success).
+- CGO dipped to 1/7 success (14.3%, lowest workflow today): 3 cascade-explained failures, 1 cancelled, 2 genuine non-cascade failures on bump-mcpg-version-0425 unrelated to its later 22:19:13Z merge.
+- Duration proxy: mean 19.87m / median 10.14m (all), mean 24.84m / median 13.78m (40/50 nonzero) — widest window yet (~495min/8.25h).
+- Orphans 0/14 open PRs → 0% NORMAL, 27th consecutive healthy day. Conv logs empty (27th+ day).
+
 ## 2026-09-17 snapshot
 - 50 sessions; **36.0% raw completion** (18 success, 8 failure, 22 action_required, 1 cancelled, 1 in_progress), +18pts vs 09-16 (18%), mid-pack vs 26-day mean 30.6%.
 - **provenance_inversion ties record**: 18/18 successes (100%) are CI-gate/review-bot workflows (CWI x4, CGO x2, CJS x2, Code scanning AI findings x4, + 6 single-instance reviewer/gate bots) — 2nd consecutive all-bot day after 09-16's first-ever 100% record.
@@ -70,3 +81,4 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - 09-15 update: provenance_inversion reverted to 80.8% (back in the 75-86% band); merge_invalidation_cascade had a zero-instance day (8/24 recorded days show >=1 cascade); conv logs empty 24th+ day.
 - 09-16 update: provenance_inversion hit first-ever 100% bot-driven day (9/9); true_agentic_100pct_streak broke after 9 consecutive days; new cross_branch_scheduled_cascade sub-pattern identified (same-second failures across sibling branches not explained by own-branch merge timing).
 - 09-17 update: provenance_inversion ties the 100% record for a 2nd consecutive day (18/18); true-agentic streak remains broken (candidate still in_progress); a same-branch double failure-cluster (3min apart, well before its own merge) doesn't fit merge_invalidation_cascade or cross_branch_scheduled_cascade — open question, watch for recurrence before naming a new pattern. Conv logs empty 26th+ day.
+- 09-18 update: provenance_inversion reverted to 72.4% bot-driven, ending the 2-day 100% streak; true-agentic streak still not fully restored (8/10=80%, 3rd day since break); new **human_batch_merge_cascade** sub-pattern identified — same human merging multiple PRs back-to-back produces a same-window multi-branch cascade cluster that looks like but is NOT a cross_branch_scheduled_cascade (distinguish via merged_by identity + tight/consistent per-branch offsets); burst_vs_isolated_success_gap inverted for the first time (burst-fired > isolated). Conv logs empty 27th+ day.

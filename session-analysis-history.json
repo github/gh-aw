@@ -65,8 +65,19 @@
    "orphan_rate_pct": 0.0,
    "data_quality": "metadata-only (conv-logs empty 25th+ day); duration figures inflated by a GitHub status-resync artifact, not real exec time",
    "notes": "18.0% completion (9 succ/33 fail/7 action_required/1 cancelled), -12.8pts vs 24-day mean 30.8%. Cascade-adjusted 37.5% (9/24) excluding 26 same-second review-bot failures. EXPERIMENTAL cross_branch_cascade_synchronization (roll=5): 3 branches (fix-github-actions-job-failure-again 8f, daily-docs-healer-fix 8f, model-inventory-update-2026-09-16 10f) cascaded within a 23s window; only 2/3 offsets matched their own branch merge time (32-58s prior), 3rd merged 15m45s later with no explanatory push -- implies a shared scheduled dispatcher, not pure per-branch merge race. CJS failed 6/6 (100%, all branches) -- first 100%-failure single-workflow day. true_agentic_100pct_streak BROKE (Addressing comment on PR #61232 cancelled, not success) after 9 consecutive 100% days. provenance_inversion NEW RECORD 100% bot-driven (9/9). Squad Implement Worker + new-named 'Squad' both 0/7 action_required (never-resolves pattern holds). Orphan 0/20 open PRs, 25th consecutive healthy day (24-day baseline 0.0%)."
+  },
+  {
+   "date": "2026-09-18",
+   "sessions": 50,
+   "completion_pct": 58.0,
+   "avg_dur_min": 19.87,
+   "median_dur_min": 10.14,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 27th+ day)",
+   "notes": "58.0% completion (29 succ/8 fail/10 action_required/3 cancelled), +22pts vs 09-17 (36%), 2nd-highest of 27 recorded days (behind 09-02's 78%). EXPERIMENTAL human_batch_merge_cascade_control (roll=8): 3 independent merge_invalidation_cascades (PRs #61599/#61600/#61602) clustered within a 67s window across 3 branches, all merged_by the SAME human (pelikhan) back-to-back -- clean positive control confirming ordinary per-branch cascades (tight 1-2s offsets matching own merge) vs 09-16's dispatcher-driven cross_branch_scheduled_cascade. true_agentic streak still not restored: 8/10=80% (2 cancelled), 3rd consecutive day since the 09-16 break. provenance_inversion reverted to 72.4% bot-driven (21/29), lower edge of the 72-86% band, ending the 2-day 100% streak. burst_vs_isolated_success_gap INVERTED for the first time (burst-fired 59.5% > isolated 53.8%) after 8/8 days of the opposite direction. 4 branches (bump-mcpg-version-0425 46%/82.6%succ -- highest branch success on record, fix-install-awf-binary-failure 28%/28.6%succ, fix-claude-engine-experiments-model 14%/42.9%succ, fix-slash-command-crlf-activation 12%/50%succ). Orphan 0/14 open PRs, 27th consecutive healthy day (26-day baseline 0.0%)."
   }
  ],
- "last_updated": "2026-09-16",
- "version": "1.8"
+ "last_updated": "2026-09-18",
+ "version": "1.9"
 }
