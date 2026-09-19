@@ -735,34 +735,77 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 
 func TestPrepareLogsDataAuditUsesCachedDataBestEffort(t *testing.T) {
 	outputDir := t.TempDir()
+	baseline := RunData{
+		RunID:        41,
+		WorkflowName: "cached-workflow",
+		Status:       "completed",
+		Conclusion:   "success",
+		CreatedAt:    time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
+	}
 	cached := RunData{
-		RunID:      42,
-		Status:     "completed",
-		Conclusion: "success",
-		UpdatedAt:  time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
+		RunID:        42,
+		WorkflowName: "cached-workflow",
+		Status:       "completed",
+		Conclusion:   "success",
+		CreatedAt:    baseline.CreatedAt.Add(time.Minute),
+		UpdatedAt:    baseline.UpdatedAt,
+	}
+	baselineAudit := &AuditData{
+		CacheSource: auditCacheSourceLogs,
+		Overview: OverviewData{
+			RunID:        baseline.RunID,
+			WorkflowName: baseline.WorkflowName,
+			Status:       baseline.Status,
+			Conclusion:   baseline.Conclusion,
+			CreatedAt:    baseline.CreatedAt,
+			UpdatedAt:    baseline.UpdatedAt,
+		},
+		Metrics:          MetricsData{Turns: 2},
+		FirewallAnalysis: &FirewallAnalysis{AnalysisBase: AnalysisBase{BlockedRequests: 1}},
 	}
 	cachedAudit := &AuditData{
 		CacheSource: auditCacheSourceLogs,
 		Overview: OverviewData{
-			RunID:      cached.RunID,
-			Status:     cached.Status,
-			Conclusion: cached.Conclusion,
-			UpdatedAt:  cached.UpdatedAt,
+			RunID:        cached.RunID,
+			WorkflowName: cached.WorkflowName,
+			Status:       cached.Status,
+			Conclusion:   cached.Conclusion,
+			CreatedAt:    cached.CreatedAt,
+			UpdatedAt:    cached.UpdatedAt,
 		},
+		Metrics: MetricsData{Turns: 5},
+		CreatedItems: []CreatedItemReport{{
+			Type:      "create_issue",
+			Timestamp: "cache-only-created-item",
+		}},
+		FirewallAnalysis: &FirewallAnalysis{AnalysisBase: AnalysisBase{BlockedRequests: 7}},
+		MCPFailures:      []MCPFailureReport{{ServerName: "cache-only-mcp", Status: "failed"}},
 	}
+	baselineRun := processedRunFromCachedData(baseline, baselineAudit, outputDir)
 	processedRun := processedRunFromCachedData(cached, cachedAudit, outputDir)
 
-	logsData, err := prepareLogsData([]ProcessedRun{processedRun}, renderLogsOutputOptions{
+	logsData, err := prepareLogsData([]ProcessedRun{baselineRun, processedRun}, renderLogsOutputOptions{
 		audit:     true,
 		outputDir: outputDir,
 	})
 	require.NoError(t, err)
-	require.Len(t, logsData.Runs, 1)
-	assert.Equal(t, filepath.Join(outputDir, "run-42", auditFileName), logsData.Runs[0].AuditPath)
+	require.Len(t, logsData.Runs, 2)
+	assert.Equal(t, filepath.Join(outputDir, "run-42", auditFileName), logsData.Runs[1].AuditPath)
 
 	written, ok := loadCachedAuditData(processedRun.Run.LogsPath, processedRun.Run, auditCacheSourceLogs)
 	require.True(t, ok)
 	assert.Equal(t, cachedAudit.Overview, written.Overview)
+	assert.Equal(t, cachedAudit.CreatedItems, written.CreatedItems)
+	assert.Equal(t, cachedAudit.FirewallAnalysis, written.FirewallAnalysis)
+	assert.Equal(t, cachedAudit.MCPFailures, written.MCPFailures)
+	require.NotNil(t, written.Comparison)
+	require.NotNil(t, written.Comparison.Delta)
+	assert.Equal(t, AuditComparisonIntDelta{Before: 2, After: 5, Changed: true}, written.Comparison.Delta.Turns)
+	assert.Equal(t, AuditComparisonStringDelta{Before: "read_only", After: "write_capable", Changed: true}, written.Comparison.Delta.Posture)
+	assert.Equal(t, AuditComparisonIntDelta{Before: 1, After: 7, Changed: true}, written.Comparison.Delta.BlockedRequests)
+	require.NotNil(t, written.Comparison.Delta.MCPFailure)
+	assert.Equal(t, []string{"cache-only-mcp"}, written.Comparison.Delta.MCPFailure.After)
 }
 
 func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {

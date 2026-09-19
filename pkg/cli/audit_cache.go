@@ -95,7 +95,8 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 		auditData, _ = buildLocalAuditData(processedRun, metrics, processedRun.MCPToolUsage)
 		auditData.CacheSource = auditCacheSourceLogs
 	}
-	auditData.Comparison = buildAuditComparisonForProcessedRuns(processedRun, processedRuns)
+	hydratedProcessedRuns := hydrateProcessedRunsWithCachedAudit(processedRuns)
+	auditData.Comparison = buildAuditComparisonForProcessedRuns(hydrateProcessedRunWithCachedAudit(processedRun), hydratedProcessedRuns)
 	if err := writeAuditData(runOutputDir, auditData); err != nil {
 		logsOrchestratorLog.Printf("Failed to write audit file for run %d: %v", processedRun.Run.DatabaseID, err)
 		return
@@ -103,4 +104,32 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 	if processedRun.cachedData != nil {
 		processedRun.cachedData.AuditPath = auditPath(runOutputDir)
 	}
+}
+
+func hydrateProcessedRunsWithCachedAudit(processedRuns []ProcessedRun) []ProcessedRun {
+	hydrated := make([]ProcessedRun, len(processedRuns))
+	for i, processedRun := range processedRuns {
+		hydrated[i] = hydrateProcessedRunWithCachedAudit(processedRun)
+	}
+	return hydrated
+}
+
+func hydrateProcessedRunWithCachedAudit(processedRun ProcessedRun) ProcessedRun {
+	if processedRun.cachedAudit == nil {
+		return processedRun
+	}
+	audit := processedRun.cachedAudit
+	if processedRun.Run.Turns == 0 {
+		processedRun.Run.Turns = audit.Metrics.Turns
+	}
+	if len(processedRun.SafeOutputs) == 0 {
+		processedRun.SafeOutputs = audit.CreatedItems
+	}
+	if processedRun.FirewallAnalysis == nil {
+		processedRun.FirewallAnalysis = audit.FirewallAnalysis
+	}
+	if len(processedRun.MCPFailures) == 0 {
+		processedRun.MCPFailures = audit.MCPFailures
+	}
+	return processedRun
 }
