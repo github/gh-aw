@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -1054,6 +1055,103 @@ func TestUpdateWorkflow_NoMergeMode(t *testing.T) {
 		merge := !noMerge
 		assert.False(t, merge, "merge should be false when --no-merge is set")
 	})
+}
+
+// TestUpdateWorkflow_RestoresContentOnCompileFailure verifies that when an
+// upstream update produces content that fails to compile (for example, a new
+// dispatch-workflow target that doesn't exist locally), the local workflow
+// file is restored to its previous, working content instead of being left in
+// a broken state on disk.
+func TestUpdateWorkflow_RestoresContentOnCompileFailure(t *testing.T) {
+	originalResolveLatestRef := resolveLatestRefFn
+	originalDownloadWorkflow := downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn = originalResolveLatestRef
+		downloadWorkflowContentFn = originalDownloadWorkflow
+	})
+
+	tmpDir := testutil.TempDir(t, "test-*")
+	require.NoError(t, initTestGitRepo(tmpDir), "failed to initialize git repo")
+
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755), "failed to create workflows dir")
+
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "failed to get current directory")
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldDir), "failed to restore directory")
+	})
+	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+
+	const currentRef = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const latestRef = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	originalContent := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+source: owner/repo/workflows/test-workflow.md@` + currentRef + `
+---
+
+# Test Workflow
+
+Original content.
+`
+
+	// Simulate an upstream update that introduces a dispatch-workflow target
+	// that doesn't exist locally — this must fail to compile.
+	brokenNewContent := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  dispatch-workflow:
+    workflows:
+      - missing-workflow
+    max: 1
+source: owner/repo/workflows/test-workflow.md@` + latestRef + `
+---
+
+# Test Workflow
+
+Updated content referencing a workflow that doesn't exist locally.
+`
+
+	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
+	require.NoError(t, os.WriteFile(workflowFile, []byte(originalContent), 0644), "failed to write initial workflow")
+
+	resolveLatestRefFn = func(_ context.Context, _ string, ref string, _ bool, _ bool, _ time.Duration) (latestRefResolution, error) {
+		if ref == currentRef {
+			return latestRefResolution{Ref: latestRef}, nil
+		}
+		return latestRefResolution{Ref: ref}, nil
+	}
+	downloadWorkflowContentFn = func(_ context.Context, _, _, ref string, _ bool) ([]byte, error) {
+		if ref == latestRef {
+			return []byte(brokenNewContent), nil
+		}
+		return []byte(originalContent), nil
+	}
+
+	wf := &workflowWithSource{
+		Name:       "test-workflow",
+		Path:       workflowFile,
+		SourceSpec: "owner/repo/workflows/test-workflow.md@" + currentRef,
+	}
+
+	opts := UpdateWorkflowsOptions{
+		WorkflowsDir: workflowsDir,
+	}
+
+	err = updateWorkflow(context.Background(), wf, opts)
+	require.Error(t, err, "update should fail because the new content doesn't compile")
+	assert.Contains(t, err.Error(), "failed to compile updated workflow")
+
+	restoredContent, readErr := os.ReadFile(workflowFile)
+	require.NoError(t, readErr, "failed to read workflow file after failed update")
+	assert.Equal(t, originalContent, string(restoredContent), "workflow file should be restored to its original content after a compile failure")
 }
 
 // TestMarshalActionsLockSorted tests that the actions lock marshaling produces sorted output
