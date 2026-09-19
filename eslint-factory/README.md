@@ -54,6 +54,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
 | [`require-new-url-try-catch`](#require-new-url-try-catch) | Require try/catch around `new URL(variable)` calls |
+| [`require-dynamic-regexp-constructor-try-catch`](#require-dynamic-regexp-constructor-try-catch) | Require try/catch around `new RegExp(pattern)` when `pattern` is forwarded wholesale as a bare identifier/property access |
 | [`require-parseInt-radix`](#require-parseInt-radix) | Require an explicit radix argument to `parseInt()` |
 | [`require-nan-check-after-env-numeric-parse`](#require-nan-check-after-env-numeric-parse) | Require NaN validation after parsing numeric values from `process.env` |
 | [`require-nan-check-after-split-index-parse`](#require-nan-check-after-split-index-parse) | Require NaN validation after parsing a `split(...)[index]` value |
@@ -578,6 +579,34 @@ try {
 ### `require-new-url-try-catch`
 
 Require `new URL(variable)` calls to be wrapped in `try/catch`.
+
+### `require-dynamic-regexp-constructor-try-catch`
+
+Require `new RegExp(pattern)` calls to be wrapped in `try/catch` when `pattern` is passed through wholesale as a bare identifier or property access (e.g. `validation.pattern`), rather than built locally from a string/template literal.
+
+Why: the `RegExp` constructor throws a `SyntaxError` when given a malformed pattern (unbalanced brackets, invalid escape sequences, invalid backreferences). When the *entire* pattern originates from external configuration — a workflow-provided validation rule, an environment variable, or other user-controlled data — with no local escaping or construction, an unguarded `new RegExp(...)` call turns a single bad input into an unhandled crash. This rule intentionally targets only the highest-risk shape (a value forwarded wholesale) to keep false positives near zero; patterns assembled locally from template/string literals (even with interpolated variables) are a different, lower-risk concern already covered by `require-escaped-regexp-interpolation`.
+
+**Detected forms:**
+- `new RegExp(validation.pattern)` — pattern sourced from a config/data object property, forwarded as-is.
+- `new RegExp(userInput, "i")` — pattern is a plain dynamic identifier, forwarded as-is.
+
+**Out of scope (not flagged):**
+- `new RegExp("^abc$")` — compile-time constant string literal or static concatenation.
+- `` new RegExp(`^abc$`) `` — template literal with no expressions.
+- `` new RegExp(`^${escapedKey}:\\s*`, "i") `` — pattern built locally from a template literal with interpolated variables (covered by `require-escaped-regexp-interpolation` instead).
+- `new RegExp("^" + escapedKey + "$")` — pattern built locally via string concatenation.
+- `new RegExp(FOO_RE.source, "gi")` — pattern derived from `.source` of an existing (already-valid) regex literal/identifier.
+- `function parse(RegExp, value) { return new RegExp(value); }` — `RegExp` shadowed by a local binding is not the global constructor.
+- Calls already inside a `try` block with a `catch` clause.
+
+**Safe alternative:**
+```js
+try {
+  const regex = new RegExp(validation.pattern);
+} catch (err) {
+  throw new Error("RegExp constructor call failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
 
 ### `require-decodeuricomponent-try-catch`
 

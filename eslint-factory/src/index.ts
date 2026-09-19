@@ -26,6 +26,7 @@ import { requireSpawnSyncErrorCheckRule } from "./rules/require-spawnsync-error-
 import { requireSpawnErrorListenerRule } from "./rules/require-spawn-error-listener";
 import { requireDecodeURIComponentTryCatchRule } from "./rules/require-decodeuricomponent-try-catch";
 import { requireNewUrlTryCatchRule } from "./rules/require-new-url-try-catch";
+import { requireDynamicRegexpConstructorTryCatchRule } from "./rules/require-dynamic-regexp-constructor-try-catch";
 import { preferCoreLoggingRule } from "./rules/prefer-core-logging";
 import { noCoreErrorThenProcessExitRule } from "./rules/no-core-error-then-process-exit";
 import { noCoreErrorThenProcessExitCodeRule } from "./rules/no-core-error-then-process-exitcode";
@@ -94,6 +95,7 @@ const plugin = {
     "require-spawnsync-error-check": requireSpawnSyncErrorCheckRule,
     "require-spawn-error-listener": requireSpawnErrorListenerRule,
     "require-new-url-try-catch": requireNewUrlTryCatchRule,
+    "require-dynamic-regexp-constructor-try-catch": requireDynamicRegexpConstructorTryCatchRule,
     "require-decodeuricomponent-try-catch": requireDecodeURIComponentTryCatchRule,
     "prefer-core-logging": preferCoreLoggingRule,
     "no-core-error-then-process-exit": noCoreErrorThenProcessExitRule,
