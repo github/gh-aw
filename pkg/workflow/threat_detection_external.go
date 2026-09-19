@@ -513,7 +513,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	steps := []string{
 		"      - name: Execute threat detection with AWF\n",
 		"        id: detection_agentic_execution\n",
-		fmt.Sprintf("        if: %s\n", detectionStepCondition),
+		fmt.Sprintf("        if: %s && steps.threat_detect_install.outcome == 'success'\n", detectionStepCondition),
 		"        continue-on-error: true\n",
 		// Bound the step at the workflow level as well as through
 		// GH_AW_TIMEOUT_MINUTES: the env var is only honoured once the binary is
@@ -650,7 +650,8 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 // parse_threat_detection_results.cjs path. Outputs (not env vars) are used exclusively;
 // downstream jobs consume these via needs.detection.outputs.* expressions.
 // The step ID (detection_conclusion) and env vars (RUN_DETECTION, DETECTION_AGENTIC_EXECUTION_OUTCOME,
-// GH_AW_DETECTION_CONTINUE_ON_ERROR) are byte-identical to the inline conclude step.
+// GH_AW_DETECTION_CONTINUE_ON_ERROR) match the inline conclude step; THREAT_DETECT_INSTALL_OUTCOME is
+// additionally passed because only the external path installs a pinned binary.
 func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []string {
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError := true
@@ -683,6 +684,12 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"        env:\n",
 		"          RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}\n",
 		"          DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}\n",
+		// The conclude script must never invoke a detector that was not installed
+		// under compiler-pinned digest verification: on a failed install the binary on
+		// PATH is absent, unverified, or the install script's fail-closed placeholder.
+		// The placeholder cannot set conclusion outputs itself, so the script emits the
+		// agent_failure conclusion from this outcome instead.
+		"          THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}\n",
 		coeEnvLine,
 		"        run: |\n",
 		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh\" %s\n", shellEscapeArg(constants.ThreatDetectionResultPath)),

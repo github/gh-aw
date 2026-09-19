@@ -272,6 +272,12 @@ Test workflow`
 	if !strings.Contains(installStepBlock, "continue-on-error: true") {
 		t.Error("Install threat-detect binary step must set continue-on-error: true in warn mode")
 	}
+	if !strings.Contains(detectionSection, "steps.threat_detect_install.outcome == 'success'") {
+		t.Error("External detector execution must require a successful verified installation")
+	}
+	if !strings.Contains(detectionSection, "THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}") {
+		t.Error("External detector conclude step must receive the install outcome so it can fail closed without invoking a detector")
+	}
 	if !strings.Contains(detectionSection, "install_copilot_cli.sh") {
 		t.Error("External detector path must emit engine installation step for copilot")
 	}

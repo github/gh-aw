@@ -11908,6 +11908,13 @@
                   "type": "string",
                   "description": "GitHub Actions environment override for the detection job."
                 },
+                "artifact-base-url": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://\\S+$",
+                  "description": "Optional HTTPS base URL for a mirror of pinned threat-detect release assets. The compiler appends the pinned release tag and asset name; compiler-supplied SHA-256 digests remain authoritative.",
+                  "examples": ["https://artifacts.example.com/gh-aw-threat-detection/releases/download"]
+                },
                 "continue-on-error": {
                   "$ref": "#/$defs/templatable_boolean",
                   "description": "When true (default), detection failures produce warnings and allow safe outputs to proceed with a caution notice and 'needs-review' label. When false, detection failures block safe outputs entirely. Accepts a boolean literal or a GitHub Actions expression."

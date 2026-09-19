@@ -596,12 +596,20 @@ func (c *Compiler) buildRenderDetectionLogStep(data *WorkflowData) []string {
 // in warn mode keeps the job conclusion consistent with that tolerance.
 func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	version := string(constants.DefaultThreatDetectVersion)
+	artifactBaseURL := constants.DefaultThreatDetectArtifactBaseURL
+	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil &&
+		data.SafeOutputs.ThreatDetection.ArtifactBaseURL != "" {
+		artifactBaseURL = data.SafeOutputs.ThreatDetection.ArtifactBaseURL
+	}
+	amd64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"]
+	arm64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"]
 
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
 
 	steps := []string{
 		"      - name: Install threat-detect binary\n",
+		"        id: threat_detect_install\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 	}
 	if continueOnErrorExpr != nil {
@@ -611,7 +619,13 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	}
 	steps = append(steps,
 		"        run: |\n",
-		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s\n", version),
+		fmt.Sprintf(
+			"          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s --artifact-base-url %s --sha256-amd64 %s --sha256-arm64 %s\n",
+			shellEscapeArg(version),
+			shellEscapeArg(artifactBaseURL),
+			shellEscapeArg(amd64Digest),
+			shellEscapeArg(arm64Digest),
+		),
 	)
 	return steps
 }

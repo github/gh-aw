@@ -33,6 +33,34 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 	}
 }
 
+func TestDefaultThreatDetectReleasePins(t *testing.T) {
+	t.Parallel()
+
+	if DefaultThreatDetectVersion != "v0.5.2" {
+		t.Fatalf("DefaultThreatDetectVersion = %q, want v0.5.2; update the version and reviewed digest table together", DefaultThreatDetectVersion)
+	}
+
+	expectedDigests := map[string]string{
+		"threat-detect-linux-amd64":  "b4ecda6a8f1ee09913c40b58e5e9d3337d2173618d41b1bfdef9207e4e7959b9",
+		"threat-detect-linux-arm64":  "f6260a0f9ad72bcb67c7af19c4ce262ca34e2c3d5ccbf912832a8bd277200904",
+		"threat-detect-darwin-x64":   "7ed0a68ffbdd927eb2e25f862864602af289ad9cfc85f1385d83d4d52f11251c",
+		"threat-detect-darwin-arm64": "0d4f41134a0839a496ca34f5fbbce44ba89ca0be6d681f960e7c06070b8b04c6",
+	}
+	if len(DefaultThreatDetectSHA256) != len(expectedDigests) {
+		t.Fatalf("DefaultThreatDetectSHA256 has %d entries, want the complete %d-asset release matrix", len(DefaultThreatDetectSHA256), len(expectedDigests))
+	}
+	for asset, want := range expectedDigests {
+		got, ok := DefaultThreatDetectSHA256[asset]
+		if !ok {
+			t.Errorf("DefaultThreatDetectSHA256 is missing %q", asset)
+			continue
+		}
+		if got != want {
+			t.Errorf("DefaultThreatDetectSHA256[%q] = %q, want the reviewed v0.5.2 digest %q; update the version and reviewed digest table together", asset, got, want)
+		}
+	}
+}
+
 func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	t.Parallel()
 	const (

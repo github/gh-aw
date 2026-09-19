@@ -449,6 +449,49 @@ func TestPrepareDetectionFilesStepInvokesSetupScript(t *testing.T) {
 	}
 }
 
+func TestBuildInstallThreatDetectStepEmbedsReviewedPins(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	step := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
+	for _, expected := range []string{
+		"id: threat_detect_install",
+		string(constants.DefaultThreatDetectVersion),
+		constants.DefaultThreatDetectArtifactBaseURL,
+		"--sha256-amd64 " + constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"],
+		"--sha256-arm64 " + constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"],
+	} {
+		if !strings.Contains(step, expected) {
+			t.Errorf("install step does not contain %q:\n%s", expected, step)
+		}
+	}
+}
+
+func TestBuildInstallThreatDetectStepUsesArtifactMirror(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{
+				ArtifactBaseURL: "https://artifacts.example.com/threat-detect/releases/download",
+			},
+		},
+	}
+
+	step := strings.Join(compiler.buildInstallThreatDetectStep(data), "")
+	if !strings.Contains(step, "--artifact-base-url https://artifacts.example.com/threat-detect/releases/download") {
+		t.Errorf("install step does not contain configured artifact mirror:\n%s", step)
+	}
+	for _, asset := range []string{"threat-detect-linux-amd64", "threat-detect-linux-arm64"} {
+		if !strings.Contains(step, constants.DefaultThreatDetectSHA256[asset]) {
+			t.Errorf("mirror install step does not retain compiler pin for %s:\n%s", asset, step)
+		}
+	}
+}
+
 func TestSetupThreatDetectionPromptSummarySuppressedOnExternalPath(t *testing.T) {
 	// The setup step renders a prompt that the external detector never uses (threat-detect
 	// renders and publishes its own prompt), so its step summary write must be suppressed to
