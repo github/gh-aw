@@ -801,7 +801,7 @@ func normalizeCachedLogRun(run *RunData) error {
 // artifact, whose JSON includes the metadata required for cached reports.
 // Audit mode uses the available cached data on a best-effort basis. Parsing,
 // explicit training, and tool graphs require raw artifact files.
-func cachedJSONLCanSatisfy(artifactFilter []string, parse, _ bool, train, toolGraph bool) bool {
+func cachedJSONLCanSatisfy(artifactFilter []string, parse, train, toolGraph bool) bool {
 	return isUsageOnlyArtifactFilter(artifactFilter) && !parse && !train && !toolGraph
 }
 

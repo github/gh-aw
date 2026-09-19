@@ -46,7 +46,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if preparedCachedJSONL.cache != nil {
 		cachedRuns = preparedCachedJSONL.cache.runs
 	}
-	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
 	cachedJSONLWriter := preparedCachedJSONL.writer
