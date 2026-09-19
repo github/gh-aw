@@ -30,7 +30,7 @@ Current version in `go.mod`: **v0.3.0**
 
 The library is used for **automatic JSON schema generation for MCP (Model Context Protocol) tool outputs**. This enables type-safe integration between Go structs and JSON Schema requirements for AI agent tool interfaces.
 
-### Key APIs Utilized
+### Key APIs Used
 
 #### 1. `jsonschema.ForType()` - Schema Generation
 ```go
@@ -63,7 +63,7 @@ func GenerateOutputSchema[T any]() (*jsonschema.Schema, error) {
    - Generic function (`GenerateOutputSchema[T]`) ensures compile-time type checking
    - No runtime type assertions needed
 
-3. **Schema Features Utilized:**
+3. **Schema Features Used:**
    - Object type schemas
    - Nested struct support
    - Optional field handling via pointers
@@ -151,7 +151,7 @@ While not officially released, upstream development suggests:
 ### Feature Opportunities
 
 1. **Custom Type Schemas**
-   - Utilize `ForOptions.TypeSchemas` for domain-specific types
+   - Use `ForOptions.TypeSchemas` for domain-specific types
    - Map custom types (e.g., time.Time, url.URL) to specific JSON Schema formats
 
 2. **Schema Validation in Tests**
