@@ -70,6 +70,9 @@ the default; set `features.gh-aw-detection: false` to select the legacy inline
 engine implementation. Compiled workflows embed the reviewed detector release
 tag and per-architecture SHA-256 digests. Installation verifies the downloaded
 binary against those compiler-controlled pins instead of a runtime checksum file.
+If installation does not complete verification, the detection job neither runs nor
+concludes with a detector binary: analysis is skipped and the conclusion is reported
+as an `agent_failure` (a warning in warn mode, a hard failure in strict mode).
 
 > [!NOTE]
 > When a workflow explicitly sets `threat-detection: false`, that setting takes precedence over any imported fragments. Imported shared workflows that configure safe outputs without a `threat-detection` key will not re-enable threat detection in the importing workflow.
