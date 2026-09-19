@@ -136,6 +136,7 @@ type ProcessedRun struct {
 	JobDetails              []JobInfoWithDuration
 	SafeOutputs             []CreatedItemReport
 	cachedData              *RunData
+	cachedAudit             *AuditData
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.
@@ -317,6 +318,7 @@ type DownloadResult struct {
 	Cached          bool // True if loaded from cached summary
 	CachedRun       *RunData
 	LogsPath        string
+	cachedAudit     *AuditData
 	storageReserved bool
 }
 

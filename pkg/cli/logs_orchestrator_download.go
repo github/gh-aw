@@ -209,7 +209,7 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	if opts.cachedJSONLCache != nil {
 		cachedRuns = opts.cachedJSONLCache.runs
 	}
-	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
 	if err := prepareLogsDownloadOutput(ctx, opts); err != nil {
@@ -904,7 +904,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	}
 	if result.CachedRun != nil {
 		if c.opts.countLimit.tryAdd() {
-			c.candidates[index] = processedRunFromCachedData(*result.CachedRun)
+			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
 			c.accepted[index] = true
 			c.acceptedCount++
 		}
