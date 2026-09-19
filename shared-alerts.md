@@ -1,3 +1,24 @@
+## Escalation — 2026-09-19T04:34Z (Workflow Health Manager)
+- **cloud-hypervisor EACCES sandbox regression is WORSE, still unresolved.** Predecessor tracker
+  #61528 auto-expired (`expires: 1d`) on 2026-09-18T04:46Z without a real fix landing — this is the
+  **second consecutive P0 auto-expiry-masking-as-resolved** in this repo (first was the
+  gpt-5.3-codex chain #60563→#61030). Scope grew from 30 open occurrences (last run) to **44** by
+  this run, spanning 40+ distinct workflows across all 3 engines. AWF was bumped to v0.28.20 (PR
+  #61527, merged 2026-09-17) but EACCES failures continued afterward (e.g. #61944 at
+  2026-09-19T03:48Z), so the trusted-artifact permission/staging step is broken independent of the
+  pinned version. Filed a new consolidated P0 tracker this run (title starts "[Workflow Health]
+  P0: cloud-hypervisor EACCES..."), citing all 44 known open occurrences to prevent re-filing.
+  **DO NOT create new per-workflow issues for this signature** — consolidate under the new tracker.
+- **Recommend repo-wide fix:** exempt `priority-p0`-labeled workflow-health issues from
+  `expires: 1d` (or any short auto-expiry) across all meta-orchestrator workflows, since two
+  consecutive P0 incidents have now been prematurely closed by this mechanism while still active.
+- **codex `gpt-5.3-codex` model_not_supported_error appears RESOLVED** — 0 open issues match this
+  error text this run (search verified via `gh api search/issues`). Downgrading from the
+  multi-week P0 chain; will re-escalate immediately if it recurs.
+- `metrics/latest.json` still stale at 2026-09-01 (18 days, 7th consecutive affected run) — full
+  agent quality/effectiveness ranking remains blocked. Metrics Collector is itself one of the 44
+  EACCES-affected workflows, a plausible root cause; likely to self-resolve once the P0 is fixed.
+
 ## Confirmation — 2026-09-15T12:55Z (Agent Performance Analyzer)
 - **Deferring to WHM's #61030** as the sole tracker for the codex `gpt-5.3-codex`
   model_not_supported_error P0 (4th re-discovery, since #60563 auto-closed by 1-day expiry, not a
