@@ -1154,6 +1154,56 @@ Updated content referencing a workflow that doesn't exist locally.
 	assert.Equal(t, originalContent, string(restoredContent), "workflow file should be restored to its original content after a compile failure")
 }
 
+func TestUpdateWorkflow_BackupReadFailureStopsUpdate(t *testing.T) {
+	originalResolveLatestRef := resolveLatestRefFn
+	originalDownloadWorkflow := downloadWorkflowContentFn
+	t.Cleanup(func() {
+		resolveLatestRefFn = originalResolveLatestRef
+		downloadWorkflowContentFn = originalDownloadWorkflow
+	})
+
+	tmpDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755), "failed to create workflows dir")
+
+	const currentRef = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const latestRef = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	updatedContent := []byte(`---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+source: owner/repo/workflows/test-workflow.md@` + latestRef + `
+---
+
+# Updated Workflow
+`)
+
+	resolveLatestRefFn = func(_ context.Context, _ string, ref string, _ bool, _ bool, _ time.Duration) (latestRefResolution, error) {
+		if ref == currentRef {
+			return latestRefResolution{Ref: latestRef}, nil
+		}
+		return latestRefResolution{Ref: ref}, nil
+	}
+	downloadWorkflowContentFn = func(_ context.Context, _, _, _ string, _ bool) ([]byte, error) {
+		return updatedContent, nil
+	}
+
+	workflowFile := filepath.Join(workflowsDir, "missing-workflow.md")
+	wf := &workflowWithSource{
+		Name:       "missing-workflow",
+		Path:       workflowFile,
+		SourceSpec: "owner/repo/workflows/test-workflow.md@" + currentRef,
+	}
+
+	err := updateWorkflow(context.Background(), wf, UpdateWorkflowsOptions{
+		WorkflowsDir: workflowsDir,
+		NoMerge:      true,
+	})
+	require.ErrorContains(t, err, "failed to read current workflow before update")
+	assert.NoFileExists(t, workflowFile, "workflow must not be written without a recoverable backup")
+}
+
 // TestMarshalActionsLockSorted tests that the actions lock marshaling produces sorted output
 // using the ActionCache.Save helper.
 func TestMarshalActionsLockSorted(t *testing.T) {

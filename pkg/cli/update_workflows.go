@@ -939,8 +939,10 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 	// fetched content fails to compile. Without this, a broken upstream
 	// change (e.g. a dispatch-workflow target that doesn't exist locally)
 	// would be left on disk and could break a later, unrelated recompile.
-	originalContent, readOriginalErr := os.ReadFile(wf.Path)
-	hadOriginalContent := readOriginalErr == nil
+	originalContent, err := os.ReadFile(wf.Path)
+	if err != nil {
+		return fmt.Errorf("failed to read current workflow before update: %w", err)
+	}
 
 	// Write updated content
 	if err := os.WriteFile(wf.Path, []byte(finalContent), constants.FilePermPublic); err != nil {
@@ -960,13 +962,11 @@ func updateWorkflow(ctx context.Context, wf *workflowWithSource, opts UpdateWork
 		updateLog.Printf("Compiling updated workflow: %s", wf.Name)
 		if err := compileWorkflowsForUpdate(ctx, []string{wf.Path}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			updateLog.Printf("Compilation failed for workflow %s: %v", wf.Name, err)
-			if hadOriginalContent {
-				if restoreErr := os.WriteFile(wf.Path, originalContent, constants.FilePermPublic); restoreErr != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to restore original content for %s after compile failure: %v", wf.Name, restoreErr)))
-				} else {
-					updateLog.Printf("Restored original content for %s after compile failure", wf.Name)
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Reverted %s to its previous content because the updated version failed to compile", wf.Name)))
-				}
+			if restoreErr := os.WriteFile(wf.Path, originalContent, constants.FilePermPublic); restoreErr != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to restore original content for %s after compile failure: %v", wf.Name, restoreErr)))
+			} else {
+				updateLog.Printf("Restored original content for %s after compile failure", wf.Name)
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Reverted %s to its previous content because the updated version failed to compile", wf.Name)))
 			}
 			return fmt.Errorf("failed to compile updated workflow: %w", err)
 		}
