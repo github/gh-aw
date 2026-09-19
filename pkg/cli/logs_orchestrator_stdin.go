@@ -46,7 +46,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if preparedCachedJSONL.cache != nil {
 		cachedRuns = preparedCachedJSONL.cache.runs
 	}
-	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Audit, opts.Train, opts.ToolGraph) {
+	if !cachedJSONLCanSatisfy(artifactFilter, opts.Parse, opts.Train, opts.ToolGraph) {
 		cachedRuns = nil
 	}
 	cachedJSONLWriter := preparedCachedJSONL.writer
@@ -218,7 +218,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	for _, result := range downloadResults {
 		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
-			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun))
+			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir))
 			continue
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
