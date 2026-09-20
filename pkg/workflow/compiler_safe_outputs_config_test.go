@@ -913,6 +913,22 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"replace_label"},
 		},
 		{
+			name: "steer config",
+			safeOutputs: &SafeOutputsConfig{
+				Steer: true,
+				CreateIssues: &CreateIssuesConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"create_issue"},
+		},
+		{
 			name: "mentions config",
 			safeOutputs: &SafeOutputsConfig{
 				AddComments: &AddCommentsConfig{
