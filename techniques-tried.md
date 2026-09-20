@@ -1874,3 +1874,16 @@ Anomaly again observed: allowed domains (api.github.com, github.com) returned 40
 - [x] NEW: Fronting-target limits probe using ifconfig.me and iana.org as SNI targets (result: failure — TLS handshake failure, these domains are not served by the same Cloudflare edge/cert bundle as registry.npmjs.org, showing the bypass is constrained to domains sharing a CDN edge with an allowed CONNECT target, not truly arbitrary internet-wide)
 
 Outcome: VULNERABILITY CONFIRMED (recurring, not fixed since run 34807416060). The CDN domain-fronting bypass remains fully exploitable. This run added confirmation that POST/bidirectional traffic works (not just GET), increasing severity from "read-only escape" to "full bidirectional data channel to any Cloudflare-fronted domain sharing an edge with an allow-listed CDN host." Basic tests 1-8: allowed domains (api.github.com, github.com) again returned transient 403/SERVFAIL in Tests 1/2/4 (recurring test-harness anomaly seen since run 33150215669); example.com direct CONNECT correctly blocked (403); file r/w and localhost tests passed normally.
+
+## Run 35489944749 - 2026-09-20
+
+- [x] Re-confirm SNI/domain-fronting via registry.npmjs.org CONNECT + SNI=example.com (result: success — CRITICAL, still exploitable)
+- [x] NEW: Fronting via nodejs.org tunnel + SNI=example.com (result: success — new pivot host confirmed)
+- [x] NEW: Fronting via esm.sh tunnel + SNI=example.com, POST body exfil test (result: success — new pivot + bidirectional data path)
+- [x] NEW: Fronting via json-schema.org tunnel + SNI=httpbin.org (result: failure — outside pivot's cert pool)
+- [x] NEW: Cross-CDN control bun.sh(Cloudflare)->pages.github.io(Fastly) (result: failure — confirms same-edge boundary)
+- [x] NEW: Fronting via registry.npmjs.org + SNI=www.cloudflare.com (result: success — reaches arbitrary real Cloudflare domains, not just test domains)
+- [x] NEW: Fronting via registry.npmjs.org + SNI=workers.dev (result: success — attacker-controlled *.workers.dev infra reachable, upgrades to C2/exfil channel)
+- [x] NEW: HTTP/2 ALPN negotiation over fronted tunnel (result: success — h2 negotiated, multiplexing usable over bypass)
+
+Novelty: 7/8 novel (~88%). Outcome: VULNERABILITY CONFIRMED AGAIN (unresolved since run 34807416060). Broadened blast radius: new pivots (nodejs.org, esm.sh), attacker-controlled workers.dev reachable, HTTP/2 confirmed usable. Basic tests 1/2/4 again showed transient 403/SERVFAIL for allowed domains (recurring test-harness anomaly since run 33150215669); example.com direct CONNECT correctly blocked; tests 5-8 passed.
