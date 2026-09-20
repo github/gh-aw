@@ -52,6 +52,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
+| [`require-lstatguard-try-catch`](#require-lstatguard-try-catch) | Require try/catch around `lstatGuard(...)` calls (symlink_guard.cjs helper) |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
 | [`require-new-url-try-catch`](#require-new-url-try-catch) | Require try/catch around `new URL(variable)` calls |
 | [`require-parseInt-radix`](#require-parseInt-radix) | Require an explicit radix argument to `parseInt()` |
@@ -543,6 +544,32 @@ try {
   // use tmpDir here
 } catch (err) {
   throw new Error("fs.mkdtempSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-lstatguard-try-catch`
+
+Require `lstatGuard(...)` calls (from `actions/setup/js/symlink_guard.cjs`) to be wrapped in `try/catch`.
+
+Why: `lstatGuard` delegates to `fs.lstatSync`, which throws synchronously when the target path does not exist, permissions are denied, or another I/O error occurs. `symlink_guard.cjs`'s own JSDoc explicitly documents this: "Throws if `filePath` does not exist — callers that need to tolerate non-existent paths should wrap the call in a try/catch." Without a call-site `try/catch`, the error propagates as a generic engine-level stack instead of a specific message that preserves the original failure via `{ cause }`.
+
+**Detected forms:**
+- `const { lstatGuard } = require("./symlink_guard.cjs"); lstatGuard(filePath)` — CommonJS destructured binding.
+- `import { lstatGuard } from "./symlink_guard.cjs"; lstatGuard(filePath)` — ESM named import.
+
+**Out of scope:**
+- Calls to an identifier named `lstatGuard` that is not bound to an import/require of a `symlink_guard` module (e.g., a locally defined function with the same name, or a same-named export from an unrelated module).
+- Calls already inside a `try` block with a `catch` clause.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Known limitation — no autofix for `VariableDeclaration`:** when the flagged call appears as a variable initializer, the rule reports the error but emits no autofix suggestion. Only `ExpressionStatement` and `ReturnStatement` positions receive an autofix suggestion.
+
+**Safe alternative:**
+```js
+try {
+  const stats = lstatGuard(filePath);
+} catch (err) {
+  throw new Error("lstatGuard failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
