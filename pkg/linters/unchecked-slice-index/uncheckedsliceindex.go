@@ -191,6 +191,7 @@ func isInRangeLoop(pass *analysis.Pass, node *ast.IndexExpr, parents map[ast.Nod
 	}
 }
 
+// isAncestorOf reports whether ancestor is an ancestor of node in the parent chain.
 func isAncestorOf(ancestor, node ast.Node, parents map[ast.Node]ast.Node) bool {
 	current := node
 	for {
@@ -214,18 +215,22 @@ func isInBoundedForLoop(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map
 		}
 		if forStmt, ok := parent.(*ast.ForStmt); ok {
 			if !isAncestorOf(forStmt.Body, current, parents) {
-				return false
+				current = parent
+				continue
 			}
 			index, ok := idxExpr.Index.(*ast.Ident)
-			return ok && initializedToZero(pass, forStmt.Init, index) &&
+			if ok && initializedToZero(pass, forStmt.Init, index) &&
 				increments(pass, forStmt.Post, index) &&
 				hasUpperBound(pass, forStmt.Cond, idxExpr) &&
-				!changedBefore(pass, forStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index)
+				!changedBefore(pass, forStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index) {
+				return true
+			}
 		}
 		current = parent
 	}
 }
 
+// hasBoundsCheck reports whether an index expression is guarded by valid bounds.
 func hasBoundsCheck(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
 	current := ast.Node(idxExpr)
 	for {
@@ -258,6 +263,7 @@ func hasUpperBound(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) b
 	return upper
 }
 
+// boundFacts reports strict upper and nonnegative lower-bound facts from a conjunction.
 func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upper, lower bool) {
 	cond = astutil.UnwrapParenExpr(cond)
 	bin, ok := cond.(*ast.BinaryExpr)
@@ -307,6 +313,7 @@ func hasTerminatingGuardBefore(pass *analysis.Pass, idxExpr *ast.IndexExpr, pare
 	return false
 }
 
+// invalidBounds reports bounds violations that make a terminating guard safe to pass.
 func invalidBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upper, lower bool) {
 	cond = astutil.UnwrapParenExpr(cond)
 	bin, ok := cond.(*ast.BinaryExpr)
@@ -340,8 +347,11 @@ func isLenOf(pass *analysis.Pass, expr, value ast.Expr) bool {
 		return false
 	}
 	fun, ok := call.Fun.(*ast.Ident)
+	if !ok {
+		return false
+	}
 	builtin, isBuiltin := pass.TypesInfo.ObjectOf(fun).(*types.Builtin)
-	return ok && isBuiltin && builtin.Name() == "len"
+	return isBuiltin && builtin.Name() == "len"
 }
 
 func isZero(pass *analysis.Pass, expr ast.Expr) bool {
@@ -386,6 +396,7 @@ func enclosingBlock(node ast.Node, parents map[ast.Node]ast.Node) (*ast.BlockStm
 	}
 }
 
+// changedBefore reports whether values are written before node within block.
 func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, parents map[ast.Node]ast.Node, values ...ast.Expr) bool {
 	current := node
 	for {
@@ -411,6 +422,7 @@ func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, par
 	}
 }
 
+// writesObjects reports whether statements assign to any value expression's object.
 func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Expr) bool {
 	objects := make(map[types.Object]struct{}, len(values))
 	for _, value := range values {
@@ -451,11 +463,12 @@ func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Exp
 	return false
 }
 
+// terminates reports whether block ends in a statement that cannot fall through.
 func terminates(block *ast.BlockStmt) bool {
-	if len(block.List) != 1 {
+	if len(block.List) == 0 {
 		return false
 	}
-	switch stmt := block.List[0].(type) { //nolint:uncheckedsliceindex // len block.List is checked above
+	switch stmt := block.List[len(block.List)-1].(type) { //nolint:uncheckedsliceindex // len block.List is checked above
 	case *ast.ReturnStmt, *ast.BranchStmt:
 		return true
 	case *ast.ExprStmt:

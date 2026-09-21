@@ -210,8 +210,24 @@ func goodBoundedFor(arr []int) {
 	}
 }
 
+func goodBoundedOuterFor(arr []int) {
+	for i := 0; i < len(arr); i++ {
+		for range arr {
+			_ = arr[i]
+		}
+	}
+}
+
 func goodEarlyReturnGuard(arr []int, idx int) int {
 	if idx < 0 || idx >= len(arr) {
+		return -1
+	}
+	return arr[idx]
+}
+
+func goodEarlyReturnWithSetup(arr []int, idx int) int {
+	if idx < 0 || idx >= len(arr) {
+		_ = "invalid index"
 		return -1
 	}
 	return arr[idx]
