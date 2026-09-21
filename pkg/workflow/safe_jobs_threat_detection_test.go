@@ -10,7 +10,10 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSafeOutputsJobsEnableThreatDetectionByDefault verifies that when safe-outputs.jobs
@@ -366,6 +369,54 @@ Test workflow content
 	if !strings.Contains(workflowStr, "- detection") {
 		t.Error("Expected custom safe job to depend on detection job")
 	}
+}
+
+func TestSafeJobsThreatDetectionArtifactPathsUseSlashes(t *testing.T) {
+	c := NewCompiler()
+	markdown := `---
+name: Reproduce detector artifact redaction failure
+on:
+  workflow_dispatch:
+permissions:
+  copilot-requests: write
+engine:
+  id: copilot
+  model: gpt-5.6-luna
+safe-outputs:
+  threat-detection:
+    engine:
+      id: copilot
+      model: detection
+  jobs:
+    publish:
+      description: Publish a value after detection succeeds.
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+      inputs:
+        value:
+          type: string
+          required: true
+      steps:
+        - run: echo "$VALUE"
+          env:
+            VALUE: ${{ inputs.value }}
+---
+
+Return a short response.
+`
+
+	tmpDir := testutil.TempDir(t, "test-*")
+	testFile := filepath.Join(tmpDir, "test-safe-jobs-threat-detection.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(markdown), 0o644))
+	require.NoError(t, c.CompileWorkflow(testFile))
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	require.NoError(t, err)
+	uploadSection := extractWorkflowStepByName(t, string(lockContent), "Upload agent output fallback artifact")
+	assert.Contains(t, uploadSection, "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl")
+	assert.Contains(t, uploadSection, "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl")
+	assert.NotContains(t, uploadSection, `\tmp\gh-aw`)
 }
 
 // TestSafeJobsExpressionEnvNeverWrittenToOutput verifies that job-level env vars containing
