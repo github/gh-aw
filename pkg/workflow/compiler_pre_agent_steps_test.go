@@ -200,6 +200,10 @@ Shared APM-style steps.
 				t.Fatal(err)
 			}
 
+			tools := tc.tools
+			if tools != "" && !strings.HasSuffix(tools, "\n") {
+				tools += "\n"
+			}
 			mainContent := `---
 on:
   pull_request:
@@ -211,7 +215,7 @@ permissions:
 imports:
   - ./shared/apm.md
 engine: ` + tc.engine + `
-` + tc.tools + `strict: false
+` + tools + `strict: false
 ---
 
 Main workflow.
@@ -239,9 +243,13 @@ Main workflow.
 				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
 			}
 			restoreStep := lockContent[strings.Index(lockContent, "- name: Restore agent config folders from base branch"):]
+			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
+				restoreStep = restoreStep[:nextStep]
+			}
 			if !strings.Contains(restoreStep, tc.agentFolder) {
 				t.Errorf("Expected base restore to include %s", tc.agentFolder)
 			}
+			// Base restore must run first so it cannot clobber APM-restored skills.
 			if restoreBaseIdx >= restoreAPMIdx {
 				t.Errorf("Base restore step (%d) should appear before APM restore step (%d)", restoreBaseIdx, restoreAPMIdx)
 			}
