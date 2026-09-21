@@ -1500,6 +1500,10 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			if line == "" {
 				continue
 			}
+			if line == "\n" {
+				runtimeConfig.WriteString(line)
+				continue
+			}
 			if !strings.HasPrefix(line, codexRunBlockIndent) {
 				t.Fatalf("custom config heredoc body line is not indented for YAML run block: %q\nFull body:\n%s", line, body)
 			}

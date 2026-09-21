@@ -45,6 +45,11 @@ func addCodexPluginConfig(config string) string {
 func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 	for config != "" {
 		lineEnd := strings.IndexByte(config, '\n')
+		if lineEnd == 0 {
+			yaml.WriteByte('\n')
+			config = config[1:]
+			continue
+		}
 		yaml.WriteString(codexRunBlockIndent)
 		if lineEnd == -1 {
 			yaml.WriteString(config)
@@ -53,6 +58,14 @@ func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 		yaml.WriteString(config[:lineEnd+1])
 		config = config[lineEnd+1:]
 	}
+}
+
+func codexToolConfig(tools map[string]any, name string) map[string]any {
+	toolConfig, ok := tools[name].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return toolConfig
 }
 
 // RenderMCPConfig generates MCP server configuration for Codex
@@ -104,11 +117,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		renderer := createRenderer(false) // isLast is always false in TOML format
 		switch toolName {
 		case "github":
-			githubTool, ok := expandedTools["github"].(map[string]any)
-			if !ok {
-				githubTool = nil
-			}
-			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
+			renderer.RenderGitHubMCP(&mcpConfigContent, codexToolConfig(expandedTools, "github"), workflowData)
 		case "agentic-workflows":
 			renderer.RenderAgenticWorkflowsMCP(&mcpConfigContent)
 		case "safe-outputs":
@@ -210,14 +219,14 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 			customConfig = addCodexPluginConfig(customConfig)
 		}
 		customConfigDelimiter := GenerateHeredocDelimiterFromContent("CODEX_CUSTOM_CONFIG", customConfig)
-		yaml.WriteString("          \n")
-		yaml.WriteString("          # Append engine-level custom Codex config\n")
-		yaml.WriteString("          cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << " + customConfigDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy custom config rendering remains to be migrated.
+		yaml.WriteString(codexRunBlockIndent + "\n")
+		yaml.WriteString(codexRunBlockIndent + "# Append engine-level custom Codex config\n")
+		yaml.WriteString(codexRunBlockIndent + "cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << " + customConfigDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy custom config rendering remains to be migrated.
 		writeIndentedCodexConfig(yaml, customConfig)
 		if !strings.HasSuffix(customConfig, "\n") {
 			yaml.WriteString("\n")
 		}
-		yaml.WriteString("          " + customConfigDelimiter + "\n")
+		yaml.WriteString(codexRunBlockIndent + customConfigDelimiter + "\n")
 	}
 	yaml.WriteString("          chmod 600 \"/tmp/gh-aw/mcp-config/config.toml\"\n")
 	yaml.WriteString("          mkdir -p \"${CODEX_HOME}\"\n")
