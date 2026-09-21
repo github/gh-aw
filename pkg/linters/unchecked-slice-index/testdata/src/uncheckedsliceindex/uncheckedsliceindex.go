@@ -20,7 +20,7 @@ func badIndexString() {
 }
 
 func badIndexStringLiteral() {
-	_ = "hello"[0] // want "direct string indexing without bounds checking"
+	_ = "hello"[0]
 }
 
 func badIndexHigherIndex() {
@@ -34,7 +34,7 @@ func badIndexHigherIndex() {
 func goodCheckedLenGreater() {
 	arr := []int{1, 2, 3}
 	idx := 0
-	if len(arr) > idx {
+	if idx >= 0 && len(arr) > idx {
 		_ = arr[idx]
 	}
 }
@@ -42,7 +42,7 @@ func goodCheckedLenGreater() {
 func goodCheckedIndexLess() {
 	arr := []int{1, 2, 3}
 	idx := 0
-	if idx < len(arr) {
+	if idx >= 0 && idx < len(arr) {
 		_ = arr[idx]
 	}
 }
@@ -101,7 +101,7 @@ func goodNestedCheck() {
 	arr := []int{1, 2, 3}
 	idx := 0
 	if true {
-		if idx < len(arr) {
+		if idx >= 0 && idx < len(arr) {
 			_ = arr[idx]
 		}
 	}
@@ -133,7 +133,7 @@ func goodMultipleWithCheck() {
 	arr := []int{1, 2, 3, 4}
 	i := 0
 	j := 1
-	if i < len(arr) && j < len(arr) {
+	if i >= 0 && i < len(arr) && j >= 0 && j < len(arr) {
 		_ = arr[i]
 		_ = arr[j]
 	}
@@ -144,7 +144,7 @@ func badMultiplePartialCheck() {
 	arr := []int{1, 2, 3, 4}
 	i := 0
 	j := 1
-	if i < len(arr) {
+	if i >= 0 && i < len(arr) {
 		_ = arr[i]
 		_ = arr[j] // want "direct slice indexing without bounds checking"
 	}
@@ -154,7 +154,7 @@ func badMultiplePartialCheck() {
 func goodStringCheck() {
 	s := "hello"
 	idx := 0
-	if len(s) > idx {
+	if idx >= 0 && len(s) > idx {
 		_ = s[idx]
 	}
 }
@@ -164,4 +164,55 @@ func badStringNoCheck() {
 	s := "hello"
 	idx := 1
 	_ = s[idx] // want "direct string indexing without bounds checking"
+}
+
+func badRangeDifferentSlice(a, b []int) {
+	for i := range a {
+		_ = b[i] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badRangeOffset(a []int) {
+	for i := range a {
+		_ = a[i+1] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badInclusiveUpperBound(arr []int, idx int) {
+	if idx >= 0 && idx <= len(arr) {
+		_ = arr[idx] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badOrBound(arr []int, idx int, fallback bool) {
+	if idx >= 0 && idx < len(arr) || fallback {
+		_ = arr[idx] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badChangedAfterGuard(arr []int, idx int) {
+	if idx >= 0 && idx < len(arr) {
+		arr = nil
+		_ = arr[idx] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badShadowedIndex(arr []int, idx int) {
+	if idx >= 0 && idx < len(arr) {
+		idx := len(arr)
+		_ = arr[idx] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func goodBoundedFor(arr []int) {
+	for i := 0; i < len(arr); i++ {
+		_ = arr[i]
+	}
+}
+
+func goodEarlyReturnGuard(arr []int, idx int) int {
+	if idx < 0 || idx >= len(arr) {
+		return -1
+	}
+	return arr[idx]
 }

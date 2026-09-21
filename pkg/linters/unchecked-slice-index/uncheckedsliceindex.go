@@ -3,7 +3,6 @@
 package uncheckedsliceindex
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -65,7 +64,7 @@ func analyzeIndexExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 	}
 
 	// Skip arrays with constant indices (provably safe).
-	if isArrayWithConstantIndex(pass, idxExpr) {
+	if isArrayWithConstantIndex(pass, idxExpr) || isConstantStringIndex(pass, idxExpr) {
 		return
 	}
 
@@ -80,16 +79,19 @@ func analyzeIndexExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 	}
 
 	// Check if this index is inside a range loop; if so, it's safe.
-	if isInRangeLoop(idxExpr, parents) {
+	if isInRangeLoop(pass, idxExpr, parents) || isInBoundedForLoop(pass, idxExpr, parents) {
 		return
 	}
 
 	// Check if there's a bounds check in the control flow.
-	if hasBoundsCheck(pass, idxExpr, parents, fset) {
+	if hasBoundsCheck(pass, idxExpr, parents) {
 		return
 	}
 
-	// Report the finding.
+	reportIndex(pass, idxExpr, isString, fset)
+}
+
+func reportIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr, isString bool, fset *token.FileSet) {
 	var typeDesc string
 	if isString {
 		typeDesc = "string"
@@ -99,11 +101,17 @@ func analyzeIndexExpr(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 
 	pass.ReportRangef(
 		idxExpr,
-		"direct %s indexing without bounds checking; use `if len(%s) > %s { ... }` or similar guard",
+		"direct %s indexing without bounds checking; ensure `0 <= %s && %s < len(%s)` before indexing",
 		typeDesc,
-		astutil.NodeText(fset, idxExpr.X),
 		astutil.NodeText(fset, idxExpr.Index),
+		astutil.NodeText(fset, idxExpr.Index),
+		astutil.NodeText(fset, idxExpr.X),
 	)
+}
+
+func isConstantStringIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr) bool {
+	_, isConst := astutil.ConstIntValue(pass, idxExpr.Index)
+	return isConst && pass.TypesInfo.Types[idxExpr.X].Value != nil
 }
 
 // isSliceOrStringType reports whether t is a slice or string type.
@@ -155,19 +163,20 @@ func isArrayWithConstantIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr) bool 
 	return isConst
 }
 
-// isInRangeLoop reports whether node is part of a range loop's body.
-func isInRangeLoop(node ast.Node, parents map[ast.Node]ast.Node) bool {
-	current := node
+// isInRangeLoop reports whether node indexes the value ranged over using that
+// range statement's key.
+func isInRangeLoop(pass *analysis.Pass, node *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
+	current := ast.Node(node)
 	for {
 		parent, ok := parents[current]
 		if !ok {
 			return false
 		}
 
-		// If we encounter a range statement, check if the node is in its body.
 		if rangeStmt, ok := parent.(*ast.RangeStmt); ok {
-			// Check if we're in the body of this range.
-			return isAncestorOf(rangeStmt.Body, current, parents)
+			return isAncestorOf(rangeStmt.Body, current, parents) &&
+				sameExpr(pass, node.X, rangeStmt.X) &&
+				sameExpr(pass, node.Index, rangeStmt.Key)
 		}
 
 		// Stop traversing if we hit a function boundary.
@@ -182,7 +191,6 @@ func isInRangeLoop(node ast.Node, parents map[ast.Node]ast.Node) bool {
 	}
 }
 
-// isAncestorOf reports whether ancestor is an ancestor of node in the parent chain.
 func isAncestorOf(ancestor, node ast.Node, parents map[ast.Node]ast.Node) bool {
 	current := node
 	for {
@@ -197,136 +205,266 @@ func isAncestorOf(ancestor, node ast.Node, parents map[ast.Node]ast.Node) bool {
 	}
 }
 
-// hasBoundsCheck reports whether there's a bounds check for the given index
-// expression in the immediate control flow.
-func hasBoundsCheck(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node, fset *token.FileSet) bool {
-	// Walk up the parent chain to find the enclosing if/else statement.
+func isInBoundedForLoop(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
 	current := ast.Node(idxExpr)
 	for {
 		parent, ok := parents[current]
 		if !ok {
 			return false
 		}
-
-		// Stop at function boundaries.
-		if _, ok := parent.(*ast.FuncDecl); ok {
-			return false
-		}
-		if _, ok := parent.(*ast.FuncLit); ok {
-			return false
-		}
-
-		// If we encounter an if statement, check if it guards this index.
-		if ifStmt, ok := parent.(*ast.IfStmt); ok {
-			if checkIfStatementGuards(pass, ifStmt, idxExpr, parents, fset) {
-				return true
+		if forStmt, ok := parent.(*ast.ForStmt); ok {
+			if !isAncestorOf(forStmt.Body, current, parents) {
+				return false
 			}
+			index, ok := idxExpr.Index.(*ast.Ident)
+			return ok && initializedToZero(pass, forStmt.Init, index) &&
+				increments(pass, forStmt.Post, index) &&
+				hasUpperBound(pass, forStmt.Cond, idxExpr) &&
+				!changedBefore(pass, forStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index)
 		}
-
 		current = parent
 	}
 }
 
-// checkIfStatementGuards reports whether an if statement contains a bounds check
-// that guards the given index expression.
-func checkIfStatementGuards(pass *analysis.Pass, ifStmt *ast.IfStmt, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node, fset *token.FileSet) bool {
-	if ifStmt == nil || idxExpr == nil {
-		return false
+func hasBoundsCheck(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
+	current := ast.Node(idxExpr)
+	for {
+		parent, ok := parents[current]
+		if !ok {
+			return hasTerminatingGuardBefore(pass, idxExpr, parents)
+		}
+		if ifStmt, ok := parent.(*ast.IfStmt); ok && isAncestorOf(ifStmt.Body, current, parents) &&
+			hasBounds(pass, ifStmt.Cond, idxExpr) &&
+			!changedBefore(pass, ifStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index) {
+			return true
+		}
+		if _, ok := parent.(*ast.FuncDecl); ok {
+			return hasTerminatingGuardBefore(pass, idxExpr, parents)
+		}
+		if _, ok := parent.(*ast.FuncLit); ok {
+			return hasTerminatingGuardBefore(pass, idxExpr, parents)
+		}
+		current = parent
 	}
-
-	// Check if the condition contains a bounds check for the indexed value and index.
-	if checkConditionForBounds(pass, ifStmt.Cond, idxExpr, fset) {
-		// Now verify that idxExpr is actually inside the then-body of the if.
-		return isAncestorOf(ifStmt.Body, idxExpr, parents)
-	}
-
-	return false
 }
 
-// checkConditionForBounds reports whether a condition checks bounds for an indexed value.
-func checkConditionForBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr, fset *token.FileSet) bool {
-	if cond == nil {
+func hasBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) bool {
+	upper, lower := boundFacts(pass, cond, idxExpr)
+	return upper && lower
+}
+
+func hasUpperBound(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) bool {
+	upper, _ := boundFacts(pass, cond, idxExpr)
+	return upper
+}
+
+func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upper, lower bool) {
+	cond = astutil.UnwrapParenExpr(cond)
+	bin, ok := cond.(*ast.BinaryExpr)
+	if !ok {
+		return false, false
+	}
+	if bin.Op == token.LAND {
+		upperX, lowerX := boundFacts(pass, bin.X, idxExpr)
+		upperY, lowerY := boundFacts(pass, bin.Y, idxExpr)
+		return upperX || upperY, lowerX || lowerY
+	}
+	if isLenOf(pass, bin.X, idxExpr.X) && sameExpr(pass, bin.Y, idxExpr.Index) && bin.Op == token.GTR {
+		return true, indexNonnegative(pass, idxExpr.Index)
+	}
+	if sameExpr(pass, bin.X, idxExpr.Index) && isLenOf(pass, bin.Y, idxExpr.X) && bin.Op == token.LSS {
+		return true, indexNonnegative(pass, idxExpr.Index)
+	}
+	if sameExpr(pass, bin.X, idxExpr.Index) && isZero(pass, bin.Y) && bin.Op == token.GEQ {
+		return false, true
+	}
+	if isLenOf(pass, bin.X, idxExpr.X) && isZero(pass, bin.Y) && bin.Op == token.GTR && isZero(pass, idxExpr.Index) {
+		return true, true
+	}
+	return false, false
+}
+
+func hasTerminatingGuardBefore(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
+	block, target := enclosingBlock(idxExpr, parents)
+	if block == nil {
 		return false
 	}
-
-	// Extract the variable name being indexed.
-	indexedVar := astutil.NodeText(fset, idxExpr.X)
-	indexValue := astutil.NodeText(fset, idxExpr.Index)
-
-	// Unwrap parentheses.
-	cond = astutil.UnwrapParenExpr(cond)
-
-	// Check for binary expressions (e.g., len(s) > i, i < len(s), i < len(s) && ...)
-	if binOp, ok := cond.(*ast.BinaryExpr); ok {
-		// Handle AND operations: check if left side is a bounds check.
-		if binOp.Op.String() == "&&" {
-			if checkConditionForBounds(pass, binOp.X, idxExpr, fset) {
+	for i, stmt := range block.List {
+		if stmt != target {
+			continue
+		}
+		for j, prior := range block.List[:i] {
+			ifStmt, ok := prior.(*ast.IfStmt)
+			if !ok || !terminates(ifStmt.Body) || writesObjects(pass, block.List[j+1:i], idxExpr.X, idxExpr.Index) {
+				continue
+			}
+			upper, lower := invalidBounds(pass, ifStmt.Cond, idxExpr)
+			if upper && lower {
 				return true
 			}
 		}
-
-		// Check both sides for bounds check patterns.
-		if isBoundsCheckExpr(pass, binOp.X, indexedVar, indexValue, fset) || isBoundsCheckExpr(pass, binOp.Y, indexedVar, indexValue, fset) {
-			return true
-		}
-
-		// Also check the binary operation itself for patterns like:
-		// len(s) > i, i < len(s), len(s) > 0, etc.
-		if matchesBoundsCheckPattern(binOp, indexedVar, indexValue, fset) {
-			return true
-		}
 	}
-
 	return false
 }
 
-// isBoundsCheckExpr reports whether expr is a bounds check for the indexed variable.
-func isBoundsCheckExpr(pass *analysis.Pass, expr ast.Expr, indexedVar, indexValue string, fset *token.FileSet) bool {
-	if expr == nil {
-		return false
-	}
-
-	expr = astutil.UnwrapParenExpr(expr)
-
-	binOp, ok := expr.(*ast.BinaryExpr)
+func invalidBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upper, lower bool) {
+	cond = astutil.UnwrapParenExpr(cond)
+	bin, ok := cond.(*ast.BinaryExpr)
 	if !ok {
-		return false
+		return false, false
 	}
-
-	return matchesBoundsCheckPattern(binOp, indexedVar, indexValue, fset)
+	if bin.Op == token.LOR {
+		upperX, lowerX := invalidBounds(pass, bin.X, idxExpr)
+		upperY, lowerY := invalidBounds(pass, bin.Y, idxExpr)
+		return upperX || upperY, lowerX || lowerY
+	}
+	if sameExpr(pass, bin.X, idxExpr.Index) && isLenOf(pass, bin.Y, idxExpr.X) && bin.Op == token.GEQ {
+		return true, false
+	}
+	if sameExpr(pass, bin.X, idxExpr.Index) && isZero(pass, bin.Y) && bin.Op == token.LSS {
+		return false, true
+	}
+	return false, false
 }
 
-// matchesBoundsCheckPattern reports whether a binary operation is a bounds check.
-func matchesBoundsCheckPattern(binOp *ast.BinaryExpr, indexedVar, indexValue string, fset *token.FileSet) bool {
-	if binOp == nil {
+func sameExpr(pass *analysis.Pass, x, y ast.Expr) bool {
+	xID, xOK := astutil.UnwrapParenExpr(x).(*ast.Ident)
+	yID, yOK := astutil.UnwrapParenExpr(y).(*ast.Ident)
+	return xOK && yOK && pass.TypesInfo.ObjectOf(xID) != nil &&
+		pass.TypesInfo.ObjectOf(xID) == pass.TypesInfo.ObjectOf(yID)
+}
+
+func isLenOf(pass *analysis.Pass, expr, value ast.Expr) bool {
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 || !sameExpr(pass, call.Args[0], value) { //nolint:uncheckedsliceindex // len call.Args is checked above
 		return false
 	}
+	fun, ok := call.Fun.(*ast.Ident)
+	builtin, isBuiltin := pass.TypesInfo.ObjectOf(fun).(*types.Builtin)
+	return ok && isBuiltin && builtin.Name() == "len"
+}
 
-	lhs := astutil.NodeText(fset, binOp.X)
-	rhs := astutil.NodeText(fset, binOp.Y)
-	op := binOp.Op.String()
+func isZero(pass *analysis.Pass, expr ast.Expr) bool {
+	value, ok := astutil.ConstIntValue(pass, expr)
+	return ok && value == 0
+}
 
-	// Pattern: len(s) > i
-	if lhs == fmt.Sprintf("len(%s)", indexedVar) && rhs == indexValue && (op == ">" || op == ">=") {
+func indexNonnegative(pass *analysis.Pass, expr ast.Expr) bool {
+	if value, ok := astutil.ConstIntValue(pass, expr); ok {
+		return value >= 0
+	}
+	basic, ok := pass.TypesInfo.TypeOf(expr).Underlying().(*types.Basic)
+	return ok && basic.Info()&types.IsUnsigned != 0
+}
+
+func initializedToZero(pass *analysis.Pass, stmt ast.Stmt, index *ast.Ident) bool {
+	assign, ok := stmt.(*ast.AssignStmt)
+	return ok && len(assign.Lhs) == 1 && len(assign.Rhs) == 1 &&
+		sameExpr(pass, assign.Lhs[0], index) && isZero(pass, assign.Rhs[0]) //nolint:uncheckedsliceindex // lengths are checked above
+}
+
+func increments(pass *analysis.Pass, stmt ast.Stmt, index *ast.Ident) bool {
+	inc, ok := stmt.(*ast.IncDecStmt)
+	return ok && inc.Tok == token.INC && sameExpr(pass, inc.X, index)
+}
+
+func enclosingBlock(node ast.Node, parents map[ast.Node]ast.Node) (*ast.BlockStmt, ast.Stmt) {
+	current := node
+	var target ast.Stmt
+	for {
+		parent, ok := parents[current]
+		if !ok {
+			return nil, nil
+		}
+		if stmt, ok := current.(ast.Stmt); ok {
+			target = stmt
+		}
+		if block, ok := parent.(*ast.BlockStmt); ok {
+			return block, target
+		}
+		current = parent
+	}
+}
+
+func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, parents map[ast.Node]ast.Node, values ...ast.Expr) bool {
+	current := node
+	for {
+		parent, ok := parents[current]
+		if !ok {
+			return true
+		}
+		if parentBlock, ok := parent.(*ast.BlockStmt); ok {
+			target, ok := current.(ast.Stmt)
+			if !ok {
+				return true
+			}
+			for i, stmt := range parentBlock.List {
+				if stmt == target && writesObjects(pass, parentBlock.List[:i], values...) {
+					return true
+				}
+			}
+			if parentBlock == block {
+				return false
+			}
+		}
+		current = parent
+	}
+}
+
+func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Expr) bool {
+	objects := make(map[types.Object]struct{}, len(values))
+	for _, value := range values {
+		if ident, ok := astutil.UnwrapParenExpr(value).(*ast.Ident); ok {
+			objects[pass.TypesInfo.ObjectOf(ident)] = struct{}{}
+		}
+	}
+	for _, stmt := range statements {
+		written := false
+		ast.Inspect(stmt, func(node ast.Node) bool {
+			if written {
+				return false
+			}
+			switch n := node.(type) {
+			case *ast.AssignStmt:
+				for _, lhs := range n.Lhs {
+					if ident, ok := lhs.(*ast.Ident); ok {
+						if _, ok := objects[pass.TypesInfo.ObjectOf(ident)]; ok {
+							written = true
+							return false
+						}
+					}
+				}
+			case *ast.IncDecStmt:
+				if ident, ok := n.X.(*ast.Ident); ok {
+					if _, ok := objects[pass.TypesInfo.ObjectOf(ident)]; ok {
+						written = true
+						return false
+					}
+				}
+			}
+			return true
+		})
+		if written {
+			return true
+		}
+	}
+	return false
+}
+
+func terminates(block *ast.BlockStmt) bool {
+	if len(block.List) != 1 {
+		return false
+	}
+	switch stmt := block.List[0].(type) { //nolint:uncheckedsliceindex // len block.List is checked above
+	case *ast.ReturnStmt, *ast.BranchStmt:
 		return true
+	case *ast.ExprStmt:
+		call, ok := stmt.X.(*ast.CallExpr)
+		if !ok {
+			return false
+		}
+		ident, ok := call.Fun.(*ast.Ident)
+		return ok && ident.Name == "panic"
 	}
-
-	// Pattern: i < len(s)
-	if lhs == indexValue && rhs == fmt.Sprintf("len(%s)", indexedVar) && (op == "<" || op == "<=") {
-		return true
-	}
-
-	// Pattern: len(s) > 0 (simple check for non-empty)
-	if lhs == fmt.Sprintf("len(%s)", indexedVar) && rhs == "0" && (op == ">" || op == "!=") {
-		// This is safe for indexing like s[0].
-		return indexValue == "0"
-	}
-
-	// Pattern: i >= 0 && i < len(s) is handled by the AND case in checkConditionForBounds.
-	// Here we just check: i >= 0
-	if lhs == indexValue && rhs == "0" && op == ">=" {
-		return false // Not a complete bounds check by itself.
-	}
-
 	return false
 }

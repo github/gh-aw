@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 72 active analyzers:
+// All 73 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -69,6 +69,7 @@
 //   - tolowerequalfold — flags case-insensitive comparisons via ToLower/ToUpper that should use EqualFold
 //   - trimleftright — flags strings.TrimLeft/TrimRight calls with a multi-character literal cutset where TrimPrefix/TrimSuffix was likely intended
 //   - typeassertionokdiscarded — flags two-value type assertions whose ok result is discarded
+//   - uncheckedsliceindex — reports slice and string indexes without proven bounds
 //   - uncheckedtypeassertion — flags unchecked single-value type assertions
 //   - uncheckedflushreturn — flags Flush() method calls where the error return is discarded
 //   - walkfuncerrshadow — flags filepath.Walk/WalkDir callbacks whose err parameter shadows an outer err variable assigned from the walk call

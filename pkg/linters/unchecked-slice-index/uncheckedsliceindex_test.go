@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
+	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 )
 
 func TestAnalyzer(t *testing.T) {
