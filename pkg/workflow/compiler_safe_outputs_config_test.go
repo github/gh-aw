@@ -20,6 +20,7 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 		checkContains []string
 		checkJSON     bool
 		expectedKeys  []string
+		absentKeys    []string
 	}{
 		{
 			name: "create issue config",
@@ -913,7 +914,7 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"replace_label"},
 		},
 		{
-			name: "steer config",
+			name: "steer enabled config",
 			safeOutputs: &SafeOutputsConfig{
 				Steer: true,
 				CreateIssues: &CreateIssuesConfig{
@@ -927,6 +928,24 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			},
 			checkJSON:    true,
 			expectedKeys: []string{"create_issue"},
+			absentKeys:   []string{"steer"},
+		},
+		{
+			name: "steer disabled config",
+			safeOutputs: &SafeOutputsConfig{
+				Steer: false,
+				CreateIssues: &CreateIssuesConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: strPtr("1"),
+					},
+				},
+			},
+			checkContains: []string{
+				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+			checkJSON:    true,
+			expectedKeys: []string{"create_issue"},
+			absentKeys:   []string{"steer"},
 		},
 		{
 			name: "mentions config",
@@ -1217,6 +1236,9 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 							// Check expected keys
 							for _, key := range tt.expectedKeys {
 								assert.Contains(t, config, key, "Expected config key: "+key)
+							}
+							for _, key := range tt.absentKeys {
+								assert.NotContains(t, config, key, "Unexpected config key: "+key)
 							}
 						}
 					}
