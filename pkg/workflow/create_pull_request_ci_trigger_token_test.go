@@ -222,6 +222,13 @@ func TestCITriggerTokenNoneOmitsSecret(t *testing.T) {
     github-token-for-extra-empty-commit: none`,
 		},
 		{
+			name: "create-pull-request with None is case-insensitive",
+			safeOutputsConfig: `safe-outputs:
+  create-pull-request:
+    title-prefix: "[test] "
+    github-token-for-extra-empty-commit: None`,
+		},
+		{
 			name: "push-to-pull-request-branch with none",
 			safeOutputsConfig: `safe-outputs:
   push-to-pull-request-branch:

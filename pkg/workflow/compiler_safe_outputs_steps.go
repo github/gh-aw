@@ -434,7 +434,9 @@ func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
 		ciTriggerToken = data.SafeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
 	}
 
-	switch ciTriggerToken {
+	// Match the sentinel values case-insensitively so "App"/"None" are not mistaken for
+	// literal token values; the original string is used for custom token expressions.
+	switch strings.ToLower(strings.TrimSpace(ciTriggerToken)) {
 	case "app":
 		*steps = append(*steps, "          GH_AW_CI_TRIGGER_TOKEN: ${{ steps.safe-outputs-app-token.outputs.token || '' }}\n")
 		consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GitHub App token")
