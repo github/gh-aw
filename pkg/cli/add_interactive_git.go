@@ -243,12 +243,7 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 	return nil
 }
 
-// updateLocalBranch fetches and pulls the latest changes from GitHub after PR merge.
-// It switches to the default branch before pulling so that the working tree contains
-// the merged workflow files, which are required when offering to run the workflow.
-func (c *AddInteractiveConfig) updateLocalBranch() error {
-	addInteractiveLog.Print("Updating local branch with merged changes")
-
+func (c *AddInteractiveConfig) resolveDefaultBranch() string {
 	// Get the default branch name using gh
 	output, err := workflow.RunGHCombined("Getting default branch...", "repo", "view", "--repo", c.RepoOverride, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
 	defaultBranch := ""
@@ -268,19 +263,32 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
+	return defaultBranch
+}
+
+// updateLocalBranch fetches and pulls the latest changes from GitHub after PR merge.
+// It switches to the default branch before pulling so that the working tree contains
+// the merged workflow files, which are required when offering to run the workflow.
+func (c *AddInteractiveConfig) updateLocalBranch() error {
+	addInteractiveLog.Print("Updating local branch with merged changes")
+
+	defaultBranch := c.resolveDefaultBranch()
 	if err := validateGitBranchArg(defaultBranch, "default branch name"); err != nil {
 		return err
 	}
 	addInteractiveLog.Printf("Default branch: %s", defaultBranch)
+
 	// Fetch the latest changes from origin
 	if c.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage("Fetching latest changes from GitHub..."))
 	}
+
 	fetchCmd := exec.Command("git", "fetch", "origin", defaultBranch)
 	fetchOutput, err := fetchCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git fetch failed: %w (output: %s)", err, string(fetchOutput))
 	}
+
 	// Switch to the default branch so the working tree contains the merged workflow
 	// files. Without this, users on a feature branch won't have the files locally and
 	// the subsequent "run workflow" step will fail with "workflow file not found".
@@ -289,12 +297,14 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 		addInteractiveLog.Printf("Could not determine current branch: %v", err)
 		currentBranch = ""
 	}
+
 	if currentBranch != defaultBranch {
 		addInteractiveLog.Printf("Switching from %q to default branch %q", currentBranch, defaultBranch)
 		if err := switchBranch(defaultBranch, c.Verbose); err != nil {
 			return fmt.Errorf("failed to switch to default branch %s: %w", defaultBranch, err)
 		}
 	}
+
 	pullCmd := exec.Command("git", "pull", "origin", defaultBranch)
 	pullOutput, err := pullCmd.CombinedOutput()
 	if err != nil {
