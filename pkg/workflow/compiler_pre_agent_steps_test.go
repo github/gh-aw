@@ -242,7 +242,11 @@ Main workflow.
 			if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
 				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
 			}
-			restoreStep := lockContent[restoreBaseIdx:]
+			restoreStepStart := strings.Index(lockContent, "- name: Restore agent config folders from base branch")
+			if restoreStepStart == -1 {
+				t.Fatal("Could not find base restore step")
+			}
+			restoreStep := lockContent[restoreStepStart:]
 			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
 				restoreStep = restoreStep[:nextStep]
 			}
