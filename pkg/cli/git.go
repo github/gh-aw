@@ -28,6 +28,9 @@ func isSafeGitRevisionArg(ref string) bool {
 }
 
 func validateGitBranchArg(branchName, label string) error {
+	if branchName == "" {
+		return fmt.Errorf("invalid %s: must not be empty", label)
+	}
 	if !isSafeGitRevisionArg(branchName) {
 		return fmt.Errorf("invalid %s %q: must not start with '-' or contain control characters", label, branchName)
 	}
