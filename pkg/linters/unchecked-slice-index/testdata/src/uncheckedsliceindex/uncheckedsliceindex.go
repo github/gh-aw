@@ -19,7 +19,7 @@ func badIndexString() {
 	_ = s[idx] // want "direct string indexing without bounds checking"
 }
 
-func badIndexStringLiteral() {
+func goodIndexStringLiteral() {
 	_ = "hello"[0]
 }
 

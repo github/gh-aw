@@ -102,9 +102,8 @@ func reportIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr, isString bool, fse
 
 	pass.ReportRangef(
 		idxExpr,
-		"direct %s indexing without bounds checking; ensure `0 <= %s && %s < len(%s)` before indexing",
+		"direct %s indexing without bounds checking; ensure %s is nonnegative and less than len(%s) before indexing",
 		typeDesc,
-		astutil.NodeText(fset, idxExpr.Index),
 		astutil.NodeText(fset, idxExpr.Index),
 		astutil.NodeText(fset, idxExpr.X),
 	)
@@ -277,6 +276,7 @@ func hasUpperBound(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) b
 }
 
 // boundFacts reports strict upper and nonnegative lower-bound facts from a conjunction.
+// It deliberately ignores disjunctions because they do not prove facts on every path.
 func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upper, lower bool) {
 	cond = astutil.UnwrapParenExpr(cond)
 	bin, ok := cond.(*ast.BinaryExpr)
@@ -322,13 +322,19 @@ func hasTerminatingGuardBefore(pass *analysis.Pass, idxExpr *ast.IndexExpr, pare
 			}
 			for j, prior := range block.List[:i] {
 				ifStmt, ok := prior.(*ast.IfStmt)
-				if !ok || !terminates(ifStmt.Body) || writesObjects(pass, block.List[j+1:i], idxExpr.X, idxExpr.Index) {
+				if !ok || !terminates(pass, ifStmt.Body) || writesObjects(pass, block.List[j+1:i], idxExpr.X, idxExpr.Index) {
 					continue
 				}
 				upper, lower := invalidBounds(pass, ifStmt.Cond, idxExpr)
 				if upper && lower {
 					return true
 				}
+			}
+			if _, ok := parents[block].(*ast.FuncDecl); ok {
+				return false
+			}
+			if _, ok := parents[block].(*ast.FuncLit); ok {
+				return false
 			}
 		}
 		current = block
@@ -497,7 +503,7 @@ func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Exp
 }
 
 // terminates reports whether block ends in a statement that cannot fall through.
-func terminates(block *ast.BlockStmt) bool {
+func terminates(pass *analysis.Pass, block *ast.BlockStmt) bool {
 	if len(block.List) == 0 {
 		return false
 	}
@@ -510,7 +516,11 @@ func terminates(block *ast.BlockStmt) bool {
 			return false
 		}
 		ident, ok := call.Fun.(*ast.Ident)
-		return ok && ident.Name == "panic"
+		if !ok {
+			return false
+		}
+		builtin, isBuiltin := pass.TypesInfo.ObjectOf(ident).(*types.Builtin)
+		return isBuiltin && builtin.Name() == "panic"
 	}
 	return false
 }
