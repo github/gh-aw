@@ -301,3 +301,43 @@ This workflow tests that GH_AW_CI_TRIGGER_TOKEN is omitted when disabled.
 		})
 	}
 }
+
+func TestCITriggerTokenCreatePullRequestPrecedence(t *testing.T) {
+	tests := []struct {
+		name     string
+		create   string
+		push     string
+		expected string
+		disabled bool
+	}{
+		{
+			name:     "create-pull-request none wins over push token",
+			create:   "none",
+			push:     "${{ secrets.PUSH_TOKEN }}",
+			expected: "none",
+			disabled: true,
+		},
+		{
+			name:     "create-pull-request token wins over push none",
+			create:   "${{ secrets.CREATE_TOKEN }}",
+			push:     "none",
+			expected: "${{ secrets.CREATE_TOKEN }}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			safeOutputs := &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{
+					GithubTokenForExtraEmptyCommit: tt.create,
+				},
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{
+					GithubTokenForExtraEmptyCommit: tt.push,
+				},
+			}
+
+			assert.Equal(t, tt.expected, getCITriggerTokenConfig(safeOutputs))
+			assert.Equal(t, tt.disabled, isCITriggerTokenDisabled(safeOutputs))
+		})
+	}
+}
