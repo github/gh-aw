@@ -535,7 +535,7 @@ func getCurrentBranchIn(dir string) (string, error) {
 // createAndSwitchBranch creates a new branch and switches to it
 func createAndSwitchBranch(branchName string, verbose bool) error {
 	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("unsafe branch name %q", branchName)
+		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
 	}
 	console.LogVerbose(verbose, "Creating and switching to branch: "+branchName)
 
@@ -550,7 +550,7 @@ func createAndSwitchBranch(branchName string, verbose bool) error {
 // switchBranch switches to the specified branch
 func switchBranch(branchName string, verbose bool) error {
 	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("unsafe branch name %q", branchName)
+		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
 	}
 	console.LogVerbose(verbose, "Switching to branch: "+branchName)
 
@@ -579,7 +579,7 @@ func commitChanges(message string, verbose bool) error {
 // pushBranch pushes the specified branch to origin
 func pushBranch(branchName string, verbose bool) error {
 	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("unsafe branch name %q", branchName)
+		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
 	}
 	console.LogVerbose(verbose, "Pushing branch: "+branchName)
 

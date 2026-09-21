@@ -74,8 +74,8 @@ func TestCheckoutUpdatedDefaultBranchRejectsUnsafeDefaultBranch(t *testing.T) {
 
 	err := checkoutUpdatedDefaultBranch("target-owner", "target-repo", false)
 
-	if err == nil || !strings.Contains(err.Error(), "unsafe default branch name") {
-		t.Fatalf("checkoutUpdatedDefaultBranch() error = %v, want unsafe default branch rejection", err)
+	if err == nil || !strings.Contains(err.Error(), "invalid default branch name") {
+		t.Fatalf("checkoutUpdatedDefaultBranch() error = %v, want invalid default branch rejection", err)
 	}
 }
 

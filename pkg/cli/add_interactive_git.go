@@ -269,7 +269,7 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 		defaultBranch = "main"
 	}
 	if !isSafeGitRevisionArg(defaultBranch) {
-		return fmt.Errorf("unsafe default branch name %q", defaultBranch)
+		return fmt.Errorf("invalid default branch name %q: must not start with '-' or contain control characters", defaultBranch)
 	}
 	addInteractiveLog.Printf("Default branch: %s", defaultBranch)
 	// Fetch the latest changes from origin

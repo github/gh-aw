@@ -278,7 +278,7 @@ func checkoutUpdatedDefaultBranch(targetOwner, targetRepo string, verbose bool) 
 	}
 	defaultBranch := strings.TrimSpace(string(defaultBranchOutput))
 	if !isSafeGitRevisionArg(defaultBranch) {
-		return fmt.Errorf("unsafe default branch name %q", defaultBranch)
+		return fmt.Errorf("invalid default branch name %q: must not start with '-' or contain control characters", defaultBranch)
 	}
 
 	// Ensure we're on the latest version of the default branch

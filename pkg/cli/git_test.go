@@ -58,7 +58,7 @@ func TestBranchOperationsRejectUnsafeRevisionArgs(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			assert.ErrorContains(t, operation("--upload-pack=evil", false), "unsafe branch name")
+			assert.ErrorContains(t, operation("--upload-pack=evil", false), "invalid branch name")
 		})
 	}
 }

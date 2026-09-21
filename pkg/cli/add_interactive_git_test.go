@@ -104,7 +104,7 @@ func TestUpdateLocalBranchRejectsUnsafeDefaultBranch(t *testing.T) {
 
 	err := (&AddInteractiveConfig{}).updateLocalBranch()
 
-	assert.ErrorContains(t, err, "unsafe default branch name")
+	assert.ErrorContains(t, err, "invalid default branch name")
 }
 
 // TestParseDefaultBranchFromLsRemoteWithRealGit creates real git repositories
