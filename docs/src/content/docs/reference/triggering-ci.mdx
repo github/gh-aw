@@ -90,7 +90,7 @@ safe-outputs:
     github-token-for-extra-empty-commit: none
 ```
 
-With `none`, no `GH_AW_CI_TRIGGER_TOKEN` environment variable is emitted and CI checks will not be triggered on the created or updated pull request branch.
+With `none`, no `GH_AW_CI_TRIGGER_TOKEN` environment variable is emitted, so the extra empty commit used to trigger CI is skipped. If the full `github-token` override below is also configured, the primary push still triggers CI.
 
 ## Alternative: Full Token Override
 

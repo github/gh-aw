@@ -427,12 +427,7 @@ func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
 		return
 	}
 
-	var ciTriggerToken string
-	if data.SafeOutputs.CreatePullRequests != nil && data.SafeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
-		ciTriggerToken = data.SafeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
-	} else if data.SafeOutputs.PushToPullRequestBranch != nil && data.SafeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit != "" {
-		ciTriggerToken = data.SafeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
-	}
+	ciTriggerToken := getCITriggerTokenConfig(data.SafeOutputs)
 
 	// Match the sentinel values case-insensitively so "App"/"None" are not mistaken for
 	// literal token values; the original string is used for custom token expressions.
@@ -450,6 +445,20 @@ func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
 		*steps = append(*steps, fmt.Sprintf("          GH_AW_CI_TRIGGER_TOKEN: %s\n", getEffectiveCITriggerGitHubToken(ciTriggerToken)))
 		consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GH_AW_CI_TRIGGER_TOKEN")
 	}
+}
+
+func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
+	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
+		return safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
+	}
+	if safeOutputs.PushToPullRequestBranch != nil {
+		return safeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
+	}
+	return ""
+}
+
+func isCITriggerTokenDisabled(safeOutputs *SafeOutputsConfig) bool {
+	return safeOutputs != nil && strings.EqualFold(strings.TrimSpace(getCITriggerTokenConfig(safeOutputs)), "none")
 }
 
 // addSafeOutputTokenEnvVars appends token-related environment variables required by the

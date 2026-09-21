@@ -229,6 +229,15 @@ func TestCITriggerTokenNoneOmitsSecret(t *testing.T) {
     github-token-for-extra-empty-commit: None`,
 		},
 		{
+			name: "create-pull-request with none overrides custom environment token",
+			safeOutputsConfig: `safe-outputs:
+  env:
+    GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.CUSTOM_CI_TRIGGER_TOKEN }}
+  create-pull-request:
+    title-prefix: "[test] "
+    github-token-for-extra-empty-commit: none`,
+		},
+		{
 			name: "push-to-pull-request-branch with none",
 			safeOutputsConfig: `safe-outputs:
   push-to-pull-request-branch:
