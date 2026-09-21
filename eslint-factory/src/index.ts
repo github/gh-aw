@@ -60,6 +60,7 @@ import { requireGetExecOutputExitCodeCheckRule } from "./rules/require-getexecou
 import { preferActionsExecOverChildProcessRule } from "./rules/prefer-actions-exec-over-child-process";
 import { noMisplacedErrorCodeDefinitionRule } from "./rules/no-misplaced-error-code-definition";
 import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
+import { requireLstatSyncReadlinkSyncTryCatchRule } from "./rules/require-lstatsync-readlinksync-try-catch";
 
 const plugin = {
   meta: {
@@ -129,6 +130,7 @@ const plugin = {
     "prefer-actions-exec-over-child-process": preferActionsExecOverChildProcessRule,
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
+    "require-lstatsync-readlinksync-try-catch": requireLstatSyncReadlinkSyncTryCatchRule,
   },
 };
 

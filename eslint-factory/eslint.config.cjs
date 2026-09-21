@@ -49,6 +49,7 @@ module.exports = [
       "gh-aw-custom/require-execfilesync-try-catch": "warn",
       "gh-aw-custom/require-fs-io-try-catch": "warn",
       "gh-aw-custom/require-fs-chmod-try-catch": "warn",
+      "gh-aw-custom/require-lstatsync-readlinksync-try-catch": "warn",
       "gh-aw-custom/no-setfailed-then-exit-zero": "warn",
       "gh-aw-custom/no-err-stack-then-string-fallback": "warn",
       "gh-aw-custom/no-caught-error-interpolation": "warn",

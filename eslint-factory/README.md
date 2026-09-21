@@ -46,6 +46,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fetch-timeout`](#require-fetch-timeout) | Require `fetch(...)` calls to include a non-nullish abort `signal` option |
 | [`require-fetch-try-catch`](#require-fetch-try-catch) | Require try/catch around awaited `fetch(...)` calls, including chained promise forms without rejection handlers |
 | [`require-fs-chmod-try-catch`](#require-fs-chmod-try-catch) | Require try/catch around `fs.chmodSync` and `fs.fchmodSync` |
+| [`require-lstatsync-readlinksync-try-catch`](#require-lstatsync-readlinksync-try-catch) | Require try/catch around `fs.lstatSync` and `fs.readlinkSync` calls |
 | [`require-fs-close-sync`](#require-fs-close-sync) | Require `fs.openSync(...)` file descriptors to be closed with `fs.closeSync(fd)` in the same function |
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
@@ -543,6 +544,35 @@ try {
   // use tmpDir here
 } catch (err) {
   throw new Error("fs.mkdtempSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-lstatsync-readlinksync-try-catch`
+
+Require `fs.lstatSync` and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: both methods throw synchronously — `lstatSync` on a missing path or permission denial, `readlinkSync` additionally when the target is not a symbolic link. These APIs are used in security-sensitive code paths (symlink-traversal guards, staged-attachment validation, memory-directory digesting); an unguarded call surfaces a generic engine-level stack instead of a specific, `{ cause }`-preserving error.
+
+**Detected forms:**
+- `fs.lstatSync(path)` / `fs.readlinkSync(path)` — direct call on a known `require("fs")` result.
+- `fs["lstatSync"](path)` — computed string-literal property access.
+- `const { lstatSync, readlinkSync } = require("fs"); lstatSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace imports: `import * as fs from "fs"; fs.lstatSync(path)`.
+- ESM named imports: `import { readlinkSync } from "fs"; readlinkSync(path)`.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- Calls already inside a `try` block with a `catch` clause.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Known limitation — no autofix for `VariableDeclaration`:** when the flagged call appears as a variable initializer, the rule reports the error but emits no autofix suggestion. Only `ExpressionStatement` and `ReturnStatement` positions receive an autofix suggestion.
+
+**Safe alternative:**
+```js
+try {
+  const stat = fs.lstatSync(path);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
