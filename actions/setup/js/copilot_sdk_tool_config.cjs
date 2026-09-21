@@ -213,6 +213,8 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   }
 
   const availableTools = new sdk.ToolSet();
+  // Profile configs must fail closed even when a caller hand-constructs a config
+  // and bypasses parseCopilotSDKToolConfig, which is the only other parity check.
   if (config.profile) validateToolPermissionParity(config);
   if (!config.profile) availableTools.addBuiltIn(sdk.BuiltInTools.Isolated.filter(name => name !== "ask_user"));
   availableTools.addBuiltIn(config.profile ? ["view", "rg", "glob"] : COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
