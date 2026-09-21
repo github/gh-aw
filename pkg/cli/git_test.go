@@ -63,6 +63,7 @@ func TestValidateGitBranchArg(t *testing.T) {
 		{"control character", "origin/main\n--help", "branch name", true, "must not start with '-' or contain control characters"},
 		{"valid branch", "main", "branch name", false, ""},
 		{"custom label", "", "default branch name", true, "invalid default branch name"},
+		{"custom label option-like", "--upload-pack=evil", "default branch name", true, "invalid default branch name \"--upload-pack=evil\": must not start with '-' or contain control characters"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
