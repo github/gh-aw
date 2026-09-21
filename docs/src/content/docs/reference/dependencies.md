@@ -80,9 +80,7 @@ To reproduce or debug the pack/unpack flow locally, run `apm pack` and `apm unpa
 
 ## Pull request runs
 
-On pull request triggers the agent job restores agent config folders (`.agents`, `.github`, and the engine folder such as `.claude`) from a base-branch snapshot so a fork PR cannot inject skill or instruction files. This restore removes only the files tracked by git in the PR branch, so package files that APM unpacked into `.claude/skills/` or `.github/skills/` earlier in the job are preserved.
-
-If a package installs a file at a path that the repository also tracks, the base-branch version wins.
+For pull request triggers, the agent job replaces agent config folders (`.agents`, `.github`, and the engine folder such as `.claude`) with a base-branch snapshot so a fork PR cannot inject skill or instruction files.
 
 ## Reference
 
