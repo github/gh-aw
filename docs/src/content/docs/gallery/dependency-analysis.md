@@ -3,7 +3,7 @@ title: Automated dependency analysis
 description: Use Go Fan to review direct Go-module usage, compare it with upstream guidance, and create actionable follow-up issues.
 ---
 
-Go Fan is a scheduled dependency-analysis workflow for Go repositories. Each weekday, it selects a direct dependency from `go.mod`, researches upstream changes and recommended usage, compares those findings with the repository's code, and creates a single issue containing actionable recommendations.
+Go Fan is a weekday dependency-analysis workflow for Go repositories. On each run, it selects a direct dependency from `go.mod`, researches upstream changes and recommended usage, compares those findings with the repository's code, and creates a single issue containing actionable recommendations.
 
 ```mermaid
 flowchart LR
@@ -24,7 +24,7 @@ Review the recommendations before implementing them. For a structured handoff fr
 
 ## Workflow source
 
-The active workflow runs daily on weekdays and can also be started manually:
+The active workflow runs on weekdays and can also be started manually:
 
 - [Go Fan workflow source](https://github.com/github/gh-aw/blob/main/.github/workflows/go-fan.md)
 - [Go Fan generated workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/go-fan.lock.yml)
