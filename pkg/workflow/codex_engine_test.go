@@ -1473,7 +1473,7 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
-				Config: "model_reasoning_effort = \"high\"\n\n[profiles.demo]\napproval_policy = \"never\"",
+				Config: "model_reasoning_effort = \"high\"\n   \n[profiles.demo]\napproval_policy = \"never\"",
 			},
 		}
 		var yaml strings.Builder
@@ -1509,8 +1509,9 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			}
 			runtimeConfig.WriteString(strings.TrimPrefix(line, codexRunBlockIndent))
 		}
-		if got := runtimeConfig.String(); got != workflowData.EngineConfig.Config+"\n" {
-			t.Fatalf("custom config heredoc body changed runtime TOML content:\nExpected:\n%q\nGot:\n%q", workflowData.EngineConfig.Config+"\n", got)
+		expectedRuntimeConfig := "model_reasoning_effort = \"high\"\n\n[profiles.demo]\napproval_policy = \"never\"\n"
+		if got := runtimeConfig.String(); got != expectedRuntimeConfig {
+			t.Fatalf("custom config heredoc body changed runtime TOML content:\nExpected:\n%q\nGot:\n%q", expectedRuntimeConfig, got)
 		}
 	})
 

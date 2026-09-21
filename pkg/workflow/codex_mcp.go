@@ -42,18 +42,21 @@ func addCodexPluginConfig(config string) string {
 // config line. YAML block scalar parsing strips this common indentation before
 // the shell runs, so the heredoc receives the original TOML content.
 func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
+	outputEndsWithNewline := false
 	for _, line := range strings.SplitAfter(config, "\n") {
 		if line == "" {
 			continue
 		}
-		if line == "\n" {
+		if strings.TrimSpace(line) == "" {
 			yaml.WriteByte('\n')
+			outputEndsWithNewline = true
 			continue
 		}
 		yaml.WriteString(codexRunBlockIndent)
 		yaml.WriteString(line)
+		outputEndsWithNewline = strings.HasSuffix(line, "\n")
 	}
-	if config != "" && !strings.HasSuffix(config, "\n") {
+	if config != "" && !outputEndsWithNewline {
 		yaml.WriteByte('\n')
 	}
 }
@@ -107,11 +110,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		renderer := createRenderer(false) // isLast is always false in TOML format
 		switch toolName {
 		case "github":
-			githubTool, ok := expandedTools["github"].(map[string]any)
-			if !ok {
-				renderer.RenderGitHubMCP(&mcpConfigContent, nil, workflowData)
-				break
-			}
+			githubTool, _ := expandedTools["github"].(map[string]any) //nolint:typeassertionokdiscarded // Preserve legacy nil fallback when config is absent or not a map.
 			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
 		case "agentic-workflows":
 			renderer.RenderAgenticWorkflowsMCP(&mcpConfigContent)
