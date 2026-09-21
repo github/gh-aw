@@ -44,20 +44,16 @@ func addCodexPluginConfig(config string) string {
 // line without a trailing newline is indented here and the caller appends the
 // newline.
 func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
-	for config != "" {
-		lineEnd := strings.IndexByte(config, '\n')
-		if lineEnd == 0 {
+	for _, line := range strings.SplitAfter(config, "\n") {
+		if line == "" {
+			continue
+		}
+		if line == "\n" {
 			yaml.WriteByte('\n')
-			config = config[1:]
 			continue
 		}
 		yaml.WriteString(codexRunBlockIndent)
-		if lineEnd == -1 {
-			yaml.WriteString(config)
-			return
-		}
-		yaml.WriteString(config[:lineEnd+1])
-		config = config[lineEnd+1:]
+		yaml.WriteString(line)
 	}
 }
 
