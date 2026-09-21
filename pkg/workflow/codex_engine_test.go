@@ -1459,7 +1459,12 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 		shellPolicyStart := strings.Index(config, "# Sync converter output")
 		shellPolicyEnd := strings.Index(config, "# Append engine-level custom Codex config")
 		shellPolicy := config[shellPolicyStart:shellPolicyEnd]
-		if strings.Contains(shellPolicy, "[features]") || !strings.Contains(config, "          [features]\n          plugins = false\n           shell_tool = false") {
+		expectedCustomFeatures := strings.Join([]string{
+			codexRunBlockIndent + "[features]",
+			codexRunBlockIndent + "plugins = false",
+			codexRunBlockIndent + " shell_tool = false",
+		}, "\n")
+		if strings.Contains(shellPolicy, "[features]") || !strings.Contains(config, expectedCustomFeatures) {
 			t.Errorf("Expected plugin setting to be merged into custom Codex features table, got:\n%s", config)
 		}
 	})
@@ -1477,8 +1482,8 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 		}
 
 		config := normalizeHeredocDelimiters(yaml.String())
-		startMarker := "          cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
-		endMarker := "          GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
+		startMarker := codexRunBlockIndent + "cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
+		endMarker := codexRunBlockIndent + "GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
 		start := strings.Index(config, startMarker)
 		if start < 0 {
 			t.Fatalf("custom config heredoc start marker not found in:\n%s", config)
@@ -1495,10 +1500,10 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			if line == "" {
 				continue
 			}
-			if !strings.HasPrefix(line, "          ") {
+			if !strings.HasPrefix(line, codexRunBlockIndent) {
 				t.Fatalf("custom config heredoc body line is not indented for YAML run block: %q\nFull body:\n%s", line, body)
 			}
-			runtimeConfig.WriteString(strings.TrimPrefix(line, "          "))
+			runtimeConfig.WriteString(strings.TrimPrefix(line, codexRunBlockIndent))
 		}
 		if got := runtimeConfig.String(); got != workflowData.EngineConfig.Config+"\n" {
 			t.Fatalf("custom config heredoc body changed runtime TOML content:\nExpected:\n%q\nGot:\n%q", workflowData.EngineConfig.Config+"\n", got)

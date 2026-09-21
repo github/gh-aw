@@ -15,6 +15,7 @@ var codexMCPLog = logger.New("workflow:codex_mcp")
 const (
 	codexOpenAIProxyProviderID   = "openai-proxy"
 	codexOpenAIProxyProviderName = "OpenAI AWF proxy"
+	codexRunBlockIndent          = "          "
 )
 
 func hasCodexFeaturesTable(config string) bool {
@@ -37,10 +38,14 @@ func addCodexPluginConfig(config string) string {
 	return config
 }
 
-func writeIndentedCodexConfig(yaml *strings.Builder, config, indent string) {
+// writeIndentedCodexConfig adds the YAML run-block indentation to each custom
+// config line. GitHub Actions strips this indentation before the shell runs, so
+// the heredoc receives the original TOML content; a final line without a
+// trailing newline is indented here and the caller appends the newline.
+func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 	for config != "" {
 		lineEnd := strings.IndexByte(config, '\n')
-		yaml.WriteString(indent)
+		yaml.WriteString(codexRunBlockIndent)
 		if lineEnd == -1 {
 			yaml.WriteString(config)
 			return
@@ -208,7 +213,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		yaml.WriteString("          \n")
 		yaml.WriteString("          # Append engine-level custom Codex config\n")
 		yaml.WriteString("          cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << " + customConfigDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy custom config rendering remains to be migrated.
-		writeIndentedCodexConfig(yaml, customConfig, "          ")
+		writeIndentedCodexConfig(yaml, customConfig)
 		if !strings.HasSuffix(customConfig, "\n") {
 			yaml.WriteString("\n")
 		}
