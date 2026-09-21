@@ -147,7 +147,7 @@ describe("buildCopilotSDKSessionToolConfig", () => {
       "builtin:glob",
       "builtin:sql",
       "mcp:*",
-      "custom:web_fetch",
+      "builtin:web_fetch",
     ]);
     for (const forbiddenTool of ["builtin:bash", "builtin:read_bash", "builtin:stop_bash", "builtin:list_bash", "builtin:apply_patch"]) {
       expect(config.availableTools.toArray()).not.toContain(forbiddenTool);

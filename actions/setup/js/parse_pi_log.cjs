@@ -87,6 +87,7 @@ function parsePiLog(logContent) {
       },
       duration_ms: stats.duration_ms || 0,
       num_turns: stats.turns || 0,
+      errors: stats.errors && stats.errors.length > 0 ? stats.errors : undefined,
     };
     markdown += generateInformationSection(syntheticEntry);
 
@@ -96,6 +97,7 @@ function parsePiLog(logContent) {
       type: "result",
       num_turns: syntheticEntry.num_turns,
       usage: syntheticEntry.usage,
+      errors: syntheticEntry.errors,
     });
   } else {
     markdown += generateInformationSection(null);
@@ -365,13 +367,15 @@ function isPiV3ResultError(result) {
  * finalized turns.
  *
  * @param {Array<any>} rawEntries - Raw parsed JSONL entries
- * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number}|null} Stats or null when unavailable
+ * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number, errors:Array<string>}|null} Stats or null when unavailable
  */
 function computePiV3Stats(rawEntries) {
   let outputTokens = 0;
   let inputTokens = 0;
   let turns = 0;
   let sawUsage = false;
+  /** @type {Array<string>} */
+  const errors = [];
 
   for (const raw of rawEntries) {
     if (raw.type !== "turn_end") {
@@ -388,6 +392,14 @@ function computePiV3Stats(rawEntries) {
         inputTokens += usage.input;
       }
     }
+    // A turn can end with an empty content array and no toolCalls when the provider
+    // request itself failed (e.g. a 400 model_not_supported response); the only trace
+    // of the failure is this top-level errorMessage, which would otherwise render as a
+    // silent, content-free turn in the step summary.
+    const errorMessage = raw.message && typeof raw.message.errorMessage === "string" ? raw.message.errorMessage : undefined;
+    if (errorMessage) {
+      errors.push(errorMessage);
+    }
   }
 
   if (turns === 0 && !sawUsage) {
@@ -399,13 +411,14 @@ function computePiV3Stats(rawEntries) {
     output_tokens: outputTokens,
     turns: turns,
     duration_ms: 0,
+    errors: errors,
   };
 }
 
 /**
  * Extracts stats from a legacy Pi `result` event, preserving the original flat-schema behavior.
  * @param {Array<any>} rawEntries - Raw parsed JSONL entries
- * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number}|null} Stats or null when absent
+ * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number, errors:Array<string>}|null} Stats or null when absent
  */
 function legacyPiStats(rawEntries) {
   const resultEntry = rawEntries.find(e => e.type === "result");
@@ -418,6 +431,7 @@ function legacyPiStats(rawEntries) {
     output_tokens: stats.output_tokens || 0,
     turns: stats.turns || 0,
     duration_ms: stats.duration_ms || 0,
+    errors: [],
   };
 }
 

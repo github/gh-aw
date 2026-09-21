@@ -552,6 +552,87 @@ imports:
 	assert.Equal(t, int64(1500), result.engineConfig.MaxAICredits, "max-ai-credits from main workflow must be preserved")
 }
 
+func TestSetupEngineAndImports_ImportedAuthPreservedWithTopLevelEnginePreferences(t *testing.T) {
+	tests := []struct {
+		name        string
+		rootSetting string
+		verify      func(t *testing.T, result *engineSetupResult)
+	}{
+		{
+			name:        "model",
+			rootSetting: "model: claude-sonnet-4-5",
+			verify: func(t *testing.T, result *engineSetupResult) {
+				assert.Equal(t, "claude-sonnet-4-5", result.model)
+			},
+		},
+		{
+			name:        "max turns",
+			rootSetting: "max-turns: 40",
+			verify: func(t *testing.T, result *engineSetupResult) {
+				assert.Equal(t, "40", result.engineConfig.MaxTurns)
+			},
+		},
+		{
+			name:        "max AI credits",
+			rootSetting: "max-ai-credits: 500",
+			verify: func(t *testing.T, result *engineSetupResult) {
+				assert.Equal(t, int64(500), result.engineConfig.MaxAICredits)
+			},
+		},
+	}
+
+	sharedContent := `---
+engine:
+  id: claude
+  auth:
+    type: github-oidc
+    provider: anthropic
+    federation-rule-id: fr_01ABC
+    organization-id: org_01XYZ
+    service-account-id: sa_01DEF
+    workspace-id: ws_01GHI
+---
+
+# Shared Workflow
+`
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "engine-imported-auth-preferences")
+			sharedDir := filepath.Join(tmpDir, "shared")
+			require.NoError(t, os.MkdirAll(sharedDir, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(sharedContent), 0644))
+
+			testContent := `---
+on: push
+` + tt.rootSetting + `
+imports:
+  - shared/engine.md
+---
+
+# Test Workflow
+`
+			testFile := filepath.Join(tmpDir, "test.md")
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+
+			compiler := NewCompiler()
+			frontmatterResult, err := parser.ExtractFrontmatterFromContent(testContent)
+			require.NoError(t, err)
+
+			result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, []byte(testContent), tmpDir)
+			require.NoError(t, err)
+			require.NotNil(t, result.engineConfig.Auth)
+			assert.Equal(t, "github-oidc", result.engineConfig.Auth.Type)
+			assert.Equal(t, "anthropic", result.engineConfig.Auth.Provider)
+			assert.Equal(t, "fr_01ABC", result.engineConfig.Auth.AnthropicFederationRuleID)
+			assert.Equal(t, "org_01XYZ", result.engineConfig.Auth.AnthropicOrganizationID)
+			assert.Equal(t, "sa_01DEF", result.engineConfig.Auth.AnthropicServiceAccountID)
+			assert.Equal(t, "ws_01GHI", result.engineConfig.Auth.AnthropicWorkspaceID)
+			tt.verify(t, result)
+		})
+	}
+}
+
 // TestSetupEngineAndImports_EngineOverride tests command-line engine override
 func TestSetupEngineAndImports_EngineOverride(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "engine-override")
