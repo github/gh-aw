@@ -68,10 +68,22 @@ remove_pr_content() {
     return
   fi
 
-  local tracked
+  # Collect tracked paths in a file: command substitution cannot carry the NUL
+  # separators, and a failing git call must fall back to removing everything.
+  local tracked_list tracked
+  tracked_list="$(mktemp)"
+  if ! git -C "${WORKSPACE}" ls-files -z -- "${rel_path}" >"${tracked_list}" 2>/dev/null; then
+    rm -f "${tracked_list}"
+    echo "Could not list tracked files for ${rel_path}, removing it entirely"
+    rm -rf "${dest}"
+    return
+  fi
+
   while IFS= read -r -d '' tracked; do
-    rm -f "${WORKSPACE}/${tracked}"
-  done < <(git -C "${WORKSPACE}" ls-files -z -- "${rel_path}")
+    # -r handles gitlink entries (submodule directories)
+    rm -rf "${WORKSPACE:?}/${tracked:?}"
+  done <"${tracked_list}"
+  rm -f "${tracked_list}"
 
   # Drop directories that only held PR-branch files
   if [ -d "${dest}" ]; then

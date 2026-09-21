@@ -219,6 +219,26 @@ assert "untracked APM skill preserved" "grep -q 'apm skill' '${TEST_WORKSPACE}/.
 rm -rf "${TEST_WORKSPACE}"
 echo ""
 
+# ── Test 9: git ls-files failure → falls back to removing the whole folder ───
+echo "Test 9: unreadable git index → falls back to full removal"
+TEST_WORKSPACE=$(mktemp -d)
+rm -rf /tmp/gh-aw/base
+
+git -C "${TEST_WORKSPACE}" init -q
+mkdir -p "${TEST_WORKSPACE}/.claude/skills/evil"
+echo "evil skill" >"${TEST_WORKSPACE}/.claude/skills/evil/SKILL.md"
+git -C "${TEST_WORKSPACE}" add -A -f >/dev/null 2>&1
+printf 'not an index' >"${TEST_WORKSPACE}/.git/index"
+
+EXIT_CODE=0
+GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
+  GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${RESTORE_SCRIPT}" >/dev/null 2>&1 || EXIT_CODE=$?
+
+assert "exits 0" "[ ${EXIT_CODE} -eq 0 ]"
+assert ".claude removed when tracked files cannot be listed" "[ ! -d '${TEST_WORKSPACE}/.claude' ]"
+rm -rf "${TEST_WORKSPACE}"
+echo ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "Tests passed: ${TESTS_PASSED}"
 echo "Tests failed: ${TESTS_FAILED}"
