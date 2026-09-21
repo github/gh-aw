@@ -5,6 +5,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { ERR_NOT_FOUND } = require("./error_codes.cjs");
 const { createCloseEntityHandler, checkLabelFilter, buildCommentBody, PULL_REQUEST_CONFIG } = require("./close_entity_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -107,20 +108,16 @@ async function main(config = {}) {
         }
         const { repo: entityRepo, repoParts } = repoResult;
 
-        let prNumber;
-        if (item.pull_request_number !== undefined) {
-          prNumber = parseInt(String(item.pull_request_number), 10);
-          if (Number.isNaN(prNumber)) {
-            return { success: false, error: `Invalid pull request number: ${item.pull_request_number}` };
-          }
-        } else {
-          const contextPR = context.payload?.pull_request?.number;
-          if (!contextPR) {
-            return { success: false, error: "No pull_request_number provided and not in pull request context" };
-          }
-          prNumber = contextPR;
+        const targetResult = resolveTarget({
+          targetConfig: config.target || "triggering",
+          item,
+          context,
+          itemType: PULL_REQUEST_CONFIG.itemType,
+        });
+        if (!targetResult.success) {
+          return { success: false, error: targetResult.error };
         }
-        return { success: true, entityNumber: prNumber, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
+        return { success: true, entityNumber: targetResult.number, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
       },
 
       getDetails: getPullRequestDetails,

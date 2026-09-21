@@ -68,6 +68,7 @@ describe("assign_milestone (Handler Factory Architecture)", () => {
     handler = await main({
       max: 10,
       allowed: [],
+      target: "*",
     });
   });
 
@@ -261,7 +262,7 @@ describe("assign_milestone (Handler Factory Architecture)", () => {
 
   it("should resolve milestone by title when milestone_number is not provided", async () => {
     const { main } = require("./assign_milestone.cjs");
-    const handlerWithTitle = await main({ max: 10 });
+    const handlerWithTitle = await main({ max: 10, target: "*" });
 
     mockPaginateWith([
       { number: 5, title: "v1.0" },
@@ -311,7 +312,7 @@ describe("assign_milestone (Handler Factory Architecture)", () => {
 
   it("should auto-create milestone when auto_create is true and title not found", async () => {
     const { main } = require("./assign_milestone.cjs");
-    const handlerAutoCreate = await main({ max: 10, auto_create: true });
+    const handlerAutoCreate = await main({ max: 10, auto_create: true, target: "*" });
 
     mockPaginateWith([]);
     mockGithub.rest.issues.createMilestone.mockResolvedValue({

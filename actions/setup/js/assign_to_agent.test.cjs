@@ -57,7 +57,7 @@ describe("assign_to_agent", () => {
   // This mirrors the production flow without requiring any backward-compat changes in
   // assign_to_agent.cjs itself.
   const STANDALONE_RUNNER = `
-    const _config = {};
+    const _config = { target: "*" };
     if (process.env.GH_AW_AGENT_DEFAULT?.trim()) _config.name = process.env.GH_AW_AGENT_DEFAULT.trim();
     if (process.env.GH_AW_AGENT_MODEL?.trim()) _config.model = process.env.GH_AW_AGENT_MODEL.trim();
     if (process.env.GH_AW_AGENT_MAX_COUNT?.trim()) _config.max = process.env.GH_AW_AGENT_MAX_COUNT.trim();
@@ -360,7 +360,7 @@ describe("assign_to_agent", () => {
     // Call main() factory then invoke the handler directly so we can inspect the deferred result
     const deferred = await eval(`(async () => {
       ${assignToAgentScript};
-      const _handler = await main({});
+      const _handler = await main({ target: "*" });
       const { loadTemporaryIdMap } = require("./temporary_id.cjs");
       const _map = loadTemporaryIdMap();
       return _handler({ type: "assign_to_agent", issue_number: "#aw_abc123", agent: "copilot" }, {}, _map);
@@ -894,6 +894,7 @@ describe("assign_to_agent", () => {
   });
 
   it("should auto-resolve issue number from context when not provided (triggering target)", async () => {
+    process.env.GH_AW_AGENT_TARGET = "triggering";
     // Set up context to simulate an issue event
     mockContext.eventName = "issues";
     mockContext.payload = {
@@ -935,6 +936,7 @@ describe("assign_to_agent", () => {
   });
 
   it("should skip when context doesn't match triggering target", async () => {
+    process.env.GH_AW_AGENT_TARGET = "triggering";
     // Set up context that doesn't support triggering target (e.g., push event)
     mockContext.eventName = "push";
 
@@ -1413,7 +1415,7 @@ describe("assign_to_agent", () => {
 
     const result = await eval(`(async () => {
       ${assignToAgentScript};
-      const _handler = await main({ max: "1", name: "copilot" });
+      const _handler = await main({ max: "1", name: "copilot", target: "*" });
       const _invalid = await _handler({ type: "assign_to_agent", issue_number: 1, pull_number: 2, agent: "copilot" }, {}, new Map());
       const _valid = await _handler({ type: "assign_to_agent", issue_number: 3, agent: "copilot" }, {}, new Map());
       return {
@@ -1446,7 +1448,7 @@ describe("assign_to_agent", () => {
 
     const result = await eval(`(async () => {
       ${assignToAgentScript};
-      const _handler = await main({ max: "2", name: "copilot" });
+      const _handler = await main({ max: "2", name: "copilot", target: "*" });
       await _handler({ type: "assign_to_agent", issue_number: 1, agent: "copilot" }, {}, new Map());
       return {
         second: _handler({ type: "assign_to_agent", issue_number: 2, agent: "copilot" }, {}, new Map()),
@@ -1472,8 +1474,8 @@ describe("assign_to_agent", () => {
 
     const result = await eval(`(async () => {
       ${assignToAgentScript};
-      const _handlerA = await main({ max: "5", name: "copilot" });
-      const _handlerB = await main({ max: "5", name: "copilot" });
+      const _handlerA = await main({ max: "5", name: "copilot", target: "*" });
+      const _handlerB = await main({ max: "5", name: "copilot", target: "*" });
       await _handlerA({ type: "assign_to_agent", issue_number: 11, agent: "copilot" }, {}, new Map());
       return {
         assignedA: getAssignToAgentAssigned(_handlerA),

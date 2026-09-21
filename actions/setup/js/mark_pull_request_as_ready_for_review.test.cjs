@@ -115,7 +115,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
   describe("handleMarkPullRequestAsReadyForReview", () => {
     it("should use GraphQL mutation to mark a draft PR as ready for review", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "All tests passing" }, {});
 
@@ -127,7 +127,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should NOT call REST pulls.update (the broken endpoint)", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       await handler({ pull_request_number: 42, reason: "Ready!" }, {});
 
@@ -136,7 +136,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should use context PR number when pull_request_number is not provided", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
 
       const result = await handler({ reason: "Ready for review" }, {});
 
@@ -146,7 +146,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should return success with correct fields on success", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "LGTM" }, {});
 
@@ -160,7 +160,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       mockRestPullsGet.mockResolvedValue({ data: makePR(42, { draft: false }) });
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "Already ready" }, {});
 
@@ -183,7 +183,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       });
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "Ready" }, {});
 
@@ -193,7 +193,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should add a comment after successfully marking ready for review", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       await handler({ pull_request_number: 42, reason: "All checks passing" }, {});
 
@@ -209,7 +209,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should return failure for invalid pull_request_number", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: "not-a-number", reason: "Ready" }, {});
 
@@ -222,19 +222,19 @@ describe("mark_pull_request_as_ready_for_review", () => {
       global.context.payload = { repository: { html_url: "https://github.com/test-owner/test-repo" } };
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
 
       const result = await handler({ reason: "Ready" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("No pull request number available");
+      expect(result.error).toContain("no pull request found");
 
       global.context.payload = originalPayload;
     });
 
     it("should return failure when reason is missing", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42 }, {});
 
@@ -244,7 +244,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should return failure when reason is empty string", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "" }, {});
 
@@ -254,7 +254,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should return failure when reason is whitespace only", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "   " }, {});
 
@@ -264,7 +264,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should respect max count limit", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 2 });
+      const handler = await main({ max: 2, target: "*" });
 
       // First two succeed
       const r1 = await handler({ pull_request_number: 42, reason: "Ready 1" }, {});
@@ -282,7 +282,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       mockGraphql.mockRejectedValue(new Error("GraphQL request failed: Resource not accessible by integration"));
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "Ready" }, {});
 
@@ -294,7 +294,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       mockRestPullsGet.mockRejectedValue(new Error("Not Found"));
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "Ready" }, {});
 
@@ -308,7 +308,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       });
 
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       await handler({ pull_request_number: 42, reason: "Ready" }, {});
 
@@ -317,7 +317,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should use staged mode without executing GraphQL mutation", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10, staged: true });
+      const handler = await main({ max: 10, staged: true, target: "*" });
 
       const result = await handler({ pull_request_number: 42, reason: "Staged test" }, {});
 
@@ -333,6 +333,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
       const handler = await main({
         max: 10,
         "target-repo": "external-org/external-repo",
+        target: "*",
       });
 
       setupDefaultMocks(42);
@@ -346,7 +347,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
 
     it("should use context.repo as default when no target-repo configured", async () => {
       const { main } = require("./mark_pull_request_as_ready_for_review.cjs");
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       setupDefaultMocks(42);
 
@@ -362,6 +363,7 @@ describe("mark_pull_request_as_ready_for_review", () => {
         max: 10,
         "target-repo": "default-org/default-repo",
         allowed_repos: ["cross-org/cross-repo"],
+        target: "*",
       });
 
       setupDefaultMocks(42);

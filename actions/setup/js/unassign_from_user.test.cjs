@@ -101,6 +101,8 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
   });
 
   it("should use explicit issue number from message", async () => {
+    const { main } = require("./unassign_from_user.cjs");
+    handler = await main({ max: 10, allowed: ["user1"], target: "*" });
     mockGithub.rest.issues.removeAssignees.mockResolvedValue({});
 
     const message = {
@@ -185,7 +187,7 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
     const result = await handler(message, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("No issue number available");
+    expect(result.error).toContain("not running in issue context");
     expect(mockGithub.rest.issues.removeAssignees).not.toHaveBeenCalled();
 
     // Restore context
@@ -247,6 +249,7 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
       max: 10,
       allowed: ["user1"],
       allowed_repos: ["test-owner/other-repo"],
+      target: "*",
     });
 
     mockGithub.rest.issues.removeAssignees.mockResolvedValue({});

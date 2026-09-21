@@ -518,7 +518,7 @@ describe("resolve_pr_review_thread", () => {
     expect(mockGraphql).toHaveBeenCalledTimes(1);
   });
 
-  it("should succeed when not in a pull request context but explicit thread_id is provided", async () => {
+  it("should reject an explicit thread when triggering PR context is unavailable", async () => {
     // Override context to non-PR event (afterEach restores the original payload)
     global.context.payload = {
       repository: { html_url: "https://github.com/test-owner/test-repo" },
@@ -534,13 +534,11 @@ describe("resolve_pr_review_thread", () => {
 
     const result = await freshHandler(message, {});
 
-    // Should succeed: thread_id was explicitly provided and resolved to a PR via the API
-    expect(result.success).toBe(true);
-    expect(result.thread_id).toBe("PRRT_kwDOABCD123456");
-    expect(result.is_resolved).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("outside of a pull request context");
   });
 
-  it("should succeed when triggered by a schedule event (no PR context) with explicit thread_id", async () => {
+  it("should reject a schedule-triggered thread when target defaults to triggering", async () => {
     // Simulate a schedule-triggered workflow (no pull_request in payload)
     global.context.payload = {};
 
@@ -556,12 +554,9 @@ describe("resolve_pr_review_thread", () => {
 
     const result = await freshHandler(message, {});
 
-    expect(result.success).toBe(true);
-    expect(result.thread_id).toBe("PRRT_kwDOSchedule77");
-    expect(result.is_resolved).toBe(true);
-    // Should have made two GraphQL calls: thread lookup + resolve mutation
-    expect(mockGraphql).toHaveBeenCalledTimes(2);
-    expect(mockGraphql).toHaveBeenCalledWith(expect.stringContaining("resolveReviewThread"), expect.objectContaining({ threadId: "PRRT_kwDOSchedule77" }));
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("outside of a pull request context");
+    expect(mockGraphql).toHaveBeenCalledTimes(1);
   });
 
   it("should fail in legacy mode when schedule-triggered and thread repo cannot be determined", async () => {
@@ -589,7 +584,7 @@ describe("resolve_pr_review_thread", () => {
     const result = await freshHandler(message, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Unable to determine repository");
+    expect(result.error).toContain("determine the repository");
   });
 
   it("should skip (not fail fatally) in legacy mode when schedule-triggered and thread belongs to a different repo", async () => {

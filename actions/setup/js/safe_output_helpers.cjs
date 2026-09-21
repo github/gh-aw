@@ -63,8 +63,8 @@ function parseMaxCount(envValue, defaultValue = 3) {
  * @param {any} params.item - Safe output item with optional item_number, issue_number, or pull_request_number
  * @param {any} params.context - GitHub Actions context
  * @param {string} params.itemType - Type of item being processed (for error messages)
- * @param {boolean} params.supportsPR - When true, handler supports BOTH issues and PRs (e.g., add_labels)
- *                                       When false, handler supports PRs ONLY (e.g., add_reviewers)
+ * @param {boolean} [params.supportsPR] - When true, handler supports BOTH issues and PRs (e.g., add_labels)
+ *                                         When false, handler supports PRs ONLY (e.g., add_reviewers)
  * @param {boolean} [params.supportsIssue] - When true, handler supports issues ONLY (e.g., update_issue)
  *                                           Optional; defaults to false.
  * @returns {{success: true, number: number, contextType: string} | {success: false, error: string, shouldFail: boolean}} Resolution result
