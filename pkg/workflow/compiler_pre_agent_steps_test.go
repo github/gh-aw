@@ -242,11 +242,20 @@ Main workflow.
 			if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
 				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
 			}
-			restoreStep := lockContent[strings.Index(lockContent, "- name: Restore agent config folders from base branch"):]
+			restoreStep := lockContent[restoreBaseIdx:]
 			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
 				restoreStep = restoreStep[:nextStep]
 			}
-			if !strings.Contains(restoreStep, tc.agentFolder) {
+			const agentFoldersPrefix = "GH_AW_AGENT_FOLDERS: \""
+			agentFoldersStart := strings.Index(restoreStep, agentFoldersPrefix)
+			if agentFoldersStart == -1 {
+				t.Fatal("Could not find protected agent folders in base restore step")
+			}
+			agentFolders, _, found := strings.Cut(restoreStep[agentFoldersStart+len(agentFoldersPrefix):], "\"")
+			if !found {
+				t.Fatal("Could not parse protected agent folders in base restore step")
+			}
+			if !strings.Contains(" "+agentFolders+" ", " "+tc.agentFolder+" ") {
 				t.Errorf("Expected base restore to include %s", tc.agentFolder)
 			}
 			// Base restore must run first so it cannot clobber APM-restored skills.
