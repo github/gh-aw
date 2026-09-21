@@ -1734,6 +1734,138 @@ describe("copilot_sdk_driver.cjs", () => {
         }
       }
     }, 10_000);
+
+    it("persists a bounded, sanitized go_repository failure on tool.execution_complete", async () => {
+      const { createRepositoryFailure, repositoryCommandError } = require("./copilot_sdk_repo_diagnostics.cjs");
+      const failure = createRepositoryFailure(
+        repositoryCommandError("go test", {
+          exitCode: 1,
+          stdout: "stdout-marker " + "x".repeat(250_000),
+          stderr: "stderr-marker",
+        })
+      );
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      /** @type {(event: any) => void} */
+      let emit = () => {};
+      const session = {
+        sessionId: "session-repository-bounded-failure",
+        on: vi.fn().mockImplementation(handler => {
+          emit = handler;
+        }),
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          emit({ type: "tool.execution_start", timestamp: "t0", data: { toolCallId: "call-1", toolName: "go_repository" } });
+          emit({
+            type: "tool.execution_complete",
+            timestamp: "t1",
+            data: { toolCallId: "call-1", success: false, error: { message: failure.error } },
+          });
+          return { data: { content: "validation remains blocked" } };
+        }),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockResolvedValue(session);
+        stop = vi.fn().mockResolvedValue(undefined);
+      }
+
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        expect(result.exitCode).toBe(0);
+        const parsedEvents = stderrWriteSpy.mock.calls
+          .map(([message]) => {
+            if (typeof message !== "string" || !message.endsWith("\n")) return null;
+            try {
+              return JSON.parse(message.trimEnd());
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+        const completion = parsedEvents.find(event => event.type === "tool.execution_complete");
+        expect(completion.data.success).toBe(false);
+        const diagnostic = completion.data.error.message;
+        expect(diagnostic).toContain("stdout: stdout-marker");
+        expect(diagnostic).toContain("stderr: stderr-marker");
+        expect(diagnostic).toContain("[truncated]");
+        expect(Buffer.byteLength(JSON.stringify({ resultType: "failure", textResultForLlm: diagnostic, error: diagnostic }), "utf8")).toBeLessThanOrEqual(8192);
+        expect(diagnostic).not.toMatch(/[\x00-\x1f\u202e]/);
+        expect(parsedEvents.some(event => event.type === "guard.tool_denials_exceeded")).toBe(false);
+      } finally {
+        stderrWriteSpy.mockRestore();
+      }
+    });
+
+    it("leaves non-repository and successful tool completions unchanged", async () => {
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      /** @type {(event: any) => void} */
+      let emit = () => {};
+      const result = { content: '{"action":"status","exitCode":0,"stdout":"ordinary result","stderr":""}' };
+      const session = {
+        sessionId: "session-repository-result-preservation",
+        on: vi.fn().mockImplementation(handler => {
+          emit = handler;
+        }),
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          emit({ type: "tool.execution_start", timestamp: "t0", data: { toolCallId: "ok", toolName: "go_repository" } });
+          emit({ type: "tool.execution_complete", timestamp: "t1", data: { toolCallId: "ok", success: true, result } });
+          emit({ type: "tool.execution_start", timestamp: "t2", data: { toolCallId: "bash", toolName: "bash" } });
+          emit({
+            type: "tool.execution_complete",
+            timestamp: "t3",
+            data: { toolCallId: "bash", success: false, error: { message: "command failed" } },
+          });
+          return { data: { content: "done" } };
+        }),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockResolvedValue(session);
+        stop = vi.fn().mockResolvedValue(undefined);
+      }
+
+      try {
+        await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        const completions = stderrWriteSpy.mock.calls
+          .map(([message]) => {
+            if (typeof message !== "string" || !message.endsWith("\n")) return null;
+            try {
+              return JSON.parse(message.trimEnd());
+            } catch {
+              return null;
+            }
+          })
+          .filter(event => event && event.type === "tool.execution_complete")
+          .map(event => event.data);
+        expect(completions).toEqual([
+          { toolName: "go_repository", mcpServerName: "", toolCallId: "ok", success: true, result },
+          { toolName: "bash", mcpServerName: "", toolCallId: "bash", success: false },
+        ]);
+      } finally {
+        stderrWriteSpy.mockRestore();
+      }
+    });
   });
 
   describe("parsePermissionConfigFromServerArgs", () => {
