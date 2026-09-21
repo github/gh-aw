@@ -17,13 +17,18 @@ func TestUsesSharedLogsCache(t *testing.T) {
 	}{
 		{
 			name: "scheduled custom logs command",
-			data: WorkflowData{On: "schedule: daily", CustomSteps: "run: gh aw logs --json"},
+			data: WorkflowData{On: "schedule: daily", CustomSteps: "run: gh aw logs --json -o .github/aw/logs"},
 			want: true,
 		},
 		{
 			name: "scheduled prompt audit command",
-			data: WorkflowData{On: "schedule: daily", MarkdownContent: "Run `gh aw audit 123`."},
+			data: WorkflowData{On: "schedule: daily", MarkdownContent: "Run `gh aw audit 123 -o .github/aw/logs`."},
 			want: true,
+		},
+		{
+			name: "scheduled logs command with a different output directory",
+			data: WorkflowData{On: "schedule: daily", CustomSteps: "run: ./gh-aw logs -o /tmp/gh-aw/aw-mcp/logs"},
+			want: false,
 		},
 		{
 			name: "non-scheduled logs command",
@@ -58,7 +63,7 @@ func TestGenerateSharedLogsCacheRestoreSteps(t *testing.T) {
 	cache := NewActionCache(t.TempDir())
 	data := &WorkflowData{
 		On:             "schedule: daily",
-		CustomSteps:    "run: ./gh-aw logs",
+		CustomSteps:    "run: ./gh-aw logs -o .github/aw/logs",
 		ActionCache:    cache,
 		ActionResolver: NewActionResolver(cache),
 	}
@@ -78,7 +83,7 @@ func TestSharedLogsCacheRestoreFollowsCustomCheckout(t *testing.T) {
 	cache := NewActionCache(t.TempDir())
 	data := &WorkflowData{
 		On:             "schedule: daily",
-		CustomSteps:    "steps:\n  - uses: actions/checkout@v4\n  - name: Download logs\n    run: gh aw logs",
+		CustomSteps:    "steps:\n  - uses: actions/checkout@v4\n  - name: Download logs\n    run: gh aw logs -o .github/aw/logs",
 		ActionCache:    cache,
 		ActionResolver: NewActionResolver(cache),
 	}
@@ -113,7 +118,7 @@ func TestSharedLogsCacheRestoreFollowsLastCheckoutInMultiCheckout(t *testing.T) 
 			"    with:\n" +
 			"      repository: org/repo-b\n" +
 			"  - name: Download logs\n" +
-			"    run: gh aw logs",
+			"    run: gh aw logs -o .github/aw/logs",
 		ActionCache:    cache,
 		ActionResolver: NewActionResolver(cache),
 	}

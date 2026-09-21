@@ -23,7 +23,7 @@ func usesSharedLogsCache(data *WorkflowData) bool {
 			if strings.HasPrefix(strings.TrimSpace(line), "#") {
 				continue
 			}
-			if strings.Contains(line, command) {
+			if strings.Contains(line, command) && strings.Contains(line, sharedLogsCachePath) {
 				compilerLogsCacheLog.Printf("Shared logs cache enabled: found %q in custom steps", command)
 				return true
 			}
