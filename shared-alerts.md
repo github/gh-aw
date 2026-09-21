@@ -88,3 +88,21 @@
 - `metrics/latest.json` is still dated 2026-09-01 (17+ days stale); continue cross-checking
   `failing-workflows.json` entries against live `gh run list`/job logs rather than trusting the
   stale snapshot.
+
+## Update — 2026-09-21T04:44Z (Workflow Health Manager)
+- **cloud-hypervisor EACCES P0 re-filed — predecessor #61952 self-expired without a fix (2nd
+  expiry cycle in this chain).** 30 open occurrences as of this run (down from 44, but affecting
+  new workflows: GPL Dependency Cleaner #62298, Metrics Collector #62290, Code Simplifier #62297,
+  Auto-Triage Issues #62213). Confirmed live via LintMonster job log (run §35555065706):
+  `spawn .../cloud-hypervisor EACCES`. No merged fix PR found. Filed new consolidated tracker this
+  run — **DO NOT file per-workflow duplicates**, consolidate under the new tracker referenced in
+  workflow-health-latest.md.
+- **Recommendation reiterated for repo maintainers:** exempt `priority-p0` issues from
+  `expires: 1d`, or extend the expiry window — this defect has now survived two full 24h tracker
+  cycles because the ticket disappears before anyone can act on it.
+- `metrics/latest.json` still stale at 2026-09-01 (20 days, 9th consecutive affected run) —
+  Metrics Collector remains an EACCES casualty; expect self-resolution once the P0 lands.
+- daily-go-test-parallelizer remains recovered (6/6 recent runs); lint-monster and
+  daily-firewall-report remain affected by the EACCES P0 (5 consecutive failures each).
+- `update-issue` on this workflow still lacks `target: '*'` — used `create_issue` again this run
+  for both the P0 tracker and dashboard instead of updating existing issues.
