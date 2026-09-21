@@ -448,6 +448,9 @@ func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
 }
 
 func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
+	if safeOutputs == nil {
+		return ""
+	}
 	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
 		return safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
 	}
