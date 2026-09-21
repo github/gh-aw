@@ -243,7 +243,7 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 	return nil
 }
 
-// resolveDefaultBranch queries GitHub and falls back to the local origin, then main.
+// resolveDefaultBranch queries GitHub and falls back to the local origin, then main on failure.
 func (c *AddInteractiveConfig) resolveDefaultBranch() string {
 	// Get the default branch name using gh
 	output, err := workflow.RunGHCombined("Getting default branch...", "repo", "view", "--repo", c.RepoOverride, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
