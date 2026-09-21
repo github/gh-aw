@@ -292,7 +292,7 @@ function assertTargetAuthorizationInvariant(params) {
     return { success: true };
   }
 
-  if (!Number.isInteger(authorizedNumber) || authorizedNumber <= 0) {
+  if (typeof authorizedNumber !== "number" || !Number.isInteger(authorizedNumber) || authorizedNumber <= 0) {
     return {
       success: false,
       error: `ERR_TARGET_AUTHORIZATION: could not determine authorized target for ${itemType}`,
