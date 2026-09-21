@@ -9718,8 +9718,9 @@ safe-outputs:
     # Token used to push an empty commit after PR creation to trigger CI events. Works
     # around the GITHUB_TOKEN limitation where pushes don't trigger workflow runs.
     # Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the repository.
-    # Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token, or
-    # 'app' for GitHub App auth.
+    # Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token,
+    # 'app' for GitHub App auth, or 'none' to skip the extra empty commit and keep
+    # GH_AW_CI_TRIGGER_TOKEN out of the compiled workflow.
     # (optional)
     github-token-for-extra-empty-commit: "example-value"
 
@@ -16096,7 +16097,8 @@ safe-outputs:
     # Works around the GITHUB_TOKEN limitation where pushes don't trigger workflow
     # runs. Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the
     # repository. Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a
-    # custom token, or 'app' for GitHub App auth.
+    # custom token, 'app' for GitHub App auth, or 'none' to skip the extra empty
+    # commit and keep GH_AW_CI_TRIGGER_TOKEN out of the compiled workflow.
     # (optional)
     github-token-for-extra-empty-commit: "example-value"
 

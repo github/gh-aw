@@ -203,3 +203,76 @@ This workflow tests push-to-pull-request-branch token configuration.
 		})
 	}
 }
+
+// TestCITriggerTokenNoneOmitsSecret verifies that setting
+// github-token-for-extra-empty-commit to "none" removes GH_AW_CI_TRIGGER_TOKEN
+// from the compiled workflow entirely, including the gh-aw-manifest secrets list.
+// This lets repositories that do not configure the magic secret keep it out of
+// their lock files.
+func TestCITriggerTokenNoneOmitsSecret(t *testing.T) {
+	tests := []struct {
+		name              string
+		safeOutputsConfig string
+	}{
+		{
+			name: "create-pull-request with none",
+			safeOutputsConfig: `safe-outputs:
+  create-pull-request:
+    title-prefix: "[test] "
+    github-token-for-extra-empty-commit: none`,
+		},
+		{
+			name: "push-to-pull-request-branch with none",
+			safeOutputsConfig: `safe-outputs:
+  push-to-pull-request-branch:
+    labels: [test]
+    github-token-for-extra-empty-commit: none`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "ci-trigger-token-none-test")
+
+			testContent := `---
+on: push
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+tools:
+  github:
+    allowed: [list_issues]
+engine: claude
+strict: false
+` + tt.safeOutputsConfig + `
+---
+
+# Test CI Trigger Token Disabled
+
+This workflow tests that GH_AW_CI_TRIGGER_TOKEN is omitted when disabled.
+`
+
+			testFile := filepath.Join(tmpDir, "test-ci-trigger-token-none.md")
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644), "Failed to write test file")
+
+			compiler := NewCompiler()
+			require.NoError(t, compiler.CompileWorkflow(testFile), "Should compile workflow without error")
+
+			lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+			require.NoError(t, err, "Should read generated lock file")
+			lockContentStr := string(lockContent)
+
+			assert.NotContains(t, lockContentStr, "GH_AW_CI_TRIGGER_TOKEN",
+				"GH_AW_CI_TRIGGER_TOKEN should not appear anywhere in the lock file when disabled")
+
+			manifest, err := ExtractGHAWManifestFromLockFile(lockContentStr)
+			require.NoError(t, err)
+			require.NotNil(t, manifest)
+			assert.NotContains(t, manifest.Secrets, "secrets.GH_AW_CI_TRIGGER_TOKEN",
+				"gh-aw-manifest secrets should not include GH_AW_CI_TRIGGER_TOKEN when disabled")
+			assert.NotContains(t, manifest.Secrets, "GH_AW_CI_TRIGGER_TOKEN",
+				"gh-aw-manifest secrets should not include GH_AW_CI_TRIGGER_TOKEN when disabled")
+		})
+	}
+}
