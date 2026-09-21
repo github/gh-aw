@@ -175,6 +175,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 		runs = append(runs, run)
 	}
+	logsOrchestratorLog.Printf("Resolved %d/%d run(s) from stdin input", len(runs), len(opts.RunURLs))
 
 	if len(runs) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
@@ -223,6 +224,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
 			storageLimitReached = true
+			logsOrchestratorLog.Print("Storage limit reached while processing stdin runs")
 		}
 		if result.Skipped {
 			if opts.Verbose && result.Error != nil {
@@ -275,6 +277,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if opts.CachedJSONL != "" {
 		renderLogsCollectionStats(collectionStats)
 	}
+	logsOrchestratorLog.Printf("Processed %d run(s) into output (storageLimitReached=%t)", len(processedRuns), storageLimitReached)
 
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)

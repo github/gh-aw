@@ -12,9 +12,14 @@ import (
 )
 
 func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data *WorkflowData) []string {
-	if c.getExternalThreatDetectionEngineID(data) != "codex" {
+	engineID := c.getExternalThreatDetectionEngineID(data)
+	if engineID != "codex" {
+		if threatLog.Enabled() {
+			threatLog.Printf("Skipping Codex config preparation: detection engine is %q", engineID)
+		}
 		return nil
 	}
+	threatLog.Print("Preparing Codex config for external threat-detect")
 
 	const emptyMCPServersJSON = `{"mcpServers":{}}`
 	shellCodexConfigPath := constants.ShellMcpConfigDir + "/config.toml"
@@ -188,6 +193,7 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	if engineID == "" {
 		engineID = "claude"
 	}
+	threatLog.Printf("Resolved base threat detection engine: %s", engineID)
 
 	// Threat detection currently does not support the Pi engine backend.
 	// Normalize to Copilot so workflows with engine: pi still get a working detector.
@@ -634,6 +640,7 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	// untrusted agent transcript, so bundling them does not introduce the secret-exfiltration
 	// risk that keeps detection.log off this artifact.
 	if isFirewallEnabled(data) {
+		threatLog.Print("Including firewall logs in detection artifact upload")
 		steps = append(steps,
 			"            "+detectionFirewallLogsDir+"/logs/\n",
 			"            "+detectionFirewallLogsDir+"/audit/\n",
