@@ -1933,6 +1933,37 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       }
     });
 
+    it("should stop if refreshed-head reconciliation fails", async () => {
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-reconcile-fail-"));
+      const setFailed = vi.fn();
+      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_API: stale head"));
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed };
+      try {
+        execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
+        await pushRepoMemoryChangesWithRetry({
+          githubClient: {},
+          targetOwner: "owner",
+          targetRepoName: "repo",
+          targetRepo: "owner/repo",
+          branchName: "memory/test",
+          baseRef: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          workspaceDir: repoDir,
+          ghToken: "token",
+          serverHost: "github.com",
+          pushSignedCommitsFn,
+          repoUrlWithTokenForRetry: path.join(repoDir, "missing-remote.git"),
+          execGetExecOutput: vi.fn().mockResolvedValue({ stdout: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\trefs/heads/memory/test\n" }),
+          sleepFn: vi.fn(),
+        });
+
+        expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
+        expect(setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to reconcile repo-memory changes onto refreshed head before retry"));
+      } finally {
+        delete global.core;
+        fs.rmSync(repoDir, { recursive: true, force: true });
+      }
+    });
+
     it("retries a compare-and-swap loss by rebasing onto the refreshed head and preserving both JSONL rows", async () => {
       const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-race-"));
       const remoteDir = path.join(rootDir, "remote.git");

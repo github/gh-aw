@@ -46,10 +46,25 @@ function configureRepoMemoryMergePolicy(workspaceDir) {
   }
 }
 
+/**
+ * Deterministic validation errors come from static commit shape or policy
+ * checks in pushSignedCommits. Retrying them with the same local commits cannot
+ * make them pass, unlike transient API failures or stale remote heads.
+ *
+ * @param {string} errorMessage
+ * @returns {boolean}
+ */
 function isDeterministicPushValidationError(errorMessage) {
   return /^ERR_VALIDATION\b/.test(errorMessage);
 }
 
+/**
+ * Rebase this run's repo-memory commit(s) onto a refreshed remote branch head
+ * without creating a merge commit. JSONL conflicts keep both rows via the
+ * checkout-local merge=union policy; non-JSONL conflicts keep this run's files.
+ *
+ * @param {{workspaceDir: string, branchName: string, repoUrlWithToken: string, previousBaseRef: string, remoteHead: string}} opts
+ */
 function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead }) {
   try {
     configureRepoMemoryMergePolicy(workspaceDir);
@@ -72,6 +87,25 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, 
   }
 }
 
+/**
+ * Push repo-memory changes with optimistic retries after stale-head failures.
+ *
+ * @param {object} opts
+ * @param {any} opts.githubClient
+ * @param {string} opts.targetOwner
+ * @param {string} opts.targetRepoName
+ * @param {string} opts.targetRepo
+ * @param {string} opts.branchName
+ * @param {string} opts.baseRef
+ * @param {string} opts.workspaceDir
+ * @param {string} opts.ghToken
+ * @param {string} opts.serverHost
+ * @param {typeof pushSignedCommits} [opts.pushSignedCommitsFn]
+ * @param {typeof exec.getExecOutput} [opts.execGetExecOutput]
+ * @param {(delay: number) => Promise<void>} [opts.sleepFn]
+ * @param {string} [opts.repoUrlWithTokenForRetry]
+ * @param {string} [opts.originUrlForPush]
+ */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
   targetOwner,
@@ -147,7 +181,8 @@ async function pushRepoMemoryChangesWithRetry({
             try {
               reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead });
             } catch (reconcileError) {
-              core.warning(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
+              core.setFailed(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
+              return;
             }
           }
         } catch (lsRemoteError) {
