@@ -142,7 +142,12 @@ func (e *ClaudeEngine) prepareClaudeToolsForAllowedList(tools map[string]any) ma
 	}
 	claudeToolsLog.Print("Converting neutral tools to Claude-specific format")
 	tools = e.expandNeutralToolsToClaudeTools(tools)
-	defaultClaudeTools := []string{"Task", "Glob", "Grep", "ExitPlanMode", "TodoWrite", "LS", "Read", "NotebookRead"}
+	// Skill is included by default so that skills available to the CLI — repository
+	// skills under .claude/skills/, frontmatter `skills:`, and skills installed by
+	// workflow steps such as the APM package restore — can be invoked without
+	// requiring permission-mode: bypassPermissions. Claude only exposes the Skill
+	// tool when at least one skill is registered, so allowing it is a no-op otherwise.
+	defaultClaudeTools := []string{"Task", "Glob", "Grep", "ExitPlanMode", "TodoWrite", "LS", "Read", "NotebookRead", "Skill"}
 	ensureDefaultClaudeAllowedTools(tools, defaultClaudeTools)
 	claudeToolsLog.Printf("Added %d default Claude tools to allowed list", len(defaultClaudeTools))
 	return tools

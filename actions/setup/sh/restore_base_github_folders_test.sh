@@ -165,6 +165,60 @@ assert ".codex removed (not in base)" "[ ! -d '${TEST_WORKSPACE}/.codex' ]"
 rm -rf "${TEST_WORKSPACE}" /tmp/gh-aw/base
 echo ""
 
+# ── Test 7: git workspace → untracked step-installed files survive restore ───
+echo "Test 7: git workspace → untracked APM skills survive base restore"
+TEST_WORKSPACE=$(mktemp -d)
+rm -rf /tmp/gh-aw/base
+
+# Base branch snapshot has .claude with a tracked skill
+mkdir -p /tmp/gh-aw/base/.claude/skills/docs-check-style
+echo "trusted skill" >/tmp/gh-aw/base/.claude/skills/docs-check-style/SKILL.md
+
+# Workspace is a git working tree holding PR-branch (tracked) content
+git -C "${TEST_WORKSPACE}" init -q
+mkdir -p "${TEST_WORKSPACE}/.claude/skills/docs-check-style"
+echo "evil skill" >"${TEST_WORKSPACE}/.claude/skills/docs-check-style/SKILL.md"
+echo "evil instructions" >"${TEST_WORKSPACE}/.claude/settings.json"
+git -C "${TEST_WORKSPACE}" add -A -f >/dev/null 2>&1
+
+# APM installed these after checkout: untracked, must survive
+mkdir -p "${TEST_WORKSPACE}/.claude/skills/frontmatter-audit"
+echo "apm skill" >"${TEST_WORKSPACE}/.claude/skills/frontmatter-audit/SKILL.md"
+
+GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
+  GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${RESTORE_SCRIPT}" >/dev/null 2>&1
+
+assert "base skill restored over PR content" "grep -q 'trusted skill' '${TEST_WORKSPACE}/.claude/skills/docs-check-style/SKILL.md'"
+assert "PR-tracked settings.json removed" "[ ! -f '${TEST_WORKSPACE}/.claude/settings.json' ]"
+assert "untracked APM skill preserved" "grep -q 'apm skill' '${TEST_WORKSPACE}/.claude/skills/frontmatter-audit/SKILL.md'"
+rm -rf "${TEST_WORKSPACE}" /tmp/gh-aw/base
+echo ""
+
+# ── Test 8: git workspace, folder absent from base → only tracked files go ───
+echo "Test 8: git workspace, folder absent from base → tracked files removed, untracked kept"
+TEST_WORKSPACE=$(mktemp -d)
+rm -rf /tmp/gh-aw/base
+
+git -C "${TEST_WORKSPACE}" init -q
+mkdir -p "${TEST_WORKSPACE}/.claude"
+echo "evil instructions" >"${TEST_WORKSPACE}/.claude/settings.json"
+echo "evil agents" >"${TEST_WORKSPACE}/AGENTS.md"
+git -C "${TEST_WORKSPACE}" add -A -f >/dev/null 2>&1
+
+mkdir -p "${TEST_WORKSPACE}/.claude/skills/check-contradictions"
+echo "apm skill" >"${TEST_WORKSPACE}/.claude/skills/check-contradictions/SKILL.md"
+
+EXIT_CODE=0
+GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
+  GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${RESTORE_SCRIPT}" >/dev/null 2>&1 || EXIT_CODE=$?
+
+assert "exits 0" "[ ${EXIT_CODE} -eq 0 ]"
+assert "PR-tracked .claude/settings.json removed" "[ ! -f '${TEST_WORKSPACE}/.claude/settings.json' ]"
+assert "PR-tracked AGENTS.md removed" "[ ! -f '${TEST_WORKSPACE}/AGENTS.md' ]"
+assert "untracked APM skill preserved" "grep -q 'apm skill' '${TEST_WORKSPACE}/.claude/skills/check-contradictions/SKILL.md'"
+rm -rf "${TEST_WORKSPACE}"
+echo ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "Tests passed: ${TESTS_PASSED}"
 echo "Tests failed: ${TESTS_FAILED}"
