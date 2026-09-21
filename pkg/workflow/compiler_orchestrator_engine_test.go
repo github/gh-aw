@@ -625,6 +625,9 @@ imports:
 			assert.Equal(t, "github-oidc", result.engineConfig.Auth.Type)
 			assert.Equal(t, "anthropic", result.engineConfig.Auth.Provider)
 			assert.Equal(t, "fr_01ABC", result.engineConfig.Auth.AnthropicFederationRuleID)
+			assert.Equal(t, "org_01XYZ", result.engineConfig.Auth.AnthropicOrganizationID)
+			assert.Equal(t, "sa_01DEF", result.engineConfig.Auth.AnthropicServiceAccountID)
+			assert.Equal(t, "ws_01GHI", result.engineConfig.Auth.AnthropicWorkspaceID)
 			tt.verify(t, result)
 		})
 	}
