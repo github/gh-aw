@@ -216,7 +216,7 @@ function isReadPathAllowedByShellRules(requestedPath, allowedPathPatterns, works
  *
  * @param {CopilotSDKPermissionConfig | undefined} permissionConfig
  * @param {import("@github/copilot-sdk").PermissionHandler} approveAll
- * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string}=} logOptions
+ * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string, getMCPToolMetadata?: () => ReadonlyArray<NonNullable<import("@github/copilot-sdk").ToolInvocation["availableTools"]>[number]>}=} logOptions
  * @returns {import("@github/copilot-sdk").PermissionHandler}
  */
 function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptions) {
@@ -392,10 +392,18 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
         return hasReadGrant || allowedToolEntries.has("shell") || isReadPathAllowedByShellRules(request.path, readablePathPatterns, logOptions?.workspaceRoot);
       case "url":
         return allowedToolEntries.has("web_fetch");
-      case "mcp":
+      case "mcp": {
+        // Native SDK requests use canonical wire names; compiler permissions
+        // use raw MCP names. Join through verified metadata, never strip a
+        // namespace prefix that might itself be part of another raw tool name.
+        if (logOptions?.getMCPToolMetadata) {
+          const tool = logOptions.getMCPToolMetadata().find(tool => tool.name === request.toolName && tool.mcpServerName === request.serverName);
+          return Boolean(tool?.mcpToolName && (allowedToolEntries.has(request.serverName) || allowedToolEntries.has(`${request.serverName}(${tool.mcpToolName})`)));
+        }
         // Server-only entries (for example: "github") allow all tools from that server.
         // Server+tool entries (for example: "github(get_file_contents)") allow only that tool.
         return allowedToolEntries.has(request.serverName) || allowedToolEntries.has(`${request.serverName}(${request.toolName})`);
+      }
       case "custom-tool":
         return allowedToolEntries.has(request.toolName);
       default:

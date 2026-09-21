@@ -10,7 +10,7 @@
  * Event mapping:
  *   SDK "user.message"            → JSONL "user.message"
  *   SDK "tool.execution_start"    → JSONL "tool.execution_start"  (toolName, mcpServerName, mcpToolName?, toolCallId?, input?, command?)
- *   SDK "tool.execution_complete" → JSONL "tool.execution_complete" (toolName, mcpServerName, toolCallId?, success, result)
+ *   SDK "tool.execution_complete" → JSONL "tool.execution_complete" (toolName, mcpServerName, toolCallId?, success, result, repository error?)
  *   SDK "assistant.message"       → JSONL "assistant.message"     (content)
  *   SDK "assistant.turn_start"    → watchdog disarmed (inAssistantTurn = true)
  *   SDK "assistant.turn_end"      → watchdog re-enabled (inAssistantTurn = false)
@@ -27,6 +27,9 @@
  * Consumed directly by copilot_sdk_driver.cjs (the built-in gh-aw driver) and
  * available to any custom driver that wants the same session lifecycle and JSONL
  * telemetry without duplicating the implementation.
+ *
+ * Repository tool profiles abort owned operations immediately during shutdown and
+ * add a preceding repository-cleanup stage before the events stream is drained.
  */
 
 "use strict";
@@ -37,6 +40,9 @@ const path = require("path");
 const os = require("os");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
 const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
+const { createCopilotSDKRepositoryRuntime } = require("./copilot_sdk_repo_tools.cjs");
+const { createRepositoryEventFailure } = require("./copilot_sdk_repo_diagnostics.cjs");
+const { restrictCopilotSDKRepositoryCatalog } = require("./copilot_sdk_tool_catalog.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
 
@@ -117,6 +123,7 @@ function extractPromptFromArgs(args) {
  *   },
  *   toolConfig?: import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig,
  *   webFetchOptions?: {fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number},
+ *   repositoryOptions?: Parameters<typeof createCopilotSDKRepositoryRuntime>[2],
  *   coreLogger?: import("./copilot_sdk_permissions.cjs").CopilotSDKCoreLogger,
  *   sdkModule?: {
  *     CopilotClient: typeof import("@github/copilot-sdk").CopilotClient,
@@ -127,6 +134,7 @@ function extractPromptFromArgs(args) {
  *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
+ *   mcpServers?: Record<string, import("@github/copilot-sdk").MCPServerConfig>,
  * }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
@@ -143,9 +151,11 @@ async function runWithCopilotSDK({
   permissionConfig,
   toolConfig,
   webFetchOptions,
+  repositoryOptions,
   coreLogger,
   sdkModule,
   sessionStateBaseDir,
+  mcpServers,
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
@@ -155,6 +165,18 @@ async function runWithCopilotSDK({
   const startTime = Date.now();
   let output = "";
   let hasOutput = false;
+  /** @type {ReturnType<typeof createCopilotSDKRepositoryRuntime> | null} */
+  let repositoryRuntime = null;
+  const catalogCancellation = new AbortController();
+  /** @type {NonNullable<import("@github/copilot-sdk").ToolInvocation["availableTools"]>} */
+  let verifiedToolMetadata = [];
+  const diagnosticSecrets = [...(repositoryOptions?.diagnosticSecrets ?? []), ...(connectionToken ? [connectionToken] : [])];
+  for (const server of Object.values(mcpServers ?? {})) {
+    if (!("headers" in server)) continue;
+    for (const [name, value] of Object.entries(server.headers ?? {})) {
+      if (typeof value === "string" && /^(?:authorization|proxy-authorization|x-agent-id)$/i.test(name)) diagnosticSecrets.push(value);
+    }
+  }
 
   const log = msg => logger(`[sdk-driver] ${msg}`);
   log(`attempt ${attempt + 1}: connecting to Copilot SDK at ${sdkUri}`);
@@ -289,6 +311,8 @@ async function runWithCopilotSDK({
       reason,
     });
     log(`${catastrophicToolDenialsError.message}; stopping SDK session early`);
+    catalogCancellation.abort();
+    repositoryRuntime?.abort();
     if (session) {
       void session.disconnect().catch(() => {
         // best-effort early stop
@@ -308,6 +332,11 @@ async function runWithCopilotSDK({
   }
 
   try {
+    if (toolConfig?.profile) {
+      if (typeof sdk.defineTool !== "function") throw new Error("SDK defineTool is required for go-repository");
+      repositoryRuntime = createCopilotSDKRepositoryRuntime(sdk.defineTool, toolConfig.profile, { ...repositoryOptions, diagnosticSecrets });
+      await repositoryRuntime.initialize();
+    }
     await client.start();
     clientStarted = true;
     log("client started");
@@ -316,21 +345,24 @@ async function runWithCopilotSDK({
      * Build the session on-permission handler from configuration input.
      * @type {import("@github/copilot-sdk").PermissionHandler}
      */
-    const onPermissionRequest = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, {
+    const onPermissionRequest = buildCopilotSDKPermissionHandler(toolConfig?.profile ? toolConfig.permissions : permissionConfig, approveAll, {
       coreLogger,
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: process.env.GITHUB_WORKSPACE,
+      ...(toolConfig?.profile ? { getMCPToolMetadata: () => verifiedToolMetadata } : {}),
     });
 
     // Build session config using the multi-provider surface.
+    const sessionTools = buildCopilotSDKSessionToolConfig(toolConfig, sdk, { ...webFetchOptions, repositoryTool: repositoryRuntime?.tool });
     /** @type {import("@github/copilot-sdk").SessionConfig} */
     const sessionConfig = {
       model: model || resolveModelWithFallback(process.env, "COPILOT_MODEL") || undefined,
       providers,
       models: providerModels,
       onPermissionRequest,
-      ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
+      mcpServers,
+      ...sessionTools,
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = await client.createSession(sessionConfig);
@@ -405,9 +437,10 @@ async function runWithCopilotSDK({
           // Include result.content (concise LLM-facing output) so that the log
           // parser can render tool output previews from events.jsonl directly.
           const result = event.data?.result ?? undefined;
+          const error = !success && toolName === "go_repository" && event.data?.error ? { message: createRepositoryEventFailure(event.data.error, diagnosticSecrets).textResultForLlm } : undefined;
           // max-tool-denials intentionally tracks permission denials only.
           // Tool execution failures are still logged, but do not increment the guardrail counter.
-          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp);
+          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result, ...(error ? { error } : {}) }, event.timestamp);
           break;
         }
 
@@ -505,8 +538,18 @@ async function runWithCopilotSDK({
       }
     });
 
-    log("sending prompt...");
     const sendTimeoutMs = getEnvPositiveIntOrDefault("COPILOT_SDK_SEND_TIMEOUT_MS", SDK_SEND_TIMEOUT_MS_DEFAULT);
+    if (toolConfig?.profile) {
+      const availableTools = sessionTools.availableTools;
+      if (!sdk.ToolSet || !availableTools || Array.isArray(availableTools) || !mcpServers) throw new Error("go-repository requires the compiler-owned native catalog");
+      const catalog = await Promise.race([
+        restrictCopilotSDKRepositoryCatalog(session, { ToolSet: sdk.ToolSet, availableTools, allowedTools: toolConfig.permissions.allowedTools, mcpServers, signal: catalogCancellation.signal }),
+        denialGuardPromise,
+      ]);
+      verifiedToolMetadata = catalog;
+      log(`verified no-shell repository catalog: ${catalog.length} native tools`);
+    }
+    log("sending prompt...");
     // Race against denialGuardPromise so that if the tool-denial guard fires and
     // session.disconnect()/sendAndWait then stall, the driver still settles with a
     // nonzero exit within a bounded interval instead of hanging until the job's own
@@ -566,6 +609,8 @@ async function runWithCopilotSDK({
       durationMs,
     };
   } finally {
+    catalogCancellation.abort();
+    repositoryRuntime?.abort();
     if (denialGuardTimer) {
       clearTimeout(denialGuardTimer);
       denialGuardTimer = null;
@@ -574,6 +619,24 @@ async function runWithCopilotSDK({
     if (postCompletionWatchdog) {
       clearTimeout(postCompletionWatchdog);
       postCompletionWatchdog = null;
+    }
+    if (repositoryRuntime) {
+      const runtime = repositoryRuntime;
+      // Bound repository cleanup with the same deadline used for the remaining
+      // cleanup stages; the helper is declared after the events stream is closed,
+      // so inline the deadline here to keep repository teardown first.
+      await Promise.race([
+        runtime.close().catch(err => {
+          log(`warning: go_repository cleanup failed: ${getErrorMessage(err)}`);
+        }),
+        new Promise(resolve => {
+          const timeoutId = setTimeout(() => {
+            log("warning: go_repository cleanup timed out after 5000ms");
+            resolve(undefined);
+          }, 5_000);
+          if (typeof timeoutId?.unref === "function") timeoutId.unref();
+        }),
+      ]);
     }
     // Snapshot for null-safe cleanup in this scope.
     const stream = eventsStream;

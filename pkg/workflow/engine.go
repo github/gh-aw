@@ -88,6 +88,9 @@ type EngineConfig struct {
 	// and sets COPILOT_SDK_URI on child processes so the SDK can connect to it.
 	CopilotSDK bool
 
+	// ToolProfile selects an opt-in compiler-owned SDK tool and policy contract.
+	ToolProfile string
+
 	// Cwd is a templatable string that overrides the working directory for the engine's
 	// spawned process. When set, it is passed as GH_AW_ENGINE_CWD to the execution
 	// environment. JS harness engines read this variable in preference to GITHUB_WORKSPACE;
@@ -436,6 +439,9 @@ func applyEngineConcurrencyField(config *EngineConfig, engineObj map[string]any)
 }
 
 func applyEngineStringFields(config *EngineConfig, engineObj map[string]any) {
+	if profile, ok := engineObj["tool-profile"].(string); ok {
+		config.ToolProfile = profile
+	}
 	if userAgent, ok := engineObj["user-agent"].(string); ok {
 		config.UserAgent = userAgent
 	}

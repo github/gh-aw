@@ -37,6 +37,7 @@ type copilotSDKInstallSpec struct {
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
 const copilotSDKWebFetchDependency = "undici@6.28.0"
+const copilotSDKRepositoryInstallDir = `${RUNNER_TEMP}/gh-aw/copilot-sdk`
 
 // inlineMavenVersion is the pinned Maven version used to bootstrap Maven for inline Java drivers
 // on runners that don't have it pre-installed (e.g. self-hosted). GitHub-hosted runners already
@@ -197,6 +198,14 @@ func appendCopilotLSPInstallSteps(steps []GitHubActionStep, workflowData *Workfl
 func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return GitHubActionStep{}
+	}
+	if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+		spec := getCopilotSDKInstallSpec("")
+		spec.runLines = []string{
+			`: "${RUNNER_TEMP:?RUNNER_TEMP is required for the SDK repository profile}"`,
+			`mkdir -p "` + copilotSDKRepositoryInstallDir + `" && cd "` + copilotSDKRepositoryInstallDir + `" && ` + strings.TrimPrefix(spec.command, workspaceCommandPrefix),
+		}
+		return specToInstallStep(spec)
 	}
 	if inlineRuntimeID := copilotSDKInlineDriverRuntimeID(workflowData); inlineRuntimeID != "" {
 		spec := getInlineCopilotSDKInstallSpec(inlineRuntimeID)

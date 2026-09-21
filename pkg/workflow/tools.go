@@ -66,7 +66,7 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	// us distinguish "bash explicitly refused" from "bash never configured", which both end up
 	// with an absent "bash" key after applyDefaultTools.
 	bashExplicitlyFalse := isToolExplicitlyFalse(data.Tools["bash"])
-	data.Tools = c.applyDefaultTools(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions)
+	data.Tools = c.applyDefaultToolsWithProfile(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions, engineToolProfile(data))
 	data.BashDisabled = isBashFullyDisabled(data.Tools, bashExplicitlyFalse)
 	data.ParsedTools = NewTools(data.Tools)
 
@@ -553,7 +553,11 @@ func isBashFullyDisabled(tools map[string]any, wasExplicitlyFalse bool) bool {
 }
 
 // applyDefaultTools adds default read-only GitHub MCP tools, creating github tool if not present
-func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) map[string]any { //nolint:largefunc // Existing defaulting logic is centralized; SDK changes only preserve explicit disabled state before this runs.
+func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) map[string]any {
+	return c.applyDefaultToolsWithProfile(tools, safeOutputs, sandboxConfig, networkPermissions, "")
+}
+
+func (c *Compiler) applyDefaultToolsWithProfile(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions, toolProfile string) map[string]any { //nolint:largefunc // Existing defaulting logic stays centralized; the profile only suppresses PR-induced model shell grants.
 	toolsLog.Printf("Applying default tools: existingToolCount=%d", len(tools))
 	// Always apply default GitHub tools (create github section if it doesn't exist)
 
@@ -629,13 +633,13 @@ func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutp
 		}
 	}
 
-	// Add Git commands and file editing tools when safe-outputs includes create-pull-request or push-to-pull-request-branch
+	// PR profiles still need editing and the normal Git/publication infrastructure.
 	if safeOutputs != nil && needsGitCommands(safeOutputs) {
-
-		// Add edit tool with null value
 		if _, exists := tools["edit"]; !exists {
 			tools["edit"] = nil
 		}
+	}
+	if safeOutputs != nil && needsGitCommands(safeOutputs) && toolProfile != copilotGoRepositoryToolProfile {
 		gitCommands := []any{
 			"git checkout:*",
 			"git branch:*",

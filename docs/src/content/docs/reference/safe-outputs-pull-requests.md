@@ -60,6 +60,8 @@ safe-outputs:
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for `target-repo`, `allowed-repos`, and authentication configuration.
 
+The [Go repository tool profile](/gh-aw/reference/engines/#go-repository-tool-profile-tool-profile) preserves explicit publication restrictions such as `target-repo: owner/repo` with `allowed-repos: [owner/repo]`. Compilation accepts a literal target with an absent/empty allowlist or one case-insensitively matching literal entry. For an omitted target or `${{ github.repository }}`, the optional single allowlist entry must also be `${{ github.repository }}`. Wildcards, mismatched or multiple entries, and other expressions are rejected. This is not cross-repository authorization: before any model session, the runtime checks the projected target and current-checkout repository against `GITHUB_REPOSITORY` and rejects foreign literals. Do not remove publication restrictions to select the profile.
+
 ### Steering issues
 
 Configure steering independently at [`safe-outputs.steer`](/gh-aw/reference/safe-outputs/#steering-issues-steer). The pull request itself follows the normal `create-pull-request` flow: steering does not pre-create or override a branch, so `branch-prefix`, cross-repository targets, allowed branch policies, multiple outputs, and checkout configuration retain their standard behavior.
@@ -69,6 +71,8 @@ Configure steering independently at [`safe-outputs.steer`](/gh-aw/reference/safe
 `base-branch` sets the PR's target branch. Defaults to `github.base_ref` (PR event) or `github.ref_name` (push event). Use `allowed-base-branches` to let the agent pick the target branch at runtime — the agent supplies a `base` value in the tool call and it is accepted only if it matches one of the configured glob patterns.
 
 `allowed-branches` restricts which _source_ branch names the agent may use. The effective branch (agent-provided, or the checkout branch as fallback) must match a configured glob.
+
+The opt-in [Go repository tool profile](/gh-aw/reference/engines/#go-repository-tool-profile-tool-profile) carries the same normalized branch policy to its SDK tool. Its separate `repositoryDefaultBranch` comes from trusted repository event metadata; it does not replace an explicit `base-branch` or change the omitted-base behavior above. No `main` fallback is introduced. Projected `recreate_ref` remains a publication policy, not permission for destructive local branch preparation.
 
 ### Stacked pull requests
 
@@ -137,9 +141,15 @@ By default a random hex suffix is appended to the agent-provided branch name to 
 
 ### Other notes
 
-`draft` is a **policy**, not a default, so the agent cannot override it at runtime. `auto-close-issue` (default `true`) appends `Fixes #N` when the workflow is triggered from an issue; set it to `false` for partial-work or multi-PR flows. `normalize-closing-keywords` removes wrapping backticks from recognized issue-closing keywords in the PR body (for example, `` `Closes #123` `` → `Closes #123`). When `create-pull-request` is configured, git commands (`checkout`, `branch`, `switch`, `add`, `rm`, `commit`, `merge`) are automatically enabled. PRs do not trigger CI by default; see [Triggering CI](/gh-aw/reference/triggering-ci/). You can also disable `create-pull-request` at runtime without recompiling by setting the `GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST` GitHub Actions variable to `"false"` at repository, organization, or enterprise scope. See [Governance](/gh-aw/reference/governance/#disabling-create-pull-request-org-wide).
+`draft` is a **policy**, not a default, so the agent cannot override it at runtime. `auto-close-issue` (default `true`) appends `Fixes #N` when the workflow is triggered from an issue; set it to `false` for partial-work or multi-PR flows. `normalize-closing-keywords` removes wrapping backticks from recognized issue-closing keywords in the PR body (for example, `` `Closes #123` `` → `Closes #123`). When `create-pull-request` is configured, git commands (`checkout`, `branch`, `switch`, `add`, `rm`, `commit`, `merge`) are automatically enabled, except for the opt-in `engine.tool-profile: go-repository`, which preserves the explicit model Bash refusal without disabling publication infrastructure. PRs do not trigger CI by default; see [Triggering CI](/gh-aw/reference/triggering-ci/). You can also disable `create-pull-request` at runtime without recompiling by setting the `GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST` GitHub Actions variable to `"false"` at repository, organization, or enterprise scope. See [Governance](/gh-aw/reference/governance/#disabling-create-pull-request-org-wide).
+
+The Go repository profile projects only non-secret checkout, branch, file, and patch-limit policy, including engine-specific protected files and normalized exclusions. Basename protection includes nested files such as `docs/CHANGELOG.md`; the default remains **request review**, not blanket denial. Excluded files are removed before allowlist/protection checks. These publication policies are not universal ACLs on native editing. Credentials, output counts, draft/staging settings, and recovery behavior stay with safe outputs.
 
 ### How it works
+
+`create_pull_request` requires local commits: an uncommitted working tree is not sufficient, and the tool does not automatically commit dirty files. With the Go repository profile, run `validate`, then the fixed `commit` action, then native `safeoutputs-create_pull_request`. The policy-scoped `commit` action requires successful validation, uses a fixed commit message and identity, accepts no additional inputs, and performs no remote operation. Native completion names are `safeoutputs-create_pull_request` and `safeoutputs-noop`, as confirmed by the SDK tool metadata; bare `create_pull_request`/`noop` names and shell wrappers are not the native completion interface.
+
+Profile validation runs against the **exact projected publication tree**, with excluded files removed before validation, not an unfiltered tree that differs from the eventual commit. It requires a global `gofmt` check with no unformatted Go files, `go test -count=1`, `go vet`, and `go build` to pass on that tree. If the projected tree changes, it must be validated again before committing. The change baseline is the immutable initial `GITHUB_SHA`; branch preparation and local commits do not move it to the new `HEAD`. This does not change the separate PR base-branch policy.
 
 The agent's commits are packaged as a **git bundle** and uploaded as an Actions artifact. A separate, permission-controlled `safe_outputs` job then:
 

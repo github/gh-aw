@@ -14530,6 +14530,11 @@
               "type": "boolean",
               "description": "Enables the experimental GitHub Copilot SDK integration (copilot engine only). When true, the harness starts a separate headless Copilot CLI sidecar on the configured localhost port and sets COPILOT_SDK_URI on child processes."
             },
+            "tool-profile": {
+              "type": "string",
+              "enum": ["go-repository"],
+              "description": "Opt-in repository tool profile for the bundled Copilot SDK driver inside AWF. Requires explicit bash: false (or []), cli-proxy: false, editing, and a single current-repository create-pull-request target. Omit to retain the default SDK tool contract."
+            },
             "driver": {
               "description": "Custom driver script, command, or inline source for the engine. String values accept a workspace-relative path or bare name. Inline object values are supported for the Copilot engine and materialize runtime files before execution. Supported inline runtimes are node, python, go, and java.",
               "oneOf": [

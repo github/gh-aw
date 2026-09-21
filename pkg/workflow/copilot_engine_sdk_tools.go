@@ -27,6 +27,7 @@ type copilotSDKToolConfig struct {
 	Capabilities            copilotSDKToolCapabilities `json:"capabilities"`
 	Permissions             copilotSDKPermissionConfig `json:"permissions"`
 	ExplicitlyDisabledTools []string                   `json:"explicitlyDisabledTools,omitempty"`
+	Profile                 *copilotSDKToolProfile     `json:"profile,omitempty"`
 }
 
 func isCopilotSDKMode(workflowData *WorkflowData) bool {
@@ -183,6 +184,7 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 		config.ExplicitlyDisabledTools = append(config.ExplicitlyDisabledTools, "bash")
 	}
 	sort.Strings(config.ExplicitlyDisabledTools)
+	addGoRepositoryToolProfile(&config, workflowData)
 	return config
 }
 

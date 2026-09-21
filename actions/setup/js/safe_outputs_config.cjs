@@ -117,4 +117,4 @@ function loadConfig(server) {
   };
 }
 
-module.exports = { loadConfig };
+module.exports = { loadConfig, resolveEnvPlaceholders };

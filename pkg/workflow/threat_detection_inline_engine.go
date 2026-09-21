@@ -57,7 +57,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	}
 
 	// Build a detection engine config inheriting ID, Version, Env, Config, Args, APITarget.
-	// MaxTurns, Concurrency, UserAgent, Firewall, Agent, and MaxAICredits are intentionally
+	// MaxTurns, Concurrency, UserAgent, Firewall, Agent, ToolProfile, and MaxAICredits are intentionally
 	// omitted — MaxAICredits is set independently below from safe-outputs.threat-detection
 	// so the detection budget is always resolved from its own default expression rather than
 	// silently reusing the main agent budget.

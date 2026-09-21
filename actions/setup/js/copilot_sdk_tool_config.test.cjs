@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -22,6 +22,25 @@ function validToolConfig(overrides = {}) {
       ...(overrides.permissions ?? {}),
     },
     explicitlyDisabledTools: overrides.explicitlyDisabledTools ?? ["bash", "cli-proxy", "edit"],
+  };
+}
+
+function repositoryToolConfig() {
+  return {
+    ...validToolConfig({ version: 2, capabilities: { edit: true }, permissions: { allowedTools: ["read", "write", "safeoutputs", "web_fetch", "go_repository"] }, explicitlyDisabledTools: ["bash", "cli-proxy"] }),
+    profile: {
+      id: "go-repository",
+      repositoryDefaultBranch: "trunk",
+      policy: {
+        "target-repo": "fixture/repository",
+        base_branch: "release/current",
+        allowed_branches: ["automation/*"],
+        allowed_files: ["docs/**", "*.go"],
+        excluded_files: ["CHANGELOG.md"],
+        protected_files: ["CHANGELOG.md", "go.mod", "go.sum"],
+        protected_files_policy: "blocked",
+      },
+    },
   };
 }
 
@@ -72,12 +91,176 @@ describe("parseCopilotSDKToolConfig", () => {
 
   it.each([
     ["invalid JSON", "{", "must be valid JSON"],
-    ["unsupported version", JSON.stringify({ ...validToolConfig(), version: 2 }), "unsupported"],
+    ["unsupported version", JSON.stringify({ ...validToolConfig(), version: 3 }), "unsupported"],
     ["missing capability", JSON.stringify({ ...validToolConfig(), capabilities: { bash: false } }), "capabilities.edit"],
     ["duplicate permission", JSON.stringify(validToolConfig({ permissions: { allowedTools: ["read", "read"] } })), "duplicate"],
     ["empty permissions", JSON.stringify(validToolConfig({ permissions: { allowedTools: [] } })), "must not be empty"],
   ])("fails closed for %s", (_name, value, message) => {
     expect(() => parseCopilotSDKToolConfig(value)).toThrow(message);
+  });
+
+  describe("go-repository v2 compiler contract", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("preserves the explicit PR base independently of the repository default branch", () => {
+      const config = parseCopilotSDKToolConfig(JSON.stringify(repositoryToolConfig()));
+      expect(config.profile.repositoryDefaultBranch).toBe("trunk");
+      expect(config.profile.policy.base_branch).toBe("release/current");
+    });
+
+    it("does not manufacture a base branch when the policy omits it", () => {
+      const source = repositoryToolConfig();
+      delete source.profile.policy.base_branch;
+      expect(parseCopilotSDKToolConfig(JSON.stringify(source)).profile.policy).not.toHaveProperty("base_branch");
+    });
+
+    it("resolves trusted expression bindings after JSON parsing, not by JSON text substitution", () => {
+      vi.stubEnv("GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH", "trunk");
+      vi.stubEnv("GH_AW_INPUT_PATTERN", 'docs/quoted"name*');
+      const source = repositoryToolConfig();
+      source.profile.repositoryDefaultBranch = "${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}";
+      source.profile.policy.allowed_files = ["${GH_AW_INPUT_PATTERN}"];
+      const config = parseCopilotSDKToolConfig(JSON.stringify(source));
+      expect(config.profile.repositoryDefaultBranch).toBe("trunk");
+      expect(config.profile.policy.allowed_files).toEqual(['docs/quoted"name*']);
+      expect(config.profile.policy.protected_files_policy).toBe("blocked");
+    });
+
+    it.each([
+      ["missing profile", config => delete config.profile, "profile.id"],
+      [
+        "unknown profile",
+        config => {
+          config.profile.id = "shell";
+        },
+        "profile.id",
+      ],
+      [
+        "v1 profile",
+        config => {
+          config.version = 1;
+        },
+        "version 2",
+      ],
+      [
+        "unresolved metadata",
+        config => {
+          config.profile.repositoryDefaultBranch = "${GH_AW_INPUT_ABSENT}";
+        },
+        "unresolved runtime binding",
+      ],
+      [
+        "unresolved policy",
+        config => {
+          config.profile.policy.allowed_files = ["${GH_AW_INPUT_ABSENT}"];
+        },
+        "unresolved runtime binding",
+      ],
+      [
+        "secret binding",
+        config => {
+          config.profile.policy.branch_prefix = "${GITHUB_TOKEN}";
+        },
+        "unsupported runtime binding",
+      ],
+      [
+        "missing custom permission",
+        config => {
+          config.permissions.allowedTools = config.permissions.allowedTools.filter(tool => tool !== "go_repository");
+        },
+        "exact go_repository",
+      ],
+      [
+        "missing explicit refusal",
+        config => {
+          config.explicitlyDisabledTools = [];
+        },
+        "explicit bash:false",
+      ],
+      [
+        "inconsistent shell grant",
+        config => {
+          config.permissions.allowedTools.push("shell(git:*)");
+        },
+        "bash visibility",
+      ],
+      [
+        "shell visibility",
+        config => {
+          config.capabilities.bash = true;
+          config.permissions.allowedTools.push("shell");
+          config.explicitlyDisabledTools = ["cli-proxy"];
+        },
+        "with Bash",
+      ],
+      [
+        "editing disabled",
+        config => {
+          config.capabilities.edit = false;
+          config.permissions.allowedTools = config.permissions.allowedTools.filter(tool => tool !== "write");
+        },
+        "native MCP and editing",
+      ],
+      [
+        "malformed file rules",
+        config => {
+          config.profile.policy.allowed_files = "docs/**";
+        },
+        "array of resolved",
+      ],
+      [
+        "unknown protected policy",
+        config => {
+          config.profile.policy.protected_files_policy = "ignore-errors";
+        },
+        "unknown protected-files policy",
+      ],
+    ])("rejects %s before session creation", (_name, mutate, message) => {
+      const config = repositoryToolConfig();
+      mutate(config);
+      expect(() => parseCopilotSDKToolConfig(JSON.stringify(config))).toThrow(message);
+    });
+
+    it("rejects sensitive policy keys without echoing their values", () => {
+      const config = repositoryToolConfig();
+      config.profile.policy["github-token"] = "fixture-private-value";
+      expect(() => parseCopilotSDKToolConfig(JSON.stringify(config))).toThrow("potentially sensitive field");
+      expect(() => parseCopilotSDKToolConfig(JSON.stringify(config))).not.toThrow("fixture-private-value");
+    });
+
+    it("does not leak write_bash through editing in either contract version", () => {
+      const legacy = validToolConfig({ capabilities: { edit: true }, permissions: { allowedTools: ["read", "write", "safeoutputs", "web_fetch"] }, explicitlyDisabledTools: ["bash", "cli-proxy"] });
+      const profile = repositoryToolConfig();
+      for (const config of [legacy, profile]) {
+        const built = buildCopilotSDKSessionToolConfig(config, fakeSDKTools, { repositoryTool: { name: "go_repository", handler: () => "fixture" } });
+        expect(built.availableTools.toArray()).toContain("builtin:edit");
+        expect(built.availableTools.toArray()).not.toContain("builtin:write_bash");
+      }
+    });
+
+    it("registers only inspection, safe editing, the fixed repository tool and bootstrap MCP selectors", () => {
+      const tool = { name: "go_repository", handler: () => "fixture" };
+      const built = buildCopilotSDKSessionToolConfig(repositoryToolConfig(), fakeSDKTools, { repositoryTool: tool });
+      expect(built.availableTools.toArray()).toEqual([
+        "builtin:view",
+        "builtin:rg",
+        "builtin:glob",
+        "builtin:apply_patch",
+        "builtin:edit",
+        "builtin:create",
+        "builtin:delete",
+        "builtin:move",
+        "mcp:*",
+        "custom:web_fetch",
+        "custom:go_repository",
+      ]);
+      expect(built.tools).toContain(tool);
+      expect(built.toolSearch).toEqual({ enabled: false });
+    });
+
+    it("cannot silently drop the repository runtime", () => {
+      expect(() => buildCopilotSDKSessionToolConfig(repositoryToolConfig(), fakeSDKTools)).toThrow("driver-owned repository runtime");
+    });
   });
 
   it.each([
