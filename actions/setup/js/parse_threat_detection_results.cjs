@@ -22,6 +22,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { listFilesRecursively } = require("./file_helpers.cjs");
 const { DETECTION_LOG_FILENAME, DETECTION_RESULT_FILENAME } = require("./constants.cjs");
 const { ERR_SYSTEM, ERR_PARSE, ERR_VALIDATION } = require("./error_codes.cjs");
+const { parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
 
 const RESULT_PREFIX = "THREAT_DETECTION_RESULT:";
 
@@ -474,6 +475,28 @@ function parseStructuredResultFile(resultFilePath) {
 }
 
 /**
+ * Surface an AWF API proxy guardrail rejection (e.g. `max_cache_misses_exceeded`) in the
+ * detection job log. The proxy answers such requests with HTTP 403 and engines commonly
+ * report that as a generic authentication failure, so without this the detection job shows
+ * no trace of the guard that actually stopped the run.
+ *
+ * @param {string} [eventLogPathOverride] - Explicit proxy log path (tests); defaults to the known proxy log locations
+ * @returns {boolean} true when a guard rejection was found and reported
+ */
+function reportAPIProxyGuardRejection(eventLogPathOverride) {
+  /** @type {{ guard: string, counters: Record<string, string|number> } | null} */
+  let rejection = null;
+  try {
+    rejection = parseAPIProxyGuardRejectionFromEventLog(eventLogPathOverride);
+  } catch {
+    return false;
+  }
+  if (!rejection) return false;
+  core.warning(`AWF API proxy guardrail rejected detection requests: ${formatAPIProxyGuardRejection(rejection)}. This is a proxy policy outcome (HTTP 403), not an authentication failure.`);
+  return true;
+}
+
+/**
  * Main entry point for parsing threat detection results and concluding the detection job.
  *
  * This function consolidates three responsibilities previously split across two steps:
@@ -504,6 +527,9 @@ async function main() {
    * @param {string} message - Human-readable error message
    */
   function setDetectionFailure(reason, message) {
+    if (reason === "agent_failure" || reason === "parse_error") {
+      reportAPIProxyGuardRejection();
+    }
     core.setOutput("reason", reason);
     core.exportVariable("GH_AW_DETECTION_REASON", reason);
     const mustFail = detectionExecutionOutcome === "failure" && (reason === "agent_failure" || reason === "parse_error");
@@ -693,4 +719,4 @@ async function main() {
   } // end runMain
 }
 
-module.exports = { main, parseDetectionLog, extractFromStreamJson, extractResultFromText, extractStructuredOutput, parseStructuredResultFile };
+module.exports = { main, reportAPIProxyGuardRejection, parseDetectionLog, extractFromStreamJson, extractResultFromText, extractStructuredOutput, parseStructuredResultFile };

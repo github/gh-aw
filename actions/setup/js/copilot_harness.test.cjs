@@ -669,6 +669,21 @@ describe("copilot_harness.cjs", () => {
         expect(classifyCopilotFailure({ hasOutput: false, isInvocationCapExceeded: true })).toBe("invocation_cap_exceeded");
       });
 
+      it("classifies an AWF API proxy guardrail rejection distinctly", () => {
+        expect(classifyCopilotFailure({ hasOutput: true, isAPIProxyGuardRejected: true })).toBe("api_proxy_guard_rejected");
+      });
+
+      it("api_proxy_guard_rejected outranks authentication_failed", () => {
+        // The Copilot CLI reports the proxy's guardrail HTTP 403 as a provider auth failure;
+        // the guardrail classification must win so the run is not reported as a credential problem.
+        expect(classifyCopilotFailure({ hasOutput: true, isAPIProxyGuardRejected: true, isAuthenticationFailed: true })).toBe("api_proxy_guard_rejected");
+      });
+
+      it("does not retry a failed attempt that hit an api-proxy guardrail", () => {
+        const output = "API Error: 403 Maximum consecutive cache misses exceeded (5 / 5).";
+        expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput: true, output, attempt: 0, maxRetries: 3 })).toBe(false);
+      });
+
       it("classifies trusted AI credits budget exhaustion distinctly", () => {
         expect(classifyCopilotFailure({ hasOutput: true, isTrustedAICreditsBudgetExhausted: true })).toBe("ai_credits_exhausted");
       });
