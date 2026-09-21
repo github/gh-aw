@@ -145,11 +145,10 @@ engine:
 	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
 
 	compiler := NewCompiler()
-	content := []byte(testContent)
-	frontmatterResult, err := parser.ExtractFrontmatterFromContent(string(content))
+	frontmatterResult, err := parser.ExtractFrontmatterFromContent(testContent)
 	require.NoError(t, err)
 
-	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, content, tmpDir)
+	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, []byte(testContent), tmpDir)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.engineConfig)
