@@ -158,7 +158,10 @@ Main workflow.
 }
 
 func TestImportedPreAgentStepsRunAfterPRBaseRestore(t *testing.T) {
-	const baseRestoreStepName = "- name: Restore agent config folders from base branch"
+	const (
+		stepNamePrefix      = "- name: "
+		baseRestoreStepName = "Restore agent config folders from base branch"
+	)
 
 	testCases := []struct {
 		engine        string
@@ -238,13 +241,14 @@ Main workflow.
 			}
 			lockContent := string(content)
 
-			restoreBaseIdx := indexInNonCommentLines(lockContent, baseRestoreStepName)
-			restoreAPMIdx := indexInNonCommentLines(lockContent, "- name: Restore APM packages")
-			aiStepIdx := indexInNonCommentLines(lockContent, "- name: "+tc.executionStep)
+			restoreBaseIdx := indexInNonCommentLines(lockContent, stepNamePrefix+baseRestoreStepName)
+			restoreAPMIdx := indexInNonCommentLines(lockContent, stepNamePrefix+"Restore APM packages")
+			aiStepIdx := indexInNonCommentLines(lockContent, stepNamePrefix+tc.executionStep)
 			if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
 				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
 			}
 			restoreStep := lockContent[restoreBaseIdx:]
+			// Generated job steps use six spaces; stop at the next top-level step.
 			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
 				restoreStep = restoreStep[:nextStep]
 			}
