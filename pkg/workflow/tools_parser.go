@@ -105,6 +105,7 @@ var knownTools = map[string]struct{}{
 	"timeout":           {},
 	"startup-timeout":   {},
 	"cli-proxy":         {},
+	"profile":           {},
 }
 
 func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing tool parsing remains centralized.

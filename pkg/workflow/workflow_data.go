@@ -86,6 +86,7 @@ type WorkflowData struct {
 	Container                      string // container setting for the main job
 	Services                       string // services setting for the main job
 	Tools                          map[string]any
+	ToolProfiles                   []string                   // merged tools.profile selections from the main workflow and imports
 	LSP                            map[string]LSPServerConfig // top-level LSP server configuration for Copilot CLI
 	ParsedTools                    *Tools                     // Structured tools configuration (NEW: parsed from Tools map)
 	ExplicitlyDisabledTools        map[string]struct{}        // tool names explicitly set to false before default resolution mutates/removes their map entries

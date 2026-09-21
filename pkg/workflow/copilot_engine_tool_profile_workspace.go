@@ -17,7 +17,7 @@ func validateGoRepositoryEnvironment(data *WorkflowData) error {
 	for _, env := range envs {
 		for _, name := range reserved {
 			if _, exists := env[name]; exists {
-				return fmt.Errorf("engine.tool-profile: go-repository does not support overriding %s in engine or sandbox agent env", name)
+				return fmt.Errorf("tools.profile: go does not support overriding %s in engine or sandbox agent env", name)
 			}
 		}
 	}
@@ -26,14 +26,14 @@ func validateGoRepositoryEnvironment(data *WorkflowData) error {
 	}
 	var section map[string]any
 	if err := yaml.Unmarshal([]byte(data.Env), &section); err != nil {
-		return fmt.Errorf("engine.tool-profile: go-repository could not validate workflow env: %w", err)
+		return fmt.Errorf("tools.profile: go could not validate workflow env: %w", err)
 	}
 	if env, ok := section["env"].(map[string]any); ok {
 		section = env
 	}
 	for _, name := range reserved {
 		if _, exists := section[name]; exists {
-			return fmt.Errorf("engine.tool-profile: go-repository does not support overriding %s in workflow env", name)
+			return fmt.Errorf("tools.profile: go does not support overriding %s in workflow env", name)
 		}
 	}
 	return nil
@@ -46,10 +46,10 @@ func validateGoRepositoryCheckoutSteps(data *WorkflowData) error {
 		}
 		var section any
 		if err := yaml.Unmarshal([]byte(raw), &section); err != nil {
-			return fmt.Errorf("engine.tool-profile: go-repository could not validate checkout steps: %w", err)
+			return fmt.Errorf("tools.profile: go could not validate checkout steps: %w", err)
 		}
 		if containsGoRepositoryCheckoutAction(section) {
-			return errors.New("engine.tool-profile: go-repository requires the compiler-managed checkout; actions/checkout in steps, pre-steps, or pre-agent steps is not supported")
+			return errors.New("tools.profile: go requires the compiler-managed checkout; actions/checkout in steps, pre-steps, or pre-agent steps is not supported")
 		}
 	}
 	return nil

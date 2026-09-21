@@ -131,7 +131,7 @@ func TestGoRepositoryProfileRequiresParsedNoop(t *testing.T) {
 			if test.wantErr {
 				require.Nil(t, data.SafeOutputs.NoOp)
 				require.ErrorContains(t, err, "safe-outputs.noop")
-				data.EngineConfig.ToolProfile = ""
+				data.ToolProfiles = nil
 				require.NoError(t, validateCopilotToolProfile(data), "legacy noop opt-out must remain supported")
 				assert.Nil(t, data.SafeOutputs.NoOp)
 			} else {

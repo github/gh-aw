@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -48,7 +49,7 @@ func mergeToolsFromJSON(content string) (string, error) {
 }
 
 // MergeTools merges two neutral tool configurations.
-// Only supports merging arrays and maps for neutral tools (bash, web-fetch, web-search, edit, mcp-*).
+// Supports merging arrays and maps for neutral tools plus the tools.profile string-or-array shorthand.
 // Removes all legacy Claude tool merging logic.
 func MergeTools(base, additional map[string]any) (map[string]any, error) {
 	parserLog.Printf("Merging tools: base_keys=%d, additional_keys=%d", len(base), len(additional))
@@ -117,6 +118,10 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
+	if key == "profile" {
+		merged, err := mergeToolProfiles(existingValue, newValue)
+		return merged, true, err
+	}
 	if existingArray, ok := existingValue.([]any); ok {
 		if newArray, ok := newValue.([]any); ok {
 			return mergeAllowedArrays(existingArray, newArray), true, nil
@@ -143,6 +148,21 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 	return recursiveMerged, true, nil
 }
 
+func mergeToolProfiles(existingValue, newValue any) ([]any, error) {
+	var merged []any
+	for _, value := range []any{existingValue, newValue} {
+		switch profiles := value.(type) {
+		case string:
+			merged = mergeAllowedArrays(merged, []any{profiles})
+		case []any:
+			merged = mergeAllowedArrays(merged, profiles)
+		default:
+			return nil, errors.New("tools.profile must be a string or an array")
+		}
+	}
+	return merged, nil
+}
+
 func mergeMCPIfApplicable(key string, existingMap, newMap map[string]any) (map[string]any, bool, error) {
 	if !hasMCPType(existingMap) || !hasMCPType(newMap) {
 		return nil, false, nil
@@ -163,8 +183,8 @@ func hasMCPType(tool map[string]any) bool {
 	if !ok {
 		return false
 	}
-	mcpType, _ := mcpMap["type"].(string)
-	return IsMCPType(mcpType)
+	mcpType, ok := mcpMap["type"].(string)
+	return ok && IsMCPType(mcpType)
 }
 
 func mergeAllowedSubfieldIfPresent(existingMap, newMap map[string]any) (map[string]any, bool) {

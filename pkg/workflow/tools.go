@@ -66,7 +66,7 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	// us distinguish "bash explicitly refused" from "bash never configured", which both end up
 	// with an absent "bash" key after applyDefaultTools.
 	bashExplicitlyFalse := isToolExplicitlyFalse(data.Tools["bash"])
-	data.Tools = c.applyDefaultToolsWithProfile(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions, engineToolProfile(data))
+	data.Tools = c.applyDefaultToolsWithProfile(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions, hasToolProfile(data, copilotGoRepositoryToolProfile))
 	data.BashDisabled = isBashFullyDisabled(data.Tools, bashExplicitlyFalse)
 	data.ParsedTools = NewTools(data.Tools)
 
@@ -79,6 +79,12 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 }
 
 func prepareToolsForDefaults(data *WorkflowData) error {
+	profiles, err := extractToolProfiles(data.Tools)
+	if err != nil {
+		return err
+	}
+	data.ToolProfiles = profiles
+	delete(data.Tools, "profile")
 	data.ExplicitlyDisabledTools = collectExplicitlyDisabledTools(data.Tools)
 	return expandJiraToolConfig(data.Tools)
 }
@@ -366,11 +372,17 @@ func (c *Compiler) buildLabelCommandEventsMap(data *WorkflowData) (map[string]an
 func mergeLabelCommandOtherEvents(labelEventsMap map[string]any, otherEvents map[string]any) {
 	for eventKey, eventVal := range otherEvents {
 		if existing, exists := labelEventsMap[eventKey]; exists {
-			existingMap, _ := existing.(map[string]any)
-			userMap, _ := eventVal.(map[string]any)
-			if existingMap != nil && userMap != nil {
-				existingTypes, _ := existingMap["types"].([]any)
-				userTypes, _ := userMap["types"].([]any)
+			existingMap, existingIsMap := existing.(map[string]any)
+			userMap, userIsMap := eventVal.(map[string]any)
+			if existingIsMap && userIsMap {
+				existingTypes, existingHasTypes := existingMap["types"].([]any)
+				userTypes, userHasTypes := userMap["types"].([]any)
+				if !existingHasTypes {
+					existingTypes = nil
+				}
+				if !userHasTypes {
+					userTypes = nil
+				}
 				merged := make([]any, 0, typeutil.SafeAllocationCapacity(len(existingTypes), len(userTypes)))
 				merged = append(merged, existingTypes...)
 				merged = append(merged, userTypes...)
@@ -435,8 +447,8 @@ func ensureWorkflowDispatchItemNumberInput(eventsMap map[string]any) bool {
 func (c *Compiler) mergeToolsAndMCPServers(topTools, mcpServers map[string]any, includedTools string) (map[string]any, error) {
 	toolsLog.Printf("Merging tools and MCP servers: topTools=%d, mcpServers=%d", len(topTools), len(mcpServers))
 
-	// Start with top-level tools
-	result := topTools
+	// Start with a copy so extracting compiler-only metadata does not mutate raw frontmatter.
+	result := maps.Clone(topTools)
 	if result == nil {
 		result = make(map[string]any)
 	}
@@ -554,10 +566,10 @@ func isBashFullyDisabled(tools map[string]any, wasExplicitlyFalse bool) bool {
 
 // applyDefaultTools adds default read-only GitHub MCP tools, creating github tool if not present
 func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) map[string]any {
-	return c.applyDefaultToolsWithProfile(tools, safeOutputs, sandboxConfig, networkPermissions, "")
+	return c.applyDefaultToolsWithProfile(tools, safeOutputs, sandboxConfig, networkPermissions, false)
 }
 
-func (c *Compiler) applyDefaultToolsWithProfile(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions, toolProfile string) map[string]any { //nolint:largefunc // Existing defaulting logic stays centralized; the profile only suppresses PR-induced model shell grants.
+func (c *Compiler) applyDefaultToolsWithProfile(tools map[string]any, safeOutputs *SafeOutputsConfig, sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions, goRepositoryProfile bool) map[string]any { //nolint:largefunc // Existing defaulting logic stays centralized; the profile only suppresses PR-induced model shell grants.
 	toolsLog.Printf("Applying default tools: existingToolCount=%d", len(tools))
 	// Always apply default GitHub tools (create github section if it doesn't exist)
 
@@ -639,7 +651,7 @@ func (c *Compiler) applyDefaultToolsWithProfile(tools map[string]any, safeOutput
 			tools["edit"] = nil
 		}
 	}
-	if safeOutputs != nil && needsGitCommands(safeOutputs) && toolProfile != copilotGoRepositoryToolProfile {
+	if safeOutputs != nil && needsGitCommands(safeOutputs) && !goRepositoryProfile {
 		gitCommands := []any{
 			"git checkout:*",
 			"git branch:*",

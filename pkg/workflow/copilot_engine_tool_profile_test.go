@@ -22,12 +22,12 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
-  tool-profile: go-repository
   harness:
     max-retries: 0
 sandbox:
   agent: awf
 tools:
+  profile: go
   bash: false
   cli-proxy: false
   github:
@@ -66,6 +66,7 @@ func TestGoRepositoryProfileDefaultsAndContract(t *testing.T) {
 			data := parseGoRepositoryProfileTestSource(t, markdown)
 			require.NoError(t, validateCopilotToolProfile(data))
 			assert.True(t, data.BashDisabled)
+			assert.Equal(t, "go", data.RawFrontmatter["tools"].(map[string]any)["profile"])
 			assert.True(t, needsGitCommands(data.SafeOutputs), "publication infrastructure must remain enabled")
 			assert.Equal(t, "0", data.EngineConfig.HarnessMaxRetries)
 
@@ -86,8 +87,31 @@ func TestGoRepositoryProfileDefaultsAndContract(t *testing.T) {
 	}
 }
 
+func TestGoRepositoryProfileMergesFromSharedWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+description: Shared Go repository profile
+tools:
+  profile: [go]
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	filename := filepath.Join(dir, "profile.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(filename)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go"}, data.ToolProfiles)
+	assert.NotContains(t, data.Tools, "profile")
+	assert.Equal(t, "go", data.RawFrontmatter["tools"].(map[string]any)["profile"])
+	require.NoError(t, validateCopilotToolProfile(data))
+}
+
 func TestGoRepositoryProfileLegacyPRDefaults(t *testing.T) {
-	markdown := strings.Replace(goRepositoryProfileTestMarkdown, "  tool-profile: go-repository\n", "", 1)
+	markdown := strings.Replace(goRepositoryProfileTestMarkdown, "  profile: go\n", "", 1)
 	data := parseGoRepositoryProfileTestSource(t, markdown)
 	assert.False(t, data.BashDisabled)
 	assert.Contains(t, data.Tools["bash"], "git commit:*")
@@ -106,7 +130,7 @@ func TestGoRepositoryProfileValidation(t *testing.T) {
 		mutate func(*WorkflowData)
 		want   string
 	}{
-		{"unknown profile", func(d *WorkflowData) { d.EngineConfig.ToolProfile = "other" }, "unsupported engine.tool-profile"},
+		{"unknown profile", func(d *WorkflowData) { d.ToolProfiles = []string{"other"} }, "unsupported tools.profile"},
 		{"non Copilot", func(d *WorkflowData) { d.EngineConfig.ID = "claude" }, "effective engine"},
 		{"effective override", func(d *WorkflowData) { d.AI = "codex" }, "effective engine"},
 		{"CLI mode", func(d *WorkflowData) { d.EngineConfig.CopilotSDK = false }, "copilot-sdk: true"},
@@ -197,22 +221,6 @@ func TestGoRepositoryProfileRejectsEffectiveEngineOverride(t *testing.T) {
 	assert.Contains(t, err.Error(), "copilot")
 }
 
-func TestGoRepositoryProfileRejectsExplicitSecondaryUse(t *testing.T) {
-	for _, name := range []string{"evals", "safe-outputs.threat-detection"} {
-		t.Run(name, func(t *testing.T) {
-			data := parseGoRepositoryProfileTestWorkflow(t)
-			data.EngineConfig.ToolProfile = ""
-			nested := map[string]any{"engine": map[string]any{"id": "copilot", "tool-profile": "go-repository"}}
-			if name == "evals" {
-				data.RawFrontmatter["evals"] = nested
-			} else {
-				data.RawFrontmatter["safe-outputs"] = map[string]any{"threat-detection": nested}
-			}
-			require.ErrorContains(t, validateCopilotToolProfile(data), name+".engine.tool-profile")
-		})
-	}
-}
-
 func TestGoRepositoryProfileIsNotInheritedBySecondaryEngines(t *testing.T) {
 	data := parseGoRepositoryProfileTestWorkflow(t)
 	data.Evals = &EvalsConfig{Questions: []EvalDefinition{{ID: "check", Question: "Did the agent finish?"}}}
@@ -240,5 +248,5 @@ func TestGoRepositoryProfileIsNotInheritedBySecondaryEngines(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "evaluations must retain SDK mode while clearing the profile")
-	assert.Equal(t, "go-repository", data.EngineConfig.ToolProfile, "secondary engines must not mutate the main config")
+	assert.Equal(t, []string{"go"}, data.ToolProfiles, "secondary engines must not mutate the main profiles")
 }

@@ -34,7 +34,6 @@ on: workflow_dispatch
 engine:
   id: copilot
   copilot-sdk: true
-  tool-profile: go-repository
   harness:
     max-retries: 0
 max-tool-denials: 1
@@ -44,6 +43,7 @@ permissions:
 sandbox:
   agent: awf
 tools:
+  profile: go
   bash: ` + test.bash + `
   cli-proxy: false
   github:
