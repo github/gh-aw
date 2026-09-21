@@ -116,11 +116,11 @@ func buildGoRepositoryToolConfigRuntimeData(configJSON string) (string, map[stri
 	}
 	profile, ok := config["profile"].(map[string]any)
 	if !ok {
-		return "", nil, errors.New("Go repository SDK tool config requires a profile object")
+		return "", nil, errors.New("go-repository SDK tool config requires a profile object")
 	}
 	policy, ok := profile["policy"].(map[string]any)
 	if !ok {
-		return "", nil, errors.New("Go repository SDK tool config requires a policy object")
+		return "", nil, errors.New("go-repository SDK tool config requires a policy object")
 	}
 	for key, value := range policy {
 		policy[key] = bindGoRepositoryTypedExpressions(value)
