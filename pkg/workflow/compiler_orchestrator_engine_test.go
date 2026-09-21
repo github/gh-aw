@@ -118,10 +118,11 @@ engine: claude
 	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
 
 	compiler := NewCompiler()
-	frontmatterResult, err := parser.ExtractFrontmatterFromContent(testContent)
+	content := []byte(testContent)
+	frontmatterResult, err := parser.ExtractFrontmatterFromContent(string(content))
 	require.NoError(t, err)
 
-	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, []byte(testContent), tmpDir)
+	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, content, tmpDir)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.engineConfig)
@@ -145,10 +146,11 @@ engine:
 	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
 
 	compiler := NewCompiler()
-	frontmatterResult, err := parser.ExtractFrontmatterFromContent(testContent)
+	content := []byte(testContent)
+	frontmatterResult, err := parser.ExtractFrontmatterFromContent(string(content))
 	require.NoError(t, err)
 
-	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, []byte(testContent), tmpDir)
+	result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, content, tmpDir)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.engineConfig)
@@ -614,11 +616,10 @@ imports:
 			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
 
 			compiler := NewCompiler()
-			content := []byte(testContent)
-			frontmatterResult, err := parser.ExtractFrontmatterFromContent(string(content))
+			frontmatterResult, err := parser.ExtractFrontmatterFromContent(testContent)
 			require.NoError(t, err)
 
-			result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, content, tmpDir)
+			result, err := compiler.setupEngineAndImports(frontmatterResult, testFile, []byte(testContent), tmpDir)
 			require.NoError(t, err)
 			require.NotNil(t, result.engineConfig.Auth)
 			assert.Equal(t, "github-oidc", result.engineConfig.Auth.Type)
