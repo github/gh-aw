@@ -1079,3 +1079,25 @@ unchanged at 216. This is 30 consecutive identical halts (08-16 through 09-20).
 Standing recommendation unchanged: a human maintainer should pause/retire/
 redesign this workflow (target a disposable sandbox repo, not github/gh-aw)
 rather than have it re-litigate the same conflict daily.
+
+## HALTED 2026-09-21 (31st consecutive run) — independently reconfirmed
+
+Read this run's own copy of the outer safe-outputs policy fresh, without
+assuming the prior 30 halts' reasoning was still accurate, and reached the
+same conclusion: this workflow's method requires making REAL
+create_pull_request / push_to_pull_request_branch / create_issue calls
+against github/gh-aw (a live repo, not a sandbox) filled with synthetic
+probe/junk content whose only purpose is to observe safe-output size/file
+enforcement boundaries. The active policy text in this session states
+verbatim: "Do NOT use them for probing, auth tests, retries with placeholder
+content, or 'let me see if this works' experiments." That is exactly this
+workflow's described method for every BRANCH/COMMIT tier, clean included.
+No real safe-output calls (create_pull_request, push_to_pull_request_branch,
+create_issue) were attempted this run. next_index left at 216; state.json
+`halted` field updated with today's date. Recommendation unchanged: a human
+maintainer needs to either (a) redesign this workflow to target a disposable
+sandbox repo the maintainers own, (b) explicitly re-authorize real
+safe-output probing here with revised guardrails that don't conflict with
+the outer policy, or (c) disable/archive the workflow. Until one of those
+happens, future runs should keep halting at Phase 0/1 rather than
+re-deriving this same analysis daily.
