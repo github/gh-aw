@@ -4,6 +4,7 @@ package uncheckedsliceindex
 
 import (
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 
@@ -109,9 +110,12 @@ func reportIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr, isString bool, fse
 	)
 }
 
+// isConstantStringIndex reports whether a constant string has an in-range constant index.
 func isConstantStringIndex(pass *analysis.Pass, idxExpr *ast.IndexExpr) bool {
-	_, isConst := astutil.ConstIntValue(pass, idxExpr.Index)
-	return isConst && pass.TypesInfo.Types[idxExpr.X].Value != nil
+	index, isConst := astutil.ConstIntValue(pass, idxExpr.Index)
+	value := pass.TypesInfo.Types[idxExpr.X].Value
+	return isConst && index >= 0 && value != nil && value.Kind() == constant.String &&
+		index < int64(len(constant.StringVal(value)))
 }
 
 // isSliceOrStringType reports whether t is a slice or string type.
@@ -206,6 +210,7 @@ func isAncestorOf(ancestor, node ast.Node, parents map[ast.Node]ast.Node) bool {
 	}
 }
 
+// isInBoundedForLoop reports whether a counted loop proves the index is in range.
 func isInBoundedForLoop(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
 	current := ast.Node(idxExpr)
 	for {
@@ -225,6 +230,12 @@ func isInBoundedForLoop(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map
 				!changedBefore(pass, forStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index) {
 				return true
 			}
+		}
+		if _, ok := parent.(*ast.FuncDecl); ok {
+			return false
+		}
+		if _, ok := parent.(*ast.FuncLit); ok {
+			return false
 		}
 		current = parent
 	}
@@ -253,11 +264,13 @@ func hasBoundsCheck(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast
 	}
 }
 
+// hasBounds reports whether cond proves both bounds for idxExpr.
 func hasBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) bool {
 	upper, lower := boundFacts(pass, cond, idxExpr)
 	return upper && lower
 }
 
+// hasUpperBound reports whether cond proves a strict upper bound for idxExpr.
 func hasUpperBound(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) bool {
 	upper, _ := boundFacts(pass, cond, idxExpr)
 	return upper
@@ -268,6 +281,9 @@ func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upp
 	cond = astutil.UnwrapParenExpr(cond)
 	bin, ok := cond.(*ast.BinaryExpr)
 	if !ok {
+		return false, false
+	}
+	if bin.Op == token.LOR {
 		return false, false
 	}
 	if bin.Op == token.LAND {
@@ -290,6 +306,7 @@ func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upp
 	return false, false
 }
 
+// hasTerminatingGuardBefore reports whether a preceding invalid-bounds guard terminates.
 func hasTerminatingGuardBefore(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
 	block, target := enclosingBlock(idxExpr, parents)
 	if block == nil {
@@ -334,6 +351,7 @@ func invalidBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (
 	return false, false
 }
 
+// sameExpr reports whether x and y are identifiers for the same type-checker object.
 func sameExpr(pass *analysis.Pass, x, y ast.Expr) bool {
 	xID, xOK := astutil.UnwrapParenExpr(x).(*ast.Ident)
 	yID, yOK := astutil.UnwrapParenExpr(y).(*ast.Ident)
@@ -341,6 +359,7 @@ func sameExpr(pass *analysis.Pass, x, y ast.Expr) bool {
 		pass.TypesInfo.ObjectOf(xID) == pass.TypesInfo.ObjectOf(yID)
 }
 
+// isLenOf reports whether expr is the builtin len call for value.
 func isLenOf(pass *analysis.Pass, expr, value ast.Expr) bool {
 	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	if !ok || len(call.Args) != 1 || !sameExpr(pass, call.Args[0], value) { //nolint:uncheckedsliceindex // len call.Args is checked above
@@ -354,11 +373,13 @@ func isLenOf(pass *analysis.Pass, expr, value ast.Expr) bool {
 	return isBuiltin && builtin.Name() == "len"
 }
 
+// isZero reports whether expr is the integer constant zero.
 func isZero(pass *analysis.Pass, expr ast.Expr) bool {
 	value, ok := astutil.ConstIntValue(pass, expr)
 	return ok && value == 0
 }
 
+// indexNonnegative reports whether expr is a nonnegative constant or unsigned value.
 func indexNonnegative(pass *analysis.Pass, expr ast.Expr) bool {
 	if value, ok := astutil.ConstIntValue(pass, expr); ok {
 		return value >= 0
@@ -367,17 +388,20 @@ func indexNonnegative(pass *analysis.Pass, expr ast.Expr) bool {
 	return ok && basic.Info()&types.IsUnsigned != 0
 }
 
+// initializedToZero reports whether stmt initializes index to zero.
 func initializedToZero(pass *analysis.Pass, stmt ast.Stmt, index *ast.Ident) bool {
 	assign, ok := stmt.(*ast.AssignStmt)
 	return ok && len(assign.Lhs) == 1 && len(assign.Rhs) == 1 &&
 		sameExpr(pass, assign.Lhs[0], index) && isZero(pass, assign.Rhs[0]) //nolint:uncheckedsliceindex // lengths are checked above
 }
 
+// increments reports whether stmt increments index by one.
 func increments(pass *analysis.Pass, stmt ast.Stmt, index *ast.Ident) bool {
 	inc, ok := stmt.(*ast.IncDecStmt)
 	return ok && inc.Tok == token.INC && sameExpr(pass, inc.X, index)
 }
 
+// enclosingBlock returns node's closest containing block and its statement in that block.
 func enclosingBlock(node ast.Node, parents map[ast.Node]ast.Node) (*ast.BlockStmt, ast.Stmt) {
 	current := node
 	var target ast.Stmt
@@ -397,6 +421,7 @@ func enclosingBlock(node ast.Node, parents map[ast.Node]ast.Node) (*ast.BlockStm
 }
 
 // changedBefore reports whether values are written before node within block.
+// It returns true if the parent chain cannot be classified, preserving fail-closed analysis.
 func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, parents map[ast.Node]ast.Node, values ...ast.Expr) bool {
 	current := node
 	for {
