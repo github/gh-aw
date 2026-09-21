@@ -540,6 +540,125 @@ PY
 }
 check_safe_output_config_schema_coverage
 
+# IMP-005: Safe Output Target Authorization Coverage
+check_safe_output_target_authorization_coverage() {
+    local findings
+
+    echo "Running IMP-005: Safe Output Target Authorization Coverage..."
+
+    findings=$(python3 - <<'PY'
+import re
+from pathlib import Path
+
+spec_path = Path("docs/src/content/docs/specs/safe-outputs-specification.md")
+spec = spec_path.read_text()
+
+target_authorized_types = {
+    "add_comment": ("actions/setup/js/add_comment.cjs", "resolveTarget"),
+    "update_issue": ("actions/setup/js/update_issue.cjs", "resolveTarget"),
+    "close_issue": ("actions/setup/js/close_issue.cjs", "resolveTarget"),
+    "add_labels": ("actions/setup/js/add_labels.cjs", "resolveTarget"),
+    "remove_labels": ("actions/setup/js/remove_labels.cjs", "resolveTarget"),
+    "link_sub_issue": ("actions/setup/js/link_sub_issue.cjs", "resolveTarget"),
+    "close_pull_request": ("actions/setup/js/close_pull_request.cjs", "resolveTarget"),
+    "merge_pull_request": ("actions/setup/js/merge_pull_request.cjs", "resolveTarget"),
+    "mark_pull_request_as_ready_for_review": ("actions/setup/js/mark_pull_request_as_ready_for_review.cjs", "resolveTarget"),
+    "resolve_pull_request_review_thread": ("actions/setup/js/resolve_pr_review_thread.cjs", "reviewThreadTargetChecks"),
+    "add_reviewer": ("actions/setup/js/add_reviewer.cjs", "resolveTarget"),
+    "assign_milestone": ("actions/setup/js/assign_milestone.cjs", "resolveTarget"),
+    "assign_to_agent": ("actions/setup/js/assign_to_agent.cjs", "resolveTarget"),
+    "assign_to_user": ("actions/setup/js/assign_to_user.cjs", "resolveTarget"),
+    "unassign_from_user": ("actions/setup/js/unassign_from_user.cjs", "resolveTarget"),
+    "set_issue_type": ("actions/setup/js/set_issue_type.cjs", "resolveTarget"),
+    "set_issue_field": ("actions/setup/js/set_issue_field.cjs", "resolveTarget"),
+    "hide_comment": ("actions/setup/js/hide_comment.cjs", "commentParentTargetChecks"),
+}
+
+
+def type_section(type_name):
+    header = f"#### Type: {type_name}"
+    start = spec.find(header)
+    if start == -1:
+        return ""
+    rest = spec[start + len(header):]
+    next_section = rest.find("\n#### Type: ")
+    if next_section == -1:
+        return spec[start:]
+    return spec[start:start + len(header) + next_section]
+
+
+messages = []
+for type_name, (handler_path, enforcement_mode) in target_authorized_types.items():
+    section = type_section(type_name)
+    if not section:
+        messages.append(f"missing specification section for {type_name}")
+        continue
+    if "**Target Authorization**" not in section:
+        messages.append(f"missing Target Authorization section for {type_name}")
+        continue
+
+    prefix_match = re.search(r"\*\*([A-Z]+)-001\*\*", section)
+    if not prefix_match:
+        messages.append(f"missing numbered target authorization requirements for {type_name}")
+    else:
+        prefix = prefix_match.group(1)
+        for suffix in ("001", "002", "003", "004", "005"):
+            if f"**{prefix}-{suffix}**" not in section:
+                messages.append(f"missing {prefix}-{suffix} in {type_name} target authorization requirements")
+
+    for needle in ('target: "triggering"', 'target: "*"'):
+        if needle not in section:
+            messages.append(f"missing {needle} semantics in {type_name} target authorization requirements")
+
+    test_path = Path(f"pkg/workflow/safe_outputs_specification_{type_name}_test.go")
+    if not test_path.exists():
+        messages.append(f"missing specification regression test for {type_name}")
+
+    handler = Path(handler_path)
+    if not handler.exists():
+        messages.append(f"missing target-authorized handler {handler_path}")
+        continue
+    handler_text = handler.read_text()
+    if enforcement_mode == "resolveTarget":
+        if "resolveTarget" not in handler_text:
+            messages.append(f"{handler_path} does not use resolveTarget for runtime target authorization")
+    elif enforcement_mode == "reviewThreadTargetChecks":
+        for needle in ("resolveInvocationContext", "threadPRNumber", "triggeringPRNumber"):
+            if needle not in handler_text:
+                messages.append(f"{handler_path} missing {needle} review-thread target boundary check")
+    elif enforcement_mode == "commentParentTargetChecks":
+        for needle in ("resolvedComment.itemNumber", "resolvedComment.kind", "expectedKind"):
+            if needle not in handler_text:
+                messages.append(f"{handler_path} missing {needle} comment parent target boundary check")
+
+helper = Path("actions/setup/js/safe_output_helpers.cjs").read_text()
+helper_test = Path("actions/setup/js/safe_output_helpers.test.cjs").read_text()
+if "assertTargetAuthorizationInvariant" not in helper:
+    messages.append("safe_output_helpers.cjs missing fail-safe target authorization invariant assertion")
+for needle in (
+    "should ignore agent-supplied issue numbers for triggering targets",
+    "should ignore conflicting agent-supplied issue numbers for fixed targets",
+    "should ignore agent-supplied PR numbers for triggering targets",
+    "should ignore conflicting agent-supplied PR numbers for fixed targets",
+    "ERR_TARGET_AUTHORIZATION",
+):
+    if needle not in helper_test:
+        messages.append(f"safe_output_helpers.test.cjs missing regression coverage: {needle}")
+
+print("\n".join(sorted(set(messages))))
+PY
+)
+
+    if [ -n "$findings" ]; then
+        while IFS= read -r finding; do
+            log_high "IMP-005: Safe output target authorization conformance gap: $finding"
+        done <<< "$findings"
+    else
+        log_pass "IMP-005: Safe output target authorization is specified, tested, and enforced"
+    fi
+}
+check_safe_output_target_authorization_coverage
+
 # MCE-001: Tool Description Constraint Disclosure (Section 8.3 MCE2)
 echo "Running MCE-001: Tool Description Constraint Disclosure..."
 check_mce_constraint_disclosure() {

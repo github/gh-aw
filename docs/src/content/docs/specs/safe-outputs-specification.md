@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.3<br>
+**Version**: 1.29.4<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-09-12<br>
+**Publication Date**: 2026-09-21<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -191,6 +191,7 @@ An implementation satisfying ALL normative requirements (MUST, SHALL, REQUIRED s
 - Complete security architecture implementation (privilege separation, threat mitigations)
 - Support for all mandatory safe output types (defined in Section 7)
 - Universal feature implementation (max limits, staged mode, footers, sanitization)
+- Runtime target authorization for every safe output type that accepts a configured `target`
 - Protocol exchange pattern adherence (MCP stdio container transport, NDJSON persistence)
 - Content integrity mechanism enforcement (schema validation, domain filtering)
 - Execution guarantee provision (atomicity, ordering, idempotency)
@@ -260,7 +261,11 @@ Verification that configuration parsing, validation, and enforcement match speci
 - Inheritance rules (type-specific overriding global)
 - Default value application
 
-*Note*: A normative conformance test suite is RECOMMENDED for future specification versions but not currently provided.
+**Method M5: Target Authorization Regression Testing**
+
+Validation that configured targets are enforced at runtime before privileged API calls. Target authorization tests MUST verify that omitted and explicit `target: "triggering"` configurations use trusted invocation context, fixed numeric targets use the configured number, only `target: "*"` may select agent-supplied target identifiers, and fail-safe runtime assertions abort if a non-wildcard resolved target diverges from the authorized target.
+
+*Note*: Implementations SHOULD maintain an automated conformance suite that maps each target-authorized safe output type to its specification section, runtime handler, and regression tests.
 
 ---
 
@@ -2739,6 +2744,8 @@ This section provides complete definitions for all remaining safe output types. 
 - Cross-repository targets MUST be validated against the `allowed-repos` allowlist
 - Issue number MUST be validated as a positive integer belonging to the target repository
 
+**Target Authorization**:
+
 **UI-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
 
 **UI-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
@@ -3714,7 +3721,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Requires both `issues: write` and `pull-requests: write` to support labeling both entity types
 - Labels must exist in repository; non-existent labels generate warnings
 
-**Target Authorization Requirements**:
+**Target Authorization**:
 
 - **AL-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
 - **AL-002**: With `target: "triggering"`, the handler MUST use only the issue or pull request number from trusted triggering-event context. It MUST ignore agent-supplied `item_number` and equivalent aliases.
@@ -3750,7 +3757,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Same permissions as `add_labels`
 - Missing labels are silently ignored (no error)
 
-**Target Authorization Requirements**:
+**Target Authorization**:
 
 - **RML-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
 - **RML-002**: With `target: "triggering"`, the handler MUST use only the issue or pull request number from trusted triggering-event context. It MUST ignore agent-supplied `item_number` and equivalent aliases.
@@ -5924,6 +5931,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.4** (2026-09-21):
+
+- **Added**: Conformance verification requirements for systematic target authorization regression testing and fail-safe runtime assertions.
+- **Updated**: Publication metadata to 1.29.4.
 
 **Version 1.29.3** (2026-09-12):
 
