@@ -27,6 +27,13 @@ func isSafeGitRevisionArg(ref string) bool {
 	return ref != "" && !strings.HasPrefix(ref, "-") && !containsControlCharacters(ref)
 }
 
+func validateGitBranchArg(branchName, label string) error {
+	if !isSafeGitRevisionArg(branchName) {
+		return fmt.Errorf("invalid %s %q: must not start with '-' or contain control characters", label, branchName)
+	}
+	return nil
+}
+
 // validateRelPathForGit rejects relative paths that could be misinterpreted as
 // a git CLI flag (a leading "-") or that escape the repository root via path
 // traversal (a leading ".." path segment after cleaning), before the path is
@@ -534,8 +541,8 @@ func getCurrentBranchIn(dir string) (string, error) {
 
 // createAndSwitchBranch creates a new branch and switches to it
 func createAndSwitchBranch(branchName string, verbose bool) error {
-	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
+	if err := validateGitBranchArg(branchName, "branch name"); err != nil {
+		return err
 	}
 	console.LogVerbose(verbose, "Creating and switching to branch: "+branchName)
 
@@ -549,8 +556,8 @@ func createAndSwitchBranch(branchName string, verbose bool) error {
 
 // switchBranch switches to the specified branch
 func switchBranch(branchName string, verbose bool) error {
-	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
+	if err := validateGitBranchArg(branchName, "branch name"); err != nil {
+		return err
 	}
 	console.LogVerbose(verbose, "Switching to branch: "+branchName)
 
@@ -578,8 +585,8 @@ func commitChanges(message string, verbose bool) error {
 
 // pushBranch pushes the specified branch to origin
 func pushBranch(branchName string, verbose bool) error {
-	if !isSafeGitRevisionArg(branchName) {
-		return fmt.Errorf("invalid branch name %q: must not start with '-' or contain control characters", branchName)
+	if err := validateGitBranchArg(branchName, "branch name"); err != nil {
+		return err
 	}
 	console.LogVerbose(verbose, "Pushing branch: "+branchName)
 
