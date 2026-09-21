@@ -219,7 +219,9 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
       throw new Error("Copilot SDK defineTool is required when tools.web-fetch is enabled");
     }
     tools.push(createCopilotSDKWebFetchTool(sdk.defineTool, options));
-    availableTools.addCustom("web_fetch");
+    // The runtime classifies a same-name replacement as the built-in tool it
+    // overrides, rather than as a custom tool.
+    availableTools.addBuiltIn("web_fetch");
   }
   return { availableTools, tools };
 }
