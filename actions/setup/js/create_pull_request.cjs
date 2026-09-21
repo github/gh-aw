@@ -50,6 +50,7 @@ const {
   summarizeListForLog,
   createBundleTempRef,
   isLabelTransientError,
+  withTransientPushRetry,
   parseAllowedBaseBranches,
   isBaseBranchAllowed,
   parseStringListConfig,
@@ -1833,7 +1834,7 @@ async function main(config = {}) {
             });
           };
           try {
-            await runBundlePush();
+            await withTransientPushRetry(runBundlePush, "push branch (bundle)");
             core.info("Changes pushed to branch (from bundle)");
 
             // Count new commits on PR branch relative to base
@@ -2228,7 +2229,7 @@ ${issueSafeFallbackFooter}`;
               });
             };
             try {
-              await runPatchPush();
+              await withTransientPushRetry(runPatchPush, "push branch");
               core.info("Changes pushed to branch");
 
               // Count new commits on PR branch relative to base, used to restrict

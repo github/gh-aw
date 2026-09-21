@@ -1284,6 +1284,92 @@ index 0000000..abc1234
     expect(fallbackIssueBody).not.toContain("Closes #57");
     expect(fallbackIssueBody).not.toContain("Resolves test-owner/test-repo#58");
   });
+
+  it("should create the PR when the initial push fails once with a transient workflows-scope timeout and succeeds on retry (no bundle)", async () => {
+    vi.useFakeTimers();
+    try {
+      const patchPath = canonicalPatchPath("autoloop/perf-comparison");
+      fs.writeFileSync(
+        patchPath,
+        `From abc123 Mon Sep 17 00:00:00 2001
+From: Test Author <test@example.com>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH] Test commit
+
+diff --git a/test.txt b/test.txt
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/test.txt
+@@ -0,0 +1 @@
++Hello World
+--
+2.34.1
+`
+      );
+      // No bundle file - forces the patch transport fallback path
+      pushSignedSpy.mockRejectedValueOnce(new Error("Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.")).mockResolvedValueOnce("new-head-sha");
+
+      const { main } = require("./create_pull_request.cjs");
+      const handler = await main({ base_branch: "main", preserve_branch_name: true });
+      const resultPromise = handler({ title: "Test PR", body: "Test body", branch: "autoloop/perf-comparison" }, {});
+
+      await vi.runAllTimersAsync();
+
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(result.fallback_used).not.toBe(true);
+      expect(pushSignedSpy).toHaveBeenCalledTimes(2);
+      expect(global.github.rest.pulls.create).toHaveBeenCalled();
+      expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("should fall back to a review issue when the initial push keeps failing with a transient workflows-scope timeout after retries are exhausted (no bundle)", async () => {
+    vi.useFakeTimers();
+    try {
+      const patchPath = canonicalPatchPath("autoloop/perf-comparison");
+      fs.writeFileSync(
+        patchPath,
+        `From abc123 Mon Sep 17 00:00:00 2001
+From: Test Author <test@example.com>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH] Test commit
+
+diff --git a/test.txt b/test.txt
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/test.txt
+@@ -0,0 +1 @@
++Hello World
+--
+2.34.1
+`
+      );
+      // No bundle file - forces the patch transport fallback path
+      pushSignedSpy.mockRejectedValue(new Error("Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required."));
+
+      const { main } = require("./create_pull_request.cjs");
+      const handler = await main({ base_branch: "main", preserve_branch_name: true });
+      const resultPromise = handler({ title: "Test PR", body: "Test body", branch: "autoloop/perf-comparison" }, {});
+
+      await vi.runAllTimersAsync();
+
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(result.fallback_used).toBe(true);
+      // 1 initial + 5 retries = 6 total push attempts (RATE_LIMIT_RETRY_CONFIG.maxRetries = 5)
+      expect(pushSignedSpy).toHaveBeenCalledTimes(6);
+      expect(global.github.rest.issues.create).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("create_pull_request - fallback-as-issue configuration", () => {
