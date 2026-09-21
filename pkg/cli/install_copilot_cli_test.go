@@ -26,7 +26,8 @@ func TestInstallCopilotCLIScriptUsesToolcacheBeforeDownload(t *testing.T) {
 	require.NoError(t, os.MkdirAll(toolcacheBin, 0o755))
 
 	cachedCopilot := filepath.Join(toolcacheBin, "copilot")
-	require.NoError(t, os.WriteFile(cachedCopilot, []byte("#!/usr/bin/env bash\necho 'copilot 1.2.3'\n"), 0o755))
+	autoUpdateLog := filepath.Join(tempDir, "auto-update.log")
+	require.NoError(t, os.WriteFile(cachedCopilot, []byte("#!/usr/bin/env bash\necho \"${COPILOT_AUTO_UPDATE:-}\" >> \""+autoUpdateLog+"\"\necho 'copilot 1.2.3'\n"), 0o755))
 
 	fakeBinDir := filepath.Join(tempDir, "fake-bin")
 	require.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
@@ -75,9 +76,45 @@ exit 97
 	require.NoError(t, err)
 	assert.Contains(t, string(wrapper), cachedCopilot, "wrapper should exec the cached Copilot CLI")
 
+	autoUpdateValues, err := os.ReadFile(autoUpdateLog)
+	require.NoError(t, err)
+	assert.Equal(t, "false\nfalse\n", string(autoUpdateValues), "installer version checks should disable automatic updates")
+
 	wrapperOutput, err := exec.Command(installedCopilot, "--version").CombinedOutput()
 	require.NoError(t, err, "wrapper should be executable: %s", wrapperOutput)
 	assert.Contains(t, string(wrapperOutput), "copilot 1.2.3")
+}
+
+func TestInstallCopilotCLIScriptRejectsMislabeledToolcacheBinary(t *testing.T) {
+	t.Parallel()
+	wd, err := os.Getwd()
+	require.NoError(t, err, "Failed to get working directory")
+
+	projectRoot := filepath.Join(wd, "..", "..")
+	installScript := filepath.Join(projectRoot, "actions", "setup", "sh", "install_copilot_cli.sh")
+
+	tempDir := t.TempDir()
+	toolcacheBin := filepath.Join(tempDir, "toolcache", "copilot-cli", "1.2.3", "x64", "bin")
+	require.NoError(t, os.MkdirAll(toolcacheBin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(toolcacheBin, "copilot"), []byte("#!/usr/bin/env bash\necho 'copilot 1.2.4'\n"), 0o755))
+
+	fakeBinDir := filepath.Join(tempDir, "fake-bin")
+	require.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
+	curlLog := filepath.Join(tempDir, "curl.log")
+	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte("#!/usr/bin/env bash\nexec \"$@\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "curl"), []byte("#!/usr/bin/env bash\necho curl-invoked >> \""+curlLog+"\"\nexit 97\n"), 0o755))
+
+	cmd := exec.Command("bash", installScript, "1.2.3")
+	cmd.Env = append(os.Environ(),
+		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
+		"COPILOT_INSTALL_DIR="+filepath.Join(tempDir, "install-bin"),
+		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
+	)
+
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, "script should attempt a download after rejecting the mislabeled cache entry")
+	assert.Contains(t, string(output), "Skipping candidate (cached binary reports 1.2.4, directory claims 1.2.3)")
+	assert.FileExists(t, curlLog, "release download should be attempted after rejecting the cache entry")
 }
 
 func TestInstallCopilotCLIScriptPreservesCachedBinaryAtInstallPath(t *testing.T) {

@@ -40,11 +40,12 @@ const DefaultClaudeCodeVersion Version = "2.1.273"
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
 //
-// NOTE: 1.0.85 was pinned back to 1.0.83 after reports that 1.0.85 returns an
-// instant HTTP 400 ("Bad Request") on the very first /responses request for some
-// workflow shapes (see github/gh-aw#62363). Do not bump past 1.0.83 until that
-// regression is confirmed fixed upstream.
-const DefaultCopilotVersion Version = "1.0.83"
+// NOTE: 1.0.81 introduced MCP 2026-07-28 lifecycle discovery, which remains
+// incompatible with dual-era MCP servers through 1.0.86. Versions 1.0.83 and
+// 1.0.85 also produce an instant HTTP 400 before inference in affected workflows
+// (see github/gh-aw#60820 and github/gh-aw#62363). Do not bump past 1.0.80 until
+// both regressions are confirmed fixed upstream.
+const DefaultCopilotVersion Version = "1.0.80"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.13"

@@ -36,7 +36,7 @@ COPILOT_TOOLCACHE_MAX_DEPTH=4
 # argument nor a GH_AW_COMPILED_VERSION-backed compat.json lookup is available.
 # It is the last resort (priority 3) after engine.version (priority 1) and
 # compat.json toolcache lookup (priority 2).
-DEFAULT_COPILOT_VERSION="1.0.83"
+DEFAULT_COPILOT_VERSION="1.0.80"
 COMPAT_URL="${COPILOT_COMPAT_URL:-https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json}"
 COMPILED_GH_AW_VERSION="${GH_AW_COMPILED_VERSION:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -392,6 +392,8 @@ find_cached_copilot_bin() {
   local candidate_arch=""
   local candidate_version=""
   local candidate_version_normalized=""
+  local reported_version=""
+  local reported_version_normalized=""
   local best_candidate=""
   local best_version=""
 
@@ -434,6 +436,13 @@ find_cached_copilot_bin() {
       # Skip non-numeric versions (e.g., "1.2.3-beta.1") to prevent arithmetic expansion errors
       if ! version_is_numeric "$candidate_version_normalized"; then
         echo "  Skipping candidate (non-numeric version: ${candidate_version_normalized})" >&2
+        continue
+      fi
+
+      reported_version="$(COPILOT_AUTO_UPDATE=false "$candidate" --version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+      reported_version_normalized="$(normalize_version "$reported_version")"
+      if [ -z "$reported_version_normalized" ] || [ "$reported_version_normalized" != "$candidate_version_normalized" ]; then
+        echo "  Skipping candidate (cached binary reports ${reported_version_normalized:-unknown}, directory claims ${candidate_version_normalized})" >&2
         continue
       fi
 
@@ -574,7 +583,7 @@ if CACHED_COPILOT_BIN="$(find_cached_copilot_bin "$REQUESTED_VERSION" "${COMPAT_
   if [ -n "$RESOLVED_COPILOT" ]; then
     echo "  Resolved copilot binary: ${RESOLVED_COPILOT}"
     echo "  Canonical install path: ${INSTALL_DIR}/copilot"
-    "$RESOLVED_COPILOT" --version
+    COPILOT_AUTO_UPDATE=false "$RESOLVED_COPILOT" --version
     echo "✓ Copilot CLI installation complete (cached)"
     exit 0
   fi
@@ -663,14 +672,14 @@ fi
 echo "Verifying Copilot CLI installation..."
 if [ "$ROOTLESS" = "true" ]; then
   if [ -x "${INSTALL_DIR}/copilot" ]; then
-    "${INSTALL_DIR}/copilot" --version
+    COPILOT_AUTO_UPDATE=false "${INSTALL_DIR}/copilot" --version
     echo "✓ Copilot CLI installation complete"
   else
     echo "ERROR: Copilot CLI installation failed - binary not found at ${INSTALL_DIR}/copilot"
     exit 1
   fi
 elif command -v copilot >/dev/null 2>&1; then
-  copilot --version
+  COPILOT_AUTO_UPDATE=false copilot --version
   echo "✓ Copilot CLI installation complete"
 else
   echo "ERROR: Copilot CLI installation failed - command not found"
