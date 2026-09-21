@@ -20,9 +20,9 @@ Each phase produces a concrete artifact consumed by the next, and every transiti
 
 ### Phase 1: Research
 
-A scheduled workflow investigates the codebase from a specific angle and publishes its findings as a GitHub discussion. The discussion is the contract between the research phase and everything that follows—it contains the analysis, recommendations, and context a planner needs.
+A scheduled workflow investigates the codebase from a specific angle and publishes its findings as an issue or GitHub discussion. The research artifact is the contract between the research phase and everything that follows—it contains the analysis, recommendations, and context a planner needs.
 
-The [`go-fan`](https://github.com/github/gh-aw/blob/main/.github/workflows/go-fan.md) workflow is a live example: it runs each weekday, picks one Go dependency, compares current usage against upstream best practices, and creates a `[go-fan]` discussion under the `audits` category.
+The [`go-fan`](https://github.com/github/gh-aw/blob/main/.github/workflows/go-fan.md) workflow is a live example: it runs each weekday, picks one Go dependency, compares current usage against upstream best practices, and creates a `[go-fan]` issue.
 
 ```aw wrap
 ---
@@ -57,7 +57,7 @@ The research agent uses `cache-memory` to track which modules have been reviewed
 
 ### Phase 2: Plan
 
-After reading the research discussion, a developer triggers the `/plan` command on it. The [`plan`](https://github.com/github/gh-aw/blob/main/.github/workflows/plan.md) workflow reads the discussion, extracts concrete work items, and creates up to five sub-issues grouped under a parent tracking issue.
+After reading the research issue or discussion, a developer triggers the `/plan` command on it. The [`plan`](https://github.com/github/gh-aw/blob/main/.github/workflows/plan.md) workflow reads the source, extracts concrete work items, and creates up to five sub-issues grouped under a parent tracking issue.
 
 ```
 /plan focus on the quick wins and API simplifications
@@ -104,7 +104,7 @@ Copilot's pull request is reviewed by a human maintainer. The maintainer checks 
 
 ## End-to-End Example
 
-A typical `go-fan` cycle spans two days: Monday morning the workflow posts a discussion such as *"[go-fan] Go Module Review: spf13/cobra"* with recommendations like adopting `SetContext` and moving shared setup into `PersistentPreRunE`. That afternoon a developer runs `/plan`, which creates a `[plan] cobra improvements` tracking issue plus three sub-issues (context propagation, `PersistentPreRunE` refactor, and cancellation tests) and assigns the first two to Copilot. By Tuesday, the developer reviews the resulting PRs, requests any needed tweaks, and merges them; the tracking issue closes automatically once the sub-issues are resolved.
+A typical `go-fan` cycle spans two days: Monday morning the workflow creates an issue such as *"[go-fan] Go Module Review: spf13/cobra"* with recommendations like adopting `SetContext` and moving shared setup into `PersistentPreRunE`. That afternoon a developer runs `/plan`, which creates a `[plan] cobra improvements` tracking issue plus three sub-issues (context propagation, `PersistentPreRunE` refactor, and cancellation tests) and assigns the first two to Copilot. By Tuesday, the developer reviews the resulting PRs, requests any needed tweaks, and merges them; the tracking issue closes automatically once the sub-issues are resolved.
 
 ## Workflow Configuration Patterns
 
