@@ -1515,6 +1515,14 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("normalizes unterminated whitespace-only final config line", func(t *testing.T) {
+		var yaml strings.Builder
+		writeIndentedCodexConfig(&yaml, "a = 1\n   ")
+		if got, want := yaml.String(), codexRunBlockIndent+"a = 1\n\n"; got != want {
+			t.Fatalf("unterminated whitespace-only line was not normalized:\nExpected: %q\nGot: %q", want, got)
+		}
+	})
+
 	t.Run("accepts nil workflow data", func(t *testing.T) {
 		var yaml strings.Builder
 		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, nil); err != nil {

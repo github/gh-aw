@@ -49,11 +49,9 @@ func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 			continue
 		}
 		if strings.TrimSpace(line) == "" {
-			if strings.HasSuffix(line, "\n") {
-				yaml.WriteByte('\n')
-				outputEndsWithNewline = true
-				continue
-			}
+			yaml.WriteByte('\n')
+			outputEndsWithNewline = true
+			continue
 		}
 		yaml.WriteString(codexRunBlockIndent)
 		yaml.WriteString(line)
