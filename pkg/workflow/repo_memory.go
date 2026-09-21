@@ -28,6 +28,9 @@ const (
 	defaultRepoMemoryMaxPatchSize = 10240
 	// maxRepoMemoryPatchSize is the maximum allowed value for max-patch-size (1MB).
 	maxRepoMemoryPatchSize = 1048576
+	// pushRepoMemoryTimeoutMinutes bounds the retry loop (about two minutes of
+	// capped jittered backoff) plus git/network overhead.
+	pushRepoMemoryTimeoutMinutes = 10
 )
 
 // Pre-compiled regexes for performance (avoid recompilation in hot paths)
@@ -582,17 +585,18 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	// is cancelled and its memory writes are silently lost. Instead of serialising the
 	// pushes, the push script converges optimistically: createCommitOnBranch is a
 	// compare-and-swap on the expected head OID, and a rejected push re-reads the remote
-	// head, merges (JSONL files use merge=union) and retries with exponential backoff.
+	// head, rebases with a JSONL merge=union policy and retries with exponential backoff.
 
 	return &Job{
-		Name:        pushRepoMemoryJobName,
-		DisplayName: "",
-		RunsOn:      c.formatFrameworkJobRunsOn(data),
-		If:          jobCondition,
-		Permissions: "permissions:\n      contents: write",
-		Needs:       jobNeeds,
-		Steps:       steps,
-		Outputs:     outputs,
+		Name:           pushRepoMemoryJobName,
+		DisplayName:    "",
+		RunsOn:         c.formatFrameworkJobRunsOn(data),
+		If:             jobCondition,
+		Permissions:    "permissions:\n      contents: write",
+		TimeoutMinutes: pushRepoMemoryTimeoutMinutes,
+		Needs:          jobNeeds,
+		Steps:          steps,
+		Outputs:        outputs,
 	}, nil
 }
 

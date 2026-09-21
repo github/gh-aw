@@ -1871,6 +1871,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: write
+    timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:

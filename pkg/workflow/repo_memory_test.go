@@ -1422,6 +1422,7 @@ func TestPushRepoMemoryJobHasNoConcurrencyGroup(t *testing.T) {
 	require.NotNil(t, pushJob, "Should produce a push job")
 
 	assert.Empty(t, pushJob.Concurrency, "push_repo_memory job should not set a concurrency group")
+	assert.Equal(t, pushRepoMemoryTimeoutMinutes, pushJob.TimeoutMinutes, "push_repo_memory job should expose an explicit retry ceiling")
 }
 
 // TestPushRepoMemoryJobConditionGatesOnAgentNotSkipped verifies that the push_repo_memory
