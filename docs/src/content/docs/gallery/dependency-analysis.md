@@ -14,7 +14,7 @@ flowchart LR
 
 ## How Go Fan selects modules
 
-Go Fan tracks previously reviewed modules with `cache-memory`. It prioritizes recently updated GitHub-hosted dependencies, then cycles through the remaining direct dependencies. A module is not selected again until the workflow has reviewed the rest of the list or seven days have passed.
+Go Fan tracks previously reviewed modules with `cache-memory`. It prioritizes recently updated GitHub-hosted dependencies, then cycles through the remaining direct dependencies. It avoids selecting a module reviewed in the last seven days unless every direct dependency is still within that review window, in which case it resets the list and starts from the top.
 
 ## What the workflow reports
 
