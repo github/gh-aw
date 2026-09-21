@@ -447,6 +447,8 @@ func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
 	}
 }
 
+// getCITriggerTokenConfig returns the configured extra-empty-commit token, preferring
+// create-pull-request over push-to-pull-request-branch when both are configured.
 func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
 	if safeOutputs == nil {
 		return ""
@@ -454,12 +456,13 @@ func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
 	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
 		return safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
 	}
-	if safeOutputs.PushToPullRequestBranch != nil {
+	if safeOutputs.PushToPullRequestBranch != nil && safeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit != "" {
 		return safeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
 	}
 	return ""
 }
 
+// isCITriggerTokenDisabled reports whether the effective token uses the "none" sentinel.
 func isCITriggerTokenDisabled(safeOutputs *SafeOutputsConfig) bool {
 	return safeOutputs != nil && strings.EqualFold(strings.TrimSpace(getCITriggerTokenConfig(safeOutputs)), "none")
 }
