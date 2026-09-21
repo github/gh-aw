@@ -3996,6 +3996,92 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 ---
 
+#### Type: set_issue_type
+
+**Purpose**: Set or clear the type of an issue.
+
+**Default Max**: 5
+**Cross-Repository Support**: Yes
+**Mandatory**: No
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `allowed`: Optional allowlist of issue type names
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
+- `required-labels`: Labels that must all be present on the issue
+- `required-title-prefix`: Title prefix the issue must start with
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repository allowlist
+
+**Target Authorization**:
+
+**SIT-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**SIT-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**SIT-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**SIT-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**SIT-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+
+- `issues: write` - Issue type operations
+
+*GitHub App*:
+
+- `issues: write` - Issue type operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: set_issue_field
+
+**Purpose**: Set one custom issue field value.
+
+**Default Max**: 5
+**Cross-Repository Support**: Yes
+**Mandatory**: No
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `allowed-fields`: Optional allowlist of custom issue field names
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
+- `required-labels`: Labels that must all be present on the issue
+- `required-title-prefix`: Title prefix the issue must start with
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repository allowlist
+
+**Target Authorization**:
+
+**SIF-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**SIF-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**SIF-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**SIF-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**SIF-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+
+- `issues: write` - Custom issue field operations
+
+*GitHub App*:
+
+- `issues: write` - Custom issue field operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
 #### Type: hide_comment
 
 **Purpose**: Hide (minimize) comments on issues, pull requests, or discussions.
