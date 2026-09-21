@@ -12,41 +12,17 @@ A loop workflow repeatedly: 1) selects one work item, 2) makes one bounded impro
 
 Design for reliability across repeated runs, merges, CI failures, and human steering.
 
-## Shared architecture across Autoloop, Goal, and Crane
-
-### 1) Single-item scheduler
-
-Select one item per run (Autoloop: one program, Goal: one goal issue, Crane: one migration). Bounds run cost, preserves round-robin fairness.
-
-### 2) Canonical long-running branch + single PR
-
-Each item owns one stable branch and one draft PR (`autoloop/<program>`, `goal/<issue>-<slug>`, `crane/<migration>`). Accumulate accepted commits on that same PR over time.
-
-### 3) Ratcheting acceptance
-
-Accept a change only when it improves the tracked metric (or advances the contract) and passes CI/verification gates. On failure, discard the change but still record the run.
-
-### 4) Durable state in repo-memory
-
-Persist state as markdown in a dedicated memory branch (`memory/autoloop`, `memory/goal`, `memory/crane`). Keep it machine-readable and human-editable.
-
-### 5) Human control-plane issue
-
-Each item has one canonical issue with: a durable status comment sentinel (`<!-- ...:STATUS -->`), one per-run log comment, human steering directives.
-
-### 6) Explicit no-progress and pause semantics
-
-When blocked or stuck, pause with a concrete reason. Do not retry forever.
-
 ## Pattern inventory
 
 ### Pattern A — Item selection and fairness
+
+Select one item per run (Autoloop: one program, Goal: one goal issue, Crane: one migration). Bounds run cost, preserves round-robin fairness.
 
 Use a deterministic pre-step scheduler that writes a compact selection artifact (e.g. `/tmp/gh-aw/autoloop.json`; match the file name to your workflow) with: selected item, deferred items, due/not-due flags, existing PR/branch metadata. Do not discover candidates ad hoc in-prompt.
 
 ### Pattern B — Canonical branch invariants
 
-Branch names must be deterministic and suffix-free. Always use ahead/behind logic against default branch:
+Each item owns one stable, deterministic, suffix-free branch (`autoloop/<program>`, `goal/<issue>-<slug>`, `crane/<migration>`). Always use ahead/behind logic against default branch:
 
 - `ahead=0, behind>0`: fast-forward/reset branch to default,
 - `ahead>0, behind>0`: merge default into branch,
@@ -56,19 +32,19 @@ When a force-push is required, use `--force-with-lease` (not `--force`). Keep ca
 
 ### Pattern C — One PR per item
 
-Never create multiple active PRs for the same item. Resolve in order: 1) scheduler-provided `existing_pr`, 2) state-file PR fallback, 3) create exactly one PR if none exists.
+Each item owns one draft PR; accumulate accepted commits on it over time. Never create multiple active PRs for the same item. Resolve in order: 1) scheduler-provided `existing_pr`, 2) state-file PR fallback, 3) create exactly one PR if none exists.
 
 ### Pattern D — Improve → push → gate → accept
 
-Three-phase accept path: 1) metric/contract improvement check, 2) push and wait for CI/checks, 3) accept only on green. Avoids sandbox-only false positives.
+Three-phase accept path: 1) metric/contract improvement check, 2) push and wait for CI/checks, 3) accept only on green. Avoids sandbox-only false positives. On failure, discard the change but still record the run.
 
 ### Pattern E — CI fix loop with circuit breakers
 
-When CI fails after an improved change: collect failing jobs and error signatures, attempt bounded fix retries, stop on repeated identical signature, pause with structured reason (`ci-fix-exhausted`, `stuck`, `ci-timeout`).
+When CI fails after an improved change: collect failing jobs and error signatures, attempt bounded fix retries, stop on repeated identical signature, pause with structured reason (`ci-fix-exhausted`, `stuck`, `ci-timeout`). Do not retry forever.
 
 ### Pattern F — Structured state file
 
-Keep a stable state layout with: machine-state table (iteration count, last run, best metric, pause/completion fields), current focus/checkpoint, lessons learned, foreclosed avenues/blockers, iteration history (newest first).
+Persist state as markdown in a dedicated repo-memory branch (`memory/autoloop`, `memory/goal`, `memory/crane`), machine-readable and human-editable. Keep a stable layout with: machine-state table (iteration count, last run, best metric, pause/completion fields), current focus/checkpoint, lessons learned, foreclosed avenues/blockers, iteration history (newest first).
 
 ### Pattern G — Setup guard and safety rails
 
@@ -84,7 +60,7 @@ Completion requires explicit evidence gates. Goal enforces issue-defined complet
 
 ### Pattern J — Unified run reporting
 
-On every run (accepted/rejected/error/blocked): update durable status comment, append per-run summary comment, include run URL, checkpoint, evidence, result, next step. Creates an auditable run narrative.
+Each item has one canonical control-plane issue carrying a durable status comment sentinel (`<!-- ...:STATUS -->`), per-run log comments, and human steering directives. On every run (accepted/rejected/error/blocked): update the status comment, append a per-run summary comment, include run URL, checkpoint, evidence, result, next step. Creates an auditable run narrative.
 
 ## Comparative notes by project
 

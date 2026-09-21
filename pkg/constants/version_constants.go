@@ -39,7 +39,12 @@ const DefaultClaudeCodeVersion Version = "2.1.273"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.85"
+//
+// NOTE: 1.0.85 was pinned back to 1.0.83 after reports that 1.0.85 returns an
+// instant HTTP 400 ("Bad Request") on the very first /responses request for some
+// workflow shapes (see github/gh-aw#62363). Do not bump past 1.0.83 until that
+// regression is confirmed fixed upstream.
+const DefaultCopilotVersion Version = "1.0.83"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.13"
