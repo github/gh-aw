@@ -422,6 +422,7 @@ func enclosingBlock(node ast.Node, parents map[ast.Node]ast.Node) (*ast.BlockStm
 
 // changedBefore reports whether values are written before node within block.
 // It returns true if the parent chain cannot be classified, preserving fail-closed analysis.
+// It intentionally considers only lexically preceding statements.
 func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, parents map[ast.Node]ast.Node, values ...ast.Expr) bool {
 	current := node
 	for {
@@ -452,7 +453,9 @@ func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Exp
 	objects := make(map[types.Object]struct{}, len(values))
 	for _, value := range values {
 		if ident, ok := astutil.UnwrapParenExpr(value).(*ast.Ident); ok {
-			objects[pass.TypesInfo.ObjectOf(ident)] = struct{}{}
+			if object := pass.TypesInfo.ObjectOf(ident); object != nil {
+				objects[object] = struct{}{}
+			}
 		}
 	}
 	for _, stmt := range statements {
