@@ -389,7 +389,7 @@ export default defineConfig({
             { label: "Repository Maintenance", link: "/gallery/maintaining-repos/" },
             { label: "CI Failure Investigation", link: "/gallery/ci-failure-investigation/" },
             { label: "Code Improvement", link: "/gallery/code-improvement/" },
-            { label: "Dependency Analysis", link: "/patterns/research-plan-assign-ops/" },
+            { label: "Dependency Analysis", link: "/gallery/dependency-analysis/" },
             { label: "Metrics and Analytics", link: "/gallery/metrics-analytics/" },
             { label: "Repository Reporting", link: "/gallery/ai-release-notes/" },
             { label: "Security Review", link: "/gallery/security-review/" },

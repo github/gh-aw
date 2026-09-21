@@ -304,6 +304,41 @@ describe("parse_pi_log.cjs", () => {
       expect(toolResult.message.content[0].is_error).toBe(true);
       expect(toolResult.message.content[0].content).toContain("boom");
     });
+
+    it("surfaces a provider-level errorMessage from an empty-content turn_end (e.g. model_not_supported)", () => {
+      // Reproduces a real failed run: the provider request itself fails (HTTP 400), so
+      // turn_end carries content: [] with no assistant text or tool calls — the only trace
+      // of the failure is the top-level errorMessage on the turn_end message.
+      const failedTurnLines = [
+        { type: "session", version: 3, id: "s1" },
+        { type: "agent_start" },
+        { type: "turn_start" },
+        {
+          type: "turn_end",
+          message: {
+            role: "assistant",
+            model: "auto",
+            content: [],
+            stopReason: "error",
+            usage: { input: 0, output: 0 },
+            errorMessage: '400: {"message":"The requested model is not supported.","code":"model_not_supported","param":"model","type":"invalid_request_error"}',
+          },
+          toolResults: [],
+        },
+        { type: "agent_end", messages: [], willRetry: false },
+        { type: "agent_settled" },
+      ];
+      const failedLog = failedTurnLines.map(l => JSON.stringify(l)).join("\n");
+
+      const stats = computePiV3Stats(failedTurnLines);
+      expect(stats.errors).toEqual([expect.stringContaining("model_not_supported")]);
+
+      const result = parsePiLog(failedLog);
+      expect(result.markdown).toContain("model_not_supported");
+
+      const resultEntry = result.logEntries.find(e => e.type === "result");
+      expect(resultEntry.errors).toEqual([expect.stringContaining("model_not_supported")]);
+    });
   });
 
   describe("normalizePiToolName", () => {
