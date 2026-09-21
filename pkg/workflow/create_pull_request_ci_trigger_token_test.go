@@ -322,6 +322,7 @@ func TestCITriggerTokenCreatePullRequestPrecedence(t *testing.T) {
 			create:   "${{ secrets.CREATE_TOKEN }}",
 			push:     "none",
 			expected: "${{ secrets.CREATE_TOKEN }}",
+			disabled: false,
 		},
 	}
 
