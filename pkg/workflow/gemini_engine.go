@@ -136,7 +136,7 @@ func (e *GeminiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 		"gemini",
 		workflowData,
 	)
-	return buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, false)
+	return BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
 }
 
 // GetDeclaredOutputFiles returns the output files that Gemini may produce.

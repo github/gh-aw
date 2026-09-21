@@ -128,7 +128,7 @@ func buildStandardNpmEngineInstallSteps(
 // Returns:
 //   - []GitHubActionStep: Steps in order: Node.js setup, AWF (if enabled), CLI install
 func BuildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData *WorkflowData) []GitHubActionStep {
-	return buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, true)
+	return buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, false)
 }
 
 func buildNpmEngineInstallStepsWithAWF(npmSteps []GitHubActionStep, workflowData *WorkflowData, stageCopilotCLI bool) []GitHubActionStep {
