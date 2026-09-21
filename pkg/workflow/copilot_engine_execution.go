@@ -416,7 +416,7 @@ func (e *CopilotEngine) buildCopilotExecPrefix(workflowData *WorkflowData, comma
 	runtimeResolutionCommand := nodeRuntimeResolutionCommand
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.CopilotSDK {
 		runtimeResolutionCommand = nodeRuntimeResolutionCommandForCopilotSDK
-		if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+		if hasToolProfile(workflowData, copilotGoRepositoryToolProfile) {
 			runtimeResolutionCommand = nodeRuntimeResolutionCommandForGoRepository
 		}
 		return e.buildCopilotSDKExecPrefix(workflowData, commandName, harnessScriptPath, runtimeResolutionCommand)
@@ -679,7 +679,10 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 	if !hasGitHubTool(workflowData.ParsedTools) {
 		return
 	}
-	githubToolConfig, _ := workflowData.Tools["github"].(map[string]any)
+	githubToolConfig, ok := workflowData.Tools["github"].(map[string]any)
+	if !ok {
+		githubToolConfig = nil
+	}
 	customGitHubToken := getGitHubToken(githubToolConfig)
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil && workflowData.ParsedTools.GitHub.GitHubApp != nil {
 		tokenExpression := "${{ steps.github-mcp-app-token.outputs.token }}"
@@ -742,7 +745,7 @@ func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData
 	env[constants.CopilotSDKDriverEnvVar] = "1"
 	env[constants.CopilotSDKServerArgsEnvVar] = copilotSDKServerArgsJSON
 	env[constants.CopilotSDKToolConfigEnvVar] = copilotSDKToolConfigJSON
-	if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+	if hasToolProfile(workflowData, copilotGoRepositoryToolProfile) {
 		configJSON, bindings, err := buildGoRepositoryToolConfigRuntimeData(copilotSDKToolConfigJSON)
 		if err != nil {
 			panic(fmt.Sprintf("BUG: invalid validated Go repository SDK tool config: %v", err))

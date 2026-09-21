@@ -68,6 +68,12 @@ func TestMergeTools(t *testing.T) {
 			},
 		},
 		{
+			name:       "merge tool profiles from string and array",
+			base:       map[string]any{"profile": "go"},
+			additional: map[string]any{"profile": []any{"go"}},
+			expected:   map[string]any{"profile": []any{"go"}},
+		},
+		{
 			name: "merge neutral tools with maps (no Claude-specific logic)",
 			base: map[string]any{
 				"github": map[string]any{
@@ -327,6 +333,16 @@ func TestMergeTools(t *testing.T) {
 				t.Errorf("MergeTools() = %s, want %s", string(resultJSON), string(expectedJSON))
 			}
 		})
+	}
+}
+
+func TestMergeToolsRejectsInvalidProfileType(t *testing.T) {
+	_, err := MergeTools(
+		map[string]any{"profile": "go"},
+		map[string]any{"profile": true},
+	)
+	if err == nil {
+		t.Fatal("MergeTools() must reject an invalid imported profile type")
 	}
 }
 

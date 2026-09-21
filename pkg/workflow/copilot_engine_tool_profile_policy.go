@@ -17,14 +17,14 @@ const goRepositoryDefaultBranchEnv = "GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRAN
 
 func projectGoRepositoryPolicy(data *WorkflowData) (map[string]any, error) {
 	if data == nil || data.SafeOutputs == nil || data.SafeOutputs.CreatePullRequests == nil {
-		return nil, errors.New("engine.tool-profile: go-repository requires safe-outputs.create-pull-request")
+		return nil, errors.New("tools.profile: go requires safe-outputs.create-pull-request")
 	}
 	handlers := make(map[string]any)
 	// Project before generateSafeOutputsConfig neutralizes later-job expressions.
 	addStandardHandlerConfigs(handlers, data)
 	pr, ok := handlers["create_pull_request"].(map[string]any)
 	if !ok {
-		return nil, errors.New("engine.tool-profile: go-repository could not derive the create_pull_request policy")
+		return nil, errors.New("tools.profile: go could not derive the create_pull_request policy")
 	}
 	policy := make(map[string]any)
 	for _, field := range []string{
@@ -42,8 +42,10 @@ func projectGoRepositoryPolicy(data *WorkflowData) (map[string]any, error) {
 	return policy, nil
 }
 
+const copilotGoRepositoryRuntimeProfileID = "go-repository"
+
 func addGoRepositoryToolProfile(config *copilotSDKToolConfig, data *WorkflowData) {
-	if engineToolProfile(data) != copilotGoRepositoryToolProfile {
+	if !hasToolProfile(data, copilotGoRepositoryToolProfile) {
 		return
 	}
 	policy, err := projectGoRepositoryPolicy(data)
@@ -52,7 +54,7 @@ func addGoRepositoryToolProfile(config *copilotSDKToolConfig, data *WorkflowData
 	}
 	config.Version = 2
 	config.Profile = &copilotSDKToolProfile{
-		ID:                      copilotGoRepositoryToolProfile,
+		ID:                      copilotGoRepositoryRuntimeProfileID,
 		RepositoryDefaultBranch: goRepositoryDefaultBranchExpression,
 		Policy:                  policy,
 	}

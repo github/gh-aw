@@ -199,7 +199,7 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return GitHubActionStep{}
 	}
-	if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+	if hasToolProfile(workflowData, copilotGoRepositoryToolProfile) {
 		spec := getCopilotSDKInstallSpec("")
 		spec.runLines = []string{
 			`: "${RUNNER_TEMP:?RUNNER_TEMP is required for the SDK repository profile}"`,

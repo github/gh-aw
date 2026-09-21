@@ -20,7 +20,7 @@ var goRepositoryPolicyDotPattern = regexp.MustCompile(`\s*\.\s*`)
 func validateGoRepositoryPolicyExpressions(policy map[string]any) error {
 	for _, field := range sliceutil.SortedKeys(policy) {
 		if err := visitGoRepositoryPolicyStrings(policy[field], validateGoRepositoryPolicyString); err != nil {
-			return fmt.Errorf("engine.tool-profile: go-repository policy %s: %w", field, err)
+			return fmt.Errorf("tools.profile: go policy %s: %w", field, err)
 		}
 	}
 	return nil
