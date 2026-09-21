@@ -504,6 +504,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 		result.ReportFailureAsIssueCategories = importedConfig.ReportFailureAsIssueCategories
 		result.ReportFailureAsIssueExcludedCategories = importedConfig.ReportFailureAsIssueExcludedCategories
 	}
+	if result.ReportFailedJobs == nil && importedConfig.ReportFailedJobs != nil {
+		result.ReportFailedJobs = importedConfig.ReportFailedJobs
+	}
 	if result.FailureIssueRepo == "" && importedConfig.FailureIssueRepo != "" {
 		result.FailureIssueRepo = importedConfig.FailureIssueRepo
 	}
