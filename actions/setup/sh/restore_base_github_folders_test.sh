@@ -228,6 +228,8 @@ git -C "${TEST_WORKSPACE}" init -q
 mkdir -p "${TEST_WORKSPACE}/.claude/skills/evil"
 echo "evil skill" >"${TEST_WORKSPACE}/.claude/skills/evil/SKILL.md"
 git -C "${TEST_WORKSPACE}" add -A -f >/dev/null 2>&1
+# A corrupt index still lets `git rev-parse --is-inside-work-tree` succeed, so the
+# script enters the git-tracking path and only `git ls-files` fails.
 printf 'not an index' >"${TEST_WORKSPACE}/.git/index"
 
 EXIT_CODE=0
