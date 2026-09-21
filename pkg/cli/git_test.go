@@ -48,6 +48,21 @@ func TestIsSafeGitRevisionArg(t *testing.T) {
 	}
 }
 
+func TestBranchOperationsRejectUnsafeRevisionArgs(t *testing.T) {
+	t.Parallel()
+
+	for name, operation := range map[string]func(string, bool) error{
+		"create and switch": createAndSwitchBranch,
+		"switch":            switchBranch,
+		"push":              pushBranch,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.ErrorContains(t, operation("--upload-pack=evil", false), "unsafe branch name")
+		})
+	}
+}
+
 func TestValidateRelPathForGit(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

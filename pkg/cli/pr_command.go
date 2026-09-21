@@ -277,6 +277,9 @@ func checkoutUpdatedDefaultBranch(targetOwner, targetRepo string, verbose bool) 
 		return fmt.Errorf("could not get default branch; ensure required prerequisites are configured, then retry: %w", err)
 	}
 	defaultBranch := strings.TrimSpace(string(defaultBranchOutput))
+	if !isSafeGitRevisionArg(defaultBranch) {
+		return fmt.Errorf("unsafe default branch name %q", defaultBranch)
+	}
 
 	// Ensure we're on the latest version of the default branch
 	if verbose {
