@@ -47,7 +47,7 @@ func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 		if line == "" {
 			continue
 		}
-		if line == "\n" {
+		if strings.TrimSpace(line) == "" {
 			yaml.WriteByte('\n')
 			outputEndsWithNewline = true
 			continue
@@ -245,6 +245,8 @@ func (e *CodexEngine) getOpenAIProxyProviderBaseURL(workflowData *WorkflowData) 
 }
 
 func (e *CodexEngine) renderAppendConvertedConfigWithoutOpenAIProxy(yaml *strings.Builder) {
+	// The run-block indent is stripped by YAML; the extra two spaces remain in
+	// the shell string as harmless indentation inside the awk program.
 	awkBodyIndent := codexRunBlockIndent + "  "
 	yaml.WriteString(codexRunBlockIndent + "awk '\n")
 	yaml.WriteString(awkBodyIndent + "BEGIN { skip_openai_proxy = 0 }\n")
