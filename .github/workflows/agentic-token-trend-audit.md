@@ -31,9 +31,6 @@ safe-outputs:
   upload-asset:
     max: 5
     allowed-exts: [.png, .jpg, .jpeg, .svg]
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   agentic-workflows:
   bash:

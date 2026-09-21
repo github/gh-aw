@@ -103,7 +103,6 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 evals:
   - id: files_analyzed
     question: Did the agent analyze compiler code files for quality standards such as readability and maintainability?

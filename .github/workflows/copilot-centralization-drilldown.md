@@ -160,9 +160,6 @@ steps:
             report_style: "Use issue sections with visible summary and one fenced draft block."
           }
         ' > /tmp/gh-aw/data/derived-plan.json
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: candidate_expanded
     question: Did the agent expand a centralization candidate into a concrete draft workflow or reusable prompt template?

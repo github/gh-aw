@@ -27,9 +27,6 @@ imports:
       assignees: [copilot]
   - shared/otlp.md
   - shared/graders.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   bash:

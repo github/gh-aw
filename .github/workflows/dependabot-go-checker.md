@@ -76,9 +76,6 @@ evals:
     question: Was an issue created for dependency updates, or was noop used when no actionable updates were found?
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 engine:
   id: codex
   model-provider: openai

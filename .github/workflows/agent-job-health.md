@@ -55,7 +55,6 @@ evals:
     question: Did the agent check every schedule-triggered workflow's most recent run against its expected cadence and report any blind spots?
 sandbox:
   agent:
-    runtime: cloud-hypervisor
 
 ---
 

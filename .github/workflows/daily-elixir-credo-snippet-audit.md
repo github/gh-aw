@@ -44,7 +44,6 @@ imports:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 steps:
   - name: Install Credo tooling project
     run: |

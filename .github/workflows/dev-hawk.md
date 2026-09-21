@@ -55,9 +55,6 @@ evals:
     question: Does the agent output include specific insights about pull request status or CI results?
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Dev Hawk - Development Workflow Monitor

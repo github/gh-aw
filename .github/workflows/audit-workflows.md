@@ -58,9 +58,6 @@ imports:
   - shared/graders.md
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: workflow_runs_audited
     question: Did the agent audit agentic workflow runs from the last 24 hours?

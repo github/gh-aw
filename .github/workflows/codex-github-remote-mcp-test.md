@@ -25,7 +25,6 @@ features:
   gh-aw-detection: true
 sandbox:
   agent:
-    runtime: cloud-hypervisor
 
 ---
 

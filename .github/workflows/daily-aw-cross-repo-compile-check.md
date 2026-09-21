@@ -19,7 +19,6 @@ engine:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

@@ -63,9 +63,6 @@ evals:
   - id: tone_style_goal_met
     question: Does the agent output show that the objective for experiment tone_style was successfully completed?
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Typist - Go Type Consistency Analysis

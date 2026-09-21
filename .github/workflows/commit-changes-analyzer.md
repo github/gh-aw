@@ -46,9 +46,6 @@ evals:
     question: Did the agent analyze all repository changes since the specified commit and produce a comprehensive report?
   - id: discussion_created
     question: Was a discussion or report created summarizing the changes since the specified commit?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Commit Changes Analyzer

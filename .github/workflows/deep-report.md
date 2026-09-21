@@ -100,9 +100,6 @@ evals:
   - id: labels-applied
     question: Does the agent output confirm that the created issues include the expected labels (code-quality, automation, task-mining)?
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 ### DeepReport - Intelligence Gathering Agent

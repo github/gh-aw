@@ -94,9 +94,6 @@ evals:
     question: Did the agent review the glossary and identify gaps or stale entries relative to recent codebase changes?
   - id: pr_created_or_noop
     question: Was a pull request created with glossary updates, or was noop used when the glossary required no changes?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Glossary Maintainer

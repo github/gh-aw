@@ -69,9 +69,6 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: false
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Smoke Test: Cross-Repo Pull Request Update

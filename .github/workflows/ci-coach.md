@@ -62,9 +62,6 @@ experiments:
     issue: 32335
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: repair-or-optimization-path
     question: Did the workflow check validation-status first and then follow the correct repair or optimization path for this run?

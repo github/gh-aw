@@ -56,9 +56,6 @@ timeout-minutes: 20
 strict: true
 
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # jsweep - JavaScript Unbloater

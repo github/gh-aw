@@ -71,9 +71,6 @@ tools:
   cli-proxy: true
 
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Go Code Pattern Detector
