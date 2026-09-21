@@ -40,7 +40,8 @@ func addCodexPluginConfig(config string) string {
 
 // writeIndentedCodexConfig adds the YAML run-block indentation to each custom
 // config line. YAML block scalar parsing strips this common indentation before
-// the shell runs, so the heredoc receives the original TOML content.
+// the shell runs, so the heredoc receives the original TOML content. Lines that
+// contain only whitespace are normalized to empty lines.
 func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 	outputEndsWithNewline := false
 	for _, line := range strings.SplitAfter(config, "\n") {
@@ -110,7 +111,10 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		renderer := createRenderer(false) // isLast is always false in TOML format
 		switch toolName {
 		case "github":
-			githubTool, _ := expandedTools["github"].(map[string]any) //nolint:typeassertionokdiscarded // Preserve legacy nil fallback when config is absent or not a map.
+			githubTool, ok := expandedTools["github"].(map[string]any)
+			if !ok {
+				githubTool = map[string]any{}
+			}
 			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
 		case "agentic-workflows":
 			renderer.RenderAgenticWorkflowsMCP(&mcpConfigContent)
