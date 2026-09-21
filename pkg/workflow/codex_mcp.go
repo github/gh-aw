@@ -49,9 +49,11 @@ func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 			continue
 		}
 		if strings.TrimSpace(line) == "" {
-			yaml.WriteByte('\n')
-			outputEndsWithNewline = true
-			continue
+			if strings.HasSuffix(line, "\n") {
+				yaml.WriteByte('\n')
+				outputEndsWithNewline = true
+				continue
+			}
 		}
 		yaml.WriteString(codexRunBlockIndent)
 		yaml.WriteString(line)
@@ -113,7 +115,8 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		case "github":
 			githubTool, ok := expandedTools["github"].(map[string]any)
 			if !ok {
-				githubTool = map[string]any{}
+				// Preserve the legacy nil fallback when config is absent or not a map.
+				githubTool = nil
 			}
 			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
 		case "agentic-workflows":
@@ -253,14 +256,11 @@ func (e *CodexEngine) renderAppendConvertedConfigWithoutOpenAIProxy(yaml *string
 	// the shell string as harmless indentation inside the awk program.
 	awkBodyIndent := codexRunBlockIndent + "  "
 	yaml.WriteString(codexRunBlockIndent + "awk '\n")
-	yaml.WriteString(awkBodyIndent + "BEGIN { skip_openai_proxy = 0 }\n")
-	yaml.WriteString(awkBodyIndent)
-	yaml.WriteString("/^[[:space:]]*model_provider[[:space:]]*=/ { next }\n")
-	yaml.WriteString(awkBodyIndent)
-	yaml.WriteString("/^\\[model_providers\\.openai-proxy\\][[:space:]]*$/ { skip_openai_proxy = 1; next }\n")
-	yaml.WriteString(awkBodyIndent)
-	yaml.WriteString("/^\\[/ { skip_openai_proxy = 0 }\n")
-	yaml.WriteString(awkBodyIndent + "!skip_openai_proxy { print }\n")
+	fmt.Fprintf(yaml, "%sBEGIN { skip_openai_proxy = 0 }\n", awkBodyIndent)
+	fmt.Fprintf(yaml, "%s/^[[:space:]]*model_provider[[:space:]]*=/ { next }\n", awkBodyIndent)
+	fmt.Fprintf(yaml, "%s/^\\[model_providers\\.openai-proxy\\][[:space:]]*$/ { skip_openai_proxy = 1; next }\n", awkBodyIndent)
+	fmt.Fprintf(yaml, "%s/^\\[/ { skip_openai_proxy = 0 }\n", awkBodyIndent)
+	fmt.Fprintf(yaml, "%s!skip_openai_proxy { print }\n", awkBodyIndent)
 	yaml.WriteString(codexRunBlockIndent + "' \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" >> \"/tmp/gh-aw/mcp-config/config.toml\"\n")
 }
 
