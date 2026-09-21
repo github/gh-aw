@@ -715,8 +715,13 @@ async function main() {
   // pushes to the correct repository.
   execGitSync(["remote", "set-url", "origin", `https://${serverHost}/${targetRepo}.git`], { stdio: "pipe" });
 
-  const MAX_RETRIES = 3;
+  // Pushes to a memory branch are not serialised by a job-level concurrency group
+  // (GitHub Actions would cancel all but one pending job under fan-out), so the retry
+  // loop is what makes concurrent writers converge. Full-jitter exponential backoff
+  // spreads out the retries of many runs that finish at the same time.
+  const MAX_RETRIES = 10;
   const BASE_DELAY_MS = 1000;
+  const MAX_DELAY_MS = 20000;
   let currentBaseRef = baseRef;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -736,7 +741,8 @@ async function main() {
     } catch (error) {
       const errMsg = getErrorMessage(error);
       if (attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        const ceiling = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * Math.pow(2, attempt));
+        const delay = Math.floor(Math.random() * ceiling) + 1;
         core.warning(`Push failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${errMsg}`);
         await new Promise(resolve => setTimeout(resolve, delay));
 

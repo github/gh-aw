@@ -2304,9 +2304,6 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: write
-    concurrency:
-      group: "push-repo-memory-${{ github.repository }}|memory/session-insights"
-      cancel-in-progress: false
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:

@@ -1902,6 +1902,24 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       expect(scriptContent).toContain("BASE_DELAY_MS * Math.pow(2, attempt)");
     });
 
+    it("should retry at least 10 times with capped full-jitter backoff (regression guard)", () => {
+      const nodeFs = require("fs");
+      const nodePath = require("path");
+      const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+      const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+      // Concurrent writers converge through this retry loop (no concurrency group),
+      // so the attempt budget must stay high enough for realistic fan-out.
+      const maxRetriesMatch = scriptContent.match(/const MAX_RETRIES = (\d+);/);
+      expect(maxRetriesMatch).not.toBeNull();
+      expect(Number(maxRetriesMatch[1])).toBeGreaterThanOrEqual(10);
+
+      // Backoff must be capped and jittered so retries of many runs spread out.
+      expect(scriptContent).toContain("const MAX_DELAY_MS");
+      expect(scriptContent).toContain("Math.min(MAX_DELAY_MS, BASE_DELAY_MS * Math.pow(2, attempt))");
+      expect(scriptContent).toContain("Math.random() * ceiling");
+    });
+
     it("should surface a clear GH013 error message when signed-commit push is rejected (regression guard)", () => {
       const nodeFs = require("fs");
       const nodePath = require("path");

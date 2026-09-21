@@ -1402,80 +1402,16 @@ func TestRepoMemoryNonWikiPushNoAllowedRepos(t *testing.T) {
 		"Non-wiki push step should not set REPO_MEMORY_ALLOWED_REPOS")
 }
 
-// TestBuildPushRepoMemoryConcurrencyGroup verifies that the concurrency group key is scoped
-// to the actual branch targets, so workflows pushing to different memory branches do not
-// contend with each other.
-func TestBuildPushRepoMemoryConcurrencyGroup(t *testing.T) {
-	tests := []struct {
-		name     string
-		memories []RepoMemoryEntry
-		expected string
-	}{
-		{
-			name: "single memory uses branch name in key",
-			memories: []RepoMemoryEntry{
-				{ID: "default", BranchName: "memory/daily-news"},
-			},
-			expected: "push-repo-memory-${{ github.repository }}|memory/daily-news",
-		},
-		{
-			name: "multiple memories sorted for deterministic key",
-			memories: []RepoMemoryEntry{
-				{ID: "b", BranchName: "memory/workflow-b"},
-				{ID: "a", BranchName: "memory/workflow-a"},
-			},
-			expected: "push-repo-memory-${{ github.repository }}|memory/workflow-a|memory/workflow-b",
-		},
-		{
-			name: "non-default target repo is prefixed to branch",
-			memories: []RepoMemoryEntry{
-				{ID: "default", BranchName: "memory/shared", TargetRepo: "other-org/other-repo"},
-			},
-			expected: "push-repo-memory-${{ github.repository }}|other-org/other-repo:memory/shared",
-		},
-		{
-			name: "mix of default and custom target repos",
-			memories: []RepoMemoryEntry{
-				{ID: "local", BranchName: "memory/local"},
-				{ID: "remote", BranchName: "memory/remote", TargetRepo: "other-org/other-repo"},
-			},
-			expected: "push-repo-memory-${{ github.repository }}|memory/local|other-org/other-repo:memory/remote",
-		},
-		{
-			name: "branches with hyphens use pipe separator in key",
-			memories: []RepoMemoryEntry{
-				{ID: "a", BranchName: "memory/workflow-a"},
-				{ID: "b", BranchName: "memory/workflow-b"},
-			},
-			// This expectation documents the current use of "|" as the list separator in the key.
-			// If the concurrency key encoding changes (e.g., different delimiter or encoding scheme),
-			// update this test to match the new encoding strategy.
-			expected: "push-repo-memory-${{ github.repository }}|memory/workflow-a|memory/workflow-b",
-		},
-		{
-			name: "pipe in branch name is percent-encoded so the separator stays unambiguous",
-			memories: []RepoMemoryEntry{
-				{ID: "unusual", BranchName: "memory/foo|bar"},
-			},
-			expected: "push-repo-memory-${{ github.repository }}|memory/foo%7Cbar",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := buildPushRepoMemoryConcurrencyGroup(tt.memories)
-			assert.Equal(t, tt.expected, got, "Concurrency group key should match expected value")
-		})
-	}
-}
-
-// TestPushRepoMemoryJobConcurrencyKey verifies that buildPushRepoMemoryJob sets a concurrency
-// key scoped to the actual memory branch rather than a repo-wide key.
-func TestPushRepoMemoryJobConcurrencyKey(t *testing.T) {
+// TestPushRepoMemoryJobHasNoConcurrencyGroup verifies that the push_repo_memory job does not
+// declare a concurrency group. GitHub Actions only queues one pending job per group, so a
+// shared group silently cancels memory writes when many runs finish at once; the push script
+// converges with a compare-and-swap retry loop instead.
+func TestPushRepoMemoryJobHasNoConcurrencyGroup(t *testing.T) {
 	data := &WorkflowData{
 		RepoMemoryConfig: &RepoMemoryConfig{
 			Memories: []RepoMemoryEntry{
 				{ID: "default", BranchName: "memory/my-workflow"},
+				{ID: "remote", BranchName: "memory/shared", TargetRepo: "other-org/other-repo"},
 			},
 		},
 	}
@@ -1485,11 +1421,7 @@ func TestPushRepoMemoryJobConcurrencyKey(t *testing.T) {
 	require.NoError(t, err, "Should build push job without error")
 	require.NotNil(t, pushJob, "Should produce a push job")
 
-	assert.Contains(t, pushJob.Concurrency, "memory/my-workflow",
-		"Concurrency key should include the memory branch name")
-	// Ensure the old repo-wide-only key is not used
-	assert.NotContains(t, pushJob.Concurrency, "push-repo-memory-${{ github.repository }}\"",
-		"Concurrency key should not be the old repo-wide-only key format")
+	assert.Empty(t, pushJob.Concurrency, "push_repo_memory job should not set a concurrency group")
 }
 
 // TestPushRepoMemoryJobConditionGatesOnAgentNotSkipped verifies that the push_repo_memory
