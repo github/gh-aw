@@ -60,9 +60,6 @@ evals:
 
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 engine:
   id: codex
   model-provider: openai

@@ -80,7 +80,6 @@ evals:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 ---
 
 # Smoke Test: Gemini Engine Validation

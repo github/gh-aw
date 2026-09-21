@@ -90,7 +90,6 @@ jobs:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 ---
 
 # Update Astro

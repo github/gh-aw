@@ -151,9 +151,6 @@ safe-outputs:
   noop:
 imports:
   - shared/reporting.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Sighthound Security Scan Triage

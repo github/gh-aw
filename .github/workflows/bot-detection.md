@@ -17,9 +17,6 @@ imports:
   - shared/otlp.md
   - shared/reporting.md
   - shared/graders.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

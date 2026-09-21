@@ -189,7 +189,6 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 models:
   default-ai-credits-pricing:
     input: 0.000001

@@ -36,9 +36,6 @@ imports:
   - shared/reporting.md
 
   - shared/otlp.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 engine:
   id: codex
   model-provider: github

@@ -35,7 +35,6 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   agentic-workflows: true
   bash: true

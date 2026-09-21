@@ -85,9 +85,6 @@ safe-outputs:
 timeout-minutes: 20
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: cli_inspected
     question: Did the agent inspect the gh-aw CLI commands and analyze their output for inconsistencies, typos, or documentation gaps?

@@ -64,9 +64,6 @@ evals:
     question: Does the agent output confirm that category, risk, and action data were determined for each processed PR?
   - id: report-produced
     question: Does the agent output include a triage report summarizing the PRs processed?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # PR Triage Agent

@@ -110,9 +110,6 @@ safe-outputs:
     labels: [cookie]
     max: 1
 timeout-minutes: 20
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 engine:
   id: codex
   model-provider: github

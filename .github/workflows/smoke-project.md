@@ -99,9 +99,6 @@ evals:
   - id: prompt_style_test_goal_met
     question: Does the agent output show that the objective for experiment prompt_style_test was successfully completed?
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Smoke Test: Project Operations Validation

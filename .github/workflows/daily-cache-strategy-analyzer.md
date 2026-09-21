@@ -41,7 +41,6 @@ network:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   cache-memory: true
   cli-proxy: true

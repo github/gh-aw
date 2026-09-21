@@ -64,9 +64,6 @@ evals:
   - id: issue-actions-completed
     question: Were the planned sub-issues created successfully, with discussion closure handled correctly when required?
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Planning Assistant

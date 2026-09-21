@@ -9,18 +9,14 @@ Playwright enables headless browser control for accessibility testing, visual re
 
 ## Configuration
 
-The built-in Playwright tool is CLI-only by default. It is token-efficient because it does not load MCP tool schemas into the agent context, avoids Docker overhead, and reaches local development servers through `localhost`. If an older workflow still sets `mode: cli`, it continues to work for compatibility, but omitting `mode` is preferred.
+The built-in Playwright tool is CLI-only. It is token-efficient because it skips MCP tool schemas, avoids Docker overhead, and can reach local development servers through `localhost`. Older workflows may still set `mode: cli`, but omitting `mode` is preferred.
 
 ```yaml wrap
 tools:
   playwright:
 ```
 
-The compiler installs `@playwright/cli` as a global npm package, its skills, and
-Chromium before the agent runs. The default `open` browser is Chromium. Select
-additional browsers with `browsers`. Playwright's `chromium` download is the
-Chrome for Testing distribution; `chrome` and `chrome-for-testing` are accepted
-aliases:
+Before the agent runs, the compiler installs `@playwright/cli`, its skills, and Chromium. Use `browsers` to provision additional browsers:
 
 ```yaml wrap
 tools:
@@ -28,11 +24,9 @@ tools:
     browsers: [chrome, firefox]
 ```
 
-The supported values are `chrome`, `chrome-for-testing`, `chromium`, `firefox`,
-and `webkit`.
-Requested browsers are downloaded with retries before the agent starts; package
-and browser installation during agent execution is prohibited. The agent
-invokes `playwright-cli <command>` from bash:
+Supported values are `chrome`, `chrome-for-testing`, `chromium`, `firefox`, and `webkit`. `chromium` downloads the Chrome for Testing distribution, and `chrome` and `chrome-for-testing` are accepted aliases. Browser downloads happen before the agent starts, with retries; runtime package or browser installation is not allowed.
+
+The agent runs Playwright through `playwright-cli <command>` from bash:
 
 ```bash wrap
 playwright-cli open "https://example.com"
@@ -58,9 +52,7 @@ tools:
 
 ### Network Access
 
-Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. Playwright can reach `localhost` and `127.0.0.1` by default. A local server
-started in the same AWF sandbox does not require `network.allowed: local`. Use
-ecosystem identifiers and explicit external domains together:
+Domain access is controlled by the top-level [`network:`](/gh-aw/reference/network/) field. Playwright can always reach `localhost` and `127.0.0.1`, so a local server started in the same AWF sandbox does not require `network.allowed: local`. Combine ecosystem identifiers with explicit external domains as needed:
 
 ```yaml wrap
 network:
@@ -86,8 +78,7 @@ installation or navigating to arbitrary example domains.
 
 ### Browser Support and Sessions
 
-Chromium is the default. Use Firefox or WebKit with `--browser` when selected
-for provisioning:
+Chromium is the default. When Firefox or WebKit has been provisioned, select it with `--browser`:
 
 ```bash wrap
 playwright-cli open "https://example.com"                  # Chromium
@@ -97,13 +88,11 @@ playwright-cli -s=firefox close
 playwright-cli -s=webkit close
 ```
 
-Named sessions (`-s=<name>`) keep cookies and storage isolated, which is useful
-for comparing authenticated and anonymous flows.
+Named sessions (`-s=<name>`) isolate cookies and storage, which helps when comparing authenticated and anonymous flows.
 
 ### Publishing Screenshots
 
-Files under `/tmp` are ephemeral. To let users retrieve a screenshot, configure
-an artifact safe output and have the agent publish the file:
+Files under `/tmp` are ephemeral. To let users retrieve a screenshot, configure an artifact safe output and have the agent publish the file:
 
 ```aw wrap
 ---
@@ -120,8 +109,7 @@ Capture `/tmp/home.png`, then call `upload_artifact` with
 
 ## Migrate from Playwright MCP
 
-Remove `mode: mcp`. The built-in integration is CLI-only, so no replacement
-`mode` field is needed. The compiler now reports `mode: mcp` as an error.
+Remove `mode: mcp`. The built-in integration is CLI-only, so no replacement `mode` field is needed, and the compiler now reports `mode: mcp` as an error.
 
 Replace MCP tool calls in prompts with equivalent `playwright-cli` commands run through bash:
 
@@ -133,11 +121,11 @@ Replace MCP tool calls in prompts with equivalent `playwright-cli` commands run 
 | `browser_click` | `playwright-cli click <ref>` |
 | `browser_evaluate` | `playwright-cli eval "() => document.title"` |
 
-Use `localhost` directly for development servers because Playwright CLI runs on the runner. Remove Playwright MCP container arguments and MCP-specific tool names such as `mcp__playwright__browser_navigate` from prompts and engine allowlists.
+Use `localhost` directly for development servers because Playwright CLI runs on the runner. Also remove Playwright MCP container arguments and MCP-specific tool names such as `mcp__playwright__browser_navigate` from prompts and engine allowlists.
 
-## What if you really want to use MCP?
+## What if you still want MCP?
 
-The built-in tool no longer manages Playwright MCP. Configure it as a custom server under `mcp-servers` and select the package version explicitly:
+The built-in tool no longer manages Playwright MCP. Configure it as a custom server under `mcp-servers` and pin the package version explicitly:
 
 ```aw wrap
 ---
@@ -161,7 +149,7 @@ network:
 ---
 ```
 
-Custom MCP servers are not covered by the built-in Playwright compatibility or version tracking. Pin and update the package deliberately, restrict `allowed` to the required tools, and follow the [custom MCP server guidance](/gh-aw/guides/mcps/#manually-configuring-a-custom-mcp-server).
+Custom MCP servers are outside the built-in Playwright compatibility and version tracking. Pin and update the package deliberately, restrict `allowed` to the tools you need, and follow the [custom MCP server guidance](/gh-aw/guides/mcps/#manually-configuring-a-custom-mcp-server).
 
 ## Common Use Cases
 
@@ -260,14 +248,9 @@ safe-outputs:
 
 # Visual Regression Check
 
-The dev server is running at http://localhost:4321/. Check for visual regressions
-on the home, getting-started, and reference pages across three viewports:
+The dev server is running at http://localhost:4321/. Check the home, getting-started, and reference pages for visual regressions at three viewports: mobile (375×812), tablet (768×1024), and desktop (1440×900).
 
-- Mobile: 375×812
-- Tablet: 768×1024
-- Desktop: 1440×900
-
-For each viewport, resize and screenshot:
+For each viewport, resize and capture a screenshot:
 
 ```bash
 playwright-cli open "http://localhost:4321/"
@@ -301,9 +284,7 @@ permissions:
 
 # E2E Testing
 
-Start the dev server on localhost:3000, then drive a full user journey with
-`playwright-cli open "http://localhost:3000"`. Report any failures with
-screenshots.
+Start the dev server on localhost:3000, then drive a full user journey with `playwright-cli open "http://localhost:3000"`. Report failures with screenshots.
 ```
 
 ## Learn More

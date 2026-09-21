@@ -33,7 +33,6 @@ timeout-minutes: 30
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 imports:
   - shared/otlp.md
 evals:

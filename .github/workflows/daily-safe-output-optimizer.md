@@ -15,7 +15,6 @@ permissions:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 engine:
   id: claude

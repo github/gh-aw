@@ -23,9 +23,6 @@ engine:
 model: openai/gpt-5.3-codex
 strict: false
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Example: Properly Provisioned Permissions

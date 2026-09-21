@@ -30,9 +30,6 @@ safe-outputs:
     category: "artifacts"
     max: 1
 timeout-minutes: 15
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Python Data Visualization Generator

@@ -141,7 +141,6 @@ steps:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 features:
   gh-aw-detection: true
 ---

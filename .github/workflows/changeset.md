@@ -56,9 +56,6 @@ imports:
 
   - shared/otlp.md
   - shared/graders.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: changeset-created
     question: Did the agent create a valid changeset file for the labeled pull request?

@@ -32,9 +32,6 @@ experiments:
     start_date: "2026-06-30"
     issue: 42467
 tracker-id: breaking-change-checker
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

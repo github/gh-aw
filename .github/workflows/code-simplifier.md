@@ -38,9 +38,6 @@ network:
   allowed:
     - go
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

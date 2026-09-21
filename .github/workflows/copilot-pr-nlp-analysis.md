@@ -29,7 +29,6 @@ network:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 imports:
   - uses: shared/daily-audit-base.md

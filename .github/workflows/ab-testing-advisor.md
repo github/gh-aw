@@ -52,9 +52,6 @@ tools:
 tracker-id: ab-testing-advisor
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: experiment_issue_created
     question: Did the agent create a GitHub issue with an A/B experiment campaign for a selected workflow?

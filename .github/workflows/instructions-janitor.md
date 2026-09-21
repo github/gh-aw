@@ -51,9 +51,6 @@ tools:
     mode: local
     toolsets:
     - default
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Instructions Janitor

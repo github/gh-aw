@@ -59,9 +59,6 @@ safe-outputs:
 timeout-minutes: 50
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: alerts_analyzed
     question: Did the agent analyze code scanning alerts and identify at least one fixable alert, or correctly skip when no fixable alerts were found?

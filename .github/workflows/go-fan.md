@@ -48,9 +48,6 @@ tools:
     toolsets:
     - default
 tracker-id: go-fan-daily
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Go Fan 🐹 - Daily Go Module Reviewer

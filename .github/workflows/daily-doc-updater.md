@@ -61,7 +61,6 @@ timeout-minutes: 45
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   bash:
   - "*"
