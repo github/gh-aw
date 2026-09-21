@@ -418,7 +418,7 @@ function computePiV3Stats(rawEntries) {
 /**
  * Extracts stats from a legacy Pi `result` event, preserving the original flat-schema behavior.
  * @param {Array<any>} rawEntries - Raw parsed JSONL entries
- * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number}|null} Stats or null when absent
+ * @returns {{input_tokens:number, output_tokens:number, turns:number, duration_ms:number, errors:Array<string>}|null} Stats or null when absent
  */
 function legacyPiStats(rawEntries) {
   const resultEntry = rawEntries.find(e => e.type === "result");
@@ -431,6 +431,7 @@ function legacyPiStats(rawEntries) {
     output_tokens: stats.output_tokens || 0,
     turns: stats.turns || 0,
     duration_ms: stats.duration_ms || 0,
+    errors: [],
   };
 }
 
