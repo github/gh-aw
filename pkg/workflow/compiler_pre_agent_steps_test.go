@@ -205,10 +205,6 @@ Shared APM-style steps.
 				t.Fatal(err)
 			}
 
-			tools := tc.tools
-			if tools != "" && !strings.HasSuffix(tools, "\n") {
-				tools += "\n"
-			}
 			mainContent := `---
 on:
   pull_request:
@@ -220,7 +216,7 @@ permissions:
 imports:
   - ./shared/apm.md
 engine: ` + tc.engine + `
-` + tools + `strict: false
+` + tc.tools + `strict: false
 ---
 
 Main workflow.
@@ -247,7 +243,11 @@ Main workflow.
 			if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
 				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
 			}
-			restoreStep := lockContent[restoreBaseIdx:]
+			restoreStepStart := strings.Index(lockContent, stepNamePrefix+baseRestoreStepName)
+			if restoreStepStart == -1 {
+				t.Fatal("Could not find base restore step")
+			}
+			restoreStep := lockContent[restoreStepStart:]
 			// Generated job steps use six spaces; stop at the next top-level step.
 			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
 				restoreStep = restoreStep[:nextStep]
