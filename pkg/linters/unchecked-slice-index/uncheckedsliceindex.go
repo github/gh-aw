@@ -227,7 +227,7 @@ func isInBoundedForLoop(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map
 			if ok && initializedToZero(pass, forStmt.Init, index) &&
 				increments(pass, forStmt.Post, index) &&
 				hasUpperBound(pass, forStmt.Cond, idxExpr) &&
-				!changedBefore(pass, forStmt.Body, idxExpr, parents, idxExpr.X, idxExpr.Index) {
+				!writesObjects(pass, forStmt.Body.List, idxExpr.X, idxExpr.Index) {
 				return true
 			}
 		}
@@ -284,6 +284,7 @@ func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upp
 		return false, false
 	}
 	if bin.Op == token.LOR {
+		// A disjunction does not establish either bound on every path.
 		return false, false
 	}
 	if bin.Op == token.LAND {
@@ -300,7 +301,8 @@ func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upp
 	if sameExpr(pass, bin.X, idxExpr.Index) && isZero(pass, bin.Y) && bin.Op == token.GEQ {
 		return false, true
 	}
-	if isLenOf(pass, bin.X, idxExpr.X) && isZero(pass, bin.Y) && bin.Op == token.GTR && isZero(pass, idxExpr.Index) {
+	if isLenOf(pass, bin.X, idxExpr.X) && isZero(pass, bin.Y) &&
+		(bin.Op == token.GTR || bin.Op == token.NEQ) && isZero(pass, idxExpr.Index) {
 		return true, true
 	}
 	return false, false
@@ -308,26 +310,29 @@ func boundFacts(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (upp
 
 // hasTerminatingGuardBefore reports whether a preceding invalid-bounds guard terminates.
 func hasTerminatingGuardBefore(pass *analysis.Pass, idxExpr *ast.IndexExpr, parents map[ast.Node]ast.Node) bool {
-	block, target := enclosingBlock(idxExpr, parents)
-	if block == nil {
-		return false
-	}
-	for i, stmt := range block.List {
-		if stmt != target {
-			continue
+	current := ast.Node(idxExpr)
+	for {
+		block, target := enclosingBlock(current, parents)
+		if block == nil {
+			return false
 		}
-		for j, prior := range block.List[:i] {
-			ifStmt, ok := prior.(*ast.IfStmt)
-			if !ok || !terminates(ifStmt.Body) || writesObjects(pass, block.List[j+1:i], idxExpr.X, idxExpr.Index) {
+		for i, stmt := range block.List {
+			if stmt != target {
 				continue
 			}
-			upper, lower := invalidBounds(pass, ifStmt.Cond, idxExpr)
-			if upper && lower {
-				return true
+			for j, prior := range block.List[:i] {
+				ifStmt, ok := prior.(*ast.IfStmt)
+				if !ok || !terminates(ifStmt.Body) || writesObjects(pass, block.List[j+1:i], idxExpr.X, idxExpr.Index) {
+					continue
+				}
+				upper, lower := invalidBounds(pass, ifStmt.Cond, idxExpr)
+				if upper && lower {
+					return true
+				}
 			}
 		}
+		current = block
 	}
-	return false
 }
 
 // invalidBounds reports bounds violations that make a terminating guard safe to pass.

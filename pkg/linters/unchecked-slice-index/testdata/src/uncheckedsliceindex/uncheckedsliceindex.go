@@ -54,6 +54,13 @@ func goodCheckedLenGreaterZero() {
 	}
 }
 
+func goodCheckedLenNotZero() {
+	arr := []int{1, 2, 3}
+	if len(arr) != 0 {
+		_ = arr[0]
+	}
+}
+
 func goodCheckedWithAnd() {
 	arr := []int{1, 2, 3}
 	idx := 0
@@ -231,4 +238,14 @@ func goodEarlyReturnWithSetup(arr []int, idx int) int {
 		return -1
 	}
 	return arr[idx]
+}
+
+func goodNestedEarlyReturnGuard(arr []int, idx int) int {
+	if idx < 0 || idx >= len(arr) {
+		return -1
+	}
+	if true {
+		return arr[idx]
+	}
+	return -1
 }
