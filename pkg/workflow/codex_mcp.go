@@ -37,6 +37,19 @@ func addCodexPluginConfig(config string) string {
 	return config
 }
 
+func writeIndentedCodexConfig(yaml *strings.Builder, config, indent string) {
+	for config != "" {
+		lineEnd := strings.IndexByte(config, '\n')
+		yaml.WriteString(indent)
+		if lineEnd == -1 {
+			yaml.WriteString(config)
+			return
+		}
+		yaml.WriteString(config[:lineEnd+1])
+		config = config[lineEnd+1:]
+	}
+}
+
 // RenderMCPConfig generates MCP server configuration for Codex
 func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error { //nolint:largefunc // Legacy Codex config rendering remains to be migrated.
 	if codexMCPLog.Enabled() {
@@ -86,7 +99,10 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		renderer := createRenderer(false) // isLast is always false in TOML format
 		switch toolName {
 		case "github":
-			githubTool, _ := expandedTools["github"].(map[string]any)
+			githubTool, ok := expandedTools["github"].(map[string]any)
+			if !ok {
+				githubTool = nil
+			}
 			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
 		case "agentic-workflows":
 			renderer.RenderAgenticWorkflowsMCP(&mcpConfigContent)
@@ -192,7 +208,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		yaml.WriteString("          \n")
 		yaml.WriteString("          # Append engine-level custom Codex config\n")
 		yaml.WriteString("          cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << " + customConfigDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy custom config rendering remains to be migrated.
-		yaml.WriteString(customConfig)
+		writeIndentedCodexConfig(yaml, customConfig, "          ")
 		if !strings.HasSuffix(customConfig, "\n") {
 			yaml.WriteString("\n")
 		}
