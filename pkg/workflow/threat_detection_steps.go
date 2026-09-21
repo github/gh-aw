@@ -223,6 +223,7 @@ const detectionFirewallLogsDir = constants.ThreatDetectionDir + "/sandbox/firewa
 // cap have nothing to observe for the detection phase (see gh-aw#54047/#54046).
 func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []string {
 	if !isFirewallEnabled(data) {
+		threatLog.Print("Firewall disabled, skipping detection firewall log copy step")
 		return nil
 	}
 
@@ -508,6 +509,7 @@ func (c *Compiler) buildCustomThreatDetectionSteps(steps []any) []string {
 			}
 		}
 	}
+	threatLog.Printf("Built %d custom threat detection step(s)", len(result))
 	return result
 }
 
@@ -530,6 +532,7 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
 	}
 	if isFirewallEnabled(data) {
+		threatLog.Print("Including firewall logs in detection log upload artifact")
 		steps = append(steps,
 			"            "+detectionFirewallLogsDir+"/logs/\n",
 			"            "+detectionFirewallLogsDir+"/audit/\n",
@@ -606,6 +609,7 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
+	threatLog.Printf("Installing threat-detect binary: version=%s, continueOnError=%t", version, continueOnError)
 
 	steps := []string{
 		"      - name: Install threat-detect binary\n",
