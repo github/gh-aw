@@ -464,7 +464,7 @@ func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
 
 // isCITriggerTokenDisabled reports whether the effective token uses the "none" sentinel.
 func isCITriggerTokenDisabled(safeOutputs *SafeOutputsConfig) bool {
-	return safeOutputs != nil && strings.EqualFold(strings.TrimSpace(getCITriggerTokenConfig(safeOutputs)), "none")
+	return strings.EqualFold(strings.TrimSpace(getCITriggerTokenConfig(safeOutputs)), "none")
 }
 
 // addSafeOutputTokenEnvVars appends token-related environment variables required by the
