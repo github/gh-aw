@@ -16,7 +16,7 @@ import (
 func TestCompileWorkflow_ArcDindStagesCopilotCLIOnlyForCopilot(t *testing.T) {
 	const copilotStagingStepName = "Copy Copilot CLI to daemon-visible path"
 
-	for _, test := range []struct {
+	for _, tc := range []struct {
 		engine    string
 		wantStage bool
 	}{
@@ -25,7 +25,7 @@ func TestCompileWorkflow_ArcDindStagesCopilotCLIOnlyForCopilot(t *testing.T) {
 		{engine: "pi"},
 		{engine: "copilot", wantStage: true},
 	} {
-		t.Run(test.engine, func(t *testing.T) {
+		t.Run(tc.engine, func(t *testing.T) {
 			workflow := fmt.Sprintf(`---
 on: workflow_dispatch
 engine: %s
@@ -37,14 +37,14 @@ network:
 ---
 
 # Test
-`, test.engine)
-			testFile := filepath.Join(testutil.TempDir(t, test.engine+"-arc-dind-test"), "test-workflow.md")
+`, tc.engine)
+			testFile := filepath.Join(testutil.TempDir(t, tc.engine+"-arc-dind-test"), "test-workflow.md")
 			if err := os.WriteFile(testFile, []byte(workflow), 0644); err != nil {
 				t.Fatal(err)
 			}
 
 			if err := NewCompiler().CompileWorkflow(testFile); err != nil {
-				t.Fatalf("compile %s workflow: %v", test.engine, err)
+				t.Fatalf("compile %s workflow: %v", tc.engine, err)
 			}
 
 			lockFile := stringutil.MarkdownToLockFile(testFile)
@@ -52,8 +52,8 @@ network:
 			if err != nil {
 				t.Fatalf("read lock file: %v", err)
 			}
-			if got := strings.Contains(string(lockContent), copilotStagingStepName); got != test.wantStage {
-				t.Fatalf("Copilot CLI staging = %v, want %v", got, test.wantStage)
+			if got := strings.Contains(string(lockContent), copilotStagingStepName); got != tc.wantStage {
+				t.Fatalf("Copilot CLI staging = %v, want %v", got, tc.wantStage)
 			}
 		})
 	}
