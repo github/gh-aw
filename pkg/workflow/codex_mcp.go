@@ -140,15 +140,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Config != "" {
 		mcpConfigContent.WriteString(codexRunBlockIndent + "\n")
 		mcpConfigContent.WriteString(codexRunBlockIndent + "# Custom configuration\n")
-		// Write the custom config line by line with proper indentation
-		configLines := strings.SplitSeq(workflowData.EngineConfig.Config, "\n")
-		for line := range configLines {
-			if strings.TrimSpace(line) != "" {
-				mcpConfigContent.WriteString(codexRunBlockIndent + line + "\n")
-			} else {
-				mcpConfigContent.WriteString(codexRunBlockIndent + "\n")
-			}
-		}
+		writeIndentedCodexConfig(&mcpConfigContent, workflowData.EngineConfig.Config)
 	}
 
 	// Derive the delimiter from the content so it is stable across builds.
@@ -253,12 +245,16 @@ func (e *CodexEngine) getOpenAIProxyProviderBaseURL(workflowData *WorkflowData) 
 }
 
 func (e *CodexEngine) renderAppendConvertedConfigWithoutOpenAIProxy(yaml *strings.Builder) {
+	awkBodyIndent := codexRunBlockIndent + "  "
 	yaml.WriteString(codexRunBlockIndent + "awk '\n")
-	yaml.WriteString("            BEGIN { skip_openai_proxy = 0 }\n")
-	yaml.WriteString("            /^[[:space:]]*model_provider[[:space:]]*=/ { next }\n")
-	yaml.WriteString("            /^\\[model_providers\\.openai-proxy\\][[:space:]]*$/ { skip_openai_proxy = 1; next }\n")
-	yaml.WriteString("            /^\\[/ { skip_openai_proxy = 0 }\n")
-	yaml.WriteString("            !skip_openai_proxy { print }\n")
+	yaml.WriteString(awkBodyIndent + "BEGIN { skip_openai_proxy = 0 }\n")
+	yaml.WriteString(awkBodyIndent)
+	yaml.WriteString("/^[[:space:]]*model_provider[[:space:]]*=/ { next }\n")
+	yaml.WriteString(awkBodyIndent)
+	yaml.WriteString("/^\\[model_providers\\.openai-proxy\\][[:space:]]*$/ { skip_openai_proxy = 1; next }\n")
+	yaml.WriteString(awkBodyIndent)
+	yaml.WriteString("/^\\[/ { skip_openai_proxy = 0 }\n")
+	yaml.WriteString(awkBodyIndent + "!skip_openai_proxy { print }\n")
 	yaml.WriteString(codexRunBlockIndent + "' \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" >> \"/tmp/gh-aw/mcp-config/config.toml\"\n")
 }
 
