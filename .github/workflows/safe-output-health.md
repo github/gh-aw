@@ -31,9 +31,6 @@ imports:
   - ../skills/jqschema/SKILL.md
 
   - shared/otlp.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Safe Output Health Monitor

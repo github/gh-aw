@@ -17,7 +17,6 @@ model: claude-sonnet-4.5
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

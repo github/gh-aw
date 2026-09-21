@@ -157,9 +157,6 @@ steps:
 
       echo "Static analysis tool output completeness check passed."
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Static Analysis Report

@@ -46,9 +46,6 @@ evals:
     question: Did the workflow review open draft pull requests and classify stale drafts according to the warning and cleanup policy?
   - id: warnings-or-closures-applied
     question: Were the expected labels, comments, and closures applied to stale draft pull requests when appropriate?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Draft PR Cleanup Agent 🧹

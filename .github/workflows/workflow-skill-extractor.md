@@ -102,9 +102,6 @@ tools:
   - python3 *
   - cat > /tmp/gh-aw/agent/*.py
   cli-proxy: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 # Workflow Skill Extractor
 

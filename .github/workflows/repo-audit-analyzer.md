@@ -51,9 +51,6 @@ evals:
     question: Does the agent output include at least one actionable recommendation for improving repository productivity using agentic workflows?
   - id: evidence-cited
     question: Does the agent output cite specific repository characteristics or existing workflows as evidence supporting its recommendations?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Repository Audit & Agentic Workflow Opportunity Analyzer

@@ -18,7 +18,6 @@ tracker-id: daily-evals-report
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
     memory: 4g
 features:
   gh-aw-detection: true

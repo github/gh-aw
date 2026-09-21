@@ -84,7 +84,6 @@ features:
   samples: true
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 ---
 

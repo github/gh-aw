@@ -116,7 +116,6 @@ jobs:
           retention-days: 7
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 steps:
   - name: Download VulnHunter bundle artifact

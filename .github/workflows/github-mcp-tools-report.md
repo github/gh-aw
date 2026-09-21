@@ -37,9 +37,6 @@ imports:
       title-prefix: "[mcp-tools-report] "
 
   - shared/otlp.md
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # GitHub MCP Remote Server Tools Report Generator

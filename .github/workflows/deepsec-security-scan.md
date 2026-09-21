@@ -36,9 +36,6 @@ network:
     - defaults
     - node
     - ai-gateway.vercel.sh
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   bash:
     - "*"

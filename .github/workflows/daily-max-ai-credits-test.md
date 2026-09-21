@@ -19,7 +19,6 @@ model: copilot/gpt-5.3-codex
 strict: true
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 timeout-minutes: 5
 network: {}

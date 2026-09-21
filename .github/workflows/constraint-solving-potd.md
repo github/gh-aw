@@ -40,9 +40,6 @@ evals:
     question: Does the agent output include a clear problem statement with constraints?
   - id: solution-provided
     question: Does the agent output include a solution or answer to the problem?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Constraint Solving — Problem of the Day

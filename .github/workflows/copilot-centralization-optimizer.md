@@ -8,9 +8,6 @@ on:
 permissions:
   contents: read
   copilot-requests: write
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   repo-memory:
     branch-name: memory/copilot-centralization-optimizer

@@ -38,9 +38,6 @@ safe-outputs:
     - "docs/src/assets/archivx/*.svg"
     max-patch-files: 1
     max-patch-size: 1024
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 skills:
 - SylphAI-Inc/skills/skills/glowmotion@490fda5de2427c496d34e914f68896c4c2818fac
 - cathrynlavery/diagram-design/skills/diagram-design@648c2a597839301e06df1e7434a08bde9f42eed3

@@ -38,9 +38,6 @@ evals:
     question: Did the agent analyze recent gh-aw project activity for the daily status report?
   - id: status_report_created
     question: Did the agent create a daily status report with relevant project updates?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 <!--

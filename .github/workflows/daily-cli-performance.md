@@ -81,7 +81,6 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 evals:
   - id: benchmarks_run
     question: Did the agent run CLI performance benchmarks and track performance trends?

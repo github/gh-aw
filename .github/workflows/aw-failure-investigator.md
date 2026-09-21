@@ -30,9 +30,6 @@ experiments:
     analysis_type: mann_whitney
     tags: [tone, output-quality, triage]
     issue: 36105
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

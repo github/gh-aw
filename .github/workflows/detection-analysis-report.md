@@ -40,9 +40,6 @@ evals:
     question: Did the agent analyze detection jobs for workflow misconfiguration and performance differences?
   - id: detection_report_created
     question: Did the agent create a report with evidence-backed detection findings or recommendations?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Detection Analysis Report
