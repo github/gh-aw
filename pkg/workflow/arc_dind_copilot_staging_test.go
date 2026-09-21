@@ -14,6 +14,8 @@ import (
 )
 
 func TestCompileWorkflow_ArcDindStagesCopilotCLIOnlyForCopilot(t *testing.T) {
+	const copilotStagingStepName = "Copy Copilot CLI to daemon-visible path"
+
 	for _, test := range []struct {
 		engine    string
 		wantStage bool
@@ -50,7 +52,7 @@ network:
 			if err != nil {
 				t.Fatalf("read lock file: %v", err)
 			}
-			if got := strings.Contains(string(lockContent), "Copy Copilot CLI to daemon-visible path"); got != test.wantStage {
+			if got := strings.Contains(string(lockContent), copilotStagingStepName); got != test.wantStage {
 				t.Fatalf("Copilot CLI staging = %v, want %v", got, test.wantStage)
 			}
 		})
@@ -85,7 +87,7 @@ network:
 				Firewall: &FirewallConfig{Enabled: true},
 			},
 		})
-		if strings.Contains(strings.Join(flattenSteps(steps), "\n"), "Copy Copilot CLI to daemon-visible path") {
+		if strings.Contains(strings.Join(flattenSteps(steps), "\n"), copilotStagingStepName) {
 			t.Fatal("behavior-defined workflow must not stage the Copilot CLI")
 		}
 	})
