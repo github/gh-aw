@@ -464,7 +464,7 @@ The top-level `max-runs:` field is a **deprecated** alias for `max-turns:` and i
 
 ### Turn Cache Miss Limit (`max-turn-cache-misses:`)
 
-Sets the maximum consecutive AWF cache misses allowed before the API proxy blocks further requests. The value maps to `apiProxy.maxCacheMisses`, must be a positive integer, and defaults to `5` when neither frontmatter nor the `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES` environment override provides a value.
+Sets the maximum consecutive AWF cache misses allowed before the API proxy blocks further requests. The value maps to `apiProxy.maxCacheMisses`, must be a positive integer, and defaults to `5` when neither frontmatter nor the `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES` environment override provides a value. The configured value also applies to the threat-detection job, which talks to the same LLM provider.
 
 ```yaml wrap
 max-turn-cache-misses: 5

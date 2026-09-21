@@ -87,6 +87,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}
+	// The cache-miss guardrail is inherited from the workflow so the detection job's AWF
+	// API proxy enforces the same limit as the agent job instead of always falling back
+	// to the compile-time default.
+	inheritDetectionTurnCacheMisses(data, detectionEngineConfig)
 	// Threat detection is a bounded scan of already-completed agent output, not the
 	// primary task. If the harness policy was not explicitly configured (via
 	// engine.harness or threat-detection.engine.harness), default to zero retries so a
