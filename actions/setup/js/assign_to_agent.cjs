@@ -269,7 +269,8 @@ async function main(config = {}) {
     const customInstructions = defaultCustomInstructions || null;
 
     // Validate that both issue_number and pull_number are not specified simultaneously
-    if (message.issue_number != null && message.pull_number != null) {
+    // (only relevant when the model-provided identifiers are actually used, i.e. target: "*")
+    if (targetConfig === "*" && message.issue_number != null && message.pull_number != null) {
       const error = "Cannot specify both issue_number and pull_number in the same assign_to_agent item";
       core.error(error);
       allResults.push({ issue_number: message.issue_number, pull_number: message.pull_number, agent: agentName, owner: null, repo: null, success: false, error });

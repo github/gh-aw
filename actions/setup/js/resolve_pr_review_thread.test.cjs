@@ -128,6 +128,41 @@ describe("resolve_pr_review_thread", () => {
     expect(result.error).toContain("triggering PR #42");
   });
 
+  it("should resolve the triggering PR from a forwarded workflow_dispatch aw_context invocation", async () => {
+    // Thread belongs to PR #42, and the run was forwarded via workflow_dispatch with
+    // aw_context describing PR #42 as the triggering item, rather than context.payload.pull_request.
+    mockGraphqlForThread(42);
+
+    global.context = {
+      ...mockContext,
+      eventName: "workflow_dispatch",
+      payload: {
+        inputs: {
+          aw_context: JSON.stringify({
+            event_type: "issue_comment",
+            item_type: "pull_request",
+            item_number: "42",
+            repo: "test-owner/test-repo",
+          }),
+        },
+      },
+    };
+
+    const { main } = require("./resolve_pr_review_thread.cjs");
+    const freshHandler = await main({ max: 10 });
+
+    const message = {
+      type: "resolve_pull_request_review_thread",
+      thread_id: "PRRT_kwDOForwardedThread",
+    };
+
+    const result = await freshHandler(message, {});
+
+    global.context = mockContext;
+
+    expect(result.success).toBe(true);
+  });
+
   it("should succeed as a no-op when thread is not found (stale or already resolved)", async () => {
     mockGraphql.mockImplementation(query => {
       if (query.includes("resolveReviewThread")) {

@@ -63,7 +63,8 @@ const main = createCountGatedHandler({
         item: unassignItem,
         context,
         itemType: HANDLER_TYPE,
-        supportsIssue: true,
+        // supportsPR=true means both issues and PRs in resolveTarget().
+        supportsPR: true,
       });
       if (!targetResult.success) {
         core.warning(`Skipping unassign_from_user: ${targetResult.error}`);

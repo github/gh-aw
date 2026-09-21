@@ -11,6 +11,7 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveTargetRepoConfig, validateTargetRepo } = require("./repo_helpers.cjs");
+const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 
 /**
  * Type constant for handler identification
@@ -322,8 +323,11 @@ async function main(config = {}) {
 
   const githubClient = await createAuthenticatedGitHubClient(config);
 
-  // Determine the triggering PR number from context
-  const triggeringPRNumber = getPRNumber(context.payload);
+  // Determine the triggering PR number from context, resolving forwarded invocations
+  // (workflow_dispatch inputs/aw_context, repository_dispatch.client_payload) the same
+  // way resolveTarget does.
+  const invocationContext = resolveInvocationContext(context);
+  const triggeringPRNumber = getPRNumber(invocationContext.eventPayload);
 
   // Check if we're in staged mode
   const isStaged = isStagedMode(config);

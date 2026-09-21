@@ -228,6 +228,20 @@ const mockCore = {
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });
 
+    it("should reject when a fixed parent target equals the sub-issue, even though the raw model parent differs", async () => {
+      const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
+      // The configured target (#50) is the same as the requested sub-issue (#50), so applying
+      // the target would create a self-link even though the model-provided parent (999) differs.
+      const fixedTargetHandler = await main({ max: 5, target: "50" });
+
+      const result = await fixedTargetHandler({ type: "link_sub_issue", parent_issue_number: 999, sub_issue_number: 50 }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("must be different");
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
+
     it("should use target-repo config as default for issue resolution", async () => {
       const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
       const handlerWithTarget = await main({

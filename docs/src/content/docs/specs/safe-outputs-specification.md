@@ -2413,6 +2413,18 @@ safe-outputs:
 - Cross-repository commenting requires appropriate permissions in target repository
 - When `safe-outputs.add-comment.target` is `"*"`, requests MUST include at least one of `item_number`, `pr_number`, or `pr`; `item_number` is the canonical field.
 
+**Target Authorization**:
+
+**AC-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**AC-002**: For `target: "triggering"`, the processor MUST use only the issue, pull request, or discussion number from trusted triggering-event context and MUST ignore any agent-supplied `item_number`, `pr_number`, or `pr`.
+
+**AC-003**: For a fixed numeric `target`, the processor MUST use the configured item number and MUST ignore any conflicting agent-supplied identifier.
+
+**AC-004**: Only `target: "*"` MAY select an item from the agent-supplied identifier.
+
+**AC-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
 ---
 
 #### Type: create_pull_request
@@ -2873,6 +2885,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 - `footer`: Footer override
@@ -2886,6 +2899,18 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Cross-repository targets MUST be validated against the `allowed-repos` allowlist
 - The handler MUST verify the caller has `issues: write` permission before executing
 - The `duplicate_of` canonical issue reference MUST be resolved and validated before the GraphQL mutation is called; an unparseable value MUST be logged and skipped rather than causing an error
+
+**Target Authorization**:
+
+**CI-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**CI-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**CI-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**CI-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**CI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -2943,6 +2968,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number. Controls the **parent** issue; `sub_issue_number` is always agent-supplied.
 - `staged`: Staged mode override
 
 **Security Requirements**:
@@ -2951,6 +2977,19 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Both issue numbers MUST exist in the target repository before modification
 - The handler MUST enforce the maximum sub-issue count limit to prevent unbounded growth
 - Cross-repository operations MUST be rejected; only same-repository linking is permitted
+- The effective parent and sub-issue numbers, after applying `target`, MUST be validated as different; implementations MUST NOT rely solely on comparing the raw agent-supplied `parent_issue_number` to `sub_issue_number` before `target` is applied
+
+**Target Authorization**:
+
+**LSI-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**LSI-002**: For `target: "triggering"`, the processor MUST use only the parent issue number from trusted triggering-event context and MUST ignore any agent-supplied `parent_issue_number`.
+
+**LSI-003**: For a fixed numeric `target`, the processor MUST use the configured parent issue number and MUST ignore any conflicting agent-supplied `parent_issue_number`.
+
+**LSI-004**: Only `target: "*"` MAY select the parent issue from the agent-supplied `parent_issue_number`.
+
+**LSI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3219,6 +3258,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**CPR-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**CPR-002**: For `target: "triggering"`, the processor MUST use only the pull request number from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+
+**CPR-003**: For a fixed numeric `target`, the processor MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+
+**CPR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
+
+**CPR-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -3363,12 +3421,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
 - `required-labels`: Labels that must ALL be present on the pull request
 - `required-title-prefix`: Title prefix the pull request must start with
 - `allowed-branches`: Source branch glob patterns; the PR's branch must match at least one
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
+
+**Target Authorization**:
+
+**MPR-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**MPR-002**: For `target: "triggering"`, the processor MUST use only the pull request number from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+
+**MPR-003**: For a fixed numeric `target`, the processor MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+
+**MPR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
+
+**MPR-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3401,6 +3472,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Default Max**: 1  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**MRR-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**MRR-002**: For `target: "triggering"`, the processor MUST use only the pull request number from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+
+**MRR-003**: For a fixed numeric `target`, the processor MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+
+**MRR-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
+
+**MRR-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3533,6 +3623,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number. Constrains which PR's review threads may be resolved; `thread_id` (or `comment_id`) always identifies the specific thread.
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**RPT-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**RPT-002**: For `target: "triggering"`, the processor MUST resolve the invocation context (including forwarded `workflow_dispatch`/`repository_dispatch` invocations) and reject the operation unless the resolved thread's pull request matches the triggering pull request.
+
+**RPT-003**: For a fixed numeric `target`, the processor MUST reject the operation unless the resolved thread's pull request matches the configured pull request number.
+
+**RPT-004**: Only `target: "*"` MAY resolve threads on any pull request within the allowed repositories, without matching a specific triggering or fixed pull request.
+
+**RPT-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. This requirement applies uniformly, including in legacy same-repository mode.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -3659,6 +3768,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 3)
+- `target`: `"triggering"` (default), `"*"`, or a fixed pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**ARV-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**ARV-002**: For `target: "triggering"`, the processor MUST use only the pull request number from trusted triggering-event context and MUST ignore any agent-supplied `pull_request_number`.
+
+**ARV-003**: For a fixed numeric `target`, the processor MUST use the configured pull request number and MUST ignore any conflicting agent-supplied `pull_request_number`.
+
+**ARV-004**: Only `target: "*"` MAY select a pull request from the agent-supplied `pull_request_number`.
+
+**ARV-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -3703,6 +3831,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 | `allowed` | `string[]` | `[]` | Restrict assignments to milestones with these titles |
 | `auto_create` | `boolean` | `false` | Auto-create milestones from the `allowed` list if they don't exist |
 | `max` | `number` | `1` | Maximum number of assignments |
+| `target` | `string` | `"triggering"` | `"triggering"`, `"*"`, or a fixed issue number |
 | `target-repo` | `string` | — | Cross-repository target (`owner/repo`) |
 | `github-token` | `string` | — | Custom token for elevated permissions |
 
@@ -3715,6 +3844,18 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 | `milestone_title` | No* | Milestone title (e.g., `"v1.0"`). Resolved to a number internally. Either this or `milestone_number` is required. |
 
 \* At least one of `milestone_number` or `milestone_title` must be provided.
+
+**Target Authorization**:
+
+**AM-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**AM-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**AM-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**AM-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**AM-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Notes**:
 
@@ -3732,6 +3873,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Default Max**: 1  
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**ATA-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**ATA-002**: For `target: "triggering"`, the processor MUST use only the issue or pull request number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`/`pull_number`.
+
+**ATA-003**: For a fixed numeric `target`, the processor MUST use the configured issue or pull request number and MUST ignore any conflicting agent-supplied `issue_number`/`pull_number`.
+
+**ATA-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied `issue_number`/`pull_number`; only in this mode MUST the processor reject a message that specifies both fields as mutually exclusive.
+
+**ATA-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3762,6 +3922,19 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Configuration Options**:
 
 - `unassign-first` (boolean, default: false): If true, unassigns all current assignees before assigning new ones. Useful for reassigning issues from one user to another.
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
+
+**Target Authorization**:
+
+**ATU-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**ATU-002**: For `target: "triggering"`, the processor MUST use only the issue or pull request number from trusted triggering-event context and MUST ignore any agent-supplied identifier.
+
+**ATU-003**: For a fixed numeric `target`, the processor MUST use the configured issue or pull request number and MUST ignore any conflicting agent-supplied identifier.
+
+**ATU-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied identifier.
+
+**ATU-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3791,6 +3964,25 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: Yes  
 **Mandatory**: No
 
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+
+**Target Authorization**:
+
+**UFU-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**UFU-002**: For `target: "triggering"`, the processor MUST use only the issue or pull request number from trusted triggering-event context and MUST ignore any agent-supplied identifier. This applies equally when the triggering context is an issue or a pull request.
+
+**UFU-003**: For a fixed numeric `target`, the processor MUST use the configured issue or pull request number and MUST ignore any conflicting agent-supplied identifier.
+
+**UFU-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied identifier.
+
+**UFU-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
@@ -3815,10 +4007,23 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request/discussion number. Constrains the **parent item** that the resolved `comment_id` must belong to.
 - `discussions`: Control `discussions:write` permission (default: false)
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 - `allowed-reasons`: Allowed reasons for hiding comments
+
+**Target Authorization**:
+
+**HC-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**HC-002**: For `target: "triggering"`, the processor MUST resolve the comment's parent item and reject the operation unless both the parent item's number and kind (issue/pull request vs. discussion) match the triggering context. Matching only the numeric ID and repository MUST NOT be treated as sufficient, since issue/pull request numbers and discussion numbers are independent sequences that can collide.
+
+**HC-003**: For a fixed numeric `target`, the processor MUST reject the operation unless the resolved comment's parent item number matches the configured target.
+
+**HC-004**: Only `target: "*"` MAY hide a comment on any parent item within the allowed repositories, without matching a specific triggering or fixed item.
+
+**HC-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization.
 
 **Required Permissions**:
 

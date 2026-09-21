@@ -893,6 +893,44 @@ describe("assign_to_agent", () => {
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
+  it("should ignore model-provided issue_number/pull_number conflict when target is not '*'", async () => {
+    process.env.GH_AW_AGENT_TARGET = "triggering";
+    mockContext.eventName = "issues";
+    mockContext.payload = {
+      issue: { number: 123 },
+    };
+    mockContext.repo = {
+      owner: "test-owner",
+      repo: "test-repo",
+    };
+
+    setAgentOutput({
+      items: [
+        {
+          type: "assign_to_agent",
+          issue_number: 42,
+          pull_number: 99,
+          agent: "copilot",
+        },
+      ],
+      errors: [],
+    });
+
+    mockGithub.rest.issues.checkUserCanBeAssigned.mockResolvedValueOnce({});
+    mockGithub.rest.users.getByUsername.mockResolvedValueOnce({ data: { id: 99999 } });
+    mockGithub.rest.issues.get.mockResolvedValueOnce({
+      data: { id: 12345, number: 123, assignees: [], html_url: "", title: "", body: "" },
+    });
+    mockGithub.request.mockResolvedValueOnce({ data: { id: "task-123" } });
+
+    await eval(`(async () => { ${assignToAgentScript}; ${STANDALONE_RUNNER} })()`);
+
+    // The mutual-exclusivity check should be skipped since target isn't "*", so the
+    // triggering issue #123 should be used instead of the ignored issue_number/pull_number.
+    expect(mockCore.error).not.toHaveBeenCalledWith("Cannot specify both issue_number and pull_number in the same assign_to_agent item");
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
   it("should auto-resolve issue number from context when not provided (triggering target)", async () => {
     process.env.GH_AW_AGENT_TARGET = "triggering";
     // Set up context to simulate an issue event

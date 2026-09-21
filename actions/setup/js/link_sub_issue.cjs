@@ -207,6 +207,19 @@ async function main(config = {}) {
           error,
         };
       }
+
+      // Validate the effective parent/sub-issue pair (after applying `target`), not the
+      // raw model-provided values which may have been overridden by a fixed/triggering target.
+      if (parentRepoSlug === subRepoSlug && parentIssueNumber === subIssueNumber) {
+        const error = `Parent and sub-issue must be different (both resolve to #${parentIssueNumber})`;
+        core.warning(error);
+        return {
+          parent_issue_number: item.parent_issue_number,
+          sub_issue_number: item.sub_issue_number,
+          success: false,
+          error,
+        };
+      }
     }
 
     // Fetch parent issue to validate filters

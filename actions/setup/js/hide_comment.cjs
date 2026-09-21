@@ -50,7 +50,7 @@ async function hideCommentAPI(github, nodeId, reason = "spam") {
  * @param {any} github - GitHub client
  * @param {{owner?: string, repo?: string}|null|undefined} repoContext - Repository context
  * @param {string|number} commentId - GraphQL node ID or numeric REST comment ID
- * @returns {Promise<{nodeId: string, itemNumber: number, repo: string}>} Resolved comment target
+ * @returns {Promise<{nodeId: string, itemNumber: number, repo: string, kind: "issue"|"discussion"}>} Resolved comment target
  */
 async function resolveCommentNodeId(github, repoContext, commentId) {
   if (typeof commentId === "string") {
@@ -98,7 +98,8 @@ async function resolveCommentNodeId(github, repoContext, commentId) {
       if (!Number.isInteger(itemNumber) || itemNumber <= 0 || !repo) {
         throw new Error(`${ERR_VALIDATION}: comment_id must reference a comment on an issue, pull request, or discussion`);
       }
-      return { nodeId: trimmed, itemNumber, repo };
+      const kind = result?.node?.discussion ? "discussion" : "issue";
+      return { nodeId: trimmed, itemNumber, repo, kind };
     }
 
     commentId = Number.parseInt(trimmed, 10);
@@ -128,7 +129,7 @@ async function resolveCommentNodeId(github, repoContext, commentId) {
     throw new Error(`${ERR_API}: Failed to resolve parent item for comment_id ${commentId}`);
   }
 
-  return { nodeId, itemNumber: Number(match[3]), repo: `${match[1]}/${match[2]}` };
+  return { nodeId, itemNumber: Number(match[3]), repo: `${match[1]}/${match[2]}`, kind: "issue" };
 }
 
 /**
@@ -219,9 +220,16 @@ async function main(config = {}) {
       }
 
       let expectedNumber;
+      let expectedKind;
       if (targetConfig === "triggering") {
         const invocationContext = resolveInvocationContext(context);
-        expectedNumber = invocationContext.eventPayload?.issue?.number ?? invocationContext.eventPayload?.pull_request?.number ?? invocationContext.eventPayload?.discussion?.number;
+        if (invocationContext.eventPayload?.discussion?.number) {
+          expectedNumber = invocationContext.eventPayload.discussion.number;
+          expectedKind = "discussion";
+        } else {
+          expectedNumber = invocationContext.eventPayload?.issue?.number ?? invocationContext.eventPayload?.pull_request?.number;
+          expectedKind = "issue";
+        }
         if (!expectedNumber) {
           return {
             success: false,
@@ -241,6 +249,12 @@ async function main(config = {}) {
         return {
           success: false,
           error: `Comment belongs to item #${resolvedComment.itemNumber}, but target is #${expectedNumber}`,
+        };
+      }
+      if (expectedKind && resolvedComment.kind !== expectedKind) {
+        return {
+          success: false,
+          error: `Comment belongs to a ${resolvedComment.kind === "discussion" ? "discussion" : "issue/pull request"}, but the triggering item is a ${expectedKind === "discussion" ? "discussion" : "issue/pull request"} (#${expectedNumber})`,
         };
       }
 

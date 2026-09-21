@@ -211,6 +211,35 @@ describe("hide_comment.cjs", () => {
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });
 
+    it("should reject a discussion comment for target: triggering when triggered by an issue with the same number", async () => {
+      // Issue #42 triggered the run, but the resolved comment belongs to discussion #42
+      // (discussions use a separate numbering sequence from issues/PRs).
+      mockGithub.graphql.mockImplementation(query => {
+        if (query.includes("query ($nodeId")) {
+          return Promise.resolve({
+            node: {
+              __typename: "DiscussionComment",
+              discussion: {
+                number: 42,
+                repository: { nameWithOwner: "testowner/testrepo" },
+              },
+            },
+          });
+        }
+        return Promise.resolve({
+          minimizeComment: { minimizedComment: { isMinimized: true } },
+        });
+      });
+
+      const { main } = await loadModule();
+      const handler = await main({ target: "triggering" });
+
+      const result = await handler({ comment_id: "IC_someDiscussionCommentId", reason: "SPAM" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("discussion");
+    });
+
     it("should enforce max count limit", async () => {
       const { main } = await loadModule();
       const handler = await main({ max: 2 });
