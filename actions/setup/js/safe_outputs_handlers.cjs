@@ -27,6 +27,7 @@ const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
 const { validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
+const { parseAllowedBranchPatterns, isAllowedBranch } = require("./branch_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
@@ -226,24 +227,6 @@ function normalizeCombinedTitleBodyArgs(args) {
 }
 
 /**
- * Parse branch pattern configuration from array or comma-separated string.
- * @param {string[]|string|undefined} value
- * @returns {string[]}
- */
-function parseAllowedBranchPatterns(value) {
-  if (Array.isArray(value)) {
-    return value.map(item => String(item).trim()).filter(Boolean);
-  }
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map(item => item.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-/**
  * Parse trusted comment IDs supplied by workflow configuration.
  * @param {unknown} value
  * @returns {Set<string>}
@@ -310,27 +293,6 @@ function validateAllowedAddCommentId(entry, addCommentConfig) {
     return { error: buildIntentErrorResponse("add_comment comment_id is not listed in safe-outputs.add-comment.allows-comment-ids.") };
   }
   return { error: null, commentId };
-}
-
-/**
- * @param {string} branch
- * @param {string[]} allowedPatterns
- * @returns {boolean}
- */
-function isAllowedBranch(branch, allowedPatterns) {
-  for (const pattern of allowedPatterns) {
-    if (branch === pattern) {
-      return true;
-    }
-    if (pattern === "*") {
-      // Add this fast-path
-      return true;
-    }
-    if (pattern.includes("*") && globPatternToRegex(pattern, { pathMode: true, caseSensitive: true }).test(branch)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**

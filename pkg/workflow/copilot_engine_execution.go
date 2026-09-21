@@ -105,20 +105,49 @@ func buildCopilotSettingsCleanupAndExitCodeTrap() string {
 //   - XDG_CONFIG_HOME=$HOME (Copilot CLI resolves its config dir from this)
 //
 // Exported only when the workflow has MCP servers:
-//   - GH_AW_MCP_CONFIG=$HOME/.copilot/mcp-config.json
+//   - SDK: GH_AW_MCP_CONFIG=${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json,
+//     after copying the converted home config into the existing AWF temp mount.
+//   - CLI: GH_AW_MCP_CONFIG=$HOME/.copilot/mcp-config.json
 func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
 	var b strings.Builder
 	b.WriteString("export XDG_CONFIG_HOME=\"$HOME\"\n")
 	if HasMCPServers(workflowData) {
-		b.WriteString("export GH_AW_MCP_CONFIG=\"$HOME/.copilot/mcp-config.json\"\n")
+		if isCopilotSDKMode(workflowData) {
+			b.WriteString(`if [ -z "${RUNNER_TEMP:-}" ]; then
+  echo "RUNNER_TEMP is required to stage Copilot SDK MCP config" >&2
+  exit 1
+fi
+if ! (umask 077 && mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-config"); then
+  echo "Failed to create Copilot SDK MCP config directory" >&2
+  exit 1
+fi
+if ! chmod 700 "${RUNNER_TEMP}/gh-aw/mcp-config"; then
+  echo "Failed to secure Copilot SDK MCP config directory" >&2
+  exit 1
+fi
+if ! (umask 077 && cp "$HOME/.copilot/mcp-config.json" "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"); then
+  echo "Failed to stage Copilot SDK MCP config" >&2
+  exit 1
+fi
+if ! chmod 600 "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"; then
+  echo "Failed to secure Copilot SDK MCP config" >&2
+  exit 1
+fi
+export GH_AW_MCP_CONFIG="${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"
+`)
+		} else {
+			b.WriteString("export GH_AW_MCP_CONFIG=\"$HOME/.copilot/mcp-config.json\"\n")
+		}
 	}
 	return b.String()
 }
 
 const nodePathSetupCommand = `GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi`
-const nodeRuntimeResolutionCommand = `GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; ` + nodePathSetupCommand + `; "$GH_AW_NODE_EXEC"`
+const nodeRuntimeSelectionCommand = `GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; `
+const nodeRuntimeResolutionCommand = nodeRuntimeSelectionCommand + nodePathSetupCommand + `; "$GH_AW_NODE_EXEC"`
 const nodePathSetupCommandForCopilotSDK = `GH_AW_WORKSPACE_NODE_MODULES="${GITHUB_WORKSPACE:-$PWD}/node_modules"; if [ -d "$GH_AW_WORKSPACE_NODE_MODULES" ]; then export NODE_PATH="${GH_AW_WORKSPACE_NODE_MODULES}${NODE_PATH:+:${NODE_PATH}}"; fi; ` + nodePathSetupCommand
-const nodeRuntimeResolutionCommandForCopilotSDK = `GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; ` + nodePathSetupCommandForCopilotSDK + `; "$GH_AW_NODE_EXEC"`
+const nodeRuntimeResolutionCommandForCopilotSDK = nodeRuntimeSelectionCommand + nodePathSetupCommandForCopilotSDK + `; "$GH_AW_NODE_EXEC"`
+const nodeRuntimeResolutionCommandForGoRepository = nodeRuntimeSelectionCommand + `: "${RUNNER_TEMP:?RUNNER_TEMP is required for the SDK repository profile}"; export NODE_PATH="` + copilotSDKRepositoryInstallDir + `/node_modules"; "$GH_AW_NODE_EXEC"`
 const copilotBinaryPathSetup = `GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
 if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
   echo "GitHub Copilot CLI executable not found on PATH after installation" >&2
@@ -387,6 +416,9 @@ func (e *CopilotEngine) buildCopilotExecPrefix(workflowData *WorkflowData, comma
 	runtimeResolutionCommand := nodeRuntimeResolutionCommand
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.CopilotSDK {
 		runtimeResolutionCommand = nodeRuntimeResolutionCommandForCopilotSDK
+		if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+			runtimeResolutionCommand = nodeRuntimeResolutionCommandForGoRepository
+		}
 		return e.buildCopilotSDKExecPrefix(workflowData, commandName, harnessScriptPath, runtimeResolutionCommand)
 	}
 	return fmt.Sprintf(`%s %s %s`, runtimeResolutionCommand, harnessScriptPath, commandName)
@@ -710,6 +742,14 @@ func (e *CopilotEngine) addCopilotSDKStepEnv(env map[string]string, workflowData
 	env[constants.CopilotSDKDriverEnvVar] = "1"
 	env[constants.CopilotSDKServerArgsEnvVar] = copilotSDKServerArgsJSON
 	env[constants.CopilotSDKToolConfigEnvVar] = copilotSDKToolConfigJSON
+	if engineToolProfile(workflowData) == copilotGoRepositoryToolProfile {
+		configJSON, bindings, err := buildGoRepositoryToolConfigRuntimeData(copilotSDKToolConfigJSON)
+		if err != nil {
+			panic(fmt.Sprintf("BUG: invalid validated Go repository SDK tool config: %v", err))
+		}
+		maps.Copy(env, bindings)
+		env[constants.CopilotSDKToolConfigEnvVar] = configJSON
+	}
 	copilotExecLog.Printf("copilot-sdk driver mode: set %s, %s and %s", constants.CopilotSDKDriverEnvVar, constants.CopilotSDKServerArgsEnvVar, constants.CopilotSDKToolConfigEnvVar)
 	if currentPythonPath, exists := env["PYTHONPATH"]; copilotSDKRuntimeID(workflowData) == "python" && (!exists || currentPythonPath == "") {
 		env["PYTHONPATH"] = copilotSDKPythonPathExpression

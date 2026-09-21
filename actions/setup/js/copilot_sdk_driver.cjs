@@ -14,6 +14,7 @@
  *   GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON   — JSON-encoded multi-provider config (required).
  *                                             Shape: { model, providers: NamedProviderConfig[], models: ProviderModelConfig[] }
  *   GH_AW_COPILOT_SDK_SERVER_ARGS           — JSON-encoded allow-tool sidecar args (set by the engine)
+ *   GH_AW_MCP_CONFIG                      — compiler-produced gateway MCP configuration file
  *
  * The sidecar is started and stopped by the harness; the driver only opens a
  * client connection, runs the session, and exits.
@@ -30,6 +31,7 @@ const fs = require("fs");
 const { runWithCopilotSDK, extractPromptFromArgs } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
 const { parseCopilotSDKToolConfig } = require("./copilot_sdk_tool_config.cjs");
+const { loadCopilotSDKMCPConfig } = require("./copilot_sdk_mcp_config.cjs");
 const { parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -118,6 +120,8 @@ async function main() {
   const toolConfig = parseCopilotSDKToolConfig(process.env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
   const permissionConfig = toolConfig.permissions;
   log(`permission config: ${permissionConfig.allowedTools.length} compiler-owned allow-tool entries`);
+  const mcpServers = toolConfig.capabilities.mcp ? loadCopilotSDKMCPConfig(process.env.GH_AW_MCP_CONFIG) : undefined;
+  if (mcpServers) log(`native MCP config: ${Object.keys(mcpServers).length} compiler-owned servers`);
 
   // --- Run SDK session -------------------------------------------------
 
@@ -131,6 +135,7 @@ async function main() {
     models: sdkModels,
     permissionConfig,
     toolConfig,
+    mcpServers,
   });
 
   process.exit(result.exitCode);

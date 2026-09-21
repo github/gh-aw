@@ -3,8 +3,10 @@
 "use strict";
 
 const { createCopilotSDKWebFetchTool } = require("./copilot_sdk_web_fetch.cjs");
+const { parseGoRepositoryProfile } = require("./copilot_sdk_repo_policy.cjs");
 
 const COPILOT_SDK_TOOL_CONFIG_VERSION = 1;
+const COPILOT_SDK_REPOSITORY_TOOL_CONFIG_VERSION = 2;
 const COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS = Object.freeze(["view", "rg", "glob", "sql"]);
 const COPILOT_SDK_SHELL_BUILTIN_TOOLS = Object.freeze(["bash", "read_bash", "stop_bash", "list_bash"]);
 const COPILOT_SDK_EDIT_BUILTIN_TOOLS = Object.freeze(["apply_patch", "edit", "create", "delete", "move", "write_bash"]);
@@ -26,6 +28,7 @@ const COPILOT_SDK_EDIT_BUILTIN_TOOLS = Object.freeze(["apply_patch", "edit", "cr
  *   capabilities: CopilotSDKToolCapabilities,
  *   permissions: {allowedTools: string[]},
  *   explicitlyDisabledTools: string[],
+ *   profile?: import("./copilot_sdk_repo_policy.cjs").GoRepositoryProfile,
  * }} CopilotSDKToolConfig
  */
 
@@ -95,7 +98,7 @@ function isReservedSDKPermission(tool) {
 function validateToolPermissionParity(config) {
   const allowed = new Set(config.permissions.allowedTools);
   const hasShellPermission = config.permissions.allowedTools.some(tool => tool === "shell" || (tool.startsWith("shell(") && tool.endsWith(")")));
-  const hasMCPPermission = config.permissions.allowedTools.some(tool => !isReservedSDKPermission(tool));
+  const hasMCPPermission = config.permissions.allowedTools.some(tool => !isReservedSDKPermission(tool) && !(config.profile && tool === "go_repository"));
 
   if (config.capabilities.bash !== hasShellPermission) {
     throw new Error("SDK tool contract mismatch: bash visibility and shell permissions differ");
@@ -131,6 +134,17 @@ function validateToolPermissionParity(config) {
       throw new Error(`SDK tool contract mismatch: explicitly disabled ${toolName} is visible`);
     }
   }
+  if (config.profile) {
+    if (config.version !== COPILOT_SDK_REPOSITORY_TOOL_CONFIG_VERSION || config.capabilities.bash || config.capabilities.cliProxy || config.capabilities.webSearch || !config.capabilities.edit || !config.capabilities.mcp) {
+      throw new Error("go-repository requires SDK v2, native MCP and editing, with Bash, CLI proxy and web search disabled");
+    }
+    if (!allowed.has("go_repository") || !allowed.has("read") || !allowed.has("write")) {
+      throw new Error("go-repository requires exact go_repository, read and write permissions");
+    }
+    if (!config.explicitlyDisabledTools.includes("bash") || !config.explicitlyDisabledTools.includes("cli-proxy")) {
+      throw new Error("go-repository requires explicit bash:false and cli-proxy:false");
+    }
+  }
 }
 
 /**
@@ -153,7 +167,7 @@ function parseCopilotSDKToolConfig(value) {
   if (!isRecord(parsed)) {
     throw new Error("GH_AW_COPILOT_SDK_TOOL_CONFIG must be a JSON object");
   }
-  if (parsed.version !== COPILOT_SDK_TOOL_CONFIG_VERSION) {
+  if (parsed.version !== COPILOT_SDK_TOOL_CONFIG_VERSION && parsed.version !== COPILOT_SDK_REPOSITORY_TOOL_CONFIG_VERSION) {
     throw new Error(`unsupported GH_AW_COPILOT_SDK_TOOL_CONFIG version: ${String(parsed.version)}`);
   }
   if (!isRecord(parsed.capabilities)) {
@@ -167,14 +181,17 @@ function parseCopilotSDKToolConfig(value) {
   if (allowedTools.length === 0) {
     throw new Error("permissions.allowedTools must not be empty");
   }
+  if (parsed.version === COPILOT_SDK_TOOL_CONFIG_VERSION && parsed.profile != null) throw new Error("SDK tool profiles require contract version 2");
+  /** @type {CopilotSDKToolConfig} */
   const config = {
-    version: COPILOT_SDK_TOOL_CONFIG_VERSION,
+    version: parsed.version,
     capabilities: parseCapabilities(parsed.capabilities),
     permissions: {
       allowedTools,
     },
     explicitlyDisabledTools: parsed.explicitlyDisabledTools == null ? [] : parseStringArray(parsed.explicitlyDisabledTools, "explicitlyDisabledTools"),
   };
+  if (parsed.version === COPILOT_SDK_REPOSITORY_TOOL_CONFIG_VERSION) config.profile = parseGoRepositoryProfile(parsed.profile);
   validateToolPermissionParity(config);
   return config;
 }
@@ -186,8 +203,8 @@ function parseCopilotSDKToolConfig(value) {
  *   BuiltInTools?: typeof import("@github/copilot-sdk").BuiltInTools,
  *   defineTool?: typeof import("@github/copilot-sdk").defineTool,
  * }} sdk
- * @param {{fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number}} [options]
- * @returns {Pick<import("@github/copilot-sdk").SessionConfig, "availableTools" | "tools">}
+ * @param {{fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number, repositoryTool?: import("@github/copilot-sdk").Tool<unknown>}} [options]
+ * @returns {Pick<import("@github/copilot-sdk").SessionConfig, "availableTools" | "tools" | "toolSearch">}
  */
 function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   if (!config) return {};
@@ -196,10 +213,11 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   }
 
   const availableTools = new sdk.ToolSet();
-  availableTools.addBuiltIn(sdk.BuiltInTools.Isolated.filter(name => name !== "ask_user"));
-  availableTools.addBuiltIn(COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
+  if (config.profile) validateToolPermissionParity(config);
+  if (!config.profile) availableTools.addBuiltIn(sdk.BuiltInTools.Isolated.filter(name => name !== "ask_user"));
+  availableTools.addBuiltIn(config.profile ? ["view", "rg", "glob"] : COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
   if (config.capabilities.bash) availableTools.addBuiltIn(COPILOT_SDK_SHELL_BUILTIN_TOOLS);
-  if (config.capabilities.edit) availableTools.addBuiltIn(COPILOT_SDK_EDIT_BUILTIN_TOOLS);
+  if (config.capabilities.edit) availableTools.addBuiltIn(COPILOT_SDK_EDIT_BUILTIN_TOOLS.filter(name => name !== "write_bash" || config.capabilities.bash));
   // The compiler currently always emits webSearch: false (the Copilot SDK runtime
   // cannot authorize/execute web-search); this branch is kept ready for when a
   // real implementation and permission are wired, guarded by the parity check
@@ -221,11 +239,20 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
     tools.push(createCopilotSDKWebFetchTool(sdk.defineTool, options));
     availableTools.addCustom("web_fetch");
   }
+  if (config.profile) {
+    if (options.repositoryTool?.name !== "go_repository" || typeof options.repositoryTool.handler !== "function") {
+      throw new Error("go-repository requires the driver-owned repository runtime");
+    }
+    tools.push(options.repositoryTool);
+    availableTools.addCustom("go_repository");
+    return { availableTools, tools, toolSearch: { enabled: false } };
+  }
   return { availableTools, tools };
 }
 
 module.exports = {
   COPILOT_SDK_TOOL_CONFIG_VERSION,
+  COPILOT_SDK_REPOSITORY_TOOL_CONFIG_VERSION,
   COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS,
   COPILOT_SDK_SHELL_BUILTIN_TOOLS,
   COPILOT_SDK_EDIT_BUILTIN_TOOLS,
