@@ -39,9 +39,10 @@ func addCodexPluginConfig(config string) string {
 }
 
 // writeIndentedCodexConfig adds the YAML run-block indentation to each custom
-// config line. GitHub Actions strips this indentation before the shell runs, so
-// the heredoc receives the original TOML content; a final line without a
-// trailing newline is indented here and the caller appends the newline.
+// config line. YAML block scalar parsing strips this common indentation before
+// the shell runs, so the heredoc receives the original TOML content; a final
+// line without a trailing newline is indented here and the caller appends the
+// newline.
 func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 	for config != "" {
 		lineEnd := strings.IndexByte(config, '\n')
