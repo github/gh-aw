@@ -14,7 +14,7 @@ import (
 
 // importInputsFallbackExprRegex matches fallback expressions. The replacement
 // function folds only chains whose operands are all compile-time safe.
-var importInputsFallbackExprRegex = regexp.MustCompile(`\$\{\{\s*([^{}\n]*\|\|[^{}\n]*)\s*\}\}`)
+var importInputsFallbackExprRegex = regexp.MustCompile(`\$\{\{\s*([^{}\n]*(?:github\.aw\.import-inputs\.|github\.aw\.inputs\.)[^{}\n]*\|\|[^{}\n]*|[^{}\n]*\|\|[^{}\n]*(?:github\.aw\.import-inputs\.|github\.aw\.inputs\.)[^{}\n]*)\s*\}\}`)
 
 // importInputsExprRegex matches ${{ github.aw.import-inputs.<key> }} and
 // ${{ github.aw.import-inputs.<key>.<subkey> }} expressions in raw content.
@@ -109,10 +109,14 @@ func splitFallbackOperands(expression string) []string {
 }
 
 type fallbackOperandResult struct {
-	value            any
-	formatted        string
+	// value is the operand's raw value for truthiness checks.
+	value any
+	// formatted is the text substituted when the operand wins or is the final fallback.
+	formatted string
+	// isInputReference is true for github.aw.import-inputs.* and github.aw.inputs.* operands.
 	isInputReference bool
-	ok               bool
+	// ok is false when the operand is unsupported or cannot be formatted, so folding must abort.
+	ok bool
 }
 
 func resolveFallbackOperand(operand string, inputs map[string]any) fallbackOperandResult {
