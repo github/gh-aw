@@ -57,9 +57,16 @@ EOF
 #!/usr/bin/env bash
 echo unverified >>"${SANDBOX_EXECUTION_LOG}"
 EOF
-  chmod +x "${sandbox}/bin/uname" "${sandbox}/bin/curl" "${sandbox}/bin/threat-detect"
+  cat >"${sandbox}/bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+echo 'rootless installation must not use sudo' >&2
+exit 1
+EOF
+  chmod +x "${sandbox}/bin/uname" "${sandbox}/bin/curl" "${sandbox}/bin/threat-detect" "${sandbox}/bin/sudo"
 
   local payload_hash
+  # Hash the literal script payload; its environment variable expands only when run.
+  # shellcheck disable=SC2016
   payload_hash=$(printf '%s\n' '#!/usr/bin/env bash' 'echo verified >>"${SANDBOX_EXECUTION_LOG}"' | sha256sum | awk '{print $1}')
   local bad_hash
   bad_hash=$(printf '0%.0s' {1..64})
@@ -76,16 +83,24 @@ EOF
   local url_log="${sandbox}/url.log"
   local execution_log="${sandbox}/execution.log"
   local github_path="${sandbox}/github-path"
+  local github_output="${sandbox}/github-output"
   : >"$url_log"
   : >"$execution_log"
   : >"$github_path"
+  : >"$github_output"
 
   RUN_OUTPUT=$(cd "$sandbox" && env PATH="${sandbox}/bin:${PATH}" HOME="${sandbox}/home" \
-    SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" \
+    SANDBOX_URL_LOG="$url_log" SANDBOX_EXECUTION_LOG="$execution_log" GITHUB_PATH="$github_path" GITHUB_OUTPUT="$github_output" \
     bash "$INSTALL_SCRIPT" v0.5.2 --rootless --artifact-base-url "$base_url" "${pin_args[@]}" "$@" 2>&1)
   RUN_STATUS=$?
   RUN_URLS=$(cat "$url_log")
   RUN_EXECUTIONS=$(cat "$execution_log")
+  RUN_BINARY_PATH=$(sed -n 's/^binary-path=//p' "$github_output")
+  RUN_EXPECTED_BINARY_PATH="${sandbox}/home/.local/bin/threat-detect"
+  RUN_INSTALLED_EXECUTABLE=false
+  if [ -x "$RUN_EXPECTED_BINARY_PATH" ]; then
+    RUN_INSTALLED_EXECUTABLE=true
+  fi
 
   # Simulate the subsequent detection step after a failed tolerated install.
   if [ "$RUN_STATUS" -ne 0 ] && [ -x "${sandbox}/home/.local/bin/threat-detect" ]; then
@@ -105,6 +120,8 @@ assert_success() {
   run_installer "$@"
   if [ "$RUN_STATUS" -ne 0 ]; then
     fail "$description" "installer exited with ${RUN_STATUS}: ${RUN_OUTPUT}"
+  elif [ "$RUN_BINARY_PATH" != "$RUN_EXPECTED_BINARY_PATH" ] || [ "$RUN_INSTALLED_EXECUTABLE" != true ]; then
+    fail "$description" "installer must export the exact executable verified path: ${RUN_BINARY_PATH}"
   else
     pass "$description"
   fi
@@ -172,6 +189,8 @@ elif ! grep -qF "Checksum verification failed" <<<"$RUN_OUTPUT"; then
   fail "Tampered bytes are rejected" "unexpected output: ${RUN_OUTPUT}"
 elif [ -n "$RUN_EXECUTIONS" ]; then
   fail "Tampered bytes are not executed" "execution log: ${RUN_EXECUTIONS}"
+elif [ -n "$RUN_BINARY_PATH" ]; then
+  fail "Failed verification publishes no binary path" "unexpected path: ${RUN_BINARY_PATH}"
 elif grep -qF "unverified" <<<"$RUN_EXECUTIONS_AFTER_FAILURE"; then
   fail "Failed verification blocks PATH fallback" "execution log: ${RUN_EXECUTIONS_AFTER_FAILURE}"
 else

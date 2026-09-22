@@ -14,6 +14,10 @@ External threat detection currently assumes the runner process and Docker daemon
 
 We will stage external threat-detection inputs and the `threat-detect` binary under `${RUNNER_TEMP}/gh-aw` for ARC/DinD executions, mount the staged detection directory read-write into AWF, and collect only detector output files back into the canonical host-side detection directory after execution. gh-aw will preserve existing non-ARC behavior and leave existing conclusion semantics unchanged while compiling ARC/DinD detection runs to use rewritten shared-volume paths. We chose this approach because it directly addresses the split-filesystem constraint visible in the PR while preserving downstream consumers that still read the canonical host-side detection directory.
 
+The ARC/DinD detector installation uses `--rootless`. The installer publishes the exact verified executable path as a step output; staging consumes that path instead of selecting an executable from `PATH`. Codex configuration is prepared inside the detection directory and uses a writable home under the shared detection mount. The parent runtime mount remains read-only.
+
+An unconditional reset step removes inherited host-side result files and clears the dedicated shared staging directory before preparation and installation. This prevents a failed or cancelled installation from leaving an old verdict for downstream consumers. Staging clears the shared directory again before copying current inputs, including optional files, and collection explicitly requires installation success and a non-skipped execution. Neither cleanup nor collection manufactures a verdict or changes conclusion policy.
+
 ### Alternatives Considered
 
 #### Alternative 1: Keep using the canonical host detection directory directly inside ARC/DinD runs
@@ -38,7 +42,7 @@ This was a realistic alternative because it would avoid the collect-back step an
 
 #### Neutral
 - Non-ARC threat-detection execution remains on the existing direct-path behavior and does not use the new staging helper.
-- New regression tests cover compiler output and shell-level round trips for success, failure, spaced paths, and stale-result cleanup.
+- New regression tests cover compiler output and shell-level round trips for success, failure, spaced paths, stale-result and optional-input cleanup, verified binary selection, and rejected symlink directories.
 
 ---
 

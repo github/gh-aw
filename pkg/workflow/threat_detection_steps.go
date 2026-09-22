@@ -53,6 +53,10 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 	// Step 3: Clear MCP configuration files so the detection engine runs without MCP servers
 	steps = append(steps, c.buildClearMCPConfigStep()...)
 
+	if usingExternalDetector {
+		steps = append(steps, buildResetArcDindDetectionResultsStep(data)...)
+	}
+
 	// Step 4: Prepare files - copies agent output files to expected paths
 	steps = append(steps, c.buildPrepareDetectionFilesStep()...)
 
@@ -609,6 +613,10 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	}
 	amd64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"]
 	arm64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"]
+	installFlags := ""
+	if isArcDindTopology(data) {
+		installFlags = " --rootless"
+	}
 
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
@@ -627,11 +635,12 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	steps = append(steps,
 		"        run: |\n",
 		fmt.Sprintf(
-			"          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s --artifact-base-url %s --sha256-amd64 %s --sha256-arm64 %s\n",
+			"          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s --artifact-base-url %s --sha256-amd64 %s --sha256-arm64 %s%s\n",
 			shellEscapeArg(version),
 			shellEscapeArg(artifactBaseURL),
 			shellEscapeArg(amd64Digest),
 			shellEscapeArg(arm64Digest),
+			installFlags,
 		),
 	)
 	return steps
