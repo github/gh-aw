@@ -147,14 +147,6 @@ func ExtractEnvExpressionsFromMap(values map[string]string) map[string]string {
 	return allEnvVars
 }
 
-// ReplaceSecretsWithEnvVars replaces secret expressions in a value with environment variable references
-// Example: "${{ secrets.DD_API_KEY }}" -> "\${DD_API_KEY}"
-// The backslash is used to escape the ${} for proper JSON rendering in Copilot configs
-func ReplaceSecretsWithEnvVars(value string, secrets map[string]string) string {
-	// Replace ${{ secrets.VAR }} with \${VAR} (backslash-escaped for copilot JSON config)
-	return replaceSecretsWithPrefixedEnvVars(value, secrets, "\\${")
-}
-
 // ReplaceSecretsWithShellEnvVars replaces secret expressions in a value with plain shell
 // environment variable references, without the backslash escape used for JSON configs.
 // Example: "${{ secrets.DD_API_KEY }}" -> "${DD_API_KEY}"

@@ -18,6 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// schedulerWaitingCount reports how many targets are currently parked waiting
+// for a batch turn on scheduler. It exists so tests can observe that a target
+// has actually blocked rather than inferring it from timing.
+func schedulerWaitingCount(s *logsBatchScheduler) int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waiting
+}
+
 func TestLogsTargetOutputDir(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t,
@@ -331,7 +343,7 @@ func TestLogsBatchSchedulerUnblocksWaitersOnContextCancellation(t *testing.T) {
 	// Wait until the target is genuinely parked in cond.Wait, otherwise the
 	// cheap ctx pre-check at the top of acquire could satisfy this test without
 	// the cancellation broadcast ever waking a blocked waiter.
-	require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return schedulerWaitingCount(scheduler) == 1 }, time.Second, time.Millisecond)
 
 	cancel()
 	select {
@@ -356,7 +368,7 @@ func TestLogsBatchSchedulerAdvancesRoundWhenTargetLeavesMidRound(t *testing.T) {
 
 	waitErr := make(chan error, 1)
 	go func() { waitErr <- scheduler.acquire(ctx, 1) }()
-	require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return schedulerWaitingCount(scheduler) == 1 }, time.Second, time.Millisecond)
 
 	// Target 0 finishes its collection without ever claiming a turn in this
 	// round; dropping it must advance the round rather than wedge the waiters.
@@ -753,13 +765,13 @@ func TestRunLogsBatchRoundHoldsSchedulerTurnDuringRateLimitCheck(t *testing.T) {
 		// A competing target must not be able to take a turn while this check
 		// is in flight; it has to park until this round's turn is released.
 		go func() { otherAcquired <- scheduler.acquire(ctx, 1) }()
-		require.Eventually(t, func() bool { return scheduler.waitingCount() == 1 }, time.Second, time.Millisecond)
+		require.Eventually(t, func() bool { return schedulerWaitingCount(scheduler) == 1 }, time.Second, time.Millisecond)
 		turnHeldDuringCheck.Store(true)
 		return rateLimitResource{Limit: 15000, Remaining: 14000, Reset: time.Now().Add(time.Hour).Unix(), Used: 1000}, nil
 	}
 	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
 		assert.True(t, turnHeldDuringCheck.Load(), "the rate-limit check must precede the batch request inside the same turn")
-		assert.Equal(t, 1, scheduler.waitingCount(), "the competing target must still be parked while this batch runs")
+		assert.Equal(t, 1, schedulerWaitingCount(scheduler), "the competing target must still be parked while this batch runs")
 		return workflowRunBatch{runs: []WorkflowRun{{DatabaseID: 1}}, totalFetched: 1, batchSize: 1}, nil
 	}
 	logsProcessWorkflowRunBatch = func(_ context.Context, batch workflowRunBatch, processedRuns []ProcessedRun, _ processWorkflowRunBatchOptions) ([]ProcessedRun, int, bool, bool, bool) {

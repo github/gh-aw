@@ -99,16 +99,6 @@ func getLoadedEcosystemDomains() map[string][]string {
 // invariant above.
 var engineDefaultDomainSets = getLoadedDomainSets().EngineDefaults
 
-// GetEngineDefaultDomainSets returns copies of the named engine domain sets for
-// analysis, reporting, and network.allowed expansion.
-func GetEngineDefaultDomainSets() map[string][]string {
-	sets := make(map[string][]string, len(engineDefaultDomainSets))
-	for name, domains := range engineDefaultDomainSets {
-		sets[name] = copyEngineDefaultDomainSet(domains)
-	}
-	return sets
-}
-
 func copyEngineDefaultDomainSet(domains []string) []string {
 	return append([]string(nil), domains...)
 }
