@@ -56,7 +56,9 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     expect(rendered).toContain("`transient_error`");
     expect(rendered).toContain("run 34616576735");
     expect(rendered).toContain("detection/token_usage.jsonl is missing");
-    expect(rendered).toContain("fails closed");
+    expect(rendered).toContain("fails open");
+    expect(rendered).toContain("downstream work continued while accounting was unavailable");
+    expect(rendered).toContain("the daily AI Credits limit was not enforced for this run");
     expect(rendered).toContain("missing, empty, or unreadable");
     expect(rendered).toContain("rolling 24-hour window");
   });
