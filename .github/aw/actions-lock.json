@@ -108,10 +108,10 @@
       "version": "v0.24.2",
       "sha": "3ad7283483fc7af8ff2b4ea19663c2d5ca935e26"
     },
-    "astral-sh/setup-uv@v10.1.0": {
+    "astral-sh/setup-uv@v10.2.0": {
       "repo": "astral-sh/setup-uv",
-      "version": "v10.1.0",
-      "sha": "bec219d24cd3e171d82865faccec33120bb574f4"
+      "version": "v10.2.0",
+      "sha": "c18668ad3cf93ea998bef934396af7bb5c839dc7"
     },
     "denoland/setup-deno@v2.0.5": {
       "repo": "denoland/setup-deno",
@@ -163,10 +163,10 @@
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.324.0": {
+    "ruby/setup-ruby@v1.325.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.324.0",
-      "sha": "a0102e0972be65f351c307e2d64b9314a57c8073"
+      "version": "v1.325.0",
+      "sha": "e8944e80fb94b20106697132f8c20c665fab29e9"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",
@@ -624,11 +624,6 @@
       "image": "ghcr.io/github/gh-aw-node",
       "digest": "sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23",
       "pinned_image": "ghcr.io/github/gh-aw-node@sha256:0daa8971fa4732b647150cb6524a6b0804b68d5d24f6f58b5dd1af23bd63fb23"
-    },
-    "ghcr.io/github/github-mcp-server:v1.12.1": {
-      "image": "ghcr.io/github/github-mcp-server:v1.12.1",
-      "digest": "sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560",
-      "pinned_image": "ghcr.io/github/github-mcp-server:v1.12.1@sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560"
     },
     "ghcr.io/oraios/serena:1.7.0": {
       "image": "ghcr.io/oraios/serena:1.7.0",
