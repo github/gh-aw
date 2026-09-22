@@ -233,7 +233,10 @@ func hasBashWildcard(commands []any) bool {
 // isClaudeToolName uses the existing Claude naming convention heuristic:
 // valid Claude tool keys are expected to start with an uppercase ASCII letter.
 func isClaudeToolName(toolName string) bool {
-	return toolName != "" && toolName[0] >= 'A' && toolName[0] <= 'Z'
+	for _, first := range toolName {
+		return first >= 'A' && first <= 'Z'
+	}
+	return false
 }
 
 func appendTopLevelClaudeTools(allowedTools []string, tools map[string]any, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig) []string {
