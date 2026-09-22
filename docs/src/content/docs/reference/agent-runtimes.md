@@ -30,13 +30,13 @@ These similarly named fields control different layers:
 | Cloud Hypervisor (preview) | A KVM-backed microVM for the agent | GitHub-hosted Ubuntu x86_64 runner with `/dev/kvm` and AWF release asset download access | Preview-only path with strict host requirements and release-asset provisioning |
 | ARC DinD | Standard Docker agent container in a DinD sidecar | ARC or equivalent Kubernetes runner with a privileged DinD sidecar and shared work volume | Supports Kubernetes runner fleets, but adds split-filesystem and daemon-connectivity complexity |
 
-Apply this selection order:
+Use this order when choosing:
 
-1. Use **ARC DinD** when the runner is an ARC pod or another Kubernetes runner whose Docker daemon is a DinD sidecar. Do not combine it with gVisor or Docker sbx.
-2. Otherwise, use **Docker sbx** when the user requires a hardware-virtualized boundary and the runner exposes working KVM.
-3. Use **Cloud Hypervisor (preview)** only when the runtime must be Cloud Hypervisor and the runner is GitHub-hosted Ubuntu x86_64 with `/dev/kvm`.
-4. Otherwise, use **gVisor** when untrusted agent code warrants a smaller host-kernel attack surface and the workload is compatible with `runsc`.
-5. Use the default **Docker** runtime when compatibility, startup time, or runner portability is more important than an additional kernel or VM boundary.
+1. **ARC DinD** for ARC pods or other Kubernetes runners that reach Docker through a DinD sidecar. Do not combine it with gVisor, Docker sbx, or Cloud Hypervisor.
+2. **Docker sbx** when you need a hardware-virtualized boundary and the runner exposes working KVM.
+3. **Cloud Hypervisor (preview)** only when that exact runtime is required and the runner is GitHub-hosted Ubuntu x86_64 with `/dev/kvm`.
+4. **gVisor** when untrusted agent code needs a smaller host-kernel attack surface and the workload is compatible with `runsc`.
+5. **Docker** when compatibility, startup time, or runner portability matters more than an extra kernel or VM boundary.
 
 If the user's requirement is unclear, prefer Docker. Do not select a stronger runtime until the runner prerequisites are known to be available.
 
@@ -82,12 +82,7 @@ The entire `sandbox` block may be omitted when its defaults are sufficient. AWF 
 
 ### Docker runner requirements
 
-A conventional Docker runner needs:
-
-- A Linux Docker Engine that the runner user can access.
-- Docker Compose support.
-- A daemon on the same filesystem as the runner, unless `runner.topology: arc-dind` is configured.
-- Outbound access to pull the pinned AWF, proxy, gateway, and MCP images.
+A conventional Docker runner needs a Linux Docker Engine that the runner user can access, Docker Compose support, a daemon on the same filesystem as the runner unless `runner.topology: arc-dind` is configured, and outbound access to pull the pinned AWF, proxy, gateway, and MCP images.
 
 For a self-hosted runner, avoid a remote TCP Docker daemon unless the environment is intentionally configured as a split-daemon topology. Bind-mount source paths are resolved by the daemon, not by the client, so a remote daemon that cannot see the runner workspace causes missing-workspace and mount errors.
 
@@ -123,22 +118,9 @@ Investigate this issue.
 
 ### gVisor runner requirements
 
-The generated setup step:
+The generated setup step detects `x86_64` or `aarch64`, downloads pinned `runsc` and `containerd-shim-runsc-v1` binaries plus their SHA-512 files from `storage.googleapis.com/gvisor`, verifies both checksums, installs them under `/usr/local/bin` with `sudo`, runs `sudo runsc install` and `sudo systemctl restart docker`, then verifies the runtime with `docker run --rm --runtime=runsc hello-world`.
 
-1. Detects `x86_64` or `aarch64` with `uname -m`.
-2. Downloads pinned `runsc` and `containerd-shim-runsc-v1` binaries and their SHA-512 files from `storage.googleapis.com/gvisor`.
-3. Verifies both checksums.
-4. Uses `sudo` to install the binaries under `/usr/local/bin`.
-5. Runs `sudo runsc install` and `sudo systemctl restart docker`.
-6. Verifies the runtime with `docker run --rm --runtime=runsc hello-world`.
-
-The runner therefore needs:
-
-- A supported Linux architecture and a Docker Engine managed by systemd.
-- Passwordless, non-interactive `sudo` for the runner user.
-- Permission to modify Docker's runtime configuration and restart Docker.
-- Outbound HTTPS access to `storage.googleapis.com/gvisor` and the registry serving `hello-world`.
-- AWF `v0.27.30` or newer. The repository default is newer; this matters when `firewall.version` or `sandbox.agent.version` is pinned.
+The runner therefore needs a supported Linux architecture, a Docker Engine managed by systemd, passwordless non-interactive `sudo` for the runner user, permission to modify Docker's runtime configuration and restart Docker, outbound HTTPS access to `storage.googleapis.com/gvisor` and the registry serving `hello-world`, and AWF `v0.27.30` or newer. The repository default is newer; this matters when `firewall.version` or `sandbox.agent.version` is pinned.
 
 > [!IMPORTANT]
 > Host-level `sudo` is required by the generated gVisor installation step, but the agent itself keeps running rootless under AWF network isolation. The compiler derives these privileges from `sandbox.agent.runtime: gvisor`; there is no separate `sudo` field to set.
@@ -206,16 +188,7 @@ Add these Actions secrets to the repository or organization:
 
 ### Docker sbx runner requirements
 
-The runner needs:
-
-- Linux with the KVM module loaded and `/dev/kvm` exposed.
-- Nested virtualization when the runner itself is a virtual machine.
-- Passwordless, non-interactive `sudo`.
-- An apt-based distribution on which the official Docker repository and `docker-sbx` package can be installed.
-- Docker Engine and the Docker CLI.
-- Docker Hub credentials with access to `docker/sandbox-templates:shell-docker`.
-- Outbound HTTPS access to `get.docker.com`, Docker's apt repository, and Docker Hub.
-- AWF `v0.27.30` or newer.
+The runner needs Linux with the KVM module loaded and `/dev/kvm` exposed, nested virtualization when the runner itself is a virtual machine, passwordless non-interactive `sudo`, an apt-based distribution on which the official Docker repository and `docker-sbx` package can be installed, Docker Engine and the Docker CLI, Docker Hub credentials with access to `docker/sandbox-templates:shell-docker`, outbound HTTPS access to `get.docker.com`, Docker's apt repository, and Docker Hub, and AWF `v0.27.30` or newer.
 
 The compiler generates fail-fast KVM and secret checks, installs `docker-sbx`, changes `/dev/kvm` permissions, starts the sbx daemon, authenticates both CLIs, initializes an allow-all sbx policy, pulls the template, and runs a create/exec/remove smoke test. It refreshes sbx credentials again immediately before AWF starts the agent.
 
@@ -279,15 +252,7 @@ sandbox:
 Investigate this issue.
 ```
 
-Preview scope is intentionally narrow:
-
-- GitHub-hosted runners only (`RUNNER_ENVIRONMENT=github-hosted`).
-- Ubuntu Linux x86_64 only (`RUNNER_OS=Linux`, `RUNNER_ARCH=X64`, `ImageOS=ubuntu*`).
-- `/dev/kvm` must be present, and the host must have `gh`, `rsync`, and Docker (with a running Docker Engine), a usable cgroup v2 hierarchy, and a kernel that reports Landlock LSM support.
-- `runner.topology: arc-dind` is not supported.
-- `tools.github.mode: gh-proxy` and the `integrity-reactions` feature are not supported: the CLI proxy sidecar is not attached to the isolated topology.
-- `sandbox.agent.allow-host-ports` and GitHub Actions `services:` with published ports are not supported: host access requires `sandbox.agent.runtime: docker-sudo-iptables`.
-- `enclaves` configuration is not supported.
+Preview scope is intentionally narrow: it supports only GitHub-hosted Ubuntu Linux x86_64 runners (`RUNNER_ENVIRONMENT=github-hosted`, `RUNNER_OS=Linux`, `RUNNER_ARCH=X64`, `ImageOS=ubuntu*`) with `/dev/kvm`, `gh`, `rsync`, Docker with a running engine, a usable cgroup v2 hierarchy, and a kernel that reports Landlock LSM support. It does not support `runner.topology: arc-dind`, `tools.github.mode: gh-proxy`, the `integrity-reactions` feature, `sandbox.agent.allow-host-ports`, GitHub Actions `services:` with published ports, or `enclaves`.
 
 The compiler grants only the runner user read/write access to `/dev/kvm`, then emits host preflight and release-asset provisioning steps before AWF runs. Host preflight fails closed unless `/dev/kvm`, `gh`, `rsync`, Docker, a usable cgroup v2 hierarchy, and Landlock LSM support are all present. Provisioning downloads the Cloud Hypervisor guest archive together with its attested `manifest.json` and Sigstore `manifest.sigstore.jsonl` bundle from the pinned `gh-aw-firewall` release, validates the release identity, artifact names, and bundle structure, and feeds AWF the manifest path, bundle path, and exact release tag so AWF can perform the authoritative offline Sigstore/provenance verification for the Cloud Hypervisor binary, `virtiofsd`, kernel, rootfs, and supervisor.
 
@@ -315,15 +280,7 @@ Do not set `runtime: gvisor`, `runtime: docker-sbx`, or `runtime: cloud-hypervis
 
 ### ARC DinD runner requirements
 
-The ARC or equivalent Kubernetes pod needs:
-
-- `containerMode.type="dind"` or an equivalent privileged Docker sidecar. Kubernetes container mode is not supported.
-- A shared `/home/runner/_work` volume between the runner and DinD sidecar.
-- `DOCKER_HOST` set to the sidecar's `tcp://` endpoint.
-- An unprivileged runner container; only the DinD sidecar needs `privileged: true`.
-- No `sudo`, `apt install`, or other root-requiring commands in `steps`, `pre-steps`, `pre-agent-steps`, or `post-steps`.
-- AWF `v0.27.20` or newer.
-- A tool cache on a daemon-visible shared path, such as `/tmp/gh-aw/tool-cache`, rather than `/opt/hostedtoolcache`.
+The ARC or equivalent Kubernetes pod needs `containerMode.type="dind"` or an equivalent privileged Docker sidecar, a shared `/home/runner/_work` volume between the runner and DinD sidecar, `DOCKER_HOST` set to the sidecar's `tcp://` endpoint, an unprivileged runner container with privilege limited to the DinD sidecar, no `sudo`, `apt install`, or other root-requiring commands in `steps`, `pre-steps`, `pre-agent-steps`, or `post-steps`, AWF `v0.27.20` or newer, and a tool cache on a daemon-visible shared path such as `/tmp/gh-aw/tool-cache` rather than `/opt/hostedtoolcache`.
 
 The compiler uses `runner.topology: arc-dind` to enable sysroot staging, shared-volume paths, chroot identity, log relocation, network isolation, and tool-cache checks. At runtime, the generated workflow also inspects `DOCKER_HOST` and passes the Docker endpoint to AWF.
 
