@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.36
+**Version**: 1.0.37
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.37` | `v0.87.9` | Adds CTR-028; PR-triggered agent jobs restore agent configuration from the base branch before any step that installs agent content. |
 | `1.0.36` | `v0.87.9` | Audit-only; Opengrep build-reproducibility findings (non-deterministic `npm`/`uv pip` installs, non-SHA-pinned Dockerfile image) are out of conformance scope per Section 1. |
 | `1.0.35` | `v0.87.9` | Audit-only; #681/#678/#676/#675, #679, #674/#669/#668/#667, #663, #657, #652/#651, and #680 are not new threat classes. |
 | `1.0.34` | `v0.87.9` | Adds CTR-027; allowlisted bot synchronization requires trusted same-repository provenance. |
@@ -50,6 +51,8 @@ Each version maps to the minimum compatible binary. A version change MUST update
 ## 3. Threat Model Overview
 
 Generated workflows run with elevated permissions and consume untrusted content (issues, PRs, comments, external tool output). The catalog in Section 5 groups the threats a conforming compiler MUST detect into five classes: unauthorized privilege or scope expansion, unsafe or bypassed sandboxing, injection (template, shell, or subprocess argument), unsafe output and supply-chain routes, and compile-time drift between manifests, mappings, and the rules that reference them. Each class maps to one or more `CTR-*` rules with a stable trigger and compiler action.
+
+Sandbox bypass includes the provenance of the agent's own configuration. On pull-request triggers the workspace holds head-branch content that the PR author controls, so agent configuration folders and root instruction files are attacker-controlled inputs until the generated job replaces them with the base-branch snapshot captured before that content was checked out.
 
 ## 4. Governance and Responsibilities
 
@@ -87,6 +90,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-025 Framework Self-Prompt Misattribution**: Strip only a leading framework `<system>` block before analysis.
 - **CTR-026 Generated Job Timeout Expression Injection**: Reject non-positive or expression job timeout values.
 - **CTR-027 Allowlisted Bot Synchronization Provenance**: Deny bot-driven PR synchronization when the actor differs from the PR author unless the bot is explicitly allowlisted and active, the PR is from the base repository, the PR author satisfies the configured roles, and the actor is not Dependabot.
+- **CTR-028 Agent Configuration Restore Provenance**: For pull-request triggers, emit the base-branch restore of every engine's agent configuration folders and root instruction files after the PR checkout and before any generated step that installs agent content or executes the agent.
 
 ### 5.2 Compiler Response Requirements
 
@@ -155,6 +159,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-025 Framework Self-Prompt Misattribution | `actions/setup/js/setup_threat_detection.cjs` | `setup_threat_detection.test.cjs` |
 | CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
 | CTR-027 Allowlisted Bot Synchronization Provenance | `actions/setup/js/check_membership.cjs`, `actions/setup/js/check_permissions_utils.cjs` | `actions/setup/js/check_membership.test.cjs`, `actions/setup/js/check_permissions_utils.test.cjs` |
+| CTR-028 Agent Configuration Restore Provenance | `pkg/workflow/pr.go`, `actions/setup/sh/save_base_github_folders.sh`, `actions/setup/sh/restore_base_github_folders.sh` | `pkg/workflow/compiler_pre_agent_steps_test.go`, `actions/setup/sh/restore_base_github_folders_test.sh` |
 
 ### 7.2 Mapping Audit History
 
@@ -194,6 +199,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-039** | CTR-025 Framework Self-Prompt Misattribution | Strip only a leading framework `<system>` block before analysis | Strip only a leading framework `<system>` block before analysis. | `CTR-025` |
 | **T-CTR-041** | CTR-026 Generated Job Timeout Expression Injection | Reject non-positive or expression job timeout values | Reject non-positive or expression job timeout values. | `CTR-026` |
 | **T-CTR-042** | CTR-027 Allowlisted Bot Synchronization Provenance | An allowlisted bot synchronizes a PR authored by another actor | Authorize only when the bot, repository provenance, and PR author satisfy all trust requirements; otherwise deny with `confused_deputy` or `bot_not_active`. | `CTR-027` |
+| **T-CTR-043** | CTR-028 Agent Configuration Restore Provenance | A pull-request-triggered workflow generates an agent job that installs agent content through `steps:` or `pre-agent-steps:` | Emit the base-branch restore of the engine's agent configuration folders and root instruction files after the PR checkout and before any agent-content install step and the agent execution step. | `CTR-028` |
 
 The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
 

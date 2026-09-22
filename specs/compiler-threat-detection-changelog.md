@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.37 | Added CTR-028 for base-branch agent configuration restore provenance on pull-request triggers; the restore is emitted after the PR checkout and before any step that installs agent content, for every engine. |
 | 1.0.36 | Audit-only review; Opengrep build-reproducibility alerts (`github-actions-npm-install-non-deterministic`, `actions-uv-pip-install-non-deterministic`, `actions-pip-install-inline-no-hash-check`, `github-actions-setup-node-missing-version`, `dockerfile-non-sha-pinned-image`) are external-scanner findings outside conformance scope; no new CTR rule required. |
 | 1.0.35 | Audit-only review; open code-scanning alerts (#681/#678/#676/#675 allocation-overflow, #679 useless-assignment, #674/#669/#668/#667 bad-redirect-check, #663 http-to-file-access, #657 smoke-test dummy, #652/#651 stale GraphQL-injection claim, #680 out-of-context stray commit artifacts) are not new compiler threat classes. |
 | 1.0.34 | Added CTR-027 for trusted same-repository allowlisted bot synchronization and fail-closed confused-deputy handling. |
