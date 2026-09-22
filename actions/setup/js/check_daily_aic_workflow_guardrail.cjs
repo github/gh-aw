@@ -477,7 +477,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
     });
     const allRuns = response.data.workflow_runs || [];
     const normalizedWorkflowPath = typeof workflowPath === "string" ? workflowPath.replace(/^\.\//, "") : "";
-    const filteredRuns = allRuns.filter(run => run?.workflow_id === workflowId || (run?.workflow_id == null && typeof run?.path === "string" && run.path.replace(/^\.\//, "") === normalizedWorkflowPath));
+    const filteredRuns = allRuns.filter(run => run?.workflow_id === workflowId || (normalizedWorkflowPath && run?.workflow_id == null && typeof run?.path === "string" && run.path.replace(/^\.\//, "") === normalizedWorkflowPath));
     logDailyGuardrail("Filtered repository workflow runs by workflow ID fallback", {
       workflowId,
       page,

@@ -720,7 +720,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("falls back to repository run history when workflow-specific run lookup 404s under required workflows", async () => {
+  it("falls back to repository run history by workflow ID or path after a 404", async () => {
     const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockResolvedValue(25);
     const workflowName = "PR Quality Review";
     const nowIso = new Date().toISOString();
