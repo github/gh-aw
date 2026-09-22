@@ -21,6 +21,8 @@ func TestImportInputFallbackExpressionCompilation(t *testing.T) {
 		{name: "campaign", input: "campaign: eslint-rules", expected: "eslint-rules"},
 		{name: "package", input: "package: repo-assist", expected: "repo-assist"},
 		{name: "neither", input: "{}", expected: ""},
+		{name: "both provided campaign wins", input: "campaign: eslint-rules\n      package: repo-assist", expected: "eslint-rules"},
+		{name: "empty campaign falls back to package", input: "campaign: \"\"\n      package: repo-assist", expected: "repo-assist"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "import-input-fallback-*")
