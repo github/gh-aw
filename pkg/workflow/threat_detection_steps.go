@@ -89,6 +89,9 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string { //nolin
 		// Step 11: Run threat-detect under AWF with a read-write mount for the result file
 		steps = append(steps, c.buildExternalDetectorExecutionStep(data)...)
 
+		// Collect staged results before post-steps, accounting, upload, and conclusion.
+		steps = append(steps, buildCollectArcDindDetectionResultsStep(data)...)
+
 		// Step 11a: Render detection.log to the Actions log wrapped in group/stop-commands macros.
 		steps = append(steps, c.buildRenderDetectionLogStep(data)...)
 

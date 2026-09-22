@@ -260,19 +260,25 @@ type externalDetectorPathSetup struct {
 // name, so the mounted ${RUNNER_TEMP}/gh-aw/bin/ directory must be prepended to
 // PATH in the container command. Non-ARC topologies also need a host-side copy
 // into that mounted directory; ARC/DinD already stages Copilot there during install.
+// Every ARC detection engine also needs the detector binary and prepared inputs
+// staged on the shared volume before AWF starts.
 func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID string) externalDetectorPathSetup {
+	setup := externalDetectorPathSetup{}
+	if isArcDindTopology(data) {
+		setup.hostSetup = `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`
+		setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
+	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
-		return externalDetectorPathSetup{commandPrefix: codexBYOKAPIKeyExport() + " && "}
+		setup.commandPrefix += codexBYOKAPIKeyExport() + " && "
+		return setup
 	}
 	if engineID != "copilot" {
-		return externalDetectorPathSetup{}
-	}
-	setup := externalDetectorPathSetup{
-		commandPrefix: `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `,
+		return setup
 	}
 	if isArcDindTopology(data) {
 		return setup
 	}
+	setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
 	setup.hostSetup = copilotBinaryPathSetup
 	return setup
 }
@@ -350,11 +356,10 @@ func isAWFBinaryInstallStep(step GitHubActionStep) bool {
 }
 
 func appendThreatDetectionRWMount(mounts []string) []string {
-	threatDetectionMount := constants.ThreatDetectionDir + ":" + constants.ThreatDetectionDir + ":rw"
-	if slices.Contains(mounts, threatDetectionMount) {
+	if slices.Contains(mounts, threatDetectionRWMount) {
 		return mounts
 	}
-	return append(mounts, threatDetectionMount)
+	return append(mounts, threatDetectionRWMount)
 }
 
 // buildExternalDetectorExecutionStep creates the AWF execution step for the external
@@ -471,7 +476,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// no longer writes any step-summary output (see
 	// github/gh-aw-threat-detection#792), so the flag is intentionally omitted here.
 	npmPathSetup := GetNpmBinPathSetup()
-	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection)
+	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection, isArcDindTopology(threatDetectionData))
 
 	// Build the complete AWF command. BuildAWFCommand handles config file setup,
 	// ARC/DinD probes, tool cache mount, and the log tee pattern.
@@ -552,7 +557,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	return steps
 }
 
-func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetectionConfig) string {
+func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetectionConfig, arcDind bool) string {
 	args := []string{
 		"threat-detect",
 		"--engine", shellEscapeArg(engineID),
@@ -570,10 +575,15 @@ func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetec
 		}
 	}
 
-	args = append(args,
-		"--output", shellEscapeArg(constants.ThreatDetectionResultPath),
-		shellEscapeArg(constants.ThreatDetectionDir),
-	)
+	resultPath := shellEscapeArg(constants.ThreatDetectionResultPath)
+	inputPath := shellEscapeArg(constants.ThreatDetectionDir)
+	if arcDind {
+		// These compiler-owned expressions must expand inside the sandbox, with
+		// quotes retained so runner temp paths containing spaces remain single args.
+		resultPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionResultPath))
+		inputPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionDir))
+	}
+	args = append(args, "--output", resultPath, inputPath)
 
 	return fmt.Sprintf("%s && %s", npmPathSetup, strings.Join(args, " "))
 }

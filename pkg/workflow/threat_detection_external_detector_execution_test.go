@@ -320,7 +320,7 @@ func TestBuildExternalDetectorExecutionStepEmitsTimeoutMinutes(t *testing.T) {
 }
 
 func TestBuildThreatDetectCommandOmitsUnsetOptionalFlags(t *testing.T) {
-	cmd := buildThreatDetectCommand("setup-path", "copilot", &ThreatDetectionConfig{})
+	cmd := buildThreatDetectCommand("setup-path", "copilot", &ThreatDetectionConfig{}, false)
 
 	if strings.Contains(cmd, "--engine-timeout") {
 		t.Fatalf("expected --engine-timeout to be omitted when unset, got: %s", cmd)
@@ -344,7 +344,7 @@ func TestBuildThreatDetectCommandEmitsConfiguredOptionalFlags(t *testing.T) {
 			v := 1
 			return &v
 		}(),
-	})
+	}, false)
 
 	for _, want := range []string{
 		"--engine-timeout 10m",
@@ -359,7 +359,7 @@ func TestBuildThreatDetectCommandEmitsConfiguredOptionalFlags(t *testing.T) {
 }
 
 func TestBuildThreatDetectCommandShellEscapesEngineID(t *testing.T) {
-	cmd := buildThreatDetectCommand("setup-path", "copilot next", &ThreatDetectionConfig{})
+	cmd := buildThreatDetectCommand("setup-path", "copilot next", &ThreatDetectionConfig{}, false)
 
 	if !strings.Contains(cmd, "--engine 'copilot next'") {
 		t.Fatalf("expected engine argument to be shell-escaped as a single argument, got: %s", cmd)
