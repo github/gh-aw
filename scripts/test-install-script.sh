@@ -12,6 +12,17 @@ fail() {
     exit 1
 }
 
+# Derive the installer's expected platform asset name the same way install-gh-aw.sh does,
+# so the fixture curl works on every Linux architecture the installer supports.
+case "$(uname -m)" in
+    x86_64) ARCH_NAME="amd64" ;;
+    aarch64|arm64) ARCH_NAME="arm64" ;;
+    armv7l|armv6l) ARCH_NAME="arm" ;;
+    i386|i686) ARCH_NAME="386" ;;
+    *) fail "Unsupported test architecture: $(uname -m)" ;;
+esac
+PLATFORM="linux-${ARCH_NAME}"
+
 make_binary() {
     local path=$1
     local version=$2
@@ -56,7 +67,7 @@ test_manual_binary_replacement() (
     make_binary "$asset" "v1.2.3" "$([ "$case_name" = invalid-binary ] && echo true || echo false)"
     {
         for platform in linux-amd64 linux-arm64 linux-arm linux-386; do
-            if [ "$case_name" = checksum-mismatch ] && [ "$platform" = linux-amd64 ]; then
+            if [ "$case_name" = checksum-mismatch ] && [ "$platform" = "$PLATFORM" ]; then
                 printf '%064d %s\n' 0 "$platform"
             else
                 sha256sum "$asset" | awk -v platform="$platform" '{print $1 " " platform}'
@@ -104,7 +115,7 @@ if [ "${FIXTURE_PARTIAL_DOWNLOAD:-}" = true ]; then
 fi
 case "$url" in
     https://api.github.com/repos/github/gh-aw/releases/latest) source_file="$FIXTURE_LATEST" ;;
-    https://github.com/github/gh-aw/releases/latest/download/linux-amd64|https://github.com/github/gh-aw/releases/download/v1.2.3/linux-amd64) source_file="$FIXTURE_BINARY" ;;
+    "https://github.com/github/gh-aw/releases/latest/download/$PLATFORM"|"https://github.com/github/gh-aw/releases/download/v1.2.3/$PLATFORM") source_file="$FIXTURE_BINARY" ;;
     https://github.com/github/gh-aw/releases/latest/download/checksums.txt|https://github.com/github/gh-aw/releases/download/v1.2.3/checksums.txt) source_file="$FIXTURE_CHECKSUMS" ;;
     *) echo "unexpected curl URL: $url" >&2; exit 1 ;;
 esac
@@ -123,6 +134,7 @@ EOF
         HOME="$home" \
         PATH="$fixture_bin:$PATH" \
         REAL_CURL="$REAL_CURL" \
+        PLATFORM="$PLATFORM" \
         FIXTURE_LATEST="$case_root/latest.json" \
         FIXTURE_BINARY="$asset" \
         FIXTURE_CHECKSUMS="$checksums" \
