@@ -57,6 +57,22 @@ func TestLoadCachedAuditDataRequiresMatchingRunState(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestLoadCachedAuditDataRejectsOlderSchema(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"}
+	data, err := json.Marshal(AuditData{
+		CacheSource: auditCacheSourceFull,
+		Overview:    buildAuditOverview(run, nil),
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(auditPath(runDir), data, 0o600))
+
+	_, ok := loadCachedAuditData(runDir, run, auditCacheSourceFull)
+	assert.False(t, ok)
+}
+
 func TestWriteLogsAuditFilesUsesCacheUntilRunStateChanges(t *testing.T) {
 	runDir := t.TempDir()
 	run := WorkflowRun{

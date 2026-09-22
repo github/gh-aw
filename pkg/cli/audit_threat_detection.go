@@ -20,6 +20,12 @@ type threatDetectionVerdict struct {
 	MaliciousPatch  bool `json:"malicious_patch"`
 }
 
+type rawThreatDetectionVerdict struct {
+	PromptInjection *bool `json:"prompt_injection"`
+	SecretLeak      *bool `json:"secret_leak"`
+	MaliciousPatch  *bool `json:"malicious_patch"`
+}
+
 func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	detectionJobFailed := false
 	for _, job := range processedRun.JobDetails {
@@ -93,17 +99,44 @@ func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 		}
 		return nil
 	})
-	for _, path := range resultFiles {
-		if verdict, ok := readThreatDetectionResult(path); ok {
-			return verdict, true
+	var foundVerdict threatDetectionVerdict
+	found := false
+	for _, path := range append(resultFiles, logFiles...) {
+		var verdict threatDetectionVerdict
+		var ok bool
+		if filepath.Base(path) == "detection_result.json" {
+			verdict, ok = readThreatDetectionResult(path)
+		} else {
+			verdict, ok = scanThreatDetectionLog(path)
 		}
-	}
-	for _, path := range logFiles {
-		if verdict, ok := scanThreatDetectionLog(path); ok {
-			return verdict, true
+		if !ok {
+			continue
 		}
+		if found && verdict != foundVerdict {
+			return threatDetectionVerdict{}, false
+		}
+		foundVerdict = verdict
+		found = true
 	}
-	return threatDetectionVerdict{}, false
+	return foundVerdict, found
+}
+
+func hasThreatDetectionArtifact(runDir string) bool {
+	if runDir == "" {
+		return false
+	}
+	found := false
+	_ = filepath.WalkDir(runDir, func(_ string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if entry.Name() == "detection_result.json" || entry.Name() == "detection.log" {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 func readThreatDetectionResult(path string) (threatDetectionVerdict, bool) {
@@ -113,11 +146,22 @@ func readThreatDetectionResult(path string) (threatDetectionVerdict, bool) {
 	}
 	defer file.Close()
 
-	var verdict threatDetectionVerdict
-	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&verdict); err != nil {
+	var raw rawThreatDetectionVerdict
+	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&raw); err != nil {
 		return threatDetectionVerdict{}, false
 	}
-	return verdict, true
+	return validateThreatDetectionVerdict(raw)
+}
+
+func validateThreatDetectionVerdict(raw rawThreatDetectionVerdict) (threatDetectionVerdict, bool) {
+	if raw.PromptInjection == nil || raw.SecretLeak == nil || raw.MaliciousPatch == nil {
+		return threatDetectionVerdict{}, false
+	}
+	return threatDetectionVerdict{
+		PromptInjection: *raw.PromptInjection,
+		SecretLeak:      *raw.SecretLeak,
+		MaliciousPatch:  *raw.MaliciousPatch,
+	}, true
 }
 
 func scanThreatDetectionLog(path string) (threatDetectionVerdict, bool) {
@@ -127,6 +171,8 @@ func scanThreatDetectionLog(path string) (threatDetectionVerdict, bool) {
 	}
 	defer file.Close()
 
+	var foundVerdict threatDetectionVerdict
+	found := false
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -135,13 +181,22 @@ func scanThreatDetectionLog(path string) (threatDetectionVerdict, bool) {
 		if prefixIndex < 0 {
 			continue
 		}
-		var verdict threatDetectionVerdict
-		if err := json.Unmarshal([]byte(line[prefixIndex+len(threatDetectionResultPrefix):]), &verdict); err == nil {
-			return verdict, true
+		var raw rawThreatDetectionVerdict
+		if err := json.Unmarshal([]byte(line[prefixIndex+len(threatDetectionResultPrefix):]), &raw); err != nil {
+			continue
 		}
+		verdict, ok := validateThreatDetectionVerdict(raw)
+		if !ok {
+			continue
+		}
+		if found && verdict != foundVerdict {
+			return threatDetectionVerdict{}, false
+		}
+		foundVerdict = verdict
+		found = true
 	}
 	if scanner.Err() != nil {
 		return threatDetectionVerdict{}, false
 	}
-	return threatDetectionVerdict{}, false
+	return foundVerdict, found
 }

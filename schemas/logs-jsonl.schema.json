@@ -1094,6 +1094,9 @@
             "audit": {
               "type": "object",
               "properties": {
+                "schema_version": {
+                  "type": "integer"
+                },
                 "cache_source": {
                   "type": "string"
                 },
@@ -3614,6 +3617,7 @@
                 }
               },
               "required": [
+                "schema_version",
                 "overview",
                 "metrics",
                 "downloaded_files"

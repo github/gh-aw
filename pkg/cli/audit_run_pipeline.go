@@ -182,8 +182,25 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (bool
 		auditLog.Printf("Cache miss for run %d evals: evals not present locally, bypassing cache", cfg.runID)
 		return false, nil
 	}
+	if auditNeedsDetectionArtifact(cfg, summary) {
+		auditLog.Printf("Cache miss for run %d threat detection: detection artifact not present locally, bypassing cache", cfg.runID)
+		return false, nil
+	}
 	processedRun := processedRunFromSummary(summary, cfg.outputDir)
 	return true, renderAuditReport(ctx, processedRun, summary.Metrics, summary.MCPToolUsage, cfg.auditOptions())
+}
+
+func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
+	if !artifactMatchesFilter(constants.DetectionArtifactName.String(), cfg.artifactFilter) ||
+		hasThreatDetectionArtifact(cfg.outputDir) {
+		return false
+	}
+	for _, job := range summary.JobDetails {
+		if normalizeJobName(job.Name) == string(constants.DetectionJobName) {
+			return true
+		}
+	}
+	return false
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {

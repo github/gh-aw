@@ -30,6 +30,7 @@ var ghaLogTimestampPrefixPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T`)
 
 // AuditData represents the complete structured audit data for a workflow run
 type AuditData struct {
+	SchemaVersion           int                      `json:"schema_version"`
 	CacheSource             auditCacheSource         `json:"cache_source,omitempty"`
 	Overview                OverviewData             `json:"overview"`
 	Comparison              *AuditComparisonData     `json:"comparison,omitempty"`

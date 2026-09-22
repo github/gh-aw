@@ -78,6 +78,8 @@ The Graders section is present when the run recorded deterministic grader result
 
 Every `key_findings` entry includes a stable `code` for downstream automation. Titles and descriptions are human-readable and may change; consumers must use `code` to identify a finding type. Existing codes are not repurposed.
 
+The top-level `schema_version` identifies the audit cache and JSON contract version. Cached reports with an older version are regenerated before use.
+
 | Code | Finding |
 |---|---|
 | `workflow_failed` | The workflow failed |
