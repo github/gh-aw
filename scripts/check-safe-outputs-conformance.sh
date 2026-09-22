@@ -2093,6 +2093,8 @@ check_fork_backed_pr_semantics() {
     # 4. head-github-app takes precedence over head-github-token when both are configured.
     # 5. Successful executions MUST record head_repo in the safe-output summary and manifest.
     # 6. push_to_pull_request_branch follow-up is limited to PRs whose head repo matches head-repo.
+    # 7. head_repo MUST be included whenever head-repo differs from target-repo, even when both
+    #    share the same owner/organization (Section 7.1 v1.29.5).
 
     if [ ! -f "$pr_handler" ]; then
         log_high "TYPE-012: create_pull_request handler missing: $pr_handler"
@@ -2116,12 +2118,26 @@ check_fork_backed_pr_semantics() {
             log_high "TYPE-012: create_pull_request handler does not record head_repo in summary/manifest (Section 7.1 v1.26.0 requirement 5)"
             failed=1
         fi
+
+        # Check head_repo is gated on full repo identity, not owner alone, so that
+        # same-organization forks (differing repo, same owner) still send head_repo (requirement 7)
+        if ! grep -qE "pushRepo\.toLowerCase\(\)\s*===\s*itemRepo\.toLowerCase\(\)" "$pr_handler"; then
+            log_high "TYPE-012: create_pull_request handler does not compare full repo identity before omitting head_repo, risking same-organization fork failures (Section 7.1 v1.29.5 requirement 7)"
+            failed=1
+        fi
     fi
 
     # Check push_to_pull_request_branch restricts to configured head-repo (requirement 6)
     if [ -f "$push_handler" ]; then
         if ! grep -qE "head.repo|headRepo|head_repo" "$push_handler"; then
             log_high "TYPE-012: push_to_pull_request_branch handler does not enforce head-repo restriction (Section 7.1 v1.26.0 requirement 6)"
+            failed=1
+        fi
+
+        # Check head_repo params are gated on full repo identity, not owner alone, so that
+        # same-organization forks (differing repo, same owner) still send head_repo (requirement 7)
+        if ! grep -qE "pushRepo\.toLowerCase\(\)\s*===\s*itemRepo\.toLowerCase\(\)" "$push_handler"; then
+            log_high "TYPE-012: push_to_pull_request_branch handler does not compare full repo identity before omitting head_repo, risking same-organization fork failures (Section 7.1 v1.29.5 requirement 7)"
             failed=1
         fi
     else
@@ -2141,7 +2157,7 @@ check_fork_backed_pr_semantics() {
     fi
 
     if [ $failed -eq 0 ]; then
-        log_pass "TYPE-012: Fork-backed PR semantics implemented: allowlist, owner-qualified refs, head_repo provenance, and head-github-app precedence (Section 7.1 v1.26.0)"
+        log_pass "TYPE-012: Fork-backed PR semantics implemented: allowlist, owner-qualified refs, head_repo provenance (including same-organization forks), and head-github-app precedence (Section 7.1 v1.29.5)"
     fi
 }
 check_fork_backed_pr_semantics
