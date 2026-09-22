@@ -19,7 +19,7 @@ sandbox:
 tracker-id: daily-team-evolution-insights
 engine:
   id: goose
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 strict: false
 network:
   allowed:

@@ -20,7 +20,7 @@ permissions:
   pull-requests: read
   copilot-requests: write
 name: Smoke DeepSeek Harness
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 engine:
   id: deepseek-harness
 strict: true

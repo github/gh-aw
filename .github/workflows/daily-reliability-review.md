@@ -17,7 +17,7 @@ sandbox:
 tracker-id: daily-reliability-review
 engine:
   id: copilot
-model: claude-sonnet-4.5
+model: copilot/auto
 strict: true
 network:
   allowed:
