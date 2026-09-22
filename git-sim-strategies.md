@@ -1101,3 +1101,8 @@ safe-output probing here with revised guardrails that don't conflict with
 the outer policy, or (c) disable/archive the workflow. Until one of those
 happens, future runs should keep halting at Phase 0/1 rather than
 re-deriving this same analysis daily.
+
+## HALTED 2026-09-22 (32nd consecutive run)
+Same policy conflict reconfirmed independently again; also reconfirmed config-simulator
+still unregistered (untracked .claude/agents/config-simulator.md only). No cells advanced,
+next_index=216. See state.json `halted` field for full detail. noop only.
