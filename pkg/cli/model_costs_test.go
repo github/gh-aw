@@ -88,13 +88,18 @@ func TestFindGrok45CacheReadPricing(t *testing.T) {
 	assert.InDelta(t, 0.0000005, pricing["cache_read"], 1e-12)
 }
 
-func TestFindGrok46Pricing(t *testing.T) {
+func TestFindLatestGrokPricing(t *testing.T) {
 	t.Parallel()
-	pricing, ok := findModelPricing("github-copilot", "grok-4.6")
-	require.True(t, ok)
-	assert.InDelta(t, 0.000002, pricing["input"], 1e-12)
-	assert.InDelta(t, 0.000006, pricing["output"], 1e-12)
-	assert.InDelta(t, 0.0000005, pricing["cache_read"], 1e-12)
+	for _, model := range []string{"grok-4.6", "grok-4.7"} {
+		t.Run(model, func(t *testing.T) {
+			t.Parallel()
+			pricing, ok := findModelPricing("github-copilot", model)
+			require.True(t, ok)
+			assert.InDelta(t, 0.000002, pricing["input"], 1e-12)
+			assert.InDelta(t, 0.000006, pricing["output"], 1e-12)
+			assert.InDelta(t, 0.0000005, pricing["cache_read"], 1e-12)
+		})
+	}
 }
 
 func TestFindGemini37FlashPricing(t *testing.T) {
