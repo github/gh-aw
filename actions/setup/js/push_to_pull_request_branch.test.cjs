@@ -1663,7 +1663,6 @@ index 0000000..abc1234
       });
       await handler({ branch: "review-pr-from-same-organization-fork" }, {});
       expect(mockGithub.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ head: expect.stringMatching(/^test-owner:/), head_repo: "test-owner/automation-fork" }));
-      expect(mockGithub.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ head: expect.stringMatching(/^test-owner:/), head_repo: "test-owner/automation-fork" }));
     });
 
     it("should skip non-fatally when review branch is rejected for workflows scope (timeout variant, agent has none)", async () => {

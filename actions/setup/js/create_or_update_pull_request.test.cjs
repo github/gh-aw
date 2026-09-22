@@ -27,6 +27,5 @@ describe("createOrUpdatePullRequest", () => {
 
     await createOrUpdatePullRequest({ ...options, githubClient });
     expect(githubClient.rest.pulls.create).toHaveBeenCalledWith(expect.not.objectContaining({ head_repo: expect.anything() }));
-    expect(githubClient.rest.pulls.create).toHaveBeenCalledWith(expect.not.objectContaining({ head_repo: expect.anything() }));
   });
 });
