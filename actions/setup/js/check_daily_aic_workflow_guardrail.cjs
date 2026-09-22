@@ -484,7 +484,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
     });
     // Return the oldest unfiltered run's timestamp so the outer pagination loop
     // can stop early when all remaining runs predate the 24h window, even when
-    // none of the runs on this page match the workflow name.
+    // none of the runs on this page match the workflow ID.
     const lastUnfilteredRun = allRuns[allRuns.length - 1];
     return {
       response: {
@@ -658,7 +658,6 @@ async function main(options = {}) {
       getRunAIC: module.exports.getRunAIC,
       listPage: listCompletedWorkflowRunsPage,
       token,
-      workflowName: process.env.GH_AW_WORKFLOW_NAME || "",
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);

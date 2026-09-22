@@ -12,7 +12,7 @@ const MAX_PAGES = 10;
  * Publish only individually resolved observations, including nonzero usage.
  * Missing entries and concurrent snapshots are safe misses, never zero usage.
  */
-async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC, listPage, token, workflowName, cachePath = AIC_SCAN_CACHE_FILE_PATH, now = Date.now() }) {
+async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC, listPage, token, cachePath = AIC_SCAN_CACHE_FILE_PATH, now = Date.now() }) {
   const { owner, repo } = context.repo;
   const repository = `${owner}/${repo}`;
   const currentResponse = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId });
@@ -28,7 +28,6 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       owner,
       repo,
       workflowId: current.workflow_id,
-      workflowName,
       page,
       perPage: 100,
       lookupMode,
