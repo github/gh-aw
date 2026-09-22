@@ -134,11 +134,14 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, postResu
     // preserve the previous behavior where children immediately observe EOF. A child can
     // exit before a large prompt has been fully written, so handle EPIPE explicitly rather
     // than allowing an unhandled stream error to terminate the harness.
-    child.stdin.on("error", err => {
-      if (err.code !== "EPIPE") {
-        log(`attempt ${attempt + 1}: failed to write process stdin: ${err.message}`);
+    child.stdin.on(
+      "error",
+      /** @param {NodeJS.ErrnoException} err */ err => {
+        if (err.code !== "EPIPE") {
+          log(`attempt ${attempt + 1}: failed to write process stdin: ${err.message}`);
+        }
       }
-    });
+    );
     child.stdin.end(stdin);
 
     log(`attempt ${attempt + 1}: process started (pid=${child.pid ?? "unknown"})`);

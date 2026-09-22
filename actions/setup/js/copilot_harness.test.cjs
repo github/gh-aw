@@ -2280,6 +2280,16 @@ describe("copilot_harness.cjs", () => {
       expect(resolved.stdin).toEqual(prompt);
     });
 
+    it("removes explicit prompt args when streaming a prompt file through stdin", () => {
+      const promptFile = path.join(os.tmpdir(), `copilot-driver-conflict-${Date.now()}.txt`);
+      const prompt = Buffer.concat([Buffer.from("generated prompt\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x79)]);
+      fs.writeFileSync(promptFile, prompt);
+
+      const resolved = resolvePromptFileInput(["--prompt", "ignored before", "--add-dir", "/tmp", "--prompt-file", promptFile, "-p", "ignored after", "--prompt=also ignored", "--allow-all-tools"]);
+      expect(resolved.args).toEqual(["--add-dir", "/tmp", "--allow-all-tools"]);
+      expect(resolved.stdin).toEqual(prompt);
+    });
+
     it("keeps --prompt-file arguments unchanged when file resolution fails", () => {
       const missingPath = path.join(os.tmpdir(), `copilot-driver-missing-${Date.now()}.txt`);
       const resolved = resolvePromptFileInput(["--prompt-file", missingPath, "--allow-all-tools"]);

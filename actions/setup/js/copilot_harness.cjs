@@ -988,6 +988,48 @@ function parseCopilotSDKServerArgsFromEnv(serverArgsEnv, options) {
 }
 
 /**
+ * Return whether the argument is an explicit Copilot prompt option that takes
+ * the prompt from argv instead of stdin.
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isPromptOption(arg) {
+  return arg === "-p" || arg === "--prompt";
+}
+
+/**
+ * Return whether the argument is an explicit Copilot prompt option with an
+ * inline value.
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isInlinePromptOption(arg) {
+  return arg.startsWith("--prompt=");
+}
+
+/**
+ * Remove explicit prompt options so Copilot reads the streamed prompt from stdin.
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+function removeExplicitPromptOptions(args) {
+  /** @type {string[]} */
+  const filteredArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (isPromptOption(arg)) {
+      i++;
+      continue;
+    }
+    if (isInlinePromptOption(arg)) {
+      continue;
+    }
+    filteredArgs.push(arg);
+  }
+  return filteredArgs;
+}
+
+/**
  * Resolve --prompt-file arguments for the Copilot CLI.
  * Small files are inlined as -p prompt text for compatibility with older Copilot CLIs.
  * Larger files are removed from the argument list and returned as stdin data so the full
@@ -1035,6 +1077,9 @@ function resolvePromptFileInput(args) {
     }
   }
 
+  if (promptStdin) {
+    return { args: removeExplicitPromptOptions(resolvedArgs), stdin: promptStdin };
+  }
   return { args: resolvedArgs, stdin: promptStdin };
 }
 
