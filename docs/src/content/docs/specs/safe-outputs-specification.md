@@ -3636,6 +3636,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `target`: `"triggering"` (default), `"*"`, or a fixed pull request number. Constrains which PR's review threads may be resolved; `thread_id` (or `comment_id`) always identifies the specific thread.
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the pull request for the resolution to be processed
+- `required-title-prefix`: Title prefix that the pull request MUST have for the resolution to be processed
 
 **Target Authorization**:
 
@@ -3686,6 +3688,16 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - `pull-requests: write` - Review comment reply creation
 - `metadata: read` - Repository metadata (automatically granted)
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 10)
+- `target`: `"triggering"` (default) or `"*"` (requires explicit `pull_request_number` per message)
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the pull request for the reply to be processed
+- `required-title-prefix`: Title prefix that the pull request MUST have for the reply to be processed
+- `footer`: Whether to append footer attribution (default: `true`)
 
 **Notes**:
 
