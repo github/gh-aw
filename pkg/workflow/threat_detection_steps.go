@@ -229,7 +229,7 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 
 	proxyLogsDir := constants.AWFProxyLogsDir.String()
 	auditDir := constants.AWFAuditDir.String()
-	if isArcDindTopology(data) {
+	if isArcDindDetectionJob(data) {
 		proxyLogsDir = rewriteArcDindPath(proxyLogsDir)
 		auditDir = rewriteArcDindPath(auditDir)
 	}

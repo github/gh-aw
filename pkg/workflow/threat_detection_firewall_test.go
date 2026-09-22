@@ -119,7 +119,7 @@ func TestBuildCopyDetectionFirewallLogsStep(t *testing.T) {
 				Firewall: &FirewallConfig{Enabled: true},
 			},
 			SafeOutputs: &SafeOutputsConfig{
-				ThreatDetection: &ThreatDetectionConfig{},
+				ThreatDetection: &ThreatDetectionConfig{RunsOn: "runs-on: arc-scale-set"},
 			},
 		}
 

@@ -9,6 +9,12 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+// arcDindDetectionRunsOn is the detection-job runner override used by tests that
+// exercise the ARC/DinD detection codegen. The detection job only inherits the
+// workflow's runner topology when it declares its own runs-on, because otherwise it
+// is pinned to the GitHub-hosted ubuntu-latest runner (see gh-aw#59935).
+const arcDindDetectionRunsOn = "runs-on: arc-runner-set"
+
 func TestBuildDetectionJobStepsCodexAvoidsDuplicateContainerPullStep(t *testing.T) {
 	compiler := NewCompiler()
 
@@ -114,7 +120,9 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 			data: &WorkflowData{
 				AI:           "copilot",
 				RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
-				SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+					RunsOn: arcDindDetectionRunsOn,
+				}},
 			},
 			wantInstallStep:      "Install GitHub Copilot CLI",
 			wantArcDindSetup:     true,
@@ -258,7 +266,7 @@ func TestBuildPullAWFContainersStepPropagatesRunnerTopology(t *testing.T) {
 				Topology: RunnerTopologyArcDind,
 			},
 			SafeOutputs: &SafeOutputsConfig{
-				ThreatDetection: &ThreatDetectionConfig{},
+				ThreatDetection: &ThreatDetectionConfig{RunsOn: arcDindDetectionRunsOn},
 			},
 		}
 
@@ -305,6 +313,65 @@ func TestBuildPullAWFContainersStepPropagatesRunnerTopology(t *testing.T) {
 
 		if permissionSteps != baseSteps {
 			t.Errorf("expected detection pull step to ignore permissions when collecting images;\nwithout permissions:\n%s\nwith permissions:\n%s", baseSteps, permissionSteps)
+		}
+	})
+}
+
+// TestBuildDetectionJobStepsArcDindTopologyScopedToDetectionRunner verifies that the
+// workflow's arc-dind runner topology is only applied to the detection job when the
+// detection job declares its own runs-on. By default the detection job is pinned to the
+// GitHub-hosted ubuntu-latest runner, where ARC/DinD codegen (tool-cache redirection,
+// `topology: arc-dind` in the AWF config, and ${RUNNER_TEMP}/gh-aw path rewriting) is
+// wrong: threat-detect is never staged to the rewritten path and the detection result is
+// written under a read-only mount that no later step reads (gh-aw#59935).
+func TestBuildDetectionJobStepsArcDindTopologyScopedToDetectionRunner(t *testing.T) {
+	compiler := NewCompiler()
+
+	buildData := func(detectionRunsOn string) *WorkflowData {
+		return &WorkflowData{
+			AI:           "copilot",
+			RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+			SafeOutputs: &SafeOutputsConfig{
+				ThreatDetection: &ThreatDetectionConfig{RunsOn: detectionRunsOn},
+			},
+			Features: map[string]any{
+				string(constants.GHAWDetectionFeatureFlag): true,
+			},
+			SandboxConfig: &SandboxConfig{
+				Agent: &AgentSandboxConfig{Type: SandboxTypeAWF},
+			},
+		}
+	}
+
+	t.Run("default ubuntu-latest detection runner drops arc-dind codegen", func(t *testing.T) {
+		joined := strings.Join(compiler.buildDetectionJobSteps(buildData("")), "")
+
+		if strings.Contains(joined, "Redirect tool cache and install paths for ARC/DinD") {
+			t.Errorf("did not expect ARC/DinD tool cache redirection in a detection job pinned to ubuntu-latest;\ngot:\n%s", joined)
+		}
+		if strings.Contains(joined, `topology\":\"arc-dind\"`) {
+			t.Errorf("did not expect arc-dind topology in the detection AWF config for a detection job pinned to ubuntu-latest;\ngot:\n%s", joined)
+		}
+		if strings.Contains(joined, "${RUNNER_TEMP}/gh-aw/threat-detection") {
+			t.Errorf("did not expect detection paths to be rewritten under ${RUNNER_TEMP}/gh-aw;\ngot:\n%s", joined)
+		}
+		// The producer (--output) and the consumers (artifact upload, conclude) must agree.
+		if !strings.Contains(joined, "--output "+constants.ThreatDetectionResultPath+" "+constants.ThreatDetectionDir) {
+			t.Errorf("expected threat-detect to write %s and read %s;\ngot:\n%s", constants.ThreatDetectionResultPath, constants.ThreatDetectionDir, joined)
+		}
+		if !strings.Contains(joined, "conclude_threat_detection.sh\" "+constants.ThreatDetectionResultPath) {
+			t.Errorf("expected the conclude step to read %s;\ngot:\n%s", constants.ThreatDetectionResultPath, joined)
+		}
+	})
+
+	t.Run("detection runs-on override keeps arc-dind codegen", func(t *testing.T) {
+		joined := strings.Join(compiler.buildDetectionJobSteps(buildData(arcDindDetectionRunsOn)), "")
+
+		if !strings.Contains(joined, "Redirect tool cache and install paths for ARC/DinD") {
+			t.Errorf("expected ARC/DinD tool cache redirection when the detection job declares its own runner;\ngot:\n%s", joined)
+		}
+		if !strings.Contains(joined, `topology\":\"arc-dind\"`) {
+			t.Errorf("expected arc-dind topology in the detection AWF config when the detection job declares its own runner;\ngot:\n%s", joined)
 		}
 	})
 }

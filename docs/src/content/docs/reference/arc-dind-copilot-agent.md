@@ -249,6 +249,10 @@ gh aw compile
 
 The threat-detection job can't find the Copilot binary. This was fixed in gh-aw v0.82.5 ([#44445](https://github.com/github/gh-aw/pull/44445)). The fix is the same — upgrade and recompile.
 
+### Detection job exits with code 127 or `Detection result file not found`
+
+The detection job ran with ARC/DinD codegen while being pinned to the GitHub-hosted `ubuntu-latest` runner, so the detection binary was never staged to the rewritten `$RUNNER_TEMP/gh-aw` path and the detection result was written under a read-only mount ([#59935](https://github.com/github/gh-aw/issues/59935)). Upgrade and recompile: the detection job now only inherits `runner: topology: arc-dind` when it declares its own runner through `safe-outputs.threat-detection.runs-on`.
+
 ### `sudo: The "no new privileges" flag is set`
 
 The runner pod's security context has `allowPrivilegeEscalation: false`. Pass `--rootless` to the Copilot CLI install script so it installs without `sudo` — see [Pod security and rootless install](#pod-security-and-rootless-install) above.

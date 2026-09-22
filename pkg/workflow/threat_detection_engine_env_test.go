@@ -380,7 +380,7 @@ func TestBuildDetectionEngineExecutionStepArcDindTopology(t *testing.T) {
 				Topology: RunnerTopologyArcDind,
 			},
 			SafeOutputs: &SafeOutputsConfig{
-				ThreatDetection: &ThreatDetectionConfig{},
+				ThreatDetection: &ThreatDetectionConfig{RunsOn: arcDindDetectionRunsOn},
 			},
 		}
 

@@ -87,7 +87,7 @@ func TestBuildExternalDetectorPathSetup(t *testing.T) {
 					Topology: RunnerTopologyArcDind,
 				},
 				SafeOutputs: &SafeOutputsConfig{
-					ThreatDetection: &ThreatDetectionConfig{},
+					ThreatDetection: &ThreatDetectionConfig{RunsOn: arcDindDetectionRunsOn},
 				},
 			},
 			engineID:          "copilot",
@@ -232,7 +232,7 @@ func TestBuildExternalDetectorExecutionStepPropagatesRunnerTopology(t *testing.T
 				Topology: RunnerTopologyArcDind,
 			},
 			SafeOutputs: &SafeOutputsConfig{
-				ThreatDetection: &ThreatDetectionConfig{},
+				ThreatDetection: &ThreatDetectionConfig{RunsOn: arcDindDetectionRunsOn},
 			},
 		}
 

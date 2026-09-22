@@ -133,6 +133,39 @@ func mergeThreatDetectionEngineEnv(data *WorkflowData, detectionEnv map[string]s
 	return merged
 }
 
+// detectionJobRunnerConfig returns the runner configuration that applies to the
+// detection job.
+//
+// The detection job runs on its own runner: `ubuntu-latest` unless
+// safe-outputs.threat-detection.runs-on overrides it. A runner topology such as
+// arc-dind describes the runner the workflow's agent job executes on, so it must
+// not be propagated to a detection job pinned to a GitHub-hosted runner. Doing so
+// emits ARC/DinD-only codegen (tool-cache redirection, `topology: arc-dind` in the
+// AWF config, and ${RUNNER_TEMP}/gh-aw path rewriting) on a runner where the
+// daemon-visible staging those paths depend on never happens, which leaves the
+// detection binary unstaged and the detection result written to a read-only mount
+// that no later step reads (see gh-aw#59935).
+//
+// When the detection job declares its own runs-on it may well be the same
+// self-hosted (ARC) runner as the agent job, so the topology is preserved.
+func detectionJobRunnerConfig(data *WorkflowData) *RunnerConfig {
+	if data == nil || data.RunnerConfig == nil {
+		return nil
+	}
+	if data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil ||
+		data.SafeOutputs.ThreatDetection.RunsOn == "" {
+		threatLog.Print("Detection job uses the default GitHub-hosted runner; not propagating runner topology")
+		return nil
+	}
+	return data.RunnerConfig
+}
+
+// isArcDindDetectionJob reports whether the detection job itself runs with the
+// arc-dind runner topology, taking the detection job's own runner into account.
+func isArcDindDetectionJob(data *WorkflowData) bool {
+	return isArcDindTopology(&WorkflowData{RunnerConfig: detectionJobRunnerConfig(data)})
+}
+
 // buildExternalDetectorWorkflowData creates the base WorkflowData for an external
 // detector step. It calls buildThreatDetectionWorkflowData and then applies the
 // detection engine config, env, and APITarget inheritance that is shared by both

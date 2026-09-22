@@ -27,6 +27,8 @@ Any `tcp://` endpoint (for example `tcp://localhost:2375`, `tcp://dind:2375`, or
 
 With ARC DinD handling enabled, AWF receives `--docker-host`, shared-work sysroot staging is applied, and chroot config patching is enabled. The runtime no longer uses `--docker-host-path-prefix`.
 
+The topology applies to jobs that run on the ARC runner. The threat-detection job runs on `ubuntu-latest` unless `safe-outputs.threat-detection.runs-on` selects another runner, so it only inherits `runner.topology: arc-dind` when that override is set.
+
 ### Docker socket override for split-daemon topologies
 
 When `DOCKER_HOST` is a TCP address (e.g., `tcp://localhost:2375`) and the Docker socket is mounted via a bind mount at a non-standard path, the MCP gateway needs explicit configuration to find the socket and determine its group ID.
