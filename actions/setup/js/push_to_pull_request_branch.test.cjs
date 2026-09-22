@@ -1242,6 +1242,116 @@ index 0000000..abc1234
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
+    const TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT = "Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.";
+
+    /**
+     * Mocks git plumbing so the primary push path is reached with a clean, workflow-file-free
+     * changeset, letting tests drive the pushSignedCommits outcome directly.
+     */
+    function mockGitForPrimaryPush() {
+      mockExec.getExecOutput = vi.fn().mockImplementation(async (cmd, args) => {
+        const argList = Array.isArray(args) ? args : [];
+        if (argList[0] === "log" && argList.includes(".github/workflows/")) {
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
+        if (argList[0] === "diff" && argList[1] === "--name-only") {
+          return { exitCode: 0, stdout: "test.txt\n", stderr: "" };
+        }
+        return { exitCode: 0, stdout: "abc123\n", stderr: "" };
+      });
+    }
+
+    it("should retry the primary push when it fails once with a transient workflows-scope timeout", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValueOnce(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT)).mockResolvedValueOnce("retried-sha");
+
+      try {
+        createPatchFile("should-retry-primary-push-on-transient-workflows-scope-timeo");
+        mockGitForPrimaryPush();
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const resultPromise = handler({ branch: "should-retry-primary-push-on-transient-workflows-scope-timeo" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        expect(result.success).toBe(true);
+        expect(result.error_type).toBeUndefined();
+        expect(result.fallback_used).not.toBe(true);
+        expect(pushSignedSpy).toHaveBeenCalledTimes(2);
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("should create a fallback pull request when the primary push keeps failing with a transient workflows-scope timeout", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
+
+      try {
+        createPatchFile("should-fallback-when-primary-push-keeps-timing-out-on-scope");
+        mockGitForPrimaryPush();
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const resultPromise = handler({ branch: "should-fallback-when-primary-push-keeps-timing-out-on-scope" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        // 1 initial + 5 retries = 6 total push attempts (RATE_LIMIT_RETRY_CONFIG.maxRetries = 5)
+        expect(pushSignedSpy).toHaveBeenCalledTimes(6);
+        expect(result.success).toBe(true);
+        expect(result.fallback_used).toBe(true);
+        expect(result.fallback_type).toBe("pull_request");
+        expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
+        const [params] = mockGithub.rest.pulls.create.mock.calls.at(-1);
+        expect(params.body).toContain("workflow-permission check");
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("should return a typed workflows_scope_required error when the primary push is rejected and the agent changed workflow files", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error("! [remote rejected] feature-branch -> feature-branch (`workflows` scope may be required.)"));
+
+      try {
+        createPatchFile("should-return-workflows-scope-required-on-primary-push-rejec");
+        mockExec.getExecOutput = vi.fn().mockImplementation(async (cmd, args) => {
+          const argList = Array.isArray(args) ? args : [];
+          if (argList[0] === "log" && argList.includes(".github/workflows/")) {
+            return { exitCode: 0, stdout: "", stderr: "" };
+          }
+          if (argList[0] === "diff" && argList[1] === "--name-only") {
+            return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          }
+          return { exitCode: 0, stdout: "abc123\n", stderr: "" };
+        });
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const resultPromise = handler({ branch: "should-return-workflows-scope-required-on-primary-push-rejec" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        expect(result.success).toBe(false);
+        expect(result.error_type).toBe("workflows_scope_required");
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
     it("should not create fallback pull request when fallback-as-pull-request is disabled", async () => {
       const patchPath = createPatchFile("should-not-create-fallback-pull-request-when-fallback-as-pul");
 
