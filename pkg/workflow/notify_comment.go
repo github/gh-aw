@@ -231,10 +231,9 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"        if: always()\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell),
-		"      - name: Upload usage artifact\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        uses: %s\n", pinAction("actions/upload-artifact")),
+	)
+	usageArtifactUploadAction := pinAction("actions/upload-artifact")
+	usageArtifactUploadWithLines := []string{
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", usageArtifactName),
 		"          path: |\n",
@@ -255,7 +254,32 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
 		"          if-no-files-found: ignore\n",
+	}
+	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)
+	retryUsageArtifactUploadWithLines = append(retryUsageArtifactUploadWithLines, "          overwrite: true\n")
+	steps = append(steps,
+		"      - name: Upload usage artifact\n",
+		"        id: upload-usage-artifact\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
 	)
+	steps = append(steps, usageArtifactUploadWithLines...)
+	// The initial upload can fail transiently (e.g. a runner-side DNS blip while
+	// talking to blob storage). A missing usage artifact permanently blocks the
+	// daily AI Credits guardrail for this run, so wait briefly and retry once
+	// before giving up, so a short-lived network hiccup has time to clear.
+	steps = append(steps,
+		"      - name: Wait before retrying usage artifact upload\n",
+		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
+		"        run: sleep 10\n",
+		"      - name: Retry upload usage artifact\n",
+		"        id: upload-usage-artifact-retry\n",
+		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
+	)
+	steps = append(steps, retryUsageArtifactUploadWithLines...)
 	return steps
 }
 

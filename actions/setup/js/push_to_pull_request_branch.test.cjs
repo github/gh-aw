@@ -1242,6 +1242,131 @@ index 0000000..abc1234
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
+    const TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT = "! [remote rejected] feature-branch -> feature-branch (Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.)";
+
+    /**
+     * Mocks git plumbing so the primary push path is reached with a clean, workflow-file-free
+     * changeset, letting tests drive the pushSignedCommits outcome directly.
+     */
+    function mockGitForPrimaryPush(changedFiles = "test.txt\n") {
+      mockExec.getExecOutput = vi.fn().mockImplementation(async (cmd, args) => {
+        const argList = Array.isArray(args) ? args : [];
+        if (argList[0] === "log" && argList.includes(".github/workflows/")) {
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
+        if (argList[0] === "diff" && argList[1] === "--name-only") {
+          return { exitCode: 0, stdout: changedFiles, stderr: "" };
+        }
+        return { exitCode: 0, stdout: "abc123\n", stderr: "" };
+      });
+    }
+
+    it("should retry the primary push when it fails once with a transient workflows-scope timeout", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValueOnce(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT)).mockResolvedValueOnce("retried-sha");
+
+      try {
+        createPatchFile("should-retry-primary-push-on-transient-workflows-scope-timeo");
+        mockGitForPrimaryPush();
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const resultPromise = handler({ branch: "should-retry-primary-push-on-transient-workflows-scope-timeo" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        expect(result.success).toBe(true);
+        expect(result.error_type).toBeUndefined();
+        expect(result.fallback_used).not.toBe(true);
+        expect(pushSignedSpy).toHaveBeenCalledTimes(2);
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("should create a fallback pull request when the primary push keeps failing with a transient workflows-scope timeout", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
+
+      try {
+        createPatchFile("should-fallback-when-primary-push-keeps-timing-out-on-scope");
+        mockGitForPrimaryPush();
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const resultPromise = handler({ branch: "should-fallback-when-primary-push-keeps-timing-out-on-scope" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        // 1 initial + 5 retries = 6 total push attempts (RATE_LIMIT_RETRY_CONFIG.maxRetries = 5)
+        expect(pushSignedSpy).toHaveBeenCalledTimes(6);
+        expect(result.success).toBe(true);
+        expect(result.fallback_used).toBe(true);
+        expect(result.fallback_type).toBe("pull_request");
+        expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
+        const [params] = mockGithub.rest.pulls.create.mock.calls.at(-1);
+        expect(params.body).toContain("workflow-permission check");
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("should create a fallback pull request after a persistent timeout when allow_workflows is true", async () => {
+      vi.useFakeTimers();
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
+
+      try {
+        createPatchFile("should-fallback-after-timeout-with-workflows-permission");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
+
+        const module = await loadModule();
+        const handler = await module.main({ allow_workflows: true });
+        const resultPromise = handler({ branch: "should-fallback-after-timeout-with-workflows-permission" }, {});
+
+        await vi.runAllTimersAsync();
+        const result = await resultPromise;
+
+        // 1 initial + 5 retries = 6 total push attempts (RATE_LIMIT_RETRY_CONFIG.maxRetries = 5)
+        expect(pushSignedSpy).toHaveBeenCalledTimes(6);
+        expect(result.success).toBe(true);
+        expect(result.fallback_used).toBe(true);
+        const [params] = mockGithub.rest.pulls.create.mock.calls.at(-1);
+        expect(params.body).toContain("workflow-permission check");
+      } finally {
+        pushSignedSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("should fail before pushing when workflow files changed without workflows permission", async () => {
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits");
+
+      try {
+        createPatchFile("should-fail-before-push-without-workflows-permission");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const result = await handler({ branch: "should-fail-before-push-without-workflows-permission" }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error_type).toBe("workflows_scope_required");
+        expect(pushSignedSpy).not.toHaveBeenCalled();
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
+      }
+    });
+
     it("should not create fallback pull request when fallback-as-pull-request is disabled", async () => {
       const patchPath = createPatchFile("should-not-create-fallback-pull-request-when-fallback-as-pul");
 

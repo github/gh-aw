@@ -76,6 +76,7 @@ function fixture(runs = [run(1), run(2), run(3)]) {
     getRunAIC,
     listPage: vi.fn(async () => ({ response: response({ workflow_runs: runs }), sourceRunCount: runs.length, lookupMode: "workflow_id" })),
     token: "synthetic",
+    fallbackAIC: 1000,
     cachePath,
     now,
   };
@@ -121,7 +122,7 @@ describe("complete daily AIC scan observations", () => {
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"scan_cache"'));
   });
 
-  it.each(["missing", "metadata-only", "malformed", "unknown-model", "old-attempt", "detection", "evals", "invalid-numeric"])("does not convert %s usage into an under-budget observation", async kind => {
+  it.each(["missing", "metadata-only", "malformed", "unknown-model", "old-attempt", "detection", "evals", "invalid-numeric"])("conservatively assumes max AI Credits when %s usage cannot be resolved", async kind => {
     const f = fixture([run(1)]);
     f.getRunAIC = guardrail.getRunAIC;
     if (["detection", "evals"].includes(kind)) {
@@ -148,8 +149,20 @@ describe("complete daily AIC scan observations", () => {
         return { downloadPath: options.path };
       },
     };
-    await expect(scanDailyAIC(f)).rejects.toThrow();
-    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).size).toBe(0);
+    const result = await scanDailyAIC(f);
+    expect(result.countedRuns[0].aic).toBe(1000);
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)?.aic).toBe(1000);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Assuming max AI Credits after all accounting sources failed"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"max_ai_credits_fallback"'));
+  });
+
+  it("still rejects unresolved usage when no positive max-AI-credits fallback is available", async () => {
+    const f = fixture([run(1)]);
+    f.fallbackAIC = 0;
+    f.getRunAIC.mockRejectedValue(new Error("synthetic accounting failure"));
+
+    await expect(scanDailyAIC(f)).rejects.toThrow("synthetic accounting failure");
+    expect(global.core.warning).not.toHaveBeenCalled();
   });
 
   it("records absent usage as zero only with authoritative skipped billable jobs for that attempt", async () => {
