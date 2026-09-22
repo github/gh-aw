@@ -1004,7 +1004,7 @@ function isPromptOption(arg) {
  * @returns {boolean}
  */
 function isInlinePromptOption(arg) {
-  return arg.startsWith("--prompt=");
+  return arg.startsWith("--prompt=") || arg.startsWith("-p=");
 }
 
 /**

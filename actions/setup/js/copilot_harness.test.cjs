@@ -2285,7 +2285,7 @@ describe("copilot_harness.cjs", () => {
       const prompt = Buffer.concat([Buffer.from("generated prompt\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x79)]);
       fs.writeFileSync(promptFile, prompt);
 
-      const resolved = resolvePromptFileInput(["--prompt", "ignored before", "--add-dir", "/tmp", "--prompt-file", promptFile, "-p", "ignored after", "--prompt=also ignored", "--allow-all-tools"]);
+      const resolved = resolvePromptFileInput(["--prompt", "ignored before", "--add-dir", "/tmp", "--prompt-file", promptFile, "-p", "ignored after", "--prompt=also ignored", "-p=ignored inline", "--allow-all-tools"]);
       expect(resolved.args).toEqual(["--add-dir", "/tmp", "--allow-all-tools"]);
       expect(resolved.stdin).toEqual(prompt);
     });
