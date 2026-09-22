@@ -129,6 +129,20 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			contains: true,
 		},
 		{
+			name:     "unformattable truthy input leaves fallback expression untouched",
+			content:  `VALUE: ${{ github.aw.import-inputs.config || 'fallback-literal' }}`,
+			inputs:   map[string]any{"config": map[string]any{"bad": func() {}}},
+			expected: `VALUE: ${{ github.aw.import-inputs.config || 'fallback-literal' }}`,
+			contains: true,
+		},
+		{
+			name:     "unrelated fallback expression remains untouched",
+			content:  `VALUE: ${{ github.event.inputs.campaign || 'fallback-literal' }}`,
+			inputs:   map[string]any{},
+			expected: `VALUE: ${{ github.event.inputs.campaign || 'fallback-literal' }}`,
+			contains: true,
+		},
+		{
 			name:     "non-fallback single import-inputs expression still substitutes",
 			content:  `VALUE: ${{ github.aw.import-inputs.campaign }}`,
 			inputs:   map[string]any{"campaign": "solo-value"},

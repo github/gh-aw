@@ -47,6 +47,9 @@ func buildImportInputFallbackReplaceFunc(inputs map[string]any) func(string) str
 		if !found {
 			return match
 		}
+		if !strings.Contains(expression, "github.aw.import-inputs.") && !strings.Contains(expression, "github.aw.inputs.") {
+			return match
+		}
 		operands := splitFallbackOperands(expression)
 		if len(operands) < 2 {
 			return match
@@ -120,9 +123,12 @@ func resolveFallbackInputOperand(inputPath string, inputs map[string]any) (any, 
 	if !found {
 		return nil, "", true, true
 	}
+	if value == nil {
+		return nil, "", true, true
+	}
 	formatted, ok := importinpututil.FormatResolvedValue(value)
 	if !ok {
-		return value, "", true, true
+		return value, "", true, false
 	}
 	return value, formatted, true, true
 }
