@@ -130,7 +130,7 @@ func TestLinearCredentialsOnlyAddedToTrustedProcessingStep(t *testing.T) {
 
 	assert.Contains(t, rendered, "GH_AW_LINEAR_TOKEN: ${{ secrets.LINEAR_API_KEY }}")
 	assert.Contains(t, rendered, "LINEAR_PROJECT_ID: ${{ vars.LINEAR_PROJECT_ID }}")
-	assert.Contains(t, rendered, "LINEAR_TEAM_ID: ${{ vars.LINEAR_TEAM_ID }}")
+	assert.Contains(t, rendered, "LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}")
 	assert.NotContains(t, rendered, "linear-token")
 	processStep := rendered[strings.Index(rendered, "- name: Process Safe Outputs"):]
 	assert.Contains(t, processStep, "env:\n          GH_AW_LINEAR_TOKEN:")
@@ -149,7 +149,7 @@ func TestLinearSafeOutputUsesDefaultCredentials(t *testing.T) {
 	rendered := strings.Join(injectLinearCredentialsIntoProcessorStep(steps, config), "")
 	assert.Contains(t, rendered, "GH_AW_LINEAR_TOKEN: ${{ secrets.LINEAR_API_KEY }}")
 	assert.Contains(t, rendered, "LINEAR_PROJECT_ID: ${{ vars.LINEAR_PROJECT_ID }}")
-	assert.Contains(t, rendered, "LINEAR_TEAM_ID: ${{ vars.LINEAR_TEAM_ID }}")
+	assert.Contains(t, rendered, "LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}")
 }
 
 func TestLinearSafeOutputIDEnvOverrides(t *testing.T) {
