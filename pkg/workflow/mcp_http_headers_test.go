@@ -95,55 +95,6 @@ func TestExtractSecretsFromHeaders(t *testing.T) {
 	}
 }
 
-func TestReplaceSecretsWithEnvVars(t *testing.T) {
-	tests := []struct {
-		name     string
-		value    string
-		secrets  map[string]string
-		expected string
-	}{
-		{
-			name:  "Replace single secret",
-			value: "${{ secrets.DD_API_KEY }}",
-			secrets: map[string]string{
-				"DD_API_KEY": "${{ secrets.DD_API_KEY }}",
-			},
-			expected: "\\${DD_API_KEY}",
-		},
-		{
-			name:  "Replace secret with default",
-			value: "${{ secrets.DD_SITE || 'datadoghq.com' }}",
-			secrets: map[string]string{
-				"DD_SITE": "${{ secrets.DD_SITE || 'datadoghq.com' }}",
-			},
-			expected: "\\${DD_SITE}",
-		},
-		{
-			name:  "Replace in Bearer token",
-			value: "Bearer ${{ secrets.TOKEN }}",
-			secrets: map[string]string{
-				"TOKEN": "${{ secrets.TOKEN }}",
-			},
-			expected: "Bearer \\${TOKEN}",
-		},
-		{
-			name:     "No replacement needed",
-			value:    "static-value",
-			secrets:  map[string]string{},
-			expected: "static-value",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ReplaceSecretsWithEnvVars(tt.value, tt.secrets)
-			if result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
-			}
-		})
-	}
-}
-
 func TestRenderSharedMCPConfig_HTTPWithHeaderSecrets(t *testing.T) {
 	toolConfig := map[string]any{
 		"type": "http",

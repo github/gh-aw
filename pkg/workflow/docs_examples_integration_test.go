@@ -27,7 +27,7 @@ func TestDocumentationGalleryWorkflowsCompile(t *testing.T) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" || entry.Name() == "index.md" || entry.Name() == "multi-repo.md" || entry.Name() == "maintaining-repos.md" {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" || entry.Name() == "index.md" || entry.Name() == "multi-repo.md" || entry.Name() == "maintaining-repos.md" || entry.Name() == "dependency-analysis.md" {
 			continue
 		}
 

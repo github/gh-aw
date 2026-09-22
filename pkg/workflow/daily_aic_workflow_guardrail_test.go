@@ -134,6 +134,9 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, `GH_AW_MAX_DAILY_AI_CREDITS: "100000000"`) {
 		t.Fatal("expected activation job env to include normalized guardrail threshold")
 	}
+	if !strings.Contains(lockStr, `GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}`) {
+		t.Fatal("expected activation job env to include the per-run AI Credits fallback")
+	}
 	if !strings.Contains(lockStr, "daily_ai_credits_exceeded: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}") {
 		t.Fatal("expected activation job to expose daily_ai_credits_exceeded output")
 	}
@@ -452,6 +455,54 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 		}
 	})
 
+	t.Run("object form continue-on-error is extracted", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value":             5000,
+				"continue-on-error": true,
+			},
+		}
+		if !resolveMaxDailyAICContinueOnError(frontmatter, "") {
+			t.Fatal("expected continue-on-error to be enabled")
+		}
+	})
+
+	t.Run("continue-on-error defaults to false", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value": 5000,
+			},
+		}
+		if resolveMaxDailyAICContinueOnError(frontmatter, "") {
+			t.Fatal("expected continue-on-error to be disabled by default")
+		}
+	})
+
+	t.Run("continue-on-error falls back to imported config when main frontmatter omits it", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value": 5000,
+			},
+		}
+		importedJSON := `{"value":5000,"continue-on-error":true}`
+		if !resolveMaxDailyAICContinueOnError(frontmatter, importedJSON) {
+			t.Fatal("expected continue-on-error to be resolved from imported config")
+		}
+	})
+
+	t.Run("continue-on-error main frontmatter takes precedence over imported config", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value":             5000,
+				"continue-on-error": false,
+			},
+		}
+		importedJSON := `{"value":5000,"continue-on-error":true}`
+		if resolveMaxDailyAICContinueOnError(frontmatter, importedJSON) {
+			t.Fatal("expected main frontmatter continue-on-error:false to take precedence over imported config")
+		}
+	})
+
 	t.Run("object form github-app with ignore-if-missing is preserved", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"max-daily-ai-credits": map[string]any{
@@ -463,6 +514,7 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 				},
 			},
 		}
+
 		app := extractMaxDailyAICGitHubApp(frontmatter)
 		if app == nil {
 			t.Fatal("expected non-nil app when ignore-if-missing is set")
@@ -511,6 +563,48 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 			t.Fatalf("expected nil github-app when not specified, got %+v", app)
 		}
 	})
+}
+
+func TestMaxDailyAICContinueOnErrorCompiledWorkflow(t *testing.T) {
+	testDir := testutil.TempDir(t, "daily-aic-continue-on-error-*")
+	workflowFile := filepath.Join(testDir, "daily-aic-continue-on-error.md")
+
+	workflow := `---
+on:
+  workflow_dispatch:
+max-daily-ai-credits:
+  value: 10000
+  continue-on-error: true
+---
+
+Daily AIC guardrail with warning-only unknown accounting`
+
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
+		t.Fatalf("failed to write test workflow: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowFile); err != nil {
+		t.Fatalf("failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowFile))
+	if err != nil {
+		t.Fatalf("failed to read lock file: %v", err)
+	}
+	lockStr := string(lockContent)
+	stepStart := strings.Index(lockStr, "id: daily-ai-credits-workflow-guardrail")
+	if stepStart < 0 {
+		t.Fatal("expected compiled workflow to include the daily AI Credits guardrail step")
+	}
+	stepEnd := strings.Index(lockStr[stepStart:], "\n      - name:")
+	if stepEnd < 0 {
+		t.Fatal("expected another step after the daily AI Credits guardrail step")
+	}
+	guardrailStep := lockStr[stepStart : stepStart+stepEnd]
+	if !strings.Contains(guardrailStep, "continue-on-error: true") {
+		t.Fatal("expected unknown daily AI Credits accounting to be warning-only")
+	}
 }
 
 func TestMaxDailyAICWithGitHubAppCompiledWorkflow(t *testing.T) {

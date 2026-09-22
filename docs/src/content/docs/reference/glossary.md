@@ -558,6 +558,10 @@ A `create-pull-request` safe-output field that sets the maximum number of unique
 
 A `create-pull-request` and `push-to-pull-request-branch` safe output field that limits the total size of the git patch in kilobytes. Accepts an integer in the range 1–10,240 KB. Defaults to `4096` KB (4 MB). If the patch exceeds the limit, PR creation fails with an actionable error. Useful when workflows generate large diffs and the default limit is too restrictive or too permissive. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
 
+### CI Trigger Token (`github-token-for-extra-empty-commit:`)
+
+A `create-pull-request` and `push-to-pull-request-branch` safe output field that selects the token used to push an extra empty commit after PR creation or update, which re-triggers CI events that GitHub does not fire for GITHUB_TOKEN-authored pushes. Accepts a secret expression (for example `${{ secrets.CI_TOKEN }}`), `app` to use GitHub App installation auth, or `none` (case-insensitive) as an explicit opt-out that omits the `GH_AW_CI_TRIGGER_TOKEN` environment variable entirely from the compiled workflow. Without an explicit `none`, the default behavior still emits the extra empty commit. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
 ### Implausible Shallow Range Guard
 
 A safety check in `push-to-pull-request-branch` that detects when a shallow clone (`fetch-depth: 1`) causes `git rev-list` to report the entire local history as the commit range instead of just the new commits — for example, tens of thousands of commits on a branch with a single new commit. This happens because a shallow checkout gives `origin/<branch>` no traversable ancestry. When the reported range exceeds a threshold (100 commits) in a shallow checkout, merge-commit detection returns `false` with a warning rather than risk selecting the wrong push transport; if the range still reaches the signed-push linearization step, that step throws and refuses to proceed. Set `fetch-depth: 0` in `checkout:` to give the transport-selection logic an accurate commit range. See [Checkout Reference](/gh-aw/reference/checkout/#git-credentials-after-checkout).
@@ -1381,6 +1385,10 @@ A Software Bill of Materials (SBOM) generation tool that catalogs packages and d
 ### ssljson
 
 A custom Go static-analysis linter (`pkg/linters/ssljson`) that validates Scheduling-Structural-Logical (SSL) JSON scene and logic-step graphs, reporting duplicate scene or logic-step IDs and dangling `entry_logic_step` or `scene_id` references between scenes and steps. Part of the gh-aw linter registry used in CI. See [Linters README](https://github.com/github/gh-aw/blob/main/pkg/linters/README.md).
+
+### unchecked-slice-index
+
+A custom Go static-analysis linter (`pkg/linters/unchecked-slice-index`) that flags direct slice or string indexing expressions lacking an evident bounds check, a pattern that can panic at runtime. Recognizes safe patterns such as guarded accesses, range-loop indices, and constant indices within array bounds to avoid false positives. Part of the gh-aw linter registry used in CI. See [Linters README](https://github.com/github/gh-aw/blob/main/pkg/linters/README.md).
 
 ### manualpathconcat
 

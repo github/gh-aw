@@ -51,6 +51,9 @@ func (c *Compiler) parseReplyToPullRequestReviewCommentConfig(outputMap map[stri
 				}
 			}
 
+			// Parse filter config (required-labels, required-title-prefix)
+			config.SafeOutputFilterConfig = ParseFilterConfig(configMap)
+
 			// Parse footer as templatable bool
 			if err := preprocessBoolFieldAsString(configMap, "footer", replyToPRReviewCommentLog); err != nil {
 				replyToPRReviewCommentLog.Printf("Invalid footer value: %v", err)

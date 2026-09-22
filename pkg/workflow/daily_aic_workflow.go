@@ -66,6 +66,43 @@ func extractMaxDailyAICGitHubApp(frontmatter map[string]any) *GitHubAppConfig {
 	return app
 }
 
+// extractMaxDailyAICContinueOnError reports whether failures to determine the
+// daily AI Credits total should be treated as warnings, reading the
+// continue-on-error key directly from an already-unwrapped max-daily-ai-credits
+// object (either the main workflow's raw frontmatter value or an imported one).
+func extractMaxDailyAICContinueOnError(raw any) (bool, bool) {
+	rawMap, ok := raw.(map[string]any)
+	if !ok {
+		return false, false
+	}
+	continueOnError, ok := rawMap["continue-on-error"].(bool)
+	if !ok {
+		return false, false
+	}
+	return continueOnError, true
+}
+
+// resolveMaxDailyAICContinueOnError resolves the effective continue-on-error
+// mode for the daily AI Credits guardrail. The main workflow frontmatter takes
+// precedence; when it does not set continue-on-error, the first-wins imported
+// max-daily-ai-credits object (MergedMaxDailyAICredits) is consulted so
+// imported warning-mode configuration is not silently dropped.
+func resolveMaxDailyAICContinueOnError(frontmatter map[string]any, importedJSON string) bool {
+	if continueOnError, ok := extractMaxDailyAICContinueOnError(frontmatter[maxDailyAICreditsField]); ok {
+		return continueOnError
+	}
+	if importedJSON == "" {
+		return false
+	}
+	var imported any
+	if err := json.Unmarshal([]byte(importedJSON), &imported); err != nil {
+		dailyAICWorkflowLog.Printf("Failed to unmarshal imported max-daily-ai-credits JSON for continue-on-error resolution: %v", err)
+		return false
+	}
+	continueOnError, _ := extractMaxDailyAICContinueOnError(imported)
+	return continueOnError
+}
+
 // parseMaxDailyAICValue normalizes max-daily-ai-credits
 // values into a runtime-ready string.
 //

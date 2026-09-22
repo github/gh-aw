@@ -31,6 +31,9 @@ func (c *Compiler) parseResolvePullRequestReviewThreadConfig(outputMap map[strin
 			targetConfig, _ := ParseTargetConfig(configMap)
 			config.SafeOutputTargetConfig = targetConfig
 
+			// Parse filter config (required-labels, required-title-prefix)
+			config.SafeOutputFilterConfig = ParseFilterConfig(configMap)
+
 			resolvePRReviewThreadLog.Printf("Parsed resolve-pull-request-review-thread config: max=%d, target_repo=%s", templatableIntValue(config.Max), config.TargetRepoSlug)
 		} else {
 			// If configData is nil or not a map, still set the default max

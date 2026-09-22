@@ -287,7 +287,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
       target-repo: "owner/repo"       # Optional: cross-repository
       head-repo: "fork-owner/repo"    # Optional: head (fork) repository for cross-repository PRs; defaults to target-repo
       head-github-token: ${{ secrets.HEAD_REPO_PAT }}  # Optional: token for branch writes to head-repo when it differs from target-repo
-      github-token-for-extra-empty-commit: ${{ secrets.MY_CI_PAT }}  # Optional: PAT or "app" to trigger CI on created PRs
+      github-token-for-extra-empty-commit: ${{ secrets.MY_CI_PAT }}  # Optional: PAT, "app" to trigger CI on created PRs, or "none" to omit GH_AW_CI_TRIGGER_TOKEN entirely
       allowed-files:                  # Recommended: always restrict to specific paths or extensions to limit agent scope
         - "src/**/*.ts"               # e.g. restrict to TypeScript source files
         - "docs/**/*.md"              # e.g. restrict to Markdown docs
@@ -316,7 +316,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
 
   **Workflow File Changes**: To modify files under `.github/workflows/`, set `allow-workflows: true`. This adds `workflows: write` to the token used for the PR — a permission that requires `safe-outputs.github-app` to be configured, since `GITHUB_TOKEN` cannot hold this permission.
 
-  **CI Triggering**: By default, PRs created with `GITHUB_TOKEN` do not trigger CI workflow runs. To trigger CI, set `github-token-for-extra-empty-commit` to a PAT with `Contents: Read & Write` permission, or to `"app"` to use the configured GitHub App. Alternatively, set the magic secret `GH_AW_CI_TRIGGER_TOKEN` to a suitable PAT — this is automatically used without requiring explicit configuration in the workflow.
+  **CI Triggering**: By default, PRs created with `GITHUB_TOKEN` do not trigger CI workflow runs. To trigger CI, set `github-token-for-extra-empty-commit` to a PAT with `Contents: Read & Write` permission, or to `"app"` to use the configured GitHub App. Alternatively, set the magic secret `GH_AW_CI_TRIGGER_TOKEN` to a suitable PAT — this is automatically used without requiring explicit configuration in the workflow. Set `github-token-for-extra-empty-commit: none` to skip the extra empty commit and keep `GH_AW_CI_TRIGGER_TOKEN` out of the compiled lock file and manifest entirely.
 
 - `create-pull-request-review-comment:` - Safe PR review comment creation on code lines
 

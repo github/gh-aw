@@ -81,6 +81,19 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     expect(buildDailyAICGuardrailErrorContext(false, "under_budget", "")).toBe("");
   });
 
+  it("reports the agent as not started when continue-on-error is not configured", () => {
+    const rendered = buildDailyAICGuardrailErrorContext(true, "transient_error", "Daily workflow AI Credits are unknown: Network error");
+    expect(rendered).toContain("The agent was not started because the daily guardrail could not prove complete AI Credits accounting");
+  });
+
+  it("reports warning-mode wording without claiming the agent never started when continue-on-error is enabled", () => {
+    const rendered = buildDailyAICGuardrailErrorContext(true, "transient_error", "Daily workflow AI Credits are unknown: Network error", true);
+    expect(rendered).not.toContain("The agent was not started");
+    expect(rendered).toContain("warning mode");
+    expect(rendered).toContain("continue-on-error: true");
+    expect(rendered).toContain("the agent still ran");
+  });
+
   it("propagates a reachable missing-accounting error end-to-end from coverage detection through the template", async () => {
     const { getRunAIC } = require("./check_daily_aic_workflow_guardrail.cjs");
     const { createAPIBudget } = require("./daily_aic_api_budget.cjs");

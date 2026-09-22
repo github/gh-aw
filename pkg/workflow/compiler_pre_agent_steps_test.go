@@ -158,14 +158,42 @@ Main workflow.
 }
 
 func TestImportedPreAgentStepsRunAfterPRBaseRestore(t *testing.T) {
-	tmpDir := testutil.TempDir(t, "pre-agent-steps-pr-restore-test")
+	const (
+		stepNamePrefix      = "- name: "
+		baseRestoreStepName = "Restore agent config folders from base branch"
+	)
 
-	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
-		t.Fatal(err)
+	testCases := []struct {
+		engine        string
+		agentFolder   string
+		executionStep string
+		tools         string
+	}{
+		{engine: "claude", agentFolder: ".claude", executionStep: "Execute Claude Code CLI"},
+		{engine: "copilot", agentFolder: ".github", executionStep: "Execute GitHub Copilot CLI"},
+		{engine: "codex", agentFolder: ".codex", executionStep: "Execute Codex CLI"},
+		{engine: "gemini", agentFolder: ".gemini", executionStep: "Execute Gemini CLI"},
+		{
+			engine:        "pi",
+			agentFolder:   ".pi",
+			executionStep: "Execute Pi CLI",
+			tools: `tools:
+  github:
+    mode: gh-proxy
+  cli-proxy: true
+`,
+		},
 	}
 
-	sharedContent := `---
+	for _, tc := range testCases {
+		t.Run(tc.engine, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "pre-agent-steps-pr-restore-"+tc.engine)
+			sharedDir := filepath.Join(tmpDir, "shared")
+			if err := os.MkdirAll(sharedDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+
+			sharedContent := `---
 pre-agent-steps:
   - name: Restore APM packages
     run: echo "restore apm"
@@ -173,12 +201,11 @@ pre-agent-steps:
 
 Shared APM-style steps.
 `
-	sharedFile := filepath.Join(sharedDir, "apm.md")
-	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+			if err := os.WriteFile(filepath.Join(sharedDir, "apm.md"), []byte(sharedContent), 0644); err != nil {
+				t.Fatal(err)
+			}
 
-	mainContent := `---
+			mainContent := `---
 on:
   pull_request:
     types: [opened]
@@ -188,118 +215,62 @@ permissions:
   pull-requests: read
 imports:
   - ./shared/apm.md
-engine: claude
-strict: false
+engine: ` + tc.engine + `
+` + tc.tools + `strict: false
 ---
 
 Main workflow.
 `
-	mainFile := filepath.Join(tmpDir, "main.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+			mainFile := filepath.Join(tmpDir, "main.md")
+			if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+				t.Fatal(err)
+			}
 
-	compiler := NewCompiler()
-	if err := compiler.CompileWorkflow(mainFile); err != nil {
-		t.Fatalf("Unexpected error compiling workflow with imported pre-agent-steps in PR context: %v", err)
-	}
+			compiler := NewCompiler()
+			if err := compiler.CompileWorkflow(mainFile); err != nil {
+				t.Fatalf("Unexpected error compiling workflow with imported pre-agent-steps in PR context: %v", err)
+			}
 
-	lockFile := filepath.Join(tmpDir, "main.lock.yml")
-	content, err := os.ReadFile(lockFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated lock file: %v", err)
-	}
-	lockContent := string(content)
+			content, err := os.ReadFile(filepath.Join(tmpDir, "main.lock.yml"))
+			if err != nil {
+				t.Fatalf("Failed to read generated lock file: %v", err)
+			}
+			lockContent := string(content)
 
-	restoreBaseIdx := indexInNonCommentLines(lockContent, "- name: Restore agent config folders from base branch")
-	restoreAPMIdx := indexInNonCommentLines(lockContent, "- name: Restore APM packages")
-	startMCPGatewayIdx := indexInNonCommentLines(lockContent, "- name: Start MCP Gateway")
-	aiStepIdx := indexInNonCommentLines(lockContent, "- name: Execute Claude Code CLI")
-	if restoreBaseIdx == -1 || restoreAPMIdx == -1 || startMCPGatewayIdx == -1 || aiStepIdx == -1 {
-		t.Fatal("Could not find expected base-restore, pre-agent, MCP gateway, and AI steps in generated workflow")
-	}
-	// Base restore must run BEFORE APM restore so the base snapshot cannot clobber
-	// APM-restored skills placed in .github/skills/ by pre-agent-steps.
-	if restoreBaseIdx >= restoreAPMIdx {
-		t.Errorf("Base restore step (%d) should appear before APM restore step (%d)", restoreBaseIdx, restoreAPMIdx)
-	}
-	if restoreAPMIdx >= startMCPGatewayIdx {
-		t.Errorf("Imported pre-agent step (%d) should appear before Start MCP Gateway (%d)", restoreAPMIdx, startMCPGatewayIdx)
-	}
-	if restoreAPMIdx >= aiStepIdx {
-		t.Errorf("Imported pre-agent step (%d) should appear before AI execution step (%d)", restoreAPMIdx, aiStepIdx)
-	}
-}
-
-// TestImportedPreAgentStepsRunAfterPRBaseRestoreCopilot verifies the same ordering
-// invariant as TestImportedPreAgentStepsRunAfterPRBaseRestore but with engine: copilot,
-// which is the engine used in the public repro from the original issue report.
-func TestImportedPreAgentStepsRunAfterPRBaseRestoreCopilot(t *testing.T) {
-	tmpDir := testutil.TempDir(t, "pre-agent-steps-pr-restore-copilot-test")
-
-	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	sharedContent := `---
-pre-agent-steps:
-  - name: Restore APM packages
-    run: echo "restore apm"
----
-
-Shared APM-style steps.
-`
-	sharedFile := filepath.Join(sharedDir, "apm.md")
-	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	mainContent := `---
-on:
-  pull_request:
-    types: [opened]
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
-imports:
-  - ./shared/apm.md
-engine: copilot
-strict: false
----
-
-Main workflow.
-`
-	mainFile := filepath.Join(tmpDir, "main.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	compiler := NewCompiler()
-	if err := compiler.CompileWorkflow(mainFile); err != nil {
-		t.Fatalf("Unexpected error compiling workflow with imported pre-agent-steps in PR context (copilot): %v", err)
-	}
-
-	lockFile := filepath.Join(tmpDir, "main.lock.yml")
-	content, err := os.ReadFile(lockFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated lock file: %v", err)
-	}
-	lockContent := string(content)
-
-	restoreBaseIdx := indexInNonCommentLines(lockContent, "- name: Restore agent config folders from base branch")
-	restoreAPMIdx := indexInNonCommentLines(lockContent, "- name: Restore APM packages")
-	aiStepIdx := indexInNonCommentLines(lockContent, "- name: Execute GitHub Copilot CLI")
-	if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
-		t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
-	}
-	// Base restore must run BEFORE APM restore so the base snapshot cannot clobber
-	// APM-restored skills placed in .github/skills/ by pre-agent-steps.
-	if restoreBaseIdx >= restoreAPMIdx {
-		t.Errorf("Base restore step (%d) should appear before APM restore step (%d)", restoreBaseIdx, restoreAPMIdx)
-	}
-	if restoreAPMIdx >= aiStepIdx {
-		t.Errorf("Imported pre-agent step (%d) should appear before AI execution step (%d)", restoreAPMIdx, aiStepIdx)
+			restoreBaseIdx := indexInNonCommentLines(lockContent, stepNamePrefix+baseRestoreStepName)
+			restoreAPMIdx := indexInNonCommentLines(lockContent, stepNamePrefix+"Restore APM packages")
+			aiStepIdx := indexInNonCommentLines(lockContent, stepNamePrefix+tc.executionStep)
+			if restoreBaseIdx == -1 || restoreAPMIdx == -1 || aiStepIdx == -1 {
+				t.Fatal("Could not find expected base-restore, pre-agent, and AI steps in generated workflow")
+			}
+			restoreStepStart := strings.Index(lockContent, stepNamePrefix+baseRestoreStepName)
+			if restoreStepStart == -1 {
+				t.Fatal("Could not find base restore step")
+			}
+			restoreStep := lockContent[restoreStepStart:]
+			// Generated job steps use six spaces; stop at the next top-level step.
+			if nextStep := strings.Index(restoreStep, "\n      - name: "); nextStep != -1 {
+				restoreStep = restoreStep[:nextStep]
+			}
+			const agentFoldersPrefix = "GH_AW_AGENT_FOLDERS: \""
+			agentFoldersStart := strings.Index(restoreStep, agentFoldersPrefix)
+			if agentFoldersStart == -1 {
+				t.Fatal("Could not find protected agent folders in base restore step")
+			}
+			agentFolders, _, found := strings.Cut(restoreStep[agentFoldersStart+len(agentFoldersPrefix):], "\"")
+			if !found {
+				t.Fatal("Could not parse protected agent folders in base restore step")
+			}
+			if !strings.Contains(" "+agentFolders+" ", " "+tc.agentFolder+" ") {
+				t.Errorf("Expected base restore to include %s", tc.agentFolder)
+			}
+			// Base restore must run first so it cannot clobber APM-restored skills.
+			if restoreBaseIdx >= restoreAPMIdx {
+				t.Errorf("Base restore step (%d) should appear before APM restore step (%d)", restoreBaseIdx, restoreAPMIdx)
+			}
+			if restoreAPMIdx >= aiStepIdx {
+				t.Errorf("Imported pre-agent step (%d) should appear before AI execution step (%d)", restoreAPMIdx, aiStepIdx)
+			}
+		})
 	}
 }

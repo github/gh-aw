@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
 // compiler_activation_daily_aic contains daily AIC guardrail token and step builders.
@@ -44,18 +46,7 @@ func (c *Compiler) buildDailyAICAppTokenMintStep(app *GitHubAppConfig) []string 
 		owner = "${{ github.repository_owner }}"
 	}
 	steps = append(steps, fmt.Sprintf("          owner: %s\n", owner))
-	if len(app.Repositories) == 1 && app.Repositories[0] == "*" {
-		// Org-wide access: omit repositories field entirely
-	} else if len(app.Repositories) == 1 {
-		steps = append(steps, fmt.Sprintf("          repositories: %s\n", app.Repositories[0]))
-	} else if len(app.Repositories) > 1 {
-		steps = append(steps, "          repositories: |-\n")
-		for _, repo := range app.Repositories {
-			steps = append(steps, fmt.Sprintf("            %s\n", repo))
-		}
-	} else {
-		steps = append(steps, "          repositories: ${{ github.event.repository.name }}\n")
-	}
+	steps = appendDailyAICAppRepositories(steps, app.Repositories)
 	steps = append(steps, "          github-api-url: ${{ github.api_url }}\n")
 	// Build permission fields: baseline is actions: read (required for guardrail script to read
 	// workflow run data). Merge any user-configured app.Permissions on top so callers can extend
@@ -76,6 +67,24 @@ func (c *Compiler) buildDailyAICAppTokenMintStep(app *GitHubAppConfig) []string 
 	}
 	for _, key := range sliceutil.SortedKeys(permissionFields) {
 		steps = append(steps, fmt.Sprintf("          %s: %s\n", key, permissionFields[key]))
+	}
+	return steps
+}
+
+func appendDailyAICAppRepositories(steps []string, repositories []string) []string {
+	if len(repositories) == 1 {
+		for _, repository := range repositories {
+			if repository != "*" {
+				steps = append(steps, fmt.Sprintf("          repositories: %s\n", repository))
+			}
+		}
+	} else if len(repositories) > 1 {
+		steps = append(steps, "          repositories: |-\n")
+		for _, repo := range repositories {
+			steps = append(steps, fmt.Sprintf("            %s\n", repo))
+		}
+	} else {
+		steps = append(steps, "          repositories: ${{ github.event.repository.name }}\n")
 	}
 	return steps
 }
@@ -126,6 +135,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 	steps = append(steps, "      - name: Check daily workflow token guardrail\n")
 	steps = append(steps, "        id: daily-ai-credits-workflow-guardrail\n")
 	steps = append(steps, fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr))
+	steps = appendDailyAICContinueOnError(steps, data)
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 	steps = append(steps, "        env:\n")
 	steps = append(steps, fmt.Sprintf("          GH_AW_WORKFLOW_NAME: %q\n", data.Name))
@@ -136,6 +146,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 	steps = append(steps, fmt.Sprintf("          GH_AW_HAS_LABEL_COMMAND: %q\n", strconv.FormatBool(len(data.LabelCommand) > 0)))
 	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN: %s\n", c.resolveDailyAICToken(data)))
 	steps = append(steps, buildTemplatableIntEnvVar(maxDailyAICreditsEnvVar, data.MaxDailyAICredits)...)
+	steps = append(steps, fmt.Sprintf("          GH_AW_MAX_AI_CREDITS: %s\n", dailyAICMaxCreditsEnvValue(data)))
 	steps = append(steps, "        with:\n")
 	steps = append(steps, fmt.Sprintf("          github-token: %s\n", c.resolveDailyAICToken(data)))
 	steps = append(steps, "          script: |\n")
@@ -156,6 +167,20 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, "          retention-days: 3\n")
 	}
 	return steps
+}
+
+func appendDailyAICContinueOnError(steps []string, data *WorkflowData) []string {
+	if data.MaxDailyAICContinueOnError {
+		return append(steps, "        continue-on-error: true\n")
+	}
+	return steps
+}
+
+func dailyAICMaxCreditsEnvValue(data *WorkflowData) string {
+	if data.EngineConfig != nil && data.EngineConfig.MaxAICredits != 0 {
+		return strconv.Quote(strconv.FormatInt(data.EngineConfig.MaxAICredits, 10))
+	}
+	return compilerenv.BuildDefaultMaxAICreditsExpression(strconv.FormatInt(constants.DefaultMaxAICredits, 10))
 }
 
 func buildDailyAICActivationJobEnv(data *WorkflowData) map[string]string {

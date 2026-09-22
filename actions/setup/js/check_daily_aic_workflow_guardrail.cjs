@@ -456,35 +456,36 @@ function isStructuralGuardrailError(error) {
 }
 
 /**
- * @typedef {'workflow_id' | 'repo_workflow_name_fallback'} WorkflowRunLookupMode
+ * @typedef {'workflow_id' | 'repo_workflow_id_fallback'} WorkflowRunLookupMode
  */
 
 /**
  * @param {any} githubClient
- * @param {{ owner: string, repo: string, workflowId: number, workflowName: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
+ * @param {{ owner: string, repo: string, workflowId: number, created: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
  * @returns {Promise<{ response: any, lookupMode: WorkflowRunLookupMode, sourceRunCount: number, oldestUnfilteredCreatedAt?: string | null }>}
  */
 async function listCompletedWorkflowRunsPage(githubClient, params) {
-  const { owner, repo, workflowId, workflowName, page, perPage, lookupMode } = params;
-  if (lookupMode === "repo_workflow_name_fallback") {
+  const { owner, repo, workflowId, created, page, perPage, lookupMode } = params;
+  if (lookupMode === "repo_workflow_id_fallback") {
     const response = await githubClient.rest.actions.listWorkflowRunsForRepo({
       owner,
       repo,
       status: "completed",
+      created,
       per_page: perPage,
       page,
     });
     const allRuns = response.data.workflow_runs || [];
-    const filteredRuns = allRuns.filter(run => (run?.name || "") === workflowName);
-    logDailyGuardrail("Filtered repository workflow runs by workflow name fallback", {
-      workflowName,
+    const filteredRuns = allRuns.filter(run => run?.workflow_id === workflowId);
+    logDailyGuardrail("Filtered repository workflow runs by workflow ID fallback", {
+      workflowId,
       page,
       totalRunsInPage: allRuns.length,
       matchedRunsInPage: filteredRuns.length,
     });
     // Return the oldest unfiltered run's timestamp so the outer pagination loop
     // can stop early when all remaining runs predate the 24h window, even when
-    // none of the runs on this page match the workflow name.
+    // none of the runs on this page match the workflow ID.
     const lastUnfilteredRun = allRuns[allRuns.length - 1];
     return {
       response: {
@@ -518,25 +519,18 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
     if (!hasHttpStatus(error, 404)) {
       throw error;
     }
-    if (!workflowName) {
-      // A 404 with no explicit workflow name means we have no meaningful name
-      // to filter by in the fallback lookup — rethrow so the outer catch can
-      // classify this as a structural error rather than silently failing open.
-      throw error;
-    }
-    logDailyGuardrail("Workflow-specific run history query returned 404; falling back to repository run listing by workflow name", {
+    logDailyGuardrail("Workflow-specific run history query returned 404; falling back to repository run listing by workflow ID", {
       workflowId,
-      workflowName,
       page,
     });
     return listCompletedWorkflowRunsPage(githubClient, {
       owner,
       repo,
       workflowId,
-      workflowName,
+      created,
       page,
       perPage,
-      lookupMode: "repo_workflow_name_fallback",
+      lookupMode: "repo_workflow_id_fallback",
     });
   }
 }
@@ -633,6 +627,12 @@ async function main(options = {}) {
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
   core.setOutput("daily_ai_credits_guardrail_error", "");
   const threshold = parsePositiveCompactNumber(process.env.GH_AW_MAX_DAILY_AI_CREDITS);
+  const maxAICredits = parsePositiveCompactNumber(process.env.GH_AW_MAX_AI_CREDITS);
+  logDailyGuardrail("Resolved daily AIC guardrail limits", {
+    dailyAICThreshold: threshold,
+    perRunMaxAICredits: maxAICredits > 0 ? maxAICredits : null,
+    perRunFallbackAvailable: maxAICredits > 0,
+  });
   if (threshold <= 0) {
     core.setOutput("daily_ai_credits_guardrail_status", "disabled");
     return;
@@ -666,7 +666,7 @@ async function main(options = {}) {
       getRunAIC: module.exports.getRunAIC,
       listPage: listCompletedWorkflowRunsPage,
       token,
-      workflowName: process.env.GH_AW_WORKFLOW_NAME || "",
+      fallbackAIC: maxAICredits,
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
