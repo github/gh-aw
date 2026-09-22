@@ -1323,6 +1323,11 @@ update-threat-detect-pins:
 		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
 		exit 1; \
 	fi
+	@if ! printf '%s\n' "$(THREAT_DETECT_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "Error: THREAT_DETECT_VERSION must be a semantic release tag such as v0.5.2"; \
+		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
+		exit 1; \
+	fi
 	bash scripts/update-threat-detect-pins.sh "$(THREAT_DETECT_VERSION)"
 	$(MAKE) fmt
 	$(MAKE) recompile
