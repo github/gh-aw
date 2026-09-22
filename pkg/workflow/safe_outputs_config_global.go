@@ -226,12 +226,13 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 		}
 	}
 
-	// Handle report-failed-jobs flag (bool, default true)
-	if reportFailedJobs, exists := outputMap["report-failed-jobs"]; exists {
-		if reportFailedJobsBool, ok := reportFailedJobs.(bool); ok {
-			config.ReportFailedJobs = &reportFailedJobsBool
-			safeOutputsConfigLog.Printf("Report failed jobs: %t", reportFailedJobsBool)
-		}
+	// Handle report-failed-jobs as a templatable bool (default true).
+	if err := preprocessBoolFieldAsString(outputMap, "report-failed-jobs", safeOutputsConfigLog); err != nil {
+		safeOutputsConfigLog.Printf("Failed to preprocess report-failed-jobs field: %v (ignoring invalid value and leaving field unset)", err)
+	} else if reportFailedJobs, ok := outputMap["report-failed-jobs"].(string); ok {
+		value := TemplatableBool(reportFailedJobs)
+		config.ReportFailedJobs = &value
+		safeOutputsConfigLog.Printf("Report failed jobs: %s", value.String())
 	}
 
 	// Handle max-bot-mentions (templatable integer)

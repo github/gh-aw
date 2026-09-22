@@ -5,7 +5,7 @@
 const crypto = require("crypto");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { isTransientError } = require("./error_recovery.cjs");
+const { isTransientError, isWorkflowsScopeTimeoutError, withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { MAX_ASSIGNEES } = require("./constants.cjs");
 const { encodePathSegments, renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
@@ -74,6 +74,31 @@ function isLabelTransientError(error) {
     return true;
   }
   return isTransientError(error);
+}
+
+/**
+ * Runs an initial branch-push operation, retrying with exponential backoff when it fails
+ * with a transient workflows-scope timeout. Non-transient
+ * errors, and the error from the final exhausted attempt, are rethrown completely unmodified
+ * so existing push-failure handling (message-based classification, fallback issue body, etc.)
+ * behaves exactly as it did before retries were introduced.
+ * @template T
+ * @param {() => Promise<T>} operation - The push operation to run
+ * @returns {Promise<T>}
+ */
+async function withTransientPushRetry(operation) {
+  try {
+    return await withRetry(
+      operation,
+      {
+        ...RATE_LIMIT_RETRY_CONFIG,
+        shouldRetry: isWorkflowsScopeTimeoutError,
+      },
+      "push branch"
+    );
+  } catch (error) {
+    throw error?.originalError ?? error;
+  }
 }
 
 /**
@@ -469,6 +494,7 @@ module.exports = {
   createBundleTempRef,
   shellQuote,
   isLabelTransientError,
+  withTransientPushRetry,
   parseAllowedBaseBranches,
   isBaseBranchAllowed,
   parseStringListConfig,

@@ -2673,9 +2673,8 @@
           "leaf": true
         },
         "report-failed-jobs": {
-          "type": "boolean",
+          "type": "boolean|string",
           "desc": "Controls whether to report failed non-builtin jobs as issues (default: true).",
-          "enum": [true, false],
           "leaf": true
         },
         "max-bot-mentions": {
