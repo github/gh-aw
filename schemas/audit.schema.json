@@ -482,6 +482,9 @@
           "items": {
             "type": "object",
             "properties": {
+              "code": {
+                "type": "string"
+              },
               "category": {
                 "type": "string"
               },
@@ -499,6 +502,7 @@
               }
             },
             "required": [
+              "code",
               "category",
               "severity",
               "title",

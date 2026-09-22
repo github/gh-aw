@@ -1,0 +1,86 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestGenerateThreatDetectionFindings(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "detection"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "detection", "detection_result.json"),
+		[]byte(`{"prompt_injection":true,"secret_leak":false,"malicious_patch":true,"reasons":["sensitive detail"]}`),
+		0o600,
+	))
+
+	findings := generateThreatDetectionFindings(ProcessedRun{
+		Run: WorkflowRun{LogsPath: runDir},
+		JobDetails: []JobInfoWithDuration{{
+			JobInfo: JobInfo{Name: "detection", Conclusion: "failure"},
+		}},
+	})
+
+	require.Len(t, findings, 2)
+	assert.Equal(t, AuditFindingDetectionJobFailed, findings[0].Code)
+	assert.Equal(t, AuditFindingThreatDetected, findings[1].Code)
+	assert.Contains(t, findings[1].Description, "prompt injection")
+	assert.Contains(t, findings[1].Description, "malicious patch")
+	assert.NotContains(t, findings[1].Description, "sensitive detail")
+}
+
+func TestFindThreatDetectionVerdictFromLegacyLog(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "detection.log"),
+		[]byte("output\nTHREAT_DETECTION_RESULT:{\"prompt_injection\":false,\"secret_leak\":true,\"malicious_patch\":false,\"reasons\":[]}\n"),
+		0o600,
+	))
+
+	verdict, found := findThreatDetectionVerdict(runDir)
+	require.True(t, found)
+	assert.True(t, verdict.SecretLeak)
+}
+
+func TestGeneratedAuditFindingsHaveCodes(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "detection_result.json"),
+		[]byte(`{"prompt_injection":true,"secret_leak":false,"malicious_patch":false,"reasons":[]}`),
+		0o600,
+	))
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{
+			Conclusion: "failure",
+			LogsPath:   runDir,
+		},
+		MCPFailures:  []MCPFailureReport{{ServerName: "server"}},
+		MissingTools: []MissingToolReport{{Tool: "tool"}},
+		FirewallAnalysis: &FirewallAnalysis{
+			AnalysisBase: AnalysisBase{BlockedRequests: 1},
+		},
+	}
+
+	findings := generateFindings(processedRun, MetricsData{
+		TokenUsage: 60_000,
+		Turns:      11,
+	}, []ValidationIssue{
+		{Type: "error"}, {Type: "error"}, {Type: "error"},
+		{Type: "error"}, {Type: "error"}, {Type: "error"},
+	})
+
+	require.NotEmpty(t, findings)
+	for _, finding := range findings {
+		assert.NotEmpty(t, finding.Code, "finding %q must have a stable code", finding.Title)
+	}
+}

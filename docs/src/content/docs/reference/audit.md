@@ -74,6 +74,32 @@ The Observability Insights section includes `skill_activations` when skill-invoc
 
 The Graders section is present when the run recorded deterministic grader results (`graders` declared in the workflow frontmatter). The `graders` object in JSON output lists each grader (`id`, `name`, `status`, `value`, `unit`, `passed`, and, when declared in the grader manifest, `direction` and `threshold`) plus aggregate counts: `total`, `passed`, `failed`, `error_count`, and `unavailable_count`. Grader results are read from the compact `usage` artifact (mirrored there by the conclusion job), the unified `agent` artifact, or the `agent-output-fallback` artifact, so they are available even when `--artifacts usage` narrows the download. The same `graders` object is included per run in `gh aw logs --json` output.
 
+### Audit finding codes
+
+Every `key_findings` entry includes a stable `code` for downstream automation. Titles and descriptions are human-readable and may change; consumers must use `code` to identify a finding type. Existing codes are not repurposed.
+
+| Code | Finding |
+|---|---|
+| `workflow_failed` | The workflow failed |
+| `workflow_timeout` | The workflow timed out |
+| `high_token_usage` | Token usage exceeded the audit threshold |
+| `many_iterations` | The run exceeded the turn threshold |
+| `multiple_errors` | The run produced more than five errors |
+| `mcp_server_failures` | One or more MCP servers failed |
+| `tools_not_available` | Requested tools were unavailable |
+| `blocked_network_requests` | The firewall blocked network requests |
+| `workflow_succeeded` | The workflow completed successfully |
+| `threat_detection_job_failed` | The `detection` job failed |
+| `threat_detected` | The detection artifact identified one or more threats |
+| `agentic_resource_heavy_for_domain` | Resource use was high for the inferred task domain |
+| `agentic_overkill_for_agentic` | The task may not require an agentic workflow |
+| `agentic_poor_agentic_control` | Agentic control signals were weak |
+| `agentic_partially_reducible` | Part of the task could use deterministic steps |
+| `agentic_model_downgrade_available` | A smaller model may be sufficient |
+| `agentic_delegated_context_present` | Delegated workflow context was preserved |
+
+The audit inspects the `detection` job result and the downloaded `detection` artifact. A failed job emits `threat_detection_job_failed`. A structured verdict in `detection_result.json`, or a legacy `THREAT_DETECTION_RESULT` verdict in `detection.log`, emits `threat_detected` when `prompt_injection`, `secret_leak`, or `malicious_patch` is true. Threat reasons are not copied into the finding description because they may contain sensitive agent output.
+
 The Metrics section includes an `ambient_context` object when available. Ambient context captures the first LLM inference footprint for the run. It is absent when token-usage data is unavailable for the run — for example, when neither `token-usage.jsonl` nor the fallback `agent_usage.json` can be found in the downloaded artifacts, which is common for older runs and runs without firewall/usage artifacts:
 - `ambient_context.input_tokens` — input tokens for the first invocation
 - `ambient_context.cached_tokens` — cache-read tokens reused by the first invocation
