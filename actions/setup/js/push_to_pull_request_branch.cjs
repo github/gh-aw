@@ -1494,10 +1494,13 @@ async function main(config = {}) {
         // timeout (retries above are already exhausted), which is handled as a recoverable
         // push failure below so the changes are preserved in a fallback pull request.
         const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
-        const isWorkflowsScopeTimeout = isWorkflowsScopeRejection(pushErrorMessage);
-        if (isWorkflowsScopeTimeout && agentWorkflowFiles.length > 0) {
+        const isWorkflowsScopeRejected = isWorkflowsScopeRejection(pushErrorMessage);
+        if (isWorkflowsScopeRejected && agentWorkflowFiles.length > 0) {
           return buildWorkflowsScopeError("Branch", core);
         }
+        // No workflow files in the agent's own changeset, so the rejection is GitHub's
+        // transient permission-check timeout rather than a real scope problem.
+        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected;
 
         const nonFastForwardPatterns = ["non-fast-forward", "rejected", "fetch first", "Updates were rejected"];
         const isNonFastForward = nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
