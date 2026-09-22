@@ -129,7 +129,7 @@ Linear Safe Outputs use Linear's public GraphQL API from the isolated `safe_outp
 safe-outputs:
   linear-token: ${{ secrets.LINEAR_API_KEY }}
   linear-create-issue:
-    team-id: ${{ secrets.LINEAR_TEAM_ID }}
+    team-id: "ENG"
     project-id: "810f57a7e383"
     max: 1
   linear-add-comment:
@@ -140,7 +140,7 @@ safe-outputs:
     body: true
 ```
 
-`team-id` accepts a Linear team model UUID, available through Linear's model UUID tooling or API, or a GitHub Actions expression such as `${{ secrets.LINEAR_TEAM_ID }}`. Optional `project-id` fixes new issues to a trusted project and accepts either the 12-character identifier from a Linear project URL or its model UUID. When omitted, the compiler loads `LINEAR_TEAM_ID` from a repository or organization secret and `LINEAR_PROJECT_ID` from a same-named variable. Values in `safe-outputs.env` can override those defaults; explicit `team-id` and `project-id` values take precedence over environment fallbacks. Comment and update targets are fixed trusted configuration and accept either a Linear issue model UUID or shorthand identifier such as `ENG-123`. Updates replace only the enabled `title` and `body` fields. All agent-provided titles, descriptions, and comments use standard Safe Outputs sanitization.
+`team-id` accepts a Linear team model UUID, team key such as `ENG`, team name, or a GitHub Actions expression such as `${{ secrets.LINEAR_TEAM_ID }}`. UUIDs are passed directly to Linear; keys and names are resolved through the Linear API, with key matches taking precedence. Optional `project-id` fixes new issues to a trusted project and accepts either the 12-character identifier from a Linear project URL or its model UUID. When omitted, the compiler loads `LINEAR_TEAM_ID` from a repository or organization secret and `LINEAR_PROJECT_ID` from a same-named variable. Values in `safe-outputs.env` can override those defaults; explicit `team-id` and `project-id` values take precedence over environment fallbacks. Comment and update targets are fixed trusted configuration and accept either a Linear issue model UUID or shorthand identifier such as `ENG-123`. Updates replace only the enabled `title` and `body` fields. All agent-provided titles, descriptions, and comments use standard Safe Outputs sanitization.
 
 ### System Types (Auto-Enabled)
 

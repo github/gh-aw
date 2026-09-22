@@ -51,7 +51,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
   | `linear-add-comment` | `linear_add_comment` | `body` (target issue) |
   | `linear-update-issue` | `linear_update_issue` | `title`/`body`, gated by the matching `title:`/`body:` config flags |
 
-  `linear-token:` optionally overrides the `LINEAR_API_KEY` secret and is a top-level `safe-outputs:` field, not nested under `env:`. `linear-create-issue.project-id` optionally fixes created issues to a trusted Linear project identifier from its URL or model UUID. Each output supports `max` and `staged`. Only fields explicitly enabled in `update-issue` config (`title`, `body`) can be changed by the agent.
+  `linear-token:` optionally overrides the `LINEAR_API_KEY` secret and is a top-level `safe-outputs:` field, not nested under `env:`. `linear-create-issue.team-id` accepts a Linear team UUID, key, or name; keys and names are resolved through Linear's API before issue creation. `linear-create-issue.project-id` optionally fixes created issues to a trusted Linear project identifier from its URL or model UUID. Each output supports `max` and `staged`. Only fields explicitly enabled in `update-issue` config (`title`, `body`) can be changed by the agent.
 
 - **[Experimental]** Azure DevOps work-item operations are namespaced `ado-*` and rely on an Azure DevOps MCP server (configured separately under `mcp-servers:`/`tools:`) for the underlying connection and credentials:
 
