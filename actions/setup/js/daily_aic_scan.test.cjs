@@ -76,7 +76,6 @@ function fixture(runs = [run(1), run(2), run(3)]) {
     getRunAIC,
     listPage: vi.fn(async () => ({ response: response({ workflow_runs: runs }), sourceRunCount: runs.length, lookupMode: "workflow_id" })),
     token: "synthetic",
-    workflowName: "Example",
     fallbackAIC: 1000,
     cachePath,
     now,

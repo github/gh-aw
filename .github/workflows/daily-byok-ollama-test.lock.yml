@@ -1428,6 +1428,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🦙 *BYOK test via [{workflow_name}]({run_url})*{ai_credits_suffix}\",\"runStarted\":\"🦙 BYOK Ollama test starting... [{workflow_name}]({run_url})\",\"runSuccess\":\"✅ [{workflow_name}]({run_url}) — BYOK endpoint responded.\",\"runFailure\":\"❌ [{workflow_name}]({run_url}) — BYOK endpoint test failed: {status}\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

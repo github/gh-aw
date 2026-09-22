@@ -503,6 +503,14 @@ max-daily-ai-credits:
     private-key: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
+By default, the activation job fails when the guardrail cannot determine the complete 24-hour AI Credits total. Set `continue-on-error: true` to report the unknown total as a warning and allow the workflow to continue:
+
+```yaml wrap
+max-daily-ai-credits:
+  value: 10000
+  continue-on-error: true
+```
+
 ```yaml wrap
 # Disable the guardrail explicitly
 max-daily-ai-credits: -1

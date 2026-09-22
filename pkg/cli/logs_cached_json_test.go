@@ -605,6 +605,28 @@ func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {
 	assert.Equal(t, before, after)
 }
 
+func TestCachedLogsCollectorDoesNotRewriteCachedRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	writer := newCachedLogsJSONLWriter(path)
+	cached := RunData{RunID: 42}
+	collector := &orderedLogsRunCollector{
+		candidates: []ProcessedRun{
+			{Run: WorkflowRun{DatabaseID: 41}},
+			{Run: WorkflowRun{DatabaseID: 42}, cachedData: &cached},
+		},
+		accepted: []bool{true, true},
+	}
+
+	processedRuns, batchProcessed := collector.appendAccepted(nil, 0, writer)
+
+	require.Len(t, processedRuns, 2)
+	assert.Equal(t, 2, batchProcessed)
+	cache, err := loadCachedLogsJSONL(path)
+	require.NoError(t, err)
+	require.Contains(t, cache.runs, int64(41))
+	assert.NotContains(t, cache.runs, int64(42))
+}
+
 func TestCachedLogsJSONLWriterSerializesConcurrentAppends(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	writer := newCachedLogsJSONLWriter(path)

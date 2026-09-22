@@ -1539,6 +1539,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e ⚠️ *Compatibility report by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"footerWorkflowRecompile\":\"\\u003e 🛠️ *Workflow maintenance by [{workflow_name}]({run_url}) for {repository}*\",\"runStarted\":\"🔬 Breaking Change Checker online! [{workflow_name}]({run_url}) is analyzing API compatibility on this {event_type}...\",\"runSuccess\":\"✅ Analysis complete! [{workflow_name}]({run_url}) has reviewed all changes. Compatibility verdict delivered! 📋\",\"runFailure\":\"🔬 Analysis interrupted! [{workflow_name}]({run_url}) {status}. Compatibility status unknown...\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

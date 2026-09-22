@@ -1461,6 +1461,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"runStarted\":\"🧹 Starting stale PR cleanup... [{workflow_name}]({run_url}) is reviewing PRs open 30+ days\",\"runSuccess\":\"✅ Stale PR cleanup complete! [{workflow_name}]({run_url}) has triaged the 30+ day PR backlog.\",\"runFailure\":\"❌ Stale PR cleanup failed! [{workflow_name}]({run_url}) {status}. Some PRs may not be processed.\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

@@ -21,7 +21,7 @@ function getErrorStatus(error) {
  * Publish only individually resolved observations, including nonzero usage.
  * Missing entries and concurrent snapshots are safe misses, never zero usage.
  */
-async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC, listPage, token, workflowName, fallbackAIC = 0, cachePath = AIC_SCAN_CACHE_FILE_PATH, now = Date.now() }) {
+async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC, listPage, token, fallbackAIC = 0, cachePath = AIC_SCAN_CACHE_FILE_PATH, now = Date.now() }) {
   const { owner, repo } = context.repo;
   const repository = `${owner}/${repo}`;
   const currentResponse = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId });
@@ -47,7 +47,6 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       owner,
       repo,
       workflowId: current.workflow_id,
-      workflowName,
       created,
       page,
       perPage: 100,

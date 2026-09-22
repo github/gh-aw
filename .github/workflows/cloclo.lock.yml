@@ -1901,6 +1901,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🎤 *Magnifique! Performance by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"🎵 Comme d'habitude! [{workflow_name}]({run_url}) takes the stage on this {event_type}...\",\"runSuccess\":\"🎤 Bravo! [{workflow_name}]({run_url}) has delivered a stunning performance! Standing ovation! 🌟\",\"runFailure\":\"🎵 Intermission... [{workflow_name}]({run_url}) {status}. Check the [run logs]({run_url}) for details.\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

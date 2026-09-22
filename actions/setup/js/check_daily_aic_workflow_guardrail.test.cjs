@@ -688,7 +688,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
   it("falls back to repository run history when workflow-specific run lookup 404s under required workflows", async () => {
     const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockResolvedValue(25);
-    const workflowName = "PR Quality Review";
+    const workflowName = "Reusable PR Review";
+    const callerWorkflowName = "PR Review";
+    const workflowId = 324645976;
     const now = Date.parse("2026-09-22T03:21:08Z");
     const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
     const nowIso = new Date(now).toISOString();
@@ -711,7 +713,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
         actions: {
           getWorkflowRun: async () => ({
             data: {
-              workflow_id: 324645976,
+              workflow_id: workflowId,
               actor: { login: "octocat" },
               triggering_actor: { login: "octocat" },
             },
@@ -729,7 +731,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
                 data: {
                   workflow_runs: Array.from({ length: 100 }, (_, index) => ({
                     id: 1000 + index,
-                    name: "Unrelated Workflow",
+                    workflow_id: 999,
+                    name: workflowName,
                     html_url: `https://example.test/runs/${1000 + index}`,
                     created_at: nowIso,
                     conclusion: "success",
@@ -743,10 +746,11 @@ describe("check_daily_aic_workflow_guardrail", () => {
                 workflow_runs: [
                   {
                     id: 41,
+                    workflow_id: workflowId,
                     run_attempt: 1,
                     updated_at: nowIso,
                     status: "completed",
-                    name: workflowName,
+                    name: callerWorkflowName,
                     html_url: "https://example.test/runs/41",
                     created_at: nowIso,
                     conclusion: "success",
@@ -795,7 +799,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       expect(getRunAICSpy.mock.calls[0][1]).toBe(41);
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
-      expect(coreInfos.some(msg => msg.includes("falling back to repository run listing by workflow name"))).toBe(true);
+      expect(coreInfos.some(msg => msg.includes("falling back to repository run listing by workflow ID"))).toBe(true);
     } finally {
       delete global.core;
       delete global.github;
@@ -972,7 +976,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("treats 404 as structural error without calling listWorkflowRunsForRepo when GH_AW_WORKFLOW_NAME is absent", async () => {
+  it("falls back by workflow ID when GH_AW_WORKFLOW_NAME is absent", async () => {
     let listWorkflowRunsForRepoCalls = 0;
 
     const mockGithub = {
@@ -1016,6 +1020,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
       info: () => {},
       warning: msg => coreWarnings.push(msg),
       setFailed: msg => coreWarnings.push(msg),
+      summary: {
+        addDetails: function () {
+          return this;
+        },
+        write: async () => {},
+      },
     };
 
     global.core = mockCore;
@@ -1024,15 +1034,15 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
     process.env.GH_AW_MAX_DAILY_AI_CREDITS = "10";
     process.env.GH_AW_GITHUB_TOKEN = "fake-token";
-    // GH_AW_WORKFLOW_NAME intentionally not set — workflowFilterName will be "" so
-    // the !workflowName branch re-throws the 404 without attempting the fallback.
+    // GH_AW_WORKFLOW_NAME is intentionally absent because the fallback does not
+    // depend on the reusable workflow's display name.
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
       await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
-      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
-      expect(listWorkflowRunsForRepoCalls).toBe(0);
+      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
+      expect(listWorkflowRunsForRepoCalls).toBe(1);
     } finally {
       delete global.core;
       delete global.github;
