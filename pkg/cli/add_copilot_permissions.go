@@ -30,9 +30,12 @@ func isCopilotWorkflowContent(content string) bool {
 		trimmed := strings.TrimSpace(line)
 		if parseYAMLMapKey(trimmed) == "engine" {
 			val := strings.TrimSpace(strings.TrimPrefix(trimmed, "engine:"))
-			return val == string(constants.CopilotEngine)
+			isCopilot := val == string(constants.CopilotEngine)
+			copilotPermissionsLog.Printf("Workflow declares engine=%q, treating as copilot workflow=%t", val, isCopilot)
+			return isCopilot
 		}
 	}
+	copilotPermissionsLog.Print("Workflow declares no engine field, defaulting to copilot workflow=true")
 	return true
 }
 
