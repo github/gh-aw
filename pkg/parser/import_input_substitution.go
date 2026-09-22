@@ -59,14 +59,14 @@ func buildImportInputFallbackReplaceFunc(inputs map[string]any) func(string) str
 		firstTruthy := ""
 		foundTruthy := false
 		for _, operand := range operands {
-			value, formatted, inputReference, ok := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
-			if !ok {
+			resolved := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
+			if !resolved.ok {
 				return match
 			}
-			hasInputReference = hasInputReference || inputReference
-			fallback = formatted
-			if isTruthyImportInput(value) && !foundTruthy {
-				firstTruthy = formatted
+			hasInputReference = hasInputReference || resolved.isInputReference
+			fallback = resolved.formatted
+			if isTruthyImportInput(resolved.value) && !foundTruthy {
+				firstTruthy = resolved.formatted
 				foundTruthy = true
 			}
 		}
@@ -108,7 +108,14 @@ func splitFallbackOperands(expression string) []string {
 	return operands
 }
 
-func resolveFallbackOperand(operand string, inputs map[string]any) (any, string, bool, bool) {
+type fallbackOperandResult struct {
+	value            any
+	formatted        string
+	isInputReference bool
+	ok               bool
+}
+
+func resolveFallbackOperand(operand string, inputs map[string]any) fallbackOperandResult {
 	if inputPath, ok := strings.CutPrefix(operand, "github.aw.import-inputs."); ok {
 		return resolveFallbackInputOperand(inputPath, inputs)
 	}
@@ -118,42 +125,39 @@ func resolveFallbackOperand(operand string, inputs map[string]any) (any, string,
 	return resolveFallbackLiteralOperand(operand)
 }
 
-func resolveFallbackInputOperand(inputPath string, inputs map[string]any) (any, string, bool, bool) {
+func resolveFallbackInputOperand(inputPath string, inputs map[string]any) fallbackOperandResult {
 	value, found := resolveImportInputValue(inputs, inputPath)
-	if !found {
-		return nil, "", true, true
-	}
-	if value == nil {
-		return nil, "", true, true
+	if !found || value == nil {
+		return fallbackOperandResult{isInputReference: true, ok: true}
 	}
 	formatted, ok := importinpututil.FormatResolvedValue(value)
 	if !ok {
-		return value, "", true, false
+		return fallbackOperandResult{value: value, isInputReference: true}
 	}
-	return value, formatted, true, true
+	return fallbackOperandResult{value: value, formatted: formatted, isInputReference: true, ok: true}
 }
 
-func resolveFallbackLiteralOperand(operand string) (any, string, bool, bool) {
+func resolveFallbackLiteralOperand(operand string) fallbackOperandResult {
 	switch operand {
 	case "true":
-		return true, "true", false, true
+		return fallbackOperandResult{value: true, formatted: "true", ok: true}
 	case "false":
-		return false, "false", false, true
+		return fallbackOperandResult{value: false, formatted: "false", ok: true}
 	case "null":
-		return nil, "", false, true
+		return fallbackOperandResult{ok: true}
 	}
 	if strings.HasPrefix(operand, "'") && strings.HasSuffix(operand, "'") && len(operand) >= 2 {
 		value := strings.ReplaceAll(operand[1:len(operand)-1], "''", "'")
-		return value, value, false, true
+		return fallbackOperandResult{value: value, formatted: value, ok: true}
 	}
 	if strings.ContainsAny(operand, ".eE") {
 		if value, err := strconv.ParseFloat(operand, 64); err == nil {
-			return value, operand, false, true
+			return fallbackOperandResult{value: value, formatted: operand, ok: true}
 		}
 	} else if value, err := strconv.ParseInt(operand, 10, 64); err == nil {
-		return value, operand, false, true
+		return fallbackOperandResult{value: value, formatted: operand, ok: true}
 	}
-	return nil, "", false, false
+	return fallbackOperandResult{}
 }
 
 func isTruthyImportInput(value any) bool {
