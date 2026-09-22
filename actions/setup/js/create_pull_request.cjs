@@ -1781,11 +1781,18 @@ async function main(config = {}) {
       core.info(`Fetching base branch: ${baseBranch}`);
 
       // Fetch without creating/updating local branch to avoid conflicts with current branch.
-      // Keep shallow checkouts depth-limited so fetching a moved tip does not require an
-      // expensive shallow negotiation. Full checkouts must remain full.
+      // For a shallow checkout that has not fetched the base ref, use depth one to avoid
+      // expensive shallow negotiation. Do not re-truncate an existing base ref's history.
       const shallowProbe = await exec.getExecOutput("git", ["rev-parse", "--is-shallow-repository"], { ignoreReturnCode: true });
       const isShallowRepo = shallowProbe.exitCode === 0 && shallowProbe.stdout.trim() === "true";
-      await exec.exec("git", isShallowRepo ? ["fetch", "--depth=1", "origin", baseBranch] : ["fetch", "origin", baseBranch]);
+      let fetchArgs = ["fetch", "origin", baseBranch];
+      if (isShallowRepo) {
+        const { exitCode: baseRefExitCode } = await exec.getExecOutput("git", ["show-ref", "--verify", "--quiet", `refs/remotes/origin/${baseBranch}`], { ignoreReturnCode: true });
+        if (baseRefExitCode !== 0) {
+          fetchArgs = ["fetch", "--depth=1", "origin", baseBranch];
+        }
+      }
+      await exec.exec("git", fetchArgs);
 
       // Apply the patch/bundle using git CLI (skip if empty)
       // Track number of new commits pushed so we can restrict the extra empty commit

@@ -159,6 +159,9 @@ describe("create_pull_request - draft policy enforcement", () => {
       if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
         return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
       }
+      if (cmd === "git" && args[0] === "show-ref") {
+        return Promise.resolve({ exitCode: 1, stdout: "", stderr: "" });
+      }
       return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
     });
     const { main } = require("./create_pull_request.cjs");
@@ -170,7 +173,24 @@ describe("create_pull_request - draft policy enforcement", () => {
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
   });
 
-  it("should preserve a full repository when fetching the base branch", async () => {
+  it("should preserve existing base history in a shallow repository", async () => {
+    global.exec.getExecOutput.mockImplementation((cmd, args) => {
+      if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+        return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    const result = await handler({ title: "Test PR", body: "Test body" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "main"]);
+    expect(global.exec.exec).not.toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+  });
+
+  it("should preserve a sparse-full repository when fetching the base branch", async () => {
     global.exec.getExecOutput.mockImplementation((cmd, args) => {
       if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
         return Promise.resolve({ exitCode: 0, stdout: "false\n", stderr: "" });
