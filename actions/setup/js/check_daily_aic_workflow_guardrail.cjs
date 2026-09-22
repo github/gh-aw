@@ -461,16 +461,17 @@ function isStructuralGuardrailError(error) {
 
 /**
  * @param {any} githubClient
- * @param {{ owner: string, repo: string, workflowId: number, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
+ * @param {{ owner: string, repo: string, workflowId: number, created: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
  * @returns {Promise<{ response: any, lookupMode: WorkflowRunLookupMode, sourceRunCount: number, oldestUnfilteredCreatedAt?: string | null }>}
  */
 async function listCompletedWorkflowRunsPage(githubClient, params) {
-  const { owner, repo, workflowId, page, perPage, lookupMode } = params;
+  const { owner, repo, workflowId, created, page, perPage, lookupMode } = params;
   if (lookupMode === "repo_workflow_id_fallback") {
     const response = await githubClient.rest.actions.listWorkflowRunsForRepo({
       owner,
       repo,
       status: "completed",
+      created,
       per_page: perPage,
       page,
     });
@@ -526,6 +527,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
       owner,
       repo,
       workflowId,
+      created,
       page,
       perPage,
       lookupMode: "repo_workflow_id_fallback",

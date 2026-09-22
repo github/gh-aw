@@ -691,9 +691,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
     const workflowName = "Reusable PR Review";
     const callerWorkflowName = "PR Review";
     const workflowId = 324645976;
-    const nowIso = new Date().toISOString();
+    const now = Date.parse("2026-09-22T03:21:08Z");
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+    const nowIso = new Date(now).toISOString();
     let listWorkflowRunsCalls = 0;
     let listWorkflowRunsForRepoCalls = 0;
+    const repoCreatedFilters = [];
 
     const mockGithub = {
       rest: {
@@ -720,8 +723,9 @@ describe("check_daily_aic_workflow_guardrail", () => {
             listWorkflowRunsCalls += 1;
             throw httpError(404, "Not Found");
           },
-          listWorkflowRunsForRepo: async ({ page }) => {
+          listWorkflowRunsForRepo: async ({ created, page }) => {
             listWorkflowRunsForRepoCalls += 1;
+            repoCreatedFilters.push(created);
             if (page === 1) {
               return {
                 data: {
@@ -790,6 +794,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
       expect(listWorkflowRunsCalls).toBe(1);
       expect(listWorkflowRunsForRepoCalls).toBe(2);
+      expect(repoCreatedFilters).toEqual([">=2026-09-21T03:21:08.000Z", ">=2026-09-21T03:21:08.000Z"]);
       expect(getRunAICSpy).toHaveBeenCalledTimes(1);
       expect(getRunAICSpy.mock.calls[0][1]).toBe(41);
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
@@ -803,6 +808,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       delete process.env.GH_AW_GITHUB_TOKEN;
       delete process.env.GH_AW_WORKFLOW_NAME;
       delete process.env.GITHUB_EVENT_NAME;
+      dateNowSpy.mockRestore();
       getRunAICSpy.mockRestore();
     }
   });
