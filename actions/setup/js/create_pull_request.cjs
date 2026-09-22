@@ -1780,9 +1780,12 @@ async function main(config = {}) {
       // First, fetch the base branch specifically (since we use shallow checkout)
       core.info(`Fetching base branch: ${baseBranch}`);
 
-      // Fetch without creating/updating local branch to avoid conflicts with current branch
-      // This works even when we're already on the base branch
-      await exec.exec("git", ["fetch", "origin", baseBranch]);
+      // Fetch without creating/updating local branch to avoid conflicts with current branch.
+      // Keep shallow checkouts depth-limited so fetching a moved tip does not require an
+      // expensive shallow negotiation. Full checkouts must remain full.
+      const shallowProbe = await exec.getExecOutput("git", ["rev-parse", "--is-shallow-repository"], { ignoreReturnCode: true });
+      const isShallowRepo = shallowProbe.exitCode === 0 && shallowProbe.stdout.trim() === "true";
+      await exec.exec("git", isShallowRepo ? ["fetch", "--depth=1", "origin", baseBranch] : ["fetch", "origin", baseBranch]);
 
       // Apply the patch/bundle using git CLI (skip if empty)
       // Track number of new commits pushed so we can restrict the extra empty commit
