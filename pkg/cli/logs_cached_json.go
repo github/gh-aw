@@ -469,15 +469,17 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 	if w == nil {
 		return nil
 	}
+	// Cached runs are already persisted in a source JSONL shard; do not copy
+	// them into the new shard created for this invocation.
 	if run.cachedData != nil {
 		return nil
 	}
 	logsData := buildLogsData([]ProcessedRun{run}, "", nil)
 	if len(logsData.Runs) == 0 {
-		return errors.New("failed to build cached logs JSONL record")
+		return errors.New("failed to build cached logs JSONL record: no run data produced")
 	}
 	if len(logsData.Runs) > 1 {
-		return errors.New("failed to build cached logs JSONL record")
+		return errors.New("failed to build cached logs JSONL record: multiple run records produced for one run")
 	}
 	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0]) //nolint:uncheckedsliceindex // The custom linter cannot infer the len checks above.
 	if includeAudit {
