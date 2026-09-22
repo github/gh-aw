@@ -23,12 +23,14 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
   const candidates = new Map();
   let complete = false;
   let lookupMode = "workflow_id";
+  const created = `>=${new Date(now - WINDOW_MS).toISOString()}`;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result = await listPage(github, {
       owner,
       repo,
       workflowId: current.workflow_id,
       workflowName,
+      created,
       page,
       perPage: 100,
       lookupMode,

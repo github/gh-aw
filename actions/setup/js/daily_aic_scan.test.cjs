@@ -87,6 +87,17 @@ function writeEntries(entries) {
 }
 
 describe("complete daily AIC scan observations", () => {
+  it("limits repository fallback listings to the 24-hour accounting window", async () => {
+    const f = fixture([]);
+    await scanDailyAIC(f);
+    expect(f.listPage).toHaveBeenCalledWith(
+      f.github,
+      expect.objectContaining({
+        created: ">=2025-02-02T12:00:00.000Z",
+      })
+    );
+  });
+
   it("reuses real artifact accounting, persists it, then avoids list and download calls", async () => {
     const f = fixture();
     f.getRunAIC = guardrail.getRunAIC;
