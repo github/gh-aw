@@ -310,12 +310,12 @@ func cachedLogsJSONLUnixSuffix(path, prefix string) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
-	digitCount := 0
-	for _, ch := range suffix {
+	digitCount := len(suffix)
+	for index, ch := range suffix {
 		if ch < '0' || ch > '9' {
+			digitCount = index
 			break
 		}
-		digitCount++
 	}
 	if digitCount == 0 {
 		return 0, false
