@@ -287,6 +287,36 @@ func TestPrettifyAssessmentKindNewKinds(t *testing.T) {
 	assert.Equal(t, "Cheaper Model Available", prettifyAssessmentKind("model_downgrade_available"))
 }
 
+func TestGenerateAgenticAssessmentFindingsSetsStableCodes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		kind string
+		code AuditFindingCode
+	}{
+		{kind: "resource_heavy_for_domain", code: AuditFindingAgenticResourceHeavy},
+		{kind: "overkill_for_agentic", code: AuditFindingAgenticOverkill},
+		{kind: "poor_agentic_control", code: AuditFindingAgenticPoorControl},
+		{kind: "partially_reducible", code: AuditFindingAgenticPartiallyReducible},
+		{kind: "model_downgrade_available", code: AuditFindingAgenticModelDowngrade},
+		{kind: "delegated_context_present", code: AuditFindingAgenticDelegatedContext},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			t.Parallel()
+
+			findings := generateAgenticAssessmentFindings([]AgenticAssessment{{
+				Kind:     tt.kind,
+				Severity: "medium",
+				Summary:  "summary",
+			}})
+
+			require.Len(t, findings, 1)
+			assert.Equal(t, tt.code, findings[0].Code)
+		})
+	}
+}
+
 func TestBuildToolUsageInfoAggregatesAndSorts(t *testing.T) {
 	t.Parallel()
 	metrics := LogMetrics{

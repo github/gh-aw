@@ -515,6 +515,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	}
 
 	return AuditData{
+		SchemaVersion:           auditSchemaVersion,
 		Overview:                inputs.overview,
 		TaskDomain:              inputs.taskDomain,
 		BehaviorFingerprint:     inputs.behaviorFingerprint,
