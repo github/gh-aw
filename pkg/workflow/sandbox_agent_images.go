@@ -32,6 +32,7 @@ const (
 	awfImageRoleSquid            = "squid"
 	awfImageRoleAgent            = "agent"
 	awfImageRoleAPIProxy         = "apiProxy"
+	awfImageRoleRouter           = "router"
 	awfImageRoleCliProxy         = "cliProxy"
 	awfImageRoleBuildTools       = "buildTools"
 	awfImageRoleDohProxy         = "dohProxy"
@@ -46,6 +47,7 @@ var awfImageRoles = []string{
 	awfImageRoleSquid,
 	awfImageRoleAgent,
 	awfImageRoleAPIProxy,
+	awfImageRoleRouter,
 	awfImageRoleCliProxy,
 	awfImageRoleBuildTools,
 	awfImageRoleDohProxy,
@@ -129,6 +131,8 @@ func defaultAWFImageForRole(role, imageTag string) string {
 		return constants.DefaultFirewallRegistry + "/agent:" + imageTag
 	case awfImageRoleAPIProxy:
 		return constants.DefaultFirewallRegistry + "/api-proxy:" + imageTag
+	case awfImageRoleRouter:
+		return constants.DefaultFirewallRegistry + "/router:" + imageTag
 	case awfImageRoleCliProxy:
 		return constants.DefaultFirewallRegistry + "/cli-proxy:" + imageTag
 	case awfImageRoleBuildTools:
@@ -215,19 +219,9 @@ func validateSandboxAgentImages(workflowData *WorkflowData) error {
 		return err
 	}
 
-	// AWF version gate: container.images is only understood by AWF v0.28.4+.
 	firewallConfig := getFirewallConfig(workflowData)
-	if !awfSupportsContainerImages(firewallConfig) {
-		effectiveVersion := string(constants.DefaultFirewallVersion)
-		if firewallConfig != nil && firewallConfig.Version != "" {
-			effectiveVersion = firewallConfig.Version
-		}
-		return NewValidationError(
-			"sandbox.agent.images",
-			strings.Join(roles, ", "),
-			fmt.Sprintf("sandbox.agent.images requires AWF %s or newer", constants.AWFContainerImagesMinVersion),
-			fmt.Sprintf("The custom image manifest maps to container.images, which older AWF versions reject.\n\nThe effective AWF version is %s. Set sandbox.agent.version (or firewall.version) to %s or newer.", effectiveVersion, constants.AWFContainerImagesMinVersion),
-		)
+	if err := validateAWFImageManifestVersionGates(firewallConfig, images, roles); err != nil {
+		return err
 	}
 
 	if err := validateNoConflictingAWFImageSelectors(workflowData, firewallConfig, roles); err != nil {
@@ -257,6 +251,36 @@ func validateAWFImageManifestCoverage(workflowData *WorkflowData, images map[str
 		"incomplete image manifest: missing required role(s) "+strings.Join(missing, ", "),
 		fmt.Sprintf("AWF fails closed when container.images is set, so every image role required by the enabled features must be pinned.\n\nAdd the missing role(s):\n\nsandbox:\n  agent:\n    images:\n      %s: registry.example.com/approved/%s:v0.28.4@sha256:<64-hex-digest>\n\nSee: %s", missing[0], missing[0], constants.DocsSandboxURL),
 	)
+}
+
+// validateAWFImageManifestVersionGates enforces the AWF minimum versions required
+// by the manifest: the base container.images support (AWF v0.28.4+) and, when
+// present, the "router" role (AWF v0.28.21+).
+func validateAWFImageManifestVersionGates(firewallConfig *FirewallConfig, images map[string]string, roles []string) error {
+	effectiveVersion := string(constants.DefaultFirewallVersion)
+	if firewallConfig != nil && firewallConfig.Version != "" {
+		effectiveVersion = firewallConfig.Version
+	}
+
+	if !awfSupportsContainerImages(firewallConfig) {
+		return NewValidationError(
+			"sandbox.agent.images",
+			strings.Join(roles, ", "),
+			fmt.Sprintf("sandbox.agent.images requires AWF %s or newer", constants.AWFContainerImagesMinVersion),
+			fmt.Sprintf("The custom image manifest maps to container.images, which older AWF versions reject.\n\nThe effective AWF version is %s. Set sandbox.agent.version (or firewall.version) to %s or newer.", effectiveVersion, constants.AWFContainerImagesMinVersion),
+		)
+	}
+
+	if _, ok := images[awfImageRoleRouter]; ok && !awfSupportsRouterImageRole(firewallConfig) {
+		return NewValidationError(
+			"sandbox.agent.images.router",
+			images[awfImageRoleRouter],
+			fmt.Sprintf("sandbox.agent.images.router requires AWF %s or newer", constants.AWFRouterImageRoleMinVersion),
+			fmt.Sprintf("The router role in container.images is rejected by older AWF versions.\n\nThe effective AWF version is %s. Set sandbox.agent.version (or firewall.version) to %s or newer.", effectiveVersion, constants.AWFRouterImageRoleMinVersion),
+		)
+	}
+
+	return nil
 }
 
 // validateNoConflictingAWFImageSelectors rejects other configuration that could

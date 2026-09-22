@@ -135,6 +135,11 @@ const AWFAPIProxyProvidersMinVersion Version = "v0.27.43"
 // sandbox.agent.images). Older versions reject the unknown property.
 const AWFContainerImagesMinVersion Version = "v0.28.4"
 
+// AWFRouterImageRoleMinVersion is the minimum AWF version that supports the
+// "router" role in the container.images manifest. Older versions reject the
+// unknown role.
+const AWFRouterImageRoleMinVersion Version = "v0.28.21"
+
 // AWFFilesystemAllowWriteMinVersion is the minimum AWF version that added
 // filesystem.allowWrite to the AWF config file schema.
 //
