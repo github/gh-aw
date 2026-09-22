@@ -1494,8 +1494,7 @@ async function main(config = {}) {
 
         // Missing workflow scope is handled by the preflight above. Any workflow-scope
         // rejection that reaches this catch is GitHub's transient permission-check timeout.
-        const isWorkflowsScopeRejected = isWorkflowsScopeRejection(pushErrorMessage);
-        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected;
+        const isWorkflowsScopeTimeout = isWorkflowsScopeRejection(pushErrorMessage);
 
         const nonFastForwardPatterns = ["non-fast-forward", "rejected", "fetch first", "Updates were rejected"];
         const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
