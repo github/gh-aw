@@ -623,7 +623,7 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if !strings.Contains(workflow, "id: codex") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to use the Codex engine")
 	}
-	if !strings.Contains(workflow, "model: copilot/gpt-5.2-codex") {
+	if !strings.Contains(workflow, "model: copilot/gpt-5.3-codex") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to use a Codex-compatible Copilot model")
 	}
 	if !strings.Contains(workflow, "Before stopping, call exactly one terminal safe-output tool") {
