@@ -88,7 +88,7 @@ const { isCAPIQuotaExceededError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
-const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
+const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
 
 const AWF_CONFIG_PATH = process.env.GH_AW_AWF_CONFIG_PATH || "/tmp/gh-aw/awf-config.json";
 
@@ -659,6 +659,7 @@ function extractTokenCountFromOutput(output) {
  *   isModelNotSupported?: boolean,
  *   isHTTP400ResponseError?: boolean,
  *   isInvocationCapExceeded?: boolean,
+ *   isAPIProxyGuardRejected?: boolean,
  *   isNullTypeToolCall?: boolean,
  *   isQuotaExceeded?: boolean,
  *   isTrustedAICreditsBudgetExhausted?: boolean,
@@ -671,6 +672,10 @@ function extractTokenCountFromOutput(output) {
 function classifyCopilotFailure(detection) {
   if (detection.isInvocationCapExceeded) return "invocation_cap_exceeded";
   if (detection.isTrustedAICreditsBudgetExhausted) return "ai_credits_exhausted";
+  // An AWF API proxy guardrail rejection is a policy outcome, not a credential failure: it must
+  // outrank the authentication classes because the Copilot CLI reports the proxy's HTTP 403 as
+  // "Authentication failed with provider ...".
+  if (detection.isAPIProxyGuardRejected) return "api_proxy_guard_rejected";
   if (detection.isQuotaExceeded) return "capi_quota_exceeded";
   if (detection.isMCPPolicy) return "mcp_policy_blocked";
   if (detection.isModelNotSupported) return "model_not_supported";
@@ -697,7 +702,9 @@ function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
   if (hasNumerousPermissionDeniedIssues(params.output)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
-  if (detectNonRetryableHarnessGuard(params.output).maxRunsExceeded) return false;
+  const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
+  if (nonRetryableGuard.maxRunsExceeded) return false;
+  if (nonRetryableGuard.apiProxyGuardRejection) return false;
   return params.attempt < params.maxRetries && params.hasOutput;
 }
 
@@ -1357,6 +1364,13 @@ async function main() {
           const auditAICreditsExceeded = shouldCheckAuditForAICreditsExceeded ? parseMaxAICreditsExceededFromAuditLog() : false;
           const trustedAICreditsExceeded = !!proxyAICreditsRejection || auditAICreditsExceeded;
           const isTrustedAICreditsBudgetExhausted = trustedAICreditsExceeded && (!isAuthenticationFailed || !!proxyAICreditsRejection || isProxyHTTP403AuthFailure);
+          // The Copilot CLI discards the api-proxy's structured 403 body and prints a generic
+          // "Authentication failed with provider ... (HTTP 403)" line, so a proxy guardrail
+          // rejection is indistinguishable from a credential failure in the CLI text. The proxy's
+          // own structured log carries the guard by name; consult it whenever the proxy answered
+          // with a 403/auth failure so the attempt is classified (and reported) correctly.
+          const shouldCheckEventLogForAPIProxyGuard = !nonRetryableGuard.apiProxyGuardRejection && !isTrustedAICreditsBudgetExhausted && (isProxyHTTP403AuthFailure || isAuthenticationFailed);
+          const apiProxyGuardRejection = nonRetryableGuard.apiProxyGuardRejection || (shouldCheckEventLogForAPIProxyGuard ? parseAPIProxyGuardRejectionFromEventLog() : null);
           const failureClass = classifyCopilotFailure({
             hasOutput: result.hasOutput,
             isAuthErr,
@@ -1367,6 +1381,7 @@ async function main() {
             isModelNotSupported,
             isHTTP400ResponseError: hasHTTP400ResponseError,
             isInvocationCapExceeded,
+            isAPIProxyGuardRejected: !!apiProxyGuardRejection,
             isNullTypeToolCall,
             isQuotaExceeded,
             isTrustedAICreditsBudgetExhausted,
@@ -1382,6 +1397,7 @@ async function main() {
               ` isCAPIError400=${isCAPIError}` +
               ` isCAPIQuotaExceededError=${isQuotaExceeded}` +
               ` isInvocationCapExceeded=${isInvocationCapExceeded}` +
+              ` apiProxyGuardRejection=${apiProxyGuardRejection ? formatAPIProxyGuardRejection(apiProxyGuardRejection) : "none"}` +
               ` isMCPPolicyError=${isMCPPolicy}` +
               ` isModelNotSupportedError=${isModelNotSupported}` +
               ` isHTTP400ResponseError=${hasHTTP400ResponseError}` +
@@ -1475,6 +1491,19 @@ async function main() {
             }
             if (isInvocationCapExceeded && safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath)) {
               log(`attempt ${attempt + 1}: invocation cap saturated but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
+              return { action: "stop", exitCode: 0 };
+            }
+            return { action: "stop" };
+          }
+
+          // An AWF API proxy guardrail rejection (HTTP 403) is a terminal policy outcome: the
+          // proxy-side counter is not reset by a fresh attempt, so retrying burns the retry budget
+          // against a spent proxy. Surface the guard name and counters so the run log states what
+          // was enforced instead of reporting a misleading credential failure.
+          if (apiProxyGuardRejection) {
+            log(`attempt ${attempt + 1}: AWF API proxy guardrail rejected the request: ${formatAPIProxyGuardRejection(apiProxyGuardRejection)} — not retrying (proxy guardrail, not an authentication failure)`);
+            if (safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath)) {
+              log(`attempt ${attempt + 1}: proxy guardrail fired but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
               return { action: "stop", exitCode: 0 };
             }
             return { action: "stop" };

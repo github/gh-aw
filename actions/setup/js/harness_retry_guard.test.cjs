@@ -4,9 +4,32 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, isMaxRunsExceededError, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
+const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, isMaxRunsExceededError, isAuthenticationFailedError, parseAICreditsExceededProxyRejection, parseAPIProxyGuardRejection } = require("./harness_retry_guard.cjs");
 
 describe("harness_retry_guard.cjs", () => {
+  it("detects the AWF API proxy cache-miss guardrail in text form", () => {
+    const output = "API Error: 403 Maximum consecutive cache misses exceeded (5 / 5).";
+    expect(parseAPIProxyGuardRejection(output)).toEqual({
+      guard: "max_cache_misses_exceeded",
+      counters: { consecutive_cache_misses: 5, max_cache_misses: 5 },
+    });
+    expect(detectNonRetryableHarnessGuard(output).apiProxyGuardRejection?.guard).toBe("max_cache_misses_exceeded");
+  });
+
+  it("detects the structured api-proxy guardrail error types", () => {
+    expect(parseAPIProxyGuardRejection('{"type":"max_cache_misses_exceeded"}')?.guard).toBe("max_cache_misses_exceeded");
+    expect(parseAPIProxyGuardRejection('{"type":"effective_tokens_limit_exceeded"}')?.guard).toBe("effective_tokens_limit_exceeded");
+    expect(parseAPIProxyGuardRejection('{"type":"permission_denied_limit_exceeded"}')?.guard).toBe("permission_denied_limit_exceeded");
+    expect(parseAPIProxyGuardRejection('{"type":"model_policy_violation"}')?.guard).toBe("model_policy_violation");
+  });
+
+  it("does not report a proxy guardrail for a genuine credential failure", () => {
+    const output = "Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).";
+    expect(parseAPIProxyGuardRejection(output)).toBeNull();
+    expect(detectNonRetryableHarnessGuard(output).apiProxyGuardRejection).toBeNull();
+    expect(isAuthenticationFailedError(output)).toBe(true);
+  });
+
   it("detects AI credits exceeded markers", () => {
     const result = detectNonRetryableHarnessGuard("error: max_ai_credits_exceeded=true");
     expect(result.aiCreditsExceeded).toBe(true);
