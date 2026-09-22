@@ -12,7 +12,7 @@ permissions:
 engine: copilot
 safe-outputs:
   linear-create-issue:
-    team-id: ${{ vars.LINEAR_TEAM_ID }}
+    team-id: ${{ secrets.LINEAR_TEAM_ID }}
     project-id: "810f57a7e383"
     max: 1
   jira-create-issue:

@@ -2,7 +2,7 @@ package workflow
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -78,8 +78,8 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
-		filepath.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
-		filepath.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
 	}
 
 	// Include grader manifest/results in the fallback so detection and downstream
