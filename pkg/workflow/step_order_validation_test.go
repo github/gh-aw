@@ -127,8 +127,23 @@ func TestIsPathScannedBySecretRedaction_ScannableFiles(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Windows-style JSONL file in /tmp/gh-aw/",
+			path:     `\tmp\gh-aw\sandbox\firewall\logs\api-proxy-logs\token-usage.jsonl`,
+			expected: true,
+		},
+		{
+			name:     "Mixed-separator JSONL file in /tmp/gh-aw/",
+			path:     `/tmp\gh-aw/sandbox\firewall\audit/api-proxy-logs\token-usage.jsonl`,
+			expected: true,
+		},
+		{
 			name:     "Directory in /tmp/gh-aw/",
 			path:     "/tmp/gh-aw/mcp-logs/",
+			expected: true,
+		},
+		{
+			name:     "Windows-style directory in /tmp/gh-aw/",
+			path:     `\tmp\gh-aw\mcp-logs\`,
 			expected: true,
 		},
 		{
@@ -172,6 +187,26 @@ func TestIsPathScannedBySecretRedaction_UnscannableFiles(t *testing.T) {
 		{
 			name:     "File outside /tmp/gh-aw/",
 			path:     "/tmp/other/file.log",
+			expected: false,
+		},
+		{
+			name:     "Windows-style file outside /tmp/gh-aw/",
+			path:     `\tmp\outside\file.log`,
+			expected: false,
+		},
+		{
+			name:     "Mixed-separator file outside /tmp/gh-aw/",
+			path:     `/tmp\outside/file.log`,
+			expected: false,
+		},
+		{
+			name:     "Lookalike Windows-style root",
+			path:     `\tmp\gh-aw-other\file.log`,
+			expected: false,
+		},
+		{
+			name:     "Windows-style path escaping approved root",
+			path:     `\tmp\gh-aw\..\outside\file.log`,
 			expected: false,
 		},
 		{

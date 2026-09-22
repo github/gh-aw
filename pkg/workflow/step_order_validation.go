@@ -3,7 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
+	"path"
 	"slices"
 	"strings"
 
@@ -143,8 +143,10 @@ func (t *StepOrderTracker) ValidateStepOrdering() error {
 		)
 	}
 
-	// Check that all uploaded paths are covered by secret redaction
-	// Secret redaction scans all files in /tmp/gh-aw/ with extensions .txt, .json, .log
+	return t.validateArtifactPathsCovered(artifactUploads)
+}
+
+func (t *StepOrderTracker) validateArtifactPathsCovered(artifactUploads []StepRecord) error {
 	unscannable := t.findUnscannablePaths(artifactUploads)
 	if len(unscannable) > 0 {
 		return NewOperationError(
@@ -181,23 +183,25 @@ func (t *StepOrderTracker) findUnscannablePaths(artifactUploads []StepRecord) []
 
 // isPathScannedBySecretRedaction checks if a path would be scanned by the secret redaction step
 // or is otherwise safe to upload (known engine-controlled diagnostic paths).
-func isPathScannedBySecretRedaction(path string) bool {
+func isPathScannedBySecretRedaction(artifactPath string) bool {
 	// Exclusion patterns (paths starting with !) are not uploaded - they tell the artifact
 	// action to skip matching files. They do not need to be scanned by secret redaction.
-	if strings.HasPrefix(path, "!") {
+	if strings.HasPrefix(artifactPath, "!") {
 		return true
 	}
+
+	normalizedPath, isDirectory := normalizeArtifactPathForRedaction(artifactPath)
 
 	// Paths must be under /tmp/gh-aw/ or ${RUNNER_TEMP}/gh-aw/ to be scanned.
 	// Accept both literal paths and environment variable references.
 	// Engines that produce output outside /tmp/gh-aw/ must move their files into /tmp/gh-aw/
 	// via GetPreBundleSteps before the unified artifact upload (see gemini_engine.go).
-	if !strings.HasPrefix(path, constants.TmpGhAwDirSlash) && !strings.HasPrefix(path, constants.GhAwRootDirShellSlash) && !strings.HasPrefix(path, constants.GhAwRootDirSlash) {
+	if !isUnderSecretRedactionRoot(normalizedPath) {
 		// Check if it's an environment variable that might resolve to /tmp/gh-aw/ or ${RUNNER_TEMP}/gh-aw/
 		// For now, we'll allow ${{ env.* }} patterns through as we can't resolve them at compile time
 		// Assume environment variables that might contain /tmp/gh-aw or ${RUNNER_TEMP}/gh-aw paths are safe
 		// This is a conservative assumption - in practice these are controlled by the compiler
-		if strings.Contains(path, "${{ env.") {
+		if strings.Contains(normalizedPath, "${{ env.") {
 			return true
 		}
 
@@ -208,14 +212,34 @@ func isPathScannedBySecretRedaction(path string) bool {
 	// This list must stay in sync with targetExtensions in actions/setup/js/redact_secrets.cjs.
 	// .patch files are git-diff output written to /tmp/gh-aw/ by the safe-outputs MCP server
 	// and are covered by the redact_secrets step before the unified artifact is uploaded.
-	ext := filepath.Ext(path)
+	ext := path.Ext(normalizedPath)
 	scannedExtensions := []string{".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"}
 	if slices.Contains(scannedExtensions, ext) {
 		return true
 	}
 
 	// If path is a directory (ends with /), we assume it contains scannable files
-	return strings.HasSuffix(path, "/")
+	return isDirectory
+}
+
+func normalizeArtifactPathForRedaction(artifactPath string) (normalizedPath string, isDirectory bool) {
+	normalizedSeparators := strings.ReplaceAll(artifactPath, `\`, "/")
+	return path.Clean(normalizedSeparators), strings.HasSuffix(normalizedSeparators, "/")
+}
+
+func isUnderSecretRedactionRoot(artifactPath string) bool {
+	roots := []string{
+		constants.TmpGhAwDirSlash,
+		constants.GhAwRootDirShellSlash,
+		constants.GhAwRootDirSlash,
+	}
+	for _, root := range roots {
+		normalizedRoot := strings.TrimSuffix(root, "/")
+		if artifactPath == normalizedRoot || strings.HasPrefix(artifactPath, normalizedRoot+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // isKnownUnscannedButAllowedForUpload reports whether a path is a known type of file
@@ -225,13 +249,13 @@ func isPathScannedBySecretRedaction(path string) bool {
 // In addition to binary git bundles, the archived operational-value evaluator is
 // allowed because the compiler freezes its trusted repository bytes and records
 // their digest for replay. Redacting that archive would invalidate its provenance.
-func isKnownUnscannedButAllowedForUpload(path string) bool {
-	isUnderGhAwDir := strings.HasPrefix(path, constants.TmpGhAwDirSlash) ||
-		strings.HasPrefix(path, constants.GhAwRootDirShellSlash) ||
-		strings.HasPrefix(path, constants.GhAwRootDirSlash) ||
-		strings.Contains(path, "${{ env.")
+func isKnownUnscannedButAllowedForUpload(artifactPath string) bool {
+	normalizedPath, _ := normalizeArtifactPathForRedaction(artifactPath)
+	isUnderGhAwDir := isUnderSecretRedactionRoot(normalizedPath) ||
+		strings.Contains(normalizedPath, "${{ env.")
 	if !isUnderGhAwDir {
 		return false
 	}
-	return filepath.Ext(path) == ".bundle" || path == constants.GradersDirSlash+constants.OperationalValueEvaluatorFilename.String()
+	operationalValueEvaluatorPath, _ := normalizeArtifactPathForRedaction(constants.GradersDirSlash + constants.OperationalValueEvaluatorFilename.String())
+	return path.Ext(normalizedPath) == ".bundle" || normalizedPath == operationalValueEvaluatorPath
 }
