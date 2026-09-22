@@ -80,6 +80,55 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "VALUE: nested-value",
 		},
 		{
+			name:     "missing import-input falls back to string literal",
+			content:  `VALUE: ${{ github.aw.import-inputs.campaign || 'fallback-literal' }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: fallback-literal",
+		},
+		{
+			name:     "empty import-input falls back to string literal",
+			content:  `VALUE: ${{ github.aw.import-inputs.campaign || 'fallback-literal' }}`,
+			inputs:   map[string]any{"campaign": ""},
+			expected: "VALUE: fallback-literal",
+		},
+		{
+			name:     "truthy import-input wins over string literal",
+			content:  `VALUE: ${{ github.aw.import-inputs.campaign || 'fallback-literal' }}`,
+			inputs:   map[string]any{"campaign": "eslint-rules"},
+			expected: "VALUE: eslint-rules",
+		},
+		{
+			name:     "false literal falls through to string literal",
+			content:  `VALUE: ${{ github.aw.import-inputs.enabled || false || 'fallback-literal' }}`,
+			inputs:   map[string]any{"enabled": false},
+			expected: "VALUE: fallback-literal",
+		},
+		{
+			name:     "numeric literal fallback resolves",
+			content:  `VALUE: ${{ github.aw.import-inputs.count || 5 }}`,
+			inputs:   map[string]any{"count": 0},
+			expected: "VALUE: 5",
+		},
+		{
+			name:     "escaped quote string literal fallback resolves",
+			content:  `VALUE: ${{ github.aw.import-inputs.campaign || 'fallback''literal' }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: fallback'literal",
+		},
+		{
+			name:     "legacy input participates in fallback chains",
+			content:  `VALUE: ${{ github.aw.inputs.campaign || github.aw.import-inputs.package || 'fallback-literal' }}`,
+			inputs:   map[string]any{"package": "repo-assist"},
+			expected: "VALUE: repo-assist",
+		},
+		{
+			name:     "unsupported runtime operand leaves fallback expression untouched",
+			content:  `VALUE: ${{ github.aw.import-inputs.campaign || github.event.inputs.campaign }}`,
+			inputs:   map[string]any{},
+			expected: `VALUE: ${{ github.aw.import-inputs.campaign || github.event.inputs.campaign }}`,
+			contains: true,
+		},
+		{
 			name:     "non-fallback single import-inputs expression still substitutes",
 			content:  `VALUE: ${{ github.aw.import-inputs.campaign }}`,
 			inputs:   map[string]any{"campaign": "solo-value"},
@@ -105,7 +154,7 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			if result != tc.expected {
 				t.Errorf("substituteImportInputsInContent() = %q, want %q", result, tc.expected)
 			}
-			if strings.Contains(result, "github.aw.import-inputs") && tc.name != "no inputs leaves single expression untouched" {
+			if strings.Contains(result, "github.aw.import-inputs") && !tc.contains && tc.name != "no inputs leaves single expression untouched" {
 				t.Errorf("result still contains unresolved import-inputs expression: %q", result)
 			}
 		})

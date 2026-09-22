@@ -6,14 +6,15 @@ package parser
 import (
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/importinpututil"
 )
 
-// importInputsFallbackExprRegex matches fallback expressions containing only
-// import-input references joined by ||.
-var importInputsFallbackExprRegex = regexp.MustCompile(`\$\{\{\s*(github\.aw\.import-inputs\.[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)?(?:\s*\|\|\s*github\.aw\.import-inputs\.[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)?)+)\s*\}\}`)
+// importInputsFallbackExprRegex matches fallback expressions. The replacement
+// function folds only chains whose operands are all compile-time safe.
+var importInputsFallbackExprRegex = regexp.MustCompile(`\$\{\{\s*([^{}\n]*\|\|[^{}\n]*)\s*\}\}`)
 
 // importInputsExprRegex matches ${{ github.aw.import-inputs.<key> }} and
 // ${{ github.aw.import-inputs.<key>.<subkey> }} expressions in raw content.
@@ -46,26 +47,107 @@ func buildImportInputFallbackReplaceFunc(inputs map[string]any) func(string) str
 		if !found {
 			return match
 		}
+		operands := splitFallbackOperands(expression)
+		if len(operands) < 2 {
+			return match
+		}
 		fallback := ""
-		for operand := range strings.SplitSeq(expression, "||") {
-			inputPath := strings.TrimPrefix(strings.TrimSpace(operand), "github.aw.import-inputs.")
-			value, found := resolveImportInputValue(inputs, inputPath)
-			if !found {
-				fallback = ""
-				continue
-			}
-			formatted, ok := importinpututil.FormatResolvedValue(value)
+		hasCompileTimeInput := false
+		firstTruthy := ""
+		foundTruthy := false
+		for _, operand := range operands {
+			value, formatted, compileTimeInput, ok := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
 			if !ok {
-				fallback = ""
-				continue
+				return match
 			}
+			hasCompileTimeInput = hasCompileTimeInput || compileTimeInput
 			fallback = formatted
-			if isTruthyImportInput(value) {
-				return formatted
+			if isTruthyImportInput(value) && !foundTruthy {
+				firstTruthy = formatted
+				foundTruthy = true
 			}
+		}
+		if !hasCompileTimeInput {
+			return match
+		}
+		if foundTruthy {
+			return firstTruthy
 		}
 		return fallback
 	}
+}
+
+func splitFallbackOperands(expression string) []string {
+	operands := make([]string, 0, 2)
+	start := 0
+	inString := false
+	skipNext := false
+	for i, r := range expression {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if r == '\'' {
+			if inString && strings.HasPrefix(expression[i+1:], "'") {
+				skipNext = true
+				continue
+			}
+			inString = !inString
+			continue
+		}
+		if !inString && strings.HasPrefix(expression[i:], "||") {
+			operands = append(operands, expression[start:i])
+			skipNext = true
+			start = i + 2
+		}
+	}
+	operands = append(operands, expression[start:])
+	return operands
+}
+
+func resolveFallbackOperand(operand string, inputs map[string]any) (any, string, bool, bool) {
+	if inputPath, ok := strings.CutPrefix(operand, "github.aw.import-inputs."); ok {
+		return resolveFallbackInputOperand(inputPath, inputs)
+	}
+	if inputPath, ok := strings.CutPrefix(operand, "github.aw.inputs."); ok {
+		return resolveFallbackInputOperand(inputPath, inputs)
+	}
+	return resolveFallbackLiteralOperand(operand)
+}
+
+func resolveFallbackInputOperand(inputPath string, inputs map[string]any) (any, string, bool, bool) {
+	value, found := resolveImportInputValue(inputs, inputPath)
+	if !found {
+		return nil, "", true, true
+	}
+	formatted, ok := importinpututil.FormatResolvedValue(value)
+	if !ok {
+		return value, "", true, true
+	}
+	return value, formatted, true, true
+}
+
+func resolveFallbackLiteralOperand(operand string) (any, string, bool, bool) {
+	switch operand {
+	case "true":
+		return true, "true", false, true
+	case "false":
+		return false, "false", false, true
+	case "null":
+		return nil, "", false, true
+	}
+	if strings.HasPrefix(operand, "'") && strings.HasSuffix(operand, "'") && len(operand) >= 2 {
+		value := strings.ReplaceAll(operand[1:len(operand)-1], "''", "'")
+		return value, value, false, true
+	}
+	if strings.ContainsAny(operand, ".eE") {
+		if value, err := strconv.ParseFloat(operand, 64); err == nil {
+			return value, operand, false, true
+		}
+	} else if value, err := strconv.ParseInt(operand, 10, 64); err == nil {
+		return value, operand, false, true
+	}
+	return nil, "", false, false
 }
 
 func isTruthyImportInput(value any) bool {

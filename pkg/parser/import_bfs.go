@@ -232,12 +232,12 @@ func enqueueImportPath(state *importBFSState, importPath, fullPath, sectionName,
 
 func processImportQueue(baseDir string, cache *ImportCache, workflowFilePath string, yamlContent string, state *importBFSState) error {
 	for len(state.queue) > 0 {
-		var item importQueueItem
-		for _, queuedItem := range state.queue {
-			item = queuedItem
+		queue := state.queue
+		if len(queue) == 0 {
 			break
 		}
-		state.queue = state.queue[1:]
+		item := queue[0] //nolint:uncheckedsliceindex // len(state.queue) > 0 guards this FIFO pop.
+		state.queue = queue[1:]
 		if err := processQueueItem(item, baseDir, cache, workflowFilePath, yamlContent, state); err != nil {
 			return err
 		}

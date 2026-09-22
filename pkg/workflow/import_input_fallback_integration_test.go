@@ -14,15 +14,17 @@ import (
 
 func TestImportInputFallbackExpressionCompilation(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		input    string
-		expected string
+		name       string
+		input      string
+		expression string
+		expected   string
 	}{
-		{name: "campaign", input: "campaign: eslint-rules", expected: "eslint-rules"},
-		{name: "package", input: "package: repo-assist", expected: "repo-assist"},
-		{name: "neither", input: "{}", expected: ""},
-		{name: "both provided campaign wins", input: "campaign: eslint-rules\n      package: repo-assist", expected: "eslint-rules"},
-		{name: "empty campaign falls back to package", input: "campaign: \"\"\n      package: repo-assist", expected: "repo-assist"},
+		{name: "campaign", input: "campaign: eslint-rules", expression: "${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}", expected: "eslint-rules"},
+		{name: "package", input: "package: repo-assist", expression: "${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}", expected: "repo-assist"},
+		{name: "neither", input: "{}", expression: "${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}", expected: ""},
+		{name: "both provided campaign wins", input: "campaign: eslint-rules\n      package: repo-assist", expression: "${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}", expected: "eslint-rules"},
+		{name: "empty campaign falls back to package", input: "campaign: \"\"\n      package: repo-assist", expression: "${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}", expected: "repo-assist"},
+		{name: "missing campaign falls back to literal", input: "{}", expression: "${{ github.aw.import-inputs.campaign || 'fallback-literal' }}", expected: "fallback-literal"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "import-input-fallback-*")
@@ -40,7 +42,7 @@ import-schema:
 steps:
   - name: Check admission
     env:
-      CAO_CAMPAIGN: ${{ github.aw.import-inputs.campaign || github.aw.import-inputs.package }}
+      CAO_CAMPAIGN: ` + tc.expression + `
     run: echo "$CAO_CAMPAIGN"
 ---
 
