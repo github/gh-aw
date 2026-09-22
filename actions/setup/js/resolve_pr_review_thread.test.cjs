@@ -16,8 +16,14 @@ const mockCore = {
 global.core = mockCore;
 
 const mockGraphql = vi.fn();
+const mockGetIssue = vi.fn();
 const mockGithub = {
   graphql: mockGraphql,
+  rest: {
+    issues: {
+      get: mockGetIssue,
+    },
+  },
 };
 
 global.github = mockGithub;
@@ -77,6 +83,12 @@ describe("resolve_pr_review_thread", () => {
 
     // Default: thread belongs to triggering PR #42
     mockGraphqlForThread(42);
+    mockGetIssue.mockResolvedValue({
+      data: {
+        title: "Test pull request",
+        labels: [],
+      },
+    });
 
     const { main } = require("./resolve_pr_review_thread.cjs");
     handler = await main({ max: 10 });
@@ -107,6 +119,30 @@ describe("resolve_pr_review_thread", () => {
     // Should have made two GraphQL calls: lookup + resolve
     expect(mockGraphql).toHaveBeenCalledTimes(2);
     expect(mockGraphql).toHaveBeenCalledWith(expect.stringContaining("resolveReviewThread"), expect.objectContaining({ threadId: "PRRT_kwDOABCD123456" }));
+  });
+
+  it("should not resolve a review thread when a required label is missing", async () => {
+    const { main } = require("./resolve_pr_review_thread.cjs");
+    const filteredHandler = await main({ max: 10, required_labels: ["automation"] });
+
+    const result = await filteredHandler(
+      {
+        type: "resolve_pull_request_review_thread",
+        thread_id: "PRRT_kwDOABCD123456",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).toBe(true);
+    expect(result.error).toContain("required-labels");
+    expect(mockGetIssue).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      issue_number: 42,
+    });
+    expect(mockGraphql).toHaveBeenCalledTimes(1);
+    expect(mockGraphql.mock.calls.some(([query]) => query.includes("resolveReviewThread"))).toBe(false);
   });
 
   it("should reject a thread that belongs to a different PR", async () => {

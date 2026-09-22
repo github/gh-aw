@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
 // compiler_activation_daily_aic contains daily AIC guardrail token and step builders.
@@ -144,6 +146,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 	steps = append(steps, fmt.Sprintf("          GH_AW_HAS_LABEL_COMMAND: %q\n", strconv.FormatBool(len(data.LabelCommand) > 0)))
 	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN: %s\n", c.resolveDailyAICToken(data)))
 	steps = append(steps, buildTemplatableIntEnvVar(maxDailyAICreditsEnvVar, data.MaxDailyAICredits)...)
+	steps = append(steps, fmt.Sprintf("          GH_AW_MAX_AI_CREDITS: %s\n", dailyAICMaxCreditsEnvValue(data)))
 	steps = append(steps, "        with:\n")
 	steps = append(steps, fmt.Sprintf("          github-token: %s\n", c.resolveDailyAICToken(data)))
 	steps = append(steps, "          script: |\n")
@@ -171,6 +174,13 @@ func appendDailyAICContinueOnError(steps []string, data *WorkflowData) []string 
 		return append(steps, "        continue-on-error: true\n")
 	}
 	return steps
+}
+
+func dailyAICMaxCreditsEnvValue(data *WorkflowData) string {
+	if data.EngineConfig != nil && data.EngineConfig.MaxAICredits != 0 {
+		return strconv.Quote(strconv.FormatInt(data.EngineConfig.MaxAICredits, 10))
+	}
+	return compilerenv.BuildDefaultMaxAICreditsExpression(strconv.FormatInt(constants.DefaultMaxAICredits, 10))
 }
 
 func buildDailyAICActivationJobEnv(data *WorkflowData) map[string]string {

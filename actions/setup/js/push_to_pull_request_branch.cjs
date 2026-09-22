@@ -26,7 +26,7 @@ const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getThreatWarningPresentation } = require("./threat_detection_warning.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
-const { buildManualBranchApplyCommands } = require("./create_pull_request_helpers.cjs");
+const { buildManualBranchApplyCommands, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -1455,23 +1455,34 @@ async function main(config = {}) {
         }
       }
 
+      const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+      if (!allowWorkflows && agentWorkflowFiles.length > 0) {
+        return buildWorkflowsScopeError("Branch", core);
+      }
+
       // Push the applied commits to the branch using signed GraphQL commits (outside patch try/catch so push failures are not misattributed)
       try {
-        const pushedSha = await pushSignedCommits({
-          githubClient: pushGithubClient,
-          owner: pushRepoParts.owner,
-          repo: pushRepoParts.repo,
-          branch: branchName,
-          baseRef: rangeBaseRef,
-          cwd: repoCwd || process.cwd(),
-          gitAuthEnv,
-          pushRemoteUrl,
-          pushToken: headGitHubToken,
-          signedCommits,
-          resolvedTemporaryIds,
-          currentRepo: itemRepo,
-          validationConfig: config,
-        });
+        // GitHub intermittently fails its workflow-permission check with
+        // "Unable to determine if workflow can be created or updated due to timeout; `workflows`
+        // scope may be required." — a transient server-side condition, not a real scope problem.
+        // Retry with exponential backoff before treating the push as failed.
+        const pushedSha = await withTransientPushRetry(() =>
+          pushSignedCommits({
+            githubClient: pushGithubClient,
+            owner: pushRepoParts.owner,
+            repo: pushRepoParts.repo,
+            branch: branchName,
+            baseRef: rangeBaseRef,
+            cwd: repoCwd || process.cwd(),
+            gitAuthEnv,
+            pushRemoteUrl,
+            pushToken: headGitHubToken,
+            signedCommits,
+            resolvedTemporaryIds,
+            currentRepo: itemRepo,
+            validationConfig: config,
+          })
+        );
         if (pushedSha) {
           pushedCommitSha = pushedSha;
           core.info(`pushSignedCommits returned pushed SHA: ${pushedSha}`);
@@ -1480,11 +1491,18 @@ async function main(config = {}) {
       } catch (pushError) {
         const pushErrorMessage = getErrorMessage(pushError);
         core.error(`Failed to push changes: ${pushErrorMessage}`);
+
+        // Missing workflow scope is handled by the preflight above. Any workflow-scope
+        // rejection that reaches this catch is GitHub's transient permission-check timeout.
+        const isWorkflowsScopeTimeout = isWorkflowsScopeRejection(pushErrorMessage);
+
         const nonFastForwardPatterns = ["non-fast-forward", "rejected", "fetch first", "Updates were rejected"];
-        const isNonFastForward = nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
+        const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
         let userMessage = isNonFastForward
           ? "Failed to push changes: remote PR branch changed while the workflow was running (non-fast-forward). Re-run the workflow on the latest PR branch state."
-          : `Failed to push changes: ${pushErrorMessage}`;
+          : isWorkflowsScopeTimeout
+            ? "Failed to push changes: GitHub could not complete its workflow-permission check (transient timeout) after multiple retries. Re-run the workflow to retry the push."
+            : `Failed to push changes: ${pushErrorMessage}`;
 
         // Diagnose common race where branch was deleted after preflight checks.
         try {
@@ -1506,9 +1524,10 @@ async function main(config = {}) {
 
         // Fallback path for diverged branches: create a new pull request so changes
         // can still be reviewed and merged into the original PR branch.
-        if (isNonFastForward && fallbackAsPullRequest) {
+        if ((isNonFastForward || isWorkflowsScopeTimeout) && fallbackAsPullRequest) {
           const fallbackBranchName = normalizeBranchName(`${branchName}-fallback`, String(Date.now()));
-          core.warning(`Non-fast-forward push detected; creating fallback pull request from '${fallbackBranchName}' to '${branchName}'`);
+          const fallbackReason = isNonFastForward ? "Non-fast-forward push detected" : "Transient workflow-permission check timeout on push";
+          core.warning(`${fallbackReason}; creating fallback pull request from '${fallbackBranchName}' to '${branchName}'`);
           try {
             // Pre-flight: check full branch history for workflow file changes.
             // Like the review branch path, creating a new fallback branch ref triggers
@@ -1549,7 +1568,9 @@ async function main(config = {}) {
 
             const fallbackBody = [
               "> [!NOTE]",
-              "> Direct push to the original pull request branch failed because the branch diverged (non-fast-forward).",
+              isNonFastForward
+                ? "> Direct push to the original pull request branch failed because the branch diverged (non-fast-forward)."
+                : "> Direct push to the original pull request branch failed because GitHub could not complete its workflow-permission check (transient timeout).",
               `> Original PR branch: \`${branchName}\``,
               "",
               `This fallback PR contains the prepared changes for PR #${pullNumber}.`,

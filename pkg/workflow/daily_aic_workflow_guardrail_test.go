@@ -134,6 +134,9 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, `GH_AW_MAX_DAILY_AI_CREDITS: "100000000"`) {
 		t.Fatal("expected activation job env to include normalized guardrail threshold")
 	}
+	if !strings.Contains(lockStr, `GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}`) {
+		t.Fatal("expected activation job env to include the per-run AI Credits fallback")
+	}
 	if !strings.Contains(lockStr, "daily_ai_credits_exceeded: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}") {
 		t.Fatal("expected activation job to expose daily_ai_credits_exceeded output")
 	}

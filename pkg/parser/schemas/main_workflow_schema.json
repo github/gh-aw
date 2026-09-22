@@ -10477,7 +10477,7 @@
                 },
                 "fallback-as-pull-request": {
                   "type": "boolean",
-                  "description": "When true (default), if pushing to the PR branch fails due to a non-fast-forward/diverged branch, create a fallback pull request that targets the original PR branch. Set to false to disable this behavior and avoid requiring pull-requests: write permission.",
+                  "description": "When true (default), if pushing to the PR branch fails due to a non-fast-forward/diverged branch or an exhausted workflow-permission check timeout, create a fallback pull request that targets the original PR branch. Set to false to disable this behavior and avoid requiring pull-requests: write permission.",
                   "default": true
                 },
                 "signed-commits": {

@@ -461,16 +461,17 @@ function isStructuralGuardrailError(error) {
 
 /**
  * @param {any} githubClient
- * @param {{ owner: string, repo: string, workflowId: number, workflowName: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
+ * @param {{ owner: string, repo: string, workflowId: number, workflowName: string, created: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode }} params
  * @returns {Promise<{ response: any, lookupMode: WorkflowRunLookupMode, sourceRunCount: number, oldestUnfilteredCreatedAt?: string | null }>}
  */
 async function listCompletedWorkflowRunsPage(githubClient, params) {
-  const { owner, repo, workflowId, workflowName, page, perPage, lookupMode } = params;
+  const { owner, repo, workflowId, workflowName, created, page, perPage, lookupMode } = params;
   if (lookupMode === "repo_workflow_name_fallback") {
     const response = await githubClient.rest.actions.listWorkflowRunsForRepo({
       owner,
       repo,
       status: "completed",
+      created,
       per_page: perPage,
       page,
     });
@@ -534,6 +535,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
       repo,
       workflowId,
       workflowName,
+      created,
       page,
       perPage,
       lookupMode: "repo_workflow_name_fallback",
@@ -633,6 +635,12 @@ async function main(options = {}) {
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
   core.setOutput("daily_ai_credits_guardrail_error", "");
   const threshold = parsePositiveCompactNumber(process.env.GH_AW_MAX_DAILY_AI_CREDITS);
+  const maxAICredits = parsePositiveCompactNumber(process.env.GH_AW_MAX_AI_CREDITS);
+  logDailyGuardrail("Resolved daily AIC guardrail limits", {
+    dailyAICThreshold: threshold,
+    perRunMaxAICredits: maxAICredits > 0 ? maxAICredits : null,
+    perRunFallbackAvailable: maxAICredits > 0,
+  });
   if (threshold <= 0) {
     core.setOutput("daily_ai_credits_guardrail_status", "disabled");
     return;
@@ -667,6 +675,7 @@ async function main(options = {}) {
       listPage: listCompletedWorkflowRunsPage,
       token,
       workflowName: process.env.GH_AW_WORKFLOW_NAME || "",
+      fallbackAIC: maxAICredits,
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
