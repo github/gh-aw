@@ -5,7 +5,7 @@
 const crypto = require("crypto");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { isTransientError, sleep, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { isTransientError, isWorkflowsScopeTimeoutError, withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { MAX_ASSIGNEES } = require("./constants.cjs");
 const { encodePathSegments, renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
@@ -77,55 +77,27 @@ function isLabelTransientError(error) {
 }
 
 /**
- * Determines if a `git push` failure is a transient GitHub-side workflows-scope timeout,
- * and therefore worth retrying instead of immediately falling back to a review issue.
- *
- * GitHub can reject a push that includes workflow file changes with a message like
- * "Unable to determine if workflow can be created or updated due to timeout; `workflows`
- * scope may be required." when its internal workflow-permission check times out. This is
- * the same message classified as non-fatal for the `pulls.updateBranch` REST call in
- * `update_pull_request.cjs`'s `isNonFatalUpdateBranchError`, but here it can also surface
- * on the raw `git push` used to create the initial branch, so it is treated as retryable.
- * @param {unknown} error - The error to check
- * @returns {boolean} True if the error looks like a transient workflows-scope timeout
- */
-function isTransientPushError(error) {
-  const message = getErrorMessage(error).toLowerCase();
-  return message.includes("`workflows` scope may be required") || message.includes("unable to determine if workflow can be created or updated");
-}
-
-/**
  * Runs an initial branch-push operation, retrying with exponential backoff when it fails
- * with a transient workflows-scope timeout (see {@link isTransientPushError}). Non-transient
+ * with a transient workflows-scope timeout. Non-transient
  * errors, and the error from the final exhausted attempt, are rethrown completely unmodified
  * so existing push-failure handling (message-based classification, fallback issue body, etc.)
  * behaves exactly as it did before retries were introduced.
  * @template T
  * @param {() => Promise<T>} operation - The push operation to run
- * @param {string} operationName - Name used for log messages
  * @returns {Promise<T>}
  */
-async function withTransientPushRetry(operation, operationName) {
-  const { maxRetries, initialDelayMs, maxDelayMs, backoffMultiplier, jitterMs } = RATE_LIMIT_RETRY_CONFIG;
-  let delay = initialDelayMs;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const result = await operation();
-      if (attempt > 0) {
-        core.info(`${operationName} succeeded on retry attempt ${attempt}`);
-      }
-      return result;
-    } catch (error) {
-      if (!isTransientPushError(error) || attempt >= maxRetries) {
-        throw error;
-      }
-      const jitter = jitterMs > 0 ? Math.floor(Math.random() * jitterMs) : 0;
-      const delayWithJitter = Math.min(delay + jitter, maxDelayMs);
-      core.warning(`${operationName} failed with a transient workflows-scope timeout (attempt ${attempt + 1}/${maxRetries + 1}): ${getErrorMessage(error)}`);
-      core.info(`Retry attempt ${attempt + 1}/${maxRetries} for ${operationName} after ${delayWithJitter}ms delay`);
-      await sleep(delayWithJitter);
-      delay = Math.min(delay * backoffMultiplier, maxDelayMs);
-    }
+async function withTransientPushRetry(operation) {
+  try {
+    return await withRetry(
+      operation,
+      {
+        ...RATE_LIMIT_RETRY_CONFIG,
+        shouldRetry: isWorkflowsScopeTimeoutError,
+      },
+      "push branch"
+    );
+  } catch (error) {
+    throw error?.originalError ?? error;
   }
 }
 
@@ -522,7 +494,6 @@ module.exports = {
   createBundleTempRef,
   shellQuote,
   isLabelTransientError,
-  isTransientPushError,
   withTransientPushRetry,
   parseAllowedBaseBranches,
   isBaseBranchAllowed,

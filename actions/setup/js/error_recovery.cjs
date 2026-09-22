@@ -62,6 +62,7 @@ const RATE_LIMIT_RETRY_CONFIG = {
 const RATE_LIMIT_INDICATORS = ["rate limit", "secondary rate limit", "abuse detection", "too many requests"];
 const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+const WORKFLOWS_SCOPE_TIMEOUT_INDICATORS = ["`workflows` scope may be required", "unable to determine if workflow can be created or updated"];
 
 /**
  * @param {string} messageLower - Lower-cased error message
@@ -232,6 +233,16 @@ function isRateLimitError(error) {
 
   const errorMsg = getErrorMessage(error).toLowerCase();
   return hasRateLimitIndicator(errorMsg);
+}
+
+/**
+ * Determine whether an error indicates GitHub could not complete its workflow-permission check.
+ * @param {unknown} error - The error to classify
+ * @returns {boolean} True when the message matches the workflows-scope timeout condition
+ */
+function isWorkflowsScopeTimeoutError(error) {
+  const errorMsg = getErrorMessage(error).toLowerCase();
+  return WORKFLOWS_SCOPE_TIMEOUT_INDICATORS.some(pattern => errorMsg.includes(pattern));
 }
 
 /**
@@ -476,6 +487,7 @@ module.exports = {
   withRetry,
   sleep,
   isTransientError,
+  isWorkflowsScopeTimeoutError,
   getRetryAfterMs,
   enhanceError,
   createValidationError,

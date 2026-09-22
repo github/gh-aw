@@ -1834,7 +1834,7 @@ async function main(config = {}) {
             });
           };
           try {
-            await withTransientPushRetry(runBundlePush, "push branch (bundle)");
+            await withTransientPushRetry(runBundlePush);
             core.info("Changes pushed to branch (from bundle)");
 
             // Count new commits on PR branch relative to base
@@ -2229,7 +2229,7 @@ ${issueSafeFallbackFooter}`;
               });
             };
             try {
-              await withTransientPushRetry(runPatchPush, "push branch");
+              await withTransientPushRetry(runPatchPush);
               core.info("Changes pushed to branch");
 
               // Count new commits on PR branch relative to base, used to restrict
