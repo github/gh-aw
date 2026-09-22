@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -142,7 +143,12 @@ func (e *ClaudeEngine) prepareClaudeToolsForAllowedList(tools map[string]any) ma
 	}
 	claudeToolsLog.Print("Converting neutral tools to Claude-specific format")
 	tools = e.expandNeutralToolsToClaudeTools(tools)
-	defaultClaudeTools := []string{"Task", "Glob", "Grep", "ExitPlanMode", "TodoWrite", "LS", "Read", "NotebookRead"}
+	// Skill is included by default so that skills available to the CLI — repository
+	// skills under .claude/skills/, frontmatter `skills:`, and skills installed by
+	// workflow steps such as the APM package restore — can be invoked without
+	// requiring permission-mode: bypassPermissions. Claude only exposes the Skill
+	// tool when at least one skill is registered, so allowing it is a no-op otherwise.
+	defaultClaudeTools := []string{"Task", "Glob", "Grep", "ExitPlanMode", "TodoWrite", "LS", "Read", "NotebookRead", "Skill"}
 	ensureDefaultClaudeAllowedTools(tools, defaultClaudeTools)
 	claudeToolsLog.Printf("Added %d default Claude tools to allowed list", len(defaultClaudeTools))
 	return tools
@@ -228,7 +234,8 @@ func hasBashWildcard(commands []any) bool {
 // isClaudeToolName uses the existing Claude naming convention heuristic:
 // valid Claude tool keys are expected to start with an uppercase ASCII letter.
 func isClaudeToolName(toolName string) bool {
-	return toolName != "" && toolName[0] >= 'A' && toolName[0] <= 'Z'
+	first, _ := utf8.DecodeRuneInString(toolName)
+	return first >= 'A' && first <= 'Z'
 }
 
 func appendTopLevelClaudeTools(allowedTools []string, tools map[string]any, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig) []string {

@@ -78,6 +78,10 @@ Packages are fetched using the cascading token fallback: `GH_AW_PLUGINS_TOKEN` â
 
 To reproduce or debug the pack/unpack flow locally, run `apm pack` and `apm unpack` directly. See the [pack and distribute guide](https://microsoft.github.io/apm/guides/pack-distribute/) for instructions.
 
+## Pull request runs
+
+For pull request triggers, the agent job replaces agent config folders (`.agents`, `.github`, and the engine folder such as `.claude`) with a base-branch snapshot so a fork PR cannot inject skill or instruction files.
+
 ## Reference
 
 | Resource | URL |

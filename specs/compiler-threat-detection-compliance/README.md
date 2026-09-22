@@ -34,8 +34,9 @@ Baseline rule implementation and test-file locations are maintained in [spec §7
 | CTR-025 | T-CTR-039 |
 | CTR-026 | T-CTR-041 |
 | CTR-027 | T-CTR-042 |
+| CTR-028 | T-CTR-043 |
 
-Note: `CTR-025` maps to `T-CTR-039`, `CTR-026` maps to `T-CTR-041`, and `CTR-027` maps to `T-CTR-042` because `T-CTR-024` through `T-CTR-038` and `T-CTR-040` were already allocated to Section 6 false-positive and optimizer protocol norms. The shared `T-CTR-*` sequence is intentionally non-sequential with respect to `CTR-*` rule IDs.
+Note: `CTR-025` maps to `T-CTR-039`, `CTR-026` maps to `T-CTR-041`, `CTR-027` maps to `T-CTR-042`, and `CTR-028` maps to `T-CTR-043` because `T-CTR-024` through `T-CTR-038` and `T-CTR-040` were already allocated to Section 6 false-positive and optimizer protocol norms. The shared `T-CTR-*` sequence is intentionally non-sequential with respect to `CTR-*` rule IDs.
 
 The test triggers, expected compiler actions, and stable diagnostics are defined in [Section 8.1](../compiler-threat-detection-spec.md#81-test-id-catalog). The implementation and concrete test-file mappings are defined in [Section 7.1](../compiler-threat-detection-spec.md#71-baseline-rule-mapping).
 
