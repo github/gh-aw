@@ -224,6 +224,8 @@ func isPathScannedBySecretRedaction(artifactPath string) bool {
 
 func normalizeArtifactPathForRedaction(artifactPath string) (normalizedPath string, isDirectory bool) {
 	normalizedSeparators := strings.ReplaceAll(artifactPath, `\`, "/")
+	// Keep UNC/double-slash paths uncleaned so path.Clean cannot collapse them
+	// into an approved local root that the redaction script does not scan.
 	if strings.HasPrefix(normalizedSeparators, "//") {
 		return normalizedSeparators, strings.HasSuffix(normalizedSeparators, "/")
 	}
