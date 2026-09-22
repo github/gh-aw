@@ -135,6 +135,27 @@ describe("Linear safe outputs", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("retries team resolution after a failed lookup", async () => {
+    fetch
+      .mockResolvedValueOnce(response({}, 500))
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            teams: {
+              nodes: [{ id: "22222222-2222-2222-2222-222222222222", key: "ENG", name: "Engineering" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(response({ data: { issueCreate: { success: true, issue: { id: "id", identifier: "ENG-1", title: "Title" } } } }));
+    const handler = await createIssue({ team_id: "ENG" });
+
+    await expect(handler({ title: "Title", body: "Body with enough detail" })).rejects.toThrow("Linear request failed: HTTP 500");
+    await expect(handler({ title: "Title", body: "Body with enough detail" })).resolves.toMatchObject({ success: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
   it("creates a comment against only the configured target", async () => {
     fetch.mockResolvedValue(response({ data: { commentCreate: { success: true, comment: { id: "comment-id", body: "body" } } } }));
     const handler = await addComment({ target: "ENG-123" });

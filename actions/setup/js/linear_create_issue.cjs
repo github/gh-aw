@@ -110,7 +110,10 @@ async function main(config = {}) {
     }
 
     if (!teamResolution) {
-      teamResolution = LINEAR_UUID_PATTERN.test(teamId) ? Promise.resolve(teamId) : resolveLinearTeamId(teamId);
+      teamResolution = (LINEAR_UUID_PATTERN.test(teamId) ? Promise.resolve(teamId) : resolveLinearTeamId(teamId)).catch(error => {
+        teamResolution = undefined;
+        throw error;
+      });
     }
     const resolvedTeamId = await teamResolution;
     if (!resolvedTeamId) {

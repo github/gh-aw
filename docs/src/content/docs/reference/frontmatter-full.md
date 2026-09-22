@@ -8730,7 +8730,9 @@ safe-outputs:
   # Experimental. Create Linear issues through the isolated safe_outputs job.
   # (optional)
   linear-create-issue:
-    # Trusted Linear team model UUID.
+    # Optional trusted Linear team model UUID, key, name, or GitHub Actions
+    # expression. Defaults to LINEAR_TEAM_ID.
+    # (optional)
     team-id: "example-value"
 
     # Optional trusted Linear project identifier from a project URL or model UUID.
