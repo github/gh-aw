@@ -1,26 +1,29 @@
-# Workflow Health — 2026-09-21T04:44Z
+# Workflow Health — 2026-09-22T04:37Z
 
-## P0 (re-filed): cloud-hypervisor EACCES sandbox regression — predecessor #61952 expired unfixed
-Predecessor tracker #61952 (filed 2026-09-19T04:42Z) was auto-closed 2026-09-20T04:44Z by its
-`expires: 1d` safe-output setting (`NOT_PLANNED` / "automatically closed because it expired") —
-**no fix PR ever landed**. This is the 3rd tracker in the chain (#61528 → #61952 → new). 30 open
-`[aw] <workflow> failed` issues match this signature as of this run, spanning a wider set of
-workflows than the predecessor's 44-occurrence snapshot two days ago (new: GPL Dependency Cleaner
-#62298, Metrics Collector #62290, Code Simplifier #62297, Auto-Triage Issues #62213, several Smoke
-tests). Confirmed via direct job-log inspection of LintMonster run §35555065706:
-`spawn /run/awf-cloud-hypervisor/trusted-artifacts/run-nF74bu/cloud-hypervisor EACCES`. No merged
-PR found addressing exec-bit/mount permissions for the trusted-artifact binary (checked PR search
-for `cloud-hypervisor`, `EACCES`, `trusted-artifact`, `chmod` — no matches).
-**Action:** Filed a new consolidated P0 tracker this run (superseding expired #61952) — DO NOT
-re-file per-workflow duplicates. Recommended `priority-p0` labels be exempted from `expires: 1d`
-since the fix cadence has now exceeded 24h twice.
+## P0 RESOLVED: cloud-hypervisor EACCES sandbox regression (chain: #61528 → #61952 → #62310)
+PR github/gh-aw#62406 ("Migrate agentic workflows to Docker runtime"), merged
+2026-09-21T16:58:35Z, migrated 150 workflows off `cloud-hypervisor` to Docker runtime, resolving
+the multi-day EACCES crash. Verified: `grep -rl "cloud-hypervisor" .github/workflows/*.md` now
+returns only `daily-fact.md` (down from 150+); zero new EACCES occurrence issues filed after the
+merge timestamp (last pre-merge occurrence: #62405 at 16:48Z, 10min before merge); `lint-monster`
+succeeded on its first post-merge scheduled run (2026-09-22T02:39Z, run §35680245279, no
+EACCES/cloud-hypervisor trace in job log). Posted resolution evidence as a comment on tracker
+#62310 (recommended maintainers close it) and on dashboard #62311 — **did not** re-open a new
+tracker since the defect is fixed.
 
-## failing-workflows.json triage (4 entries, re-verified via gh run list + job logs)
-- **lint-monster**: 5 consecutive failures (09-17→09-21), same EACCES crash.
-- **daily-firewall-report**: 5 consecutive failures (09-17→09-21), same EACCES crash (signature
-  confirmed via prior-day logs; today's run log fetch hit a transient 404 but failure pattern is
-  consistent with lint-monster and the tracked P0).
-- **daily-go-test-parallelizer**: fully recovered — 6/6 most recent runs successful.
+## Residual watch item (P2, downgraded from P0)
+`daily-fact.md` remains intentionally on `cloud-hypervisor` (per #62406's own description) and its
+last run (2026-09-21T14:22:47Z, pre-merge) still failed with the old EACCES signature. Needs one
+more scheduled run post-merge to confirm recovery; if it still fails, it needs a dedicated,
+narrowly-scoped fix (not an ecosystem-wide P0 re-file).
+
+## failing-workflows.json triage (4 entries, re-verified via gh run list + job logs + PR search)
+- **lint-monster**: was 5 consecutive EACCES failures (09-17→09-21); succeeded 2026-09-22T02:39Z
+  post-#62406 merge.
+- **daily-firewall-report**: was 5 consecutive EACCES failures; next run (2026-09-22T02:29Z) was
+  `cancelled` (different signal, not a recurrence of the EACCES crash pattern).
+- **daily-go-test-parallelizer**: fully recovered — 6/6 most recent runs successful, unaffected by
+  the P0 throughout.
 - **cjs**: plain GH Actions workflow, out of `gh aw` scope — 9/10 recent runs successful, 1
   `action_required` (approval gate, not a failure).
 
@@ -28,23 +31,24 @@ since the fix cadence has now exceeded 24h twice.
 299/299 workflows have lock files (100%), compile-validate clean.
 
 ## Metrics staleness
-`metrics/latest.json` still dated 2026-09-01 — 20 days stale, 9th consecutive affected run. Root
-cause unchanged: Metrics Collector is itself an EACCES casualty of the P0 above. Continued
-cross-checking `failing-workflows.json` entries live via `gh run list`/job logs rather than
-trusting the stale snapshot.
+`metrics/latest.json` still dated 2026-09-01 — 21 days stale, 10th consecutive affected run.
+Metrics Collector was itself an EACCES casualty of the now-resolved P0; expect it to recover on
+its next scheduled run post-#62406. Continued cross-checking `failing-workflows.json` entries live
+via `gh run list`/job logs/PR search rather than trusting the stale snapshot.
 
 ## Tooling limitation (carried over, unresolved)
 `workflow-health-manager.md`'s `update-issue` safe-output still lacks `target: '*'`, so this
-schedule-triggered workflow cannot update an existing dashboard/tracker issue directly — used
-`create_issue` for both the new P0 tracker and the new dashboard issue this run instead of
-`update_issue`. Recommendation unchanged: add `update-issue: target: '*'` to enable true
-issue-refresh behavior on scheduled runs.
+schedule-triggered workflow cannot update/close existing issues directly — used `add_comment` on
+both #62310 (tracker) and #62311 (dashboard) this run instead of `update_issue`. Recommendation
+unchanged: add `update-issue: target: '*'` to enable true issue-refresh/close behavior on
+scheduled runs.
 
-## Actions Taken This Run (2026-09-21)
-- Created new P0 tracker issue: "cloud-hypervisor EACCES sandbox failure — 30 open occurrences,
-  predecessor #61952 expired unfixed" (labels: cookie, workflow-health, priority-p0, type-failure).
-- Created new dashboard issue: "Workflow Health Dashboard - 2026-09-21".
-- No other issues created/updated — all other findings already tracked or explained by expected
-  gating behavior (cjs `action_required` = approval gate).
+## Actions Taken This Run (2026-09-22)
+- Verified PR #62406 merge resolves the long-running cloud-hypervisor EACCES P0 (grep evidence +
+  issue-creation-timestamp cutoff + post-merge successful lint-monster run).
+- Posted resolution comment on P0 tracker #62310 (recommend close).
+- Posted resolution/status comment on dashboard #62311 (material delta: P0 resolved).
+- Flagged `daily-fact` as a residual single-workflow P2 watch item.
+- No new maintenance issues created — all findings resolved or already tracked.
 
-> Last updated: 2026-09-21T04:44Z
+> Last updated: 2026-09-22T04:37Z

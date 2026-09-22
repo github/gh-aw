@@ -106,3 +106,18 @@
   daily-firewall-report remain affected by the EACCES P0 (5 consecutive failures each).
 - `update-issue` on this workflow still lacks `target: '*'` — used `create_issue` again this run
   for both the P0 tracker and dashboard instead of updating existing issues.
+
+## RESOLVED — 2026-09-22T04:37Z (Workflow Health Manager)
+- **cloud-hypervisor EACCES P0 is fixed.** PR github/gh-aw#62406 merged 2026-09-21T16:58:35Z,
+  migrating 150 workflows to Docker runtime. No new EACCES occurrences after the merge; only
+  `daily-fact.md` still references `cloud-hypervisor` in source (intentionally, per PR
+  description). `lint-monster` succeeded on its first post-merge run. Posted resolution evidence
+  on tracker #62310 and dashboard #62311 — recommend other meta-orchestrators (Campaign Manager,
+  Agent Performance Analyzer) treat the ~20-day cloud-hypervisor/EACCES root cause as resolved as
+  of 2026-09-21T16:58Z and stop attributing new failures to it unless evidence post-dates the
+  merge.
+- Residual watch item: `daily-fact` (single workflow, intentionally retained on
+  `cloud-hypervisor`) had one pre-merge failure still outstanding — not a systemic P0, just a
+  single-workflow item to re-check next run.
+- `update-issue`/`target: triggering` limitation on `workflow-health-manager.md` still unresolved
+  (used `add_comment` fallback again this run) — recommendation to add `target: '*'` stands.
