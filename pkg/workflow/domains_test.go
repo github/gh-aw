@@ -409,7 +409,7 @@ func TestCopilotVendorDomainsRequireOptIn(t *testing.T) {
 }
 
 func TestThreatDetectionDomains(t *testing.T) {
-	detectionDomains := GetEngineDefaultDomainSets()["threat-detection"]
+	detectionDomains := engineDefaultDomainSets["threat-detection"]
 
 	// Detection domains must include every required Copilot API domain
 	requiredDomains := []string{
@@ -446,7 +446,7 @@ func TestThreatDetectionDomains(t *testing.T) {
 }
 
 func TestThreatDetectionNetworkAllowedCompatibilityAlias(t *testing.T) {
-	engineDefaults := GetEngineDefaultDomainSets()["threat-detection"]
+	engineDefaults := engineDefaultDomainSets["threat-detection"]
 	expanded := GetAllowedDomains(&NetworkPermissions{Allowed: []string{"threat-detection"}})
 
 	assert.Equal(t, engineDefaults, expanded,
@@ -464,30 +464,6 @@ func TestEngineDomainSetsRequireExplicitNetworkAllowedOptIn(t *testing.T) {
 		"the copilot domain set should expand when explicitly referenced in network.allowed")
 	assert.True(t, isKnownEcosystemIdentifier("copilot"),
 		"engine domain sets should validate like other domain set identifiers")
-}
-
-func TestGetEngineDefaultDomainSets(t *testing.T) {
-	sets := GetEngineDefaultDomainSets()
-
-	assert.Equal(t, CopilotDefaultDomains, sets["copilot"])
-	assert.Equal(t, ClaudeDefaultDomains, sets["claude"])
-	assert.Equal(t, CodexDefaultDomains, sets["codex"])
-	assert.Equal(t, GeminiDefaultDomains, sets["gemini"])
-	assert.Equal(t, PiBaseDefaultDomains, sets["pi-base"])
-	assert.Equal(t, PiDefaultDomains, sets["pi"])
-	assert.NotEmpty(t, sets["threat-detection"])
-
-	sets["copilot"][0] = "modified.example.com"
-	assert.NotEqual(t, "modified.example.com", CopilotDefaultDomains[0],
-		"callers must not be able to modify registered domain sets")
-
-	original := CopilotDefaultDomains[0]
-	t.Cleanup(func() {
-		CopilotDefaultDomains[0] = original
-	})
-	CopilotDefaultDomains[0] = "modified.example.com"
-	assert.Equal(t, original, GetEngineDefaultDomainSets()["copilot"][0],
-		"exported compatibility variables must not modify registered domain sets")
 }
 
 func TestEmbeddedDomainSets(t *testing.T) {
