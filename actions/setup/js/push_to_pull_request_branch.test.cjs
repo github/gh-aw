@@ -1642,6 +1642,30 @@ index 0000000..abc1234
       expect(params.body).not.toContain(unexpectedMarker);
     });
 
+    it("should include head_repo for a review PR from a same-organization fork", async () => {
+      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+      mockContext.payload.pull_request.head.repo.full_name = "test-owner/automation-fork";
+      mockContext.payload.pull_request.head.repo.owner.login = "test-owner";
+      mockGithub.rest.pulls.get.mockResolvedValue({
+        data: {
+          head: { ref: "feature-branch", repo: { full_name: "test-owner/automation-fork", fork: true } },
+          base: { repo: { full_name: "test-owner/test-repo" } },
+          title: "Fork PR",
+          labels: [],
+        },
+      });
+      createPatchFile("review-pr-from-same-organization-fork");
+
+      const module = await loadModule();
+      const handler = await module.main({
+        "head-repo": "test-owner/automation-fork",
+        allowed_repos: ["test-owner/test-repo", "test-owner/automation-fork"],
+      });
+      await handler({ branch: "review-pr-from-same-organization-fork" }, {});
+
+      expect(mockGithub.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ head: expect.stringMatching(/^test-owner:/), head_repo: "test-owner/automation-fork" }));
+    });
+
     it("should skip non-fatally when review branch is rejected for workflows scope (timeout variant, agent has none)", async () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";
       createPatchFile("review-branch-workflows-scope-timeout");
