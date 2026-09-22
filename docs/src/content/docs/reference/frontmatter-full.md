@@ -21567,9 +21567,15 @@ safe-outputs:
   failure-issue-repo: "example-value"
 
   # Controls whether to report failed non-builtin jobs as issues (default: true).
-  # Set to false to disable.
+  # Set to false to disable. Supports GitHub Actions expressions.
   # (optional)
+  # Accepted formats:
+
+  # Format 1: boolean
   report-failed-jobs: true
+
+  # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+  report-failed-jobs: "example-value"
 
   # Maximum number of bot trigger references (e.g. 'fixes #123', 'closes #456')
   # allowed in output before all of them are neutralized. Default: 10. Supports

@@ -749,7 +749,7 @@ safe-outputs:
     - "example.com"
     - "api.example.com"
   report-failure-as-issue: ${{ inputs.report-failure-as-issue }}
-  report-failed-jobs: false
+  report-failed-jobs: ${{ inputs.report-failed-jobs }}
   staged: true
   env:
     TEST_VAR: "test_value"
@@ -812,7 +812,7 @@ This workflow uses the imported meta configuration.
 	require.NotNil(t, workflowData.SafeOutputs.ReportFailureAsIssue, "ReportFailureAsIssue should be imported")
 	assert.Equal(t, "${{ inputs.report-failure-as-issue }}", workflowData.SafeOutputs.ReportFailureAsIssue.String(), "ReportFailureAsIssue should be imported as templatable bool")
 	require.NotNil(t, workflowData.SafeOutputs.ReportFailedJobs, "ReportFailedJobs should be imported")
-	assert.False(t, *workflowData.SafeOutputs.ReportFailedJobs, "ReportFailedJobs should be imported as false")
+	assert.Equal(t, "${{ inputs.report-failed-jobs }}", workflowData.SafeOutputs.ReportFailedJobs.String(), "ReportFailedJobs should be imported as a templatable bool")
 	// Note: When main workflow has safe-outputs section, extractSafeOutputsConfig sets MaximumPatchSize default (4096)
 	// before merge happens, so imported value is not used. User should specify max-patch-size in main workflow.
 	assert.Equal(t, 4096, workflowData.SafeOutputs.MaximumPatchSize, "MaximumPatchSize defaults to 4096 when main has safe-outputs")
@@ -891,7 +891,7 @@ This workflow has its own meta configuration that should take precedence.
 	require.NotNil(t, workflowData.SafeOutputs.ReportFailureAsIssue, "ReportFailureAsIssue from main should be set")
 	assert.Equal(t, "${{ inputs.report-failure-as-issue }}", workflowData.SafeOutputs.ReportFailureAsIssue.String(), "ReportFailureAsIssue from main should take precedence")
 	require.NotNil(t, workflowData.SafeOutputs.ReportFailedJobs, "ReportFailedJobs from main should be set")
-	assert.False(t, *workflowData.SafeOutputs.ReportFailedJobs, "ReportFailedJobs from main should take precedence")
+	assert.Equal(t, "false", workflowData.SafeOutputs.ReportFailedJobs.String(), "ReportFailedJobs from main should take precedence")
 	assert.Equal(t, "${{ secrets.MAIN_TOKEN }}", workflowData.SafeOutputs.GitHubToken, "GitHubToken from main should take precedence")
 	assert.Equal(t, 2048, workflowData.SafeOutputs.MaximumPatchSize, "MaximumPatchSize from main should take precedence")
 }

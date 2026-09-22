@@ -720,7 +720,7 @@ func inlineWorkflowEnvReferences(value string, env map[string]any, resolved map[
 
 	var builder strings.Builder
 	for i := 0; i < len(inner); {
-		if inner[i] == '\'' {
+		if inner[i] == '\'' { //nolint:uncheckedsliceindex // i is bounded by the loop condition
 			next := consumeSingleQuotedGitHubExpressionString(inner, i)
 			builder.WriteString(inner[i:next])
 			i = next
@@ -728,23 +728,23 @@ func inlineWorkflowEnvReferences(value string, env map[string]any, resolved map[
 		}
 
 		if !isGitHubExpressionIdentifierStart(inner, i) {
-			builder.WriteByte(inner[i])
+			builder.WriteByte(inner[i]) //nolint:uncheckedsliceindex // i is bounded by the loop condition
 			i++
 			continue
 		}
 
 		start := i
-		for i < len(inner) && isGitHubExpressionIdentifierChar(inner[i]) {
+		for i < len(inner) && isGitHubExpressionIdentifierChar(inner[i]) { //nolint:uncheckedsliceindex // i is bounded by the loop condition
 			i++
 		}
-		if inner[start:i] != "env" || i >= len(inner) || inner[i] != '.' || i+1 >= len(inner) || !isGitHubExpressionIdentifierStart(inner, i+1) {
+		if inner[start:i] != "env" || i >= len(inner) || inner[i] != '.' || i+1 >= len(inner) || !isGitHubExpressionIdentifierStart(inner, i+1) { //nolint:uncheckedsliceindex // i is bounds-checked before indexing
 			builder.WriteString(inner[start:i])
 			continue
 		}
 
 		refStart := i + 1
 		refEnd := refStart + 1
-		for refEnd < len(inner) && isGitHubExpressionIdentifierChar(inner[refEnd]) {
+		for refEnd < len(inner) && isGitHubExpressionIdentifierChar(inner[refEnd]) { //nolint:uncheckedsliceindex // refEnd is bounded by the loop condition
 			refEnd++
 		}
 

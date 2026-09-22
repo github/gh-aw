@@ -140,7 +140,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 // conclusionReportFailedJobsEnabled returns true unless safe-outputs.report-failed-jobs is
 // explicitly set to false. Defaults to true.
 func conclusionReportFailedJobsEnabled(data *WorkflowData) bool {
-	return data.SafeOutputs == nil || data.SafeOutputs.ReportFailedJobs == nil || *data.SafeOutputs.ReportFailedJobs
+	return data.SafeOutputs == nil || data.SafeOutputs.ReportFailedJobs == nil || !strings.EqualFold(strings.TrimSpace(data.SafeOutputs.ReportFailedJobs.String()), "false")
 }
 
 // conclusionReportFailureAsIssueEnabled returns true unless safe-outputs.report-failure-as-issue
