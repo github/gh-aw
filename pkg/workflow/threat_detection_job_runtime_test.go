@@ -321,10 +321,10 @@ func TestBuildPullAWFContainersStepPropagatesRunnerTopology(t *testing.T) {
 // workflow's arc-dind runner topology is only applied to the detection job when the
 // detection job declares its own non GitHub-hosted runs-on. By default, and for explicit
 // GitHub-hosted labels, the detection job runs on a GitHub-hosted runner where ARC/DinD
-// codegen (tool-cache redirection,
-// `topology: arc-dind` in the AWF config, and ${RUNNER_TEMP}/gh-aw path rewriting) is
-// wrong: threat-detect is never staged to the rewritten path and the detection result is
-// written under a read-only mount that no later step reads (gh-aw#59935).
+// codegen (tool-cache redirection, `topology: arc-dind` in the AWF config, and
+// ${RUNNER_TEMP}/gh-aw path rewriting) is wrong: threat-detect is never staged to the
+// rewritten path and the detection result is written under a read-only mount that no
+// later step reads (gh-aw#59935).
 func TestBuildDetectionJobStepsArcDindTopologyScopedToDetectionRunner(t *testing.T) {
 	compiler := NewCompiler()
 
