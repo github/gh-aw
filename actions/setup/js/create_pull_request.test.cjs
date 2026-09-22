@@ -3318,6 +3318,27 @@ describe("create_pull_request - patch apply fallback to original base commit", (
     expect(checkoutWithBaseCommit).toBeTruthy();
   });
 
+  it("should preserve an existing shallow base ref for the patch ancestry check", async () => {
+    global.exec = {
+      exec: vi.fn().mockResolvedValue(0),
+      getExecOutput: vi.fn().mockImplementation((cmd, args) => {
+        if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+          return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
+        }
+        return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+      }),
+    };
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({});
+    const result = await handler({ title: "Test PR", body: "Test body", branch: "test-branch", base_commit: MOCK_BASE_COMMIT_SHA }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "main"]);
+    expect(global.exec.exec).not.toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+    expect(global.exec.getExecOutput).toHaveBeenCalledWith("git", ["merge-base", "--is-ancestor", MOCK_BASE_COMMIT_SHA, "origin/main"], { ignoreReturnCode: true });
+  });
+
   it("should ignore agent-supplied base_commit values when creating the branch", async () => {
     global.exec = {
       exec: vi.fn().mockResolvedValue(0),
