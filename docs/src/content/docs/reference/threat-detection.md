@@ -149,9 +149,7 @@ Review the promoted `gh-aw-threat-detection` release, then run the updater from
 the gh-aw repository root:
 
 ```bash
-scripts/update-threat-detect-pins.sh <version>
-make fmt
-make recompile
+make update-threat-detect-pins THREAT_DETECT_VERSION=<version>
 ```
 
 For example, `<version>` is `v0.5.2` for the current pin. The updater downloads
@@ -162,7 +160,10 @@ download against the manifest, and atomically updates
 matrix and synchronizes the reviewed-literal compiler test. It does not update
 source files if any validation fails.
 
-Review the constants and generated lock-file diff in the same pull request.
+The make target also runs `make fmt` and `make recompile` so the generated
+workflow locks carry the new Linux digests. Review
+`pkg/constants/version_constants.go`, `pkg/constants/version_constants_test.go`,
+and the generated lock-file diff in the same pull request.
 
 ## Detection Budget
 
