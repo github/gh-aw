@@ -1018,7 +1018,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("falls back by workflow ID when GH_AW_WORKFLOW_NAME is absent", async () => {
+  it("falls back by workflow ID after 404 without a workflow display name", async () => {
     let listWorkflowRunsForRepoCalls = 0;
 
     const mockGithub = {

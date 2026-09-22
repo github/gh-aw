@@ -507,6 +507,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
       repo,
       workflow_id: workflowId,
       status: "completed",
+      created,
       per_page: perPage,
       page,
     });
