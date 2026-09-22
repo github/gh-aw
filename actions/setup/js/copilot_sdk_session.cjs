@@ -78,7 +78,7 @@ const SDK_POST_COMPLETION_IDLE_MS_DEFAULT = 30 * 1000;
  * Extract the prompt text from a resolved args array.
  * Looks for the first occurrence of "-p <value>" or "--prompt <value>".
  *
- * @param {string[]} args - Resolved args (after resolvePromptFileArgs has run).
+ * @param {string[]} args - Resolved CLI arguments.
  * @returns {string | null} The prompt text, or null if not found.
  */
 function extractPromptFromArgs(args) {

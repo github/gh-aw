@@ -20,7 +20,6 @@ const {
   buildCopilotProxyAuthFailureDiagnostic,
   buildCopilotSDKChildEnv,
   envFlagEnabled,
-  buildPromptFileFallbackInstruction,
   countPermissionDeniedIssues,
   detectCopilotErrors,
   emitInfrastructureIncomplete,
@@ -53,7 +52,7 @@ const {
   isHTTP400ResponseError,
   isSDKSessionIdleTimeoutError,
   PROMPT_FILE_INLINE_THRESHOLD_BYTES,
-  resolvePromptFileArgs,
+  resolvePromptFileInput,
   resolveRetryConfig,
   shouldRetryFailedExecution,
   isCrashSignalExitCode,
@@ -2266,22 +2265,59 @@ describe("copilot_harness.cjs", () => {
       const promptFile = path.join(os.tmpdir(), `copilot-driver-small-${Date.now()}.txt`);
       fs.writeFileSync(promptFile, "small prompt body", "utf8");
 
-      const resolved = resolvePromptFileArgs(["--add-dir", "/tmp", "--prompt-file", promptFile, "--allow-all-tools"]);
-      expect(resolved).toEqual(["--add-dir", "/tmp", "-p", "small prompt body", "--allow-all-tools"]);
+      const resolved = resolvePromptFileInput(["--add-dir", "/tmp", "--prompt-file", promptFile, "--allow-all-tools"]);
+      expect(resolved.args).toEqual(["--add-dir", "/tmp", "-p", "small prompt body", "--allow-all-tools"]);
+      expect(resolved.stdin).toBeUndefined();
     });
 
-    it("uses compact fallback prompt when prompt file is larger than 100KB", () => {
+    it("streams the complete prompt through stdin when the prompt file is larger than 100KB", () => {
       const promptFile = path.join(os.tmpdir(), `copilot-driver-large-${Date.now()}.txt`);
-      fs.writeFileSync(promptFile, "x".repeat(PROMPT_FILE_INLINE_THRESHOLD_BYTES + 1), "utf8");
+      const prompt = Buffer.concat([Buffer.from("prompt\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x78)]);
+      fs.writeFileSync(promptFile, prompt);
 
-      const resolved = resolvePromptFileArgs(["--prompt-file", promptFile, "--allow-all-tools"]);
-      expect(resolved).toEqual(["-p", buildPromptFileFallbackInstruction(promptFile), "--allow-all-tools"]);
+      const resolved = resolvePromptFileInput(["--prompt-file", promptFile, "--allow-all-tools"]);
+      expect(resolved.args).toEqual(["--allow-all-tools"]);
+      expect(resolved.stdin).toEqual(prompt);
     });
 
     it("keeps --prompt-file arguments unchanged when file resolution fails", () => {
       const missingPath = path.join(os.tmpdir(), `copilot-driver-missing-${Date.now()}.txt`);
-      const resolved = resolvePromptFileArgs(["--prompt-file", missingPath, "--allow-all-tools"]);
-      expect(resolved).toEqual(["--prompt-file", missingPath, "--allow-all-tools"]);
+      const resolved = resolvePromptFileInput(["--prompt-file", missingPath, "--allow-all-tools"]);
+      expect(resolved.args).toEqual(["--prompt-file", missingPath, "--allow-all-tools"]);
+      expect(resolved.stdin).toBeUndefined();
+    });
+
+    it("delivers a large prompt to the child unchanged through stdin", () => {
+      const tempDir = makeHarnessTempDir("copilot-large-prompt-");
+      const promptPath = path.join(tempDir, "prompt.txt");
+      const capturedPath = path.join(tempDir, "captured-prompt.bin");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const prompt = Buffer.concat([Buffer.from("system instructions\n", "utf8"), Buffer.alloc(PROMPT_FILE_INLINE_THRESHOLD_BYTES, 0x41)]);
+      fs.writeFileSync(promptPath, prompt);
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+const chunks = [];
+process.stdin.on("data", chunk => chunks.push(chunk));
+process.stdin.on("end", () => fs.writeFileSync(process.env.COPILOT_HARNESS_STUB_STDIN, Buffer.concat(chunks)));`,
+        "utf8"
+      );
+
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt-file", promptPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          COPILOT_HARNESS_STUB_STDIN: capturedPath,
+          GH_AW_HARNESS_MAX_RETRIES: "0",
+          GH_AW_HARNESS_STALL_WARNING_MS: "0",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+
+      expect(result.status).toBe(0);
+      expect(fs.readFileSync(capturedPath)).toEqual(prompt);
+      expect(result.stderr).toContain("streaming prompt via stdin");
     });
   });
 
