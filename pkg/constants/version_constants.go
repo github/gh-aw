@@ -64,7 +64,7 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.20"
+const DefaultFirewallVersion Version = "v0.28.22"
 
 // AWFExcludeEnvMinVersion is the minimum AWF version that supports the --exclude-env flag.
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
@@ -134,6 +134,11 @@ const AWFAPIProxyProvidersMinVersion Version = "v0.27.43"
 // container.images manifest in awf-config.json (mapped from frontmatter
 // sandbox.agent.images). Older versions reject the unknown property.
 const AWFContainerImagesMinVersion Version = "v0.28.4"
+
+// AWFRouterImageRoleMinVersion is the minimum AWF version that supports the
+// "router" role in the container.images manifest. Older versions reject the
+// unknown role.
+const AWFRouterImageRoleMinVersion Version = "v0.28.21"
 
 // AWFFilesystemAllowWriteMinVersion is the minimum AWF version that added
 // filesystem.allowWrite to the AWF config file schema.
