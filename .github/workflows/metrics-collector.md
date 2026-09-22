@@ -27,6 +27,74 @@ tools:
     branch-name: memory/meta-orchestrators
     file-glob: "metrics/**"
     max-patch-size: 131072 # 128KB - handles large daily metrics snapshots without patch-size gate failures
+pre-agent-steps:
+  - name: Record metrics baseline timestamp
+    run: |
+      set -euo pipefail
+      mkdir -p /tmp/gh-aw/metrics-collector
+      latest="/tmp/gh-aw/repo-memory/default/metrics/latest.json"
+      baseline=""
+      if [ -f "$latest" ]; then
+        baseline="$(jq -r '.timestamp // empty' "$latest" 2>/dev/null || true)"
+      fi
+      printf '%s' "$baseline" > /tmp/gh-aw/metrics-collector/baseline-timestamp.txt
+      echo "Baseline metrics timestamp: ${baseline:-<none>}"
+post-steps:
+  - name: Verify metrics collection produced fresh data
+    run: |
+      set -euo pipefail
+      memory_dir="/tmp/gh-aw/repo-memory/default"
+      latest="${memory_dir}/metrics/latest.json"
+
+      if [ ! -f "$latest" ]; then
+        echo "ERROR: ${latest} was not written. The agent finished without collecting any metrics."
+        exit 1
+      fi
+
+      if ! jq -e . "$latest" >/dev/null 2>&1; then
+        echo "ERROR: ${latest} does not contain valid JSON."
+        exit 1
+      fi
+
+      new_timestamp="$(jq -r '.timestamp // empty' "$latest")"
+      if [ -z "$new_timestamp" ]; then
+        echo "ERROR: ${latest} has no 'timestamp' field."
+        exit 1
+      fi
+
+      baseline_timestamp=""
+      if [ -f /tmp/gh-aw/metrics-collector/baseline-timestamp.txt ]; then
+        baseline_timestamp="$(cat /tmp/gh-aw/metrics-collector/baseline-timestamp.txt)"
+      fi
+      if [ -n "$baseline_timestamp" ] && [ "$new_timestamp" = "$baseline_timestamp" ]; then
+        echo "ERROR: metrics/latest.json timestamp is unchanged (${new_timestamp}). No new metrics were collected."
+        exit 1
+      fi
+
+      if ! new_epoch="$(date -u -d "$new_timestamp" +%s 2>/dev/null)"; then
+        echo "ERROR: metrics/latest.json timestamp '${new_timestamp}' is not a parseable ISO 8601 date."
+        exit 1
+      fi
+      now_epoch="$(date -u +%s)"
+      age=$(( now_epoch - new_epoch ))
+      if [ "$age" -gt 86400 ] || [ "$age" -lt -3600 ]; then
+        echo "ERROR: metrics/latest.json timestamp '${new_timestamp}' is not from the current collection window."
+        exit 1
+      fi
+
+      daily_count="$(find "${memory_dir}/metrics/daily" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l)"
+      if [ "$daily_count" -eq 0 ]; then
+        echo "ERROR: no daily metrics file was written under metrics/daily/."
+        exit 1
+      fi
+
+      workflow_count="$(jq '.workflows | length' "$latest")"
+      if [ "$workflow_count" -eq 0 ]; then
+        echo "ERROR: metrics/latest.json contains zero workflows. The collection loop did not run."
+        exit 1
+      fi
+
+      echo "Metrics collection verified: timestamp ${new_timestamp}, ${workflow_count} workflow(s), ${daily_count} daily file(s)."
 timeout-minutes: 30
 safe-outputs:
   noop:
@@ -503,6 +571,21 @@ find /tmp/gh-aw/repo-memory/default/metrics -type f | sort
 ```
 
 If the validation passes, proceed with the `noop` call.
+
+#### Post-run Collection Gate (enforced automatically)
+
+After the agent finishes, a workflow step verifies that collection actually happened and **fails the
+run** when it did not. The run fails if any of the following is true:
+
+- `metrics/latest.json` was not written, or is not valid JSON
+- its `timestamp` field is missing, unparseable, or unchanged from the value present on the
+  repo-memory branch before this run started
+- its `timestamp` is not within the current collection window
+- no file was written under `metrics/daily/`
+- `workflows` is empty
+
+This means an early exit after a couple of exploratory tool calls is reported as a failure instead
+of a green run with stale data. Always run the full collection loop described above.
 
 After successfully collecting and storing all metrics data, you **MUST** call `noop` with a brief collection summary — this is a data-collection workflow that persists results to repo-memory, so `noop` is the expected safe-output for every successful run.
 
