@@ -1009,6 +1009,9 @@ function isInlinePromptOption(arg) {
 
 /**
  * Remove explicit prompt options so Copilot reads the streamed prompt from stdin.
+ * Dash-prefixed tokens after -p/--prompt are preserved as likely Copilot options;
+ * the harness does not parse Copilot's full option grammar, so dash-prefixed
+ * prompt values are treated as malformed conflicting prompt args.
  * @param {string[]} args
  * @returns {string[]}
  */
