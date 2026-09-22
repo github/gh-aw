@@ -26,6 +26,14 @@ type rawThreatDetectionVerdict struct {
 	MaliciousPatch  *bool `json:"malicious_patch"`
 }
 
+type detectionExecutionEvidence struct {
+	Version    int    `json:"version"`
+	Component  string `json:"component"`
+	RunID      int64  `json:"run_id"`
+	RunAttempt int    `json:"run_attempt"`
+	State      string `json:"state"`
+}
+
 func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	detectionJobFailed := false
 	for _, job := range processedRun.JobDetails {
@@ -37,12 +45,16 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	}
 
 	verdict, found := findThreatDetectionVerdict(processedRun.Run.LogsPath)
+	detectionExecutionNotStarted := threatDetectionExecutionNotStarted(processedRun.Run)
 	threatKinds := verdict.threatKinds()
 	findings := make([]AuditFinding, 0, 2)
-	if detectionJobFailed {
+	if detectionJobFailed || detectionExecutionNotStarted {
 		description := "The threat-detection job failed before producing a threat verdict"
 		impact := "Safe outputs may have been blocked because the security control did not complete"
-		if found {
+		if detectionExecutionNotStarted && !detectionJobFailed {
+			description = "Usage artifact evidence indicates the threat-detection job did not start"
+			impact = "Safe outputs may have been blocked because the security control did not run"
+		} else if found {
 			description = "The threat-detection job concluded with failure"
 			impact = "Safe outputs were blocked by the failed security gate"
 		}
@@ -119,6 +131,35 @@ func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 		found = true
 	}
 	return foundVerdict, found
+}
+
+func threatDetectionExecutionNotStarted(run WorkflowRun) bool {
+	if run.LogsPath == "" {
+		return false
+	}
+	path := filepath.Join(run.LogsPath, constants.UsageArtifactName.String(), string(constants.DetectionJobName), "execution.json")
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	var evidence detectionExecutionEvidence
+	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&evidence); err != nil {
+		return false
+	}
+	if evidence.Version != 1 ||
+		evidence.Component != string(constants.DetectionJobName) ||
+		evidence.State != "not_started" {
+		return false
+	}
+	if run.DatabaseID != 0 && evidence.RunID != 0 && evidence.RunID != run.DatabaseID {
+		return false
+	}
+	if run.Attempt != 0 && evidence.RunAttempt != 0 && evidence.RunAttempt != run.Attempt {
+		return false
+	}
+	return true
 }
 
 func hasThreatDetectionArtifact(runDir string) bool {

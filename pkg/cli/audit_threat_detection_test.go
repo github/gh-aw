@@ -96,6 +96,52 @@ func TestFindThreatDetectionVerdictAcceptsDuplicateResults(t *testing.T) {
 	assert.True(t, verdict.PromptInjection)
 }
 
+func TestGenerateThreatDetectionFindingsUsesUsageExecutionEvidence(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage", "detection"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "usage", "detection", "execution.json"),
+		[]byte(`{"version":1,"component":"detection","run_id":123,"run_attempt":2,"state":"not_started"}`),
+		0o600,
+	))
+
+	findings := generateThreatDetectionFindings(ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID: 123,
+			Attempt:    2,
+			LogsPath:   runDir,
+		},
+	})
+
+	require.Len(t, findings, 1)
+	assert.Equal(t, AuditFindingDetectionJobFailed, findings[0].Code)
+	assert.Contains(t, findings[0].Description, "Usage artifact")
+}
+
+func TestGenerateThreatDetectionFindingsRejectsStaleUsageExecutionEvidence(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage", "detection"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "usage", "detection", "execution.json"),
+		[]byte(`{"version":1,"component":"detection","run_id":123,"run_attempt":1,"state":"not_started"}`),
+		0o600,
+	))
+
+	findings := generateThreatDetectionFindings(ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID: 123,
+			Attempt:    2,
+			LogsPath:   runDir,
+		},
+	})
+
+	assert.Empty(t, findings)
+}
+
 func TestGeneratedAuditFindingsHaveCodes(t *testing.T) {
 	t.Parallel()
 
