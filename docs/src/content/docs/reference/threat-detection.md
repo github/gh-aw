@@ -122,8 +122,26 @@ safe-outputs:
     artifact-base-url: https://artifacts.example.com/gh-aw-threat-detection/releases/download
 ```
 
-The mirror changes only the source of the bytes. The compiler still controls the
-release tag and expected digest.
+The configured URL is the base of this required layout:
+
+```text
+<artifact-base-url>/<version>/threat-detect-linux-amd64
+<artifact-base-url>/<version>/threat-detect-linux-arm64
+```
+
+For example, the current `v0.5.2` pin resolves the amd64 asset to
+`https://artifacts.example.com/gh-aw-threat-detection/releases/download/v0.5.2/threat-detect-linux-amd64`.
+
+The mirrored bytes must exactly match the SHA-256 digests embedded by the
+compiler. The mirror changes only the source of the bytes; it cannot override
+the release tag or expected digest. The mirror must be reachable from the
+threat-detection runner. `artifact-base-url` currently has no documented
+authentication mechanism, so use a runner-accessible HTTPS endpoint that does
+not require credentials.
+
+Update the mirror contents whenever a gh-aw release changes the pinned detector
+version or digests. Populate the new `<version>` directory with both Linux assets
+before compiling workflows that use the new gh-aw release.
 
 ### Maintain detector release pins
 
