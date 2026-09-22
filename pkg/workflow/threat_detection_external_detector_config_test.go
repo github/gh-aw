@@ -438,3 +438,26 @@ func TestResolveExternalDetectorEngineConfigInheritsVersionFromMainEngine(t *tes
 		}
 	})
 }
+
+// TestBuildExternalDetectorWorkflowDataInheritsMaxTurnCacheMisses verifies that the
+// workflow's max-turn-cache-misses guardrail propagates to the external detector so it
+// does not silently run with the compile-time default.
+func TestBuildExternalDetectorWorkflowDataInheritsMaxTurnCacheMisses(t *testing.T) {
+	compiler := NewCompiler()
+
+	data := &WorkflowData{
+		AI: "copilot",
+		EngineConfig: &EngineConfig{
+			ID:                 "copilot",
+			MaxTurnCacheMisses: 500,
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	allSteps := strings.Join(compiler.buildExternalDetectorExecutionStep(data), "")
+	if !strings.Contains(allSteps, `maxCacheMisses\":500`) {
+		t.Fatalf("expected external detector steps to inherit maxCacheMisses 500, got:\n%s", allSteps)
+	}
+}

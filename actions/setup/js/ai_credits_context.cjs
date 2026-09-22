@@ -23,6 +23,14 @@ const UNKNOWN_MODEL_AI_CREDITS_TYPE = "unknown_model_ai_credits";
 // miss counter reaches the apiProxy.maxCacheMisses limit. Engine-agnostic: all engines share
 // the same proxy guardrail.
 const MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE = "max_cache_misses_exceeded";
+// Guardrail rejections emitted by the AWF API proxy as HTTP 403 responses. Each is a
+// deliberate policy decision by the proxy — never a credential problem — so retrying the
+// same request against the same (already spent) proxy counter can never succeed.
+// Engine-agnostic: all engines share the same proxy guardrails.
+const API_PROXY_GUARD_REJECTION_EVENT_TYPES = [MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE, "effective_tokens_limit_exceeded", "permission_denied_limit_exceeded", "model_policy_violation"];
+// Counter fields carried by proxy guard rejection events, reported alongside the guard name
+// so the step log states what limit was hit and at which value.
+const API_PROXY_GUARD_COUNTER_FIELDS = ["consecutive_cache_misses", "max_cache_misses", "effective_tokens", "max_effective_tokens", "permission_denied_count", "max_permission_denied", "model"];
 const MAX_AI_CREDITS_EXCEEDED_STDIO_RE = /maximum ai credits exceeded(?:\s*\((\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\))?/i;
 const DEFAULT_AGENT_STDIO_LOG = "/tmp/gh-aw/agent-stdio.log";
 const AGENT_STDIO_LOG_MAX_TAIL = 64 * 1024; // 64 KB — sufficient for any realistic error block
@@ -477,6 +485,100 @@ function parseMaxCacheMissesExceededFromEventLog(eventLogPathOverride) {
 }
 
 /**
+ * Resolves the candidate JSONL files that can carry AWF API proxy guard rejection events.
+ * In addition to the api-proxy event logs, the proxy's token tracker audit log and the
+ * copy of the detection run's firewall logs (made by the detection job) are considered, so
+ * the same detection works in the agent job and in the threat-detection job.
+ *
+ * @param {string} [eventLogPathOverride]
+ * @returns {string[]}
+ */
+function resolveAPIProxyGuardLogPaths(eventLogPathOverride) {
+  if (eventLogPathOverride) return [eventLogPathOverride];
+  const candidates = resolveUnknownModelAICreditsLogPaths();
+  const seen = new Set(candidates);
+  const addCandidate = candidate => {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    candidates.push(candidate);
+  };
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const roots = [];
+  if (agentOutputFile) roots.push(path.dirname(agentOutputFile));
+  roots.push("/tmp/gh-aw");
+  roots.push("/tmp/gh-aw/threat-detection");
+  for (const root of roots) {
+    for (const base of ["logs", "audit"]) {
+      addCandidate(path.join(root, "sandbox", "firewall", base, "api-proxy-logs", "token-tracker-audit.jsonl"));
+      addCandidate(path.join(root, "sandbox", "firewall", base, "api-proxy-logs", "event-logs.jsonl"));
+      addCandidate(path.join(root, "sandbox", "firewall", base, "api-proxy-logs", "events.jsonl"));
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Detects an AWF API proxy guard rejection (HTTP 403) from the proxy's structured logs and
+ * returns the guard name together with the counters it reported. The proxy answers with such
+ * a rejection when one of its guardrails fires (consecutive cache misses, effective token
+ * limit, permission-denied limit, model policy). These are deliberate policy outcomes, not
+ * credential failures, and the counter is not reset by retrying.
+ * Structured entries emitted by the AWF API proxy look like:
+ *   { "type": "max_cache_misses_exceeded", "consecutive_cache_misses": 6, "max_cache_misses": 5 }
+ *
+ * @param {string} [eventLogPathOverride]
+ * @returns {{ guard: string, counters: Record<string, string|number> } | null}
+ */
+function parseAPIProxyGuardRejectionFromEventLog(eventLogPathOverride) {
+  /** @type {{ guard: string, counters: Record<string, string|number> } | null} */
+  let rejection = null;
+  iterateJSONLFiles(
+    resolveAPIProxyGuardLogPaths(eventLogPathOverride),
+    false,
+    content => API_PROXY_GUARD_REJECTION_EVENT_TYPES.some(type => content.includes(type)),
+    (acc, entry) => {
+      if (acc) return true; // already detected, keep the first rejection
+      /** @type {string} */
+      let guard = "";
+      traverseObjectTree(entry, (_key, value) => {
+        if (typeof value === "string" && API_PROXY_GUARD_REJECTION_EVENT_TYPES.includes(value)) {
+          guard = value;
+          return true;
+        }
+        return false;
+      });
+      if (!guard) return undefined;
+      /** @type {Record<string, string|number>} */
+      const counters = {};
+      traverseObjectTree(entry, (key, value) => {
+        if (!API_PROXY_GUARD_COUNTER_FIELDS.includes(key)) return false;
+        if (typeof value === "number" && Number.isFinite(value)) counters[key] = value;
+        else if (typeof value === "string" && value.trim()) counters[key] = value.trim();
+        return false;
+      });
+      rejection = { guard, counters };
+      return true;
+    },
+    acc => acc
+  );
+  return rejection;
+}
+
+/**
+ * Formats a proxy guard rejection for a single-line step log entry, e.g.
+ *   "max_cache_misses_exceeded (consecutive_cache_misses=5, max_cache_misses=5)".
+ *
+ * @param {{ guard: string, counters?: Record<string, string|number> } | null | undefined} rejection
+ * @returns {string}
+ */
+function formatAPIProxyGuardRejection(rejection) {
+  if (!rejection || !rejection.guard) return "";
+  const counters = rejection.counters || {};
+  const parts = Object.keys(counters).map(key => `${key}=${counters[key]}`);
+  return parts.length > 0 ? `${rejection.guard} (${parts.join(", ")})` : rejection.guard;
+}
+
+/**
  * Single-pass combined read of the audit log, returning all AI credits fields at once.
  * Used by resolveAICreditsFailureState to avoid reading the same file twice.
  * No contentGuard is applied: rate-limit signal detection must scan all entries anyway,
@@ -604,6 +706,9 @@ module.exports = {
   parseUnknownModelAICreditsFromAuditLog,
   parseUnknownModelAICreditsAndModelFromAuditLog,
   parseMaxCacheMissesExceededFromEventLog,
+  parseAPIProxyGuardRejectionFromEventLog,
+  formatAPIProxyGuardRejection,
   resolveAICreditsFailureState,
   MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE,
+  API_PROXY_GUARD_REJECTION_EVENT_TYPES,
 };
