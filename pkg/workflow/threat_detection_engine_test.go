@@ -184,6 +184,8 @@ func TestBuildDetectionEngineExecutionStepInheritsMaxTurnCacheMisses(t *testing.
 	})
 
 	t.Run("falls back to the compile default when the workflow does not configure it", func(t *testing.T) {
+		t.Setenv(compilerenv.DefaultMaxTurnCacheMisses, "")
+
 		data := &WorkflowData{
 			AI: "claude",
 			SafeOutputs: &SafeOutputsConfig{
