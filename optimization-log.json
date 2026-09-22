@@ -273,5 +273,14 @@
     "recommendations_count": 3,
     "subagent_candidates": 1,
     "estimated_aic_savings_per_run": 60
+  },
+  {
+    "date": "2026-09-22",
+    "workflow_name": "Dead Code Removal Agent",
+    "total_aic_analyzed": 242.40869,
+    "runs_audited": 7,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 25
   }
 ]
