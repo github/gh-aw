@@ -162,6 +162,7 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		d.EngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}
+	inheritDetectionTurnCacheMisses(data, d.EngineConfig)
 	if d.EngineConfig.HarnessMaxRetries == "" {
 		d.EngineConfig.HarnessMaxRetries = "0"
 	}
@@ -219,6 +220,25 @@ func cloneThreatDetectionEngineConfig(engineID string, source *EngineConfig) *En
 	cloned := *source
 	cloned.ID = engineID
 	return &cloned
+}
+
+// inheritDetectionTurnCacheMisses propagates the workflow's top-level
+// max-turn-cache-misses guardrail (AWF apiProxy.maxCacheMisses) into the detection
+// engine config. The guardrail describes a property of the configured LLM provider
+// (how reliably it reports prompt-cache reads), so it must apply to every job that
+// talks to that provider. Without this the detection job silently falls back to the
+// compile-time default and fails closed with max_cache_misses_exceeded on providers
+// that report cache reads only intermittently, even when the workflow raised the limit.
+//
+// Unlike max-turns, this is not a budget: detection keeps its own invocation cap
+// (like max-ai-credits) so a tightly capped agent job cannot starve detection.
+func inheritDetectionTurnCacheMisses(data *WorkflowData, detectionConfig *EngineConfig) {
+	if data == nil || data.EngineConfig == nil || detectionConfig == nil {
+		return
+	}
+	if detectionConfig.MaxTurnCacheMisses <= 0 {
+		detectionConfig.MaxTurnCacheMisses = data.EngineConfig.MaxTurnCacheMisses
+	}
 }
 
 // engineCoreSecretVarNames returns the secret-backed env var names for the given engine ID

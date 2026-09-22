@@ -30,6 +30,65 @@ const GOAL_ALREADY_ACTIVE_PATTERNS = [/\bthis thread already has a goal\b[\s\S]*
 // ("Maximum LLM invocations exceeded").
 const MAX_RUNS_EXCEEDED_PATTERNS = [/\bmax_runs_exceeded\b/i, /Maximum LLM invocations exceeded/i];
 
+// Guardrail rejections emitted by the AWF API proxy as HTTP 403 responses. These are
+// deliberate policy decisions by the proxy, never credential problems: the offending counter
+// is not reset by a fresh attempt, so retrying against the same proxy is guaranteed to fail
+// again. Some CLIs (notably the Copilot CLI) discard the structured body and print a generic
+// "Authentication failed with provider ... (HTTP 403)" line, so the guard name must be
+// recovered from the proxy's own structured logs (see ai_credits_context.cjs); these patterns
+// are the text-form fallback for engines that do surface the proxy body.
+const API_PROXY_GUARD_REJECTION_PATTERNS = [
+  {
+    guard: "max_cache_misses_exceeded",
+    pattern: /(?:\bmax_cache_misses_exceeded\b|\bmaximum\s+consecutive\s+cache\s+misses\s+exceeded\b)/i,
+    counterRe: /maximum\s+consecutive\s+cache\s+misses\s+exceeded\s*\(\s*(\d+)\s*\/\s*(\d+)\s*\)/i,
+    counterNames: ["consecutive_cache_misses", "max_cache_misses"],
+  },
+  {
+    guard: "effective_tokens_limit_exceeded",
+    pattern: /(?:\beffective_tokens_limit_exceeded\b|\bmaximum\s+effective\s+tokens\s+exceeded\b)/i,
+    counterRe: /maximum\s+effective\s+tokens\s+exceeded\s*\(\s*(\d+)\s*\/\s*(\d+)\s*\)/i,
+    counterNames: ["effective_tokens", "max_effective_tokens"],
+  },
+  {
+    guard: "permission_denied_limit_exceeded",
+    pattern: /\bpermission_denied_limit_exceeded\b/i,
+    counterRe: /permission\s+denied\s+limit\s+exceeded\s*\(\s*(\d+)\s*\/\s*(\d+)\s*\)/i,
+    counterNames: ["permission_denied_count", "max_permission_denied"],
+  },
+  { guard: "model_policy_violation", pattern: /\bmodel_policy_violation\b/i, counterRe: null, counterNames: [] },
+];
+
+/**
+ * Detect an AWF API proxy guardrail rejection in harness output.
+ *
+ * Only the text form is inspected here; the authoritative source is the proxy's structured
+ * log, which callers should consult as well (the Copilot CLI replaces the proxy body with a
+ * generic authentication message). Returns the guard name and any counters carried in the
+ * human-readable message.
+ *
+ * @param {unknown} output
+ * @returns {{ guard: string, counters: Record<string, string|number> } | null}
+ */
+function parseAPIProxyGuardRejection(output) {
+  const safeOutput = typeof output === "string" ? output : "";
+  if (!safeOutput) return null;
+  for (const { guard, pattern, counterRe, counterNames } of API_PROXY_GUARD_REJECTION_PATTERNS) {
+    if (!pattern.test(safeOutput)) continue;
+    /** @type {Record<string, string|number>} */
+    const counters = {};
+    const match = counterRe ? counterRe.exec(safeOutput) : null;
+    if (match) {
+      counterNames.forEach((name, index) => {
+        const value = Number.parseInt(match[index + 1], 10);
+        if (Number.isFinite(value)) counters[name] = value;
+      });
+    }
+    return { guard, counters };
+  }
+  return null;
+}
+
 // Common authentication failure patterns shared across all harnesses.
 // Matches:
 //   - "Authentication failed (Request ID: ...)" — Anthropic/OpenAI direct auth error
@@ -109,7 +168,7 @@ function parseAICreditsExceededProxyRejection(output) {
 /**
  * Detect retry guard conditions that should stop harness retries immediately.
  * @param {unknown} output
- * @returns {{ aiCreditsExceeded: boolean, awfAPIProxyBlockingRequests: boolean, goalAlreadyActive: boolean, maxRunsExceeded: boolean }}
+ * @returns {{ aiCreditsExceeded: boolean, awfAPIProxyBlockingRequests: boolean, goalAlreadyActive: boolean, maxRunsExceeded: boolean, apiProxyGuardRejection: { guard: string, counters: Record<string, string|number> } | null }}
  */
 function detectNonRetryableHarnessGuard(output) {
   const safeOutput = typeof output === "string" ? output : "";
@@ -118,6 +177,7 @@ function detectNonRetryableHarnessGuard(output) {
     awfAPIProxyBlockingRequests: AWF_API_PROXY_BLOCKING_REQUESTS_PATTERNS.some(pattern => pattern.test(safeOutput)),
     goalAlreadyActive: GOAL_ALREADY_ACTIVE_PATTERNS.some(pattern => pattern.test(safeOutput)),
     maxRunsExceeded: isMaxRunsExceededError(safeOutput),
+    apiProxyGuardRejection: parseAPIProxyGuardRejection(safeOutput),
   };
 }
 
@@ -158,9 +218,11 @@ if (typeof module !== "undefined" && module.exports) {
     AWF_API_PROXY_BLOCKING_REQUESTS_PATTERNS,
     GOAL_ALREADY_ACTIVE_PATTERNS,
     MAX_RUNS_EXCEEDED_PATTERNS,
+    API_PROXY_GUARD_REJECTION_PATTERNS,
     AUTHENTICATION_FAILED_PATTERNS,
     isMaxRunsExceededError,
     isAuthenticationFailedError,
+    parseAPIProxyGuardRejection,
     parseAICreditsExceededProxyRejection,
     SOFT_TIMEOUT_BUFFER_MS,
     buildSoftTimeoutGuard,
