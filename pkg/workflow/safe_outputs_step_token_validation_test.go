@@ -41,7 +41,7 @@ pre-steps:
     uses: `+stsMintStep+`
 safe-outputs:
   push-to-pull-request-branch:
-  github-token: ${{ steps.octosts.outputs.token }}
+  github-token: ${{ steps.octosts.outputs.token || secrets.CUSTOM_PAT || secrets.GITHUB_TOKEN }}
 jobs:
   safe_outputs:
     pre-steps:
@@ -69,7 +69,7 @@ jobs:
 		section := extractJobSection(lockYAML, jobName)
 		require.NotEmpty(t, section, "expected %s job section", jobName)
 		assert.Contains(t, section, "id: octosts")
-		assert.Contains(t, section, "${{ steps.octosts.outputs.token }}")
+		assert.Contains(t, section, "${{ steps.octosts.outputs.token || secrets.CUSTOM_PAT || secrets.GITHUB_TOKEN }}")
 	}
 }
 
@@ -91,7 +91,7 @@ pre-steps:
     uses: `+stsMintStep+`
 safe-outputs:
   push-to-pull-request-branch:
-  github-token: ${{ steps.octosts.outputs.token }}
+  github-token: ${{ steps.octosts.outputs.token || secrets.GITHUB_TOKEN }}
 ---
 
 # Missing same-job token minting
@@ -126,7 +126,7 @@ safe-outputs:
     - name: Mint token (too late)
       id: octosts
       uses: `+stsMintStep+`
-  github-token: ${{ steps.octosts.outputs.token }}
+  github-token: ${{ steps.octosts.outputs.token || secrets.GITHUB_TOKEN }}
 jobs:
   conclusion:
     pre-steps:
@@ -147,7 +147,7 @@ jobs:
 
 func TestCollectSafeOutputStepTokenIDs(t *testing.T) {
 	config := &SafeOutputsConfig{
-		GitHubToken: "${{ steps.global_mint.outputs.token }}",
+		GitHubToken: "${{ steps.global_mint.outputs.token || secrets.GITHUB_TOKEN }}",
 		CreateIssues: &CreateIssuesConfig{
 			BaseSafeOutputConfig: BaseSafeOutputConfig{
 				GitHubToken: "${{ steps.issue_mint.outputs.token }}",
