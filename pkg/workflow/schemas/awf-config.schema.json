@@ -251,6 +251,40 @@
             }
           }
         },
+        "routing": {
+          "type": "object",
+          "description": "Opt-in task-level model routing configuration prepared by a trusted workflow compiler.",
+          "additionalProperties": false,
+          "required": ["objective", "task"],
+          "properties": {
+            "objective": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["goal", "mode"],
+              "properties": {
+                "goal": {
+                  "type": "string",
+                  "enum": ["cost", "cost-speed"]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": ["economy", "balanced", "robust", "auto"]
+                }
+              }
+            },
+            "task": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["conversationFile"],
+              "properties": {
+                "conversationFile": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
         "targets": {
           "type": "object",
           "description": "Override upstream API endpoints for each provider.",
@@ -597,6 +631,9 @@
               "$ref": "#/$defs/digestPinnedImage"
             },
             "apiProxy": {
+              "$ref": "#/$defs/digestPinnedImage"
+            },
+            "router": {
               "$ref": "#/$defs/digestPinnedImage"
             },
             "cliProxy": {
