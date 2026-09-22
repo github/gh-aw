@@ -27,7 +27,7 @@ Any `tcp://` endpoint (for example `tcp://localhost:2375`, `tcp://dind:2375`, or
 
 With ARC DinD handling enabled, AWF receives `--docker-host`, shared-work sysroot staging is applied, and chroot config patching is enabled. The runtime no longer uses `--docker-host-path-prefix`.
 
-The topology applies to jobs that run on the ARC runner. The threat-detection job runs on `ubuntu-latest` unless `safe-outputs.threat-detection.runs-on` selects another runner, so it only inherits `runner.topology: arc-dind` when that override is set.
+The topology applies to jobs that run on the ARC runner. The threat-detection job runs on `ubuntu-latest` unless `safe-outputs.threat-detection.runs-on` selects another runner, so it only inherits `runner.topology: arc-dind` when that override selects a self-hosted runner. An explicit GitHub-hosted label (for example `ubuntu-latest`) is treated like the default and does not inherit the topology.
 
 ### Docker socket override for split-daemon topologies
 
@@ -111,7 +111,7 @@ Triage this issue.
 
 ## Configuring the detection job runner
 
-When [threat detection](/gh-aw/reference/threat-detection/) is enabled, the detection job runs on the agent job's runner by default. Override it with `safe-outputs.threat-detection.runs-on`:
+When [threat detection](/gh-aw/reference/threat-detection/) is enabled, the detection job runs on `ubuntu-latest` by default; it does not inherit the agent job's runner. Override it with `safe-outputs.threat-detection.runs-on`:
 
 ```aw
 ---

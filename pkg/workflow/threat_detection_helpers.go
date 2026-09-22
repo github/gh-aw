@@ -146,15 +146,18 @@ func mergeThreatDetectionEngineEnv(data *WorkflowData, detectionEnv map[string]s
 // detection binary unstaged and the detection result written to a read-only mount
 // that no later step reads (see gh-aw#59935).
 //
-// When the detection job declares its own runs-on it may well be the same
-// self-hosted (ARC) runner as the agent job, so the topology is preserved.
+// The topology is preserved only when the detection job selects a non
+// GitHub-hosted runner, which is the only case where it may be the same
+// self-hosted (ARC) runner as the agent job. An explicit GitHub-hosted label
+// (for example `safe-outputs.threat-detection.runs-on: ubuntu-latest`) is
+// treated like the default.
 func detectionJobRunnerConfig(data *WorkflowData) *RunnerConfig {
 	if data == nil || data.RunnerConfig == nil {
 		return nil
 	}
 	if data.SafeOutputs == nil || data.SafeOutputs.ThreatDetection == nil ||
-		data.SafeOutputs.ThreatDetection.RunsOn == "" {
-		threatLog.Print("Detection job uses the default GitHub-hosted runner; not propagating runner topology")
+		!isCustomImageRunner(normalizeRunsOnSnippet(data.SafeOutputs.ThreatDetection.RunsOn)) {
+		threatLog.Print("Detection job uses a GitHub-hosted runner; not propagating runner topology")
 		return nil
 	}
 	return data.RunnerConfig

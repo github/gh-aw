@@ -97,7 +97,7 @@ safe-outputs:
 | `enabled` | boolean | Enable or disable detection (default: `true` when safe-outputs exist) |
 | `prompt` | string | Custom instructions appended to default detection prompt |
 | `engine` | string/object/false | AI engine config (`"copilot"`, full config object, or `false` for no AI) |
-| `runs-on` | string/array/object | Runner for the detection job (default: inherits from workflow `runs-on`) |
+| `runs-on` | string/array/object | Runner for the detection job (default: `ubuntu-latest`; the workflow `runs-on` is not inherited) |
 | `steps` | array | Additional GitHub Actions steps to run **before** AI analysis (pre-steps) |
 | `post-steps` | array | Additional GitHub Actions steps to run **after** AI analysis (post-steps) |
 | `max-ai-credits` | integer | AI Credits cap for the detection run, independent of the main agent budget. Defaults to `400` when unset, with runtime override via `vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`. Accepts plain integers; `-1` disables the detection budget. |
