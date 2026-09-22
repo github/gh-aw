@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -233,10 +234,8 @@ func hasBashWildcard(commands []any) bool {
 // isClaudeToolName uses the existing Claude naming convention heuristic:
 // valid Claude tool keys are expected to start with an uppercase ASCII letter.
 func isClaudeToolName(toolName string) bool {
-	for _, first := range toolName {
-		return first >= 'A' && first <= 'Z'
-	}
-	return false
+	first, _ := utf8.DecodeRuneInString(toolName)
+	return first >= 'A' && first <= 'Z'
 }
 
 func appendTopLevelClaudeTools(allowedTools []string, tools map[string]any, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig) []string {
