@@ -3278,7 +3278,7 @@ process.exit(1);`,
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
 
-    it.each(["grok-4.5", "grok-4.6"])("uses the responses API from the bundled catalog for %s", model => {
+    it.each(["grok-4.5", "grok-4.6", "grok-4.7"])("uses the responses API from the bundled catalog for %s", model => {
       process.env.COPILOT_MODEL = model;
       const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
       applyCopilotWireAPI({ modelsJson, logger: () => {} });
