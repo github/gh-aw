@@ -27,15 +27,16 @@ var legacyInputsExprRegex = regexp.MustCompile(`\$\{\{\s*github\.aw\.inputs\.([a
 // in raw file content (including YAML frontmatter). This is called before YAML
 // parsing so that array/object values serialised as JSON produce valid YAML.
 func substituteImportInputsInContent(content string, inputs map[string]any) string {
-	if len(inputs) == 0 {
-		return content
-	}
-
 	importLog.Printf("Substituting import-inputs expressions: inputs=%d, contentBytes=%d", len(inputs), len(content))
 
-	result := legacyInputsExprRegex.ReplaceAllStringFunc(content, buildImportInputReplaceFunc(legacyInputsExprRegex, inputs))
+	result := content
+	if len(inputs) > 0 {
+		result = legacyInputsExprRegex.ReplaceAllStringFunc(result, buildImportInputReplaceFunc(legacyInputsExprRegex, inputs))
+	}
 	result = importInputsFallbackExprRegex.ReplaceAllStringFunc(result, buildImportInputFallbackReplaceFunc(inputs))
-	result = importInputsExprRegex.ReplaceAllStringFunc(result, buildImportInputReplaceFunc(importInputsExprRegex, inputs))
+	if len(inputs) > 0 {
+		result = importInputsExprRegex.ReplaceAllStringFunc(result, buildImportInputReplaceFunc(importInputsExprRegex, inputs))
+	}
 	return result
 }
 

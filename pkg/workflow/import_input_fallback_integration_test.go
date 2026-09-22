@@ -20,6 +20,7 @@ func TestImportInputFallbackExpressionCompilation(t *testing.T) {
 	}{
 		{name: "campaign", input: "campaign: eslint-rules", expected: "eslint-rules"},
 		{name: "package", input: "package: repo-assist", expected: "repo-assist"},
+		{name: "neither", input: "{}", expected: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "import-input-fallback-*")
@@ -75,7 +76,7 @@ Run the campaign.
 				t.Fatalf("failed to read compiled workflow: %v", err)
 			}
 			compiled := string(lockContent)
-			if !strings.Contains(compiled, "CAO_CAMPAIGN: "+tc.expected) {
+			if tc.expected != "" && !strings.Contains(compiled, "CAO_CAMPAIGN: "+tc.expected) {
 				t.Errorf("compiled workflow does not contain folded campaign value %q", tc.expected)
 			}
 			if strings.Contains(compiled, "github.aw.import-inputs") {
