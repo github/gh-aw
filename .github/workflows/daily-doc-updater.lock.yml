@@ -1454,6 +1454,9 @@ jobs:
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+      - name: Wait before retrying usage artifact upload
+        if: always() && steps.upload-usage-artifact.outcome == 'failure'
+        run: sleep 10
       - name: Retry upload usage artifact
         id: upload-usage-artifact-retry
         if: always() && steps.upload-usage-artifact.outcome == 'failure'

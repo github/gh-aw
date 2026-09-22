@@ -265,8 +265,12 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 	steps = append(steps, usageArtifactUploadWithLines...)
 	// The initial upload can fail transiently (e.g. a runner-side DNS blip while
 	// talking to blob storage). A missing usage artifact permanently blocks the
-	// daily AI Credits guardrail for this run, so retry once before giving up.
+	// daily AI Credits guardrail for this run, so wait briefly and retry once
+	// before giving up, so a short-lived network hiccup has time to clear.
 	steps = append(steps,
+		"      - name: Wait before retrying usage artifact upload\n",
+		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
+		"        run: sleep 10\n",
 		"      - name: Retry upload usage artifact\n",
 		"        id: upload-usage-artifact-retry\n",
 		"        if: always() && steps.upload-usage-artifact.outcome == 'failure'\n",
