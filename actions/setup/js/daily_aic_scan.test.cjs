@@ -242,7 +242,7 @@ describe("complete daily AIC scan observations", () => {
     const f = fixture();
     f.listPage.mockResolvedValue({ response: response({ workflow_runs: [run(1)] }), sourceRunCount: 100, lookupMode: "workflow_id" });
     await expect(scanDailyAIC(f)).rejects.toThrow("complete pagination");
-    expect(f.listPage).toHaveBeenCalledTimes(10);
+    expect(f.listPage).toHaveBeenCalledTimes(25);
     expect(f.getRunAIC).not.toHaveBeenCalled();
   });
 

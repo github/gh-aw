@@ -5,7 +5,7 @@ const path = require("path");
 const { AIC_SCAN_CACHE_FILE_PATH, readScanCache, matchesCompletedRun, scanCacheEntry } = require("./daily_aic_cache_helpers.cjs");
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
-const MAX_PAGES = 10;
+const MAX_PAGES = 25;
 
 /**
  * The run listing is authoritative for window membership and attempt identity.
