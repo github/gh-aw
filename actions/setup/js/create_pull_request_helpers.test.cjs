@@ -38,6 +38,7 @@ const {
   buildPushErrorSection,
   buildManualBranchRecoveryCommands,
   buildManualBranchApplyCommands,
+  withTransientPushRetry,
 } = require("./create_pull_request_helpers.cjs");
 
 function runGit(args, cwd) {
@@ -65,6 +66,30 @@ describe("create_pull_request_helpers - constants", () => {
     expect(LABEL_MAX_RETRIES).toBeGreaterThan(0);
     expect(LABEL_INITIAL_DELAY_MS).toBeGreaterThan(0);
     expect(LABEL_MAX_DELAY_MS).toBeGreaterThan(LABEL_INITIAL_DELAY_MS);
+  });
+});
+
+describe("withTransientPushRetry", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("waits for the shared first retry delay before retrying workflows-scope timeouts", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const operation = vi.fn().mockRejectedValueOnce(new Error("Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.")).mockResolvedValueOnce("ok");
+
+    const resultPromise = withTransientPushRetry(operation);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(operation).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(operation).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(resultPromise).resolves.toBe("ok");
+    expect(operation).toHaveBeenCalledTimes(2);
   });
 });
 

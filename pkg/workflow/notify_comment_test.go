@@ -651,7 +651,6 @@ func TestConclusionJobActionFailureIssueExpiration_DefaultFromRepoConfig(t *test
 			NoOp: &NoOpConfig{},
 		},
 	}
-
 	job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
 	if err != nil {
 		t.Fatalf("Failed to build conclusion job: %v", err)
@@ -1756,7 +1755,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 
 	t.Run("no issues: write or actions: read when all conclusion issue-writing paths are disabled", func(t *testing.T) {
 		compiler := NewCompiler()
-		falseReportFailedJobs := false
+		falseReportFailedJobs := TemplatableBool("false")
 		workflowData := &WorkflowData{
 			Name: "Test Workflow",
 			SafeOutputs: &SafeOutputsConfig{
@@ -1767,6 +1766,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 				},
 			},
 		}
+
 		job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
 		if err != nil {
 			t.Fatalf("buildConclusionJob returned error: %v", err)
@@ -1784,7 +1784,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 
 	t.Run("no issues: write when default threat detection is enabled but issue-writing paths are disabled", func(t *testing.T) {
 		compiler := NewCompiler()
-		falseReportFailedJobs := false
+		falseReportFailedJobs := TemplatableBool("false")
 		workflowData := &WorkflowData{
 			Name: "Test Workflow",
 			SafeOutputs: &SafeOutputsConfig{
@@ -1843,7 +1843,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 
 	t.Run("issues: read from safe-outputs is upgraded to issues: write when a conclusion issue path is enabled", func(t *testing.T) {
 		compiler := NewCompiler()
-		falseReportFailedJobs := false
+		falseReportFailedJobs := TemplatableBool("false")
 		workflowData := &WorkflowData{
 			Name: "Test Workflow",
 			SafeOutputs: &SafeOutputsConfig{
@@ -1867,7 +1867,7 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 
 	t.Run("issues: write present when missing-tool issue reporting is enabled", func(t *testing.T) {
 		compiler := NewCompiler()
-		falseReportFailedJobs := false
+		falseReportFailedJobs := TemplatableBool("false")
 		trueVal := "true"
 		workflowData := &WorkflowData{
 			Name: "Test Workflow",
@@ -1890,4 +1890,23 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 			t.Errorf("conclusion job should have 'issues: write' when missing-tool issue reporting is enabled, got: %q", job.Permissions)
 		}
 	})
+}
+
+func TestConclusionReportFailedJobsExpression(t *testing.T) {
+	compiler := NewCompiler()
+	reportFailedJobs := TemplatableBool("${{ inputs.report-failed-jobs }}")
+	steps := compiler.buildConclusionReportFailedJobsStep(&WorkflowData{
+		Name: "Test Workflow",
+		SafeOutputs: &SafeOutputsConfig{
+			ReportFailedJobs: &reportFailedJobs,
+		},
+	}, string(constants.AgentJobName))
+
+	output := strings.Join(steps, "")
+	if !strings.Contains(output, "GH_AW_REPORT_FAILED_JOBS: ${{ inputs.report-failed-jobs }}") {
+		t.Errorf("report-failed-jobs expression was not emitted unquoted: %q", output)
+	}
+	if strings.Contains(output, `GH_AW_REPORT_FAILED_JOBS: "${{ inputs.report-failed-jobs }}"`) {
+		t.Errorf("report-failed-jobs expression was emitted quoted: %q", output)
+	}
 }

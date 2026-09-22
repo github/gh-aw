@@ -108,20 +108,24 @@ func TestReportFailureAsIssueWithCategoriesFilter(t *testing.T) {
 // TestReportFailedJobsConfig tests parsing of the report-failed-jobs global flag
 func TestReportFailedJobsConfig(t *testing.T) {
 	tests := []struct {
-		name       string
-		value      any
-		expectNil  bool
-		expectBool bool
+		name         string
+		value        any
+		expectString string
 	}{
 		{
-			name:       "explicit false",
-			value:      false,
-			expectBool: false,
+			name:         "explicit false",
+			value:        false,
+			expectString: "false",
 		},
 		{
-			name:       "explicit true",
-			value:      true,
-			expectBool: true,
+			name:         "explicit true",
+			value:        true,
+			expectString: "true",
+		},
+		{
+			name:         "templatable expression",
+			value:        "${{ inputs.report-failed-jobs }}",
+			expectString: "${{ inputs.report-failed-jobs }}",
 		},
 	}
 
@@ -139,7 +143,7 @@ func TestReportFailedJobsConfig(t *testing.T) {
 			config := compiler.extractSafeOutputsConfig(frontmatter)
 			require.NotNil(t, config, "SafeOutputsConfig should be created")
 			require.NotNil(t, config.ReportFailedJobs, "ReportFailedJobs should be set")
-			assert.Equal(t, tt.expectBool, *config.ReportFailedJobs, "ReportFailedJobs value should match")
+			assert.Equal(t, tt.expectString, config.ReportFailedJobs.String(), "ReportFailedJobs value should match")
 		})
 	}
 }
