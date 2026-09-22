@@ -66,6 +66,21 @@ func extractMaxDailyAICGitHubApp(frontmatter map[string]any) *GitHubAppConfig {
 	return app
 }
 
+// extractMaxDailyAICContinueOnError reports whether failures to determine the
+// daily AI Credits total should be treated as warnings.
+func extractMaxDailyAICContinueOnError(frontmatter map[string]any) bool {
+	raw, ok := frontmatter[maxDailyAICreditsField]
+	if !ok {
+		return false
+	}
+	rawMap, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	continueOnError, ok := rawMap["continue-on-error"].(bool)
+	return ok && continueOnError
+}
+
 // parseMaxDailyAICValue normalizes max-daily-ai-credits
 // values into a runtime-ready string.
 //
