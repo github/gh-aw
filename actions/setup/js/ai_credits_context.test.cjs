@@ -465,6 +465,69 @@ describe("ai_credits_context parseMaxCacheMissesExceededFromEventLog", () => {
   });
 });
 
+describe("ai_credits_context parseAPIProxyGuardRejectionFromEventLog", () => {
+  let tmpDir;
+  let parseAPIProxyGuardRejectionFromEventLog;
+  let formatAPIProxyGuardRejection;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aic-proxy-guard-test-"));
+    delete process.env.GH_AW_AGENT_OUTPUT;
+    const mod = await import("./ai_credits_context.cjs");
+    const exports = mod.default || mod;
+    parseAPIProxyGuardRejectionFromEventLog = exports.parseAPIProxyGuardRejectionFromEventLog;
+    formatAPIProxyGuardRejection = exports.formatAPIProxyGuardRejection;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    delete process.env.GH_AW_AGENT_OUTPUT;
+  });
+
+  function writeEventLog(lines, filename = "event-logs.jsonl") {
+    const logDir = path.join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs");
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(path.join(logDir, filename), lines.map(l => JSON.stringify(l)).join("\n") + "\n", "utf8");
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+  }
+
+  it("returns the guard name and counters for max_cache_misses_exceeded", () => {
+    writeEventLog([{ type: "max_cache_misses_exceeded", consecutive_cache_misses: 5, max_cache_misses: 5 }]);
+    expect(parseAPIProxyGuardRejectionFromEventLog()).toEqual({
+      guard: "max_cache_misses_exceeded",
+      counters: { consecutive_cache_misses: 5, max_cache_misses: 5 },
+    });
+  });
+
+  it("reads the token tracker audit log written by the proxy", () => {
+    writeEventLog([{ type: "max_cache_misses_exceeded", consecutive_cache_misses: 6, max_cache_misses: 5 }], "token-tracker-audit.jsonl");
+    expect(parseAPIProxyGuardRejectionFromEventLog()?.guard).toBe("max_cache_misses_exceeded");
+  });
+
+  it("detects the other api-proxy guardrails", () => {
+    writeEventLog([{ type: "permission_denied_limit_exceeded", permission_denied_count: 20, max_permission_denied: 20 }]);
+    expect(parseAPIProxyGuardRejectionFromEventLog()?.guard).toBe("permission_denied_limit_exceeded");
+  });
+
+  it("returns null when no guard rejection is present", () => {
+    writeEventLog([{ type: "response", status: 200 }]);
+    expect(parseAPIProxyGuardRejectionFromEventLog()).toBeNull();
+  });
+
+  it("returns null for a missing event log", () => {
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+    expect(parseAPIProxyGuardRejectionFromEventLog("/nonexistent/path/event-logs.jsonl")).toBeNull();
+  });
+
+  it("formats the guard name with its counters", () => {
+    expect(formatAPIProxyGuardRejection({ guard: "max_cache_misses_exceeded", counters: { consecutive_cache_misses: 5, max_cache_misses: 5 } })).toBe("max_cache_misses_exceeded (consecutive_cache_misses=5, max_cache_misses=5)");
+    expect(formatAPIProxyGuardRejection({ guard: "model_policy_violation", counters: {} })).toBe("model_policy_violation");
+    expect(formatAPIProxyGuardRejection(null)).toBe("");
+  });
+});
+
 describe("ai_credits_context parseMaxAICreditsFromAuditLog", () => {
   let tmpDir;
   /** @type {(path?: string) => string} */

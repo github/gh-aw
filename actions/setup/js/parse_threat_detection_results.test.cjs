@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // Create mock functions
 const mockExistsSync = vi.fn(() => false);
@@ -34,7 +34,7 @@ const mockCore = {
 };
 global.core = mockCore;
 
-const { parseDetectionLog, extractFromStreamJson, extractResultFromText, extractStructuredOutput, parseStructuredResultFile } = require("./parse_threat_detection_results.cjs");
+const { parseDetectionLog, extractFromStreamJson, extractResultFromText, extractStructuredOutput, parseStructuredResultFile, reportAPIProxyGuardRejection } = require("./parse_threat_detection_results.cjs");
 
 describe("extractResultFromText", () => {
   it("should extract a simple JSON object", () => {
@@ -997,5 +997,51 @@ describe("main", () => {
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to read detection log"));
       });
     });
+  });
+});
+
+describe("reportAPIProxyGuardRejection", () => {
+  // Uses real files on disk: vi.mock("fs") does not intercept require("fs") in this
+  // CJS+vitest setup (see the skipped block above), so the proxy log path is passed explicitly.
+  const realFs = require("node:fs");
+  const realOs = require("node:os");
+  const realPath = require("node:path");
+  let tmpDir;
+
+  beforeEach(() => {
+    mockCore.warning.mockClear();
+    tmpDir = realFs.mkdtempSync(realPath.join(realOs.tmpdir(), "detection-proxy-guard-"));
+  });
+
+  afterEach(() => {
+    realFs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * @param {object[]} entries
+   * @returns {string} path to the written proxy event log
+   */
+  function writeProxyEventLog(entries) {
+    const logPath = realPath.join(tmpDir, "event-logs.jsonl");
+    realFs.writeFileSync(logPath, entries.map(entry => JSON.stringify(entry)).join("\n") + "\n", "utf8");
+    return logPath;
+  }
+
+  it("warns with the guard name and counters when the proxy rejected requests", () => {
+    const logPath = writeProxyEventLog([{ type: "max_cache_misses_exceeded", consecutive_cache_misses: 5, max_cache_misses: 5 }]);
+    expect(reportAPIProxyGuardRejection(logPath)).toBe(true);
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("max_cache_misses_exceeded (consecutive_cache_misses=5, max_cache_misses=5)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("not an authentication failure"));
+  });
+
+  it("stays silent when no guard rejection is recorded", () => {
+    const logPath = writeProxyEventLog([{ type: "response", status: 200 }]);
+    expect(reportAPIProxyGuardRejection(logPath)).toBe(false);
+    expect(mockCore.warning).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when the proxy logs are unavailable", () => {
+    expect(reportAPIProxyGuardRejection(realPath.join(tmpDir, "missing.jsonl"))).toBe(false);
+    expect(mockCore.warning).not.toHaveBeenCalled();
   });
 });

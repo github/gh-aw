@@ -87,6 +87,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}
+	// The cache-miss guardrail is inherited from the workflow so the detection job's AWF
+	// API proxy enforces the same limit as the agent job instead of always falling back
+	// to the compile-time default.
+	inheritDetectionTurnCacheMisses(data, detectionEngineConfig)
 	// Threat detection is a bounded scan of already-completed agent output, not the
 	// primary task. If the harness policy was not explicitly configured (via
 	// engine.harness or threat-detection.engine.harness), default to zero retries so a
@@ -235,6 +239,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 
 		stepSummaryEnvInjected := false
 		skippedAlwaysIf := false
+		firstLineIsName := false
+		if len(step) > 0 {
+			firstLineIsName = strings.HasPrefix(strings.TrimSpace(step[0]), "- name:")
+		}
 		for i, line := range step {
 			// Prefix step IDs with "detection_" to avoid conflicts with agent job steps
 			// (e.g., "agentic_execution" is already used by the main engine execution step).
@@ -261,7 +269,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 			// for "if: always()" to avoid silently dropping a legitimate custom condition
 			// from unrelated steps. Uses a flag rather than a hard-coded index so it still
 			// works if a step ever has fields interleaved before "if:".
-			if i == 1 && strings.HasPrefix(strings.TrimSpace(step[0]), "- name:") && strings.TrimSpace(line) == "if: always()" {
+			if i == 1 && firstLineIsName && strings.TrimSpace(line) == "if: always()" {
 				skippedAlwaysIf = true
 				continue
 			}
