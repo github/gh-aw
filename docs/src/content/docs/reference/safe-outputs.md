@@ -1849,8 +1849,9 @@ safe-outputs:
 - `secrets.NAME`
 - `needs.<job>.outputs.<name>`
 - `steps.<id>.outputs.<name>`
+- `steps.<id>.outputs.<name> || secrets.NAME [|| secrets.NAME ...]`
 
-The `steps.*.outputs.*` form is useful when a short-lived token is minted inside the job that uses it, for example with a keyless OIDC token-minting action. Step outputs are only readable inside the job that produced them, so the minting step must be injected into **every** job that consumes the token: the `agent` job (top-level `pre-steps:`), the `safe_outputs` job and the `conclusion` job (`jobs.<job>.pre-steps:` or `jobs.<job>.setup-steps:`).
+The `steps.*.outputs.*` forms are useful when a short-lived token is minted inside the job that uses it, for example with a keyless OIDC token-minting action. Add one or more `secrets.*` fallbacks when the minted output may be empty. Step outputs are only readable inside the job that produced them, so the minting step must be injected into **every** job that consumes the token: the `agent` job (top-level `pre-steps:`), the `safe_outputs` job and the `conclusion` job (`jobs.<job>.pre-steps:` or `jobs.<job>.setup-steps:`).
 
 `pre-steps:` run before the job's checkout, git-credential and token-consuming steps, so the minted token is available everywhere it is needed. `safe-outputs.steps:` is not a valid place to mint such a token because it runs *after* the `safe_outputs` job checkout.
 
@@ -1868,7 +1869,7 @@ pre-steps:                        # agent job
       identity: my-policy
 
 safe-outputs:
-  github-token: ${{ steps.mint_token.outputs.token }}
+  github-token: ${{ steps.mint_token.outputs.token || secrets.CUSTOM_PAT || secrets.GITHUB_TOKEN }}
   push-to-pull-request-branch:
 
 jobs:

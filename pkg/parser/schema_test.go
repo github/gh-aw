@@ -1832,21 +1832,52 @@ func TestMainWorkflowSchema_BodyFootersAllowed(t *testing.T) {
 	}
 }
 
-func TestMainWorkflowSchema_GitHubTokenAllowsStepOutputs(t *testing.T) {
+func TestMainWorkflowSchema_GitHubTokenAllowsStepOutputsWithSecretFallbacks(t *testing.T) {
 	t.Parallel()
 
-	frontmatter := map[string]any{
-		"on": "daily",
-		"safe-outputs": map[string]any{
-			"github-token": "${{ steps.fetch-token.outputs.my-token }}",
-			"create-issue": map[string]any{
-				"github-token": "${{ steps.fetch-token.outputs.my-token }}",
-			},
-		},
-	}
+	for _, token := range []string{
+		"${{ steps.fetch-token.outputs.my-token }}",
+		"${{ steps.fetch-token.outputs.my-token || secrets.CUSTOM_PAT }}",
+		"${{ steps.fetch-token.outputs.my-token || secrets.CUSTOM_PAT || secrets.GITHUB_TOKEN }}",
+	} {
+		t.Run(token, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "daily",
+				"safe-outputs": map[string]any{
+					"github-token": token,
+					"create-issue": map[string]any{
+						"github-token": token,
+					},
+				},
+			}
 
-	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
-		t.Fatalf("expected steps.*.outputs.* github-token expression to pass schema validation, got: %v", err)
+			if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
+				t.Fatalf("expected steps.*.outputs.* github-token expression to pass schema validation, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestMainWorkflowSchema_GitHubTokenRejectsUnsupportedStepOutputFallbacks(t *testing.T) {
+	t.Parallel()
+
+	for _, token := range []string{
+		"${{ steps.fetch-token.outputs.my-token || env.GITHUB_TOKEN }}",
+		"${{ steps.fetch-token.outputs.my-token || needs.auth.outputs.token }}",
+		"${{ steps.fetch-token.outputs.my-token || 'plaintext' }}",
+	} {
+		t.Run(token, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "daily",
+				"safe-outputs": map[string]any{
+					"github-token": token,
+				},
+			}
+
+			if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err == nil {
+				t.Fatal("expected unsupported steps.*.outputs.* github-token fallback to fail schema validation")
+			}
+		})
 	}
 }
 
