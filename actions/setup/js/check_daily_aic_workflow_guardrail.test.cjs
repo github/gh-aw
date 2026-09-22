@@ -240,18 +240,18 @@ describe("check_daily_aic_workflow_guardrail", () => {
     expect(markdown).not.toContain("Guardrail issue:");
   });
 
-  it("main() fails the step when GitHub API calls leave accounting unknown", async () => {
+  it("main() reports an unknown accounting error without failing activation", async () => {
     // Simulate a scenario where the GitHub API throws during workflow run lookup.
-    // core.setFailed blocks activation without misreporting a budget exceedance.
     const coreOutputs = {};
     const coreWarnings = [];
+    const setFailed = vi.fn();
     const mockCore = {
       setOutput: (key, value) => {
         coreOutputs[key] = value;
       },
       info: () => {},
       warning: msg => coreWarnings.push(msg),
-      setFailed: msg => coreWarnings.push(msg),
+      setFailed,
     };
 
     const mockGithub = {
@@ -291,14 +291,47 @@ describe("check_daily_aic_workflow_guardrail", () => {
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("transient_error");
       expect(coreOutputs["daily_ai_credits_guardrail_error"]).toBe("Daily workflow AI Credits are unknown: Network error");
-      // Unknown accounting is an activation failure, not a successful skip.
+      // Unknown accounting is reported to the conclusion job without blocking it.
       expect(coreWarnings.some(w => /AI Credits are unknown/i.test(w))).toBe(true);
+      expect(setFailed).not.toHaveBeenCalled();
     } finally {
       delete global.core;
       delete global.github;
       delete global.context;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
       delete process.env.GH_AW_GITHUB_TOKEN;
+    }
+  });
+
+  it("reports a missing artifact lookup token without failing activation", async () => {
+    const coreOutputs = {};
+    const setFailed = vi.fn();
+    global.core = {
+      setOutput: (key, value) => {
+        coreOutputs[key] = value;
+      },
+      info: () => {},
+      warning: () => {},
+      setFailed,
+    };
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS = "10";
+    process.env.GH_AW_GITHUB_TOKEN = "";
+    process.env.GITHUB_TOKEN = "";
+    process.env.GH_TOKEN = "";
+    process.env.GITHUB_EVENT_NAME = "pull_request";
+
+    try {
+      await expect(runMain()).resolves.toBeUndefined();
+      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
+      expect(coreOutputs["daily_ai_credits_guardrail_error"]).toMatch(/no artifact lookup token/);
+      expect(setFailed).not.toHaveBeenCalled();
+    } finally {
+      delete global.core;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_GITHUB_TOKEN;
+      delete process.env.GITHUB_TOKEN;
+      delete process.env.GH_TOKEN;
+      delete process.env.GITHUB_EVENT_NAME;
     }
   });
 
@@ -642,8 +675,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
         coreOutputs[key] = value;
       },
       info: msg => coreInfos.push(msg),
-      warning: () => {},
-      setFailed: msg => coreInfos.push(msg),
+      warning: msg => coreInfos.push(msg),
+      setFailed: vi.fn(),
       summary: {
         addDetails: function () {
           return this;
@@ -667,9 +700,10 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
       expect(getRunAICSpy).toHaveBeenCalledTimes(1);
 
-      // The incomplete window is reported as a failure.
+      // The incomplete window is reported without failing activation.
       const stopLog = coreInfos.find(msg => msg.includes("AI Credits are unknown"));
       expect(stopLog).toBeDefined();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
 
       // Unknown is neither an exceedance nor a verified under-budget result.
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
@@ -718,13 +752,14 @@ describe("check_daily_aic_workflow_guardrail", () => {
             listWorkflowRunsCalls += 1;
             throw httpError(404, "Not Found");
           },
-          listWorkflowRunsForRepo: async ({ page }) => {
+          listWorkflowRunsForRepo: vi.fn(async ({ page }) => {
             listWorkflowRunsForRepoCalls += 1;
             if (page === 1) {
               return {
                 data: {
                   workflow_runs: Array.from({ length: 100 }, (_, index) => ({
                     id: 1000 + index,
+                    workflow_id: 99,
                     name: "Unrelated Workflow",
                     html_url: `https://example.test/runs/${1000 + index}`,
                     created_at: nowIso,
@@ -742,7 +777,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
                     run_attempt: 1,
                     updated_at: nowIso,
                     status: "completed",
-                    name: workflowName,
+                    workflow_id: 324645976,
+                    name: "Caller Workflow",
                     html_url: "https://example.test/runs/41",
                     created_at: nowIso,
                     conclusion: "success",
@@ -751,7 +787,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
               },
               headers: {},
             };
-          },
+          }),
         },
       },
     };
@@ -786,11 +822,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
       expect(listWorkflowRunsCalls).toBe(1);
       expect(listWorkflowRunsForRepoCalls).toBe(2);
+      expect(mockGithub.rest.actions.listWorkflowRunsForRepo).toHaveBeenCalledWith(expect.objectContaining({ created: expect.stringMatching(/^>=/) }));
       expect(getRunAICSpy).toHaveBeenCalledTimes(1);
       expect(getRunAICSpy.mock.calls[0][1]).toBe(41);
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
-      expect(coreInfos.some(msg => msg.includes("falling back to repository run listing by workflow name"))).toBe(true);
+      expect(coreInfos.some(msg => msg.includes("falling back to repository run listing by workflow ID"))).toBe(true);
     } finally {
       delete global.core;
       delete global.github;
@@ -806,13 +843,14 @@ describe("check_daily_aic_workflow_guardrail", () => {
   it("marks permanent 404 guardrail failures as structural errors distinct from transient failures", async () => {
     const coreOutputs = {};
     const coreWarnings = [];
+    const setFailed = vi.fn();
     const mockCore = {
       setOutput: (key, value) => {
         coreOutputs[key] = value;
       },
       info: () => {},
       warning: msg => coreWarnings.push(msg),
-      setFailed: msg => coreWarnings.push(msg),
+      setFailed,
     };
 
     const mockGithub = {
@@ -860,6 +898,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
       expect(coreWarnings.some(w => /AI Credits are unknown/i.test(w))).toBe(true);
+      expect(setFailed).not.toHaveBeenCalled();
     } finally {
       delete global.core;
       delete global.github;
@@ -966,7 +1005,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     }
   });
 
-  it("treats 404 as structural error without calling listWorkflowRunsForRepo when GH_AW_WORKFLOW_NAME is absent", async () => {
+  it("falls back by workflow ID when GH_AW_WORKFLOW_NAME is absent", async () => {
     let listWorkflowRunsForRepoCalls = 0;
 
     const mockGithub = {
@@ -1010,6 +1049,12 @@ describe("check_daily_aic_workflow_guardrail", () => {
       info: () => {},
       warning: msg => coreWarnings.push(msg),
       setFailed: msg => coreWarnings.push(msg),
+      summary: {
+        addDetails: function () {
+          return this;
+        },
+        write: async () => {},
+      },
     };
 
     global.core = mockCore;
@@ -1018,15 +1063,14 @@ describe("check_daily_aic_workflow_guardrail", () => {
 
     process.env.GH_AW_MAX_DAILY_AI_CREDITS = "10";
     process.env.GH_AW_GITHUB_TOKEN = "fake-token";
-    // GH_AW_WORKFLOW_NAME intentionally not set — workflowFilterName will be "" so
-    // the !workflowName branch re-throws the 404 without attempting the fallback.
+    // GH_AW_WORKFLOW_NAME is intentionally not set: fallback matching uses workflow_id.
     process.env.GITHUB_EVENT_NAME = "pull_request";
 
     try {
       await expect(runMain()).resolves.toBeUndefined();
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
-      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("structural_error");
-      expect(listWorkflowRunsForRepoCalls).toBe(0);
+      expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
+      expect(listWorkflowRunsForRepoCalls).toBe(1);
     } finally {
       delete global.core;
       delete global.github;

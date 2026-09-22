@@ -32,6 +32,7 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       page,
       perPage: 100,
       lookupMode,
+      created: `>=${new Date(now - WINDOW_MS).toISOString()}`,
     });
     budget.observe(result.response);
     lookupMode = result.lookupMode;
