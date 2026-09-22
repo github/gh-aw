@@ -232,7 +232,7 @@ func enqueueImportPath(state *importBFSState, importPath, fullPath, sectionName,
 
 func processImportQueue(baseDir string, cache *ImportCache, workflowFilePath string, yamlContent string, state *importBFSState) error {
 	for len(state.queue) > 0 {
-		item := state.queue[0]
+		item := state.queue[0] //nolint:uncheckedsliceindex // len(state.queue) > 0 guards this FIFO pop.
 		state.queue = state.queue[1:]
 		if err := processQueueItem(item, baseDir, cache, workflowFilePath, yamlContent, state); err != nil {
 			return err
@@ -367,9 +367,6 @@ func extractImportFrontmatterForNested(content []byte, item importQueueItem) (*F
 		return result, err
 	}
 	inputsWithDefaults := applyImportSchemaDefaultsFromFrontmatter(result.Frontmatter, item.inputs)
-	if len(inputsWithDefaults) == 0 {
-		return result, nil
-	}
 	origContent := string(content)
 	substituted := substituteImportInputsInContent(origContent, inputsWithDefaults)
 	if substituted == origContent {

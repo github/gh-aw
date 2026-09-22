@@ -113,6 +113,25 @@ func TestBuildAuditDataIncludesAgenticAnalysis(t *testing.T) {
 	assert.Equal(t, "triage", auditData.TaskDomain.Name)
 }
 
+func TestGenerateAgenticAssessmentFindingsHaveCodes(t *testing.T) {
+	t.Parallel()
+
+	assessments := []AgenticAssessment{
+		{Kind: "resource_heavy_for_domain"},
+		{Kind: "overkill_for_agentic"},
+		{Kind: "poor_agentic_control"},
+		{Kind: "partially_reducible"},
+		{Kind: "model_downgrade_available"},
+		{Kind: "delegated_context_present"},
+	}
+
+	findings := generateAgenticAssessmentFindings(assessments)
+	require.Len(t, findings, len(assessments))
+	for _, finding := range findings {
+		assert.NotEmpty(t, finding.Code, "finding %q must have a stable code", finding.Title)
+	}
+}
+
 func TestComputeAgenticFraction(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -266,6 +285,36 @@ func TestPrettifyAssessmentKindNewKinds(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "Partially Reducible To Deterministic", prettifyAssessmentKind("partially_reducible"))
 	assert.Equal(t, "Cheaper Model Available", prettifyAssessmentKind("model_downgrade_available"))
+}
+
+func TestGenerateAgenticAssessmentFindingsSetsStableCodes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		kind string
+		code AuditFindingCode
+	}{
+		{kind: "resource_heavy_for_domain", code: AuditFindingAgenticResourceHeavy},
+		{kind: "overkill_for_agentic", code: AuditFindingAgenticOverkill},
+		{kind: "poor_agentic_control", code: AuditFindingAgenticPoorControl},
+		{kind: "partially_reducible", code: AuditFindingAgenticPartiallyReducible},
+		{kind: "model_downgrade_available", code: AuditFindingAgenticModelDowngrade},
+		{kind: "delegated_context_present", code: AuditFindingAgenticDelegatedContext},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			t.Parallel()
+
+			findings := generateAgenticAssessmentFindings([]AgenticAssessment{{
+				Kind:     tt.kind,
+				Severity: "medium",
+				Summary:  "summary",
+			}})
+
+			require.Len(t, findings, 1)
+			assert.Equal(t, tt.code, findings[0].Code)
+		})
+	}
 }
 
 func TestBuildToolUsageInfoAggregatesAndSorts(t *testing.T) {

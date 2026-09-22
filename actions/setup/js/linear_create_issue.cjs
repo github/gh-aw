@@ -31,15 +31,61 @@ const LINEAR_RESOLVE_PROJECT = `query ResolveLinearProject($slugId: String!) {
   }
 }`;
 
+const LINEAR_RESOLVE_TEAM = `query ResolveLinearTeam($after: String) {
+  teams(first: 50, after: $after) {
+    nodes {
+      id
+      key
+      name
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}`;
+
+async function resolveLinearTeamId(teamIdentifier) {
+  const normalizedIdentifier = teamIdentifier.trim().toLowerCase();
+  let after = null;
+  let nameMatch;
+
+  do {
+    const data = await linearGraphQL(LINEAR_RESOLVE_TEAM, { after });
+    const teams = data?.teams;
+    for (const team of teams?.nodes || []) {
+      if (typeof team?.id !== "string" || !LINEAR_UUID_PATTERN.test(team.id)) {
+        continue;
+      }
+      if (typeof team.key === "string" && team.key.toLowerCase() === normalizedIdentifier) {
+        return team.id;
+      }
+      if (!nameMatch && typeof team.name === "string" && team.name.toLowerCase() === normalizedIdentifier) {
+        nameMatch = team.id;
+      }
+    }
+
+    if (teams?.pageInfo?.hasNextPage !== true) {
+      return nameMatch;
+    }
+    if (typeof teams.pageInfo.endCursor !== "string" || !teams.pageInfo.endCursor) {
+      throw new Error(`${ERR_API}: Linear teams query returned invalid pagination data`);
+    }
+    after = teams.pageInfo.endCursor;
+  } while (true);
+}
+
 async function main(config = {}) {
   const teamId = config.team_id !== undefined ? config.team_id : process.env.LINEAR_TEAM_ID;
-  if (typeof teamId !== "string" || !LINEAR_UUID_PATTERN.test(teamId)) {
-    throw new Error(`${ERR_CONFIG}: linear_create_issue requires a valid team ID from safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID`);
+  if (typeof teamId !== "string" || !teamId.trim()) {
+    throw new Error(`${ERR_CONFIG}: linear_create_issue requires a team ID or identifier from safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID`);
   }
   const projectId = config.project_id !== undefined ? config.project_id : process.env.LINEAR_PROJECT_ID || undefined;
   if (projectId !== undefined && (typeof projectId !== "string" || !LINEAR_PROJECT_ID_PATTERN.test(projectId))) {
     throw new Error(`${ERR_CONFIG}: linear_create_issue requires a valid project ID from safe-outputs.linear-create-issue.project-id or LINEAR_PROJECT_ID`);
   }
+
+  let teamResolution;
 
   return async function handleLinearCreateIssue(item) {
     if (typeof item?.title !== "string" || !item.title.trim()) {
@@ -63,7 +109,18 @@ async function main(config = {}) {
       return { success: true, staged: true, title };
     }
 
-    const input = { teamId, title, description };
+    if (!teamResolution) {
+      teamResolution = (LINEAR_UUID_PATTERN.test(teamId) ? Promise.resolve(teamId) : resolveLinearTeamId(teamId)).catch(error => {
+        teamResolution = undefined;
+        throw error;
+      });
+    }
+    const resolvedTeamId = await teamResolution;
+    if (!resolvedTeamId) {
+      throw new Error(`${ERR_CONFIG}: linear_create_issue could not resolve the configured team identifier`);
+    }
+
+    const input = { teamId: resolvedTeamId, title, description };
     if (projectId) {
       if (LINEAR_UUID_PATTERN.test(projectId)) {
         input.projectId = projectId;
@@ -90,4 +147,4 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { LINEAR_CREATE_ISSUE, LINEAR_RESOLVE_PROJECT, main };
+module.exports = { LINEAR_CREATE_ISSUE, LINEAR_RESOLVE_PROJECT, LINEAR_RESOLVE_TEAM, main };

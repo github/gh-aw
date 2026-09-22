@@ -1127,7 +1127,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       if (result && result.temporaryId && result.temporaryIdEntry) {
         const normalizedTempId = normalizeTemporaryId(result.temporaryId);
         temporaryIdMap.set(normalizedTempId, result.temporaryIdEntry);
-        core.info(`Registered Azure DevOps temporary ID: ${result.temporaryId}`);
+        core.info(`Registered provider temporary ID: ${result.temporaryId}`);
       }
 
       // If this was a successful upload_artifact, register the artifact URL so that

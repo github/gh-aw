@@ -185,10 +185,11 @@ var ValidationConfig = map[string]TypeValidationConfig{
 	"jira_create_issue": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{
-			"project_key": {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"issue_type":  {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"summary":     {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"description": {Type: "string", MinLength: 1, MaxLength: 32767, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+			"project_key":  {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+			"issue_type":   {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+			"summary":      {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+			"description":  {Type: "string", MinLength: 1, MaxLength: 32767, Pattern: ".*\\S.*", PatternError: "must not be empty"},
+			"temporary_id": {Required: true, Type: "string", Pattern: "^#aw_[A-Za-z0-9_]{3,12}$", TemporaryID: true},
 		},
 	},
 	"jira_update_issue": {

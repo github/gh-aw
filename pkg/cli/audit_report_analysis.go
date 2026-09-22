@@ -29,6 +29,7 @@ func filterActionableDomains(domains []string) []string {
 func generateFindings(processedRun ProcessedRun, metrics MetricsData, errors []ValidationIssue) []AuditFinding {
 	auditReportLog.Printf("Generating findings: errors=%d, conclusion=%s", len(errors), processedRun.Run.Conclusion)
 	findings := appendFailureAndTimeoutFindings(nil, processedRun, metrics, errors)
+	findings = append(findings, generateThreatDetectionFindings(processedRun)...)
 	findings = append(findings, generatePerformanceFindings(metrics)...)
 	findings = append(findings, generateErrorVolumeFindings(errors)...)
 	findings = append(findings, generateToolingFindings(processedRun)...)
@@ -64,6 +65,7 @@ func appendFailureAndTimeoutFindings(findings []AuditFinding, processedRun Proce
 	run := processedRun.Run
 	if run.Conclusion == "failure" {
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingWorkflowFailed,
 			Category:    "error",
 			Severity:    "critical",
 			Title:       "Workflow Failed",
@@ -73,6 +75,7 @@ func appendFailureAndTimeoutFindings(findings []AuditFinding, processedRun Proce
 	}
 	if run.Conclusion == "timed_out" {
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingWorkflowTimeout,
 			Category:    "performance",
 			Severity:    "high",
 			Title:       "Workflow Timeout",
@@ -109,13 +112,18 @@ func buildFailureFindingDescription(run WorkflowRun, jobDetails []JobInfoWithDur
 	}
 
 	const maxErrMsgLen = 200
-	return desc + ": " + stringutil.Truncate(errors[0].Message, maxErrMsgLen)
+	// Range avoids direct indexing while preserving the first error.
+	for _, issue := range errors {
+		return desc + ": " + stringutil.Truncate(issue.Message, maxErrMsgLen)
+	}
+	return desc
 }
 
 func generatePerformanceFindings(metrics MetricsData) []AuditFinding {
 	var findings []AuditFinding
 	if metrics.TokenUsage > 50000 {
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingHighTokenUsage,
 			Category:    "performance",
 			Severity:    "medium",
 			Title:       "High Token Usage",
@@ -125,6 +133,7 @@ func generatePerformanceFindings(metrics MetricsData) []AuditFinding {
 	}
 	if metrics.Turns > 10 {
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingManyIterations,
 			Category:    "performance",
 			Severity:    "medium",
 			Title:       "Many Iterations",
@@ -140,6 +149,7 @@ func generateErrorVolumeFindings(errors []ValidationIssue) []AuditFinding {
 		return nil
 	}
 	return []AuditFinding{{
+		Code:        AuditFindingMultipleErrors,
 		Category:    "error",
 		Severity:    "high",
 		Title:       "Multiple Errors",
@@ -155,6 +165,7 @@ func generateToolingFindings(processedRun ProcessedRun) []AuditFinding {
 			return failure.ServerName
 		})
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingMCPServerFailures,
 			Category:    "tooling",
 			Severity:    "high",
 			Title:       "MCP Server Failures",
@@ -164,6 +175,7 @@ func generateToolingFindings(processedRun ProcessedRun) []AuditFinding {
 	}
 	if len(processedRun.MissingTools) > 0 {
 		findings = append(findings, AuditFinding{
+			Code:        AuditFindingToolsNotAvailable,
 			Category:    "tooling",
 			Severity:    "medium",
 			Title:       "Tools Not Available",
@@ -191,6 +203,7 @@ func generateFirewallFindings(processedRun ProcessedRun) []AuditFinding {
 	}
 	blockedDomains := filterActionableDomains(processedRun.FirewallAnalysis.GetBlockedDomains())
 	return []AuditFinding{{
+		Code:        AuditFindingBlockedNetworkRequests,
 		Category:    "network",
 		Severity:    "medium",
 		Title:       "Blocked Network Requests",
@@ -202,7 +215,10 @@ func generateFirewallFindings(processedRun ProcessedRun) []AuditFinding {
 func buildBlockedNetworkFindingDescription(blockedRequests int, blockedDomains []string) string {
 	switch {
 	case len(blockedDomains) == 1:
-		return "Agent attempted to access blocked domain: " + blockedDomains[0]
+		// Range avoids direct indexing while preserving the only domain.
+		for _, domain := range blockedDomains {
+			return "Agent attempted to access blocked domain: " + domain
+		}
 	case len(blockedDomains) > 1 && len(blockedDomains) <= 3:
 		return "Agent attempted to access blocked domains: " + strings.Join(blockedDomains, ", ")
 	case len(blockedDomains) > 3:
@@ -214,6 +230,7 @@ func buildBlockedNetworkFindingDescription(blockedRequests int, blockedDomains [
 	default:
 		return fmt.Sprintf("%d network request(s) were blocked by firewall", blockedRequests)
 	}
+	return fmt.Sprintf("%d network request(s) were blocked by firewall", blockedRequests)
 }
 
 func generateSuccessFindings(run WorkflowRun, metrics MetricsData, errors []ValidationIssue) []AuditFinding {
@@ -221,6 +238,7 @@ func generateSuccessFindings(run WorkflowRun, metrics MetricsData, errors []Vali
 		return nil
 	}
 	return []AuditFinding{{
+		Code:        AuditFindingWorkflowSucceeded,
 		Category:    "success",
 		Severity:    "info",
 		Title:       "Workflow Completed Successfully",
@@ -282,11 +300,17 @@ func appendIterationRecommendations(recommendations []Recommendation, hasManyTur
 
 func appendToolingRecommendations(recommendations []Recommendation, processedRun ProcessedRun) []Recommendation {
 	if len(processedRun.MissingTools) > 0 {
+		var firstMissingTool string
+		// Range avoids direct indexing while preserving the first missing tool.
+		for _, missingTool := range processedRun.MissingTools {
+			firstMissingTool = missingTool.Tool
+			break
+		}
 		recommendations = append(recommendations, Recommendation{
 			Priority: "medium",
 			Action:   "Add missing tools to workflow configuration",
 			Reason:   "Missing tools limit agent capabilities and may cause failures",
-			Example:  "Add tools configuration for: " + processedRun.MissingTools[0].Tool,
+			Example:  "Add tools configuration for: " + firstMissingTool,
 		})
 	}
 	if len(processedRun.MCPFailures) > 0 {
@@ -347,10 +371,10 @@ func generatePerformanceMetrics(processedRun ProcessedRun, metrics MetricsData, 
 
 	// Find most used tool
 	if len(toolUsage) > 0 {
-		mostUsed := toolUsage[0]
-		for i := 1; i < len(toolUsage); i++ {
-			if toolUsage[i].CallCount > mostUsed.CallCount {
-				mostUsed = toolUsage[i]
+		var mostUsed ToolUsageInfo
+		for _, tool := range toolUsage {
+			if tool.CallCount > mostUsed.CallCount {
+				mostUsed = tool
 			}
 		}
 		pm.MostUsedTool = fmt.Sprintf("%s (%d calls)", mostUsed.Name, mostUsed.CallCount)

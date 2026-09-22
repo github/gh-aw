@@ -127,8 +127,23 @@ func TestIsPathScannedBySecretRedaction_ScannableFiles(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Windows-style JSONL file in /tmp/gh-aw/",
+			path:     `\tmp\gh-aw\sandbox\firewall\logs\api-proxy-logs\token-usage.jsonl`,
+			expected: true,
+		},
+		{
+			name:     "Mixed-separator JSONL file in /tmp/gh-aw/",
+			path:     `/tmp\gh-aw/sandbox\firewall\audit/api-proxy-logs\token-usage.jsonl`,
+			expected: true,
+		},
+		{
 			name:     "Directory in /tmp/gh-aw/",
 			path:     "/tmp/gh-aw/mcp-logs/",
+			expected: true,
+		},
+		{
+			name:     "Windows-style directory in /tmp/gh-aw/",
+			path:     `\tmp\gh-aw\mcp-logs\`,
 			expected: true,
 		},
 		{
@@ -175,6 +190,36 @@ func TestIsPathScannedBySecretRedaction_UnscannableFiles(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "Windows-style file outside /tmp/gh-aw/",
+			path:     `\tmp\outside\file.log`,
+			expected: false,
+		},
+		{
+			name:     "Mixed-separator file outside /tmp/gh-aw/",
+			path:     `/tmp\outside/file.log`,
+			expected: false,
+		},
+		{
+			name:     "Lookalike Windows-style root",
+			path:     `\tmp\gh-aw-other\file.log`,
+			expected: false,
+		},
+		{
+			name:     "Windows-style path escaping approved root",
+			path:     `\tmp\gh-aw\..\outside\file.log`,
+			expected: false,
+		},
+		{
+			name:     "UNC-style Windows path under approved root",
+			path:     `\\tmp\gh-aw\outside.log`,
+			expected: false,
+		},
+		{
+			name:     "POSIX double-slash path under approved root",
+			path:     `//tmp/gh-aw/outside.log`,
+			expected: false,
+		},
+		{
 			name:     "File in workspace root",
 			path:     "output.json",
 			expected: false,
@@ -208,6 +253,49 @@ func TestIsPathScannedBySecretRedaction_UnscannableFiles(t *testing.T) {
 			result := isPathScannedBySecretRedaction(tt.path)
 			if result != tt.expected {
 				t.Errorf("isPathScannedBySecretRedaction(%q) = %v, expected %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsKnownUnscannedButAllowedForUpload_WindowsStyle(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "Windows-style bundle under approved root",
+			path:     `\tmp\gh-aw\data.bundle`,
+			expected: true,
+		},
+		{
+			name:     "Windows-style operational-value evaluator under approved root",
+			path:     `\tmp\gh-aw\agent\graders\operational_value_evaluator.sh`,
+			expected: true,
+		},
+		{
+			name:     "UNC-style bundle under approved root",
+			path:     `\\tmp\gh-aw\data.bundle`,
+			expected: false,
+		},
+		{
+			name:     "Windows-style bundle outside approved root",
+			path:     `\tmp\outside\data.bundle`,
+			expected: false,
+		},
+		{
+			name:     "Windows-style non-allow-listed file under approved root",
+			path:     `\tmp\gh-aw\data.bin`,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isKnownUnscannedButAllowedForUpload(tt.path)
+			if result != tt.expected {
+				t.Errorf("isKnownUnscannedButAllowedForUpload(%q) = %v, expected %v", tt.path, result, tt.expected)
 			}
 		})
 	}

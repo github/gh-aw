@@ -99,84 +99,95 @@ func mergeMCPToolUsageInfo(toolUsage []ToolUsageInfo, mcpToolUsage *MCPToolUsage
 	if mcpToolUsage == nil {
 		return toolUsage
 	}
+	toolStats := cloneToolUsageStats(toolUsage)
+	if len(mcpToolUsage.Summary) > 0 {
+		mergeMCPToolUsageSummaries(toolStats, mcpToolUsage.Summary)
+	} else {
+		mergeMCPToolUsageCalls(toolStats, mcpToolUsage.ToolCalls)
+	}
+	return sortedToolUsageStats(toolStats)
+}
 
+func cloneToolUsageStats(toolUsage []ToolUsageInfo) map[string]*ToolUsageInfo {
 	toolStats := make(map[string]*ToolUsageInfo)
 	for _, info := range toolUsage {
 		cloned := info
 		toolStats[info.Name] = &cloned
 	}
+	return toolStats
+}
 
-	addOrUpdateToolUsage := func(name string, callCount, maxInputSize, maxOutputSize int, maxDuration string) {
-		normalizedName := strings.TrimSpace(name)
-		if normalizedName == "" {
-			return
-		}
-		displayKey := workflow.PrettifyToolName(normalizedName)
-		if existing, exists := toolStats[displayKey]; exists {
-			existing.CallCount += callCount
-			if maxInputSize > existing.MaxInputSize {
-				existing.MaxInputSize = maxInputSize
-			}
-			if maxOutputSize > existing.MaxOutputSize {
-				existing.MaxOutputSize = maxOutputSize
-			}
-			if maxDuration != "" {
-				maxDurationValue := parseDurationString(maxDuration)
-				if existing.MaxDuration == "" {
-					existing.MaxDuration = maxDuration
-				} else {
-					existingMaxDurationValue := parseDurationString(existing.MaxDuration)
-					if maxDurationValue > existingMaxDurationValue {
-						existing.MaxDuration = maxDuration
-					}
-				}
-			}
-			return
-		}
+func addOrUpdateToolUsage(toolStats map[string]*ToolUsageInfo, name string, callCount, maxInputSize, maxOutputSize int, maxDuration string) {
+	normalizedName := strings.TrimSpace(name)
+	if normalizedName == "" {
+		return
+	}
+	displayKey := workflow.PrettifyToolName(normalizedName)
+	if existing, exists := toolStats[displayKey]; exists {
+		updateExistingToolUsage(existing, callCount, maxInputSize, maxOutputSize, maxDuration)
+		return
+	}
+	toolStats[displayKey] = &ToolUsageInfo{
+		Name:          displayKey,
+		CallCount:     callCount,
+		MaxInputSize:  maxInputSize,
+		MaxOutputSize: maxOutputSize,
+		MaxDuration:   maxDuration,
+	}
+}
 
-		toolStats[displayKey] = &ToolUsageInfo{
-			Name:          displayKey,
-			CallCount:     callCount,
-			MaxInputSize:  maxInputSize,
-			MaxOutputSize: maxOutputSize,
-			MaxDuration:   maxDuration,
+func updateExistingToolUsage(existing *ToolUsageInfo, callCount, maxInputSize, maxOutputSize int, maxDuration string) {
+	existing.CallCount += callCount
+	if maxInputSize > existing.MaxInputSize {
+		existing.MaxInputSize = maxInputSize
+	}
+	if maxOutputSize > existing.MaxOutputSize {
+		existing.MaxOutputSize = maxOutputSize
+	}
+	if maxDuration == "" {
+		return
+	}
+	maxDurationValue := parseDurationString(maxDuration)
+	if existing.MaxDuration == "" || maxDurationValue > parseDurationString(existing.MaxDuration) {
+		existing.MaxDuration = maxDuration
+	}
+}
+
+func mergeMCPToolUsageSummaries(toolStats map[string]*ToolUsageInfo, summaries []MCPToolSummary) {
+	for _, summary := range summaries {
+		toolSummary := summary
+		toolSummary.syncFieldsFromBase()
+		switch {
+		case toolSummary.ServerName != "" && toolSummary.ToolName != "":
+			addOrUpdateToolUsage(toolStats, toolSummary.ServerName+"."+toolSummary.ToolName, toolSummary.CallCount, toolSummary.MaxInputSize, toolSummary.MaxOutputSize, toolSummary.MaxDuration)
+		case toolSummary.ToolName != "":
+			addOrUpdateToolUsage(toolStats, toolSummary.ToolName, toolSummary.CallCount, toolSummary.MaxInputSize, toolSummary.MaxOutputSize, toolSummary.MaxDuration)
 		}
 	}
+}
 
-	if len(mcpToolUsage.Summary) > 0 {
-		for _, summary := range mcpToolUsage.Summary {
-			toolSummary := summary
-			toolSummary.syncFieldsFromBase()
-			switch {
-			case toolSummary.ServerName != "" && toolSummary.ToolName != "":
-				addOrUpdateToolUsage(toolSummary.ServerName+"."+toolSummary.ToolName, toolSummary.CallCount, toolSummary.MaxInputSize, toolSummary.MaxOutputSize, toolSummary.MaxDuration)
-			case toolSummary.ToolName != "":
-				addOrUpdateToolUsage(toolSummary.ToolName, toolSummary.CallCount, toolSummary.MaxInputSize, toolSummary.MaxOutputSize, toolSummary.MaxDuration)
-			}
-		}
-	} else {
-		for _, call := range mcpToolUsage.ToolCalls {
-			switch {
-			case call.ServerName != "" && call.ToolName != "":
-				addOrUpdateToolUsage(call.ServerName+"."+call.ToolName, 1, call.InputSize, call.OutputSize, call.Duration)
-			case call.ToolName != "":
-				addOrUpdateToolUsage(call.ToolName, 1, call.InputSize, call.OutputSize, call.Duration)
-			}
+func mergeMCPToolUsageCalls(toolStats map[string]*ToolUsageInfo, calls []MCPToolCall) {
+	for _, call := range calls {
+		switch {
+		case call.ServerName != "" && call.ToolName != "":
+			addOrUpdateToolUsage(toolStats, call.ServerName+"."+call.ToolName, 1, call.InputSize, call.OutputSize, call.Duration)
+		case call.ToolName != "":
+			addOrUpdateToolUsage(toolStats, call.ToolName, 1, call.InputSize, call.OutputSize, call.Duration)
 		}
 	}
+}
 
+func sortedToolUsageStats(toolStats map[string]*ToolUsageInfo) []ToolUsageInfo {
 	mergedToolUsage := make([]ToolUsageInfo, 0, len(toolStats))
 	for _, info := range toolStats {
 		mergedToolUsage = append(mergedToolUsage, *info)
 	}
-
 	slices.SortFunc(mergedToolUsage, func(a, b ToolUsageInfo) int {
 		if a.CallCount != b.CallCount {
 			return b.CallCount - a.CallCount
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-
 	return mergedToolUsage
 }
 
@@ -319,6 +330,18 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 	frictionEvents := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
 	writeCount := len(createdItems) + processedRun.Run.SafeItemsCount
 
+	assessments = appendResourceHeavyAssessment(assessments, processedRun, metrics, domain, fingerprint, toolTypes, writeCount)
+	assessments = appendOverkillAssessment(assessments, metrics, domain, fingerprint, toolTypes)
+	assessments = appendPoorControlAssessment(assessments, domain, fingerprint, frictionEvents, writeCount)
+	assessments = appendPartiallyReducibleAssessment(assessments, metrics, fingerprint)
+	assessments = appendModelDowngradeAssessment(assessments, domain, fingerprint)
+	assessments = appendDelegatedContextAssessment(assessments, awContext)
+
+	auditAgenticLog.Printf("Built %d agentic assessments", len(assessments))
+	return assessments
+}
+
+func appendResourceHeavyAssessment(assessments []AgenticAssessment, processedRun ProcessedRun, metrics MetricsData, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, toolTypes, writeCount int) []AgenticAssessment {
 	if fingerprint.ResourceProfile == "heavy" {
 		severity := "medium"
 		if metrics.Turns >= 14 || toolTypes >= 7 || processedRun.Run.Duration >= 20*time.Minute {
@@ -332,7 +355,10 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Compare this run to similar successful runs and trim unnecessary turns, tools, or write actions.",
 		})
 	}
+	return assessments
+}
 
+func appendOverkillAssessment(assessments []AgenticAssessment, metrics MetricsData, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, toolTypes int) []AgenticAssessment {
 	if (domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ResourceProfile == "lean" && fingerprint.ExecutionStyle == "directed" && fingerprint.ToolBreadth == "narrow" {
 		assessments = append(assessments, AgenticAssessment{
 			Kind:           "overkill_for_agentic",
@@ -342,7 +368,10 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Consider whether a scripted rule or deterministic workflow step could replace this agentic path.",
 		})
 	}
+	return assessments
+}
 
+func appendPoorControlAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint, frictionEvents, writeCount int) []AgenticAssessment {
 	if frictionEvents >= 3 || (frictionEvents > 0 && writeCount >= 3) || ((domain.Name == "triage" || domain.Name == "repo_maintenance" || domain.Name == "issue_response") && fingerprint.ExecutionStyle == "exploratory") {
 		severity := "medium"
 		if frictionEvents >= 4 || (frictionEvents > 0 && fingerprint.ActuationStyle == "write_heavy") {
@@ -356,7 +385,10 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Tighten instructions, reduce unnecessary tools, or delay write actions until the workflow has stronger evidence.",
 		})
 	}
+	return assessments
+}
 
+func appendPartiallyReducibleAssessment(assessments []AgenticAssessment, metrics MetricsData, fingerprint *BehaviorFingerprint) []AgenticAssessment {
 	// Partially reducible: the workflow has a low agentic fraction, meaning
 	// many turns are data-gathering that could be moved to deterministic steps:
 	// or post-steps: in the frontmatter. Only flag when there's substantive work
@@ -376,7 +408,10 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Move data-fetching work to frontmatter steps: (pre-agent) writing to /tmp/gh-aw/agent/ or post-steps: (post-agent) to reduce inference cost. See the DeterministicOps guide.",
 		})
 	}
+	return assessments
+}
 
+func appendModelDowngradeAssessment(assessments []AgenticAssessment, domain *TaskDomainInfo, fingerprint *BehaviorFingerprint) []AgenticAssessment {
 	// Model downgrade suggestion: the run uses a heavy resource profile but
 	// the task domain is simple enough that a smaller model would likely suffice.
 	if fingerprint.ResourceProfile != "lean" &&
@@ -390,7 +425,10 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Try engine.model: gpt-4.1-mini or claude-haiku-4-5 in the workflow frontmatter.",
 		})
 	}
+	return assessments
+}
 
+func appendDelegatedContextAssessment(assessments []AgenticAssessment, awContext *AwContext) []AgenticAssessment {
 	if awContext != nil {
 		assessments = append(assessments, AgenticAssessment{
 			Kind:           "delegated_context_present",
@@ -400,8 +438,6 @@ func buildAgenticAssessments(processedRun ProcessedRun, metrics MetricsData, too
 			Recommendation: "Use this context when comparing downstream runs so follow-up workflows are evaluated as part of one task chain.",
 		})
 	}
-
-	auditAgenticLog.Printf("Built %d agentic assessments", len(assessments))
 	return assessments
 }
 
@@ -410,27 +446,35 @@ func generateAgenticAssessmentFindings(assessments []AgenticAssessment) []AuditF
 	for _, assessment := range assessments {
 		category := "agentic"
 		impact := "Review recommended"
+		var code AuditFindingCode
 		switch assessment.Kind {
 		case "resource_heavy_for_domain":
+			code = AuditFindingAgenticResourceHeavy
 			category = "performance"
 			impact = "Higher cost and latency than a comparable well-behaved run"
 		case "overkill_for_agentic":
+			code = AuditFindingAgenticOverkill
 			category = "optimization"
 			impact = "A deterministic implementation may be cheaper and easier to govern"
 		case "poor_agentic_control":
+			code = AuditFindingAgenticPoorControl
 			category = "agentic"
 			impact = "Broad or weakly controlled behavior can reduce trust even when the run succeeds"
 		case "partially_reducible":
+			code = AuditFindingAgenticPartiallyReducible
 			category = "optimization"
 			impact = "Moving data-gathering turns to deterministic steps reduces inference cost"
 		case "model_downgrade_available":
+			code = AuditFindingAgenticModelDowngrade
 			category = "optimization"
 			impact = "A smaller model could reduce per-run cost significantly for this task domain"
 		case "delegated_context_present":
+			code = AuditFindingAgenticDelegatedContext
 			category = "coordination"
 			impact = "Context continuity improves downstream debugging and auditability"
 		}
 		findings = append(findings, AuditFinding{
+			Code:        code,
 			Category:    category,
 			Severity:    scanfindings.ParseSeverity(assessment.Severity),
 			Title:       prettifyAssessmentKind(assessment.Kind),

@@ -472,7 +472,7 @@ A set of safe outputs that call Jira Cloud REST API v3 from the privileged safe-
 Linear Safe Outputs are experimental. Compiling a workflow that enables any Linear safe output emits `Using experimental feature: Linear safe outputs`.
 :::
 
-A set of safe outputs that call Linear's public GraphQL API from the isolated safe-output job, using a personal API key configured via `safe-outputs.linear-token` (a secret expression not available to the agent). `linear-create-issue` requires a `team-id` (the Linear team model UUID); comment and update targets accept either a Linear issue model UUID or a shorthand identifier such as `ENG-123`, and are fixed trusted configuration. `linear-update-issue` replaces only the enabled `title` and `body` fields. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#linear-safe-outputs).
+A set of safe outputs that call Linear's public GraphQL API from the isolated safe-output job, using a personal API key configured via `safe-outputs.linear-token` (a secret expression not available to the agent). `linear-create-issue` requires a `team-id`, which accepts a Linear team model UUID, team key such as `ENG`, or team name; comment and update targets accept either a Linear issue model UUID or a shorthand identifier such as `ENG-123`, and are fixed trusted configuration. `linear-update-issue` replaces only the enabled `title` and `body` fields. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#linear-safe-outputs).
 
 ### Azure DevOps Work Items (`ado-create-work-item`, `ado-update-work-item`, `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items`, `ado-upload-workitem-attachment`)
 

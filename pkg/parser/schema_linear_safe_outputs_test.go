@@ -44,6 +44,19 @@ func TestMainWorkflowSchemaLinearSafeOutputs(t *testing.T) {
 		t.Fatalf("expected expression-valued Linear team ID to be valid: %v", err)
 	}
 
+	validTeamKey := map[string]any{
+		"on":     "push",
+		"engine": "copilot",
+		"safe-outputs": map[string]any{
+			"linear-create-issue": map[string]any{
+				"team-id": "ENG",
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(validTeamKey, "/tmp/linear-team-key.md"); err != nil {
+		t.Fatalf("expected friendly Linear team identifier to be valid: %v", err)
+	}
+
 	globalFallback := map[string]any{
 		"on":     "push",
 		"engine": "copilot",
@@ -59,14 +72,6 @@ func TestMainWorkflowSchemaLinearSafeOutputs(t *testing.T) {
 		name        string
 		safeOutputs map[string]any
 	}{
-		{
-			name: "malformed team ID",
-			safeOutputs: map[string]any{
-				"linear-create-issue": map[string]any{
-					"team-id": "not-a-team",
-				},
-			},
-		},
 		{
 			name: "malformed project ID",
 			safeOutputs: map[string]any{

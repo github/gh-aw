@@ -2944,7 +2944,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     return defaultHandler("update_issue")(args || {});
   };
 
-  const jiraCreateIssueHandler = defaultHandler("jira_create_issue");
+  const jiraCreateIssueHandler = args => {
+    const temporaryId = `#${generateTemporaryId()}`;
+    const entry = { ...(args || {}), type: "jira_create_issue", temporary_id: temporaryId };
+    appendSafeOutputCounted(entry);
+    const output = { result: "success", temporary_id: temporaryId };
+    return {
+      content: [{ type: "text", text: JSON.stringify(output) }],
+      structuredContent: output,
+    };
+  };
   const jiraAddCommentHandler = defaultHandler("jira_add_comment");
   const jiraAddLabelHandler = defaultHandler("jira_add_label");
   const jiraUpdateIssueHandler = args => {

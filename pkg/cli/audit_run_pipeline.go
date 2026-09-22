@@ -182,8 +182,36 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (bool
 		auditLog.Printf("Cache miss for run %d evals: evals not present locally, bypassing cache", cfg.runID)
 		return false, nil
 	}
+	if auditNeedsDetectionArtifact(cfg, summary) {
+		auditLog.Printf("Cache miss for run %d threat detection: detection artifact not present locally, bypassing cache", cfg.runID)
+		if err := invalidateCompleteArtifactDownloadMarker(cfg.outputDir); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
 	processedRun := processedRunFromSummary(summary, cfg.outputDir)
 	return true, renderAuditReport(ctx, processedRun, summary.Metrics, summary.MCPToolUsage, cfg.auditOptions())
+}
+
+func invalidateCompleteArtifactDownloadMarker(runOutputDir string) error {
+	markerPath := filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, string(ArtifactSetAll))
+	if err := os.Remove(markerPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to invalidate complete artifact download marker: %w", err)
+	}
+	return nil
+}
+
+func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
+	if !artifactMatchesFilter(constants.DetectionArtifactName.String(), cfg.artifactFilter) ||
+		hasThreatDetectionArtifact(cfg.outputDir) {
+		return false
+	}
+	for _, job := range summary.JobDetails {
+		if normalizeJobName(job.Name) == string(constants.DetectionJobName) {
+			return true
+		}
+	}
+	return false
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {

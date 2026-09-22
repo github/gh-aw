@@ -2784,14 +2784,14 @@ This section provides complete definitions for all remaining safe output types. 
 **Configuration**:
 
 - `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID or GitHub Actions expression, falling back to `LINEAR_TEAM_ID`
+- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID, key, name, or GitHub Actions expression, falling back to `LINEAR_TEAM_ID`
 - `linear-create-issue.project-id`: OPTIONAL trusted Linear project URL identifier or model UUID, falling back to `LINEAR_PROJECT_ID`
 - `linear-create-issue.max`: Operation limit (default: 1)
 - `linear-create-issue.staged`: Staged mode override
 
 **MCP Tool**: `linear_create_issue`
 
-The MCP input object MUST require `title` and `body`, MUST reject additional properties, and MUST limit them to 128 and 65,000 characters respectively. The body MUST contain at least 20 characters. The trusted team UUID, optional project identifier, and credential MUST NOT be MCP inputs.
+The MCP input object MUST require `title` and `body`, MUST reject additional properties, and MUST limit them to 128 and 65,000 characters respectively. The body MUST contain at least 20 characters. The trusted team identifier, optional project identifier, and credential MUST NOT be MCP inputs. Team UUIDs MUST be passed directly to `issueCreate`; other identifiers MUST be resolved case-insensitively against available team keys, then names, before issue creation.
 
 **Operational Semantics**:
 

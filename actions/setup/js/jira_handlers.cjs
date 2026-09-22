@@ -4,6 +4,7 @@ const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createJiraClient, textToADF } = require("./jira_client.cjs");
 const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
+const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 function requiredString(value, field, maxLength = 255) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -29,10 +30,10 @@ function jiraHandler(handlerType, handle) {
     setup: async (config, _maxCount, isStaged) => {
       core.debug(`${handlerType}: initializing handler (staged=${isStaged})`);
       const client = isStaged ? null : createJiraClient();
-      return async message => {
+      return async (message, resolvedTemporaryIds = {}) => {
         core.debug(`${handlerType}: processing request`);
         try {
-          const result = await handle(message || {}, client, isStaged, config);
+          const result = await handle(message || {}, client, isStaged, config, resolvedTemporaryIds);
           core.debug(`${handlerType}: request completed successfully`);
           return result;
         } catch (error) {
@@ -46,7 +47,31 @@ function jiraHandler(handlerType, handle) {
   });
 }
 
-const createIssue = jiraHandler("jira_create_issue", async (message, client, isStaged, config) => {
+function resolveJiraIssueKey(value, resolvedTemporaryIds, allowStaged) {
+  const issueKey = requiredString(value, "issue_key");
+  if (!isTemporaryId(issueKey)) {
+    return issueKey;
+  }
+  const normalized = normalizeTemporaryId(issueKey);
+  const resolved = resolvedTemporaryIds[normalized];
+  if (resolved?.provider === "jira" && resolved.resourceType === "issue" && typeof resolved.issueKey === "string") {
+    return resolved.issueKey;
+  }
+  if (allowStaged && resolved?.provider === "jira" && resolved.resourceType === "issue" && resolved.staged === true) {
+    return `#${normalized}`;
+  }
+  throw new Error(`temporary Jira issue ID '#${normalized}' has not been resolved by jira_create_issue in this run`);
+}
+
+const createIssue = jiraHandler("jira_create_issue", async (message, client, isStaged, config, resolvedTemporaryIds) => {
+  const temporaryId = requiredString(message.temporary_id, "temporary_id");
+  if (!isTemporaryId(temporaryId)) {
+    throw new Error("jira_create_issue requires a server-generated temporary_id");
+  }
+  const normalizedTemporaryId = normalizeTemporaryId(temporaryId);
+  if (resolvedTemporaryIds[normalizedTemporaryId]) {
+    throw new Error(`temporary_id '${temporaryId}' was already used in this run`);
+  }
   const projectKey = requiredString(message.project_key, "project_key");
   const issueType = requiredString(message.issue_type, "issue_type");
   const summary = requiredString(message.summary, "summary");
@@ -55,7 +80,15 @@ const createIssue = jiraHandler("jira_create_issue", async (message, client, isS
 
   if (isStaged) {
     logStagedPreviewInfo(`Jira create issue — Project: ${projectKey}; Type: ${issueType}; Summary: ${summary}${description ? `; Description: ${description}` : ""}`);
-    return { success: true, staged: true, project_key: projectKey, issue_type: issueType, summary };
+    return {
+      success: true,
+      staged: true,
+      project_key: projectKey,
+      issue_type: issueType,
+      summary,
+      temporaryId,
+      temporaryIdEntry: { provider: "jira", resourceType: "issue", staged: true },
+    };
   }
 
   const fields = {
@@ -71,14 +104,16 @@ const createIssue = jiraHandler("jira_create_issue", async (message, client, isS
   return {
     success: true,
     issue_key: result.key,
+    temporaryId,
+    temporaryIdEntry: { provider: "jira", resourceType: "issue", issueKey: result.key },
     ...(result.id ? { issue_id: String(result.id) } : {}),
     ...(result.self ? { url: String(result.self) } : {}),
     metadata: { issue_key: result.key, ...(result.id ? { issue_id: String(result.id) } : {}) },
   };
 });
 
-const updateIssue = jiraHandler("jira_update_issue", async (message, client, isStaged, config) => {
-  const issueKey = requiredString(message.issue_key, "issue_key");
+const updateIssue = jiraHandler("jira_update_issue", async (message, client, isStaged, config, resolvedTemporaryIds) => {
+  const issueKey = resolveJiraIssueKey(message.issue_key, resolvedTemporaryIds, isStaged);
   const summary = optionalString(message.summary, "summary", 255);
   const rawDescription = optionalString(message.description, "description");
   const description = rawDescription === undefined ? undefined : requiredString(appendConfiguredBodyFooter(rawDescription, config.body_footer, { maxLength: 32767 }), "description", 32767);
@@ -103,8 +138,8 @@ const updateIssue = jiraHandler("jira_update_issue", async (message, client, isS
   return { success: true, issue_key: issueKey, metadata: { issue_key: issueKey } };
 });
 
-const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged, config) => {
-  const issueKey = requiredString(message.issue_key, "issue_key");
+const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged, config, resolvedTemporaryIds) => {
+  const issueKey = resolveJiraIssueKey(message.issue_key, resolvedTemporaryIds, isStaged);
   const body = requiredString(appendConfiguredBodyFooter(requiredString(message.body, "body", 32767), config.body_footer, { maxLength: 32767 }), "body", 32767);
 
   if (isStaged) {
@@ -125,8 +160,8 @@ const addComment = jiraHandler("jira_add_comment", async (message, client, isSta
   };
 });
 
-const addLabel = jiraHandler("jira_add_label", async (message, client, isStaged) => {
-  const issueKey = requiredString(message.issue_key, "issue_key");
+const addLabel = jiraHandler("jira_add_label", async (message, client, isStaged, _config, resolvedTemporaryIds) => {
+  const issueKey = resolveJiraIssueKey(message.issue_key, resolvedTemporaryIds, isStaged);
   const label = requiredString(message.label, "label");
   if (!/^[A-Za-z0-9_.-]+$/.test(label)) {
     throw new Error("label must contain only letters, numbers, periods, hyphens, and underscores");

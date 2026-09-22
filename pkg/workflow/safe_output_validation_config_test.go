@@ -78,6 +78,7 @@ func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	if !ok {
 		t.Fatal("approve_workflow_run not found in ValidationConfig")
 	}
+
 	if config.DefaultMax != 1 {
 		t.Errorf("approve_workflow_run DefaultMax = %d, want 1", config.DefaultMax)
 	}
@@ -99,6 +100,15 @@ func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	}
 	if runID := parsedConfig.Fields["run_id"]; !runID.Required || !runID.PositiveInteger {
 		t.Errorf("approve_workflow_run generated run_id = %+v, want required positive integer", runID)
+	}
+}
+
+func TestJiraCreateIssueValidationPreservesTemporaryID(t *testing.T) {
+	config := ValidationConfig["jira_create_issue"]
+	temporaryID := config.Fields["temporary_id"]
+
+	if !temporaryID.Required || !temporaryID.TemporaryID || temporaryID.Pattern != "^#aw_[A-Za-z0-9_]{3,12}$" {
+		t.Errorf("jira_create_issue temporary_id = %+v, want required temporary ID", temporaryID)
 	}
 }
 

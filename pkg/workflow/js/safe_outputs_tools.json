@@ -1,7 +1,7 @@
 [
   {
     "name": "linear_create_issue",
-    "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team ID, and project ID are trusted workflow configuration and are not agent inputs.",
+    "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team UUID/key/name, and project ID are trusted workflow configuration and are not agent inputs.",
     "inputSchema": {
       "type": "object",
       "required": ["title", "body"],
@@ -196,7 +196,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "summary": {
           "type": "string",
@@ -228,7 +228,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "body": {
           "type": "string",
@@ -253,7 +253,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "label": {
           "type": "string",

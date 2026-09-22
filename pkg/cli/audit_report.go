@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,9 +26,11 @@ import (
 )
 
 var auditReportLog = logger.New("cli:audit_report")
+var ghaLogTimestampPrefixPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T`)
 
 // AuditData represents the complete structured audit data for a workflow run
 type AuditData struct {
+	SchemaVersion           int                      `json:"schema_version"`
 	CacheSource             auditCacheSource         `json:"cache_source,omitempty"`
 	Overview                OverviewData             `json:"overview"`
 	Comparison              *AuditComparisonData     `json:"comparison,omitempty"`
@@ -69,6 +72,7 @@ type AuditData struct {
 
 // AuditFinding represents a key insight discovered during audit
 type AuditFinding struct {
+	Code        AuditFindingCode           `json:"code"`             // Stable machine-readable identifier
 	Category    string                     `json:"category"`         // e.g., "error", "performance", "cost", "tooling"
 	Severity    scanfindings.SeverityLevel `json:"severity"`         // shared severity vocabulary
 	Title       string                     `json:"title"`            // Brief title
@@ -511,6 +515,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	}
 
 	return AuditData{
+		SchemaVersion:           auditSchemaVersion,
 		Overview:                inputs.overview,
 		TaskDomain:              inputs.taskDomain,
 		BehaviorFingerprint:     inputs.behaviorFingerprint,
@@ -1090,7 +1095,7 @@ func stripGHALogTimestamps(content string) string {
 		// GHA timestamp format: YYYY-MM-DDTHH:MM:SS[.sss...]Z<space>
 		// The 'T' separator is always at position 10. Search for the terminating 'Z' after 'T'
 		// in a generous window (positions 11-35) to handle any fractional seconds length.
-		if len(line) > 19 && line[4] == '-' && line[7] == '-' && line[10] == 'T' {
+		if len(line) > 19 && ghaLogTimestampPrefixPattern.MatchString(line) {
 			// Find the Z that ends the timestamp within a reasonable range
 			searchBound := min(35, len(line))
 			if zIdx := strings.IndexByte(line[11:searchBound], 'Z'); zIdx >= 0 {
@@ -1098,9 +1103,7 @@ func stripGHALogTimestamps(content string) string {
 				if zPos+1 <= len(line) {
 					line = line[zPos+1:]
 					// Skip leading space after the timestamp
-					if line != "" && line[0] == ' ' {
-						line = line[1:]
-					}
+					line = strings.TrimPrefix(line, " ")
 				}
 			}
 		}

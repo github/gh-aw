@@ -4040,7 +4040,21 @@ describe("safe_outputs_handlers", () => {
     });
   });
 
-  describe("jiraUpdateIssueHandler", () => {
+  describe("Jira handlers", () => {
+    it("assigns a temporary ID when recording issue creation", () => {
+      const result = handlers.jiraCreateIssueHandler({ project_key: "ENG", issue_type: "Task", summary: "Smoke test" });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response).toMatchObject({ result: "success", temporary_id: expect.stringMatching(/^#aw_[A-Za-z0-9]{8}$/) });
+      expect(result.structuredContent).toEqual(response);
+      expect(mockAppendSafeOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "jira_create_issue",
+          temporary_id: response.temporary_id,
+        })
+      );
+    });
+
     it.each([{}, { summary: "" }, { description: "   " }])("rejects updates without a non-empty field", args => {
       const result = handlers.jiraUpdateIssueHandler(args);
       expect(result.isError).toBe(true);

@@ -3,7 +3,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const { LINEAR_GRAPHQL_ENDPOINT, linearGraphQL } = require("./linear_graphql.cjs");
-const { LINEAR_CREATE_ISSUE, LINEAR_RESOLVE_PROJECT, main: createIssue } = require("./linear_create_issue.cjs");
+const { LINEAR_CREATE_ISSUE, LINEAR_RESOLVE_PROJECT, LINEAR_RESOLVE_TEAM, main: createIssue } = require("./linear_create_issue.cjs");
 const { LINEAR_COMMENT_CREATE, main: addComment } = require("./linear_add_comment.cjs");
 const { LINEAR_UPDATE_ISSUE, main: updateIssue } = require("./linear_update_issue.cjs");
 
@@ -57,6 +57,103 @@ describe("Linear safe outputs", () => {
       title: "Safe title",
       description: "Detailed hello to `@user`",
     });
+  });
+
+  it("passes UUID team IDs directly to issueCreate without a team lookup", async () => {
+    fetch.mockResolvedValueOnce(response({ data: { issueCreate: { success: true, issue: { id: "id", identifier: "ENG-1", title: "Title" } } } }));
+    const handler = await createIssue({ team_id: "9cfb482a-81e3-4154-b5b9-2c805e70a02d" });
+
+    await handler({ title: "Title", body: "Body with enough detail" });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(request.query).toBe(LINEAR_CREATE_ISSUE);
+    expect(request.variables.input.teamId).toBe("9cfb482a-81e3-4154-b5b9-2c805e70a02d");
+  });
+
+  it("resolves friendly team identifiers by key before name", async () => {
+    fetch
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            teams: {
+              nodes: [
+                { id: "11111111-1111-1111-1111-111111111111", key: "OTHER", name: "ENG" },
+                { id: "22222222-2222-2222-2222-222222222222", key: "ENG", name: "Engineering" },
+              ],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(response({ data: { issueCreate: { success: true, issue: { id: "id", identifier: "ENG-1", title: "Title" } } } }));
+    const handler = await createIssue({ team_id: "eng" });
+
+    await handler({ title: "Title", body: "Body with enough detail" });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ query: LINEAR_RESOLVE_TEAM, variables: { after: null } });
+    expect(JSON.parse(fetch.mock.calls[1][1].body).variables.input.teamId).toBe("22222222-2222-2222-2222-222222222222");
+  });
+
+  it("resolves friendly team identifiers by name across paginated teams", async () => {
+    fetch
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            teams: {
+              nodes: [{ id: "11111111-1111-1111-1111-111111111111", key: "SEC", name: "Security" }],
+              pageInfo: { hasNextPage: true, endCursor: "next-page" },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            teams: {
+              nodes: [{ id: "22222222-2222-2222-2222-222222222222", key: "PLAT", name: "Platform" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(response({ data: { issueCreate: { success: true, issue: { id: "id", identifier: "SEC-1", title: "Title" } } } }));
+    const handler = await createIssue({ team_id: "Security" });
+
+    await handler({ title: "Title", body: "Body with enough detail" });
+
+    expect(JSON.parse(fetch.mock.calls[1][1].body).variables).toEqual({ after: "next-page" });
+    expect(JSON.parse(fetch.mock.calls[2][1].body).variables.input.teamId).toBe("11111111-1111-1111-1111-111111111111");
+  });
+
+  it("rejects unknown friendly team identifiers before creating an issue", async () => {
+    fetch.mockResolvedValueOnce(response({ data: { teams: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } } }));
+    const handler = await createIssue({ team_id: "UNKNOWN" });
+
+    await expect(handler({ title: "Title", body: "Body with enough detail" })).rejects.toThrow("could not resolve the configured team identifier");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries team resolution after a failed lookup", async () => {
+    fetch
+      .mockResolvedValueOnce(response({}, 500))
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            teams: {
+              nodes: [{ id: "22222222-2222-2222-2222-222222222222", key: "ENG", name: "Engineering" }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        })
+      )
+      .mockResolvedValueOnce(response({ data: { issueCreate: { success: true, issue: { id: "id", identifier: "ENG-1", title: "Title" } } } }));
+    const handler = await createIssue({ team_id: "ENG" });
+
+    await expect(handler({ title: "Title", body: "Body with enough detail" })).rejects.toThrow("Linear request failed: HTTP 500");
+    await expect(handler({ title: "Title", body: "Body with enough detail" })).resolves.toMatchObject({ success: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it("creates a comment against only the configured target", async () => {
