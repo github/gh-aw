@@ -196,7 +196,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "summary": {
           "type": "string",
@@ -228,7 +228,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "body": {
           "type": "string",
@@ -253,7 +253,7 @@
           "minLength": 1,
           "maxLength": 255,
           "pattern": ".*\\S.*",
-          "description": "Key of an already-existing Jira issue, for example ENG-123. Issues created by `jira_create_issue` in this run cannot be referenced."
+          "description": "Key of an existing Jira issue, for example ENG-123, or a temporary #aw_ ID returned by jira_create_issue in this run."
         },
         "label": {
           "type": "string",

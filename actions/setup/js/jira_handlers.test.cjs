@@ -43,13 +43,20 @@ describe("Jira safe-output handlers", () => {
   it("creates Jira issues with issue type name and ADF description", async () => {
     const handler = await createIssueMain({ max: 1, body_footer: "Configured footer" });
     const result = await handler({
+      temporary_id: "#aw_jira123",
       project_key: "ENG",
       issue_type: "Task",
       summary: "Investigate parser",
       description: "First paragraph\nSecond paragraph",
     });
 
-    expect(result).toMatchObject({ success: true, issue_key: "ENG-123", issue_id: "10042" });
+    expect(result).toMatchObject({
+      success: true,
+      issue_key: "ENG-123",
+      issue_id: "10042",
+      temporaryId: "#aw_jira123",
+      temporaryIdEntry: { provider: "jira", resourceType: "issue", issueKey: "ENG-123" },
+    });
     expect(requests[0]).toMatchObject({
       url: "https://example.atlassian.net/rest/api/3/issue",
       body: {
@@ -86,6 +93,23 @@ describe("Jira safe-output handlers", () => {
     expect(Object.keys(requests[0].body.fields)).toEqual(Object.keys(updates));
   });
 
+  it.each([
+    [updateIssueMain, { summary: "Updated" }, "/rest/api/3/issue/ENG-123"],
+    [addCommentMain, { body: "Investigation complete." }, "/rest/api/3/issue/ENG-123/comment"],
+    [addLabelMain, { label: "smoke-tested" }, "/rest/api/3/issue/ENG-123"],
+  ])("resolves temporary Jira issue IDs", async (factory, fields, path) => {
+    const handler = await factory({ max: 1 });
+    const result = await handler(
+      { issue_key: "#aw_jira123", ...fields },
+      {
+        aw_jira123: { provider: "jira", resourceType: "issue", issueKey: "ENG-123" },
+      }
+    );
+
+    expect(result).toMatchObject({ success: true, issue_key: "ENG-123" });
+    expect(requests[0].url).toBe(`https://example.atlassian.net${path}`);
+  });
+
   it("appends a configured body footer to Jira issue updates", async () => {
     const handler = await updateIssueMain({ max: 1, body_footer: "Configured footer" });
     await handler({ issue_key: "ENG-123", description: "Updated description" });
@@ -119,6 +143,7 @@ describe("Jira safe-output handlers", () => {
   it("preserves valid Jira text without GitHub-specific sanitization", async () => {
     const handler = await createIssueMain({ max: 1 });
     await handler({
+      temporary_id: "#aw_jira123",
       project_key: "ENG",
       issue_type: "Task",
       summary: "Fix @deprecated flag",
@@ -148,7 +173,7 @@ describe("Jira safe-output handlers", () => {
   });
 
   it.each([
-    [createIssueMain, { project_key: "ENG", issue_type: "Task", summary: "Preview" }, "Jira create issue"],
+    [createIssueMain, { temporary_id: "#aw_jira123", project_key: "ENG", issue_type: "Task", summary: "Preview" }, "Jira create issue"],
     [updateIssueMain, { issue_key: "ENG-123", summary: "Preview" }, "Jira update issue"],
     [addCommentMain, { issue_key: "ENG-123", body: "Preview" }, "Jira add comment"],
     [addLabelMain, { issue_key: "ENG-123", label: "preview" }, "Jira add label"],
@@ -172,7 +197,7 @@ describe("Jira safe-output handlers", () => {
       })
     );
     const handler = await createIssueMain({ max: 1 });
-    const result = await handler({ project_key: "BAD", issue_type: "Task", summary: "Bad issue" });
+    const result = await handler({ temporary_id: "#aw_jira123", project_key: "BAD", issue_type: "Task", summary: "Bad issue" });
 
     expect(result).toMatchObject({ success: false });
     expect(result.error).toContain("Invalid project");
