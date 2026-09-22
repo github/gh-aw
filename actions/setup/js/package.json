@@ -9,7 +9,7 @@
     "@actions/io": "^3.0.2",
     "@github/copilot-sdk": "^1.0.13",
     "@types/node": "^26.5.1",
-    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "@vitest/ui": "^5.0.0",
     "minimatch": ">=10.2.6",
     "prettier": "^3.9.6",
