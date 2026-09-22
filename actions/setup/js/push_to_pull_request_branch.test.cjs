@@ -1334,6 +1334,7 @@ index 0000000..abc1234
         await vi.runAllTimersAsync();
         const result = await resultPromise;
 
+        // 1 initial + 5 retries = 6 total push attempts (RATE_LIMIT_RETRY_CONFIG.maxRetries = 5)
         expect(pushSignedSpy).toHaveBeenCalledTimes(6);
         expect(result.success).toBe(true);
         expect(result.fallback_used).toBe(true);
