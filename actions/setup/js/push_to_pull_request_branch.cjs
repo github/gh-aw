@@ -1492,18 +1492,10 @@ async function main(config = {}) {
         const pushErrorMessage = getErrorMessage(pushError);
         core.error(`Failed to push changes: ${pushErrorMessage}`);
 
-        // Classify GitHub's 'workflows' scope rejection on the primary push, matching the
-        // review-branch and fallback-branch paths.  When the agent's own changeset contains
-        // workflow files the rejection is a real scope problem and is surfaced as a typed,
-        // actionable error.  Otherwise the message is GitHub's transient permission-check
-        // timeout (retries above are already exhausted), which is handled as a recoverable
-        // push failure below so the changes are preserved in a fallback pull request.
+        // Missing workflow scope is handled by the preflight above. Any workflow-scope
+        // rejection that reaches this catch is GitHub's transient permission-check timeout.
         const isWorkflowsScopeRejected = isWorkflowsScopeRejection(pushErrorMessage);
-        const isMissingWorkflowsScope = isWorkflowsScopeRejected && !allowWorkflows && agentWorkflowFiles.length > 0;
-        if (isMissingWorkflowsScope) {
-          return buildWorkflowsScopeError("Branch", core);
-        }
-        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected && !isMissingWorkflowsScope;
+        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected;
 
         const nonFastForwardPatterns = ["non-fast-forward", "rejected", "fetch first", "Updates were rejected"];
         const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
