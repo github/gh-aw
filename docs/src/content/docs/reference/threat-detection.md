@@ -159,7 +159,8 @@ the release `checksums.txt` and all four Linux and Darwin assets. It rejects
 malformed, missing, duplicate, or unexpected manifest entries, verifies every
 download against the manifest, and atomically updates
 `DefaultThreatDetectVersion` with the complete `DefaultThreatDetectSHA256`
-matrix. It does not update constants if any validation fails.
+matrix and synchronizes the reviewed-literal compiler test. It does not update
+source files if any validation fails.
 
 Review the constants and generated lock-file diff in the same pull request.
 
