@@ -1487,6 +1487,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🤖 *Guard policy smoke test by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"🔍 [{workflow_name}]({run_url}) testing guard policy: `repos=all, min-integrity=none`...\",\"runSuccess\":\"✅ [{workflow_name}]({run_url}) completed guard policy test.\",\"runFailure\":\"❌ [{workflow_name}]({run_url}) {status} testing guard policy: `repos=all, min-integrity=none`. Check the logs for details.\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

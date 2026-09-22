@@ -167,7 +167,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 }
 
 func appendDailyAICContinueOnError(steps []string, data *WorkflowData) []string {
-	if extractMaxDailyAICContinueOnError(data.RawFrontmatter) {
+	if data.MaxDailyAICContinueOnError {
 		return append(steps, "        continue-on-error: true\n")
 	}
 	return steps

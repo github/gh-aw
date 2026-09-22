@@ -1,5 +1,5 @@
 > [!WARNING]
-> **Daily Workflow AI Credits Could Not Be Verified**: The agent was not started because the daily guardrail could not prove complete AI Credits accounting for earlier workflow runs.
+> **Daily Workflow AI Credits Could Not Be Verified**: {impact_note}
 
 **Guardrail status:** `{status}`
 

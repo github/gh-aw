@@ -1543,6 +1543,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🗜️ *Compressed by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"runStarted\":\"📦 Time to slim down! [{workflow_name}]({run_url}) is trimming the excess from this {event_type}...\",\"runSuccess\":\"🗜️ Docs on a diet! [{workflow_name}]({run_url}) has removed the bloat. Lean and mean! 💪\",\"runFailure\":\"📦 Unbloating paused! [{workflow_name}]({run_url}) {status}. The docs remain... fluffy.\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

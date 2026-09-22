@@ -1595,6 +1595,7 @@ jobs:
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
           GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
           GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e *[{workflow_name}]({run_url}) — Powered by DeepSeek Harness*{ai_credits_suffix}{history_link}\",\"runStarted\":\"DeepSeek Harness initializing... [{workflow_name}]({run_url}) begins on this {event_type}...\",\"runSuccess\":\"[{workflow_name}]({run_url}) DeepSeek Harness delivered.\",\"runFailure\":\"[{workflow_name}]({run_url}) {status}. DeepSeek Harness encountered an unexpected failure.\"}"
           GH_AW_GROUP_REPORTS: "false"
           GH_AW_FAILURE_REPORT_AS_ISSUE: "true"

@@ -459,7 +459,7 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 				"continue-on-error": true,
 			},
 		}
-		if !extractMaxDailyAICContinueOnError(frontmatter) {
+		if !resolveMaxDailyAICContinueOnError(frontmatter, "") {
 			t.Fatal("expected continue-on-error to be enabled")
 		}
 	})
@@ -470,8 +470,33 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 				"value": 5000,
 			},
 		}
-		if extractMaxDailyAICContinueOnError(frontmatter) {
+		if resolveMaxDailyAICContinueOnError(frontmatter, "") {
 			t.Fatal("expected continue-on-error to be disabled by default")
+		}
+	})
+
+	t.Run("continue-on-error falls back to imported config when main frontmatter omits it", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value": 5000,
+			},
+		}
+		importedJSON := `{"value":5000,"continue-on-error":true}`
+		if !resolveMaxDailyAICContinueOnError(frontmatter, importedJSON) {
+			t.Fatal("expected continue-on-error to be resolved from imported config")
+		}
+	})
+
+	t.Run("continue-on-error main frontmatter takes precedence over imported config", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value":             5000,
+				"continue-on-error": false,
+			},
+		}
+		importedJSON := `{"value":5000,"continue-on-error":true}`
+		if resolveMaxDailyAICContinueOnError(frontmatter, importedJSON) {
+			t.Fatal("expected main frontmatter continue-on-error:false to take precedence over imported config")
 		}
 	})
 

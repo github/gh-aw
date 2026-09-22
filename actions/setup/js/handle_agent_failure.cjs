@@ -2360,16 +2360,24 @@ function buildDailyAICGuardrailGuidance(status, error) {
  * @param {boolean} hasDailyAICGuardrailError
  * @param {string} status
  * @param {string} error
+ * @param {boolean} [continueOnError] - When true, the guardrail is configured in warning mode:
+ *   the agent still ran despite the unverifiable accounting, so the impact wording must not
+ *   claim the agent was never started.
  * @returns {string}
  */
-function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, error) {
+function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, error, continueOnError) {
   if (!hasDailyAICGuardrailError) {
     return "";
   }
 
+  const impactNote = continueOnError
+    ? "The daily guardrail could not prove complete AI Credits accounting for earlier workflow runs. The guardrail is configured in warning mode (`continue-on-error: true`), so the agent still ran; this report is informational."
+    : "The agent was not started because the daily guardrail could not prove complete AI Credits accounting for earlier workflow runs.";
+
   return (
     "\n" +
     renderTemplateFromFile(getPromptPath("daily_workflow_aic_unknown.md"), {
+      impact_note: impactNote,
       status: sanitizeContent(status, 100) || "unknown_error",
       error: sanitizeContent(error, 2000) || "The daily guardrail did not provide an error reason.",
       guidance: buildDailyAICGuardrailGuidance(status, error),
@@ -3668,6 +3676,12 @@ async function main() {
     const dailyAICGuardrailStatus = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS || "";
     const dailyAICGuardrailError = process.env.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR || "";
     const hasDailyAICGuardrailError = dailyAICGuardrailStatus === "structural_error" || dailyAICGuardrailStatus === "transient_error";
+    // When continue-on-error is configured for max-daily-ai-credits, unknown/unverifiable
+    // accounting is a warning: the guardrail step does not block the agent job, so an unknown
+    // status alone must not be treated as an agent-failure trigger or reported with fail-closed
+    // wording that claims the agent was never started.
+    const dailyAICContinueOnError = process.env.GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR === "true";
+    const dailyAICGuardrailErrorIsFailure = hasDailyAICGuardrailError && !dailyAICContinueOnError;
     const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL || "";
     const dailyAICThreshold = process.env.GH_AW_DAILY_AI_CREDITS_THRESHOLD || "";
     // Cache-memory availability flag — set when cache-memory is configured for the workflow.
@@ -3713,6 +3727,7 @@ async function main() {
     core.info(`Max AI credits exceeded (harness budget abort): ${maxAICreditsExceeded}`);
     core.info(`Daily workflow AIC guardrail exceeded: ${hasDailyAICExceeded}`);
     core.info(`Daily workflow AIC guardrail status: ${dailyAICGuardrailStatus || "(none)"}; error detail: ${dailyAICGuardrailError ? "(set)" : "(none)"}`);
+    core.info(`Daily workflow AIC guardrail continue-on-error (warning mode): ${dailyAICContinueOnError}`);
     core.info(`Inference access error: ${inferenceAccessError}`);
     core.info(`MCP policy error: ${mcpPolicyError}`);
     core.info(`Agentic engine timeout: ${agenticEngineTimeout}`);
@@ -3916,7 +3931,7 @@ async function main() {
       !hasOAuthTokenCheckFailed &&
       !hasStaleLockFileFailed &&
       !hasDailyAICExceeded &&
-      !hasDailyAICGuardrailError &&
+      !dailyAICGuardrailErrorIsFailure &&
       !hasReportIncomplete &&
       !hasCacheMissMisconfiguration &&
       !aiCreditsRateLimitError &&
@@ -4041,7 +4056,7 @@ async function main() {
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
       hasDailyAICExceeded,
-      hasDailyAICGuardrailError,
+      hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
       maxAICreditsExceeded,
@@ -4087,7 +4102,7 @@ async function main() {
       hasOAuthTokenCheckFailed,
       hasStaleLockFileFailed,
       hasDailyAICExceeded,
-      hasDailyAICGuardrailError,
+      hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       isAWFFirewallStartupFailed: detectAWFFirewallStartupFailureFromLog(),
     });
 
@@ -4273,7 +4288,7 @@ async function main() {
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
-        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError);
+        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues
         const assignCopilotFailureContext = buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilotErrors);
@@ -4507,7 +4522,7 @@ async function main() {
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
         const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
-        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError);
+        const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues
         const assignCopilotFailureContext = buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilotErrors);

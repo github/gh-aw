@@ -52,6 +52,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		TrackerID:                  toolsResult.trackerID,
 		MaxDailyAICredits:          resolveMaxDailyAIC(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
 		MaxDailyAICreditsGitHubApp: extractMaxDailyAICGitHubApp(result.Frontmatter),
+		MaxDailyAICContinueOnError: resolveMaxDailyAICContinueOnError(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
 		ImportedFiles:              importsResult.ImportedFiles,
 		Skills:                     extractFrontmatterSkills(toolsResult.parsedFrontmatter, result.Frontmatter),
 		SkillReferences:            extractFrontmatterSkillReferences(toolsResult.parsedFrontmatter, result.Frontmatter),
