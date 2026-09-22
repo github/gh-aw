@@ -1385,6 +1385,7 @@ async function main(config = {}) {
             title: `[review] ${prTitle || `Changes for #${pullNumber}`}`,
             body: prBody,
             head: reviewHeadRef,
+            ...(pushRemoteUrl ? { head_repo: pushRepo } : {}),
             base: branchName,
           });
 
@@ -1585,6 +1586,7 @@ async function main(config = {}) {
               title: `[fallback] ${prTitle || `Changes for #${pullNumber}`}`,
               body: fallbackBody,
               head: fallbackHeadRef,
+              ...(pushRemoteUrl ? { head_repo: pushRepo } : {}),
               base: branchName,
             });
 
