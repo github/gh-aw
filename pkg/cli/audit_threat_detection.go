@@ -10,9 +10,12 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 const threatDetectionResultPrefix = "THREAT_DETECTION_RESULT:"
+
+var auditThreatDetectionLog = logger.New("cli:audit_threat_detection")
 
 type threatDetectionVerdict struct {
 	PromptInjection bool `json:"prompt_injection"`
@@ -36,16 +39,20 @@ type detectionExecutionEvidence struct {
 
 func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	detectionJobFailed := false
+	detectionJobSkipped := false
 	for _, job := range processedRun.JobDetails {
-		if normalizeJobName(job.Name) == string(constants.DetectionJobName) &&
-			strings.EqualFold(strings.TrimSpace(job.Conclusion), "failure") {
-			detectionJobFailed = true
-			break
+		if normalizeJobName(job.Name) == string(constants.DetectionJobName) {
+			switch strings.ToLower(strings.TrimSpace(job.Conclusion)) {
+			case "failure":
+				detectionJobFailed = true
+			case "skipped":
+				detectionJobSkipped = true
+			}
 		}
 	}
 
 	verdict, found := findThreatDetectionVerdict(processedRun.Run.LogsPath)
-	detectionExecutionNotStarted := threatDetectionExecutionNotStarted(processedRun.Run)
+	detectionExecutionNotStarted := !detectionJobSkipped && threatDetectionExecutionNotStarted(processedRun.Run)
 	threatKinds := verdict.threatKinds()
 	findings := make([]AuditFinding, 0, 2)
 	if detectionJobFailed || detectionExecutionNotStarted {
@@ -100,7 +107,13 @@ func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 	}
 	var resultFiles, logFiles []string
 	_ = filepath.WalkDir(runDir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		if err != nil || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if entry.IsDir() {
+			if entry.Name() == "base" || strings.HasPrefix(entry.Name(), "baseline-") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		switch entry.Name() {
@@ -125,6 +138,7 @@ func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 			continue
 		}
 		if found && verdict != foundVerdict {
+			auditThreatDetectionLog.Printf("Conflicting threat-detection verdicts: path=%s", path)
 			return threatDetectionVerdict{}, false
 		}
 		foundVerdict = verdict
@@ -168,7 +182,13 @@ func hasThreatDetectionArtifact(runDir string) bool {
 	}
 	found := false
 	_ = filepath.WalkDir(runDir, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		if err != nil || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if entry.IsDir() {
+			if entry.Name() == "base" || strings.HasPrefix(entry.Name(), "baseline-") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if entry.Name() == "detection_result.json" || entry.Name() == "detection.log" {
@@ -231,6 +251,7 @@ func scanThreatDetectionLog(path string) (threatDetectionVerdict, bool) {
 			continue
 		}
 		if found && verdict != foundVerdict {
+			auditThreatDetectionLog.Printf("Conflicting threat-detection verdicts in detection log: path=%s", path)
 			return threatDetectionVerdict{}, false
 		}
 		foundVerdict = verdict

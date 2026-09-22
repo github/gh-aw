@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -38,6 +39,21 @@ func TestRenderAuditReportReusesCompleteCache(t *testing.T) {
 		})
 	})
 	assert.Contains(t, stdout, "cache marker")
+}
+
+func TestRenderAuditReportSetsSchemaVersionOnFreshJSONOutput(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+
+	stdout, _ := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, AuditOptions{
+			OutputDir:  runDir,
+			JSONOutput: true,
+		})
+	})
+	var auditData AuditData
+	require.NoError(t, json.Unmarshal([]byte(stdout), &auditData))
+	assert.Equal(t, auditSchemaVersion, auditData.SchemaVersion)
 }
 
 func TestRenderConsoleTokenUsageWarnings(t *testing.T) {

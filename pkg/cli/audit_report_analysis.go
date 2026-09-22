@@ -112,6 +112,7 @@ func buildFailureFindingDescription(run WorkflowRun, jobDetails []JobInfoWithDur
 	}
 
 	const maxErrMsgLen = 200
+	// Range avoids direct indexing while preserving the first error.
 	for _, issue := range errors {
 		return desc + ": " + stringutil.Truncate(issue.Message, maxErrMsgLen)
 	}
@@ -214,6 +215,7 @@ func generateFirewallFindings(processedRun ProcessedRun) []AuditFinding {
 func buildBlockedNetworkFindingDescription(blockedRequests int, blockedDomains []string) string {
 	switch {
 	case len(blockedDomains) == 1:
+		// Range avoids direct indexing while preserving the only domain.
 		for _, domain := range blockedDomains {
 			return "Agent attempted to access blocked domain: " + domain
 		}
@@ -299,6 +301,7 @@ func appendIterationRecommendations(recommendations []Recommendation, hasManyTur
 func appendToolingRecommendations(recommendations []Recommendation, processedRun ProcessedRun) []Recommendation {
 	if len(processedRun.MissingTools) > 0 {
 		var firstMissingTool string
+		// Range avoids direct indexing while preserving the first missing tool.
 		for _, missingTool := range processedRun.MissingTools {
 			firstMissingTool = missingTool.Tool
 			break

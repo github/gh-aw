@@ -113,6 +113,25 @@ func TestBuildAuditDataIncludesAgenticAnalysis(t *testing.T) {
 	assert.Equal(t, "triage", auditData.TaskDomain.Name)
 }
 
+func TestGenerateAgenticAssessmentFindingsHaveCodes(t *testing.T) {
+	t.Parallel()
+
+	assessments := []AgenticAssessment{
+		{Kind: "resource_heavy_for_domain"},
+		{Kind: "overkill_for_agentic"},
+		{Kind: "poor_agentic_control"},
+		{Kind: "partially_reducible"},
+		{Kind: "model_downgrade_available"},
+		{Kind: "delegated_context_present"},
+	}
+
+	findings := generateAgenticAssessmentFindings(assessments)
+	require.Len(t, findings, len(assessments))
+	for _, finding := range findings {
+		assert.NotEmpty(t, finding.Code, "finding %q must have a stable code", finding.Title)
+	}
+}
+
 func TestComputeAgenticFraction(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

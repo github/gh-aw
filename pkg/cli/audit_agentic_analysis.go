@@ -410,27 +410,35 @@ func generateAgenticAssessmentFindings(assessments []AgenticAssessment) []AuditF
 	for _, assessment := range assessments {
 		category := "agentic"
 		impact := "Review recommended"
+		var code AuditFindingCode
 		switch assessment.Kind {
 		case "resource_heavy_for_domain":
+			code = AuditFindingAgenticResourceHeavy
 			category = "performance"
 			impact = "Higher cost and latency than a comparable well-behaved run"
 		case "overkill_for_agentic":
+			code = AuditFindingAgenticOverkill
 			category = "optimization"
 			impact = "A deterministic implementation may be cheaper and easier to govern"
 		case "poor_agentic_control":
+			code = AuditFindingAgenticPoorControl
 			category = "agentic"
 			impact = "Broad or weakly controlled behavior can reduce trust even when the run succeeds"
 		case "partially_reducible":
+			code = AuditFindingAgenticPartiallyReducible
 			category = "optimization"
 			impact = "Moving data-gathering turns to deterministic steps reduces inference cost"
 		case "model_downgrade_available":
+			code = AuditFindingAgenticModelDowngrade
 			category = "optimization"
 			impact = "A smaller model could reduce per-run cost significantly for this task domain"
 		case "delegated_context_present":
+			code = AuditFindingAgenticDelegatedContext
 			category = "coordination"
 			impact = "Context continuity improves downstream debugging and auditability"
 		}
 		findings = append(findings, AuditFinding{
+			Code:        code,
 			Category:    category,
 			Severity:    scanfindings.ParseSeverity(assessment.Severity),
 			Title:       prettifyAssessmentKind(assessment.Kind),

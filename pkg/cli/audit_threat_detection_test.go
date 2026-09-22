@@ -120,6 +120,27 @@ func TestGenerateThreatDetectionFindingsUsesUsageExecutionEvidence(t *testing.T)
 	assert.Contains(t, findings[0].Description, "Usage artifact")
 }
 
+func TestGenerateThreatDetectionFindingsIgnoresSkippedDetectionJob(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage", "detection"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "usage", "detection", "execution.json"),
+		[]byte(`{"version":1,"component":"detection","state":"not_started"}`),
+		0o600,
+	))
+
+	findings := generateThreatDetectionFindings(ProcessedRun{
+		Run: WorkflowRun{LogsPath: runDir},
+		JobDetails: []JobInfoWithDuration{{
+			JobInfo: JobInfo{Name: "detection", Conclusion: "skipped"},
+		}},
+	})
+
+	assert.Empty(t, findings)
+}
+
 func TestGenerateThreatDetectionFindingsRejectsStaleUsageExecutionEvidence(t *testing.T) {
 	t.Parallel()
 
@@ -140,6 +161,28 @@ func TestGenerateThreatDetectionFindingsRejectsStaleUsageExecutionEvidence(t *te
 	})
 
 	assert.Empty(t, findings)
+}
+
+func TestThreatDetectionVerdictIgnoresComparisonArtifacts(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "baseline-1"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "base"), 0o755))
+	for _, path := range []string{
+		filepath.Join(runDir, "baseline-1", "detection_result.json"),
+		filepath.Join(runDir, "base", "detection_result.json"),
+	} {
+		require.NoError(t, os.WriteFile(
+			path,
+			[]byte(`{"prompt_injection":true,"secret_leak":false,"malicious_patch":false}`),
+			0o600,
+		))
+	}
+
+	_, found := findThreatDetectionVerdict(runDir)
+	assert.False(t, found)
+	assert.False(t, hasThreatDetectionArtifact(runDir))
 }
 
 func TestGeneratedAuditFindingsHaveCodes(t *testing.T) {

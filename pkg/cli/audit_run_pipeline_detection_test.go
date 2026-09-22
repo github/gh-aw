@@ -34,3 +34,15 @@ func TestAuditNeedsDetectionArtifact(t *testing.T) {
 	))
 	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
 }
+
+func TestInvalidateCompleteArtifactDownloadMarker(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	marker := filepath.Join(runDir, downloadedArtifactsMarkerDir, string(ArtifactSetAll))
+	require.NoError(t, os.MkdirAll(filepath.Dir(marker), 0o700))
+	require.NoError(t, os.WriteFile(marker, nil, 0o600))
+
+	require.NoError(t, invalidateCompleteArtifactDownloadMarker(runDir))
+	assert.NoFileExists(t, marker)
+}

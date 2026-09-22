@@ -184,10 +184,21 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (bool
 	}
 	if auditNeedsDetectionArtifact(cfg, summary) {
 		auditLog.Printf("Cache miss for run %d threat detection: detection artifact not present locally, bypassing cache", cfg.runID)
+		if err := invalidateCompleteArtifactDownloadMarker(cfg.outputDir); err != nil {
+			return false, err
+		}
 		return false, nil
 	}
 	processedRun := processedRunFromSummary(summary, cfg.outputDir)
 	return true, renderAuditReport(ctx, processedRun, summary.Metrics, summary.MCPToolUsage, cfg.auditOptions())
+}
+
+func invalidateCompleteArtifactDownloadMarker(runOutputDir string) error {
+	markerPath := filepath.Join(runOutputDir, downloadedArtifactsMarkerDir, string(ArtifactSetAll))
+	if err := os.Remove(markerPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to invalidate complete artifact download marker: %w", err)
+	}
+	return nil
 }
 
 func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {

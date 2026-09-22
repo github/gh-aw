@@ -24,6 +24,7 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	if !ok {
 		auditData = buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
 		auditData.CacheSource = auditCacheSourceFull
+		auditData.SchemaVersion = auditSchemaVersion
 		if err := writeAuditData(runOutputDir, auditData); err != nil {
 			return err
 		}

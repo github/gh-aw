@@ -462,7 +462,6 @@ func buildAuditAssessments(processedRun ProcessedRun, metricsData MetricsData, t
 func buildAuditNarrative(processedRun ProcessedRun, metricsData MetricsData, errors []ValidationIssue, toolUsage []ToolUsageInfo, createdItems []CreatedItemReport, agenticAssessments []AgenticAssessment) ([]AuditFinding, []Recommendation, []ObservabilityInsight) {
 	findings := generateFindings(processedRun, metricsData, errors)
 	findings = append(findings, generateAgenticAssessmentFindings(agenticAssessments)...)
-	findings = addMissingAuditFindingCodes(findings)
 
 	recommendations := generateRecommendations(processedRun, metricsData, findings)
 	recommendations = append(recommendations, generateAgenticAssessmentRecommendations(agenticAssessments)...)
