@@ -28,6 +28,7 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       owner,
       repo,
       workflowId: current.workflow_id,
+      workflowPath: current.path || "",
       page,
       perPage: 100,
       lookupMode,

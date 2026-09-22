@@ -461,11 +461,11 @@ function isStructuralGuardrailError(error) {
 
 /**
  * @param {any} githubClient
- * @param {{ owner: string, repo: string, workflowId: number, page: number, perPage: number, lookupMode: WorkflowRunLookupMode, created: string }} params
+ * @param {{ owner: string, repo: string, workflowId: number, workflowPath: string, page: number, perPage: number, lookupMode: WorkflowRunLookupMode, created: string }} params
  * @returns {Promise<{ response: any, lookupMode: WorkflowRunLookupMode, sourceRunCount: number, oldestUnfilteredCreatedAt?: string | null }>}
  */
 async function listCompletedWorkflowRunsPage(githubClient, params) {
-  const { owner, repo, workflowId, page, perPage, lookupMode, created } = params;
+  const { owner, repo, workflowId, workflowPath, page, perPage, lookupMode, created } = params;
   if (lookupMode === "repo_workflow_id_fallback") {
     const response = await githubClient.rest.actions.listWorkflowRunsForRepo({
       owner,
@@ -476,7 +476,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
       page,
     });
     const allRuns = response.data.workflow_runs || [];
-    const filteredRuns = allRuns.filter(run => run?.workflow_id === workflowId);
+    const filteredRuns = allRuns.filter(run => run?.workflow_id === workflowId || (workflowPath && run?.path === workflowPath));
     logDailyGuardrail("Filtered repository workflow runs by workflow ID fallback", {
       workflowId,
       page,
@@ -527,6 +527,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
       owner,
       repo,
       workflowId,
+      workflowPath,
       page,
       perPage,
       created,
@@ -617,8 +618,10 @@ async function appendDailyAICSummary(workflowName, actorLogin, threshold, counte
  *
  * Requires github-script globals (`core`, `github`, `context`) provided by setupGlobals().
  *
- * Incomplete accounting reports an error to conclusion. Only a complete window
- * may produce an under_budget result; an exceeded budget keeps the existing graceful skip.
+ * Incomplete accounting reports an error to conclusion through the
+ * daily_ai_credits_guardrail_status and daily_ai_credits_guardrail_error outputs.
+ * Only a complete window may produce an under_budget result; an exceeded budget
+ * keeps the existing graceful skip.
  */
 async function main(options = {}) {
   core.setOutput("daily_ai_credits_exceeded", "false");

@@ -743,6 +743,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
           getWorkflowRun: async () => ({
             data: {
               workflow_id: 324645976,
+              path: ".github/workflows/pr-review.yml",
               actor: { login: "octocat" },
               triggering_actor: { login: "octocat" },
             },
@@ -780,6 +781,18 @@ describe("check_daily_aic_workflow_guardrail", () => {
                     workflow_id: 324645976,
                     name: "Caller Workflow",
                     html_url: "https://example.test/runs/41",
+                    created_at: nowIso,
+                    conclusion: "success",
+                  },
+                  {
+                    id: 43,
+                    run_attempt: 1,
+                    updated_at: nowIso,
+                    status: "completed",
+                    workflow_id: 99,
+                    path: ".github/workflows/pr-review.yml",
+                    name: "Caller Workflow",
+                    html_url: "https://example.test/runs/43",
                     created_at: nowIso,
                     conclusion: "success",
                   },
@@ -823,8 +836,8 @@ describe("check_daily_aic_workflow_guardrail", () => {
       expect(listWorkflowRunsCalls).toBe(1);
       expect(listWorkflowRunsForRepoCalls).toBe(2);
       expect(mockGithub.rest.actions.listWorkflowRunsForRepo).toHaveBeenCalledWith(expect.objectContaining({ created: expect.stringMatching(/^>=/) }));
-      expect(getRunAICSpy).toHaveBeenCalledTimes(1);
-      expect(getRunAICSpy.mock.calls[0][1]).toBe(41);
+      expect(getRunAICSpy).toHaveBeenCalledTimes(2);
+      expect(getRunAICSpy.mock.calls.map(call => call[1])).toEqual([41, 43]);
       expect(coreOutputs["daily_ai_credits_exceeded"]).toBe("false");
       expect(coreOutputs["daily_ai_credits_guardrail_status"]).toBe("under_budget");
       expect(coreInfos.some(msg => msg.includes("falling back to repository run listing by workflow ID"))).toBe(true);
