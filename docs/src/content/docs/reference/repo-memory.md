@@ -107,7 +107,8 @@ For fast 7-day caching without version control, see [Cache Memory](/gh-aw/refere
 - **Branch not created**: Ensure `create-orphan: true` is enabled, or create the branch manually.
 - **Validation or patch-size failures**: Keep changes within `file-glob`, `max-file-size` (100KB default), `max-file-count` (100 default), and `max-patch-size` (10KB default).
 - **Changes not persisting**: Confirm the directory path, let the workflow finish, and check the logs for push errors.
-- **Merge conflicts**: Concurrent pushes are replayed onto the latest remote state, so your file changes win.
+- **Merge conflicts**: Concurrent pushes are replayed onto the latest remote state, so your file changes win. `.jsonl` files are merged with `merge=union`, so rows written by concurrent runs are all kept; other file types keep the local version.
+- **Many runs finishing at once**: Pushes are not serialized. Each run commits with a compare-and-swap on the remote branch head and, if another run wins the race, re-reads the head, rebases its change with JSONL union merging, and retries with exponential backoff. To avoid conflicts entirely, have each run write its own file instead of all runs editing the same file, for example `runs/${{ matrix.worker }}.jsonl` or `targets/${{ matrix.target }}.jsonl`.
 - **GH013 — Commits must have verified signatures**: This usually means the artifact included a symlink, executable file, or submodule entry, which forced a fallback to plain `git push`. Remove the unsupported file type and re-run.
 
 ## Security

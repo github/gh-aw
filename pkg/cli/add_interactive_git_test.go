@@ -99,6 +99,14 @@ func TestParseDefaultBranchFromLsRemote(t *testing.T) {
 	}
 }
 
+func TestUpdateLocalBranchRejectsUnsafeDefaultBranch(t *testing.T) {
+	prependFakeGH(t, "echo '--upload-pack=evil'")
+
+	err := (&AddInteractiveConfig{}).updateLocalBranch()
+
+	assert.ErrorContains(t, err, "invalid default branch name")
+}
+
 // TestParseDefaultBranchFromLsRemoteWithRealGit creates real git repositories
 // and runs actual `git ls-remote --symref` to verify parsing against real git output.
 func TestParseDefaultBranchFromLsRemoteWithRealGit(t *testing.T) {

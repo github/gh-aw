@@ -11,6 +11,7 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveTargetRepoConfig, validateTargetRepo } = require("./repo_helpers.cjs");
+const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 
 /**
  * Type constant for handler identification
@@ -322,8 +323,11 @@ async function main(config = {}) {
 
   const githubClient = await createAuthenticatedGitHubClient(config);
 
-  // Determine the triggering PR number from context
-  const triggeringPRNumber = getPRNumber(context.payload);
+  // Determine the triggering PR number from context, resolving forwarded invocations
+  // (workflow_dispatch inputs/aw_context, repository_dispatch.client_payload) the same
+  // way resolveTarget does.
+  const invocationContext = resolveInvocationContext(context);
+  const triggeringPRNumber = getPRNumber(invocationContext.eventPayload);
 
   // Check if we're in staged mode
   const isStaged = isStagedMode(config);
@@ -419,99 +423,53 @@ async function main(config = {}) {
         core.info(`Resolved review comment ${threadId} to review thread ${resolvedThreadId}`);
       }
 
-      // When the user explicitly configured target-repo or allowed-repos, validate the thread's
-      // repository using validateTargetRepo (supports wildcards like "*", "org/*").
-      // Otherwise, fall back to the legacy behavior of scoping to the triggering PR only.
-      if (hasExplicitTargetConfig) {
-        // Cross-repo mode: validate thread repo against configured repos (fail closed if missing)
-        if (!threadRepo) {
-          core.warning(`Could not determine repository for thread ${resolvedThreadId}`);
-          return {
-            success: false,
-            error: `Could not determine the repository for thread ${resolvedThreadId}`,
-          };
-        }
-        const repoValidation = validateTargetRepo(threadRepo, defaultTargetRepo, allowedRepos);
-        if (!repoValidation.valid) {
-          core.warning(`Thread ${resolvedThreadId} belongs to repo ${threadRepo}, which is not in the allowed repos`);
-          return {
-            success: false,
-            error: repoValidation.error,
-          };
-        }
+      if (!threadRepo) {
+        core.warning(`Could not determine repository for thread ${resolvedThreadId}`);
+        return {
+          success: false,
+          error: `Could not determine the repository for thread ${resolvedThreadId}`,
+        };
+      }
+      const repoValidation = validateTargetRepo(threadRepo, defaultTargetRepo, allowedRepos);
+      if (!repoValidation.valid) {
+        core.warning(`Thread ${resolvedThreadId} belongs to repo ${threadRepo}, which is not allowed`);
+        return {
+          success: false,
+          skipped: !hasExplicitTargetConfig,
+          thread_id: resolvedThreadId,
+          error: repoValidation.error,
+        };
+      }
 
-        // Determine target PR number based on target config
-        if (resolveTarget === "triggering") {
-          if (!triggeringPRNumber) {
-            core.warning("Cannot resolve review thread: not running in a pull request context");
-            return {
-              success: false,
-              error: "Cannot resolve review threads outside of a pull request context",
-            };
-          }
-          if (threadPRNumber !== triggeringPRNumber) {
-            core.warning(`Thread ${resolvedThreadId} belongs to PR #${threadPRNumber}, not triggering PR #${triggeringPRNumber}`);
-            return {
-              success: false,
-              error: `Thread belongs to PR #${threadPRNumber}, but only threads on the triggering PR #${triggeringPRNumber} can be resolved`,
-            };
-          }
-        } else if (resolveTarget !== "*") {
-          // Explicit PR number target
-          const targetPRNumber = parseInt(resolveTarget, 10);
-          if (Number.isNaN(targetPRNumber) || targetPRNumber <= 0) {
-            core.warning(`Invalid target PR number: '${resolveTarget}'`);
-            return {
-              success: false,
-              error: `Invalid target: '${resolveTarget}' - must be 'triggering', '*', or a positive integer`,
-            };
-          }
-          if (threadPRNumber !== targetPRNumber) {
-            core.warning(`Thread ${resolvedThreadId} belongs to PR #${threadPRNumber}, not target PR #${targetPRNumber}`);
-            return {
-              success: false,
-              error: `Thread belongs to PR #${threadPRNumber}, but target is PR #${targetPRNumber}`,
-            };
-          }
-        }
-        // resolveTarget === "*": any PR in allowed repos — no further PR number check needed
-      } else {
-        // Default (legacy) mode: always validate thread repo against defaultTargetRepo to stay
-        // least-privilege, even when there is no triggering PR (e.g. schedule/workflow_dispatch).
-        if (!threadRepo) {
-          core.warning(`Unable to determine repository for review thread ${resolvedThreadId}; refusing to resolve in legacy mode`);
-          return {
-            success: false,
-            error: `Unable to determine repository for review thread ${resolvedThreadId}`,
-          };
-        }
-
-        const legacyRepoValidation = validateTargetRepo(threadRepo, defaultTargetRepo, allowedRepos);
-        if (!legacyRepoValidation.valid) {
-          // In legacy mode, no cross-repo behavior was ever configured, so a thread_id resolving
-          // to an unrelated repository almost always indicates a stale or malformed ID (e.g. a
-          // hallucinated GraphQL node ID) rather than a genuine cross-repo access attempt. Treat
-          // this the same as an already-resolved/stale thread (skipped) so a single bad ID does
-          // not fail the entire safe_outputs job, while still refusing to perform the action.
-          core.warning(`Thread ${resolvedThreadId} repository ${threadRepo} is not allowed in legacy mode; skipping`);
-          return {
-            success: false,
-            skipped: true,
-            thread_id: resolvedThreadId,
-            error: legacyRepoValidation.error || `Repository ${threadRepo} is not allowed for this handler`,
-          };
-        }
-
-        // Scope to triggering PR only when a triggering PR exists
+      if (resolveTarget === "triggering") {
         if (!triggeringPRNumber) {
-          // No triggering PR (e.g. schedule/workflow_dispatch trigger), but the thread has been
-          // resolved to a specific allowed repository via the API — allow the resolution to proceed
-          core.info(`No triggering PR context; resolving thread ${resolvedThreadId} via explicit thread_id (PR #${threadPRNumber} in ${threadRepo})`);
-        } else if (threadPRNumber !== triggeringPRNumber) {
+          core.warning("Cannot resolve review thread: not running in a pull request context");
+          return {
+            success: false,
+            error: "Cannot resolve review threads outside of a pull request context",
+          };
+        }
+        if (threadPRNumber !== triggeringPRNumber) {
           core.warning(`Thread ${resolvedThreadId} belongs to PR #${threadPRNumber}, not triggering PR #${triggeringPRNumber}`);
           return {
             success: false,
             error: `Thread belongs to PR #${threadPRNumber}, but only threads on the triggering PR #${triggeringPRNumber} can be resolved`,
+          };
+        }
+      } else if (resolveTarget !== "*") {
+        const targetPRNumber = parseInt(resolveTarget, 10);
+        if (Number.isNaN(targetPRNumber) || targetPRNumber <= 0) {
+          core.warning(`Invalid target PR number: '${resolveTarget}'`);
+          return {
+            success: false,
+            error: `Invalid target: '${resolveTarget}' - must be 'triggering', '*', or a positive integer`,
+          };
+        }
+        if (threadPRNumber !== targetPRNumber) {
+          core.warning(`Thread ${resolvedThreadId} belongs to PR #${threadPRNumber}, not target PR #${targetPRNumber}`);
+          return {
+            success: false,
+            error: `Thread belongs to PR #${threadPRNumber}, but target is PR #${targetPRNumber}`,
           };
         }
       }

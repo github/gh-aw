@@ -600,7 +600,7 @@ func (c *Compiler) buildConclusionJobConcurrency(data *WorkflowData) string {
 // Returns nil when report-failed-jobs is explicitly set to false.
 func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJobName string) []string {
 	// Skip when explicitly disabled via frontmatter
-	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailedJobs != nil && !*data.SafeOutputs.ReportFailedJobs {
+	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailedJobs != nil && strings.EqualFold(strings.TrimSpace(data.SafeOutputs.ReportFailedJobs.String()), "false") {
 		notifyCommentLog.Print("Skipping report-failed-jobs step: disabled in frontmatter")
 		return nil
 	}
@@ -608,7 +608,7 @@ func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJ
 	envVars = append(envVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))...)
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailedJobs != nil {
-		envVars = append(envVars, fmt.Sprintf("          GH_AW_REPORT_FAILED_JOBS: %q\n", strconv.FormatBool(*data.SafeOutputs.ReportFailedJobs)))
+		envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_REPORT_FAILED_JOBS", templatableBoolPtrToStringPtr(data.SafeOutputs.ReportFailedJobs))...)
 	} else {
 		envVars = append(envVars, "          GH_AW_REPORT_FAILED_JOBS: \"true\"\n")
 	}

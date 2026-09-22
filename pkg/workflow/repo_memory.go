@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -29,6 +28,9 @@ const (
 	defaultRepoMemoryMaxPatchSize = 10240
 	// maxRepoMemoryPatchSize is the maximum allowed value for max-patch-size (1MB).
 	maxRepoMemoryPatchSize = 1048576
+	// pushRepoMemoryTimeoutMinutes bounds the retry loop (about two minutes of
+	// capped jittered backoff) plus git/network overhead.
+	pushRepoMemoryTimeoutMinutes = 10
 )
 
 // Pre-compiled regexes for performance (avoid recompilation in hot paths)
@@ -548,42 +550,6 @@ func generateRepoMemorySteps(builder *strings.Builder, data *WorkflowData) {
 	}
 }
 
-// buildPushRepoMemoryConcurrencyGroup builds a concurrency group key that is scoped to the
-// specific (target-repo, branch) pairs being written by this push job.  Using the actual
-// write targets—rather than a single repo-wide key—ensures that workflows pushing to
-// different memory branches do not unnecessarily serialise or cancel each other.
-//
-// Key format: "push-repo-memory-${{ github.repository }}|<key1>[|<key2>…]"
-//
-// Each key component is percent-encoded (only `%` and `|` are encoded) before joining
-// with "|", so the separator is always unambiguous even if a user-supplied branch name
-// or target-repo contains a literal "|".  For memories that target a non-default
-// repository, the target repo is prepended to the branch name
-// (e.g., "other-owner%2Fother-repo:memory%2Fbranch" would be encoded if needed) so that
-// distinct targets produce distinct concurrency groups.  The branches are sorted for a
-// deterministic key regardless of the order memories are declared in the frontmatter.
-func buildPushRepoMemoryConcurrencyGroup(memories []RepoMemoryEntry) string {
-	branchKeys := make([]string, 0, len(memories))
-	for _, m := range memories {
-		key := encodeConcurrencyKeyPart(m.BranchName)
-		if m.TargetRepo != "" {
-			key = encodeConcurrencyKeyPart(m.TargetRepo) + ":" + key
-		}
-		branchKeys = append(branchKeys, key)
-	}
-	sort.Strings(branchKeys)
-	return "push-repo-memory-${{ github.repository }}|" + strings.Join(branchKeys, "|")
-}
-
-// encodeConcurrencyKeyPart percent-encodes the characters that would otherwise make the
-// concurrency group key ambiguous: "%" (to avoid double-encoding) and "|" (the separator).
-// All other characters are left as-is so the key remains human-readable in workflow UIs.
-func encodeConcurrencyKeyPart(s string) string {
-	s = strings.ReplaceAll(s, "%", "%25")
-	s = strings.ReplaceAll(s, "|", "%7C")
-	return s
-}
-
 // buildPushRepoMemoryJob creates a job that downloads repo-memory artifacts and pushes them to git branches
 // This job runs after the agent job completes (even if it fails) and requires contents: write permission
 // If threat detection is enabled, only runs if no threats were detected
@@ -612,19 +578,25 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
 	}
 	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
-	concurrencyGroup := buildPushRepoMemoryConcurrencyGroup(data.RepoMemoryConfig.Memories)
-	concurrency := c.indentYAMLLines(fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", concurrencyGroup), "    ")
+
+	// No job-level concurrency group is set here on purpose. GitHub Actions keeps at
+	// most one running and one pending job per concurrency group: when more than two
+	// runs sharing a memory branch finish close together, every additional pending job
+	// is cancelled and its memory writes are silently lost. Instead of serialising the
+	// pushes, the push script converges optimistically: createCommitOnBranch is a
+	// compare-and-swap on the expected head OID, and a rejected push re-reads the remote
+	// head, rebases with a JSONL merge=union policy and retries with exponential backoff.
 
 	return &Job{
-		Name:        pushRepoMemoryJobName,
-		DisplayName: "",
-		RunsOn:      c.formatFrameworkJobRunsOn(data),
-		If:          jobCondition,
-		Permissions: "permissions:\n      contents: write",
-		Concurrency: concurrency,
-		Needs:       jobNeeds,
-		Steps:       steps,
-		Outputs:     outputs,
+		Name:           pushRepoMemoryJobName,
+		DisplayName:    "",
+		RunsOn:         c.formatFrameworkJobRunsOn(data),
+		If:             jobCondition,
+		Permissions:    "permissions:\n      contents: write",
+		TimeoutMinutes: pushRepoMemoryTimeoutMinutes,
+		Needs:          jobNeeds,
+		Steps:          steps,
+		Outputs:        outputs,
 	}, nil
 }
 

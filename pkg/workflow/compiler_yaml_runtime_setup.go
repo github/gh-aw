@@ -69,10 +69,6 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	compilerYamlLog.Printf("Generating repo-memory steps for workflow")
 	generateRepoMemorySteps(yaml, data)
 
-	if !customStepsContainCheckout {
-		generateSharedLogsCacheRestoreSteps(yaml, data)
-	}
-
 	c.emitCustomSteps(yaml, data, customStepsContainCheckout, runtimeSetupSteps)
 
 	// Add cache steps if cache configuration is present. Keep workspace caches after user
@@ -203,7 +199,7 @@ func (c *Compiler) emitCustomSteps(yaml *strings.Builder, data *WorkflowData, cu
 	if hasDIFCProxyNeeded(data) {
 		customStepsToEmit = injectProxyEnvIntoCustomSteps(customStepsToEmit)
 	}
-	postLastCheckoutSteps := sharedLogsCacheRestoreSteps(data)
+	var postLastCheckoutSteps []GitHubActionStep
 	if ambientRestoreStep := restoreAmbientFoldersSteps(data); len(ambientRestoreStep) > 0 {
 		postLastCheckoutSteps = append(postLastCheckoutSteps, ambientRestoreStep)
 	}

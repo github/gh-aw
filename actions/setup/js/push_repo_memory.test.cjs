@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
-import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy } from "./push_repo_memory.cjs";
+import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
 
 const mockCore = { info: vi.fn() };
 global.core = mockCore;
@@ -1902,6 +1902,162 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       expect(scriptContent).toContain("BASE_DELAY_MS * Math.pow(2, attempt)");
     });
 
+    it("should fail deterministic validation errors without retrying", async () => {
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-validation-"));
+      const setFailed = vi.fn();
+      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_VALIDATION: merge commit detected"));
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed };
+      try {
+        execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
+        await pushRepoMemoryChangesWithRetry({
+          githubClient: {},
+          targetOwner: "owner",
+          targetRepoName: "repo",
+          targetRepo: "owner/repo",
+          branchName: "memory/test",
+          baseRef: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          workspaceDir: repoDir,
+          ghToken: "token",
+          serverHost: "github.com",
+          pushSignedCommitsFn,
+          execGetExecOutput: vi.fn(),
+          sleepFn: vi.fn(),
+        });
+
+        expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
+        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected");
+        expect(isDeterministicPushValidationError("ERR_VALIDATION: policy violation")).toBe(true);
+      } finally {
+        delete global.core;
+        fs.rmSync(repoDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should stop if refreshed-head reconciliation fails", async () => {
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-reconcile-fail-"));
+      const setFailed = vi.fn();
+      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_API: stale head"));
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed };
+      try {
+        execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
+        await pushRepoMemoryChangesWithRetry({
+          githubClient: {},
+          targetOwner: "owner",
+          targetRepoName: "repo",
+          targetRepo: "owner/repo",
+          branchName: "memory/test",
+          baseRef: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          workspaceDir: repoDir,
+          ghToken: "token",
+          serverHost: "github.com",
+          pushSignedCommitsFn,
+          repoUrlWithTokenForRetry: path.join(repoDir, "missing-remote.git"),
+          execGetExecOutput: vi.fn().mockResolvedValue({ stdout: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\trefs/heads/memory/test\n" }),
+          sleepFn: vi.fn(),
+        });
+
+        expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
+        expect(setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to reconcile repo-memory changes onto refreshed head before retry"));
+      } finally {
+        delete global.core;
+        fs.rmSync(repoDir, { recursive: true, force: true });
+      }
+    });
+
+    it("retries a compare-and-swap loss by rebasing onto the refreshed head and preserving both JSONL rows", async () => {
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-race-"));
+      const remoteDir = path.join(rootDir, "remote.git");
+      const seedDir = path.join(rootDir, "seed");
+      const workspaceDir = path.join(rootDir, "workspace");
+      const otherDir = path.join(rootDir, "other");
+      const branchName = "memory/test";
+      const delays = [];
+      const pushBases = [];
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      try {
+        execSync(`git init --bare "${remoteDir}"`, { stdio: "pipe" });
+        execSync(`git init -b "${branchName}" "${seedDir}"`, { stdio: "pipe" });
+        execSync("git config user.name test && git config user.email test@example.com", { cwd: seedDir, stdio: "pipe" });
+        fs.writeFileSync(path.join(seedDir, "history.jsonl"), '{"id":"base"}\n');
+        execSync("git add history.jsonl && git commit -m base", { cwd: seedDir, stdio: "pipe" });
+        execSync(`git remote add origin "${remoteDir}" && git push origin "${branchName}"`, { cwd: seedDir, stdio: "pipe" });
+
+        execSync(`git clone --branch "${branchName}" "${remoteDir}" "${workspaceDir}"`, { stdio: "pipe" });
+        execSync("git config user.name test && git config user.email test@example.com", { cwd: workspaceDir, stdio: "pipe" });
+        const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+        fs.appendFileSync(path.join(workspaceDir, "history.jsonl"), '{"id":"local"}\n');
+        execSync("git commit -am local", { cwd: workspaceDir, stdio: "pipe" });
+
+        execSync(`git clone --branch "${branchName}" "${remoteDir}" "${otherDir}"`, { stdio: "pipe" });
+        execSync("git config user.name test && git config user.email test@example.com", { cwd: otherDir, stdio: "pipe" });
+        fs.appendFileSync(path.join(otherDir, "history.jsonl"), '{"id":"remote"}\n');
+        execSync("git commit -am remote && git push origin HEAD", { cwd: otherDir, stdio: "pipe" });
+        const remoteHead = execSync("git rev-parse HEAD", { cwd: otherDir, encoding: "utf8" }).trim();
+
+        const pushSignedCommitsFn = vi.fn(async ({ baseRef: receivedBaseRef, cwd }) => {
+          pushBases.push(receivedBaseRef);
+          if (pushBases.length === 1) {
+            throw new Error("ERR_API: GraphQL createCommitOnBranch expectedHeadOid did not match");
+          }
+
+          const revList = execSync(`git rev-list --parents ${remoteHead}..HEAD`, { cwd, encoding: "utf8" }).trim();
+          const rows = fs.readFileSync(path.join(cwd, "history.jsonl"), "utf8").trim().split("\n");
+          expect(revList.split(/\s+/)).toHaveLength(2);
+          expect(rows).toEqual(['{"id":"base"}', '{"id":"remote"}', '{"id":"local"}']);
+        });
+
+        await pushRepoMemoryChangesWithRetry({
+          githubClient: {},
+          targetOwner: "owner",
+          targetRepoName: "repo",
+          targetRepo: "owner/repo",
+          branchName,
+          baseRef,
+          workspaceDir,
+          ghToken: "token",
+          serverHost: "github.com",
+          pushSignedCommitsFn,
+          repoUrlWithTokenForRetry: remoteDir,
+          originUrlForPush: remoteDir,
+          execGetExecOutput: async (command, args, options) => ({
+            stdout: execFileSync(command, args, { cwd: options.cwd, encoding: "utf8" }),
+            stderr: "",
+            exitCode: 0,
+          }),
+          sleepFn: async delay => delays.push(delay),
+        });
+
+        expect(pushSignedCommitsFn).toHaveBeenCalledTimes(2);
+        expect(pushBases).toEqual([baseRef, remoteHead]);
+        expect(delays).toEqual([501]);
+        expect(global.core.setFailed).not.toHaveBeenCalled();
+      } finally {
+        randomSpy.mockRestore();
+        delete global.core;
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should retry at least 10 times with capped full-jitter backoff (regression guard)", () => {
+      const nodeFs = require("fs");
+      const nodePath = require("path");
+      const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+      const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+      // Concurrent writers converge through this retry loop (no concurrency group),
+      // so the attempt budget must stay high enough for realistic fan-out.
+      const maxRetriesMatch = scriptContent.match(/const MAX_RETRIES = (\d+);/);
+      expect(maxRetriesMatch).not.toBeNull();
+      expect(Number(maxRetriesMatch[1])).toBeGreaterThanOrEqual(10);
+
+      // Backoff must be capped and jittered so retries of many runs spread out.
+      expect(scriptContent).toContain("const MAX_DELAY_MS");
+      expect(scriptContent).toContain("Math.min(MAX_DELAY_MS, BASE_DELAY_MS * Math.pow(2, attempt))");
+      expect(scriptContent).toContain("Math.random() * ceiling");
+    });
+
     it("should surface a clear GH013 error message when signed-commit push is rejected (regression guard)", () => {
       const nodeFs = require("fs");
       const nodePath = require("path");
@@ -1955,24 +2111,24 @@ describe("push_repo_memory.cjs - concurrent merge policy", () => {
     }
   });
 
-  it("configures the merge policy before the retry pull, in its own try/catch (source check)", () => {
+  it("configures the merge policy before the retry rebase, in its own try/catch (source check)", () => {
     const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
     const scriptContent = fs.readFileSync(scriptPath, "utf8");
 
     const policyIndex = scriptContent.indexOf("configureRepoMemoryMergePolicy(workspaceDir)");
-    const pullIndex = scriptContent.indexOf('execGitSync(["pull", "--no-rebase", "-X", "ours"');
+    const rebaseIndex = scriptContent.indexOf("execGitSync(rebaseArgs");
 
-    // The merge policy must be wired into the retry path and run before the pull
+    // The merge policy must be wired into the retry path and run before the rebase
     expect(policyIndex).toBeGreaterThan(-1);
-    expect(pullIndex).toBeGreaterThan(-1);
-    expect(policyIndex).toBeLessThan(pullIndex);
+    expect(rebaseIndex).toBeGreaterThan(-1);
+    expect(policyIndex).toBeLessThan(rebaseIndex);
 
     // A merge-policy failure must be reported distinctly instead of being
-    // swallowed by the generic "Pull on retry failed" message
-    const between = scriptContent.slice(policyIndex, pullIndex);
+    // swallowed by the generic rebase-reconciliation message
+    const between = scriptContent.slice(policyIndex, rebaseIndex);
     expect(between).toContain("catch (mergePolicyError)");
     expect(between).toContain("core.warning");
-    expect(between).not.toContain("Pull on retry failed");
+    expect(between).not.toContain("Failed to reconcile repo-memory changes");
   });
 });
 

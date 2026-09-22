@@ -417,32 +417,61 @@ func (c *Compiler) addSafeOutputCoreEnvVars(steps *[]string, data *WorkflowData)
 	return nil
 }
 
+// addCITriggerTokenEnvVar appends the GH_AW_CI_TRIGGER_TOKEN env var used to push an
+// empty commit after code changes to trigger CI events, working around the GITHUB_TOKEN
+// limitation where events don't trigger other workflows. The env var is only emitted
+// when create-pull-request or push-to-pull-request-branch is configured and the extra
+// empty commit has not been disabled with "none".
+func addCITriggerTokenEnvVar(steps *[]string, data *WorkflowData) {
+	if !usesPatchesAndCheckouts(data.SafeOutputs) {
+		return
+	}
+
+	ciTriggerToken := getCITriggerTokenConfig(data.SafeOutputs)
+
+	// Match the sentinel values case-insensitively so "App"/"None" are not mistaken for
+	// literal token values; the original string is used for custom token expressions.
+	switch strings.ToLower(strings.TrimSpace(ciTriggerToken)) {
+	case "app":
+		*steps = append(*steps, "          GH_AW_CI_TRIGGER_TOKEN: ${{ steps.safe-outputs-app-token.outputs.token || '' }}\n")
+		consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GitHub App token")
+	case "none":
+		// Explicitly opt out of the extra empty commit: no token env var is emitted, so the
+		// magic GH_AW_CI_TRIGGER_TOKEN secret is absent from both the compiled step and the
+		// gh-aw-manifest. The handler skips the empty commit at runtime.
+		consolidatedSafeOutputsStepsLog.Print("Extra empty commit disabled (github-token-for-extra-empty-commit: none)")
+	default:
+		// Use the magic GH_AW_CI_TRIGGER_TOKEN secret (default behavior when not explicitly configured)
+		*steps = append(*steps, fmt.Sprintf("          GH_AW_CI_TRIGGER_TOKEN: %s\n", getEffectiveCITriggerGitHubToken(ciTriggerToken)))
+		consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GH_AW_CI_TRIGGER_TOKEN")
+	}
+}
+
+// getCITriggerTokenConfig returns the configured extra-empty-commit token, preferring
+// create-pull-request over push-to-pull-request-branch when both are configured.
+func getCITriggerTokenConfig(safeOutputs *SafeOutputsConfig) string {
+	if safeOutputs == nil {
+		return ""
+	}
+	if safeOutputs.CreatePullRequests != nil && safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
+		return safeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
+	}
+	if safeOutputs.PushToPullRequestBranch != nil && safeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit != "" {
+		return safeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
+	}
+	return ""
+}
+
+// isCITriggerTokenDisabled reports whether the effective token uses the "none" sentinel.
+func isCITriggerTokenDisabled(safeOutputs *SafeOutputsConfig) bool {
+	return strings.EqualFold(strings.TrimSpace(getCITriggerTokenConfig(safeOutputs)), "none")
+}
+
 // addSafeOutputTokenEnvVars appends token-related environment variables required by the
 // handler manager step: the CI-trigger token, project URL/token, assign-to-agent token,
 // agent-session token, and the optional GITHUB_TOKEN override for cross-repo PR operations.
 func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData) {
-	// Add extra empty commit token if create-pull-request or push-to-pull-request-branch is configured.
-	// This token is used to push an empty commit after code changes to trigger CI events,
-	// working around the GITHUB_TOKEN limitation where events don't trigger other workflows.
-	// Only emit this env var when one of these safe outputs is actually configured.
-	if usesPatchesAndCheckouts(data.SafeOutputs) {
-		var ciTriggerToken string
-		if data.SafeOutputs.CreatePullRequests != nil && data.SafeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit != "" {
-			ciTriggerToken = data.SafeOutputs.CreatePullRequests.GithubTokenForExtraEmptyCommit
-		} else if data.SafeOutputs.PushToPullRequestBranch != nil && data.SafeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit != "" {
-			ciTriggerToken = data.SafeOutputs.PushToPullRequestBranch.GithubTokenForExtraEmptyCommit
-		}
-
-		switch ciTriggerToken {
-		case "app":
-			*steps = append(*steps, "          GH_AW_CI_TRIGGER_TOKEN: ${{ steps.safe-outputs-app-token.outputs.token || '' }}\n")
-			consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GitHub App token")
-		default:
-			// Use the magic GH_AW_CI_TRIGGER_TOKEN secret (default behavior when not explicitly configured)
-			*steps = append(*steps, fmt.Sprintf("          GH_AW_CI_TRIGGER_TOKEN: %s\n", getEffectiveCITriggerGitHubToken(ciTriggerToken)))
-			consolidatedSafeOutputsStepsLog.Print("Extra empty commit using GH_AW_CI_TRIGGER_TOKEN")
-		}
-	}
+	addCITriggerTokenEnvVar(steps, data)
 
 	// Add GH_AW_PROJECT_URL and GH_AW_PROJECT_GITHUB_TOKEN environment variables for project operations.
 	// These are set from the project URL and token configured in any project-related safe-output:

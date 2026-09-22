@@ -39,7 +39,7 @@ const DefaultClaudeCodeVersion Version = "2.1.273"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.85"
+const DefaultCopilotVersion Version = "1.0.87"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.13"
@@ -51,10 +51,10 @@ const DefaultCodexVersion Version = "0.154.0"
 const DefaultGeminiVersion Version = "0.59.0"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "0.85.1"
+const DefaultPiVersion Version = "0.87.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v1.12.1"
+const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -264,8 +264,10 @@ const DefaultMCPSDKVersion Version = "1.30.0"
 const DefaultGitHubScriptVersion Version = "v9"
 
 // DefaultThreatDetectVersion and DefaultThreatDetectSHA256 are the reviewed
-// gh-aw-threat-detection release pins. Treat the version and complete digest table
-// as one review unit whenever updating the detector release.
+// gh-aw-threat-detection release pins used by the default external threat-detection
+// path and when `features: gh-aw-detection: true` enables the external detector.
+// Treat the version and complete digest table as one review unit whenever updating
+// the detector release.
 const DefaultThreatDetectVersion Version = "v0.5.2"
 
 const DefaultThreatDetectArtifactBaseURL = "https://github.com/github/gh-aw-threat-detection/releases/download"

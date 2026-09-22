@@ -14,7 +14,6 @@ permissions:
   pull-requests: read
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 tracker-id: daily-regression-audit-kiro
 engine:

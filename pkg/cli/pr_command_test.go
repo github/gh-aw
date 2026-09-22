@@ -69,6 +69,16 @@ func TestCreatePatchFromPRWritesOnlyDiff(t *testing.T) {
 	}
 }
 
+func TestCheckoutUpdatedDefaultBranchRejectsUnsafeDefaultBranch(t *testing.T) {
+	prependFakeGH(t, "if [ \"$1\" = \"api\" ]; then echo '--upload-pack=evil'; exit 0; fi\nexit 1")
+
+	err := checkoutUpdatedDefaultBranch("target-owner", "target-repo", false)
+
+	if err == nil || !strings.Contains(err.Error(), "invalid default branch name") {
+		t.Fatalf("checkoutUpdatedDefaultBranch() error = %v, want invalid default branch rejection", err)
+	}
+}
+
 func TestApplyPatchToRepoScopesCommitToPatchIndex(t *testing.T) {
 	repoDir := initPRTransferRepo(t)
 	prependFakeGH(t, "if [ \"$1\" = \"api\" ] && [ \"$2\" = \"/repos/target-owner/target-repo\" ]; then echo main; exit 0; fi\necho unexpected gh \"$@\" >&2\nexit 1\n")

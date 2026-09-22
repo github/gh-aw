@@ -63,8 +63,8 @@ function parseMaxCount(envValue, defaultValue = 3) {
  * @param {any} params.item - Safe output item with optional item_number, issue_number, or pull_request_number
  * @param {any} params.context - GitHub Actions context
  * @param {string} params.itemType - Type of item being processed (for error messages)
- * @param {boolean} params.supportsPR - When true, handler supports BOTH issues and PRs (e.g., add_labels)
- *                                       When false, handler supports PRs ONLY (e.g., add_reviewers)
+ * @param {boolean} [params.supportsPR] - When true, handler supports BOTH issues and PRs (e.g., add_labels)
+ *                                         When false, handler supports PRs ONLY (e.g., add_reviewers)
  * @param {boolean} [params.supportsIssue] - When true, handler supports issues ONLY (e.g., update_issue)
  *                                           Optional; defaults to false.
  * @returns {{success: true, number: number, contextType: string} | {success: false, error: string, shouldFail: boolean}} Resolution result
@@ -128,6 +128,7 @@ function resolveTarget(params) {
   // Resolve target number
   let itemNumber;
   let contextType;
+  let authorizedTargetNumber;
 
   if (target === "*") {
     // Use item_number, issue_number, or pull_request_number (aliases: pr_number, pr, pull_number) from item
@@ -211,12 +212,14 @@ function resolveTarget(params) {
         shouldFail: true,
       };
     }
+    authorizedTargetNumber = itemNumber;
     contextType = supportsPR || supportsIssue ? "issue" : "pull request";
   } else {
     // Use triggering context
     if (isIssueContext) {
       if (effectivePayload.issue) {
         itemNumber = effectivePayload.issue.number;
+        authorizedTargetNumber = itemNumber;
         contextType = "issue";
       } else {
         return {
@@ -228,9 +231,11 @@ function resolveTarget(params) {
     } else if (isPRContext) {
       if (effectivePayload.pull_request) {
         itemNumber = effectivePayload.pull_request.number;
+        authorizedTargetNumber = itemNumber;
         contextType = "pull request";
       } else if (isIssueCommentOnPR) {
         itemNumber = effectivePayload.issue.number;
+        authorizedTargetNumber = itemNumber;
         contextType = "pull request";
       } else {
         return {
@@ -251,11 +256,59 @@ function resolveTarget(params) {
     };
   }
 
+  const authorizationInvariant = assertTargetAuthorizationInvariant({
+    targetConfig: target,
+    resolvedNumber: itemNumber,
+    authorizedNumber: authorizedTargetNumber,
+    itemType,
+  });
+  if (!authorizationInvariant.success) {
+    return authorizationInvariant;
+  }
+
   return {
     success: true,
     number: itemNumber,
     contextType: contextType || (supportsPR || supportsIssue ? "issue" : "pull request"),
   };
+}
+
+/**
+ * Fail closed when configured target authorization and resolved target diverge.
+ * For non-wildcard targets, the authorized target must come from trusted
+ * configuration or triggering context, never from agent-supplied item fields.
+ *
+ * @param {Object} params
+ * @param {string|undefined} params.targetConfig
+ * @param {number|undefined} params.resolvedNumber
+ * @param {number|undefined} params.authorizedNumber
+ * @param {string} params.itemType
+ * @returns {{success: true} | {success: false, error: string, shouldFail: boolean}}
+ */
+function assertTargetAuthorizationInvariant(params) {
+  const { targetConfig, resolvedNumber, authorizedNumber, itemType } = params;
+  const target = targetConfig || "triggering";
+  if (target === "*") {
+    return { success: true };
+  }
+
+  if (typeof authorizedNumber !== "number" || !Number.isInteger(authorizedNumber) || authorizedNumber <= 0) {
+    return {
+      success: false,
+      error: `ERR_TARGET_AUTHORIZATION: could not determine authorized target for ${itemType}`,
+      shouldFail: true,
+    };
+  }
+
+  if (resolvedNumber !== authorizedNumber) {
+    return {
+      success: false,
+      error: `ERR_TARGET_AUTHORIZATION: resolved target #${resolvedNumber} does not match authorized target #${authorizedNumber} for ${itemType}`,
+      shouldFail: true,
+    };
+  }
+
+  return { success: true };
 }
 
 /**
@@ -485,6 +538,7 @@ module.exports = {
   parseAllowedItems,
   parseMaxCount,
   resolveTarget,
+  assertTargetAuthorizationInvariant,
   loadCustomSafeOutputJobTypes,
   loadCustomSafeOutputScriptHandlers,
   loadCustomSafeOutputActionHandlers,

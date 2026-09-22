@@ -16,9 +16,6 @@ tracker-id: api-consumption-report-daily
 engine:
   id: codex
   model-provider: github
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cache-memory: true
   cli-proxy: true

@@ -7,6 +7,9 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
+
+const HANDLER_TYPE = "link_sub_issue";
 const { linkSubIssue } = require("./sub_issue_helpers.cjs");
 
 /**
@@ -22,6 +25,7 @@ async function main(config = {}) {
   const subRequiredLabels = config.sub_required_labels || [];
   const subTitlePrefix = config.sub_title_prefix || "";
   const maxCount = config.max || 5;
+  const targetConfig = config.target || "triggering";
   const githubClient = await createAuthenticatedGitHubClient(config);
 
   // Check if we're in staged mode
@@ -94,13 +98,20 @@ async function main(config = {}) {
     // Convert resolvedTemporaryIds to a normalized Map for resolveIssueNumber
     const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
-    // Resolve issue numbers, supporting temporary IDs from create_issue job
-    const parentResolved = resolveRepoIssueTarget(item.parent_issue_number, temporaryIdMap, itemOwner, itemRepo);
+    // Resolve the sub-issue from model output. The configured target controls the parent.
     const subResolved = resolveRepoIssueTarget(item.sub_issue_number, temporaryIdMap, itemOwner, itemRepo);
+    let parentResolved;
+    let targetItem = item;
+    if (targetConfig === "*") {
+      parentResolved = resolveRepoIssueTarget(item.parent_issue_number, temporaryIdMap, itemOwner, itemRepo);
+      if (parentResolved.resolved) {
+        targetItem = { ...item, issue_number: parentResolved.resolved.number };
+      }
+    }
 
     // Check if either parent or sub issue is an unresolved temporary ID
     // If so, defer the operation to allow for resolution later
-    const hasUnresolvedParent = parentResolved.wasTemporaryId && !parentResolved.resolved;
+    const hasUnresolvedParent = parentResolved?.wasTemporaryId && !parentResolved.resolved;
     const hasUnresolvedSub = subResolved.wasTemporaryId && !subResolved.resolved;
 
     if (hasUnresolvedParent || hasUnresolvedSub) {
@@ -124,7 +135,7 @@ async function main(config = {}) {
     }
 
     // Check for other resolution errors (non-temporary ID issues)
-    if (parentResolved.errorMessage) {
+    if (parentResolved?.errorMessage) {
       core.warning(`Failed to resolve parent issue: ${parentResolved.errorMessage}`);
       return {
         parent_issue_number: item.parent_issue_number,
@@ -144,8 +155,23 @@ async function main(config = {}) {
       };
     }
 
-    const parentIssueNumber = parentResolved.resolved?.number;
     const subIssueNumber = subResolved.resolved?.number;
+    const parentTarget = resolveTarget({
+      targetConfig,
+      item: targetItem,
+      context,
+      itemType: HANDLER_TYPE,
+      supportsIssue: true,
+    });
+    if (!parentTarget.success) {
+      return {
+        parent_issue_number: item.parent_issue_number,
+        sub_issue_number: item.sub_issue_number,
+        success: false,
+        error: parentTarget.error,
+      };
+    }
+    const parentIssueNumber = parentTarget.number;
 
     if (!parentIssueNumber || !subIssueNumber) {
       core.error("Internal error: Issue numbers are undefined after successful resolution");
@@ -157,16 +183,19 @@ async function main(config = {}) {
       };
     }
 
-    if (parentResolved.wasTemporaryId && parentResolved.resolved) {
+    if (parentResolved?.wasTemporaryId && parentResolved.resolved) {
       core.info(`Resolved parent temporary ID '${item.parent_issue_number}' to ${parentResolved.resolved.owner}/${parentResolved.resolved.repo}#${parentIssueNumber}`);
     }
     if (subResolved.wasTemporaryId && subResolved.resolved) {
       core.info(`Resolved sub-issue temporary ID '${item.sub_issue_number}' to ${subResolved.resolved.owner}/${subResolved.resolved.repo}#${subIssueNumber}`);
     }
 
+    const owner = parentResolved?.resolved?.owner || itemOwner;
+    const repo = parentResolved?.resolved?.repo || itemRepo;
+
     // Sub-issue linking is only supported within the same repository.
-    if (parentResolved.resolved && subResolved.resolved) {
-      const parentRepoSlug = `${parentResolved.resolved.owner}/${parentResolved.resolved.repo}`;
+    if (subResolved.resolved) {
+      const parentRepoSlug = `${owner}/${repo}`;
       const subRepoSlug = `${subResolved.resolved.owner}/${subResolved.resolved.repo}`;
       if (parentRepoSlug !== subRepoSlug) {
         const error = `Parent and sub-issue must be in the same repository for link_sub_issue (got ${parentRepoSlug} and ${subRepoSlug})`;
@@ -178,10 +207,20 @@ async function main(config = {}) {
           error,
         };
       }
-    }
 
-    const owner = parentResolved.resolved?.owner || itemOwner;
-    const repo = parentResolved.resolved?.repo || itemRepo;
+      // Validate the effective parent/sub-issue pair (after applying `target`), not the
+      // raw model-provided values which may have been overridden by a fixed/triggering target.
+      if (parentRepoSlug === subRepoSlug && parentIssueNumber === subIssueNumber) {
+        const error = `Parent and sub-issue must be different (both resolve to #${parentIssueNumber})`;
+        core.warning(error);
+        return {
+          parent_issue_number: item.parent_issue_number,
+          sub_issue_number: item.sub_issue_number,
+          success: false,
+          error,
+        };
+      }
+    }
 
     // Fetch parent issue to validate filters
     let parentIssue;

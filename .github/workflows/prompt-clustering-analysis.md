@@ -109,9 +109,6 @@ timeout-minutes: 20
 features:
   gh-aw-detection: true
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Copilot Agent Prompt Clustering Analysis

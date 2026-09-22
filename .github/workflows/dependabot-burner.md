@@ -287,9 +287,6 @@ evals:
     question: Did the agent create a remediation pull request or clearly report why no remediation was needed?
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Dependabot Burner

@@ -38,9 +38,6 @@ evals:
     question: Did the agent apply at least one label to an unlabeled issue, or correctly skip when no unlabeled issues were found?
   - id: allowed_labels_only
     question: Does the agent output show that only labels from the allowed set were applied to issues?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Issue Triage Agent

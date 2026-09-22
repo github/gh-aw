@@ -15,9 +15,6 @@ engine:
   id: codex
   model-provider: openai
 strict: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:

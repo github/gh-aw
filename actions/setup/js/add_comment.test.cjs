@@ -283,7 +283,7 @@ describe("add_comment", () => {
       expect(result.error).toBeTruthy();
     });
 
-    it("should use explicit item_number even with triggering target", async () => {
+    it("should ignore explicit item_number with triggering target", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
       /** @type {any} */
@@ -310,8 +310,8 @@ describe("add_comment", () => {
       const result = await handler(message, {});
 
       expect(result.success).toBe(true);
-      expect(capturedIssueNumber).toBe(777);
-      expect(result.itemNumber).toBe(777);
+      expect(capturedIssueNumber).toBe(8535);
+      expect(result.itemNumber).toBe(8535);
     });
 
     it("should resolve from context when item_number is not provided", async () => {
@@ -545,7 +545,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -1055,7 +1055,7 @@ describe("add_comment", () => {
         throw err;
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       // Explicit item_number targeting a different discussion (via 404 fallback)
       const message = {
@@ -1117,7 +1117,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -1179,7 +1179,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -1302,7 +1302,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -1364,7 +1364,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -1997,7 +1997,7 @@ describe("add_comment", () => {
         }
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2198,7 +2198,7 @@ describe("add_comment", () => {
         }
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2257,7 +2257,7 @@ describe("add_comment", () => {
         }
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2292,7 +2292,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2315,7 +2315,7 @@ describe("add_comment", () => {
     it("should defer when temporary ID is not yet resolved", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2348,7 +2348,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2370,7 +2370,7 @@ describe("add_comment", () => {
     it("should handle invalid temporary ID format", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2439,7 +2439,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2472,7 +2472,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -2495,7 +2495,7 @@ describe("add_comment", () => {
     it("should defer when issue_number has unresolved temporary ID", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -3079,7 +3079,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",
@@ -3124,7 +3124,7 @@ describe("add_comment", () => {
         };
       };
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({}); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: '*' }); })()`);
 
       const message = {
         type: "add_comment",

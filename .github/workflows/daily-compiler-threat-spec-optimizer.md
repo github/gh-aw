@@ -49,7 +49,6 @@ post-steps:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   bash:
   - git

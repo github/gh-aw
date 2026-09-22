@@ -48,7 +48,6 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 evals:
   - id: large_files_analyzed
     question: Did the agent analyze the largest Go source files in the repository?

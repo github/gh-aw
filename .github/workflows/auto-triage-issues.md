@@ -74,9 +74,6 @@ safe-outputs:
 timeout-minutes: 15
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: labels-applied
     question: Did the agent apply at least one label to an unlabeled issue, or correctly call noop when no unlabeled issues were found?

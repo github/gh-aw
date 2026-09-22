@@ -31,9 +31,6 @@ timeout-minutes: 30
 safe-outputs:
   noop:
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

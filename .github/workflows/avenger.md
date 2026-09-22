@@ -36,7 +36,6 @@ tools:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
     mounts:
       - "/usr/bin/make:/usr/bin/make:ro"
       - "/usr/local/bin/node:/usr/local/bin/node:ro"

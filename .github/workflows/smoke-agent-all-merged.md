@@ -21,7 +21,6 @@ permissions:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 name: "Smoke Agent: all/merged"
 engine: claude
 strict: true

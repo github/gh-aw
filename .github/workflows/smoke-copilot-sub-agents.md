@@ -53,7 +53,6 @@ evals:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 ---
 

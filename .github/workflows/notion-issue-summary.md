@@ -28,9 +28,6 @@ engine:
   model-provider: openai
 model: openai/gpt-5.3-codex
 strict: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 ### Issue Summary to Notion

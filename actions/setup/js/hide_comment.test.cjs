@@ -38,12 +38,27 @@ describe("hide_comment.cjs", () => {
     vi.resetAllMocks();
     delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
 
-    // Default successful graphql mock
-    mockGithub.graphql.mockResolvedValue({
-      minimizeComment: { minimizedComment: { isMinimized: true } },
+    mockGithub.graphql.mockImplementation(query => {
+      if (query.includes("query ($nodeId")) {
+        return Promise.resolve({
+          node: {
+            __typename: "IssueComment",
+            issue: {
+              number: 42,
+              repository: { nameWithOwner: "testowner/testrepo" },
+            },
+          },
+        });
+      }
+      return Promise.resolve({
+        minimizeComment: { minimizedComment: { isMinimized: true } },
+      });
     });
     mockGithub.rest.issues.getComment.mockResolvedValue({
-      data: { node_id: "IC_kwDOABCD123456" },
+      data: {
+        node_id: "IC_kwDOABCD123456",
+        issue_url: "https://api.github.com/repos/testowner/testrepo/issues/42",
+      },
     });
   });
 
@@ -196,6 +211,35 @@ describe("hide_comment.cjs", () => {
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });
 
+    it("should reject a discussion comment for target: triggering when triggered by an issue with the same number", async () => {
+      // Issue #42 triggered the run, but the resolved comment belongs to discussion #42
+      // (discussions use a separate numbering sequence from issues/PRs).
+      mockGithub.graphql.mockImplementation(query => {
+        if (query.includes("query ($nodeId")) {
+          return Promise.resolve({
+            node: {
+              __typename: "DiscussionComment",
+              discussion: {
+                number: 42,
+                repository: { nameWithOwner: "testowner/testrepo" },
+              },
+            },
+          });
+        }
+        return Promise.resolve({
+          minimizeComment: { minimizedComment: { isMinimized: true } },
+        });
+      });
+
+      const { main } = await loadModule();
+      const handler = await main({ target: "triggering" });
+
+      const result = await handler({ comment_id: "IC_someDiscussionCommentId", reason: "SPAM" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("discussion");
+    });
+
     it("should enforce max count limit", async () => {
       const { main } = await loadModule();
       const handler = await main({ max: 2 });
@@ -206,7 +250,7 @@ describe("hide_comment.cjs", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("Max count");
-      expect(mockGithub.graphql).toHaveBeenCalledTimes(2);
+      expect(mockGithub.graphql).toHaveBeenCalledTimes(4);
     });
 
     it("should reject reason not in allowed-reasons list", async () => {
@@ -243,8 +287,21 @@ describe("hide_comment.cjs", () => {
 
     it("should return failure when comment is not minimized", async () => {
       const { main } = await loadModule();
-      mockGithub.graphql.mockResolvedValue({
-        minimizeComment: { minimizedComment: { isMinimized: false } },
+      mockGithub.graphql.mockImplementation(query => {
+        if (query.includes("query ($nodeId")) {
+          return Promise.resolve({
+            node: {
+              __typename: "IssueComment",
+              issue: {
+                number: 42,
+                repository: { nameWithOwner: "testowner/testrepo" },
+              },
+            },
+          });
+        }
+        return Promise.resolve({
+          minimizeComment: { minimizedComment: { isMinimized: false } },
+        });
       });
       const handler = await main();
 
@@ -265,7 +322,8 @@ describe("hide_comment.cjs", () => {
       expect(result.staged).toBe(true);
       expect(result.previewInfo?.commentId).toBe("IC_kwDOABCD123456");
       expect(result.previewInfo?.reason).toBe("ABUSE");
-      expect(mockGithub.graphql).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).toHaveBeenCalledTimes(1);
+      expect(mockGithub.graphql).not.toHaveBeenCalledWith(expect.stringContaining("minimizeComment"), expect.any(Object));
     });
   });
 });

@@ -283,6 +283,46 @@ func TestValidateSafeOutputsTarget(t *testing.T) {
 			wantErr: true,
 			errText: "invalid target value for submit-pull-request-review: \"invalid-value\"",
 		},
+		{
+			name: "invalid target for unassign-from-user",
+			config: &SafeOutputsConfig{
+				UnassignFromUser: &UnassignFromUserConfig{
+					SafeOutputTargetConfig: SafeOutputTargetConfig{Target: "invalid-value"},
+				},
+			},
+			wantErr: true,
+			errText: "invalid target value for unassign-from-user: \"invalid-value\"",
+		},
+		{
+			name: "invalid target for set-issue-type",
+			config: &SafeOutputsConfig{
+				SetIssueType: &SetIssueTypeConfig{
+					SafeOutputTargetConfig: SafeOutputTargetConfig{Target: "invalid-value"},
+				},
+			},
+			wantErr: true,
+			errText: "invalid target value for set-issue-type: \"invalid-value\"",
+		},
+		{
+			name: "invalid target for set-issue-field",
+			config: &SafeOutputsConfig{
+				SetIssueField: &SetIssueFieldConfig{
+					SafeOutputTargetConfig: SafeOutputTargetConfig{Target: "invalid-value"},
+				},
+			},
+			wantErr: true,
+			errText: "invalid target value for set-issue-field: \"invalid-value\"",
+		},
+		{
+			name: "invalid target for resolve-pull-request-review-thread",
+			config: &SafeOutputsConfig{
+				ResolvePullRequestReviewThread: &ResolvePullRequestReviewThreadConfig{
+					SafeOutputTargetConfig: SafeOutputTargetConfig{Target: "invalid-value"},
+				},
+			},
+			wantErr: true,
+			errText: "invalid target value for resolve-pull-request-review-thread: \"invalid-value\"",
+		},
 	}
 
 	for _, tt := range tests {

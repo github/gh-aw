@@ -78,6 +78,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
+	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 	"github.com/github/gh-aw/pkg/linters/uncheckedflushreturn"
 	"github.com/github/gh-aw/pkg/linters/uncheckedtypeassertion"
 	"github.com/github/gh-aw/pkg/linters/walkfuncerrshadow"
@@ -98,7 +99,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 71 analyzers
+// "Public API > Subpackages" table. The README documents 72 analyzers
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -110,7 +111,7 @@ type docAnalyzer struct {
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
-//	tolowerequalfold, trimleftright, typeassertionokdiscarded, uncheckedflushreturn, uncheckedtypeassertion, walkfuncerrshadow, wgdonenotdeferred, writebytestring
+//	tolowerequalfold, trimleftright, typeassertionokdiscarded, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
 		{"appendbytestring", appendbytestring.Analyzer},
@@ -180,6 +181,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"tolowerequalfold", tolowerequalfold.Analyzer},
 		{"trimleftright", trimleftright.Analyzer},
 		{"typeassertionokdiscarded", typeassertionokdiscarded.Analyzer},
+		{"uncheckedsliceindex", uncheckedsliceindex.Analyzer},
 		{"uncheckedtypeassertion", uncheckedtypeassertion.Analyzer},
 		{"uncheckedflushreturn", uncheckedflushreturn.Analyzer},
 		{"walkfuncerrshadow", walkfuncerrshadow.Analyzer},

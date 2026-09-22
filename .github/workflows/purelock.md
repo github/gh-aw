@@ -162,9 +162,6 @@ safe-outputs:
     max-patch-files: 8
   upload-code-coverage:
   noop:
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: candidate_selected
     question: Did the agent select one pure function from the precomputed candidate list, skipping functions already recorded in cache memory?

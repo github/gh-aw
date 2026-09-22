@@ -8,7 +8,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
-const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
+const { isStagedMode, checkRequiredFilter, resolveTarget } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
@@ -45,6 +45,7 @@ async function main(config = {}) {
   // Extract configuration
   const allowedMilestones = config.allowed || [];
   const maxCount = config.max || 10;
+  const targetConfig = config.target || "triggering";
   const autoCreate = config.auto_create === true;
   const githubClient = await createAuthenticatedGitHubClient(config);
 
@@ -151,34 +152,46 @@ async function main(config = {}) {
     const milestoneOwner = repoResult.repoParts.owner;
     const milestoneRepo = repoResult.repoParts.repo;
 
-    // Resolve issue_number, which may be a temporary ID (e.g. "aw_abc123") or a plain number
-    const resolvedIssueTarget = resolveRepoIssueTarget(item.issue_number, temporaryIdMap, milestoneOwner, milestoneRepo);
-
-    // If the issue_number is a temporary ID that hasn't been resolved yet, defer processing
-    if (resolvedIssueTarget.wasTemporaryId && !resolvedIssueTarget.resolved) {
-      core.info(`Deferring assign_milestone: unresolved temporary ID (${item.issue_number})`);
-      return {
-        success: false,
-        deferred: true,
-        error: resolvedIssueTarget.errorMessage || `Unresolved temporary ID: ${item.issue_number}`,
-      };
+    let targetItem = item;
+    let resolvedIssueTarget;
+    if (targetConfig === "*" && item.issue_number != null) {
+      resolvedIssueTarget = resolveRepoIssueTarget(item.issue_number, temporaryIdMap, milestoneOwner, milestoneRepo);
+      if (resolvedIssueTarget.wasTemporaryId && !resolvedIssueTarget.resolved) {
+        core.info(`Deferring assign_milestone: unresolved temporary ID (${item.issue_number})`);
+        return {
+          success: false,
+          deferred: true,
+          error: resolvedIssueTarget.errorMessage || `Unresolved temporary ID: ${item.issue_number}`,
+        };
+      }
+      if (resolvedIssueTarget.errorMessage || !resolvedIssueTarget.resolved) {
+        core.error(`Invalid issue_number: ${item.issue_number}`);
+        return {
+          success: false,
+          error: `Invalid issue_number: ${item.issue_number}`,
+        };
+      }
+      targetItem = { ...item, issue_number: resolvedIssueTarget.resolved.number };
     }
 
-    if (resolvedIssueTarget.errorMessage || !resolvedIssueTarget.resolved) {
-      core.error(`Invalid issue_number: ${item.issue_number}`);
-      return {
-        success: false,
-        error: `Invalid issue_number: ${item.issue_number}`,
-      };
+    const numberResult = resolveTarget({
+      targetConfig,
+      item: targetItem,
+      context,
+      itemType: HANDLER_TYPE,
+      supportsIssue: true,
+    });
+    if (!numberResult.success) {
+      core.warning(numberResult.error);
+      return { success: false, error: numberResult.error };
     }
-
-    const issueNumber = resolvedIssueTarget.resolved.number;
+    const issueNumber = numberResult.number;
 
     const repoParts = { owner: milestoneOwner, repo: milestoneRepo };
     const filterResult = await checkRequiredFilter(githubClient, repoParts, issueNumber, requiredLabels, requiredTitlePrefix, "assign_milestone");
     if (filterResult) return filterResult;
 
-    if (resolvedIssueTarget.wasTemporaryId) {
+    if (resolvedIssueTarget?.wasTemporaryId) {
       core.info(`Resolved temporary ID '${item.issue_number}' to issue #${issueNumber}`);
     }
 

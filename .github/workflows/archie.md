@@ -46,9 +46,6 @@ safe-outputs:
 timeout-minutes: 10
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 evals:
   - id: mermaid_diagram_generated
     question: Did the agent generate a Mermaid diagram visualizing issue and pull request relationships?

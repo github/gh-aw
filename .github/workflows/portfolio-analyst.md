@@ -13,7 +13,6 @@ permissions:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
 
 tracker-id: portfolio-analyst
 engine: claude

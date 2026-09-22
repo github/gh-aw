@@ -10,6 +10,8 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { ERR_VALIDATION, ERR_API } = require("./error_codes.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 
 /**
  * Type constant for handler identification
@@ -48,7 +50,7 @@ async function hideCommentAPI(github, nodeId, reason = "spam") {
  * @param {any} github - GitHub client
  * @param {{owner?: string, repo?: string}|null|undefined} repoContext - Repository context
  * @param {string|number} commentId - GraphQL node ID or numeric REST comment ID
- * @returns {Promise<string>} GraphQL node ID
+ * @returns {Promise<{nodeId: string, itemNumber: number, repo: string, kind: "issue"|"discussion"}>} Resolved comment target
  */
 async function resolveCommentNodeId(github, repoContext, commentId) {
   if (typeof commentId === "string") {
@@ -57,9 +59,47 @@ async function resolveCommentNodeId(github, repoContext, commentId) {
       throw new Error(`${ERR_VALIDATION}: comment_id is required`);
     }
 
-    // GraphQL node IDs (e.g., IC_kwDOABCD123456) can be used directly.
     if (!/^\d+$/.test(trimmed)) {
-      return trimmed;
+      const query = /* GraphQL */ `
+        query ($nodeId: ID!) {
+          node(id: $nodeId) {
+            __typename
+            ... on IssueComment {
+              issue {
+                number
+                repository {
+                  nameWithOwner
+                }
+              }
+            }
+            ... on PullRequestReviewComment {
+              pullRequest {
+                number
+                repository {
+                  nameWithOwner
+                }
+              }
+            }
+            ... on DiscussionComment {
+              discussion {
+                number
+                repository {
+                  nameWithOwner
+                }
+              }
+            }
+          }
+        }
+      `;
+      const result = await github.graphql(query, { nodeId: trimmed });
+      const parent = result?.node?.issue || result?.node?.pullRequest || result?.node?.discussion;
+      const itemNumber = parent?.number;
+      const repo = parent?.repository?.nameWithOwner;
+      if (!Number.isInteger(itemNumber) || itemNumber <= 0 || !repo) {
+        throw new Error(`${ERR_VALIDATION}: comment_id must reference a comment on an issue, pull request, or discussion`);
+      }
+      const kind = result?.node?.discussion ? "discussion" : "issue";
+      return { nodeId: trimmed, itemNumber, repo, kind };
     }
 
     commentId = Number.parseInt(trimmed, 10);
@@ -79,12 +119,17 @@ async function resolveCommentNodeId(github, repoContext, commentId) {
     comment_id: commentId,
   });
 
-  const nodeId = comment && comment.data ? comment.data.node_id : null;
+  const nodeId = comment?.data?.node_id;
+  const issueURL = comment?.data?.issue_url || "";
+  const match = String(issueURL).match(/\/repos\/([^/]+)\/([^/]+)\/issues\/(\d+)(?:[#/?]|$)/);
   if (!nodeId || typeof nodeId !== "string") {
     throw new Error(`${ERR_API}: Failed to resolve GraphQL node ID for comment_id ${commentId}: comment not found or node_id unavailable`);
   }
+  if (!match) {
+    throw new Error(`${ERR_API}: Failed to resolve parent item for comment_id ${commentId}`);
+  }
 
-  return nodeId;
+  return { nodeId, itemNumber: Number(match[3]), repo: `${match[1]}/${match[2]}`, kind: "issue" };
 }
 
 /**
@@ -96,6 +141,8 @@ async function main(config = {}) {
   // Extract configuration
   const allowedReasons = config.allowed_reasons || [];
   const maxCount = config.max || 5;
+  const targetConfig = config.target || "triggering";
+  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const githubClient = await createAuthenticatedGitHubClient(config);
 
   // Check if we're in staged mode
@@ -136,6 +183,13 @@ async function main(config = {}) {
           error: "comment_id is required",
         };
       }
+      const isNumericCommentId = typeof commentId === "number" || (typeof commentId === "string" && /^\d+$/.test(commentId.trim()));
+      if (isNumericCommentId && (!context?.repo?.owner || !context?.repo?.repo)) {
+        return {
+          success: false,
+          error: "Unable to resolve numeric comment_id: repository context (owner/repo) is not available",
+        };
+      }
 
       // Normalize reason to uppercase for GitHub API
       const normalizedReason = (message.reason || "SPAM").toUpperCase();
@@ -152,6 +206,58 @@ async function main(config = {}) {
         }
       }
 
+      const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "comment");
+      if (!repoResult.success) {
+        return { success: false, error: repoResult.error };
+      }
+      const selectedRepo = repoResult.repo;
+      const resolvedComment = await resolveCommentNodeId(githubClient, repoResult.repoParts, commentId);
+      if (resolvedComment.repo.toLowerCase() !== selectedRepo.toLowerCase()) {
+        return {
+          success: false,
+          error: `Comment belongs to repository ${resolvedComment.repo}, but target repository is ${selectedRepo}`,
+        };
+      }
+
+      let expectedNumber;
+      let expectedKind;
+      if (targetConfig === "triggering") {
+        const invocationContext = resolveInvocationContext(context);
+        if (invocationContext.eventPayload?.discussion?.number) {
+          expectedNumber = invocationContext.eventPayload.discussion.number;
+          expectedKind = "discussion";
+        } else {
+          expectedNumber = invocationContext.eventPayload?.issue?.number ?? invocationContext.eventPayload?.pull_request?.number;
+          expectedKind = "issue";
+        }
+        if (!expectedNumber) {
+          return {
+            success: false,
+            error: 'Target is "triggering" but not running in issue, pull request, or discussion context',
+          };
+        }
+      } else if (targetConfig !== "*") {
+        expectedNumber = Number(targetConfig);
+        if (!Number.isInteger(expectedNumber) || expectedNumber <= 0) {
+          return {
+            success: false,
+            error: `Invalid target configuration: ${targetConfig}`,
+          };
+        }
+      }
+      if (expectedNumber && resolvedComment.itemNumber !== expectedNumber) {
+        return {
+          success: false,
+          error: `Comment belongs to item #${resolvedComment.itemNumber}, but target is #${expectedNumber}`,
+        };
+      }
+      if (expectedKind && resolvedComment.kind !== expectedKind) {
+        return {
+          success: false,
+          error: `Comment belongs to a ${resolvedComment.kind === "discussion" ? "discussion" : "issue/pull request"}, but the triggering item is a ${expectedKind === "discussion" ? "discussion" : "issue/pull request"} (#${expectedNumber})`,
+        };
+      }
+
       core.info(`Hiding comment: ${commentId} (reason: ${normalizedReason})`);
 
       // If in staged mode, preview without executing
@@ -162,19 +268,20 @@ async function main(config = {}) {
           staged: true,
           previewInfo: {
             commentId,
+            itemNumber: resolvedComment.itemNumber,
+            repo: resolvedComment.repo,
             reason: normalizedReason,
           },
         };
       }
 
-      const resolvedNodeId = await resolveCommentNodeId(githubClient, context && context.repo ? context.repo : null, commentId);
-      const hideResult = await hideCommentAPI(githubClient, resolvedNodeId, normalizedReason);
+      const hideResult = await hideCommentAPI(githubClient, resolvedComment.nodeId, normalizedReason);
 
       if (hideResult.isMinimized) {
-        core.info(`Successfully hidden comment: ${resolvedNodeId}`);
+        core.info(`Successfully hidden comment: ${resolvedComment.nodeId}`);
         return {
           success: true,
-          comment_id: resolvedNodeId,
+          comment_id: resolvedComment.nodeId,
           is_hidden: true,
         };
       } else {

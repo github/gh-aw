@@ -59,9 +59,6 @@ evals:
     question: Did the agent process at least one Go package for specification-driven test generation?
   - id: pr_created_or_noop
     question: Was a pull request created with new or updated test suites, or was noop used when no packages required test generation?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Package Specification Enforcer

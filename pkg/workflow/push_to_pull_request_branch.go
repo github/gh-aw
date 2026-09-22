@@ -20,7 +20,7 @@ type PushToPullRequestBranchConfig struct {
 	IfNoChanges                    string           `yaml:"if-no-changes,omitempty"`                       // Behavior when no changes to push: "warn", "error", or "ignore" (default: "warn")
 	IgnoreMissingBranchFailure     bool             `yaml:"ignore-missing-branch-failure,omitempty"`       // When true, missing/deleted target branches are treated as skipped instead of hard failures.
 	CommitTitleSuffix              string           `yaml:"commit-title-suffix,omitempty"`                 // Optional suffix to append to generated commit titles
-	GithubTokenForExtraEmptyCommit string           `yaml:"github-token-for-extra-empty-commit,omitempty"` // Token used to push an empty commit to trigger CI events. Use a PAT or "app" for GitHub App auth.
+	GithubTokenForExtraEmptyCommit string           `yaml:"github-token-for-extra-empty-commit,omitempty"` // Token used to push an empty commit to trigger CI events. Use a PAT, "app" for GitHub App auth, or "none" to disable the extra empty commit.
 	TargetRepoSlug                 string           `yaml:"target-repo,omitempty"`                         // Target repository in format "owner/repo" for cross-repository push to pull request branch
 	HeadRepoSlug                   string           `yaml:"head-repo,omitempty"`                           // Head repository in format "owner/repo" for allowed fork-backed pull request updates
 	HeadGitHubToken                string           `yaml:"head-github-token,omitempty"`                   // GitHub token used for branch writes to the head repository when it differs from the target repo

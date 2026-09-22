@@ -630,6 +630,11 @@
       "digest": "sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560",
       "pinned_image": "ghcr.io/github/github-mcp-server:v1.12.1@sha256:0ba840c46a237879c8300e7fddb0b6347f20e029ccb9cbe2ce4a943daa1ff560"
     },
+    "ghcr.io/github/github-mcp-server:v1.12.2": {
+      "image": "ghcr.io/github/github-mcp-server:v1.12.2",
+      "digest": "sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6",
+      "pinned_image": "ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"
+    },
     "ghcr.io/oraios/serena:1.7.0": {
       "image": "ghcr.io/oraios/serena:1.7.0",
       "digest": "sha256:6c9459e4246a39c9deaa4f23fb05a526ac6e237b24c8e84a927a098fa1ab6730",

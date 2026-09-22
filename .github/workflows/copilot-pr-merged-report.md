@@ -51,9 +51,6 @@ evals:
     question: Did the agent analyze Copilot pull requests merged in the last 24 hours?
   - id: report_created
     question: Was a daily report created tracking code generation, tests, and token usage trends?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Daily Copilot PR Merged Report

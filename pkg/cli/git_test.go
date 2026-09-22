@@ -48,6 +48,52 @@ func TestIsSafeGitRevisionArg(t *testing.T) {
 	}
 }
 
+func TestValidateGitBranchArg(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		branchName  string
+		label       string
+		wantErr     bool
+		errContains string
+	}{
+		{"empty", "", "branch name", true, "must not be empty"},
+		{"leading dash", "-oops", "branch name", true, "must not start with '-' or contain control characters"},
+		{"option-like", "--upload-pack=evil", "branch name", true, "must not start with '-' or contain control characters"},
+		{"control character", "origin/main\n--help", "branch name", true, "must not start with '-' or contain control characters"},
+		{"valid branch", "main", "branch name", false, ""},
+		{"custom label", "", "default branch name", true, "invalid default branch name"},
+		{"custom label option-like", "--upload-pack=evil", "default branch name", true, "invalid default branch name \"--upload-pack=evil\": must not start with '-' or contain control characters"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateGitBranchArg(tt.branchName, tt.label)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errContains)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBranchOperationsRejectUnsafeRevisionArgs(t *testing.T) {
+	t.Parallel()
+
+	for name, operation := range map[string]func(string, bool) error{
+		"create and switch": createAndSwitchBranch,
+		"switch":            switchBranch,
+		"push":              pushBranch,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.ErrorContains(t, operation("--upload-pack=evil", false), "invalid branch name")
+		})
+	}
+}
+
 func TestValidateRelPathForGit(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

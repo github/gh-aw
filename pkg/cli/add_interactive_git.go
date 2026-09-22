@@ -243,11 +243,8 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 	return nil
 }
 
-// updateLocalBranch fetches and pulls the latest changes from GitHub after PR merge.
-// It switches to the default branch before pulling so that the working tree contains
-// the merged workflow files, which are required when offering to run the workflow.
-func (c *AddInteractiveConfig) updateLocalBranch() error {
-	addInteractiveLog.Print("Updating local branch with merged changes")
+// resolveDefaultBranch queries GitHub and falls back to the local origin, then main on failure.
+func (c *AddInteractiveConfig) resolveDefaultBranch() string {
 	// Get the default branch name using gh
 	output, err := workflow.RunGHCombined("Getting default branch...", "repo", "view", "--repo", c.RepoOverride, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
 	defaultBranch := ""
@@ -266,6 +263,19 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 	}
 	if defaultBranch == "" {
 		defaultBranch = "main"
+	}
+	return defaultBranch
+}
+
+// updateLocalBranch fetches and pulls the latest changes from GitHub after PR merge.
+// It switches to the default branch before pulling so that the working tree contains
+// the merged workflow files, which are required when offering to run the workflow.
+func (c *AddInteractiveConfig) updateLocalBranch() error {
+	addInteractiveLog.Print("Updating local branch with merged changes")
+
+	defaultBranch := c.resolveDefaultBranch()
+	if err := validateGitBranchArg(defaultBranch, "default branch name"); err != nil {
+		return err
 	}
 	addInteractiveLog.Printf("Default branch: %s", defaultBranch)
 
