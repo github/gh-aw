@@ -1018,7 +1018,9 @@ function removeExplicitPromptOptions(args) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (isPromptOption(arg)) {
-      i++;
+      if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+        i++;
+      }
       continue;
     }
     if (isInlinePromptOption(arg)) {
@@ -1077,10 +1079,8 @@ function resolvePromptFileInput(args) {
     }
   }
 
-  if (promptStdin) {
-    return { args: removeExplicitPromptOptions(resolvedArgs), stdin: promptStdin };
-  }
-  return { args: resolvedArgs, stdin: promptStdin };
+  const finalArgs = promptStdin ? removeExplicitPromptOptions(resolvedArgs) : resolvedArgs;
+  return { args: finalArgs, stdin: promptStdin };
 }
 
 /**
