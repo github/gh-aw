@@ -3,6 +3,8 @@ package workflow
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 const safeOutputsDocsURL = "https://github.github.com/gh-aw/reference/safe-outputs/"
@@ -39,6 +41,16 @@ func getSafeOutputSecretRequirements(data *WorkflowData) []safeOutputSecretRequi
 		strings.TrimSpace(config.Env["GH_AW_LINEAR_TOKEN"]) == "" {
 		requirements = append(requirements, safeOutputSecretRequirement{
 			secretNames: []string{"LINEAR_API_KEY"},
+			name:        "Linear safe outputs",
+			docsAnchor:  "#linear-safe-outputs",
+		})
+	}
+	if config.LinearCreateIssue != nil &&
+		(strings.TrimSpace(config.LinearCreateIssue.TeamID) == constants.LinearTeamIDExpr ||
+			(strings.TrimSpace(config.LinearCreateIssue.TeamID) == "" &&
+				strings.TrimSpace(config.Env["LINEAR_TEAM_ID"]) == "")) {
+		requirements = append(requirements, safeOutputSecretRequirement{
+			secretNames: []string{"LINEAR_TEAM_ID"},
 			name:        "Linear safe outputs",
 			docsAnchor:  "#linear-safe-outputs",
 		})

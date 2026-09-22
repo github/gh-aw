@@ -2783,7 +2783,7 @@ This section provides complete definitions for all remaining safe output types. 
 **Configuration**:
 
 - `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID or GitHub Actions expression, falling back to `LINEAR_TEAM_ID`
+- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID or GitHub Actions expression, falling back to the `LINEAR_TEAM_ID` secret
 - `linear-create-issue.project-id`: OPTIONAL trusted Linear project URL identifier or model UUID, falling back to `LINEAR_PROJECT_ID`
 - `linear-create-issue.max`: Operation limit (default: 1)
 - `linear-create-issue.staged`: Staged mode override

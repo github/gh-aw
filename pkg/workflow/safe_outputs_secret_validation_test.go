@@ -22,20 +22,36 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 			{secretNames: []string{"JIRA_USER_EMAIL"}, name: "Jira safe outputs", docsAnchor: "#jira-safe-outputs"},
 			{secretNames: []string{"JIRA_API_TOKEN"}, name: "Jira safe outputs", docsAnchor: "#jira-safe-outputs"},
 			{secretNames: []string{"LINEAR_API_KEY"}, name: "Linear safe outputs", docsAnchor: "#linear-safe-outputs"},
+			{secretNames: []string{"LINEAR_TEAM_ID"}, name: "Linear safe outputs", docsAnchor: "#linear-safe-outputs"},
 			{secretNames: []string{"AZURE_DEVOPS_EXT_PAT"}, name: "Azure DevOps safe outputs", docsAnchor: "#azure-devops-work-items"},
 		}, requirements)
+	})
+
+	t.Run("omits team ID check when explicitly configured", func(t *testing.T) {
+		requirements := getSafeOutputSecretRequirements(&WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{
+				LinearCreateIssue: &LinearCreateIssueConfig{
+					TeamID: "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+				},
+				LinearToken: "${{ secrets.CUSTOM_LINEAR_TOKEN }}",
+			},
+		})
+
+		assert.Empty(t, requirements)
 	})
 
 	t.Run("omits checks when credentials are provided in safe outputs frontmatter", func(t *testing.T) {
 		requirements := getSafeOutputSecretRequirements(&WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{
-				JiraAddComment:   &JiraSafeOutputConfig{},
-				LinearAddComment: &LinearTargetConfig{},
-				UpdateWorkItems:  &UpdateWorkItemConfig{},
-				LinearToken:      "${{ secrets.CUSTOM_LINEAR_TOKEN }}",
+				JiraAddComment:    &JiraSafeOutputConfig{},
+				LinearAddComment:  &LinearTargetConfig{},
+				LinearCreateIssue: &LinearCreateIssueConfig{},
+				UpdateWorkItems:   &UpdateWorkItemConfig{},
+				LinearToken:       "${{ secrets.CUSTOM_LINEAR_TOKEN }}",
 				Env: map[string]string{
 					"JIRA_USER_EMAIL":      "${{ secrets.CUSTOM_JIRA_EMAIL }}",
 					"JIRA_API_TOKEN":       "${{ secrets.CUSTOM_JIRA_TOKEN }}",
+					"LINEAR_TEAM_ID":       "${{ secrets.CUSTOM_LINEAR_TEAM_ID }}",
 					"AZURE_DEVOPS_EXT_PAT": "${{ secrets.CUSTOM_ADO_PAT }}",
 				},
 			},
