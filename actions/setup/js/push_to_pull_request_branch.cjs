@@ -1455,6 +1455,11 @@ async function main(config = {}) {
         }
       }
 
+      const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+      if (!allowWorkflows && agentWorkflowFiles.length > 0) {
+        return buildWorkflowsScopeError("Branch", core);
+      }
+
       // Push the applied commits to the branch using signed GraphQL commits (outside patch try/catch so push failures are not misattributed)
       try {
         // GitHub intermittently fails its workflow-permission check with
@@ -1493,17 +1498,15 @@ async function main(config = {}) {
         // actionable error.  Otherwise the message is GitHub's transient permission-check
         // timeout (retries above are already exhausted), which is handled as a recoverable
         // push failure below so the changes are preserved in a fallback pull request.
-        const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
         const isWorkflowsScopeRejected = isWorkflowsScopeRejection(pushErrorMessage);
-        if (isWorkflowsScopeRejected && agentWorkflowFiles.length > 0) {
+        const isMissingWorkflowsScope = isWorkflowsScopeRejected && !allowWorkflows && agentWorkflowFiles.length > 0;
+        if (isMissingWorkflowsScope) {
           return buildWorkflowsScopeError("Branch", core);
         }
-        // No workflow files in the agent's own changeset, so the rejection is GitHub's
-        // transient permission-check timeout rather than a real scope problem.
-        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected;
+        const isWorkflowsScopeTimeout = isWorkflowsScopeRejected && !isMissingWorkflowsScope;
 
         const nonFastForwardPatterns = ["non-fast-forward", "rejected", "fetch first", "Updates were rejected"];
-        const isNonFastForward = nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
+        const isNonFastForward = !isWorkflowsScopeTimeout && nonFastForwardPatterns.some(pattern => pushErrorMessage.includes(pattern));
         let userMessage = isNonFastForward
           ? "Failed to push changes: remote PR branch changed while the workflow was running (non-fast-forward). Re-run the workflow on the latest PR branch state."
           : isWorkflowsScopeTimeout

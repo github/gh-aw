@@ -1242,20 +1242,20 @@ index 0000000..abc1234
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
-    const TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT = "Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.";
+    const TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT = "! [remote rejected] feature-branch -> feature-branch (Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.)";
 
     /**
      * Mocks git plumbing so the primary push path is reached with a clean, workflow-file-free
      * changeset, letting tests drive the pushSignedCommits outcome directly.
      */
-    function mockGitForPrimaryPush() {
+    function mockGitForPrimaryPush(changedFiles = "test.txt\n") {
       mockExec.getExecOutput = vi.fn().mockImplementation(async (cmd, args) => {
         const argList = Array.isArray(args) ? args : [];
         if (argList[0] === "log" && argList.includes(".github/workflows/")) {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
         if (argList[0] === "diff" && argList[1] === "--name-only") {
-          return { exitCode: 0, stdout: "test.txt\n", stderr: "" };
+          return { exitCode: 0, stdout: changedFiles, stderr: "" };
         }
         return { exitCode: 0, stdout: "abc123\n", stderr: "" };
       });
@@ -1318,37 +1318,51 @@ index 0000000..abc1234
       }
     });
 
-    it("should return a typed workflows_scope_required error when the primary push is rejected and the agent changed workflow files", async () => {
+    it("should create a fallback pull request after a persistent timeout when allow_workflows is true", async () => {
       vi.useFakeTimers();
       const pushSignedCommitsModule = require("./push_signed_commits.cjs");
-      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error("! [remote rejected] feature-branch -> feature-branch (`workflows` scope may be required.)"));
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockRejectedValue(new Error(TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT));
 
       try {
-        createPatchFile("should-return-workflows-scope-required-on-primary-push-rejec");
-        mockExec.getExecOutput = vi.fn().mockImplementation(async (cmd, args) => {
-          const argList = Array.isArray(args) ? args : [];
-          if (argList[0] === "log" && argList.includes(".github/workflows/")) {
-            return { exitCode: 0, stdout: "", stderr: "" };
-          }
-          if (argList[0] === "diff" && argList[1] === "--name-only") {
-            return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
-          }
-          return { exitCode: 0, stdout: "abc123\n", stderr: "" };
-        });
+        createPatchFile("should-fallback-after-timeout-with-workflows-permission");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
 
         const module = await loadModule();
-        const handler = await module.main({});
-        const resultPromise = handler({ branch: "should-return-workflows-scope-required-on-primary-push-rejec" }, {});
+        const handler = await module.main({ allow_workflows: true });
+        const resultPromise = handler({ branch: "should-fallback-after-timeout-with-workflows-permission" }, {});
 
         await vi.runAllTimersAsync();
         const result = await resultPromise;
 
-        expect(result.success).toBe(false);
-        expect(result.error_type).toBe("workflows_scope_required");
-        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+        expect(pushSignedSpy).toHaveBeenCalledTimes(6);
+        expect(result.success).toBe(true);
+        expect(result.fallback_used).toBe(true);
+        const [params] = mockGithub.rest.pulls.create.mock.calls.at(-1);
+        expect(params.body).toContain("workflow-permission check");
       } finally {
         pushSignedSpy.mockRestore();
         vi.useRealTimers();
+      }
+    });
+
+    it("should fail before pushing when workflow files changed without workflows permission", async () => {
+      const pushSignedCommitsModule = require("./push_signed_commits.cjs");
+      const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits");
+
+      try {
+        createPatchFile("should-fail-before-push-without-workflows-permission");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
+
+        const module = await loadModule();
+        const handler = await module.main({});
+        const result = await handler({ branch: "should-fail-before-push-without-workflows-permission" }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error_type).toBe("workflows_scope_required");
+        expect(pushSignedSpy).not.toHaveBeenCalled();
+        expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
+      } finally {
+        pushSignedSpy.mockRestore();
       }
     });
 
