@@ -281,7 +281,7 @@ description: Safe-output reference for update, label, milestone, project, releas
       ignore-missing-branch-failure: false  # Optional: treat deleted PR branches as skipped pushes (default: false)
       commit-title-suffix: "[auto]"   # Optional: suffix appended to commit title
       staged: true                    # Optional: preview mode (default: follows global staged)
-      github-token-for-extra-empty-commit: ${{ secrets.MY_CI_PAT }}  # Optional: PAT or "app" to trigger CI on pushed commits
+      github-token-for-extra-empty-commit: ${{ secrets.MY_CI_PAT }}  # Optional: PAT, "app" to trigger CI on pushed commits, or "none" to omit GH_AW_CI_TRIGGER_TOKEN entirely
       fallback-as-pull-request: true  # Optional: when push fails (e.g. diverged branch), open a fallback PR targeting the original branch (default: true)
       patch-format: "bundle"          # Optional: "bundle" (default, supports merge commits) or "am"; auto-falls back to "bundle" when the incremental range contains a merge commit
       signed-commits: true            # Optional: when true (default), push via createCommitOnBranch GraphQL so GitHub signs commits; set false to push merge commits via plain git push
@@ -295,7 +295,7 @@ description: Safe-output reference for update, label, milestone, project, releas
       max-patch-size: 2048            # Optional: per-output cap on git patch size in KB (overrides global; default: 4096 KB, max: 10240)
   ```
 
-  Cross-repository pushes are supported via `target-repo` (and `head-repo`/`head-github-token` for fork-backed PRs) plus an `allowed-repos` allowlist. To trigger CI on pushed commits, use `github-token-for-extra-empty-commit` or set the magic secret `GH_AW_CI_TRIGGER_TOKEN`.
+  Cross-repository pushes are supported via `target-repo` (and `head-repo`/`head-github-token` for fork-backed PRs) plus an `allowed-repos` allowlist. To trigger CI on pushed commits, use `github-token-for-extra-empty-commit` or set the magic secret `GH_AW_CI_TRIGGER_TOKEN`. Set `github-token-for-extra-empty-commit: none` to skip the extra empty commit and keep `GH_AW_CI_TRIGGER_TOKEN` out of the compiled lock file and manifest entirely.
 
   **File Restrictions**: Same as `create-pull-request`: **always specify `allowed-files`** scoped to specific file extensions or paths to limit the agent's reach. `excluded-files` strips files before all checks, and `protected-files` controls handling of sensitive files. Object form supported: `protected-files: { policy: fallback-to-issue, exclude: [AGENTS.md] }`.
 

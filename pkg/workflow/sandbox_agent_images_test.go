@@ -227,6 +227,26 @@ func TestValidateSandboxAgentImages(t *testing.T) {
 		assert.Contains(t, err.Error(), "requires AWF v0.28.4 or newer")
 	})
 
+	t.Run("accepts the router role on AWF v0.28.21 or newer", func(t *testing.T) {
+		images := fullTestImageManifest()
+		images[awfImageRoleRouter] = testPinnedAgent
+		data := newImagesWorkflowData(images)
+		data.SandboxConfig.Agent.Version = "v0.28.21"
+		data.NetworkPermissions.Firewall.Version = "v0.28.21"
+		assert.NoError(t, validateSandboxAgentImages(data))
+	})
+
+	t.Run("requires AWF v0.28.21 or newer for the router role", func(t *testing.T) {
+		images := fullTestImageManifest()
+		images[awfImageRoleRouter] = testPinnedAgent
+		data := newImagesWorkflowData(images)
+		data.SandboxConfig.Agent.Version = "v0.28.20"
+		data.NetworkPermissions.Firewall.Version = "v0.28.20"
+		err := validateSandboxAgentImages(data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sandbox.agent.images.router requires AWF v0.28.21 or newer")
+	})
+
 	t.Run("rejects conflicting SSL bump", func(t *testing.T) {
 		data := newImagesWorkflowData(fullTestImageManifest())
 		data.NetworkPermissions.Firewall.SSLBump = true
