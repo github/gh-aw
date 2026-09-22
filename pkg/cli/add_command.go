@@ -181,6 +181,7 @@ func runAddCommand(cmd *cobra.Command, args []string, validateEngine func(string
 	if err != nil {
 		return err
 	}
+	addLog.Printf("Resolved %d workflow(s) for installation", len(resolved.Workflows))
 	if err := rejectBootstrapProfileForRegularAdd(args, resolved.BootstrapProfile); err != nil {
 		return err
 	}
@@ -191,6 +192,7 @@ func runAddCommand(cmd *cobra.Command, args []string, validateEngine func(string
 		addLog.Printf("Add command failed while installing resolved workflows: %v", err)
 		return err
 	}
+	addLog.Print("Add command completed successfully")
 	return nil
 }
 

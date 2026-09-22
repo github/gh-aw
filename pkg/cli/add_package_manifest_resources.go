@@ -70,6 +70,7 @@ func validateManifestResourceDestination(destination string) error {
 	switch {
 	case strings.HasPrefix(destination, constants.WorkflowsDirSlash+"shared/"):
 		if !isSharedWorkflowScriptDestination(destination) {
+			addPackageManifestLog.Printf("Rejecting resource destination %q: not a valid shared workflow script path", destination)
 			return errorsForResourceDestination()
 		}
 		return nil
@@ -80,6 +81,7 @@ func validateManifestResourceDestination(destination string) error {
 		}
 		lower := strings.ToLower(remaining)
 		if !strings.HasSuffix(lower, ".yml") && !strings.HasSuffix(lower, ".yaml") {
+			addPackageManifestLog.Printf("Rejecting resource destination %q: issue template must end in .yml or .yaml", destination)
 			return errorsForResourceDestination()
 		}
 		return nil
@@ -88,10 +90,12 @@ func validateManifestResourceDestination(destination string) error {
 	case strings.HasPrefix(destination, constants.GithubDir+"aw/"):
 		remaining := strings.TrimPrefix(destination, constants.GithubDir+"aw/")
 		if remaining == "" || strings.HasPrefix(remaining, "../") {
+			addPackageManifestLog.Printf("Rejecting resource destination %q: invalid path under %saw/", destination, constants.GithubDir)
 			return errorsForResourceDestination()
 		}
 		return nil
 	default:
+		addPackageManifestLog.Printf("Rejecting resource destination %q: does not match any allowed destination pattern", destination)
 		return errorsForResourceDestination()
 	}
 }
