@@ -821,8 +821,8 @@ func copilotSupportsNoAskUser(engineConfig *EngineConfig) bool {
 func extractAddDirPaths(args []string) []string {
 	var dirs []string
 	for i := range len(args) - 1 {
-		if args[i] == "--add-dir" {
-			dirs = append(dirs, args[i+1])
+		if args[i] == "--add-dir" { //nolint:uncheckedsliceindex // i is bounded by the loop range
+			dirs = append(dirs, args[i+1]) //nolint:uncheckedsliceindex // the loop excludes the final element
 		}
 	}
 	return dirs

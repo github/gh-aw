@@ -15,6 +15,8 @@ const MAX_REPOSITORY_FILES = 500;
 const REPOSITORY_OUTPUT_BYTES = 256 * 1024;
 const GIT_TIMEOUT_MS = 30_000;
 const GO_TIMEOUT_MS = 5 * 60_000;
+const GO_ENV_TIMEOUT_MS = 30_000;
+const GO_ENV_OUTPUT_BYTES = 16 * 1024;
 
 /** @param {string} root @param {string} candidate */
 function isWithin(root, candidate) {
@@ -187,8 +189,10 @@ function createRepositoryWorkspace(profile, { env = process.env, runProcess = ru
       }
       if (!isWithin(root, resolved) && fs.statSync(resolved).isDirectory()) systemDirectories.push(resolved);
     }
+    const commandPath = [...new Set([...executableDirectories, ...systemDirectories])].join(path.delimiter);
+    const configuredModuleCache = env.GOMODCACHE ? cacheDirectory(env.GOMODCACHE, path.join(privateRoot, "go-mod"), root) : undefined;
     Object.assign(childEnv, {
-      PATH: [...new Set([...executableDirectories, ...systemDirectories])].join(path.delimiter),
+      PATH: commandPath,
       HOME: home,
       USERPROFILE: home,
       APPDATA: home,
@@ -200,7 +204,7 @@ function createRepositoryWorkspace(profile, { env = process.env, runProcess = ru
       GOROOT: goRoot,
       GOPATH: path.join(privateRoot, "gopath"),
       GOCACHE: cacheDirectory(env.GOCACHE, path.join(privateRoot, "go-build"), root),
-      GOMODCACHE: cacheDirectory(env.GOMODCACHE, path.join(privateRoot, "go-mod"), root),
+      ...(configuredModuleCache ? { GOMODCACHE: configuredModuleCache } : {}),
       GOTOOLCHAIN: "local",
       GOFLAGS: "-mod=readonly",
       GOPROXY: "off",
@@ -221,6 +225,45 @@ function createRepositoryWorkspace(profile, { env = process.env, runProcess = ru
       LANG: "C.UTF-8",
       LC_ALL: "C.UTF-8",
     });
+    /** @type {Promise<void> | undefined} */
+    let preparation;
+    /** @param {AbortSignal} signal */
+    async function prepare(signal) {
+      if (childEnv.GOMODCACHE) return;
+      if (!preparation) {
+        preparation = (async () => {
+          /** @type {NodeJS.ProcessEnv} */
+          const probeEnv = {
+            PATH: commandPath,
+            GOROOT: goRoot,
+            GOTOOLCHAIN: "local",
+            TMPDIR: temporary,
+            TEMP: temporary,
+            TMP: temporary,
+          };
+          for (const name of ["SystemRoot", "WINDIR", "PATHEXT", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "GOPATH", "GOENV"]) {
+            if (env[name]) probeEnv[name] = env[name];
+          }
+          const result = await runProcess({
+            command: executables.go,
+            args: ["env", "GOMODCACHE"],
+            cwd: privateRoot,
+            env: probeEnv,
+            signal,
+            timeoutMs: GO_ENV_TIMEOUT_MS,
+            maxOutputBytes: GO_ENV_OUTPUT_BYTES,
+          });
+          if (result.exitCode !== 0) throw repositoryCommandError("go env GOMODCACHE", result, diagnosticSecrets);
+          const values = result.stdout
+            .split(/\r?\n/u)
+            .map(value => value.trim())
+            .filter(Boolean);
+          if (values.length !== 1) throw new Error("go env GOMODCACHE must return exactly one directory");
+          childEnv.GOMODCACHE = cacheDirectory(undefined, values[0], root);
+        })();
+      }
+      await preparation;
+    }
     const gitArguments = ["--no-pager", "-c", `core.hooksPath=${hooks}`, "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "commit.gpgSign=false", "-c", "protocol.allow=never"];
     /**
      * @param {"git" | "go" | "gofmt"} executable
@@ -229,6 +272,7 @@ function createRepositoryWorkspace(profile, { env = process.env, runProcess = ru
      * @param {{indexFile?: string, allowFailure?: boolean, directory?: string, maxOutputBytes?: number}} [settings]
      */
     async function run(executable, args, signal, { indexFile, allowFailure = false, directory = root, maxOutputBytes = REPOSITORY_OUTPUT_BYTES } = {}) {
+      if (executable === "go" && !childEnv.GOMODCACHE) throw new Error("Repository workspace must be prepared before running Go");
       const currentRoot = lstatGuard(root);
       const currentGit = lstatGuard(gitDirectory);
       if (!currentRoot?.isDirectory() || !currentGit?.isDirectory() || currentRoot.ino !== rootIdentity.ino || currentRoot.dev !== rootIdentity.dev || currentGit.ino !== gitIdentity.ino || currentGit.dev !== gitIdentity.dev) {
@@ -292,7 +336,7 @@ function createRepositoryWorkspace(profile, { env = process.env, runProcess = ru
     function cleanup() {
       return fs.promises.rm(privateRoot, { recursive: true, maxRetries: 3, retryDelay: 100 });
     }
-    return { root, privateRoot, temporary, hooks, sourceCommit: env.GITHUB_SHA, childEnv, executables, diagnosticSecrets, run, withTemporaryDirectory, cleanup, cleanupSync };
+    return { root, privateRoot, temporary, hooks, sourceCommit: env.GITHUB_SHA, childEnv, executables, diagnosticSecrets, prepare, run, withTemporaryDirectory, cleanup, cleanupSync };
   } catch (error) {
     try {
       fs.rmSync(privateRoot, { recursive: true });

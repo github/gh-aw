@@ -110,6 +110,81 @@ tools:
 	require.NoError(t, validateCopilotToolProfile(data))
 }
 
+func TestGoRepositoryProfileCanBeProvidedBySharedWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+description: Shared Go repository profile
+tools:
+  profile: [go]
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	main = strings.Replace(main, "  profile: go\n", "", 1)
+	filename := filepath.Join(dir, "profile.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(filename)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go"}, data.ToolProfiles)
+	assert.NotContains(t, data.Tools, "profile")
+	require.NoError(t, validateCopilotToolProfile(data))
+}
+
+func TestGoRepositoryProfileRejectsMalformedSharedWorkflowValue(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+description: Malformed shared Go repository profile
+tools:
+  profile: [go, 7]
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	main = strings.Replace(main, "  profile: go\n", "", 1)
+	filename := filepath.Join(dir, "profile.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	_, err := NewCompiler().ParseWorkflowFile(filename)
+	require.ErrorContains(t, err, "tools.profile entries must be nonempty strings")
+}
+
+func TestGoRepositoryProfilePreservesLegacyMCPServerName(t *testing.T) {
+	markdown := strings.Replace(goRepositoryProfileTestMarkdown, "  profile: go\n", "", 1)
+	markdown = strings.Replace(markdown, "tools:\n", `mcp-servers:
+  profile:
+    type: http
+    url: https://example.invalid/mcp
+    allowed: [read]
+tools:
+`, 1)
+
+	data := parseGoRepositoryProfileTestSource(t, markdown)
+	assert.Empty(t, data.ToolProfiles)
+	assert.Contains(t, data.Tools, "profile")
+	assert.Contains(t, data.ResolvedMCPServers, "profile")
+	require.NotNil(t, data.ParsedTools)
+	assert.Contains(t, data.ParsedTools.Custom, "profile")
+	_, args := NewCopilotEngine().buildCopilotArgs(data)
+	assert.Equal(t, 1, buildCopilotSDKToolConfig(data, args).Version)
+}
+
+func TestGoRepositoryProfileRejectsLegacyMCPServerNameCollision(t *testing.T) {
+	markdown := strings.Replace(goRepositoryProfileTestMarkdown, "tools:\n", `mcp-servers:
+  profile:
+    type: http
+    url: https://example.invalid/mcp
+    allowed: [read]
+tools:
+`, 1)
+	_, err := NewCompiler().ParseWorkflowString(markdown, "profile.md")
+	require.ErrorContains(t, err, "tools.profile cannot be combined with mcp-servers.profile")
+}
+
 func TestGoRepositoryProfileLegacyPRDefaults(t *testing.T) {
 	markdown := strings.Replace(goRepositoryProfileTestMarkdown, "  profile: go\n", "", 1)
 	data := parseGoRepositoryProfileTestSource(t, markdown)

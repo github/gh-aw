@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile, execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const require = createRequire(import.meta.url);
@@ -47,7 +48,7 @@ function failureDiagnostic(result) {
   return result.error;
 }
 
-function fixture({ files = {}, policy = {}, realGo = false, intercept, create = defineTool, diagnosticSecrets = [] } = {}) {
+function fixture({ files = {}, policy = {}, realGo = false, omitModuleCache = false, setup, intercept, create = defineTool, diagnosticSecrets = [] } = {}) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-repo-tools-test-"));
   const root = path.join(scratch, "checkout");
   const home = path.join(scratch, "home");
@@ -55,11 +56,12 @@ function fixture({ files = {}, policy = {}, realGo = false, intercept, create = 
   fs.mkdirSync(home);
   const gitConfig = path.join(home, "gitconfig");
   fs.writeFileSync(gitConfig, "");
+  const moduleCache = path.join(scratch, "go-mod");
   const env = {
     ...Object.fromEntries(["PATH", "Path", "SystemRoot", "WINDIR", "PATHEXT", "TEMP", "TMP"].filter(key => process.env[key]).map(key => [key, process.env[key]])),
     ...goEnvironment,
     GOCACHE: path.join(scratch, "go-build"),
-    GOMODCACHE: path.join(scratch, "go-mod"),
+    ...(omitModuleCache ? {} : { GOMODCACHE: moduleCache }),
     HOME: home,
     USERPROFILE: home,
     GIT_CONFIG_NOSYSTEM: "1",
@@ -75,7 +77,7 @@ function fixture({ files = {}, policy = {}, realGo = false, intercept, create = 
     CI: "true",
   };
   fs.mkdirSync(env.GOCACHE);
-  fs.mkdirSync(env.GOMODCACHE);
+  if (env.GOMODCACHE) fs.mkdirSync(env.GOMODCACHE);
   function git(args) {
     return execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args], { cwd: root, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 }).trim();
   }
@@ -86,6 +88,7 @@ function fixture({ files = {}, policy = {}, realGo = false, intercept, create = 
   git(["init", "-q", "-b", "main"]);
   const initial = { "go.mod": "module fixture\n\ngo 1.20\n", "fixture.go": "package fixture\n\nfunc Value() int { return 1 }\n", "README.md": "Fixture baseline.\n", "ignored.go": "package fixture\n", ...files };
   for (const [filename, content] of Object.entries(initial)) write(filename, content);
+  setup?.({ scratch, root, home, env, git, write });
   git(["add", "--all", "--", "."]);
   git(["commit", "--quiet", "-m", "Fixture baseline\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"]);
   env.GITHUB_SHA = git(["rev-parse", "HEAD"]);
@@ -217,8 +220,32 @@ describe("repository file and environment boundaries", () => {
     expect(goCall.timeoutMs).toBe(5 * 60_000);
     expect(goCall.maxOutputBytes).toBe(256 * 1024);
     expect(goCall.env).toMatchObject({ CI: "true", GOTOOLCHAIN: "local", GOFLAGS: "-mod=readonly", GOPROXY: "off", GOSUMDB: "off", GOENV: "off", GOWORK: "off", GIT_ALLOW_PROTOCOL: "" });
+    expect(goCall.env.GOMODCACHE).toBe(fs.realpathSync(f.env.GOMODCACHE));
     for (const key of ["COPILOT_CONNECTION_TOKEN", "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_WORKSPACE", "NODE_OPTIONS"]) expect(goCall.env[key]).toBeUndefined();
     expect(fs.existsSync(goCall.cwd)).toBe(false);
+  });
+
+  it("rejects an explicitly configured module cache inside the repository", () => {
+    expect(() =>
+      fixture({
+        setup: ({ root, env }) => {
+          env.GOMODCACHE = root;
+        },
+      })
+    ).toThrow("Go caches must be prepared outside the repository checkout");
+  });
+
+  it("rejects an effective module cache inside the repository", async () => {
+    let f;
+    f = fixture({
+      omitModuleCache: true,
+      intercept: options => {
+        if (/^go(?:\.exe)?$/.test(path.basename(options.command)) && options.args.join(" ") === "env GOMODCACHE") {
+          return { exitCode: 0, stdout: `${f.root}\n`, stderr: "" };
+        }
+      },
+    });
+    await expect(f.runtime.initialize()).rejects.toThrow("Go caches must be prepared outside the repository checkout");
   });
 
   it("rejects hardlinks before formatting or staging through them", async () => {
@@ -354,6 +381,76 @@ describe("projected validation and local publication bookkeeping", () => {
     f.write("ignored.go", "package fixture\n\nfunc excludedHelper() int { return 2 }\n");
     await expect(f.call("validate")).rejects.toThrow("undefined: excludedHelper");
     expect(f.git(["rev-parse", "HEAD"])).toBe(f.env.GITHUB_SHA);
+  }, 120_000);
+
+  it("reuses the effective ambient module cache for offline external dependencies", async () => {
+    const modulePath = "example.com/offlinefixture";
+    const version = "v1.0.0";
+    const f = fixture({
+      realGo: true,
+      omitModuleCache: true,
+      files: {
+        "go.mod": `module fixture\n\ngo 1.20\n\nrequire ${modulePath} ${version}\n`,
+        "fixture.go": `package main\n\nimport "${modulePath}"\n\nfunc main() { _ = offlinefixture.Value() }\n`,
+        "ignored.go": "package main\n",
+      },
+      setup: ({ scratch, root, env }) => {
+        const dependency = path.join(scratch, "dependency");
+        fs.mkdirSync(dependency);
+        fs.writeFileSync(path.join(dependency, "go.mod"), `module ${modulePath}\n\ngo 1.20\n`);
+        fs.writeFileSync(path.join(dependency, "offline.go"), "package offlinefixture\n\nfunc Value() int { return 1 }\n");
+        execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dependency, env, stdio: "ignore", timeout: 30_000 });
+        execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "add", "--all", "--", "."], { cwd: dependency, env, stdio: "ignore", timeout: 30_000 });
+        execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "Dependency fixture"], { cwd: dependency, env, stdio: "ignore", timeout: 30_000 });
+
+        const proxyRoot = path.join(scratch, "proxy");
+        const versionDirectory = path.join(proxyRoot, ...modulePath.split("/"), "@v");
+        fs.mkdirSync(versionDirectory, { recursive: true });
+        fs.writeFileSync(path.join(versionDirectory, "list"), `${version}\n`);
+        fs.writeFileSync(path.join(versionDirectory, `${version}.info`), `${JSON.stringify({ Version: version, Time: "2020-01-01T00:00:00Z" })}\n`);
+        fs.copyFileSync(path.join(dependency, "go.mod"), path.join(versionDirectory, `${version}.mod`));
+        execFileSync("git", ["archive", "--format=zip", `--prefix=${modulePath}@${version}/`, `--output=${path.join(versionDirectory, `${version}.zip`)}`, "HEAD"], {
+          cwd: dependency,
+          env,
+          stdio: "ignore",
+          timeout: 30_000,
+        });
+
+        env.GOPATH = path.join(scratch, "ambient-go");
+        fs.mkdirSync(env.GOPATH);
+        execFileSync("go", ["mod", "tidy"], {
+          cwd: root,
+          env: {
+            ...env,
+            GOPROXY: pathToFileURL(proxyRoot).href,
+            GOSUMDB: "off",
+            GOENV: "off",
+            GOWORK: "off",
+            GOTOOLCHAIN: "local",
+          },
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          timeout: 60_000,
+        });
+      },
+    });
+    expect(f.env.GOMODCACHE).toBeUndefined();
+    await f.runtime.initialize();
+    const readiness = await f.call("readiness");
+    expect(readiness.test.exitCode).toBe(0);
+    const validation = await f.call("validate");
+    expect(validation.test.exitCode).toBe(0);
+    expect(validation.vet.exitCode).toBe(0);
+    expect(validation.build.exitCode).toBe(0);
+    const goCalls = f.calls.filter(call => /^go(?:\.exe)?$/.test(path.basename(call.command)));
+    expect(goCalls[0].args).toEqual(["env", "GOMODCACHE"]);
+    expect(goCalls[0].env).not.toHaveProperty("GITHUB_TOKEN");
+    expect(goCalls[0].env).not.toHaveProperty("COPILOT_CONNECTION_TOKEN");
+    const expectedModuleCache = fs.realpathSync(path.join(f.env.GOPATH, "pkg", "mod"));
+    for (const call of goCalls.slice(1)) {
+      expect(call.env.GOMODCACHE).toBe(expectedModuleCache);
+      expect(call.env.GOPROXY).toBe("off");
+    }
   }, 120_000);
 
   it("enforces file limits over successive commits instead of resetting at HEAD", async () => {

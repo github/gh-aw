@@ -251,7 +251,7 @@ describe("parseCopilotSDKToolConfig", () => {
         "builtin:delete",
         "builtin:move",
         "mcp:*",
-        "custom:web_fetch",
+        "builtin:web_fetch",
         "custom:go_repository",
       ]);
       expect(built.tools).toContain(tool);

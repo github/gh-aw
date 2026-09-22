@@ -382,7 +382,7 @@ func firstCommandToken(command string) string {
 	if len(fields) == 0 {
 		return ""
 	}
-	token := normalizeCommandToken(fields[0])
+	token := normalizeCommandToken(fields[0]) //nolint:uncheckedsliceindex // len(fields) is checked above
 	if token != "env" {
 		return token
 	}

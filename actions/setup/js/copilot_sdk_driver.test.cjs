@@ -5,7 +5,7 @@ import * as os from "os";
 import * as path from "path";
 
 const require = createRequire(import.meta.url);
-const { runWithCopilotSDK, parsePermissionConfigFromServerArgs } = require("./copilot_sdk_driver.cjs");
+const { runWithCopilotSDK, parsePermissionConfigFromServerArgs, loadCopilotSDKProfileMCPConfig } = require("./copilot_sdk_driver.cjs");
 
 describe("copilot_sdk_driver.cjs", () => {
   let testSessionStateDir;
@@ -19,6 +19,30 @@ describe("copilot_sdk_driver.cjs", () => {
     if (prevSessionStateDir === undefined) delete process.env.GH_AW_SESSION_STATE_BASE_DIR;
     else process.env.GH_AW_SESSION_STATE_BASE_DIR = prevSessionStateDir;
     if (testSessionStateDir) fs.rmSync(testSessionStateDir, { recursive: true, force: true });
+  });
+
+  describe("native MCP configuration selection", () => {
+    const profileConfig = {
+      version: 2,
+      capabilities: { mcp: true },
+      profile: { id: "go-repository" },
+    };
+
+    it("keeps legacy version 1 sessions on their existing MCP path", () => {
+      expect(loadCopilotSDKProfileMCPConfig({ version: 1, capabilities: { mcp: true } }, path.join(testSessionStateDir, "missing.json"))).toBeUndefined();
+    });
+
+    it("loads compiler-owned native MCP only for repository profile sessions", () => {
+      const filename = path.join(testSessionStateDir, "profile-mcp.json");
+      fs.writeFileSync(filename, JSON.stringify({ mcpServers: { github: { type: "http", url: "https://example.invalid/mcp", tools: ["get_file_contents"] } } }));
+      expect(loadCopilotSDKProfileMCPConfig(profileConfig, filename)).toEqual({
+        github: { type: "http", url: "https://example.invalid/mcp", tools: ["get_file_contents"] },
+      });
+    });
+
+    it("fails closed when repository profile MCP configuration is absent", () => {
+      expect(() => loadCopilotSDKProfileMCPConfig(profileConfig, undefined)).toThrow("GH_AW_MCP_CONFIG is required");
+    });
   });
 
   describe("runWithCopilotSDK", () => {

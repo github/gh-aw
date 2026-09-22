@@ -180,6 +180,7 @@ function createCopilotSDKRepositoryRuntime(defineTool, profile, options) {
       expectedRef = await currentRef(signal);
       const status = await git(["status", "--porcelain=v1", "--untracked-files=all"], signal);
       if (status.stdout.trim()) throw new Error("go_repository requires a clean checkout before the agent starts; existing changes are left untouched");
+      await workspace.prepare(signal);
       initialized = true;
     })();
     await initialization;

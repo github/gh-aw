@@ -23,17 +23,30 @@ func extractToolProfiles(tools map[string]any) ([]string, error) {
 	}
 	switch profiles := value.(type) {
 	case string:
+		if strings.TrimSpace(profiles) == "" {
+			return nil, errors.New("tools.profile entries must be nonempty strings")
+		}
 		return []string{profiles}, nil
+	case map[string]any:
+		// mcp-servers are merged into the tools map for runtime rendering.
+		// Preserve a legacy custom server named "profile".
+		return nil, nil
 	case []any:
+		if len(profiles) == 0 {
+			return nil, errors.New("tools.profile array must not be empty")
+		}
 		result := make([]string, 0, len(profiles))
+		seen := make(map[string]struct{}, len(profiles))
 		for _, profile := range profiles {
 			name, ok := profile.(string)
-			if !ok {
-				return nil, errors.New("tools.profile entries must be strings")
+			if !ok || strings.TrimSpace(name) == "" {
+				return nil, errors.New("tools.profile entries must be nonempty strings")
 			}
-			if !slices.Contains(result, name) {
-				result = append(result, name)
+			if _, exists := seen[name]; exists {
+				return nil, fmt.Errorf("tools.profile contains duplicate value %q", name)
 			}
+			result = append(result, name)
+			seen[name] = struct{}{}
 		}
 		return result, nil
 	default:
@@ -155,7 +168,7 @@ func isGoRepositoryCurrentRepo(repository string) bool {
 func isGoRepositorySinglePRTarget(pr *CreatePullRequestsConfig) bool {
 	if isGoRepositoryCurrentRepo(pr.TargetRepoSlug) {
 		return len(pr.AllowedRepos) == 0 ||
-			(len(pr.AllowedRepos) == 1 && pr.AllowedRepos[0] == "${{ github.repository }}")
+			(len(pr.AllowedRepos) == 1 && pr.AllowedRepos[0] == "${{ github.repository }}") //nolint:uncheckedsliceindex // length is checked in the same expression
 	}
 	if !goRepositoryLiteralRepoPattern.MatchString(pr.TargetRepoSlug) {
 		return false
@@ -165,8 +178,8 @@ func isGoRepositorySinglePRTarget(pr *CreatePullRequestsConfig) bool {
 		return false
 	}
 	return len(pr.AllowedRepos) == 0 ||
-		(len(pr.AllowedRepos) == 1 && goRepositoryLiteralRepoPattern.MatchString(pr.AllowedRepos[0]) &&
-			strings.EqualFold(pr.TargetRepoSlug, pr.AllowedRepos[0]))
+		(len(pr.AllowedRepos) == 1 && goRepositoryLiteralRepoPattern.MatchString(pr.AllowedRepos[0]) && //nolint:uncheckedsliceindex // length is checked in the same expression
+			strings.EqualFold(pr.TargetRepoSlug, pr.AllowedRepos[0])) //nolint:uncheckedsliceindex // length is checked in the same expression
 }
 
 func validateGoRepositoryTools(data *WorkflowData) error {

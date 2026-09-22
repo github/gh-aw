@@ -69,8 +69,11 @@ func ValidateMCPConfigs(tools map[string]any) error {
 	for _, toolName := range toolNames {
 		toolConfig := tools[toolName]
 
-		// Skip built-in tools - they have their own schema validation
-		if builtInToolNames[toolName] && toolName != "linear" {
+		// Skip built-in tools - they have their own schema validation. A
+		// map-shaped "profile" entry can be a legacy custom MCP server merged
+		// from mcp-servers rather than the tools.profile selector.
+		_, isMap := toolConfig.(map[string]any)
+		if builtInToolNames[toolName] && toolName != "linear" && !(toolName == "profile" && isMap) {
 			mcpValidationLog.Printf("Skipping MCP validation for built-in tool: %s", toolName)
 			continue
 		}

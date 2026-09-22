@@ -138,10 +138,10 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 func extractCopilotAllowedTools(args []string) []string {
 	allowed := map[string]struct{}{"read": {}}
 	for i := 0; i < len(args)-1; i++ {
-		if args[i] != "--allow-tool" {
+		if args[i] != "--allow-tool" { //nolint:uncheckedsliceindex // i is bounded by the loop condition
 			continue
 		}
-		value := strings.TrimSpace(args[i+1])
+		value := strings.TrimSpace(args[i+1]) //nolint:uncheckedsliceindex // the loop excludes the final element
 		if value != "" && !strings.HasPrefix(value, "--") {
 			allowed[value] = struct{}{}
 		}

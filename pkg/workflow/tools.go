@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -79,12 +80,17 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 }
 
 func prepareToolsForDefaults(data *WorkflowData) error {
+	profileValue, profileExists := data.Tools["profile"]
 	profiles, err := extractToolProfiles(data.Tools)
 	if err != nil {
 		return err
 	}
 	data.ToolProfiles = profiles
-	delete(data.Tools, "profile")
+	if profileExists {
+		if _, isMCPServer := profileValue.(map[string]any); !isMCPServer {
+			delete(data.Tools, "profile")
+		}
+	}
 	data.ExplicitlyDisabledTools = collectExplicitlyDisabledTools(data.Tools)
 	return expandJiraToolConfig(data.Tools)
 }
@@ -208,8 +214,8 @@ func applyDefaultPermissions(data *WorkflowData) {
 	// is stored in workflow-level indentation (2 spaces) and later re-indented for jobs.
 	lines := strings.Split(yaml, "\n")
 	for i := 1; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "      ") {
-			lines[i] = "  " + lines[i][6:]
+		if strings.HasPrefix(lines[i], "      ") { //nolint:uncheckedsliceindex // i is bounded by the loop condition
+			lines[i] = "  " + lines[i][6:] //nolint:uncheckedsliceindex // the prefix check guarantees six bytes
 		}
 	}
 	data.Permissions = strings.Join(lines, "\n")
@@ -451,6 +457,11 @@ func (c *Compiler) mergeToolsAndMCPServers(topTools, mcpServers map[string]any, 
 	result := maps.Clone(topTools)
 	if result == nil {
 		result = make(map[string]any)
+	}
+	if _, hasProfile := result["profile"]; hasProfile {
+		if _, hasMCPServer := mcpServers["profile"]; hasMCPServer {
+			return nil, errors.New("tools.profile cannot be combined with mcp-servers.profile")
+		}
 	}
 
 	// Add MCP servers to the tools collection
@@ -722,7 +733,7 @@ func (c *Compiler) applyDefaultToolsWithProfile(tools map[string]any, safeOutput
 			if safeOutputs == nil || !needsGitCommands(safeOutputs) {
 				defaultCommands := make([]any, len(constants.DefaultBashTools))
 				for i, cmd := range constants.DefaultBashTools {
-					defaultCommands[i] = cmd
+					defaultCommands[i] = cmd //nolint:uncheckedsliceindex // both slices share the same length
 				}
 				tools["bash"] = defaultCommands
 			}

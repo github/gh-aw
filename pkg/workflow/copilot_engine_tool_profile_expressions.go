@@ -66,7 +66,7 @@ func validateGoRepositoryPolicyString(value string) error {
 		return errors.New("literal environment placeholders are not supported in profile policy")
 	}
 	for _, match := range ExpressionPatternDotAll.FindAllStringSubmatch(value, -1) {
-		if err := validateGoRepositoryPolicyExpression(match[1]); err != nil {
+		if err := validateGoRepositoryPolicyExpression(match[1]); err != nil { //nolint:uncheckedsliceindex // regex has one capture group
 			return err
 		}
 	}
@@ -75,7 +75,7 @@ func validateGoRepositoryPolicyString(value string) error {
 
 func validateGoRepositoryPolicyExpression(expression string) error {
 	for _, match := range goRepositoryPolicyTokenPattern.FindAllStringIndex(expression, -1) {
-		token := expression[match[0]:match[1]]
+		token := expression[match[0]:match[1]] //nolint:uncheckedsliceindex // FindAllStringIndex returns start/end pairs
 		if strings.HasPrefix(token, "'") {
 			if strings.Contains(token, "${") {
 				return errors.New("literal environment placeholders are not supported in profile policy expressions")
@@ -96,7 +96,7 @@ func validateGoRepositoryPolicyExpression(expression string) error {
 			continue
 		}
 		if slices.Contains([]string{"format", "join", "fromjson", "tojson", "contains", "startswith", "endswith"}, reference) &&
-			strings.HasPrefix(strings.TrimSpace(expression[match[1]:]), "(") {
+			strings.HasPrefix(strings.TrimSpace(expression[match[1]:]), "(") { //nolint:uncheckedsliceindex // FindAllStringIndex returns start/end pairs
 			continue
 		}
 		return fmt.Errorf("expression reference %q is not a supported non-secret policy input; use inputs, vars, or repository/branch metadata, not secrets, env, steps, or needs (job outputs may be secret or unavailable in the agent job)", token)
@@ -139,17 +139,19 @@ func bindGoRepositoryTypedExpressions(value any) any {
 		if len(matches) == 0 {
 			return value
 		}
-		if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(value) {
+		if len(matches) == 1 &&
+			matches[0][0] == 0 && //nolint:uncheckedsliceindex // one regex match is present and includes the full-match pair
+			matches[0][1] == len(value) { //nolint:uncheckedsliceindex // one regex match is present and includes the full-match pair
 			return newTemplatableJSONExpression(wrapExpressionWithToJSON(value))
 		}
 		var format strings.Builder
 		var args []string
 		offset := 0
 		for index, match := range matches {
-			format.WriteString(escapeGoRepositoryExpressionFormat(value[offset:match[0]]))
+			format.WriteString(escapeGoRepositoryExpressionFormat(value[offset:match[0]])) //nolint:uncheckedsliceindex // submatch indexes include the full-match pair
 			fmt.Fprintf(&format, "{%d}", index)
-			args = append(args, strings.TrimSpace(value[match[2]:match[3]]))
-			offset = match[1]
+			args = append(args, strings.TrimSpace(value[match[2]:match[3]])) //nolint:uncheckedsliceindex // regex has one capture group
+			offset = match[1]                                                //nolint:uncheckedsliceindex // submatch indexes include the full-match pair
 		}
 		format.WriteString(escapeGoRepositoryExpressionFormat(value[offset:]))
 		expression := "${{ format('" + strings.ReplaceAll(format.String(), "'", "''") + "', " + strings.Join(args, ", ") + ") }}"

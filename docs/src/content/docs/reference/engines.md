@@ -471,6 +471,9 @@ safe-outputs:
   create-pull-request:
 ```
 
+The equivalent array form is `profile: [go]`. Profiles from imported workflows
+are combined with duplicate entries removed.
+
 The effective engine must be Copilot with SDK and AWF enabled. Bash must be explicitly disabled with `false` or `[]`, CLI proxy must be explicitly `false`, and editing must be enabled (the normal PR editing default applies). Native preflight requires both `safeoutputs-create_pull_request` and `safeoutputs-noop`: the implicit noop default is supported, but `safe-outputs.noop: false` is rejected at compile time. GitHub access uses MCP, not `gh-proxy` or `cli` mode. Custom engine commands, drivers, harness scripts, arguments, working directories, agents, and extensions are not supported. Bundled harness **policy** settings, including `max-retries: 0`, remain supported.
 
 The initial scope is one compiler-managed, non-sparse current-repository checkout at the workspace root and one current-repository `create-pull-request` target. Leave `checkout.repository` unset. `target-repo` may be omitted, exactly `${{ github.repository }}`, or a literal `owner/repo`. A literal target may have no `allowed-repos` entries or exactly one matching literal repository, compared case-insensitively. An omitted/current-expression target may have no entries or exactly `["${{ github.repository }}"]`. Wildcards, other expressions, mismatched allowlists, and multiple entries are rejected; the compiler preserves accepted target and allowlist values in the publication configuration.

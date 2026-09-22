@@ -36,9 +36,22 @@ const { parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
+/**
+ * Native MCP is part of the version 2 repository profile contract. Version 1
+ * sessions retain the existing raw MCP permission names and CLI-managed path.
+ *
+ * @param {import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig} toolConfig
+ * @param {string | undefined} filename
+ */
+function loadCopilotSDKProfileMCPConfig(toolConfig, filename) {
+  if (!toolConfig.profile) return undefined;
+  if (!toolConfig.capabilities.mcp) throw new Error("Repository profiles require compiler-owned native MCP");
+  return loadCopilotSDKMCPConfig(filename);
+}
+
 // Re-export the session and permission helpers so that existing callers that
 // require("./copilot_sdk_driver.cjs") (e.g. copilot_harness.cjs) continue to work.
-module.exports = { extractPromptFromArgs, runWithCopilotSDK, parsePermissionConfigFromServerArgs, parseCopilotSDKToolConfig, parseMultiProviderJson };
+module.exports = { extractPromptFromArgs, runWithCopilotSDK, parsePermissionConfigFromServerArgs, parseCopilotSDKToolConfig, parseMultiProviderJson, loadCopilotSDKProfileMCPConfig };
 
 // ---------------------------------------------------------------------------
 // Standalone entry point
@@ -120,7 +133,7 @@ async function main() {
   const toolConfig = parseCopilotSDKToolConfig(process.env.GH_AW_COPILOT_SDK_TOOL_CONFIG);
   const permissionConfig = toolConfig.permissions;
   log(`permission config: ${permissionConfig.allowedTools.length} compiler-owned allow-tool entries`);
-  const mcpServers = toolConfig.capabilities.mcp ? loadCopilotSDKMCPConfig(process.env.GH_AW_MCP_CONFIG) : undefined;
+  const mcpServers = loadCopilotSDKProfileMCPConfig(toolConfig, process.env.GH_AW_MCP_CONFIG);
   if (mcpServers) log(`native MCP config: ${Object.keys(mcpServers).length} compiler-owned servers`);
 
   // --- Run SDK session -------------------------------------------------
