@@ -12355,10 +12355,19 @@
           "examples": ["github/docs-engineering", "myorg/infra-alerts"]
         },
         "report-failed-jobs": {
-          "type": "boolean",
-          "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable.",
+          "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable. Supports GitHub Actions expressions.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$\\{\\{.*\\}\\}$",
+              "description": "GitHub Actions expression that resolves to a boolean at runtime"
+            }
+          ],
           "default": true,
-          "examples": [false, true]
+          "examples": [false, true, "${{ inputs.report-failed-jobs }}"]
         },
         "max-bot-mentions": {
           "description": "Maximum number of bot trigger references (e.g. 'fixes #123', 'closes #456') allowed in output before all of them are neutralized. Default: 10. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max-bot-mentions }}').",
