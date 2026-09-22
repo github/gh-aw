@@ -1,8 +1,8 @@
 {
-  "last_run_id": "35489944749",
-  "last_updated": "2026-09-20T04:51:01Z",
+  "last_run_id": "35688158463",
+  "last_updated": "2026-09-22T04:51:00Z",
   "outcome": "VULNERABILITY_DETECTED",
-  "vulnerability": "SNI/domain-fronting bypass via CONNECT tunnel to CDN-shared allowed domain (e.g. registry.npmjs.org, nodejs.org, esm.sh, cdn.jsdelivr.net, bun.sh, json-schema.org -> Cloudflare shared edge -> arbitrary Cloudflare-fronted domain). Recurring and unresolved since run 34807416060. This run confirmed 2 new pivot hosts and proved reachability of attacker-controlled *.workers.dev infrastructure and HTTP/2 multiplexing over the tunnel, materially expanding known severity beyond static test domains.",
-  "total_techniques_tried": 415,
-  "successful_escapes": 13
+  "vulnerability": "SNI/domain-fronting bypass via CONNECT tunnel to CDN-shared allowed domain (registry.npmjs.org, nodejs.org, esm.sh, cdn.jsdelivr.net, bun.sh, json-schema.org, deno.land, www.googleapis.com -> shared CDN edge -> arbitrary fronted domain incl. example.com). Recurring and unresolved since run 34807416060. This run reproduced the core bypass, added 2 new non-Cloudflare-limited pivot hosts (deno.land, www.googleapis.com on Google infra), and confirmed via WebSocket-Upgrade probe that Squid performs zero post-TLS-handshake payload inspection, meaning arbitrary bidirectional traffic (not just simple GET) can be smuggled once the SNI swap succeeds.",
+  "total_techniques_tried": 426,
+  "successful_escapes": 17
 }
