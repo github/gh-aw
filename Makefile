@@ -498,6 +498,7 @@ test-scripts: build
 	bash scripts/resolve-base-commit_test.sh
 	bash scripts/check-workflow-drift_test.sh ./$(BINARY_NAME)
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
+	bash scripts/update-threat-detect-pins_test.sh
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
 	@echo "✓ All Bash script tests passed"
 

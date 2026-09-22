@@ -145,12 +145,23 @@ before compiling workflows that use the new gh-aw release.
 
 ### Maintain detector release pins
 
-When updating the default detector release:
+Review the promoted `gh-aw-threat-detection` release, then run the updater from
+the gh-aw repository root:
 
-1. Review the promoted `gh-aw-threat-detection` release and its validated release manifest.
-2. Copy the complete release digest matrix into `DefaultThreatDetectSHA256`.
-3. Update `DefaultThreatDetectVersion` and all digests in the same pull request.
-4. Recompile affected workflow fixtures and lock files.
+```bash
+scripts/update-threat-detect-pins.sh <version>
+make fmt
+make recompile
+```
+
+For example, `<version>` is `v0.5.2` for the current pin. The updater downloads
+the release `checksums.txt` and all four Linux and Darwin assets. It rejects
+malformed, missing, duplicate, or unexpected manifest entries, verifies every
+download against the manifest, and atomically updates
+`DefaultThreatDetectVersion` with the complete `DefaultThreatDetectSHA256`
+matrix. It does not update constants if any validation fails.
+
+Review the constants and generated lock-file diff in the same pull request.
 
 ## Detection Budget
 
