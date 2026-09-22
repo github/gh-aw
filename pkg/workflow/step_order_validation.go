@@ -224,6 +224,9 @@ func isPathScannedBySecretRedaction(artifactPath string) bool {
 
 func normalizeArtifactPathForRedaction(artifactPath string) (normalizedPath string, isDirectory bool) {
 	normalizedSeparators := strings.ReplaceAll(artifactPath, `\`, "/")
+	if strings.HasPrefix(normalizedSeparators, "//") {
+		return normalizedSeparators, strings.HasSuffix(normalizedSeparators, "/")
+	}
 	return path.Clean(normalizedSeparators), strings.HasSuffix(normalizedSeparators, "/")
 }
 
