@@ -39,12 +39,7 @@ const DefaultClaudeCodeVersion Version = "2.1.273"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-//
-// NOTE: 1.0.85 was pinned back to 1.0.83 after reports that 1.0.85 returns an
-// instant HTTP 400 ("Bad Request") on the very first /responses request for some
-// workflow shapes (see github/gh-aw#62363). Do not bump past 1.0.83 until that
-// regression is confirmed fixed upstream.
-const DefaultCopilotVersion Version = "1.0.83"
+const DefaultCopilotVersion Version = "1.0.87"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.13"
@@ -56,10 +51,10 @@ const DefaultCodexVersion Version = "0.154.0"
 const DefaultGeminiVersion Version = "0.59.0"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "0.85.1"
+const DefaultPiVersion Version = "0.87.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v1.12.1"
+const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -272,7 +267,7 @@ const DefaultGitHubScriptVersion Version = "v9"
 // This is used by the default external threat-detection path and when
 // `features: gh-aw-detection: true` is set in the workflow frontmatter, enabling the external
 // threat-detect binary path instead of the inline engine execution path.
-const DefaultThreatDetectVersion Version = "v0.5.1"
+const DefaultThreatDetectVersion Version = "v0.5.2"
 
 // GhSkillsMinVersion is the minimum gh CLI version required for frontmatter skill support
 // (installing gh extensions via `gh extension install`). Workflows that install frontmatter
