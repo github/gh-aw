@@ -55,22 +55,22 @@ func buildImportInputFallbackReplaceFunc(inputs map[string]any) func(string) str
 			return match
 		}
 		fallback := ""
-		hasCompileTimeInput := false
+		hasInputReference := false
 		firstTruthy := ""
 		foundTruthy := false
 		for _, operand := range operands {
-			value, formatted, compileTimeInput, ok := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
+			value, formatted, inputReference, ok := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
 			if !ok {
 				return match
 			}
-			hasCompileTimeInput = hasCompileTimeInput || compileTimeInput
+			hasInputReference = hasInputReference || inputReference
 			fallback = formatted
 			if isTruthyImportInput(value) && !foundTruthy {
 				firstTruthy = formatted
 				foundTruthy = true
 			}
 		}
-		if !hasCompileTimeInput {
+		if !hasInputReference {
 			return match
 		}
 		if foundTruthy {
