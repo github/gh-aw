@@ -573,13 +573,6 @@ jobs:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
           CREATE_ORPHAN: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh"
-      - name: Restore shared agentic logs cache
-        id: restore-agentic-logs-cache
-        continue-on-error: true
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: agentic-logs
-          path: .github/aw/logs
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Download logs from last 24 hours
