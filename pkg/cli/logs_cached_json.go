@@ -311,7 +311,10 @@ func cachedLogsJSONLUnixSuffix(path, prefix string) (int64, bool) {
 		return 0, false
 	}
 	digitCount := 0
-	for digitCount < len(suffix) && suffix[digitCount] >= '0' && suffix[digitCount] <= '9' {
+	for _, ch := range []byte(suffix) {
+		if ch < '0' || ch > '9' {
+			break
+		}
 		digitCount++
 	}
 	if digitCount == 0 {
@@ -466,11 +469,18 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 	if w == nil {
 		return nil
 	}
+	if run.cachedData != nil {
+		return nil
+	}
 	logsData := buildLogsData([]ProcessedRun{run}, "", nil)
 	if len(logsData.Runs) != 1 {
 		return errors.New("failed to build cached logs JSONL record")
 	}
-	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0])
+	var logsRun RunData
+	for _, data := range logsData.Runs {
+		logsRun = data
+	}
+	runData := buildCachedLogsJSONLRunData(run, logsRun)
 	if includeAudit {
 		if audit, ok := loadCachedAuditData(run.Run.LogsPath, run.Run, auditCacheSourceLogs); ok {
 			runData.Audit = &audit
