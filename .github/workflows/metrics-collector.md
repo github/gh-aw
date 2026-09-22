@@ -77,12 +77,14 @@ post-steps:
       fi
       now_epoch="$(date -u +%s)"
       age=$(( now_epoch - new_epoch ))
-      if [ "$age" -gt 86400 ] || [ "$age" -lt -3600 ]; then
+      max_age_seconds=86400   # the collection window is 24h
+      max_skew_seconds=3600   # tolerance for clock skew on future-dated timestamps
+      if [ "$age" -gt "$max_age_seconds" ] || [ "$age" -lt "-${max_skew_seconds}" ]; then
         echo "ERROR: metrics/latest.json timestamp '${new_timestamp}' is not from the current collection window."
         exit 1
       fi
 
-      daily_count="$(find "${memory_dir}/metrics/daily" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l)"
+      daily_count="$( { find "${memory_dir}/metrics/daily" -maxdepth 1 -name '*.json' -type f 2>/dev/null || true; } | wc -l)"
       if [ "$daily_count" -eq 0 ]; then
         echo "ERROR: no daily metrics file was written under metrics/daily/."
         exit 1
