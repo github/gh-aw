@@ -227,7 +227,7 @@ describe("merge_pull_request branch validation", () => {
     };
 
     const { main } = await import("./merge_pull_request.cjs");
-    const handler = await main({ "target-repo": "github/gh-aw" });
+    const handler = await main({ "target-repo": "github/gh-aw", target: "*" });
     const result = await handler({ pull_request_number: 100 }, {});
 
     expect(result.success).toBe(false);

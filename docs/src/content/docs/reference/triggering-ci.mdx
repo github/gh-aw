@@ -77,6 +77,21 @@ Alternatively, you can set the magic secret `GH_AW_CI_TRIGGER_TOKEN` to a suitab
 gh aw secrets set GH_AW_CI_TRIGGER_TOKEN --value "<your-pat-token>"
 ```
 
+> [!NOTE]
+> `GH_AW_CI_TRIGGER_TOKEN` is unrelated to Copilot inference billing: setting `permissions.copilot-requests: write` removes the need for a `COPILOT_GITHUB_TOKEN` PAT, but a PAT (or GitHub App token) is still required to push the extra empty commit that starts CI.
+
+### Disabling the extra empty commit
+
+If your repository does not define `GH_AW_CI_TRIGGER_TOKEN` (for example because CI is triggered another way), the compiled lock file still references the magic secret, which resolves to an empty string at runtime and the empty commit is skipped. To remove the reference from the compiled workflow and its `gh-aw-manifest` entirely, set the token to `none`:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request:
+    github-token-for-extra-empty-commit: none
+```
+
+With `none`, no `GH_AW_CI_TRIGGER_TOKEN` environment variable is emitted, so the extra empty commit used to trigger CI is skipped. If the full `github-token` override below is also configured, the primary push still triggers CI.
+
 ## Alternative: Full Token Override
 
 If you want all PR operations to use a different token (not just the CI trigger), use the `github-token` field instead:

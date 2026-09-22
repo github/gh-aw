@@ -217,7 +217,11 @@ func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model string) []stri
 // addCustomSafeOutputEnvVars adds custom environment variables to safe output job steps
 func (c *Compiler) addCustomSafeOutputEnvVars(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs != nil && len(data.SafeOutputs.Env) > 0 {
+		ciTriggerTokenDisabled := isCITriggerTokenDisabled(data.SafeOutputs)
 		for _, key := range sliceutil.SortedKeys(data.SafeOutputs.Env) {
+			if key == "GH_AW_CI_TRIGGER_TOKEN" && ciTriggerTokenDisabled {
+				continue
+			}
 			if hasAnyJiraSafeOutputEnabled(data.SafeOutputs) && jiraSafeOutputDefaultEnv[key] != "" {
 				continue
 			}

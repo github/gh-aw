@@ -5,7 +5,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
-const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { isStagedMode, resolveTarget } = require("./safe_output_helpers.cjs");
 const { selectLatestRelevantChecks } = require("./check_runs_helpers.cjs");
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
@@ -361,6 +361,7 @@ async function main(config = {}) {
   const githubClient = await createAuthenticatedGitHubClient(config);
   const isStaged = isStagedMode(config);
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
+  const targetConfig = config.target || "triggering";
   const maxCount = Number(config.max || 1);
   const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
   const requiredTitlePrefix = config.required_title_prefix || "";
@@ -389,15 +390,30 @@ async function main(config = {}) {
     const { owner, repo } = repoResult.repoParts;
     core.info(`Resolved target repository: ${owner}/${repo}`);
 
-    const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
-    if (!pullNumberResolution.success) {
-      core.error(pullNumberResolution.error);
-      return { success: false, error: pullNumberResolution.error };
+    let targetItem = message;
+    if (targetConfig === "*" && message?.pull_request_number != null) {
+      const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
+      if (!pullNumberResolution.success) {
+        core.error(pullNumberResolution.error);
+        return { success: false, error: pullNumberResolution.error };
+      }
+      targetItem = { ...message, pull_request_number: pullNumberResolution.pullNumber };
+      if (pullNumberResolution.fromTemporaryId) {
+        core.info(`Resolved temporary ID '${String(message.pull_request_number)}' to pull request #${pullNumberResolution.pullNumber}`);
+      }
     }
-    const pullNumber = pullNumberResolution.pullNumber;
-    if (pullNumberResolution.fromTemporaryId) {
-      core.info(`Resolved temporary ID '${String(message?.pull_request_number)}' to pull request #${pullNumber}`);
+
+    const targetResult = resolveTarget({
+      targetConfig,
+      item: targetItem,
+      context,
+      itemType: "merge_pull_request",
+    });
+    if (!targetResult.success) {
+      core.error(targetResult.error);
+      return { success: false, error: targetResult.error };
     }
+    const pullNumber = targetResult.number;
     core.info(`Target PR number: ${pullNumber}`);
 
     /** @type {Array<{code: string, message: string, details?: any}>} */

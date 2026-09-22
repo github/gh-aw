@@ -17,9 +17,8 @@ const HANDLER_TYPE = "add_reviewer";
 
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { getPullRequestNumber } = require("./pr_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
-const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
+const { isStagedMode, checkRequiredFilter, resolveTarget } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { attachExecutionState, extractReviewStateFromData, fetchPullRequestReviewState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
@@ -85,6 +84,7 @@ async function main(config = {}) {
   const allowedReviewers = config.allowed ?? [];
   const allowedTeamReviewers = config.allowed_team_reviewers ?? [];
   const maxCount = config.max ?? 10;
+  const targetConfig = config.target || "triggering";
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const githubClient = await createAuthenticatedGitHubClient(config);
   const isStaged = isStagedMode(config);
@@ -152,21 +152,20 @@ async function main(config = {}) {
 
     processedCount++;
 
-    const { prNumber, error } = getPullRequestNumber(message, context);
-
-    if (error) {
-      core.warning(error);
+    const targetResult = resolveTarget({
+      targetConfig,
+      item: message,
+      context,
+      itemType: HANDLER_TYPE,
+    });
+    if (!targetResult.success) {
+      core.warning(targetResult.error);
       return {
         success: false,
-        error,
+        error: targetResult.error,
       };
     }
-    if (prNumber === null) {
-      return {
-        success: false,
-        error: "Pull request number is required",
-      };
-    }
+    const prNumber = targetResult.number;
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "pull request reviewer");
     if (!repoResult.success) {

@@ -1459,8 +1459,67 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 		shellPolicyStart := strings.Index(config, "# Sync converter output")
 		shellPolicyEnd := strings.Index(config, "# Append engine-level custom Codex config")
 		shellPolicy := config[shellPolicyStart:shellPolicyEnd]
-		if strings.Contains(shellPolicy, "[features]") || !strings.Contains(config, "[features]\nplugins = false\n shell_tool = false") {
+		expectedCustomFeatures := strings.Join([]string{
+			codexRunBlockIndent + "[features]",
+			codexRunBlockIndent + "plugins = false",
+			codexRunBlockIndent + " shell_tool = false",
+		}, "\n")
+		if strings.Contains(shellPolicy, "[features]") || !strings.Contains(config, expectedCustomFeatures) {
 			t.Errorf("Expected plugin setting to be merged into custom Codex features table, got:\n%s", config)
+		}
+	})
+
+	t.Run("indents custom config inside run block heredoc", func(t *testing.T) {
+		workflowData := &WorkflowData{
+			Name: "test-workflow",
+			EngineConfig: &EngineConfig{
+				Config: "model_reasoning_effort = \"high\"\n\n[profiles.demo]\napproval_policy = \"never\"",
+			},
+		}
+		var yaml strings.Builder
+		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, workflowData); err != nil {
+			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
+		}
+
+		config := normalizeHeredocDelimiters(yaml.String())
+		startMarker := codexRunBlockIndent + "cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
+		endMarker := codexRunBlockIndent + "GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
+		start := strings.Index(config, startMarker)
+		if start < 0 {
+			t.Fatalf("custom config heredoc start marker not found in:\n%s", config)
+		}
+		start += len(startMarker)
+		end := strings.Index(config[start:], endMarker)
+		if end < 0 {
+			t.Fatalf("custom config heredoc end marker not found in:\n%s", config)
+		}
+
+		body := config[start : start+end]
+		var runtimeConfig strings.Builder
+		for _, line := range strings.SplitAfter(body, "\n") {
+			if line == "" {
+				continue
+			}
+			if line == "\n" {
+				runtimeConfig.WriteString(line)
+				continue
+			}
+			if !strings.HasPrefix(line, codexRunBlockIndent) {
+				t.Fatalf("custom config heredoc body line is not indented for YAML run block: %q\nFull body:\n%s", line, body)
+			}
+			runtimeConfig.WriteString(strings.TrimPrefix(line, codexRunBlockIndent))
+		}
+		expectedRuntimeConfig := workflowData.EngineConfig.Config + "\n"
+		if got := runtimeConfig.String(); got != expectedRuntimeConfig {
+			t.Fatalf("custom config heredoc body changed runtime TOML content:\nExpected:\n%q\nGot:\n%q", expectedRuntimeConfig, got)
+		}
+	})
+
+	t.Run("normalizes unterminated whitespace-only final config line", func(t *testing.T) {
+		var yaml strings.Builder
+		writeIndentedCodexConfig(&yaml, "a = 1\n   ")
+		if got, want := yaml.String(), codexRunBlockIndent+"a = 1\n\n"; got != want {
+			t.Fatalf("unterminated whitespace-only line was not normalized:\nExpected: %q\nGot: %q", want, got)
 		}
 	})
 

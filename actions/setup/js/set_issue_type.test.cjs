@@ -77,7 +77,7 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
     });
 
     const { main } = require("./set_issue_type.cjs");
-    handler = await main({ max: 5, issue_intent: true });
+    handler = await main({ max: 5, issue_intent: true, target: "*" });
   });
 
   it("should return a function from main()", async () => {
@@ -130,6 +130,8 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
   });
 
   it("should use context issue number when issue_number not provided", async () => {
+    const { main } = require("./set_issue_type.cjs");
+    handler = await main({ max: 5, issue_intent: true, target: "triggering" });
     const message = {
       type: "set_issue_type",
       issue_type: "Bug",
@@ -306,7 +308,7 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
 
     try {
       const { main } = require("./set_issue_type.cjs");
-      const stagedHandler = await main({ max: 5 });
+      const stagedHandler = await main({ max: 5, target: "*" });
 
       const message = {
         type: "set_issue_type",
@@ -473,7 +475,7 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
 
   it("should use legacy REST issue type update when issue_intent is disabled", async () => {
     const { main } = require("./set_issue_type.cjs");
-    const handlerWithoutIntent = await main({ max: 5, issue_intent: false });
+    const handlerWithoutIntent = await main({ max: 5, issue_intent: false, target: "*" });
 
     const result = await handlerWithoutIntent(
       {

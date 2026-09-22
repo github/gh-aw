@@ -269,7 +269,8 @@ async function main(config = {}) {
     const customInstructions = defaultCustomInstructions || null;
 
     // Validate that both issue_number and pull_number are not specified simultaneously
-    if (message.issue_number != null && message.pull_number != null) {
+    // (only relevant when the model-provided identifiers are actually used, i.e. target: "*")
+    if (targetConfig === "*" && message.issue_number != null && message.pull_number != null) {
       const error = "Cannot specify both issue_number and pull_number in the same assign_to_agent item";
       core.error(error);
       allResults.push({ issue_number: message.issue_number, pull_number: message.pull_number, agent: agentName, owner: null, repo: null, success: false, error });
@@ -278,7 +279,7 @@ async function main(config = {}) {
 
     // Defer if issue_number is a temporary ID that hasn't been resolved yet
     // Strip leading '#' so both 'aw_abc1' and '#aw_abc1' (canonical validator form) are handled
-    if (message.issue_number != null) {
+    if (targetConfig === "*" && message.issue_number != null) {
       const issueNumStr = String(message.issue_number).trim();
       if (isTemporaryId(issueNumStr)) {
         const normalized = normalizeTemporaryId(issueNumStr);
@@ -301,7 +302,7 @@ async function main(config = {}) {
     let itemForTarget = message;
 
     // Resolve temporary ID in issue_number to real issue number
-    if (message.issue_number != null) {
+    if (targetConfig === "*" && message.issue_number != null) {
       const resolvedTarget = resolveRepoIssueTarget(message.issue_number, temporaryIdMap, effectiveOwner, effectiveRepo);
       if (!resolvedTarget.resolved) {
         const error = resolvedTarget.errorMessage || `Failed to resolve issue target: ${message.issue_number}`;
@@ -316,10 +317,6 @@ async function main(config = {}) {
         core.info(`Resolved temporary issue id to ${effectiveOwner}/${effectiveRepo}#${resolvedTarget.resolved.number}`);
       }
     }
-
-    // Determine effective target configuration
-    const hasExplicitTarget = itemForTarget.issue_number != null || itemForTarget.pull_number != null;
-    const effectiveTarget = hasExplicitTarget ? "*" : targetConfig;
 
     const basePullRequestRepoSlug = pullRequestOwner && pullRequestRepo ? `${pullRequestOwner}/${pullRequestRepo}` : `${effectiveOwner}/${effectiveRepo}`;
 
@@ -364,7 +361,7 @@ async function main(config = {}) {
 
     // Resolve the target issue or pull request number from context
     const targetResult = resolveTarget({
-      targetConfig: effectiveTarget,
+      targetConfig,
       item: itemForTarget,
       context,
       itemType: "assign_to_agent",

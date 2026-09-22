@@ -90,7 +90,7 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
     });
 
     const { main } = require("./set_issue_field.cjs");
-    handler = await main({ max: 5, issue_intent: true });
+    handler = await main({ max: 5, issue_intent: true, target: "*" });
   });
 
   it("should return a function from main()", async () => {

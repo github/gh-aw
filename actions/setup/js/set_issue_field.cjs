@@ -8,7 +8,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
-const { isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
+const { isStagedMode, checkRequiredFilter, resolveTarget } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { parseAllowedIssueFields, validateAllowedIssueFieldName, BUILTIN_ISSUE_FIELD_NAMES } = require("./allowed_issue_fields.cjs");
 const { resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
@@ -160,6 +160,7 @@ async function setIssueFieldValue(githubClient, issueNodeId, fieldUpdate) {
  */
 async function main(config = {}) {
   const maxCount = config.max || 5;
+  const targetConfig = config.target || "triggering";
   const allowedIssueFields = parseAllowedIssueFields(config.allowed_fields);
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const githubClient = await createAuthenticatedGitHubClient(config);
@@ -205,23 +206,24 @@ async function main(config = {}) {
     const { repo: itemRepo, repoParts } = repoResult;
     core.info(`Target repository: ${itemRepo}`);
 
-    const targetResult = resolveSafeOutputIssueTarget({ message: item, resolvedTemporaryIds, repoParts, handlerType: "set_issue_field", aliases: ["issue_number"] });
-    if (!targetResult.success) return targetResult;
-    let issueNumber;
-    if (targetResult.number !== null) {
-      issueNumber = targetResult.number;
-      core.info(`Resolved issue number: #${issueNumber}`);
-    } else {
-      const contextIssueNumber = context.payload?.issue?.number;
-      if (!contextIssueNumber) {
-        core.warning("No issue_number provided and not in issue context");
-        return {
-          success: false,
-          error: "No issue number available",
-        };
+    let targetItem = item;
+    if (targetConfig === "*") {
+      const explicitTarget = resolveSafeOutputIssueTarget({ message: item, resolvedTemporaryIds, repoParts, handlerType: "set_issue_field", aliases: ["issue_number"] });
+      if (!explicitTarget.success) return explicitTarget;
+      if (explicitTarget.number !== null) {
+        targetItem = { ...item, issue_number: explicitTarget.number };
       }
-      issueNumber = contextIssueNumber;
     }
+    const targetResult = resolveTarget({
+      targetConfig,
+      item: targetItem,
+      context,
+      itemType: "set_issue_field",
+      supportsIssue: true,
+    });
+    if (!targetResult.success) return { success: false, error: targetResult.error };
+    const issueNumber = targetResult.number;
+    core.info(`Resolved issue number: #${issueNumber}`);
 
     const filterResult = await checkRequiredFilter(githubClient, repoParts, issueNumber, requiredLabels, requiredTitlePrefix, "set_issue_field");
     if (filterResult) return filterResult;

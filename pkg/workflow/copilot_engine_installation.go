@@ -155,7 +155,7 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	if len(sdkInstallStep) > 0 {
 		npmSteps = append(npmSteps, sdkInstallStep)
 	}
-	steps := BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
+	steps := buildNpmEngineInstallStepsWithAWF(npmSteps, workflowData, true)
 
 	return appendCopilotLSPInstallSteps(steps, workflowData)
 }

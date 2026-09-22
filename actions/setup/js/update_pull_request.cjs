@@ -15,7 +15,7 @@ const { createUpdateHandlerFactory, createStandardResolveNumber, createStandardF
 const { buildCommonEntityUpdateData } = require("./update_entity_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { fetchPullRequestState, mergePullRequestState } = require("./safe_output_execution_metadata.cjs");
-const { withRetry, isTransientError } = require("./error_recovery.cjs");
+const { withRetry, isTransientError, isWorkflowsScopeTimeoutError } = require("./error_recovery.cjs");
 
 /**
  * @param {unknown} error
@@ -63,7 +63,7 @@ function isNonFatalUpdateBranchError(error) {
   const hasWorkflowsPermissionError = hasWorkflowsPermissionPhrase && (hasWorkflowMutationRefusal || message.includes("update pull request"));
   // GitHub update-branch API also returns 403 with this message when a PR contains workflow
   // file changes and the check times out, rather than the usual "refusing to allow" phrase.
-  const hasWorkflowsScopeRequired = message.includes("`workflows` scope may be required") || message.includes("unable to determine if workflow can be created or updated");
+  const hasWorkflowsScopeRequired = isWorkflowsScopeTimeoutError(error);
 
   if (status !== undefined) {
     if (status === 403 && (hasWorkflowsPermissionError || hasWorkflowsScopeRequired)) {

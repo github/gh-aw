@@ -101,6 +101,8 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
   });
 
   it("should use explicit issue number from message", async () => {
+    const { main } = require("./unassign_from_user.cjs");
+    handler = await main({ max: 10, allowed: ["user1"], target: "*" });
     mockGithub.rest.issues.removeAssignees.mockResolvedValue({});
 
     const message = {
@@ -185,8 +187,44 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
     const result = await handler(message, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("No issue number available");
+    expect(result.error).toContain("not running in issue or pull request context");
     expect(mockGithub.rest.issues.removeAssignees).not.toHaveBeenCalled();
+
+    // Restore context
+    global.context = mockContext;
+  });
+
+  it("should support triggering pull request context", async () => {
+    global.context = {
+      repo: {
+        owner: "test-owner",
+        repo: "test-repo",
+      },
+      eventName: "pull_request",
+      payload: {
+        pull_request: {
+          number: 456,
+        },
+      },
+    };
+
+    mockGithub.rest.issues.removeAssignees.mockResolvedValue({});
+
+    const message = {
+      type: "unassign_from_user",
+      assignees: ["user1"],
+    };
+
+    const result = await handler(message, {});
+
+    expect(result.success).toBe(true);
+    expect(result.issueNumber).toBe(456);
+    expect(mockGithub.rest.issues.removeAssignees).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      issue_number: 456,
+      assignees: ["user1"],
+    });
 
     // Restore context
     global.context = mockContext;
@@ -247,6 +285,7 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
       max: 10,
       allowed: ["user1"],
       allowed_repos: ["test-owner/other-repo"],
+      target: "*",
     });
 
     mockGithub.rest.issues.removeAssignees.mockResolvedValue({});

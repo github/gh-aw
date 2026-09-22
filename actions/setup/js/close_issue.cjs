@@ -12,6 +12,7 @@ const { createCloseEntityHandler, buildCommentBody, ISSUE_CONFIG } = require("./
 const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
 
 /**
  * Parse a `duplicate_of` value into { owner, repo, issueNumber }.
@@ -246,15 +247,16 @@ async function main(config = {}) {
         }
         const { repo: entityRepo, repoParts } = repoResult;
 
-        // Determine issue number - either from explicit field or from context
-        if (item.issue_number !== undefined) {
+        const targetConfig = config.target || "triggering";
+        let targetItem = item;
+        if (targetConfig === "*" && item.issue_number !== undefined) {
           // Try to resolve as temporary ID first, then fall back to integer parsing
           const tempIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
           const resolvedTarget = resolveRepoIssueTarget(item.issue_number, tempIdMap, repoParts.owner, repoParts.repo);
           if (resolvedTarget.wasTemporaryId && resolvedTarget.resolved) {
             const issueNumber = resolvedTarget.resolved.number;
             core.info(`Resolved temporary ID '${item.issue_number}' to #${issueNumber}`);
-            return { success: true, entityNumber: issueNumber, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
+            targetItem = { ...item, issue_number: issueNumber };
           } else if (resolvedTarget.wasTemporaryId && !resolvedTarget.resolved) {
             return {
               success: false,
@@ -262,21 +264,19 @@ async function main(config = {}) {
               error: resolvedTarget.errorMessage || `Unresolved temporary ID: ${item.issue_number}`,
             };
           }
-
-          // Not a temporary ID - parse as integer
-          const issueNumber = parseInt(String(item.issue_number), 10);
-          if (Number.isNaN(issueNumber)) {
-            return { success: false, error: `Invalid issue number: ${item.issue_number}` };
-          }
-          return { success: true, entityNumber: issueNumber, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
         }
 
-        // Fall back to context issue number
-        const contextIssue = context.payload?.issue?.number;
-        if (!contextIssue) {
-          return { success: false, error: "No issue number available" };
+        const numberResult = resolveTarget({
+          targetConfig,
+          item: targetItem,
+          context,
+          itemType: ISSUE_CONFIG.itemType,
+          supportsIssue: true,
+        });
+        if (!numberResult.success) {
+          return { success: false, error: numberResult.error };
         }
-        return { success: true, entityNumber: contextIssue, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
+        return { success: true, entityNumber: numberResult.number, owner: repoParts.owner, repo: repoParts.repo, entityRepo };
       },
 
       getDetails: getIssueDetails,

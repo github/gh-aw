@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, beforeEach } from "vitest";
-const { main, parseDuplicateOf } = require("./close_issue.cjs");
+const { main: createHandler, parseDuplicateOf } = require("./close_issue.cjs");
+const main = (config = {}) => createHandler({ target: "*", ...config });
 
 describe("close_issue", () => {
   let mockCore;
@@ -65,6 +66,7 @@ describe("close_issue", () => {
     };
 
     mockContext = {
+      eventName: "issues",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -205,7 +207,7 @@ describe("close_issue", () => {
     });
 
     it("should close an issue from context when issue_number not provided", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
       const updateCalls = [];
 
       mockGithub.rest.issues.update = async params => {
@@ -239,18 +241,18 @@ describe("close_issue", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Invalid issue number");
+      expect(result.error).toContain("Invalid item_number/issue_number");
     });
 
     it("should handle missing issue_number and no context", async () => {
       mockContext.payload = {};
 
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
 
       const result = await handler({ body: "Trying to close" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("No issue number available");
+      expect(result.error).toContain("no issue found");
     });
 
     it("should respect max count limit", async () => {

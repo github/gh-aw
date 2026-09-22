@@ -367,7 +367,7 @@ safe-outputs:
   report-failed-jobs: false
 ```
 
-When omitted, `report-failed-jobs` defaults to `true`.
+`report-failed-jobs` also accepts a GitHub Actions expression that resolves to a boolean. When omitted, it defaults to `true`.
 
 Custom safe-output jobs are defined under `safe-outputs.jobs:`. They run after the agent completes and can expose a custom safe-output tool to the agent. The optional `output` field is the success message returned to the agent:
 

@@ -8,7 +8,7 @@
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { resolveIssueNumber, extractAssignees, checkRequiredFilter } = require("./safe_output_helpers.cjs");
+const { resolveTarget, extractAssignees, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -29,6 +29,7 @@ const main = createCountGatedHandler({
     // Extract configuration
     const allowedAssignees = config.allowed ?? [];
     const blockedAssignees = config.blocked ?? [];
+    const targetConfig = config.target || "triggering";
     const unassignFirst = parseBoolTemplatable(config.unassign_first, false);
     const issueIntentEnabled = config.issue_intent !== false;
     const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
@@ -72,16 +73,21 @@ const main = createCountGatedHandler({
       const assignItem = message;
       const intentMetadata = issueIntentEnabled ? normalizeIssueIntentMetadata(assignItem) : {};
 
-      // Determine issue number using shared helper
-      const issueResult = resolveIssueNumber(assignItem);
-      if (!issueResult.success) {
-        core.warning(`Skipping assign_to_user: ${issueResult.error}`);
+      const targetResult = resolveTarget({
+        targetConfig,
+        item: assignItem,
+        context,
+        itemType: HANDLER_TYPE,
+        supportsIssue: true,
+      });
+      if (!targetResult.success) {
+        core.warning(`Skipping assign_to_user: ${targetResult.error}`);
         return {
           success: false,
-          error: issueResult.error,
+          error: targetResult.error,
         };
       }
-      const issueNumber = issueResult.issueNumber;
+      const issueNumber = targetResult.number;
 
       const filterResult = await checkRequiredFilter(githubClient, repoParts, issueNumber, requiredLabels, requiredTitlePrefix, HANDLER_TYPE);
       if (filterResult) return filterResult;

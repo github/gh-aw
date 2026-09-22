@@ -47,6 +47,168 @@ function configureRepoMemoryMergePolicy(workspaceDir) {
 }
 
 /**
+ * Deterministic validation errors come from static commit shape or policy
+ * checks in pushSignedCommits. Retrying them with the same local commits cannot
+ * make them pass, unlike transient API failures or stale remote heads.
+ *
+ * @param {string} errorMessage
+ * @returns {boolean}
+ */
+function isDeterministicPushValidationError(errorMessage) {
+  return /^ERR_VALIDATION\b/.test(errorMessage);
+}
+
+/**
+ * Rebase this run's repo-memory commit(s) onto a refreshed remote branch head
+ * without creating a merge commit. JSONL conflicts keep both rows via the
+ * checkout-local merge=union policy; non-JSONL conflicts keep this run's files.
+ *
+ * @param {{workspaceDir: string, branchName: string, repoUrlWithToken: string, previousBaseRef: string, remoteHead: string}} opts
+ */
+function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead }) {
+  try {
+    configureRepoMemoryMergePolicy(workspaceDir);
+  } catch (mergePolicyError) {
+    core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
+  }
+
+  execGitSync(["fetch", repoUrlWithToken, `refs/heads/${branchName}`], { cwd: workspaceDir, stdio: "pipe", suppressLogs: true });
+
+  const rebaseArgs = previousBaseRef ? ["rebase", "-X", "theirs", "--onto", remoteHead, previousBaseRef] : ["rebase", "-X", "theirs", "--onto", remoteHead, "--root"];
+  try {
+    execGitSync(rebaseArgs, { cwd: workspaceDir, stdio: "inherit", suppressLogs: true });
+  } catch (rebaseError) {
+    try {
+      execGitSync(["rebase", "--abort"], { cwd: workspaceDir, stdio: "pipe" });
+    } catch {
+      // Ignore cleanup failures; surface the original rebase error below.
+    }
+    throw rebaseError;
+  }
+}
+
+/**
+ * Push repo-memory changes with optimistic retries after stale-head failures.
+ *
+ * @param {object} opts
+ * @param {any} opts.githubClient
+ * @param {string} opts.targetOwner
+ * @param {string} opts.targetRepoName
+ * @param {string} opts.targetRepo
+ * @param {string} opts.branchName
+ * @param {string} opts.baseRef
+ * @param {string} opts.workspaceDir
+ * @param {string} opts.ghToken
+ * @param {string} opts.serverHost
+ * @param {typeof pushSignedCommits} [opts.pushSignedCommitsFn]
+ * @param {typeof exec.getExecOutput} [opts.execGetExecOutput]
+ * @param {(delay: number) => Promise<void>} [opts.sleepFn]
+ * @param {string} [opts.repoUrlWithTokenForRetry]
+ * @param {string} [opts.originUrlForPush]
+ */
+async function pushRepoMemoryChangesWithRetry({
+  githubClient,
+  targetOwner,
+  targetRepoName,
+  targetRepo,
+  branchName,
+  baseRef,
+  workspaceDir,
+  ghToken,
+  serverHost,
+  pushSignedCommitsFn = pushSignedCommits,
+  execGetExecOutput = exec.getExecOutput,
+  sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
+  repoUrlWithTokenForRetry,
+  originUrlForPush,
+}) {
+  // URL with embedded token used for the fetch/rebase-on-retry step only;
+  // pushSignedCommits authenticates via the git extraheader set by
+  // actions/checkout (and the gitAuthEnv fallback for the git-push path).
+  const repoUrlWithToken = repoUrlWithTokenForRetry || `https://x-access-token:${ghToken}@${serverHost}/${targetRepo}.git`;
+
+  // Point origin at the memory target repo so pushSignedCommits can resolve
+  // the remote branch HEAD (ls-remote origin) and the git-push fallback
+  // pushes to the correct repository.
+  execGitSync(["remote", "set-url", "origin", originUrlForPush || `https://${serverHost}/${targetRepo}.git`], { cwd: workspaceDir, stdio: "pipe" });
+
+  // Pushes to a memory branch are not serialised by a job-level concurrency group
+  // (GitHub Actions would cancel all but one pending job under fan-out), so the retry
+  // loop is what makes concurrent writers converge. Full-jitter exponential backoff
+  // spreads out the retries of many runs that finish at the same time.
+  const MAX_RETRIES = 10;
+  const BASE_DELAY_MS = 1000;
+  const MAX_DELAY_MS = 20000;
+  let currentBaseRef = baseRef;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    core.info(`Pushing changes to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+    try {
+      await pushSignedCommitsFn({
+        githubClient,
+        owner: targetOwner,
+        repo: targetRepoName,
+        branch: branchName,
+        baseRef: currentBaseRef,
+        cwd: workspaceDir,
+        gitAuthEnv: getGitAuthEnv(ghToken),
+      });
+      core.info(`Successfully pushed changes to ${branchName} branch`);
+      return;
+    } catch (error) {
+      const errMsg = getErrorMessage(error);
+      if (isDeterministicPushValidationError(errMsg)) {
+        core.setFailed(`Failed to push changes: ${errMsg}`);
+        return;
+      }
+      if (attempt < MAX_RETRIES) {
+        const ceiling = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * Math.pow(2, attempt));
+        const delay = Math.floor(Math.random() * ceiling) + 1;
+        core.warning(`Push failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${errMsg}`);
+        await sleepFn(delay);
+
+        // Refresh currentBaseRef and replay our commit(s) onto the latest remote
+        // head before retrying. This keeps the local history linear for
+        // pushSignedCommits while still preserving concurrent JSONL rows via the
+        // checkout-local merge=union policy.
+        try {
+          const { stdout: lsOut } = await execGetExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir });
+          const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
+          if (remoteHead && remoteHead !== currentBaseRef) {
+            const previousBaseRef = currentBaseRef;
+            currentBaseRef = remoteHead;
+            core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
+            try {
+              reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead });
+            } catch (reconcileError) {
+              core.setFailed(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
+              return;
+            }
+          }
+        } catch (lsRemoteError) {
+          // ls-remote failed; proceed with existing currentBaseRef
+          core.info(`ls-remote on retry failed, keeping existing baseRef: ${getErrorMessage(lsRemoteError)}`);
+        }
+      } else {
+        // Surface a helpful message when the repository's signed-commits
+        // ruleset rejects the git-push fallback path.
+        if (/GH013|must have verified signatures|Commits must have verified signatures/i.test(errMsg)) {
+          core.setFailed(
+            `repo-memory: push to branch ${branchName} was rejected because the repository requires verified (signed) commits. ` +
+              `Commits pushed via the GitHub GraphQL API are signed automatically, but the signed-commit path could not be used for this push. ` +
+              `If your memory files contain symlinks, executable files, or submodule references, remove them and use regular plain-text files (.json, .jsonl, .txt, .md, .csv). ` +
+              `Original error: ${errMsg}`
+          );
+        } else {
+          core.setFailed(`Failed to push changes after ${MAX_RETRIES + 1} attempts: ${errMsg}`);
+        }
+        return;
+      }
+    }
+  }
+}
+
+/**
  * Apply the final safe-output temporary ID map to memory files before persistence.
  *
  * @param {Array<{relativePath: string}>} files
@@ -705,85 +867,17 @@ async function main() {
   // strict signed-commits ruleset that fallback will also be rejected —
   // that is expected behaviour: remove the unsupported file types and
   // re-run.
-  // URL with embedded token used for the pull-on-retry merge step only;
-  // pushSignedCommits authenticates via the git extraheader set by
-  // actions/checkout (and the gitAuthEnv fallback for the git-push path).
-  const repoUrlWithToken = `https://x-access-token:${ghToken}@${serverHost}/${targetRepo}.git`;
-
-  // Point origin at the memory target repo so pushSignedCommits can resolve
-  // the remote branch HEAD (ls-remote origin) and the git-push fallback
-  // pushes to the correct repository.
-  execGitSync(["remote", "set-url", "origin", `https://${serverHost}/${targetRepo}.git`], { stdio: "pipe" });
-
-  const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 1000;
-  let currentBaseRef = baseRef;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    core.info(`Pushing changes to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-    try {
-      await pushSignedCommits({
-        githubClient: github,
-        owner: targetOwner,
-        repo: targetRepoName,
-        branch: branchName,
-        baseRef: currentBaseRef,
-        cwd: workspaceDir,
-        gitAuthEnv: getGitAuthEnv(ghToken),
-      });
-      core.info(`Successfully pushed changes to ${branchName} branch`);
-      return;
-    } catch (error) {
-      const errMsg = getErrorMessage(error);
-      if (attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        core.warning(`Push failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms: ${errMsg}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-
-        // Refresh currentBaseRef and merge concurrent remote changes before
-        // retrying, in case another run pushed to the branch in the interim.
-        try {
-          const { stdout: lsOut } = await exec.getExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir });
-          const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
-          if (remoteHead && remoteHead !== currentBaseRef) {
-            currentBaseRef = remoteHead;
-            core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
-            // Merge concurrent remote changes. JSONL conflicts keep rows from
-            // both sides; other file types retain the local version.
-            // Note: this may produce a merge commit; if so, pushSignedCommits
-            // will fall back to git push for this retry attempt.
-            try {
-              configureRepoMemoryMergePolicy(workspaceDir);
-            } catch (mergePolicyError) {
-              core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
-            }
-            try {
-              execGitSync(["pull", "--no-rebase", "-X", "ours", repoUrlWithToken, branchName], { stdio: "inherit", suppressLogs: true });
-            } catch (pullError) {
-              core.info(`Pull on retry failed (may be expected for new branches): ${getErrorMessage(pullError)}`);
-            }
-          }
-        } catch (lsRemoteError) {
-          // ls-remote failed; proceed with existing currentBaseRef
-          core.info(`ls-remote on retry failed, keeping existing baseRef: ${getErrorMessage(lsRemoteError)}`);
-        }
-      } else {
-        // Surface a helpful message when the repository's signed-commits
-        // ruleset rejects the git-push fallback path.
-        if (/GH013|must have verified signatures|Commits must have verified signatures/i.test(errMsg)) {
-          core.setFailed(
-            `repo-memory: push to branch ${branchName} was rejected because the repository requires verified (signed) commits. ` +
-              `Commits pushed via the GitHub GraphQL API are signed automatically, but the signed-commit path could not be used for this push. ` +
-              `If your memory files contain symlinks, executable files, or submodule references, remove them and use regular plain-text files (.json, .jsonl, .txt, .md, .csv). ` +
-              `Original error: ${errMsg}`
-          );
-        } else {
-          core.setFailed(`Failed to push changes after ${MAX_RETRIES + 1} attempts: ${errMsg}`);
-        }
-        return;
-      }
-    }
-  }
+  await pushRepoMemoryChangesWithRetry({
+    githubClient: github,
+    targetOwner,
+    targetRepoName,
+    targetRepo,
+    branchName,
+    baseRef,
+    workspaceDir,
+    ghToken,
+    serverHost,
+  });
 }
 
-module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, main };
+module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };

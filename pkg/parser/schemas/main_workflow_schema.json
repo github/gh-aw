@@ -8239,7 +8239,7 @@
                 },
                 "github-token-for-extra-empty-commit": {
                   "type": "string",
-                  "description": "Token used to push an empty commit after PR creation to trigger CI events. Works around the GITHUB_TOKEN limitation where pushes don't trigger workflow runs. Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the repository. Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token, or 'app' for GitHub App auth."
+                  "description": "Token used to push an empty commit after PR creation to trigger CI events. Works around the GITHUB_TOKEN limitation where pushes don't trigger workflow runs. Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the repository. Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token, 'app' for GitHub App auth, or 'none' to skip the extra empty commit and keep GH_AW_CI_TRIGGER_TOKEN out of the compiled workflow."
                 },
                 "protected-files": {
                   "oneOf": [
@@ -10473,7 +10473,7 @@
                 },
                 "github-token-for-extra-empty-commit": {
                   "type": "string",
-                  "description": "Token used to push an empty commit after pushing changes to trigger CI events. Works around the GITHUB_TOKEN limitation where pushes don't trigger workflow runs. Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the repository. Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token, or 'app' for GitHub App auth."
+                  "description": "Token used to push an empty commit after pushing changes to trigger CI events. Works around the GITHUB_TOKEN limitation where pushes don't trigger workflow runs. Defaults to the magic secret GH_AW_CI_TRIGGER_TOKEN if set in the repository. Use a secret expression (e.g. '${{ secrets.CI_TOKEN }}') for a custom token, 'app' for GitHub App auth, or 'none' to skip the extra empty commit and keep GH_AW_CI_TRIGGER_TOKEN out of the compiled workflow."
                 },
                 "fallback-as-pull-request": {
                   "type": "boolean",
@@ -12355,10 +12355,19 @@
           "examples": ["github/docs-engineering", "myorg/infra-alerts"]
         },
         "report-failed-jobs": {
-          "type": "boolean",
-          "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable.",
+          "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable. Supports GitHub Actions expressions.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$\\{\\{.*\\}\\}$",
+              "description": "GitHub Actions expression that resolves to a boolean at runtime"
+            }
+          ],
           "default": true,
-          "examples": [false, true]
+          "examples": [false, true, "${{ inputs.report-failed-jobs }}"]
         },
         "max-bot-mentions": {
           "description": "Maximum number of bot trigger references (e.g. 'fixes #123', 'closes #456') allowed in output before all of them are neutralized. Default: 10. Supports integer or GitHub Actions expression (e.g. '${{ inputs.max-bot-mentions }}').",

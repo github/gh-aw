@@ -95,6 +95,16 @@ describe("safe_output_helpers", () => {
         expect(result.contextType).toBe("issue");
       });
 
+      it("should ignore agent-supplied issue numbers for triggering targets", () => {
+        const result = helpers.resolveTarget({
+          ...baseParams,
+          item: { item_number: 999, issue_number: 999 },
+        });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(result.contextType).toBe("issue");
+      });
+
       it("should resolve workflow_dispatch issue context from aw_context", () => {
         const result = helpers.resolveTarget({
           ...baseParams,
@@ -148,6 +158,17 @@ describe("safe_output_helpers", () => {
         const result = helpers.resolveTarget({
           ...baseParams,
           targetConfig: "999",
+        });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(999);
+        expect(result.contextType).toBe("issue");
+      });
+
+      it("should ignore conflicting agent-supplied issue numbers for fixed targets", () => {
+        const result = helpers.resolveTarget({
+          ...baseParams,
+          targetConfig: "999",
+          item: { item_number: 123, issue_number: 123 },
         });
         expect(result.success).toBe(true);
         expect(result.number).toBe(999);
@@ -282,6 +303,16 @@ describe("safe_output_helpers", () => {
         expect(result.contextType).toBe("pull request");
       });
 
+      it("should ignore agent-supplied PR numbers for triggering targets", () => {
+        const result = helpers.resolveTarget({
+          ...baseParams,
+          item: { pull_request_number: 999, pr_number: 999, pr: 999, pull_number: 999 },
+        });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(result.contextType).toBe("pull request");
+      });
+
       it("should resolve triggering pull_request_target context", () => {
         const result = helpers.resolveTarget({
           ...baseParams,
@@ -330,6 +361,17 @@ describe("safe_output_helpers", () => {
         const result = helpers.resolveTarget({
           ...baseParams,
           targetConfig: "456",
+        });
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(456);
+        expect(result.contextType).toBe("pull request");
+      });
+
+      it("should ignore conflicting agent-supplied PR numbers for fixed targets", () => {
+        const result = helpers.resolveTarget({
+          ...baseParams,
+          targetConfig: "456",
+          item: { pull_request_number: 123, pr_number: 123, pr: 123, pull_number: 123 },
         });
         expect(result.success).toBe(true);
         expect(result.number).toBe(456);
@@ -389,6 +431,30 @@ describe("safe_output_helpers", () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain('Target is "*"');
         expect(result.shouldFail).toBe(true);
+      });
+    });
+
+    describe("target authorization invariants", () => {
+      it("should fail closed when a non-wildcard resolved target diverges from the authorized target", () => {
+        const result = helpers.assertTargetAuthorizationInvariant({
+          targetConfig: "triggering",
+          resolvedNumber: 999,
+          authorizedNumber: 123,
+          itemType: "test operation",
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
+        expect(result.shouldFail).toBe(true);
+      });
+
+      it("should allow wildcard targets because they are explicitly agent-selected", () => {
+        const result = helpers.assertTargetAuthorizationInvariant({
+          targetConfig: "*",
+          resolvedNumber: 999,
+          authorizedNumber: undefined,
+          itemType: "test operation",
+        });
+        expect(result.success).toBe(true);
       });
     });
 

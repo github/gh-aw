@@ -8,7 +8,7 @@
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { resolveIssueNumber, extractAssignees, checkRequiredFilter } = require("./safe_output_helpers.cjs");
+const { resolveTarget, extractAssignees, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
@@ -27,6 +27,7 @@ const main = createCountGatedHandler({
     // Extract configuration
     const allowedAssignees = config.allowed || [];
     const blockedAssignees = config.blocked || [];
+    const targetConfig = config.target || "triggering";
 
     // Resolve target repository configuration
     const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
@@ -57,16 +58,22 @@ const main = createCountGatedHandler({
     return async function handleUnassignFromUser(message, resolvedTemporaryIds) {
       const unassignItem = message;
 
-      // Determine issue number using shared helper
-      const issueResult = resolveIssueNumber(unassignItem);
-      if (!issueResult.success) {
-        core.warning(`Skipping unassign_from_user: ${issueResult.error}`);
+      const targetResult = resolveTarget({
+        targetConfig,
+        item: unassignItem,
+        context,
+        itemType: HANDLER_TYPE,
+        // supportsPR=true means both issues and PRs in resolveTarget().
+        supportsPR: true,
+      });
+      if (!targetResult.success) {
+        core.warning(`Skipping unassign_from_user: ${targetResult.error}`);
         return {
           success: false,
-          error: issueResult.error,
+          error: targetResult.error,
         };
       }
-      const issueNumber = issueResult.issueNumber;
+      const issueNumber = targetResult.number;
 
       // Extract assignees using shared helper
       const requestedAssignees = extractAssignees(unassignItem);

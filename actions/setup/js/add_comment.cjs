@@ -610,9 +610,8 @@ async function main(config = {}) {
       commentIdToReuse = allowedCommentId.commentId;
     }
 
-    // Check if item_number or issue_number was explicitly provided in the message.
-    // item_number takes precedence over issue_number when both are present.
-    // pr-number is accepted as an alias for item_number for robustness.
+    // Track whether the configured target selected an explicit item rather than the
+    // triggering context. This controls reply and retry behavior later in the handler.
     /** @type {{ success: boolean, number?: number | null, deferred?: boolean, error?: string }} */
     let itemTargetResult = { success: true, number: null };
     if (hasExplicitCommentId) {
@@ -641,22 +640,10 @@ async function main(config = {}) {
         };
       }
     } else {
-      itemTargetResult = resolveSafeOutputIssueTarget({ message, tempIdMap: temporaryIdMap, repoParts, handlerType: HANDLER_TYPE, aliases: ["item_number", "issue_number", "pr-number"] });
-      if (!itemTargetResult.success) return itemTargetResult;
-    }
-
-    if (itemTargetResult.number != null) {
-      itemNumber = itemTargetResult.number;
-      core.info(`Using explicitly provided target number (item_number/issue_number/pr-number): #${itemNumber}`);
-    } else if (!hasExplicitCommentId) {
-      // Check if this is a discussion context
       const isDiscussionContext = effectiveContext.eventName === "discussion" || effectiveContext.eventName === "discussion_comment";
-
-      if (isDiscussionContext) {
-        // For discussions, always use the discussion context
+      if (commentTarget === "triggering" && isDiscussionContext) {
         isDiscussion = true;
         itemNumber = effectiveContext.payload?.discussion?.number;
-
         if (!itemNumber) {
           core.warning("Discussion context detected but no discussion number found");
           return {
@@ -664,13 +651,20 @@ async function main(config = {}) {
             error: "No discussion number available",
           };
         }
-
         core.info(`Using discussion context: #${itemNumber}`);
       } else {
-        // For issues/PRs, use the resolveTarget helper which respects target configuration
+        let targetItem = message;
+        if (commentTarget === "*") {
+          itemTargetResult = resolveSafeOutputIssueTarget({ message, tempIdMap: temporaryIdMap, repoParts, handlerType: HANDLER_TYPE, aliases: ["item_number", "issue_number", "pr-number"] });
+          if (!itemTargetResult.success) return itemTargetResult;
+          if (itemTargetResult.number != null) {
+            targetItem = { ...message, item_number: itemTargetResult.number };
+          }
+        }
+
         const targetResult = resolveTarget({
           targetConfig: commentTarget,
-          item: message,
+          item: targetItem,
           context: effectiveContext,
           itemType: "add_comment",
           supportsPR: true, // add_comment supports both issues and PRs
@@ -710,6 +704,9 @@ async function main(config = {}) {
         }
 
         itemNumber = targetResult.number;
+        if (commentTarget !== "triggering") {
+          itemTargetResult = { success: true, number: itemNumber };
+        }
         core.info(`Resolved target ${targetResult.contextType} #${itemNumber} (target config: ${commentTarget})`);
       }
     }

@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, beforeEach } from "vitest";
-const { main } = require("./close_pull_request.cjs");
+const { main: createHandler } = require("./close_pull_request.cjs");
+const main = (config = {}) => createHandler({ target: "*", ...config });
 
 describe("close_pull_request", () => {
   let mockCore;
@@ -65,6 +66,7 @@ describe("close_pull_request", () => {
     };
 
     mockContext = {
+      eventName: "pull_request",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -151,7 +153,7 @@ describe("close_pull_request", () => {
     });
 
     it("should close a PR from context when pull_request_number not provided", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
       const updateCalls = [];
 
       mockGithub.rest.pulls.update = async params => {
@@ -185,18 +187,18 @@ describe("close_pull_request", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("Invalid pull request number")).toBe(true);
+      expect(result.error).toContain("Invalid pull_request_number");
     });
 
     it("should handle missing pull_request_number and no context", async () => {
       mockContext.payload = {};
 
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "triggering" });
 
       const result = await handler({ body: "Closing" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("No pull_request_number provided")).toBe(true);
+      expect(result.error).toContain("no pull request found");
     });
 
     it("should respect max count limit", async () => {

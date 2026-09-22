@@ -269,6 +269,8 @@ describe("add_reviewer (Handler Factory Architecture)", () => {
   });
 
   it("should use explicit PR number from message", async () => {
+    const { main } = require("./add_reviewer.cjs");
+    handler = await main({ max: 10, allowed: ["user1"], target: "*" });
     const message = {
       type: "add_reviewer",
       reviewers: ["user1"],
@@ -310,7 +312,7 @@ describe("add_reviewer (Handler Factory Architecture)", () => {
     const result = await handler(message, {});
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("No pull_request_number provided and not in pull request context");
+    expect(result.error).toContain("not running in pull request context");
     expect(mockGithub.rest.pulls.requestReviewers).not.toHaveBeenCalled();
   });
 
@@ -510,6 +512,8 @@ describe("add_reviewer (Handler Factory Architecture)", () => {
   });
 
   it("should return error for invalid pull_request_number", async () => {
+    const { main } = require("./add_reviewer.cjs");
+    handler = await main({ max: 10, allowed: ["user1"], target: "*" });
     const invalidValues = ["not-a-number", null, "abc123"];
 
     for (const invalidValue of invalidValues) {
@@ -523,7 +527,7 @@ describe("add_reviewer (Handler Factory Architecture)", () => {
       const result = await handler(message, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Invalid pull_request_number");
+      expect(result.error).toMatch(/Invalid pull_request_number|no pull_request_number/);
       expect(mockGithub.rest.pulls.requestReviewers).not.toHaveBeenCalled();
     }
   });
