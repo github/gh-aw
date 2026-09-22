@@ -633,6 +633,12 @@ async function main(options = {}) {
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
   core.setOutput("daily_ai_credits_guardrail_error", "");
   const threshold = parsePositiveCompactNumber(process.env.GH_AW_MAX_DAILY_AI_CREDITS);
+  const maxAICredits = parsePositiveCompactNumber(process.env.GH_AW_MAX_AI_CREDITS);
+  logDailyGuardrail("Resolved daily AIC guardrail limits", {
+    dailyAICThreshold: threshold,
+    perRunMaxAICredits: maxAICredits > 0 ? maxAICredits : null,
+    perRunFallbackAvailable: maxAICredits > 0,
+  });
   if (threshold <= 0) {
     core.setOutput("daily_ai_credits_guardrail_status", "disabled");
     return;
@@ -667,6 +673,7 @@ async function main(options = {}) {
       listPage: listCompletedWorkflowRunsPage,
       token,
       workflowName: process.env.GH_AW_WORKFLOW_NAME || "",
+      fallbackAIC: maxAICredits,
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);

@@ -201,6 +201,7 @@ jobs:
           GH_AW_HAS_LABEL_COMMAND: "false"
           GH_AW_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_MAX_DAILY_AI_CREDITS: "500"
+          GH_AW_MAX_AI_CREDITS: "120"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
