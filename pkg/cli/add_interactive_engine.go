@@ -258,6 +258,7 @@ func (c *AddInteractiveConfig) selectCopilotAuthMethod() error {
 		}
 	}
 	c.copilotCLIBillingStatus = probe.BillingStatus
+	addInteractiveLog.Printf("Copilot org billing probe result: status=%s", probe.BillingStatus)
 	copilotRequestsLabel += probe.LabelSuffix
 
 	// Build select options.
@@ -330,4 +331,5 @@ func (c *AddInteractiveConfig) applyCopilotAuthMethodChoice(authMethod string) {
 		c.UseCopilotPAT = authMethod == authMethodPAT
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected authentication: COPILOT_GITHUB_TOKEN"))
 	}
+	addInteractiveLog.Printf("Applied Copilot auth method choice: use_copilot_requests=%t use_copilot_pat=%t", c.UseCopilotRequests, c.UseCopilotPAT)
 }

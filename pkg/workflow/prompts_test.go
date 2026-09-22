@@ -626,6 +626,9 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if !strings.Contains(workflow, "model: copilot/gpt-5.3-codex") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to use a Codex-compatible Copilot model")
 	}
+	if !strings.Contains(workflow, "Before stopping, call exactly one terminal safe-output tool") {
+		t.Fatal("Expected daily-go-test-parallelizer workflow to require a terminal safe output")
+	}
 }
 
 func TestDailyCLIPerformanceUsesCodexCompatibleModel(t *testing.T) {

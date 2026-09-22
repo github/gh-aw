@@ -100,7 +100,7 @@ After editing the selected batch:
 
 Always create `/tmp/gh-aw/cache-memory/go-test-parallelizer/` and write the last path from the selected batch to `state.json`, even when no edit is safe, so the next daily run advances round-robin.
 
-If validation succeeds with a change, create one draft pull request describing the safety analysis and test results. Otherwise use `noop` with the selected path and a short reason.
+Before stopping, call exactly one terminal safe-output tool: create one draft pull request when validation succeeds with a change, otherwise use `noop` with the selected path and a short reason.
 
 Do not parallelize tests that use or may conflict through:
 

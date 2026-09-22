@@ -72,6 +72,8 @@ func (c *AddInteractiveConfig) checkStatusAndOfferRun(ctx context.Context) error
 }
 
 func (c *AddInteractiveConfig) waitForWorkflowStatus(ctx context.Context) (bool, error) {
+	addInteractiveLog.Printf("Waiting for workflow %q to appear in status (up to 5 attempts)", c.primaryWorkflowName())
+
 	// Use spinner only in non-verbose mode (spinner can't be restarted after stop)
 	var spinner *console.SpinnerWrapper
 	if !c.Verbose {
@@ -106,6 +108,7 @@ func (c *AddInteractiveConfig) waitForWorkflowStatus(ctx context.Context) (bool,
 		spinner.Stop()
 	}
 
+	addInteractiveLog.Printf("Workflow status wait complete: found=%t", workflowFound)
 	return workflowFound, nil
 }
 
@@ -258,11 +261,13 @@ func findWorkflowsByFilenamePattern(pattern, repoOverride string, verbose bool) 
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Workflow with filename '%s' found in workflow list\n", pattern)
 		}
+		addInteractiveLog.Printf("Workflow lookup by filename pattern=%q: found", pattern)
 		return []WorkflowStatus{{WorkflowListItem: WorkflowListItem{Workflow: pattern}}}, nil
 	}
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Workflow with filename '%s' NOT found in workflow list\n", pattern)
 	}
+	addInteractiveLog.Printf("Workflow lookup by filename pattern=%q: not found", pattern)
 	return nil, nil
 }
