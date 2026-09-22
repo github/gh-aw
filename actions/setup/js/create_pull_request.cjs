@@ -2555,6 +2555,7 @@ ${issueSafeFallbackFooter}`;
           title,
           body,
           branchName: getPullRequestHeadRef(branchName),
+          headRepo: pushRepo.toLowerCase() === itemRepo.toLowerCase() ? undefined : pushRepo,
           baseBranch,
           draft,
         });
