@@ -24,22 +24,17 @@ const (
 	testAddToolWorkflowSource = "githubnext/agentics/workflows/daily-team-status.md@d3422bf940923ef1d43db5559652b8e1e71869f3"
 )
 
-func setupMCPServerSession(t *testing.T, binaryPath, workingDir string, timeout time.Duration) (context.Context, *mcp.ClientSession) {
+func setupMCPServerSession(t *testing.T, workingDir string, timeout time.Duration) (context.Context, *mcp.ClientSession) {
 	t.Helper()
 
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	absBinaryPath, err := filepath.Abs(binaryPath)
-	require.NoError(t, err, "Expected to resolve absolute path for MCP server binary")
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "test-client",
 		Version: "1.0.0",
 	}, nil)
 
-	serverCmd := exec.Command(absBinaryPath, "mcp-server", "--cmd", absBinaryPath)
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	if workingDir != "" {
 		serverCmd.Dir = workingDir
 	}
@@ -80,7 +75,7 @@ func extractTextContent(result *mcp.CallToolResult) string {
 
 // TestMCPServer_AddTool tests that the add tool is exposed and functional
 func TestMCPServer_AddTool(t *testing.T) {
-	ctx, session := setupMCPServerSession(t, "../../gh-aw", "", testMCPServerListToolsTimeout)
+	ctx, session := setupMCPServerSession(t, "", testMCPServerListToolsTimeout)
 
 	result, err := session.ListTools(ctx, &mcp.ListToolsParams{})
 	require.NoError(t, err, "Expected list tools request to succeed")
@@ -105,7 +100,7 @@ func TestMCPServer_AddTool(t *testing.T) {
 // TestMCPServer_AddTool_Success tests that add tool can add a workflow successfully.
 func TestMCPServer_AddTool_Success(t *testing.T) {
 	tmpDir, workflowsDir := setupMCPServerAddRepo(t)
-	ctx, session := setupMCPServerSession(t, "../../gh-aw", tmpDir, testMCPServerAddToolTimeout)
+	ctx, session := setupMCPServerSession(t, tmpDir, testMCPServerAddToolTimeout)
 
 	callResult, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "add",
@@ -134,7 +129,7 @@ func TestMCPServer_AddTool_Success(t *testing.T) {
 func TestMCPServer_AddToolInvocation(t *testing.T) {
 	tmpDir, workflowsDir := setupMCPServerAddRepo(t)
 	require.DirExists(t, workflowsDir, "Expected setup helper to create workflows directory")
-	ctx, session := setupMCPServerSession(t, "../../gh-aw", tmpDir, testMCPServerAddToolTimeout)
+	ctx, session := setupMCPServerSession(t, tmpDir, testMCPServerAddToolTimeout)
 
 	tests := []struct {
 		name           string

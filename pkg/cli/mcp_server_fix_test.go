@@ -17,11 +17,7 @@ import (
 
 // TestMCPServer_FixTool tests that the fix tool is exposed and functional
 func TestMCPServer_FixTool(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -82,11 +78,7 @@ func TestMCPServer_FixTool(t *testing.T) {
 
 // TestMCPServer_FixToolInvocation tests calling the fix tool
 func TestMCPServer_FixToolInvocation(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Get absolute path to binary
 	absBinaryPath, err := filepath.Abs(binaryPath)

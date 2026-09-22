@@ -5,26 +5,18 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // TestMCPServer_ErrorCodes_InvalidParams tests that InvalidParams error code is returned for parameter validation errors
 func TestMCPServer_ErrorCodes_InvalidParams(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	// Get the current directory for proper path resolution
-	originalDir, _ := os.Getwd()
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -33,7 +25,7 @@ func TestMCPServer_ErrorCodes_InvalidParams(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -123,14 +115,7 @@ func isTestEnvPermissionError(errMsg string) bool {
 // TestMCPServer_ErrorCodes_InternalError tests that audit failures return structured JSON
 // content rather than a protocol-level MCP error (-32603).
 func TestMCPServer_ErrorCodes_InternalError(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	// Get the current directory for proper path resolution
-	originalDir, _ := os.Getwd()
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -139,7 +124,7 @@ func TestMCPServer_ErrorCodes_InternalError(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

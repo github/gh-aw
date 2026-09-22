@@ -17,11 +17,7 @@ import (
 )
 
 func TestMCPServer_CompileTool(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with a workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -61,7 +57,7 @@ This is a test workflow for compilation.
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -120,7 +116,7 @@ This is a test workflow for compilation.
 // 	}, nil)
 
 // 	// Start the MCP server as a subprocess
-// 	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+// 	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 // 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 // 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -165,11 +161,7 @@ This is a test workflow for compilation.
 // }
 
 func TestMCPServer_CompileWithSpecificWorkflow(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with multiple workflow files
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -222,7 +214,7 @@ This is the second test workflow.
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -268,11 +260,7 @@ This is the second test workflow.
 // TestMCPServer_UpdateToolSchema tests that the update tool has the correct schema
 
 func TestMCPServer_CompileToolWithErrors(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with an invalid workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -314,7 +302,7 @@ This workflow has a syntax error in the frontmatter.
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -371,11 +359,7 @@ This workflow has a syntax error in the frontmatter.
 // TestMCPServer_CompileToolWithMultipleWorkflows tests compiling multiple workflows with mixed results
 
 func TestMCPServer_CompileToolWithMultipleWorkflows(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with multiple workflow files
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -430,7 +414,7 @@ This workflow has an unknown field.
 	}, nil)
 
 	// Start the MCP server
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -482,11 +466,7 @@ This workflow has an unknown field.
 // TestMCPServer_CompileToolWithStrictMode tests compile with strict mode flag
 
 func TestMCPServer_CompileToolWithStrictMode(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with a workflow
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -526,7 +506,7 @@ This workflow has strict mode disabled in frontmatter.
 	}, nil)
 
 	// Start the MCP server
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -569,11 +549,7 @@ This workflow has strict mode disabled in frontmatter.
 // TestMCPServer_CompileToolWithSpecificWorkflows tests compiling specific workflows by name
 
 func TestMCPServer_CompileToolWithSpecificWorkflows(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with multiple workflows
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -627,7 +603,7 @@ Second test workflow.
 	}, nil)
 
 	// Start the MCP server
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -690,11 +666,7 @@ Second test workflow.
 // description clearly states that changes to .md files must be compiled
 
 func TestMCPServer_CompileToolDescriptionMentionsRecompileRequirement(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{

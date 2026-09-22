@@ -16,11 +16,7 @@ import (
 )
 
 func TestMCPServer_CustomCmd(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with a workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -54,7 +50,7 @@ This is a test workflow.
 	}
 
 	// Get absolute path to binary
-	absBinaryPath, err := filepath.Abs(filepath.Join(originalDir, binaryPath))
+	absBinaryPath, err := filepath.Abs(binaryPath)
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
 	}
@@ -106,11 +102,7 @@ This is a test workflow.
 }
 
 func TestMCPServer_StatusTool(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create a temporary directory with a workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -150,7 +142,7 @@ This is a test workflow.
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -189,14 +181,7 @@ This is a test workflow.
 }
 
 func TestMCPServer_AuditTool(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	// Get the current directory for proper path resolution
-	originalDir, _ := os.Getwd()
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -205,7 +190,7 @@ func TestMCPServer_AuditTool(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -254,14 +239,7 @@ func TestMCPServer_AuditTool(t *testing.T) {
 }
 
 func TestMCPServer_ContextCancellation(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	// Get the current directory for proper path resolution
-	originalDir, _ := os.Getwd()
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -270,7 +248,7 @@ func TestMCPServer_ContextCancellation(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

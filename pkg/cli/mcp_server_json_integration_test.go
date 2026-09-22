@@ -69,7 +69,7 @@ This is a test workflow.
 	}
 
 	// Get absolute path to binary
-	absBinaryPath, err := filepath.Abs(filepath.Join(originalDir, binaryPath))
+	absBinaryPath, err := filepath.Abs(binaryPath)
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
 	}
@@ -99,11 +99,7 @@ This is a test workflow.
 
 // TestMCPServer_StatusToolReturnsValidJSON tests that the status tool returns valid JSON
 func TestMCPServer_StatusToolReturnsValidJSON(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()
@@ -163,11 +159,7 @@ func TestMCPServer_StatusToolReturnsValidJSON(t *testing.T) {
 
 // TestMCPServer_CompileToolReturnsValidJSON tests that the compile tool returns valid JSON
 func TestMCPServer_CompileToolReturnsValidJSON(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()
@@ -227,11 +219,7 @@ func TestMCPServer_CompileToolReturnsValidJSON(t *testing.T) {
 
 // TestMCPServer_AuditToolReturnsValidJSON tests that the audit tool returns valid JSON
 func TestMCPServer_AuditToolReturnsValidJSON(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()
@@ -300,11 +288,7 @@ func TestMCPServer_AuditToolReturnsValidJSON(t *testing.T) {
 
 // TestMCPServer_LogsToolReturnsValidJSON tests that the logs tool returns valid JSON
 func TestMCPServer_LogsToolReturnsValidJSON(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()
@@ -373,11 +357,7 @@ func TestMCPServer_LogsToolReturnsValidJSON(t *testing.T) {
 // TestMCPServer_ChecksToolReturnsValidJSON tests that the checks tool returns valid JSON
 // (or a well-formed MCP error when GitHub credentials are unavailable in test environments).
 func TestMCPServer_ChecksToolReturnsValidJSON(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()
@@ -470,11 +450,7 @@ func TestMCPServer_ChecksToolReturnsValidJSON(t *testing.T) {
 
 // TestMCPServer_AllToolsReturnContent tests that all tools return non-empty content
 func TestMCPServer_AllToolsReturnContent(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()

@@ -16,11 +16,7 @@ import (
 
 // TestMCPServer_InspectTool tests that the mcp-inspect tool is exposed and functional
 func TestMCPServer_InspectTool(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
@@ -74,11 +70,7 @@ func TestMCPServer_InspectTool(t *testing.T) {
 // TestMCPServer_InspectToolInvocation tests calling the mcp-inspect tool
 func TestMCPServer_InspectToolInvocation(t *testing.T) {
 
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	// Get absolute path to binary
 	absBinaryPath, err := filepath.Abs(binaryPath)

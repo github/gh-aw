@@ -21,10 +21,7 @@ import (
 )
 
 func TestMCPServer_StdioDiagnosticsGoToStderr(t *testing.T) {
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	tmpDir := testutil.TempDir(t, "mcp-stdio-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
@@ -47,12 +44,7 @@ engine: copilot
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-
-	absBinaryPath := filepath.Join(originalDir, binaryPath)
+	absBinaryPath := binaryPath
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -74,7 +66,7 @@ engine: copilot
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
@@ -90,10 +82,7 @@ engine: copilot
 }
 
 func TestMCPServer_CompileAllWorkflows_StdoutOnlyJSONRPC(t *testing.T) {
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	tmpDir := testutil.TempDir(t, "mcp-stdio-rpc-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
@@ -116,12 +105,7 @@ engine: copilot
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-
-	absBinaryPath := filepath.Join(originalDir, binaryPath)
+	absBinaryPath := binaryPath
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
 	cmd := exec.CommandContext(ctx, absBinaryPath, "mcp-server", "--cmd", absBinaryPath)
