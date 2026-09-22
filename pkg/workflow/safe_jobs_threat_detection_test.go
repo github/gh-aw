@@ -371,6 +371,10 @@ Test workflow content
 	}
 }
 
+// TestSafeJobsThreatDetectionArtifactPathsUseSlashes verifies that runner artifact paths
+// emitted by the compiler always use POSIX separators. The regression it guards only
+// reproduces on Windows (where filepath.Join emits backslashes), so the CI job
+// "Redirect Resolution Tests" runs this test on windows-latest as well as ubuntu-latest.
 func TestSafeJobsThreatDetectionArtifactPathsUseSlashes(t *testing.T) {
 	c := NewCompiler()
 	markdown := `---
@@ -417,33 +421,6 @@ Return a short response.
 	assert.Contains(t, uploadSection, "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl")
 	assert.Contains(t, uploadSection, "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl")
 	assert.NotContains(t, uploadSection, `\tmp\gh-aw`)
-}
-
-// TestTokenUsageArtifactPathsBuiltWithPOSIXJoin is a platform-independent regression guard
-// for the artifact path separator bug fixed above. Since `filepath.Join` and `path.Join`
-// both emit forward slashes on the Linux runners that execute this package's tests, a
-// string-comparison assertion alone cannot detect a regression back to `filepath.Join`
-// (that only breaks on Windows, where `filepath.Join` uses backslashes). This test instead
-// inspects the source that builds the AWFProxyLogsDir/AWFAuditDir token-usage.jsonl paths and
-// fails if it ever uses `filepath.Join` instead of the platform-independent `path.Join`.
-func TestTokenUsageArtifactPathsBuiltWithPOSIXJoin(t *testing.T) {
-	source, err := os.ReadFile("compiler_yaml_artifacts.go")
-	require.NoError(t, err)
-
-	for _, line := range strings.Split(string(source), "\n") {
-		if !strings.Contains(line, "token-usage.jsonl") {
-			continue
-		}
-		if !strings.Contains(line, "AWFProxyLogsDir") && !strings.Contains(line, "AWFAuditDir") {
-			continue
-		}
-		if strings.Contains(line, "filepath.Join") {
-			t.Fatalf("token-usage.jsonl artifact path must be built with path.Join (POSIX separators), not filepath.Join, to avoid backslashes on Windows runners: %q", line)
-		}
-		if !strings.Contains(line, "path.Join") {
-			t.Fatalf("expected token-usage.jsonl artifact path to be built with path.Join: %q", line)
-		}
-	}
 }
 
 // TestSafeJobsExpressionEnvNeverWrittenToOutput verifies that job-level env vars containing

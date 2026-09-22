@@ -1975,6 +1975,12 @@ jobs:
       run: go test -v -run TestResolveAddWorkflowSpecAndContent -timeout 5m "-coverprofile=coverage-redirect-${{ matrix.os }}.out" ./pkg/cli/...
       shell: pwsh
 
+    # Artifact paths embedded in generated workflows must always use POSIX separators,
+    # so this compiler regression test has to run on Windows as well as Linux.
+    - name: Run artifact path separator tests
+      run: go test -v -run TestSafeJobsThreatDetectionArtifactPathsUseSlashes -timeout 5m ./pkg/workflow/
+      shell: pwsh
+
     - name: Convert redirect test coverage to Cobertura
       if: always() && hashFiles(format('coverage-redirect-{0}.out', matrix.os)) != ''
       run: |
