@@ -21,10 +21,14 @@ const mockCreateReplyForReviewComment = vi.fn().mockResolvedValue({
     html_url: "https://github.com/test-owner/test-repo/pull/42#discussion_r999",
   },
 });
+const mockGetIssue = vi.fn();
 
 const mockGithub = {
   graphql: vi.fn(),
   rest: {
+    issues: {
+      get: mockGetIssue,
+    },
     pulls: {
       createReplyForReviewComment: mockCreateReplyForReviewComment,
     },
@@ -57,6 +61,12 @@ describe("reply_to_pr_review_comment", () => {
       data: {
         id: 999,
         html_url: "https://github.com/test-owner/test-repo/pull/42#discussion_r999",
+      },
+    });
+    mockGetIssue.mockResolvedValue({
+      data: {
+        title: "Test pull request",
+        labels: [],
       },
     });
 
@@ -95,6 +105,30 @@ describe("reply_to_pr_review_comment", () => {
     expect(calledWith.pull_number).toBe(42);
     expect(calledWith.comment_id).toBe(123);
     expect(calledWith.body).toContain("Thanks for the feedback, I've updated the code.");
+  });
+
+  it("should not reply when a required label is missing", async () => {
+    const { main } = require("./reply_to_pr_review_comment.cjs");
+    const filteredHandler = await main({ max: 10, required_labels: ["automation"] });
+
+    const result = await filteredHandler(
+      {
+        type: "reply_to_pull_request_review_comment",
+        comment_id: 123,
+        body: "Reply text",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).toBe(true);
+    expect(result.error).toContain("required-labels");
+    expect(mockGetIssue).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      issue_number: 42,
+    });
+    expect(mockCreateReplyForReviewComment).not.toHaveBeenCalled();
   });
 
   it("should preserve allowlisted mentions and neutralize non-allowlisted mentions", async () => {
