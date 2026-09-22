@@ -249,7 +249,7 @@ func validateAWFImageManifestCoverage(workflowData *WorkflowData, images map[str
 		"sandbox.agent.images",
 		strings.Join(roles, ", "),
 		"incomplete image manifest: missing required role(s) "+strings.Join(missing, ", "),
-		fmt.Sprintf("AWF fails closed when container.images is set, so every image role required by the enabled features must be pinned.\n\nAdd the missing role(s):\n\nsandbox:\n  agent:\n    images:\n      %s: registry.example.com/approved/%s:v0.28.4@sha256:<64-hex-digest>\n\nSee: %s", missing[0], missing[0], constants.DocsSandboxURL),
+		fmt.Sprintf("AWF fails closed when container.images is set, so every image role required by the enabled features must be pinned.\n\nAdd the missing role(s):\n\nsandbox:\n  agent:\n    images:\n      %s: registry.example.com/approved/%s:v0.28.4@sha256:<64-hex-digest>\n\nSee: %s", missing[0], missing[0], constants.DocsSandboxURL), //nolint:uncheckedsliceindex // missing is non-empty per the len(missing) == 0 check above
 	)
 }
 
