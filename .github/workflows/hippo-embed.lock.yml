@@ -1292,6 +1292,7 @@ jobs:
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          overwrite: true
       - name: Handle agent failure
         id: handle_agent_failure
         if: always()

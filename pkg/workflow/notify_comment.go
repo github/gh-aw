@@ -255,6 +255,8 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
 		"          if-no-files-found: ignore\n",
 	}
+	retryUsageArtifactUploadWithLines := append([]string{}, usageArtifactUploadWithLines...)
+	retryUsageArtifactUploadWithLines = append(retryUsageArtifactUploadWithLines, "          overwrite: true\n")
 	steps = append(steps,
 		"      - name: Upload usage artifact\n",
 		"        id: upload-usage-artifact\n",
@@ -277,7 +279,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
 	)
-	steps = append(steps, usageArtifactUploadWithLines...)
+	steps = append(steps, retryUsageArtifactUploadWithLines...)
 	return steps
 }
 
