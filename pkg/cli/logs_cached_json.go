@@ -311,11 +311,12 @@ func cachedLogsJSONLUnixSuffix(path, prefix string) (int64, bool) {
 		return 0, false
 	}
 	digitCount := 0
-	for _, ch := range []byte(suffix) {
-		if ch < '0' || ch > '9' {
-			break
-		}
-		digitCount++
+	if nonDigit := strings.IndexFunc(suffix, func(ch rune) bool {
+		return ch < '0' || ch > '9'
+	}); nonDigit >= 0 {
+		digitCount = nonDigit
+	} else {
+		digitCount = len(suffix)
 	}
 	if digitCount == 0 {
 		return 0, false
@@ -476,11 +477,7 @@ func (w *cachedLogsJSONLWriter) appendRun(run ProcessedRun, includeAudit bool) e
 	if len(logsData.Runs) != 1 {
 		return errors.New("failed to build cached logs JSONL record")
 	}
-	var logsRun RunData
-	for _, data := range logsData.Runs {
-		logsRun = data
-	}
-	runData := buildCachedLogsJSONLRunData(run, logsRun)
+	runData := buildCachedLogsJSONLRunData(run, logsData.Runs[0]) //nolint:uncheckedsliceindex // len checked above.
 	if includeAudit {
 		if audit, ok := loadCachedAuditData(run.Run.LogsPath, run.Run, auditCacheSourceLogs); ok {
 			runData.Audit = &audit
