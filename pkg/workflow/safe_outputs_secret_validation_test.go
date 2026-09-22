@@ -28,7 +28,7 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 				name:        "Linear safe outputs",
 				docsAnchor:  "#linear-safe-outputs",
 				envOverrides: map[string]string{
-					"LINEAR_TEAM_ID": "${{ vars.LINEAR_TEAM_ID }}",
+					"LINEAR_TEAM_ID": "${{ secrets.LINEAR_TEAM_ID }}",
 				},
 			},
 			{secretNames: []string{"AZURE_DEVOPS_EXT_PAT"}, name: "Azure DevOps safe outputs", docsAnchor: "#azure-devops-work-items"},
@@ -127,5 +127,5 @@ func TestBuildSafeOutputSecretValidationStepsValidatesLinearTeamVariable(t *test
 	})
 
 	assert.Len(t, steps, 2)
-	assert.Contains(t, strings.Join(steps[1], "\n"), "LINEAR_TEAM_ID: ${{ vars.LINEAR_TEAM_ID }}")
+	assert.Contains(t, strings.Join(steps[1], "\n"), "LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}")
 }
