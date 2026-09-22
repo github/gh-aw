@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -305,6 +307,57 @@ func TestRenderStepForRunner(t *testing.T) {
 	ubuntuStep := "      - name: Run script\n        run: ./script.sh\n"
 	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest"); got != ubuntuStep {
 		t.Fatalf("Non-Windows step changed:\n%s", got)
+	}
+}
+
+func TestCompileWindowsRunnerUsesPosixArtifactPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowFile := filepath.Join(tmpDir, "windows-artifacts.md")
+	workflowContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+runs-on: windows-latest
+model: copilot/gpt-5.3-codex
+engine:
+  id: codex
+  model-provider: github
+network: {}
+tools:
+  bash:
+    - "*"
+safe-outputs:
+  create-issue:
+strict: false
+---
+
+# Windows artifact path regression
+
+Compile this workflow on a Windows runner.
+`
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("write workflow: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowFile); err != nil {
+		t.Fatalf("compile workflow: %v", err)
+	}
+
+	lockFile := filepath.Join(tmpDir, "windows-artifacts.lock.yml")
+	lockBytes, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("read lock file: %v", err)
+	}
+	fallbackStep := extractWorkflowStepByName(t, string(lockBytes), "Upload agent output fallback artifact")
+
+	wantPath := "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"
+	if !strings.Contains(fallbackStep, wantPath) {
+		t.Fatalf("compiled Windows artifact fallback did not include POSIX token usage path %q:\n%s", wantPath, fallbackStep)
+	}
+	if strings.Contains(fallbackStep, `\tmp\gh-aw\`) {
+		t.Fatalf("compiled Windows artifact fallback used Windows separators:\n%s", fallbackStep)
 	}
 }
 

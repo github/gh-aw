@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.4<br>
+**Version**: 1.29.5<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-09-21<br>
+**Publication Date**: 2026-09-22<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -2481,6 +2481,7 @@ safe-outputs:
 9. **Owner-Qualified Head Reference**: When `head-repo` differs from `target-repo`, the created pull request MUST use an owner-qualified head reference identifying the head repository owner and pushed branch. Unqualified same-name branch references MUST NOT be used in fork-backed mode.
 10. **Ephemeral Fork Branch Model**: When `head-repo` differs from `target-repo`, implementations SHOULD create or refresh an ephemeral branch in `head-repo` from the resolved upstream base SHA, apply the agent changes, and open the pull request back to the upstream base. Implementations MAY support explicit synchronization of that ephemeral branch with a newer upstream base, but implicit reuse of arbitrary pre-existing fork branches MUST NOT occur.
 11. **Summary and Manifest Provenance**: Successful executions MUST record `head_repo` in the safe-output summary and machine-readable manifest.
+12. **`head_repo` Required for Same-Organization Forks**: The owner-qualified head reference (requirement 9) alone is insufficient when `head-repo` and `target-repo` share the same owner/organization, because multiple repositories under that owner can define the same branch name. Whenever `head-repo` differs from `target-repo` — including when both share the same owner/organization — every pull request creation or update API call MUST include the `head_repo` parameter naming the head repository, in addition to the owner-qualified `head` reference.
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
@@ -3563,6 +3564,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - The handler MUST refuse pushes unless the resolved pull request head repository exactly matches the configured `head-repo` (or `target-repo` when `head-repo` is omitted)
 - Arbitrary contributor forks MUST remain unsupported write targets even when the upstream repository itself is allowlisted
 - Successful executions MUST record `head_repo` in the safe-output summary and machine-readable manifest
+- When the Convertible fallback (WTD2) opens a review or fallback pull request from `head-repo`, the `head_repo` parameter MUST be included on the pull request creation API call whenever `head-repo` differs from `target-repo`, including when both share the same owner/organization
 
 ---
 
@@ -5943,6 +5945,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.5** (2026-09-22):
+
+- **Specified**: The `head_repo` parameter MUST be included on `create_pull_request` and `push_to_pull_request_branch` fallback/review pull request creation API calls whenever `head-repo` differs from `target-repo`, including when both repositories share the same owner/organization. The owner-qualified `head` reference alone does not disambiguate the source repository in that case.
+- **Updated**: Publication metadata to 1.29.5.
 
 **Version 1.29.4** (2026-09-21):
 

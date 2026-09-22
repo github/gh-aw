@@ -759,6 +759,7 @@ async function main(config = {}) {
       core.info(`Fork PR check: not a fork (${forkReason})`);
     }
     const pushRemoteUrl = pushRepo.toLowerCase() === itemRepo.toLowerCase() ? "" : `${(process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "")}/${pushRepo}.git`;
+    const pullRequestHeadRepoParams = pushRemoteUrl ? { head_repo: pushRepo } : {};
     const branchRemoteName = pushRemoteUrl || "origin";
 
     // SECURITY: Sanitize branch name to prevent shell injection (CWE-78)
@@ -1385,6 +1386,7 @@ async function main(config = {}) {
             title: `[review] ${prTitle || `Changes for #${pullNumber}`}`,
             body: prBody,
             head: reviewHeadRef,
+            ...pullRequestHeadRepoParams,
             base: branchName,
           });
 
@@ -1585,6 +1587,7 @@ async function main(config = {}) {
               title: `[fallback] ${prTitle || `Changes for #${pullNumber}`}`,
               body: fallbackBody,
               head: fallbackHeadRef,
+              ...pullRequestHeadRepoParams,
               base: branchName,
             });
 

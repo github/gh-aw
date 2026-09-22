@@ -214,9 +214,6 @@ func frontmatterMapOrEmpty(result *FrontmatterResult, parseErr error) map[string
 
 func (acc *importAccumulator) applyImportDefaultsToContent(origContent string, origFm, inputs map[string]any) (string, bool) {
 	inputsWithDefaults := applyImportSchemaDefaultsFromFrontmatter(origFm, inputs)
-	if len(inputsWithDefaults) == 0 {
-		return origContent, false
-	}
 	maps.Copy(acc.importInputs, inputsWithDefaults)
 	rawContent := substituteImportInputsInContent(origContent, inputsWithDefaults)
 	return rawContent, rawContent != origContent

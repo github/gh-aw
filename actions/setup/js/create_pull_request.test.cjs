@@ -4714,6 +4714,21 @@ describe("create_pull_request - branch-prefix config", () => {
     expect(createCall.head).toMatch(/^fork-owner:my-feature(?:-[0-9a-f]+)?$/);
   });
 
+  it("should include head_repo when the head and target repositories have the same owner", async () => {
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({
+      allow_empty: true,
+      "head-repo": "test-owner/docs-automation",
+      allowed_repos: ["test-owner/test-repo", "test-owner/docs-automation"],
+    });
+
+    await handler({ title: "Test PR", body: "body", branch: "my-feature" }, {});
+
+    const createCall = global.github.rest.pulls.create.mock.calls[0][0];
+    expect(createCall.head).toMatch(/^test-owner:my-feature(?:-[0-9a-f]+)?$/);
+    expect(createCall.head_repo).toBe("test-owner/docs-automation");
+  });
+
   it("should normalize an invalid branch-prefix and emit a warning", async () => {
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({ branch_prefix: "bad prefix: ", allow_empty: true });

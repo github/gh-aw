@@ -255,7 +255,7 @@ describe("push_to_pull_request_branch.cjs", () => {
     return module;
   }
 
-  async function runFallbackPullRequestScenario(branch, detectionReason = "unknown") {
+  async function runFallbackPullRequestScenario(branch, detectionReason = "unknown", config = {}) {
     createPatchFile(branch);
     process.env.GH_AW_DETECTION_REASON = detectionReason;
 
@@ -302,7 +302,7 @@ describe("push_to_pull_request_branch.cjs", () => {
     mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
     const module = await loadModule();
-    const handler = await module.main({});
+    const handler = await module.main(config);
     return handler({ branch }, {});
   }
 
@@ -1242,6 +1242,26 @@ index 0000000..abc1234
       expect(mockGithub.rest.pulls.create).toHaveBeenCalled();
     });
 
+    it("should include head_repo for a fallback PR from a same-organization fork", async () => {
+      mockContext.payload.pull_request.head.repo.full_name = "test-owner/automation-fork";
+      mockContext.payload.pull_request.head.repo.owner.login = "test-owner";
+      mockGithub.rest.pulls.get.mockResolvedValue({
+        data: {
+          head: { ref: "feature-branch", repo: { full_name: "test-owner/automation-fork", fork: true } },
+          base: { repo: { full_name: "test-owner/test-repo" } },
+          title: "Fork PR",
+          labels: [],
+        },
+      });
+
+      await runFallbackPullRequestScenario("fallback-pr-from-same-organization-fork", "unknown", {
+        "head-repo": "test-owner/automation-fork",
+        allowed_repos: ["test-owner/test-repo", "test-owner/automation-fork"],
+      });
+
+      expect(mockGithub.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ head: expect.stringMatching(/^test-owner:/), head_repo: "test-owner/automation-fork" }));
+    });
+
     const TRANSIENT_WORKFLOWS_SCOPE_TIMEOUT = "! [remote rejected] feature-branch -> feature-branch (Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.)";
 
     /**
@@ -1620,6 +1640,29 @@ index 0000000..abc1234
       expect(params.body).toContain(title);
       expect(params.body).toContain(expectedMarker);
       expect(params.body).not.toContain(unexpectedMarker);
+    });
+
+    it("should include head_repo for a review PR from a same-organization fork", async () => {
+      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+      mockContext.payload.pull_request.head.repo.full_name = "test-owner/automation-fork";
+      mockContext.payload.pull_request.head.repo.owner.login = "test-owner";
+      mockGithub.rest.pulls.get.mockResolvedValue({
+        data: {
+          head: { ref: "feature-branch", repo: { full_name: "test-owner/automation-fork", fork: true } },
+          base: { repo: { full_name: "test-owner/test-repo" } },
+          title: "Fork PR",
+          labels: [],
+        },
+      });
+      createPatchFile("review-pr-from-same-organization-fork");
+
+      const module = await loadModule();
+      const handler = await module.main({
+        "head-repo": "test-owner/automation-fork",
+        allowed_repos: ["test-owner/test-repo", "test-owner/automation-fork"],
+      });
+      await handler({ branch: "review-pr-from-same-organization-fork" }, {});
+      expect(mockGithub.rest.pulls.create).toHaveBeenCalledWith(expect.objectContaining({ head: expect.stringMatching(/^test-owner:/), head_repo: "test-owner/automation-fork" }));
     });
 
     it("should skip non-fatally when review branch is rejected for workflows scope (timeout variant, agent has none)", async () => {
