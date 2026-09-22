@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -107,6 +108,9 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint
 		// are treated identically by the checkout step generator.
 		if s == "." {
 			s = ""
+		}
+		if err := validateCheckoutPath(s); err != nil {
+			return nil, err
 		}
 		cfg.Path = s
 	}
@@ -280,7 +284,24 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint
 	return cfg, nil
 }
 
-// buildCheckoutsPromptContent returns a markdown bullet list describing all user-configured
+// validateCheckoutPath rejects checkout paths that escape the workspace root.
+// actions/checkout requires the path to be located under $GITHUB_WORKSPACE, and
+// paths containing ".." segments would also render misleadingly in the agent prompt
+// because they collapse into a plausible-looking but incorrect location.
+func validateCheckoutPath(p string) error {
+	if p == "" {
+		return nil
+	}
+	normalized := strings.ReplaceAll(p, "\\", "/")
+	if strings.HasPrefix(normalized, "/") {
+		return fmt.Errorf("checkout.path must be a relative path under the workspace, got %q. Example:\ncheckout:\n  path: external/repo", p)
+	}
+	if slices.Contains(strings.Split(normalized, "/"), "..") {
+		return fmt.Errorf("checkout.path must not contain \"..\" segments, got %q. Use a path under the workspace. Example:\ncheckout:\n  path: external/repo", p)
+	}
+	return nil
+}
+
 // checkouts for inclusion in the GitHub context prompt.
 // Returns an empty string when no checkouts are configured.
 //

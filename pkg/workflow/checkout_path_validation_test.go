@@ -251,3 +251,31 @@ func TestCrossRepoCheckoutPathAppearsInCheckoutStep(t *testing.T) {
 	assert.Contains(t, combined, "repository: acme/my-lib")
 	assert.Contains(t, combined, "path: my-lib", "checkout step must include the auto-derived path")
 }
+
+// TestCheckoutPathRejectsWorkspaceEscape verifies that checkout paths escaping the
+// workspace root are rejected at parse time instead of being silently normalized.
+func TestCheckoutPathRejectsWorkspaceEscape(t *testing.T) {
+	t.Run("parent segment", func(t *testing.T) {
+		_, err := checkoutConfigFromMap(map[string]any{"path": "../../etc"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must not contain")
+	})
+
+	t.Run("nested parent segment", func(t *testing.T) {
+		_, err := checkoutConfigFromMap(map[string]any{"path": "external/../../etc"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must not contain")
+	})
+
+	t.Run("absolute path", func(t *testing.T) {
+		_, err := checkoutConfigFromMap(map[string]any{"path": "/etc"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "relative path")
+	})
+
+	t.Run("valid relative path", func(t *testing.T) {
+		cfg, err := checkoutConfigFromMap(map[string]any{"path": "external/repo"})
+		require.NoError(t, err)
+		assert.Equal(t, "external/repo", cfg.Path)
+	})
+}
