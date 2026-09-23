@@ -23,6 +23,13 @@ observability:
 
 Setup, agent, and conclusion spans carry token usage attributes. See [Frontmatter syntax](syntax-agentic.md#agentic-workflow-specific-fields).
 
+When a `github-script` step needs a custom span, load the helper from the portable runner temporary directory:
+
+```javascript
+const path = require('path');
+const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
+```
+
 ### Add AgenticOps token workflows
 
 - `copilot-token-audit` — scheduled audit of token usage across workflows
