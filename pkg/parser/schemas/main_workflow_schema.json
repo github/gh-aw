@@ -14088,7 +14088,7 @@
         },
         {
           "type": "object",
-          "description": "Object form: specify a 'value' (the credit limit), an optional 'github-app' to mint a dedicated token for the guardrail API calls, and optional error handling.",
+          "description": "Object form: specify a 'value' (the credit limit), an optional 'github-app' to mint a dedicated token for the guardrail API calls, an optional backend, and optional error handling.",
           "properties": {
             "value": {
               "$ref": "#/$defs/positive_ai_credits_limit",
@@ -14101,6 +14101,11 @@
             "continue-on-error": {
               "type": "boolean",
               "description": "When true, an unknown daily AI Credits total produces a warning and allows the workflow to continue. Defaults to false."
+            },
+            "backend": {
+              "type": "string",
+              "enum": ["repo-memory"],
+              "description": "Optional storage backend for the daily AI Credits rolling ledger. Use 'repo-memory' to read and write date-bucketed JSONL ledger files through tools.repo-memory."
             }
           },
           "required": ["value"],

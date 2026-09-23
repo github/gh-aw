@@ -467,12 +467,25 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 		}
 	})
 
+	t.Run("object form repo-memory backend is extracted", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"max-daily-ai-credits": map[string]any{
+				"value":   5000,
+				"backend": "repo-memory",
+			},
+		}
+		if got := resolveMaxDailyAICBackend(frontmatter, ""); got != "repo-memory" {
+			t.Fatalf("expected repo-memory backend, got %q", got)
+		}
+	})
+
 	t.Run("continue-on-error defaults to false", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"max-daily-ai-credits": map[string]any{
 				"value": 5000,
 			},
 		}
+
 		if resolveMaxDailyAICContinueOnError(frontmatter, "") {
 			t.Fatal("expected continue-on-error to be disabled by default")
 		}
@@ -563,6 +576,80 @@ func TestMaxDailyAICObjectForm(t *testing.T) {
 			t.Fatalf("expected nil github-app when not specified, got %+v", app)
 		}
 	})
+}
+
+func TestMaxDailyAICRepoMemoryBackendCompiledWorkflow(t *testing.T) {
+	testDir := testutil.TempDir(t, "daily-aic-repo-memory-*")
+	workflowFile := filepath.Join(testDir, "daily-aic-repo-memory.md")
+
+	workflow := `---
+on:
+  workflow_dispatch:
+max-daily-ai-credits:
+  value: 10000
+  backend: repo-memory
+tools:
+  repo-memory: true
+---
+
+Daily AIC guardrail with repo-memory ledger`
+
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
+		t.Fatalf("failed to write test workflow: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(workflowFile); err != nil {
+		t.Fatalf("failed to compile workflow: %v", err)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowFile))
+	if err != nil {
+		t.Fatalf("failed to read lock file: %v", err)
+	}
+	lockStr := string(lockContent)
+	if !strings.Contains(lockStr, "GH_AW_MAX_DAILY_AI_CREDITS_BACKEND: \"repo-memory\"") {
+		t.Fatal("expected activation guardrail to receive repo-memory backend env")
+	}
+	if !strings.Contains(lockStr, "Clone daily AIC repo-memory ledger (default)") {
+		t.Fatal("expected activation to clone repo-memory ledger")
+	}
+	if strings.Contains(lockStr, "Restore daily AIC scan observations") || strings.Contains(lockStr, "Publish daily AIC scan observations") {
+		t.Fatal("expected repo-memory backend to skip artifact-backed scan cache restore/publish steps")
+	}
+	appendIdx := strings.Index(lockStr, "Append daily AIC repo-memory ledger")
+	uploadIdx := strings.Index(lockStr, "Upload repo-memory artifact (default)")
+	if appendIdx < 0 || uploadIdx < 0 || appendIdx > uploadIdx {
+		t.Fatal("expected daily AIC repo-memory ledger append before repo-memory artifact upload")
+	}
+}
+
+func TestMaxDailyAICRepoMemoryBackendRequiresRepoMemory(t *testing.T) {
+	testDir := testutil.TempDir(t, "daily-aic-repo-memory-missing-*")
+	workflowFile := filepath.Join(testDir, "daily-aic-repo-memory-missing.md")
+
+	workflow := `---
+on:
+  workflow_dispatch:
+max-daily-ai-credits:
+  value: 10000
+  backend: repo-memory
+---
+
+Daily AIC guardrail without repo-memory`
+
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
+		t.Fatalf("failed to write test workflow: %v", err)
+	}
+
+	compiler := NewCompiler()
+	err := compiler.CompileWorkflow(workflowFile)
+	if err == nil {
+		t.Fatal("expected compile to fail when repo-memory backend is configured without tools.repo-memory")
+	}
+	if !strings.Contains(err.Error(), "requires tools.repo-memory") {
+		t.Fatalf("expected repo-memory requirement error, got: %v", err)
+	}
 }
 
 func TestMaxDailyAICContinueOnErrorCompiledWorkflow(t *testing.T) {

@@ -222,6 +222,8 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 		}
 	}
 
+	c.generateDailyAICRepoMemoryLedgerStep(yaml, data)
+
 	// Add repo-memory artifact upload to save state for push job
 	generateRepoMemoryArtifactUpload(yaml, data, c.getActionPin)
 

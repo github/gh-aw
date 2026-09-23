@@ -114,23 +114,13 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		compilerActivationJobLog.Print("Prepending dedicated daily-AIC app-token mint step")
 		steps = append(steps, c.buildDailyAICAppTokenMintStep(data.MaxDailyAICreditsGitHubApp)...)
 	}
+	if entry, ok := dailyAICRepoMemoryEntry(data); ok {
+		steps = append(steps, buildDailyAICRepoMemoryCloneStep(entry)...)
+	}
 	// Only restore observations from a verified workflow-run artifact. Actions
 	// cache restore-key matches do not establish producer provenance or freshness.
-	if data.WorkflowID != "" {
-		steps = append(steps, "      - name: Restore daily AIC scan observations\n")
-		steps = append(steps, "        id: restore-daily-aic-cache-fallback\n")
-		steps = append(steps, fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr))
-		steps = append(steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
-		steps = append(steps, "        env:\n")
-		steps = append(steps, fmt.Sprintf("          GH_AW_HAS_SLASH_COMMAND: %q\n", strconv.FormatBool(len(data.Command) > 0)))
-		steps = append(steps, fmt.Sprintf("          GH_AW_HAS_LABEL_COMMAND: %q\n", strconv.FormatBool(len(data.LabelCommand) > 0)))
-		steps = append(steps, "        with:\n")
-		steps = append(steps, fmt.Sprintf("          github-token: %s\n", c.resolveDailyAICToken(data)))
-		steps = append(steps, "          script: |\n")
-		steps = append(steps, "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n")
-		steps = append(steps, "            setupGlobals(core, github, context, exec, io, getOctokit);\n")
-		steps = append(steps, "            const { main } = require('"+SetupActionDestination+"/restore_aic_scan_cache.cjs');\n")
-		steps = append(steps, "            await main();\n")
+	if data.WorkflowID != "" && data.MaxDailyAICBackend != maxDailyAICBackendRepoMemory {
+		steps = append(steps, c.buildDailyAICScanObservationRestoreStep(data)...)
 	}
 	steps = append(steps, "      - name: Check daily workflow token guardrail\n")
 	steps = append(steps, "        id: daily-ai-credits-workflow-guardrail\n")
@@ -146,6 +136,12 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 	steps = append(steps, fmt.Sprintf("          GH_AW_HAS_LABEL_COMMAND: %q\n", strconv.FormatBool(len(data.LabelCommand) > 0)))
 	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN: %s\n", c.resolveDailyAICToken(data)))
 	steps = append(steps, buildTemplatableIntEnvVar(maxDailyAICreditsEnvVar, data.MaxDailyAICredits)...)
+	if data.MaxDailyAICBackend != "" {
+		steps = append(steps, fmt.Sprintf("          %s: %q\n", maxDailyAICBackendEnvVar, data.MaxDailyAICBackend))
+	}
+	if entry, ok := dailyAICRepoMemoryEntry(data); ok {
+		steps = append(steps, fmt.Sprintf("          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s%s\n", constants.TmpRepoMemoryDir, entry.ID))
+	}
 	steps = append(steps, fmt.Sprintf("          GH_AW_MAX_AI_CREDITS: %s\n", dailyAICMaxCreditsEnvValue(data)))
 	steps = append(steps, "        with:\n")
 	steps = append(steps, fmt.Sprintf("          github-token: %s\n", c.resolveDailyAICToken(data)))
@@ -154,7 +150,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 	steps = append(steps, "            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	steps = append(steps, "            const { main } = require('"+SetupActionDestination+"/check_daily_aic_workflow_guardrail.cjs');\n")
 	steps = append(steps, "            await main();\n")
-	if data.WorkflowID != "" {
+	if data.WorkflowID != "" && data.MaxDailyAICBackend != maxDailyAICBackendRepoMemory {
 		steps = append(steps, "      - name: Publish daily AIC scan observations\n")
 		steps = append(steps, "        if: always() && env.GH_AW_MAX_DAILY_AI_CREDITS != ''\n")
 		steps = append(steps, "        continue-on-error: true\n")
@@ -167,6 +163,69 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, "          retention-days: 3\n")
 	}
 	return steps
+}
+
+func (c *Compiler) buildDailyAICScanObservationRestoreStep(data *WorkflowData) []string {
+	return []string{
+		"      - name: Restore daily AIC scan observations\n",
+		"        id: restore-daily-aic-cache-fallback\n",
+		fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr),
+		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
+		"        env:\n",
+		fmt.Sprintf("          GH_AW_HAS_SLASH_COMMAND: %q\n", strconv.FormatBool(len(data.Command) > 0)),
+		fmt.Sprintf("          GH_AW_HAS_LABEL_COMMAND: %q\n", strconv.FormatBool(len(data.LabelCommand) > 0)),
+		"        with:\n",
+		fmt.Sprintf("          github-token: %s\n", c.resolveDailyAICToken(data)),
+		"          script: |\n",
+		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
+		"            const { main } = require('" + SetupActionDestination + "/restore_aic_scan_cache.cjs');\n",
+		"            await main();\n",
+	}
+}
+
+func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
+	if data == nil || data.MaxDailyAICBackend != maxDailyAICBackendRepoMemory || data.RepoMemoryConfig == nil {
+		return RepoMemoryEntry{}, false
+	}
+	for _, memory := range data.RepoMemoryConfig.Memories {
+		if memory.ID == "default" {
+			return memory, true
+		}
+	}
+	if len(data.RepoMemoryConfig.Memories) > 0 {
+		for _, memory := range data.RepoMemoryConfig.Memories {
+			return memory, true
+		}
+	}
+	return RepoMemoryEntry{}, false
+}
+
+func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
+	targetRepo := memory.TargetRepo
+	if targetRepo == "" {
+		targetRepo = "${{ github.repository }}"
+	}
+	if memory.Wiki {
+		targetRepo += ".wiki"
+	}
+	memoryLabel := "repo-memory"
+	if memory.Wiki {
+		memoryLabel = "wiki-memory"
+	}
+	memoryDir := constants.TmpRepoMemoryDir + memory.ID
+	return []string{
+		fmt.Sprintf("      - name: Clone daily AIC %s ledger (%s)\n", memoryLabel, memory.ID),
+		fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr),
+		"        env:\n",
+		"          GH_TOKEN: ${{ github.token }}\n",
+		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
+		fmt.Sprintf("          BRANCH_NAME: %s\n", memory.BranchName),
+		fmt.Sprintf("          TARGET_REPO: %s\n", targetRepo),
+		fmt.Sprintf("          MEMORY_DIR: %s\n", memoryDir),
+		fmt.Sprintf("          CREATE_ORPHAN: %t\n", memory.CreateOrphan),
+		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh\"\n",
+	}
 }
 
 func appendDailyAICContinueOnError(steps []string, data *WorkflowData) []string {

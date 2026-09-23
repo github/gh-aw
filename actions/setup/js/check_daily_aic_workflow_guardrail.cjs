@@ -14,6 +14,7 @@ const { createRateLimitAwareGithub } = require("./github_rate_limit_logger.cjs")
 const { scanDailyAIC } = require("./daily_aic_scan.cjs");
 const { createAPIBudget, retryNotBefore, safeResponseHeaders } = require("./daily_aic_api_budget.cjs");
 const { loadBillableJobs, allBillableJobsSkipped, sumCoveredComponents } = require("./daily_aic_component_coverage.cjs");
+const { readLedgerEntries } = require("./daily_aic_repo_memory_ledger.cjs");
 
 const PRIMARY_GUARDRAIL_ARTIFACT_NAMES = ["usage"];
 const MAX_WORKFLOW_RUN_PAGES = 10;
@@ -80,6 +81,10 @@ function envFlagEnabled(value) {
   }
   const normalized = value.trim().toLowerCase();
   return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
+function dailyAICBackend() {
+  return (process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND || "").trim().toLowerCase();
 }
 
 /**
@@ -644,7 +649,8 @@ async function main(options = {}) {
   }
 
   const token = process.env.GH_AW_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-  if (!token) {
+  const backend = dailyAICBackend();
+  if (!token && backend !== "repo-memory") {
     const message = "Daily workflow AI Credits are unknown: no artifact lookup token.";
     core.setOutput("daily_ai_credits_guardrail_status", "structural_error");
     core.setOutput("daily_ai_credits_guardrail_error", message);
@@ -656,8 +662,50 @@ async function main(options = {}) {
   try {
     const githubClient = createRateLimitAwareGithub(github);
     const budget = createAPIBudget();
-    const artifactClient = await module.exports.getArtifactClient(budget.observe);
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || process.env.GH_AW_WORKFLOW_ID || "workflow";
+    let actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || process.env.GITHUB_ACTOR || "";
+    if (backend === "repo-memory") {
+      const repository = `${context.repo.owner}/${context.repo.repo}`;
+      const countedRuns = readLedgerEntries({
+        repoMemoryDir: options.repoMemoryDir || process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR,
+        repository,
+        workflowId: process.env.GH_AW_WORKFLOW_ID || workflowName,
+        actor: actorLogin,
+      }).map(entry => ({
+        id: entry.run_id,
+        html_url: entry.run_url || "",
+        created_at: entry.timestamp,
+        conclusion: "completed",
+        aic: entry.aic,
+      }));
+      const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
+      const rateLimit = budget.snapshot();
+      const summaryMeta = {
+        candidateRunsCount: countedRuns.length,
+        inspectedRunsCount: countedRuns.length,
+        truncatedByRateLimit: false,
+      };
+      core.setOutput("daily_ai_credits_total", String(totalAIC));
+      core.setOutput("daily_ai_credits_threshold", String(threshold));
+      logDailyGuardrail("Completed repo-memory AIC ledger read", {
+        countedRuns: countedRuns.length,
+        currentAIC: totalAIC,
+        threshold,
+        exceeded: totalAIC >= threshold,
+      });
+      if (totalAIC < threshold) {
+        core.setOutput("daily_ai_credits_guardrail_status", "under_budget");
+        await appendDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, summaryMeta);
+        core.info(`Daily workflow AIC guardrail not exceeded (${totalAIC}/${threshold}).`);
+        return;
+      }
+      core.setOutput("daily_ai_credits_exceeded", "true");
+      core.setOutput("daily_ai_credits_guardrail_status", "exceeded");
+      await appendDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, summaryMeta);
+      core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold}.`);
+      return;
+    }
+    const artifactClient = await module.exports.getArtifactClient(budget.observe);
     const { countedRuns, candidateRunsCount, cacheHits, current } = await scanDailyAIC({
       github: githubClient,
       context,
@@ -670,7 +718,7 @@ async function main(options = {}) {
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
-    const actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || current.triggering_actor?.login || current.actor?.login || process.env.GITHUB_ACTOR || "";
+    actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || current.triggering_actor?.login || current.actor?.login || process.env.GITHUB_ACTOR || "";
     const rateLimit = budget.snapshot();
 
     core.setOutput("daily_ai_credits_total", String(totalAIC));
