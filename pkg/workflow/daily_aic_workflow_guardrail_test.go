@@ -621,9 +621,12 @@ Daily AIC guardrail with repo-memory ledger`
 		t.Fatal("expected repo-memory backend to skip artifact-backed scan cache restore/publish steps")
 	}
 	appendIdx := strings.Index(lockStr, "Append daily AIC repo-memory ledger")
-	uploadIdx := strings.Index(lockStr, "Upload repo-memory artifact (default)")
-	if appendIdx < 0 || uploadIdx < 0 || appendIdx > uploadIdx {
-		t.Fatal("expected daily AIC repo-memory ledger append before repo-memory artifact upload")
+	pushIdx := strings.Index(lockStr, "Push repo-memory changes (default)")
+	if appendIdx < 0 || pushIdx < 0 || appendIdx > pushIdx {
+		t.Fatal("expected trusted daily AIC repo-memory ledger append before repo-memory push")
+	}
+	if !strings.Contains(lockStr, "Reset untrusted daily AIC repo-memory ledger artifact") {
+		t.Fatal("expected untrusted agent-supplied repo-memory ledger files to be removed before append")
 	}
 }
 

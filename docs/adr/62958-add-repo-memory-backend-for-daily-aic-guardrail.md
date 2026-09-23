@@ -38,7 +38,7 @@ This was a realistic alternative because repo-memory can provide rolling totals 
 
 #### Neutral
 - The existing artifact/API scan backend remains the default behavior for workflows that do not configure `backend: repo-memory`.
-- The repo-memory backend reads only the current and previous UTC day buckets and filters entries by repository, workflow, actor, timestamp, run ID, and valid AIC values.
+- The repo-memory backend reads only the current and previous UTC day buckets and filters entries by repository, workflow, timestamp, run ID, and valid AIC values.
 - Workflow authors must pair `max-daily-ai-credits.backend: repo-memory` with `tools.repo-memory`, and compilation fails fast when that dependency is missing.
 
 ---

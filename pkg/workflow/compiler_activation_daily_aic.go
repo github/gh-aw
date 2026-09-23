@@ -207,10 +207,7 @@ func firstRepoMemoryEntry(memories []RepoMemoryEntry) (RepoMemoryEntry, bool) {
 	if len(memories) == 0 {
 		return RepoMemoryEntry{}, false
 	}
-	for _, memory := range memories {
-		return memory, true
-	}
-	return RepoMemoryEntry{}, false
+	return memories[0], true //nolint:uncheckedsliceindex // len(memories) is checked above.
 }
 
 func dailyAICRepoMemoryDir(memory RepoMemoryEntry) string {
