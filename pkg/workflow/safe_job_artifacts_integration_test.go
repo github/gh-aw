@@ -51,8 +51,11 @@ func TestSafeJobArtifactsIntegration(t *testing.T) {
 	require.NoError(t, err)
 	agentJob := extractJobSection(string(compiled), "agent")
 	require.Contains(t, agentJob, "name: Upload agent artifacts")
-	require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/")
+	for _, ext := range secretRedactionScannedExtensions {
+		require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/**/*"+ext)
+	}
 	require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/*.json")
+	require.NotContains(t, agentJob, "\n            /tmp/gh-aw/agent/review-bundles/\n")
 
 	redactIndex := strings.Index(agentJob, "name: Redact secrets in logs")
 	uploadIndex := strings.Index(agentJob, "name: Upload agent artifacts")

@@ -1257,9 +1257,23 @@ func TestCollectSafeJobArtifactPaths(t *testing.T) {
 	})
 
 	require.Equal(t, []string{
-		"/tmp/gh-aw/agent/alpha/",
+		"/tmp/gh-aw/agent/alpha/**/*.txt",
+		"/tmp/gh-aw/agent/alpha/**/*.json",
+		"/tmp/gh-aw/agent/alpha/**/*.log",
+		"/tmp/gh-aw/agent/alpha/**/*.md",
+		"/tmp/gh-aw/agent/alpha/**/*.mdx",
+		"/tmp/gh-aw/agent/alpha/**/*.yml",
+		"/tmp/gh-aw/agent/alpha/**/*.jsonl",
+		"/tmp/gh-aw/agent/alpha/**/*.patch",
 		"/tmp/gh-aw/agent/alpha/extra.json",
-		"/tmp/gh-aw/agent/zeta/",
+		"/tmp/gh-aw/agent/zeta/**/*.txt",
+		"/tmp/gh-aw/agent/zeta/**/*.json",
+		"/tmp/gh-aw/agent/zeta/**/*.log",
+		"/tmp/gh-aw/agent/zeta/**/*.md",
+		"/tmp/gh-aw/agent/zeta/**/*.mdx",
+		"/tmp/gh-aw/agent/zeta/**/*.yml",
+		"/tmp/gh-aw/agent/zeta/**/*.jsonl",
+		"/tmp/gh-aw/agent/zeta/**/*.patch",
 	}, paths)
 }
 
@@ -1296,5 +1310,6 @@ safe-outputs:
 	compiled, err := os.ReadFile(filepath.Join(tmpDir, "safe-job-artifacts.lock.yml"))
 	require.NoError(t, err)
 	agentJob := extractJobSection(string(compiled), "agent")
-	require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/")
+	require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/**/*.json")
+	require.NotContains(t, agentJob, "\n            /tmp/gh-aw/agent/review-bundles/\n")
 }

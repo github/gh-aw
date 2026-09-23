@@ -245,7 +245,8 @@ func validateSafeJobArtifactPath(path string) error {
 }
 
 // collectSafeJobArtifactPaths gathers all declared artifact paths from custom safe-outputs
-// jobs, sorted by normalized job name for deterministic compiled output.
+// jobs, sorted by normalized job name for deterministic compiled output. Directory
+// declarations are restricted to recursive globs for extensions covered by secret redaction.
 func collectSafeJobArtifactPaths(jobs map[string]*SafeJobConfig) []string {
 	if len(jobs) == 0 {
 		return nil
@@ -260,7 +261,15 @@ func collectSafeJobArtifactPaths(jobs map[string]*SafeJobConfig) []string {
 	var paths []string
 	for _, name := range names {
 		if job := jobs[name]; job != nil {
-			paths = append(paths, job.Artifacts...)
+			for _, artifactPath := range job.Artifacts {
+				if strings.HasSuffix(artifactPath, "/") {
+					for _, ext := range secretRedactionScannedExtensions {
+						paths = append(paths, artifactPath+"**/*"+ext)
+					}
+					continue
+				}
+				paths = append(paths, artifactPath)
+			}
 		}
 	}
 	return paths
