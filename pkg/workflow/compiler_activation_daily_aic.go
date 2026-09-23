@@ -214,7 +214,20 @@ func dailyAICRepoMemoryDir(memory RepoMemoryEntry) string {
 	return constants.TmpRepoMemoryDir + memory.ID
 }
 
-func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
+// dailyAICLedgerHydrationDir returns a directory, distinct from the
+// agent-writable repo-memory artifact directory, into which the push_repo_memory
+// job clones a read-only snapshot of the committed ledger branch. This trusted
+// snapshot is used to hydrate the ledger before appending the current run's
+// entry, so accumulated history from other runs is never discarded.
+func dailyAICLedgerHydrationDir(memory RepoMemoryEntry) string {
+	return constants.TmpGhAwDir + "/daily-aic-ledger-source/" + memory.ID
+}
+
+// dailyAICRepoMemoryTargetRepo resolves the target repository reference for the
+// repo-memory ledger, matching the resolution used for the primary repo-memory
+// clone/push steps (defaulting to the current repository and appending ".wiki"
+// for wiki-backed memories).
+func dailyAICRepoMemoryTargetRepo(memory RepoMemoryEntry) string {
 	targetRepo := memory.TargetRepo
 	if targetRepo == "" {
 		targetRepo = "${{ github.repository }}"
@@ -222,6 +235,11 @@ func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
 	if memory.Wiki {
 		targetRepo += ".wiki"
 	}
+	return targetRepo
+}
+
+func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
+	targetRepo := dailyAICRepoMemoryTargetRepo(memory)
 	memoryLabel := "repo-memory"
 	if memory.Wiki {
 		memoryLabel = "wiki-memory"

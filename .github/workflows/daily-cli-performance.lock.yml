@@ -2755,11 +2755,33 @@ jobs:
         if: always()
         continue-on-error: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
+      - name: Clone daily AIC repo-memory ledger for hydration
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          BRANCH_NAME: memory/cli-performance
+          TARGET_REPO: ${{ github.repository }}
+          MEMORY_DIR: /tmp/gh-aw/daily-aic-ledger-source/default
+          CREATE_ORPHAN: false
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh"
       - name: Reset untrusted daily AIC repo-memory ledger artifact
         if: always()
         env:
           GH_AW_DAILY_AIC_REPO_MEMORY_DIR: /tmp/gh-aw/repo-memory/default
         run: rm -rf "$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger"
+      - name: Hydrate daily AIC repo-memory ledger from trusted branch
+        if: always()
+        continue-on-error: true
+        env:
+          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: /tmp/gh-aw/repo-memory/default
+          GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR: /tmp/gh-aw/daily-aic-ledger-source/default
+        run: |
+          mkdir -p "$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger"
+          if [ -d "$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger" ]; then
+            cp -a "$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger/." "$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger/"
+          fi
       - name: Append daily AIC repo-memory ledger
         if: always()
         continue-on-error: true
