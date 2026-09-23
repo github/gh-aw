@@ -115,6 +115,20 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 			disabled:     []string{"bash"},
 		},
 		{
+			name: "web-search hidden for older pinned Copilot CLI",
+			workflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{CopilotSDK: true, Version: "1.0.86"},
+				Tools: map[string]any{
+					"web-search": nil,
+				},
+				ParsedTools: NewTools(map[string]any{
+					"web-search": nil,
+				}),
+			},
+			capabilities: copilotSDKToolCapabilities{},
+			permissions:  []string{"read"},
+		},
+		{
 			// Default-tool resolution re-adds a "github" entry for steering issue comments
 			// even when the author explicitly set github: false. The SDK contract must still
 			// honor the explicit refusal and keep MCP/github out of the visible capabilities.

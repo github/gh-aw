@@ -189,6 +189,16 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			expected: []string{"--allow-tool", "web_search"},
 		},
 		{
+			name: "web-search tool with older pinned Copilot CLI",
+			tools: map[string]any{
+				"web-search": nil,
+			},
+			workflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{Version: "1.0.86"},
+			},
+			expected: []string{},
+		},
+		{
 			name: "github tool with multiple allowed tools sorted",
 			tools: map[string]any{
 				"github": map[string]any{

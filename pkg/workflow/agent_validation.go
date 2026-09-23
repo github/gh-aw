@@ -216,7 +216,7 @@ func (c *Compiler) validatePiEngineRequirements(tools *ToolsConfig, engine Codin
 }
 
 // validateWebSearchSupport validates that web-search tool is only used with engines that support this feature
-func (c *Compiler) validateWebSearchSupport(tools map[string]any, engine CodingAgentEngine) {
+func (c *Compiler) validateWebSearchSupport(frontmatter map[string]any, tools map[string]any, engine CodingAgentEngine) {
 	// Check if web-search tool is requested
 	_, hasWebSearch := tools["web-search"]
 
@@ -232,6 +232,22 @@ func (c *Compiler) validateWebSearchSupport(tools map[string]any, engine CodingA
 		agentValidationLog.Printf("Engine %s does not natively support web-search tool, emitting warning", engine.GetID())
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Engine '%s' does not support the web-search tool. See https://github.github.com/gh-aw/guides/web-search/ for alternatives.", engine.GetID())))
 		c.IncrementWarningCount()
+		return
+	}
+
+	if engine.GetID() == string(constants.CopilotEngine) {
+		_, engineConfig, _ := c.ExtractEngineConfig(frontmatter)
+		if !copilotSupportsWebSearch(engineConfig) {
+			version := ""
+			if engineConfig != nil {
+				version = engineConfig.Version
+			}
+			agentValidationLog.Printf("Copilot CLI version %s does not support web-search tool, emitting warning", version)
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+				"Copilot CLI versions before %s do not support the web-search tool. Upgrade engine.version or omit it to use the default Copilot CLI version.",
+				constants.CopilotWebSearchMinVersion)))
+			c.IncrementWarningCount()
+		}
 	}
 }
 

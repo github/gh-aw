@@ -271,7 +271,7 @@ func copilotNeedsBuiltinMCPs(workflowData *WorkflowData) bool {
 		return false
 	}
 	return isCopilotToolValueEnabled(workflowData.Tools, "web-fetch") ||
-		isCopilotToolValueEnabled(workflowData.Tools, "web-search")
+		(isCopilotToolValueEnabled(workflowData.Tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig))
 }
 
 func (e *CopilotEngine) buildCopilotBaseArgs(sandboxEnabled bool) []string {
@@ -649,7 +649,10 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 	if !hasGitHubTool(workflowData.ParsedTools) {
 		return
 	}
-	githubToolConfig, _ := workflowData.Tools["github"].(map[string]any)
+	var githubToolConfig map[string]any
+	if config, ok := workflowData.Tools["github"].(map[string]any); ok {
+		githubToolConfig = config
+	}
 	customGitHubToken := getGitHubToken(githubToolConfig)
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil && workflowData.ParsedTools.GitHub.GitHubApp != nil {
 		tokenExpression := "${{ steps.github-mcp-app-token.outputs.token }}"
@@ -776,12 +779,34 @@ func copilotSupportsNoAskUser(engineConfig *EngineConfig) bool {
 	)
 }
 
+func copilotSupportsWebSearch(engineConfig *EngineConfig) bool {
+	var versionStr string
+	if engineConfig != nil && engineConfig.Version != "" {
+		versionStr = engineConfig.Version
+	}
+	if containsExpression(versionStr) {
+		copilotExecLog.Printf("copilotSupportsWebSearch: expression version %q treated as supported", versionStr)
+		return true
+	}
+	return versionAtLeast(
+		versionStr,
+		string(constants.DefaultCopilotVersion),
+		string(constants.CopilotWebSearchMinVersion),
+	)
+}
+
 // extractAddDirPaths extracts all directory paths from copilot args that follow --add-dir flags
 func extractAddDirPaths(args []string) []string {
 	var dirs []string
-	for i := range len(args) - 1 {
-		if args[i] == "--add-dir" {
-			dirs = append(dirs, args[i+1])
+	expectDir := false
+	for _, arg := range args {
+		if expectDir {
+			dirs = append(dirs, arg)
+			expectDir = false
+			continue
+		}
+		if arg == "--add-dir" {
+			expectDir = true
 		}
 	}
 	return dirs

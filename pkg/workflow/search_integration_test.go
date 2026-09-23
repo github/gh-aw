@@ -93,6 +93,68 @@ Search the web for information.
 	}
 }
 
+// TestWebSearchValidationForCopilotPinnedOldVersion tests that Copilot workflows
+// pinned to older CLI versions do not receive the web_search permission.
+func TestWebSearchValidationForCopilotPinnedOldVersion(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "test-*")
+
+	workflowContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine:
+  id: copilot
+  version: 1.0.86
+tools:
+  web-search:
+---
+
+# Test Workflow
+
+Search the web for information.
+`
+
+	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		t.Fatalf("Failed to write test workflow: %v", err)
+	}
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	compiler := NewCompiler()
+	err := compiler.CompileWorkflow(workflowPath)
+
+	w.Close()
+	os.Stderr = oldStderr
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	stderrOutput := buf.String()
+
+	if err != nil {
+		t.Fatalf("Expected compilation to succeed for Copilot engine with older pinned version, but got error: %v", err)
+	}
+
+	if !strings.Contains(stderrOutput, "Copilot CLI versions before 1.0.87 do not support the web-search tool") {
+		t.Errorf("Expected version-gate warning for older pinned Copilot CLI, but got: %s", stderrOutput)
+	}
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	lockStr := string(lockContent)
+	if strings.Contains(lockStr, "--allow-tool web_search") {
+		t.Errorf("Expected older pinned Copilot CLI workflow to omit web_search permission, but it was present")
+	}
+	if !strings.Contains(lockStr, "--disable-builtin-mcps") {
+		t.Errorf("Expected older pinned Copilot CLI workflow to keep built-in MCPs disabled, but it didn't")
+	}
+}
+
 // TestWebSearchValidationForGemini tests that when a Gemini workflow uses web-search,
 // compilation succeeds but emits a warning with documentation link
 func TestWebSearchValidationForGemini(t *testing.T) {
