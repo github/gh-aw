@@ -65,17 +65,6 @@ func (c *Compiler) addActivationSecretValidationStep(ctx *activationJobBuildCont
 	compilerActivationJobLog.Printf("Added %d secret validation step(s) to activation job", len(stepIDs))
 }
 
-func (c *Compiler) addActivationDockerSbxSecretsCheckStep(ctx *activationJobBuildContext) {
-	if !isDockerSbxRuntime(ctx.data) {
-		return
-	}
-	for _, line := range generateDockerSbxActivationSecretsCheckStep() {
-		ctx.steps = append(ctx.steps, line+"\n")
-	}
-	ctx.outputs["docker_sbx_secrets_result"] = "${{ steps.docker-sbx-secrets.outputs.verification_result }}"
-	compilerActivationJobLog.Printf("Added docker-sbx Docker Hub secrets check to activation job")
-}
-
 // addActivationOAuthTokenCheckStep adds a step to the activation job that checks
 // COPILOT_GITHUB_TOKEN, GH_AW_GITHUB_TOKEN, and GH_AW_GITHUB_MCP_SERVER_TOKEN are not
 // OAuth tokens. OAuth tokens (gho_...) are not suitable for automation as they are

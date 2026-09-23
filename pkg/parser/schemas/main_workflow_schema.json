@@ -3621,7 +3621,7 @@
                 }
               },
               "repos": { "$ref": "#/$defs/enclave-repos" },
-              "runtime": { "type": "string", "enum": ["docker", "gvisor", "sbx"], "default": "docker" },
+              "runtime": { "type": "string", "enum": ["docker"], "default": "docker" },
               "image": { "type": "string", "minLength": 1, "maxLength": 500 },
               "timeout": { "type": "integer", "minimum": 1, "maximum": 4740, "default": 30 },
               "memory-limit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$", "default": "512m" },
@@ -3703,7 +3703,7 @@
               },
               "repos": { "$ref": "#/$defs/enclave-repos" },
               "dynamic": { "$ref": "#/$defs/enclave-dynamic-policy" },
-              "runtime": { "type": "string", "enum": ["docker", "gvisor", "sbx"], "default": "docker" },
+              "runtime": { "type": "string", "enum": ["docker"], "default": "docker" },
               "image": { "type": "string", "minLength": 1, "maxLength": 500 },
               "timeout": { "type": "integer", "minimum": 1, "maximum": 4740, "default": 120 },
               "memory-limit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$", "default": "512m" },
@@ -3884,15 +3884,10 @@
                     },
                     "runtime": {
                       "type": "string",
-                      "description": "Sandbox runtime profile for the agent container. Each value selects one supported security and topology profile: 'docker' (default) runs the agent under Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs Docker with a privileged AWF, legacy iptables networking, and host/service access (required for allow-host-ports and GitHub Actions services: connectivity); 'gvisor' runs the agent under gVisor's runsc runtime with strict network isolation; 'docker-sbx' runs the agent inside a Docker sbx KVM microVM (requires DOCKER_PAT and DOCKER_USERNAME secrets and a KVM-capable runner; the compiler handles the required privileged setup); 'cloud-hypervisor' runs the agent in AWF's preview Cloud Hypervisor microVM runtime on GitHub-hosted Ubuntu x86_64, sized at 2 vCPUs and 4096 MiB. Omitting runtime is equivalent to 'docker'. gvisor, docker-sbx and cloud-hypervisor are incompatible with runner.topology: arc-dind.",
-                      "enum": ["docker", "docker-sudo-iptables", "gvisor", "docker-sbx", "cloud-hypervisor"],
+                      "description": "Sandbox runtime profile for the agent container. Each value selects one supported security and topology profile: 'docker' (default) runs the agent under Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs Docker with a privileged AWF, legacy iptables networking, and host/service access (required for allow-host-ports and GitHub Actions services: connectivity); 'cloud-hypervisor' runs the agent in AWF's preview Cloud Hypervisor microVM runtime on GitHub-hosted Ubuntu x86_64, sized at 2 vCPUs and 4096 MiB. Omitting runtime is equivalent to 'docker'. cloud-hypervisor is incompatible with runner.topology: arc-dind.",
+                      "enum": ["docker", "docker-sudo-iptables", "cloud-hypervisor"],
                       "default": "docker",
-                      "examples": ["docker", "docker-sudo-iptables", "gvisor", "docker-sbx", "cloud-hypervisor"]
-                    },
-                    "runtime-install": {
-                      "type": "boolean",
-                      "description": "Controls generation of sandbox runtime installation steps. Only valid with runtime: gvisor or runtime: docker-sbx. Defaults to true. Set to false when the runtime is already installed on the runner; docker-sbx credential refresh still runs.",
-                      "examples": [false]
+                      "examples": ["docker", "docker-sudo-iptables", "cloud-hypervisor"]
                     },
                     "config": {
                       "type": "object",

@@ -156,7 +156,7 @@ For the full dependency-license/compliance review pattern (paths scoping, licens
 | Trigger patterns | [triggers.md](triggers.md) |
 | Context expressions and `{{#if}}` templates | [context.md](context.md) |
 | Declarative engine configuration | [configure-agentic-engine.md](configure-agentic-engine.md) |
-| Agent runtime selection (Docker, gVisor, Docker sbx, Cloud Hypervisor, ARC DinD) | [agent-runtime-instructions.md](agent-runtime-instructions.md) |
+| Agent runtime selection (Docker, Cloud Hypervisor, ARC DinD) | [agent-runtime-instructions.md](agent-runtime-instructions.md) |
 | Private-repository enclaves (preview) | [enclaves.md](enclaves.md) |
 | CLI commands and MCP equivalents | [cli-commands.md](cli-commands.md) |
 | Network configuration | [network.md](network.md) |

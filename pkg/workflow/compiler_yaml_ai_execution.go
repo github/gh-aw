@@ -594,17 +594,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// connects to via host.docker.internal:18443.
 	c.generateStartCliProxyStep(yaml, data)
 
-	// Refresh sbx credentials immediately before AWF execution. Docker Hub OAuth
-	// tokens obtained during the daemon-setup step can expire between workflow steps,
-	// causing "user is not authenticated to Docker" errors when AWF calls `sbx create`.
-	if isDockerSbxRuntime(data) {
-		refreshStep := generateDockerSbxCredentialRefreshStep()
-		for _, line := range refreshStep {
-			yaml.WriteString(line)
-			yaml.WriteString("\n")
-		}
-	}
-
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)

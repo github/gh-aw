@@ -52,13 +52,6 @@ func awfSupportsChrootConfig(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFChrootConfigMinVersion)
 }
 
-// awfSupportsContainerRuntime returns true when the effective AWF version supports the
-// containerRuntime field in the container config (gh-aw-firewall#6093).
-// The field must not be emitted for older versions that do not recognise it.
-func awfSupportsContainerRuntime(firewallConfig *FirewallConfig) bool {
-	return awfVersionAtLeast(firewallConfig, constants.AWFContainerRuntimeMinVersion)
-}
-
 // awfSupportsCloudHypervisor returns true when the effective AWF version supports
 // the cloud-hypervisor preview runtime and its required CLI flags.
 func awfSupportsCloudHypervisor(firewallConfig *FirewallConfig) bool {
@@ -109,12 +102,6 @@ func awfSupportsAPIProxyCACert(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFAPIProxyCACertMinVersion)
 }
 
-// awfSupportsVerifySbxEgress returns true when the effective AWF version supports
-// network.verifySbxEgress for Docker sbx runtime egress verification.
-func awfSupportsVerifySbxEgress(firewallConfig *FirewallConfig) bool {
-	return awfVersionAtLeast(firewallConfig, constants.AWFVerifySbxEgressMinVersion)
-}
-
 // awfSupportsHTTPAPITargets returns true when the effective AWF version supports
 // explicit http:// schemes in apiProxy target hosts.
 func awfSupportsHTTPAPITargets(firewallConfig *FirewallConfig) bool {
@@ -126,15 +113,12 @@ func awfSupportsHTTPAPITargets(firewallConfig *FirewallConfig) bool {
 //
 // Only the Cloud Hypervisor runtime enforces filesystem.allowWrite in a way that
 // leaves a working agent: it stages its own virtiofs exports (see
-// AWFCloudHypervisorFilesystemAllowWriteMinVersion). The other runtimes are
-// excluded on purpose:
+// AWFCloudHypervisorFilesystemAllowWriteMinVersion). Docker is excluded on purpose:
 //
-//   - Docker and gVisor narrow AWF's own writable bind mounts to read-only, which
+//   - Docker narrows AWF's own writable bind mounts to read-only, which
 //     includes the internal /tmp/awf-init control-plane mount nested under the
 //     narrowed /tmp bind. runc then cannot create that mountpoint and the agent
 //     container never starts, so any policy that does not cover /tmp is fatal.
-//   - docker-sbx has no enforcement path and AWF fails closed with
-//     "filesystem.allowWrite is not yet supported by the sbx runtime".
 //
 // emitGeneralToolWarnings warns when a workflow declares allowWrite on a runtime
 // where it is dropped, so the opt-in is never silently ignored.

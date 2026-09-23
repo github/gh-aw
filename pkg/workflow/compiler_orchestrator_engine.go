@@ -67,7 +67,6 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		return nil, err
 	}
 	sandboxConfig = mergeImportedSandboxAgentMounts(sandboxConfig, importsResult.MergedSandboxAgentMounts)
-	sandboxConfig = mergeImportedSandboxAgentRuntimeInstall(sandboxConfig, importsResult.MergedSandboxAgentRuntimeInstall)
 	engineSetting, engineConfig, model, importedEngineDefinitions, err := c.resolveEngineFromIncludesAndImports(result, markdownDir, importsResult, engineSetting, engineConfig, model)
 	if err != nil {
 		return nil, err

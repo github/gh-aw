@@ -17,7 +17,7 @@ import (
 
 // secretsReferencePattern matches a direct reference to a repository/organization secret,
 // such as "secrets.MY_TOKEN" inside a ${{ }} expression. The leading character class avoids
-// matching identifiers that merely end in "secrets", such as "steps.docker-sbx-secrets.outputs".
+// matching identifiers that merely end in "secrets", such as "steps.validate-secrets.outputs".
 var secretsReferencePattern = regexp.MustCompile(`(^|[^-A-Za-z0-9_.])secrets\.[A-Za-z_][A-Za-z0-9_]*`)
 
 // secretOutputViolation describes a workflow output whose value references a secret.
@@ -207,7 +207,7 @@ jobs:
 jobs:
   activation:
     outputs:
-      docker_sbx_secrets_result: ${{ steps.docker-sbx-secrets.outputs.verification_result }}
+      validation_result: ${{ steps.validate-secrets.outputs.verification_result }}
     steps:
       - run: echo hello
 `,

@@ -60,11 +60,9 @@ strict: false
 | --- | --- |
 | `docker` (default) | Default Docker runtime, rootless AWF, network isolation |
 | `docker-sudo-iptables` | Docker with privileged AWF, legacy `iptables` networking, and host/service access |
-| `gvisor` | **Deprecated:** gVisor with strict network isolation |
-| `docker-sbx` | **Deprecated:** KVM microVM; the compiler handles the required privileged setup |
 | `cloud-hypervisor` | Preview KVM runtime with its required privileged launcher |
 
-Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default. Prefer `docker`; `gvisor` and `docker-sbx` are deprecated and will be removed in a future release.
+Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default.
 
 ```yaml wrap
 sandbox:
@@ -73,7 +71,7 @@ sandbox:
     allow-host-ports: [9000]
 ```
 
-The compiler derives every privilege the selected runtime needs, including the `sudo` used by the gVisor and Docker sbx installation steps. Unsupported combinations — such as `allow-host-ports` outside `docker-sudo-iptables`, or `runtime-install` outside `gvisor` and `docker-sbx` — fail at compile time. See [Agent Runtimes](/gh-aw/reference/agent-runtimes/) for runner prerequisites.
+The compiler derives every privilege the selected runtime needs. Unsupported combinations, such as `allow-host-ports` outside `docker-sudo-iptables`, fail at compile time. See [Agent Runtimes](/gh-aw/reference/agent-runtimes/) for runner prerequisites.
 
 ### MCP Gateway (Experimental)
 

@@ -757,52 +757,6 @@ tools:
 		"Gemini MCP_GATEWAY_HOST_DOMAIN must not be localhost under network isolation")
 }
 
-// TestMCPGatewayDockerCommandUsesDockerSbxGatewayRouting verifies that docker-sbx workflows
-// publish the gateway on 0.0.0.0 and export host.docker.internal for both container-side and
-// microVM-side clients.
-func TestMCPGatewayDockerCommandUsesDockerSbxGatewayRouting(t *testing.T) {
-	frontmatter := `---
-on: workflow_dispatch
-engine: copilot
-sandbox:
-  agent:
-    runtime: docker-sbx
-    version: v0.28.0
-tools:
-  github:
-    mode: remote
-    toolsets: [repos]
----
-
-# Test Docker SBX MCP Routing
-`
-
-	compiler := NewCompiler()
-
-	tmpDir := t.TempDir()
-	inputFile := filepath.Join(tmpDir, "test.md")
-
-	err := os.WriteFile(inputFile, []byte(frontmatter), 0644)
-	require.NoError(t, err, "Failed to write test input file")
-
-	err = compiler.CompileWorkflow(inputFile)
-	require.NoError(t, err, "Compilation should succeed")
-
-	outputFile := stringutil.MarkdownToLockFile(inputFile)
-	content, err := os.ReadFile(outputFile)
-	require.NoError(t, err, "Failed to read output file")
-	yamlStr := string(content)
-
-	require.Contains(t, yamlStr, `docker run -i --rm --network bridge`,
-		"Docker command should use bridge networking in docker-sbx mode")
-	require.Contains(t, yamlStr, `-p 0.0.0.0:`,
-		"Docker command should publish the gateway to 0.0.0.0 for docker-sbx")
-	require.Contains(t, yamlStr, `export MCP_GATEWAY_DOMAIN="host.docker.internal"`,
-		"MCP gateway domain should use host.docker.internal in docker-sbx mode")
-	require.Contains(t, yamlStr, `export MCP_GATEWAY_HOST_DOMAIN="host.docker.internal"`,
-		"MCP gateway host domain should use host.docker.internal in docker-sbx mode")
-}
-
 // TestMCPGatewayDockerCommandAddsHostGatewayForMCPScriptsInBridgeMode verifies that when
 // mcp-scripts are configured in network-isolation (bridge) mode, the gateway container command
 // includes --add-host host.docker.internal:host-gateway so the gateway can reach the

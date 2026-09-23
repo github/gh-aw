@@ -131,10 +131,6 @@ type AWFNetworkConfig struct {
 	// Maps to: --network-isolation
 	Isolation bool `json:"isolation,omitempty"`
 
-	// VerifySbxEgress enables fail-closed direct-egress verification for Docker sbx.
-	// Maps to: --verify-sbx-egress
-	VerifySbxEgress bool `json:"verifySbxEgress,omitempty"`
-
 	// TopologyAttach lists container names AWF should attach to awf-net.
 	// Maps to: --topology-attach <name> (repeatable)
 	TopologyAttach []string `json:"topologyAttach,omitempty"`
@@ -276,11 +272,6 @@ type AWFContainerConfig struct {
 	// runner and daemon have separate filesystems.
 	// Maps to: --docker-host-path-prefix <value>
 	DockerHostPathPrefix string `json:"dockerHostPathPrefix,omitempty"`
-
-	// ContainerRuntime specifies the OCI runtime for the agent container.
-	// "gvisor" enables gVisor's runsc runtime for additional kernel-level isolation.
-	// AWF translates "gvisor" → "runsc" internally.
-	ContainerRuntime string `json:"containerRuntime,omitempty"`
 
 	// Images is the closed manifest of digest-pinned AWF infrastructure images,
 	// keyed by AWF image role (squid, agent, apiProxy, ...). Mapped from the

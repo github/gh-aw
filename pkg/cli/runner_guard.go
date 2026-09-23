@@ -239,10 +239,6 @@ func parseAndDisplayRunnerGuardOutput(stdout string, verbose bool, gitRoot strin
 	// permissions. The declarations are not executable curl calls and cannot exfiltrate secrets.
 	output.Findings = filterCopilotLocalAllowToolFindings(output.Findings, gitRoot)
 
-	// Drop RGS-012 findings for the compiler-generated gVisor install step, which downloads a
-	// pinned, SHA-512-verified artifact and never exfiltrates secrets.
-	output.Findings = filterGvisorInstallFindings(output.Findings, gitRoot)
-
 	totalFindings = len(output.Findings)
 	if totalFindings == 0 {
 		return 0, nil

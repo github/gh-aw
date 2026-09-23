@@ -138,7 +138,7 @@ func TestAwInfoStepsAgentRuntime(t *testing.T) {
 		description     string
 	}{
 		{
-			name: "gvisor runtime configured",
+			name: "cloud-hypervisor runtime configured",
 			workflowContent: `---
 on: push
 permissions:
@@ -149,15 +149,15 @@ engine: copilot
 sandbox:
   agent:
     id: awf
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ---
 
-# Test gvisor runtime
+# Test cloud-hypervisor runtime
 
 This workflow tests that sandbox.agent.runtime is stored in aw_info.json.
 `,
-			expectRuntime: "gvisor",
-			description:   "Should have agent runtime gvisor when sandbox.agent.runtime is set to gvisor",
+			expectRuntime: "cloud-hypervisor",
+			description:   "Should have agent runtime cloud-hypervisor when sandbox.agent.runtime is set",
 		},
 		{
 			name: "no runtime configuration",

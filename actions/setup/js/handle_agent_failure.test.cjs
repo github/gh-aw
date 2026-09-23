@@ -17,7 +17,6 @@ describe("handle_agent_failure", () => {
   let fetchModelPricingFromModelsDev;
   let buildMissingModelPricingContext;
   let buildSecretVerificationContext;
-  let buildDockerSbxSecretsContext;
   let buildAssignmentErrorsContext;
   let buildAssignCopilotFailureContext;
   let setFailureIssueOutputs;
@@ -51,7 +50,6 @@ describe("handle_agent_failure", () => {
       fetchModelPricingFromModelsDev,
       buildMissingModelPricingContext,
       buildSecretVerificationContext,
-      buildDockerSbxSecretsContext,
       buildAssignmentErrorsContext,
       buildAssignCopilotFailureContext,
       setFailureIssueOutputs,
@@ -1662,7 +1660,6 @@ describe("handle_agent_failure", () => {
         branch: "main",
         pull_request_info: "",
         secret_verification_context: "",
-        docker_sbx_secrets_context: "",
         credential_auth_error_context: "",
         inference_access_error_context: "",
         mcp_policy_error_context: "",
@@ -1703,32 +1700,6 @@ describe("handle_agent_failure", () => {
       expect(buildSecretVerificationContext("", copilotMessage)).toBe("");
       expect(buildSecretVerificationContext("success", copilotMessage)).toBe("");
       expect(buildSecretVerificationContext("", "")).toBe("");
-    });
-
-    describe("buildDockerSbxSecretsContext", () => {
-      it("returns empty string when docker-sbx secret verification did not fail", () => {
-        expect(buildDockerSbxSecretsContext("")).toBe("");
-        expect(buildDockerSbxSecretsContext("success")).toBe("");
-      });
-
-      it("renders docker-sbx setup guidance from the dedicated markdown template", () => {
-        const originalPromptsDir = process.env.GH_AW_PROMPTS_DIR;
-        try {
-          process.env.GH_AW_PROMPTS_DIR = runtimePromptsDir;
-          const result = buildDockerSbxSecretsContext("failed");
-
-          expect(result).toContain("Docker sbx is not configured");
-          expect(result).toContain("DOCKER_USERNAME");
-          expect(result).toContain("DOCKER_PAT");
-          expect(result).toContain("sandbox.agent.runtime: docker-sbx");
-        } finally {
-          if (originalPromptsDir === undefined) {
-            delete process.env.GH_AW_PROMPTS_DIR;
-          } else {
-            process.env.GH_AW_PROMPTS_DIR = originalPromptsDir;
-          }
-        }
-      });
     });
 
     describe("buildAssignmentErrorsContext", () => {

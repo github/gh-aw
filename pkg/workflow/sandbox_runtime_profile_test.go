@@ -20,7 +20,6 @@ func TestSandboxRuntimeProfiles(t *testing.T) {
 		assert.True(t, profile.Rootless, "default profile must run AWF rootless")
 		assert.False(t, profile.LegacySecurity, "default profile must not enable legacy security")
 		assert.False(t, profile.SupportsHostAccess, "default profile must not allow host access")
-		assert.False(t, profile.SupportsRuntimeInstall, "default profile has no runtime provisioning")
 	})
 
 	t.Run("every supported runtime has a profile", func(t *testing.T) {
@@ -51,22 +50,12 @@ func TestSandboxRuntimeProfiles(t *testing.T) {
 		}
 	})
 
-	t.Run("runtime-install is only meaningful for provisioned runtimes", func(t *testing.T) {
-		for _, runtime := range supportedAgentRuntimes {
-			profile := resolveSandboxRuntimeProfile(&AgentSandboxConfig{Runtime: runtime})
-			expected := runtime == AgentRuntimeGVisor || runtime == AgentRuntimeDockerSbx
-			assert.Equal(t, expected, profile.SupportsRuntimeInstall, "runtime %q runtime-install support", runtime)
-		}
-	})
-
 	t.Run("unsupported runtime is rejected", func(t *testing.T) {
 		assert.False(t, isSupportedAgentRuntime(AgentRuntime("podman")))
 	})
 }
 
 func TestValidateSandboxRuntimeProfile(t *testing.T) {
-	runtimeInstall := false
-
 	newWorkflowData := func(agent *AgentSandboxConfig) *WorkflowData {
 		return &WorkflowData{
 			Tools:         map[string]any{"github": map[string]any{"mode": "remote"}},
@@ -80,24 +69,6 @@ func TestValidateSandboxRuntimeProfile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported sandbox runtime")
 		assert.Contains(t, err.Error(), string(AgentRuntimeDockerSudoIptables))
-	})
-
-	t.Run("runtime-install is rejected outside gvisor and docker-sbx", func(t *testing.T) {
-		err := validateSandboxConfig(newWorkflowData(&AgentSandboxConfig{ID: "awf", RuntimeInstall: &runtimeInstall}))
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "runtime-install")
-		assert.Contains(t, err.Error(), string(AgentRuntimeGVisor))
-	})
-
-	t.Run("runtime-install is accepted for gvisor", func(t *testing.T) {
-		err := validateSandboxConfig(newWorkflowData(&AgentSandboxConfig{
-			ID:             "awf",
-			Runtime:        AgentRuntimeGVisor,
-			RuntimeInstall: &runtimeInstall,
-		}))
-
-		assert.NoError(t, err)
 	})
 
 	t.Run("services with published ports require docker-sudo-iptables", func(t *testing.T) {

@@ -18,58 +18,57 @@ import (
 // BFS import traversal. It accumulates results from all imported files and provides
 // a method to convert the accumulated state into the final ImportsResult.
 type importAccumulator struct {
-	toolsBuilder               strings.Builder
-	mcpServersBuilder          strings.Builder
-	markdownBuilder            strings.Builder // imports with substituted inputs or schema defaults (compile-time substitution)
-	importPaths                []string        // Import paths for runtime-import macro generation
-	promptImports              []PromptImportEntry
-	stepsBuilder               strings.Builder
-	copilotSetupStepsBuilder   strings.Builder // Steps from copilot-setup-steps.yml (inserted at start)
-	preStepsBuilder            strings.Builder
-	preAgentStepsBuilder       strings.Builder
-	runtimesBuilder            strings.Builder
-	servicesBuilder            strings.Builder
-	networkBuilder             strings.Builder
-	permissionsBuilder         strings.Builder
-	secretMaskingBuilder       strings.Builder
-	postStepsBuilder           strings.Builder
-	jobsBuilder                strings.Builder   // Jobs from imported YAML workflows
-	envBuilder                 strings.Builder   // env vars from imported workflows (JSON, one object per line)
-	envSources                 map[string]string // env var name → source import path (for conflict detection and header listing)
-	observabilityConfigs       []string          // observability config JSON blobs from all imports (merged into endpoint array)
-	engines                    []string
-	plugins                    []string
-	pluginObjects              []map[string]any
-	safeOutputs                []string
-	gradersBuilder             strings.Builder
-	mcpScripts                 []string
-	bots                       []string
-	botsSet                    map[string]bool
-	labels                     []string
-	labelsSet                  map[string]bool
-	skipRoles                  []string
-	skipRolesSet               map[string]bool
-	skipBots                   []string
-	skipBotsSet                map[string]bool
-	skipIfMatch                string
-	skipIfNoMatch              string
-	ambientFolders             []string
-	ambientFoldersSet          map[string]bool
-	sandboxAgentMounts         []string
-	sandboxAgentMountsSet      map[string]bool
-	sandboxAgentRuntimeInstall *bool // false if any import sets sandbox.agent.runtime-install: false
-	caches                     []string
-	features                   []map[string]any
-	metadataDocs               string
-	models                     []map[string][]string // model alias maps from each imported file (appended in import order)
-	modelPolicies              []map[string][]string // model policy sets from each imported file (appended in import order)
-	modelCosts                 []map[string]any      // model pricing overlays from each imported file (appended in import order)
-	defaultAiCreditsPricing    map[string]any        // first models.default-ai-credits-pricing object found in imports (first-wins)
-	runInstallScripts          bool                  // true if any imported workflow sets runtimes.node.run-install-scripts: true
-	agentFile                  string
-	agentImportSpec            string
-	repositoryImports          []string
-	importInputs               map[string]any
+	toolsBuilder             strings.Builder
+	mcpServersBuilder        strings.Builder
+	markdownBuilder          strings.Builder // imports with substituted inputs or schema defaults (compile-time substitution)
+	importPaths              []string        // Import paths for runtime-import macro generation
+	promptImports            []PromptImportEntry
+	stepsBuilder             strings.Builder
+	copilotSetupStepsBuilder strings.Builder // Steps from copilot-setup-steps.yml (inserted at start)
+	preStepsBuilder          strings.Builder
+	preAgentStepsBuilder     strings.Builder
+	runtimesBuilder          strings.Builder
+	servicesBuilder          strings.Builder
+	networkBuilder           strings.Builder
+	permissionsBuilder       strings.Builder
+	secretMaskingBuilder     strings.Builder
+	postStepsBuilder         strings.Builder
+	jobsBuilder              strings.Builder   // Jobs from imported YAML workflows
+	envBuilder               strings.Builder   // env vars from imported workflows (JSON, one object per line)
+	envSources               map[string]string // env var name → source import path (for conflict detection and header listing)
+	observabilityConfigs     []string          // observability config JSON blobs from all imports (merged into endpoint array)
+	engines                  []string
+	plugins                  []string
+	pluginObjects            []map[string]any
+	safeOutputs              []string
+	gradersBuilder           strings.Builder
+	mcpScripts               []string
+	bots                     []string
+	botsSet                  map[string]bool
+	labels                   []string
+	labelsSet                map[string]bool
+	skipRoles                []string
+	skipRolesSet             map[string]bool
+	skipBots                 []string
+	skipBotsSet              map[string]bool
+	skipIfMatch              string
+	skipIfNoMatch            string
+	ambientFolders           []string
+	ambientFoldersSet        map[string]bool
+	sandboxAgentMounts       []string
+	sandboxAgentMountsSet    map[string]bool
+	caches                   []string
+	features                 []map[string]any
+	metadataDocs             string
+	models                   []map[string][]string // model alias maps from each imported file (appended in import order)
+	modelPolicies            []map[string][]string // model policy sets from each imported file (appended in import order)
+	modelCosts               []map[string]any      // model pricing overlays from each imported file (appended in import order)
+	defaultAiCreditsPricing  map[string]any        // first models.default-ai-credits-pricing object found in imports (first-wins)
+	runInstallScripts        bool                  // true if any imported workflow sets runtimes.node.run-install-scripts: true
+	agentFile                string
+	agentImportSpec          string
+	repositoryImports        []string
+	importInputs             map[string]any
 	// First on.github-token / on.github-app found across all imported files (first-wins strategy)
 	activationGitHubToken string
 	activationGitHubApp   string // JSON-encoded GitHubAppConfig
@@ -414,7 +413,6 @@ func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath st
 	acc.appendYAMLBuilderField(fm, "services", &acc.servicesBuilder)
 	acc.appendJSONBuilderField(fm, "network", "{}", &acc.networkBuilder)
 	acc.mergeSandboxAgentMounts(fm)
-	acc.mergeSandboxAgentRuntimeInstall(fm)
 	acc.appendJSONBuilderField(fm, "permissions", "{}", &acc.permissionsBuilder)
 	acc.appendJSONBuilderField(fm, "secret-masking", "{}", &acc.secretMaskingBuilder)
 }
@@ -518,48 +516,6 @@ func (acc *importAccumulator) mergeSandboxAgentMounts(fm map[string]any) {
 			acc.sandboxAgentMountsSet[mount] = true
 			acc.sandboxAgentMounts = append(acc.sandboxAgentMounts, mount)
 		}
-	}
-}
-
-// mergeSandboxAgentRuntimeInstall extracts sandbox.agent.runtime-install from an
-// imported workflow's frontmatter. False wins: if any import sets runtime-install
-// to false the accumulated value becomes false and stays false.
-func (acc *importAccumulator) mergeSandboxAgentRuntimeInstall(fm map[string]any) {
-	// Already locked to false — no need to inspect further imports.
-	if acc.sandboxAgentRuntimeInstall != nil && !*acc.sandboxAgentRuntimeInstall {
-		return
-	}
-
-	sandboxVal, hasSandbox := fm["sandbox"]
-	if !hasSandbox {
-		return
-	}
-	sandboxMap, ok := sandboxVal.(map[string]any)
-	if !ok {
-		return
-	}
-	agentVal, hasAgent := sandboxMap["agent"]
-	if !hasAgent {
-		return
-	}
-	agentMap, ok := agentVal.(map[string]any)
-	if !ok {
-		return
-	}
-	riVal, hasRI := agentMap["runtime-install"]
-	if !hasRI {
-		return
-	}
-	ri, ok := riVal.(bool)
-	if !ok {
-		return
-	}
-	if !ri {
-		f := false
-		acc.sandboxAgentRuntimeInstall = &f
-	} else if acc.sandboxAgentRuntimeInstall == nil {
-		t := true
-		acc.sandboxAgentRuntimeInstall = &t
 	}
 }
 
@@ -1045,53 +1001,52 @@ func (acc *importAccumulator) toImportsResult(topologicalOrder []string) *Import
 // ImportedFiles which is populated separately from the topological sort order.
 func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 	result := &ImportsResult{
-		MergedTools:                      acc.toolsBuilder.String(),
-		MergedMCPServers:                 acc.mcpServersBuilder.String(),
-		MergedEngines:                    acc.engines,
-		MergedPlugins:                    acc.plugins,
-		MergedPluginObjects:              acc.pluginObjects,
-		MergedSafeOutputs:                acc.safeOutputs,
-		MergedGraders:                    acc.gradersBuilder.String(),
-		MergedMCPScripts:                 acc.mcpScripts,
-		MergedMarkdown:                   acc.markdownBuilder.String(),
-		ImportPaths:                      acc.importPaths,
-		PromptImports:                    acc.promptImports,
-		MergedSteps:                      acc.stepsBuilder.String(),
-		CopilotSetupSteps:                acc.copilotSetupStepsBuilder.String(),
-		MergedPreSteps:                   acc.preStepsBuilder.String(),
-		MergedPreAgentSteps:              acc.preAgentStepsBuilder.String(),
-		MergedRuntimes:                   acc.runtimesBuilder.String(),
-		MergedRunInstallScripts:          acc.runInstallScripts,
-		MergedServices:                   acc.servicesBuilder.String(),
-		MergedNetwork:                    acc.networkBuilder.String(),
-		MergedSandboxAgentMounts:         acc.sandboxAgentMounts,
-		MergedSandboxAgentRuntimeInstall: acc.sandboxAgentRuntimeInstall,
-		MergedPermissions:                acc.permissionsBuilder.String(),
-		MergedSecretMasking:              acc.secretMaskingBuilder.String(),
-		MergedBots:                       acc.bots,
-		MergedSkipRoles:                  acc.skipRoles,
-		MergedSkipBots:                   acc.skipBots,
-		MergedSkipIfMatch:                acc.skipIfMatch,
-		MergedSkipIfNoMatch:              acc.skipIfNoMatch,
-		MergedAmbientFolders:             acc.ambientFolders,
-		MergedPostSteps:                  acc.postStepsBuilder.String(),
-		MergedLabels:                     acc.labels,
-		MergedCaches:                     acc.caches,
-		MergedJobs:                       acc.jobsBuilder.String(),
-		MergedEnv:                        acc.envBuilder.String(),
-		MergedEnvSources:                 acc.envSources,
-		MergedFeatures:                   acc.features,
-		MergedMetadataDocs:               acc.metadataDocs,
-		MergedModels:                     acc.models,
-		MergedModelPolicies:              acc.modelPolicies,
-		MergedModelCosts:                 acc.modelCosts,
-		MergedDefaultAiCreditsPricing:    acc.defaultAiCreditsPricing,
-		MergedObservability:              mergeObservabilityConfigs(acc.observabilityConfigs),
-		AgentFile:                        acc.agentFile,
-		AgentImportSpec:                  acc.agentImportSpec,
-		RepositoryImports:                acc.repositoryImports,
-		ImportInputs:                     acc.importInputs,
-		Warnings:                         acc.warnings,
+		MergedTools:                   acc.toolsBuilder.String(),
+		MergedMCPServers:              acc.mcpServersBuilder.String(),
+		MergedEngines:                 acc.engines,
+		MergedPlugins:                 acc.plugins,
+		MergedPluginObjects:           acc.pluginObjects,
+		MergedSafeOutputs:             acc.safeOutputs,
+		MergedGraders:                 acc.gradersBuilder.String(),
+		MergedMCPScripts:              acc.mcpScripts,
+		MergedMarkdown:                acc.markdownBuilder.String(),
+		ImportPaths:                   acc.importPaths,
+		PromptImports:                 acc.promptImports,
+		MergedSteps:                   acc.stepsBuilder.String(),
+		CopilotSetupSteps:             acc.copilotSetupStepsBuilder.String(),
+		MergedPreSteps:                acc.preStepsBuilder.String(),
+		MergedPreAgentSteps:           acc.preAgentStepsBuilder.String(),
+		MergedRuntimes:                acc.runtimesBuilder.String(),
+		MergedRunInstallScripts:       acc.runInstallScripts,
+		MergedServices:                acc.servicesBuilder.String(),
+		MergedNetwork:                 acc.networkBuilder.String(),
+		MergedSandboxAgentMounts:      acc.sandboxAgentMounts,
+		MergedPermissions:             acc.permissionsBuilder.String(),
+		MergedSecretMasking:           acc.secretMaskingBuilder.String(),
+		MergedBots:                    acc.bots,
+		MergedSkipRoles:               acc.skipRoles,
+		MergedSkipBots:                acc.skipBots,
+		MergedSkipIfMatch:             acc.skipIfMatch,
+		MergedSkipIfNoMatch:           acc.skipIfNoMatch,
+		MergedAmbientFolders:          acc.ambientFolders,
+		MergedPostSteps:               acc.postStepsBuilder.String(),
+		MergedLabels:                  acc.labels,
+		MergedCaches:                  acc.caches,
+		MergedJobs:                    acc.jobsBuilder.String(),
+		MergedEnv:                     acc.envBuilder.String(),
+		MergedEnvSources:              acc.envSources,
+		MergedFeatures:                acc.features,
+		MergedMetadataDocs:            acc.metadataDocs,
+		MergedModels:                  acc.models,
+		MergedModelPolicies:           acc.modelPolicies,
+		MergedModelCosts:              acc.modelCosts,
+		MergedDefaultAiCreditsPricing: acc.defaultAiCreditsPricing,
+		MergedObservability:           mergeObservabilityConfigs(acc.observabilityConfigs),
+		AgentFile:                     acc.agentFile,
+		AgentImportSpec:               acc.agentImportSpec,
+		RepositoryImports:             acc.repositoryImports,
+		ImportInputs:                  acc.importInputs,
+		Warnings:                      acc.warnings,
 	}
 	acc.populateImportsResultScalars(result)
 	return result

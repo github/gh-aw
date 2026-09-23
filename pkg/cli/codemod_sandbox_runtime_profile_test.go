@@ -74,26 +74,6 @@ sandbox:
 			expectExcludes: []string{"legacy-security:"},
 		},
 		{
-			name: "docker-sbx keeps its runtime and drops sudo: true",
-			content: `---
-on: workflow_dispatch
-sandbox:
-  agent:
-    runtime: docker-sbx
-    sudo: true
----
-
-# Test`,
-			frontmatter: map[string]any{
-				"sandbox": map[string]any{
-					"agent": map[string]any{"runtime": "docker-sbx", "sudo": true},
-				},
-			},
-			expectApplied:  true,
-			expectContains: []string{"    runtime: docker-sbx"},
-			expectExcludes: []string{"sudo:", "docker-sudo-iptables"},
-		},
-		{
 			name: "sudo: true without a runtime becomes docker-sudo-iptables",
 			content: `---
 on: workflow_dispatch
@@ -162,67 +142,6 @@ engine: copilot
 # Test`,
 			frontmatter:   map[string]any{"engine": "copilot"},
 			expectApplied: false,
-		},
-		{
-			name: "gvisor combined with legacy-security keeps gvisor and drops legacy-security",
-			content: `---
-on: workflow_dispatch
-sandbox:
-  agent:
-    runtime: gvisor
-    legacy-security: enable
----
-
-# Test`,
-			frontmatter: map[string]any{
-				"sandbox": map[string]any{
-					"agent": map[string]any{"runtime": "gvisor", "legacy-security": "enable"},
-				},
-			},
-			expectApplied:  true,
-			expectContains: []string{"    runtime: gvisor"},
-			expectExcludes: []string{"legacy-security:", "docker-sudo-iptables"},
-		},
-		{
-			name: "gvisor combined with sudo: true keeps gvisor and drops sudo",
-			content: `---
-on: workflow_dispatch
-sandbox:
-  agent:
-    runtime: gvisor
-    sudo: true
----
-
-# Test`,
-			frontmatter: map[string]any{
-				"sandbox": map[string]any{
-					"agent": map[string]any{"runtime": "gvisor", "sudo": true},
-				},
-			},
-			expectApplied:  true,
-			expectContains: []string{"    runtime: gvisor"},
-			expectExcludes: []string{"sudo:", "docker-sudo-iptables"},
-		},
-		{
-			name: "gvisor combined with both sudo and legacy-security keeps gvisor and drops both",
-			content: `---
-on: workflow_dispatch
-sandbox:
-  agent:
-    runtime: gvisor
-    sudo: true
-    legacy-security: enable
----
-
-# Test`,
-			frontmatter: map[string]any{
-				"sandbox": map[string]any{
-					"agent": map[string]any{"runtime": "gvisor", "sudo": true, "legacy-security": "enable"},
-				},
-			},
-			expectApplied:  true,
-			expectContains: []string{"    runtime: gvisor"},
-			expectExcludes: []string{"sudo:", "legacy-security:", "docker-sudo-iptables"},
 		},
 	}
 

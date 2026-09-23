@@ -271,14 +271,6 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 		}
 	}
 
-	// Extract runtime-install (controls generation of runtime install steps)
-	if runtimeInstallVal, hasRuntimeInstall := agentObj["runtime-install"]; hasRuntimeInstall {
-		if runtimeInstallBool, ok := runtimeInstallVal.(bool); ok {
-			agentConfig.RuntimeInstall = &runtimeInstallBool
-			frontmatterExtractionSecurityLog.Printf("Extracted sandbox.agent.runtime-install: %t", runtimeInstallBool)
-		}
-	}
-
 	// Extract allow-host-ports (additional host TCP ports for the AWF sandbox)
 	if portsVal, hasPorts := agentObj["allow-host-ports"]; hasPorts {
 		if portsSlice, ok := portsVal.([]any); ok {
