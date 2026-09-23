@@ -433,7 +433,7 @@ By default, pushes are replayed through GitHub's signed commit API because `sign
 
 ### Cross-repo usage
 
-`push-to-pull-request-branch` supports pushing to pull requests in a different repository via `target-repo` (and optionally `allowed-repos`). For fork-backed pull requests, set `head-repo` to the exact repository that owns the PR head branch; follow-up pushes are permitted only when the PR head repository matches that value exactly. When `target-repo` is set, **the target repository must be checked out into the workflow workspace** using the `checkout:` frontmatter field with a `path:` specified. Use `target-repo: "*"` to let the agent choose the target repository at runtime (the safe_outputs job will check out all `checkout:` repositories into subdirectories automatically).
+`push-to-pull-request-branch` supports pushing to pull requests in a different repository via `target-repo` (and optionally `allowed-repos`). For fork-backed pull requests, set `head-repo` to the exact repository that owns the PR head branch; follow-up pushes are permitted only when the PR head repository matches that value exactly. When `target-repo` is set, **the target repository must be checked out into the workflow workspace** using either the `checkout:` frontmatter field with a `path:` specified or a custom `steps:` entry that clones it under `$GITHUB_WORKSPACE`. Use `target-repo: "*"` to let the agent choose the target repository at runtime (the safe_outputs job will check out all `checkout:` repositories into subdirectories automatically).
 
 ```yaml wrap
 checkout:

@@ -1,6 +1,8 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
-const { extractRepoSlugFromUrl, normalizeRepoSlug, findGitDirectories, findRepoCheckout, buildRepoCheckoutMap } = require("./find_repo_checkout.cjs");
+const { spawnSync } = require("child_process");
+const { extractRepoSlugFromUrl, extractRemoteHost, isTrustedRemoteHost, normalizeRepoSlug, findGitDirectories, findRepoCheckout, buildRepoCheckoutMap } = require("./find_repo_checkout.cjs");
 const { getPatchPathForBranchInRepo, sanitizeBranchNameForPatch, sanitizeRepoSlugForPatch } = require("./generate_git_patch.cjs");
 const { _resetCache: resetCheckoutManifestCache } = require("./checkout_manifest.cjs");
 
@@ -437,6 +439,201 @@ describe("find_repo_checkout", () => {
       const map = buildRepoCheckoutMap(workspaceDir);
 
       expect(map.has("owner/stale")).toBe(false);
+    });
+  });
+
+  describe("git-scan fallback reads remotes with scoped safe.directory trust (issue #60021)", () => {
+    let workspaceDir;
+    let oldPath;
+    let oldGitScanEnvLog;
+    let oldGitConfigCount;
+    let oldGitConfigKey0;
+    let oldGitConfigValue0;
+    let oldCore;
+
+    beforeEach(() => {
+      oldPath = process.env.PATH;
+      oldGitScanEnvLog = process.env.GIT_SCAN_ENV_LOG;
+      oldGitConfigCount = process.env.GIT_CONFIG_COUNT;
+      oldGitConfigKey0 = process.env.GIT_CONFIG_KEY_0;
+      oldGitConfigValue0 = process.env.GIT_CONFIG_VALUE_0;
+      oldCore = globalThis.core;
+      globalThis.core = { debug: () => {}, error: () => {} };
+      delete process.env.GIT_CONFIG_COUNT;
+      delete process.env.GIT_CONFIG_KEY_0;
+      delete process.env.GIT_CONFIG_VALUE_0;
+      workspaceDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "test-safedir-"));
+    });
+
+    afterEach(() => {
+      oldPath === undefined ? delete process.env.PATH : (process.env.PATH = oldPath);
+      oldGitScanEnvLog === undefined ? delete process.env.GIT_SCAN_ENV_LOG : (process.env.GIT_SCAN_ENV_LOG = oldGitScanEnvLog);
+      oldGitConfigCount === undefined ? delete process.env.GIT_CONFIG_COUNT : (process.env.GIT_CONFIG_COUNT = oldGitConfigCount);
+      oldGitConfigKey0 === undefined ? delete process.env.GIT_CONFIG_KEY_0 : (process.env.GIT_CONFIG_KEY_0 = oldGitConfigKey0);
+      oldGitConfigValue0 === undefined ? delete process.env.GIT_CONFIG_VALUE_0 : (process.env.GIT_CONFIG_VALUE_0 = oldGitConfigValue0);
+      oldCore === undefined ? delete globalThis.core : (globalThis.core = oldCore);
+      try {
+        fs.rmSync(workspaceDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    });
+
+    it("injects safe.directory only for the git config read", () => {
+      const nestedRepo = path.join(workspaceDir, "repos", "analytics");
+      fs.mkdirSync(path.join(nestedRepo, ".git"), { recursive: true });
+      const binDir = path.join(workspaceDir, "bin");
+      fs.mkdirSync(binDir, { recursive: true });
+      const envLog = path.join(workspaceDir, "git-env.log");
+      const fakeGit = path.join(binDir, "git");
+      fs.writeFileSync(
+        fakeGit,
+        `#!/bin/sh
+printf '%s\\t%s\\t%s\\t%s\\n' "$PWD" "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" >> "$GIT_SCAN_ENV_LOG"
+if [ "$1" = "config" ] && [ "$2" = "--get" ] && [ "$3" = "remote.origin.url" ]; then
+  echo "https://github.com/owner/analytics.git"
+  exit 0
+fi
+exit 1
+`
+      );
+      fs.chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+      process.env.GIT_SCAN_ENV_LOG = envLog;
+
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(result.success).toBe(true);
+      expect(result.path).toBe(nestedRepo);
+      expect(process.env.GIT_CONFIG_COUNT).toBeUndefined();
+      expect(process.env.GIT_CONFIG_KEY_0).toBeUndefined();
+      expect(process.env.GIT_CONFIG_VALUE_0).toBeUndefined();
+      const configRead = fs.readFileSync(envLog, "utf8").trim().split("\n")[0].split("\t");
+      expect(configRead).toEqual([nestedRepo, "1", "safe.directory", path.resolve(nestedRepo)]);
+    });
+
+    it("reports a not-found error that mentions both checkout: and steps: clones", () => {
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("checkout:");
+      expect(result.error).toContain("steps:");
+    });
+
+    it("ignores a scanned repository whose remote points at another host", () => {
+      const plantedRepo = path.join(workspaceDir, "repos", "planted");
+      fs.mkdirSync(path.join(plantedRepo, ".git"), { recursive: true });
+      const binDir = path.join(workspaceDir, "bin");
+      fs.mkdirSync(binDir, { recursive: true });
+      const fakeGit = path.join(binDir, "git");
+      fs.writeFileSync(
+        fakeGit,
+        `#!/bin/sh
+if [ "$1" = "config" ] && [ "$2" = "--get" ] && [ "$3" = "remote.origin.url" ]; then
+  echo "https://attacker.example/owner/analytics.git"
+  exit 0
+fi
+exit 1
+`
+      );
+      fs.chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+      process.env.GIT_SCAN_ENV_LOG = path.join(workspaceDir, "git-env.log");
+
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("git-scan fallback with a dubious-ownership checkout", () => {
+    let workspaceDir;
+    let originalEnv;
+    let originalCore;
+
+    beforeEach(() => {
+      workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-safedir-git-"));
+      originalEnv = {
+        GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+        GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
+        GITHUB_ENV: process.env.GITHUB_ENV,
+        GITHUB_SERVER_URL: process.env.GITHUB_SERVER_URL,
+      };
+      originalCore = globalThis.core;
+      globalThis.core = { debug: () => {}, error: () => {} };
+      process.env.GIT_CONFIG_GLOBAL = os.devNull;
+      process.env.GIT_CONFIG_NOSYSTEM = "1";
+      process.env.GITHUB_SERVER_URL = "https://github.com";
+      delete process.env.GITHUB_ENV;
+    });
+
+    afterEach(() => {
+      spawnSync("sudo", ["-n", "rm", "-rf", workspaceDir]);
+      for (const [key, value] of Object.entries(originalEnv)) {
+        value === undefined ? delete process.env[key] : (process.env[key] = value);
+      }
+      originalCore === undefined ? delete globalThis.core : (globalThis.core = originalCore);
+    });
+
+    it("discovers a nested checkout using per-invocation safe.directory trust", () => {
+      const sudoAvailable = spawnSync("sudo", ["-n", "true"], { encoding: "utf8" });
+      expect(sudoAvailable.status).toBe(0);
+
+      const nestedRepo = path.join(workspaceDir, "repos", "analytics");
+      fs.mkdirSync(nestedRepo, { recursive: true });
+      expect(spawnSync("git", ["init", "-q"], { cwd: nestedRepo }).status).toBe(0);
+      expect(spawnSync("git", ["remote", "add", "origin", "https://github.com/owner/analytics.git"], { cwd: nestedRepo }).status).toBe(0);
+      expect(spawnSync("sudo", ["-n", "chown", "-R", "12345:12345", nestedRepo]).status).toBe(0);
+
+      const untrustedRead = spawnSync("git", ["config", "--get", "remote.origin.url"], {
+        cwd: nestedRepo,
+        encoding: "utf8",
+        env: process.env,
+      });
+      expect(untrustedRead.status).not.toBe(0);
+
+      expect(findRepoCheckout("owner/analytics", workspaceDir)).toMatchObject({
+        success: true,
+        path: nestedRepo,
+        repoSlug: "owner/analytics",
+      });
+    });
+  });
+
+  describe("remote host trust", () => {
+    let oldServerUrl;
+
+    beforeEach(() => {
+      oldServerUrl = process.env.GITHUB_SERVER_URL;
+    });
+
+    afterEach(() => {
+      oldServerUrl === undefined ? delete process.env.GITHUB_SERVER_URL : (process.env.GITHUB_SERVER_URL = oldServerUrl);
+    });
+
+    it("extracts the host from HTTPS and SSH remotes", () => {
+      expect(extractRemoteHost("https://github.com/owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("https://user@github.com/owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("https://github.example.com:8443/owner/repo.git")).toBe("github.example.com");
+      expect(extractRemoteHost("git@github.com:owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("/local/path/repo")).toBeNull();
+      expect(extractRemoteHost("")).toBeNull();
+    });
+
+    it("trusts github.com and the configured GitHub server host only", () => {
+      delete process.env.GITHUB_SERVER_URL;
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("git@GitHub.com:owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
+
+      process.env.GITHUB_SERVER_URL = "https://github.example.com";
+      expect(isTrustedRemoteHost("https://github.example.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
+
+      process.env.GITHUB_SERVER_URL = "not a url";
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
     });
   });
 
