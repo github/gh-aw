@@ -3761,6 +3761,93 @@ describe("handle_agent_failure", () => {
     });
   });
 
+  describe("buildCopilotAgentNotFoundContext", () => {
+    let buildCopilotAgentNotFoundContext;
+    let detectCopilotAgentNotFoundFromLog;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    let tmpDir;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-copilot-agent-not-found-"));
+      const promptsDir = path.join(tmpDir, "gh-aw", "prompts");
+      fs.mkdirSync(promptsDir, { recursive: true });
+      fs.copyFileSync(path.join(runtimePromptsDir, "copilot_agent_not_found.md"), path.join(promptsDir, "copilot_agent_not_found.md"));
+      process.env.RUNNER_TEMP = tmpDir;
+      ({ buildCopilotAgentNotFoundContext, detectCopilotAgentNotFoundFromLog } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.RUNNER_TEMP;
+      delete process.env.GH_AW_ENGINE_ID;
+      delete process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("detects a 'No such agent' failure with an available agents list", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: csharp-dotnet-development:expert-dotnet-software-engineer, available: foo, bar");
+      const detection = detectCopilotAgentNotFoundFromLog(logPath);
+      expect(detection).toEqual({
+        requestedAgent: "csharp-dotnet-development:expert-dotnet-software-engineer",
+        availableAgents: ["foo", "bar"],
+      });
+    });
+
+    it("detects a 'No such agent' failure with an empty available agents list", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: csharp-dotnet-development:expert-dotnet-software-engineer, available: ");
+      const detection = detectCopilotAgentNotFoundFromLog(logPath);
+      expect(detection).toEqual({
+        requestedAgent: "csharp-dotnet-development:expert-dotnet-software-engineer",
+        availableAgents: [],
+      });
+    });
+
+    it("returns null when the log does not contain the failure", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "everything is fine");
+      expect(detectCopilotAgentNotFoundFromLog(logPath)).toBeNull();
+    });
+
+    it("returns null for non-copilot engines even with a matching log line", () => {
+      process.env.GH_AW_ENGINE_ID = "claude";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: foo, available: ");
+      expect(detectCopilotAgentNotFoundFromLog(logPath)).toBeNull();
+    });
+
+    it("returns no guidance when no failure was detected", () => {
+      expect(buildCopilotAgentNotFoundContext(null)).toBe("");
+    });
+
+    it("renders the requested agent and available agents list", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: ["baz"] });
+      expect(result).toContain("Configured Copilot agent not found");
+      expect(result).toContain("`foo:bar`");
+      expect(result).toContain("`baz`");
+    });
+
+    it("renders a fallback message when no agents were reported as available", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("none — Copilot CLI discovered no loadable agents");
+    });
+
+    it("includes plugin installation diagnostics when present", () => {
+      const diagnosticsPath = path.join(tmpDir, "plugin-diagnostics.log");
+      fs.writeFileSync(diagnosticsPath, "=== Agent plugin diagnostics: octo-org/plugin@sha ===\nMarkdown files found: 0");
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("Plugin installation diagnostics");
+      expect(result).toContain("Markdown files found: 0");
+    });
+  });
+
   describe("buildModelNotSupportedErrorContext", () => {
     let buildModelNotSupportedErrorContext;
     const fs = require("fs");

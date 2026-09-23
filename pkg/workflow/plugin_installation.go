@@ -12,6 +12,13 @@ import (
 
 var pluginInstallationLog = logger.New("workflow:plugin_installation")
 
+// pluginDiagnosticsLogPath is the path where per-plugin filesystem diagnostics are appended
+// during plugin installation. It lives inside the Copilot engine's declared logs folder so it
+// is automatically picked up by the unified agent artifact upload and is readable by the
+// conclusion job's failure-issue script (handle_agent_failure.cjs) when the engine reports
+// that a configured agent could not be found at startup.
+const pluginDiagnosticsLogPath = logsFolder + "plugin-diagnostics.log"
+
 // pluginInstallSpec describes how an engine consumes checked-out Agent Plugins.
 //
 // Every engine with Agent Plugins support checks each plugin out at its pinned SHA.
@@ -33,6 +40,12 @@ type pluginInstallSpec struct {
 	// CustomInstall, when set, replaces the Directory/Command handling above and is
 	// invoked once per checked-out plugin to produce any additional installation steps.
 	CustomInstall func(parsed parsedSkillRefSpec, checkoutPath, installPath string, index int) []GitHubActionStep
+	// Diagnostics, when true, adds a step after each installed plugin that inspects the
+	// checked-out plugin's filesystem contents and appends a summary to
+	// pluginDiagnosticsLogPath. This surfaces, at install time, whether the pinned ref
+	// actually materialized loadable agent/skill files (as opposed to a source-only
+	// manifest), which is a common cause of "No such agent" failures at engine startup.
+	Diagnostics bool
 }
 
 // pluginDirectoryRegexp restricts plugin staging directories to a safe character set so
@@ -216,18 +229,58 @@ func generatePluginInstallationSteps(workflowData *WorkflowData, spec pluginInst
 			}
 		}
 
-		if spec.Command != "" && len(spec.InstallArgs) > 0 {
-			installArgs := make([]string, 0, len(spec.InstallArgs)+2)
-			installArgs = append(installArgs, spec.Command)
-			installArgs = append(installArgs, spec.InstallArgs...)
-			installArgs = append(installArgs, "./"+installPath)
-			installCommand := shellJoinArgs(installArgs)
-			installStep := []string{"      - name: Install agent plugin " + parsed.repoPath}
-			steps = append(steps, FormatStepWithCommandAndEnv(installStep, installCommand, nil))
-		}
+		steps = append(steps, newPluginInstallCommandSteps(spec, parsed, installPath)...)
 	}
 
 	return steps
+}
+
+// newPluginInstallCommandSteps builds the engine install command step (when configured) followed
+// by the optional diagnostics step for a single plugin.
+func newPluginInstallCommandSteps(spec pluginInstallSpec, parsed parsedSkillRefSpec, installPath string) []GitHubActionStep {
+	var steps []GitHubActionStep
+
+	if spec.Command != "" && len(spec.InstallArgs) > 0 {
+		installArgs := make([]string, 0, len(spec.InstallArgs)+2)
+		installArgs = append(installArgs, spec.Command)
+		installArgs = append(installArgs, spec.InstallArgs...)
+		installArgs = append(installArgs, "./"+installPath)
+		installCommand := shellJoinArgs(installArgs)
+		installStep := []string{"      - name: Install agent plugin " + parsed.repoPath}
+		steps = append(steps, FormatStepWithCommandAndEnv(installStep, installCommand, nil))
+	}
+
+	if spec.Diagnostics {
+		steps = append(steps, newPluginDiagnosticsStep(parsed, installPath))
+	}
+
+	return steps
+}
+
+// newPluginDiagnosticsStep generates a step that records the checked-out plugin's file layout
+// to pluginDiagnosticsLogPath. Awesome Copilot-style plugins that pin a source-only ref (for
+// example a manifest-only default branch instead of a published "marketplace" branch) install
+// successfully but expose no loadable agent, which only surfaces later as a
+// "No such agent: <name>, available: ..." failure at engine startup. Recording what was
+// actually materialized on disk at install time gives the conclusion job's failure-issue
+// reporting something concrete to show alongside that runtime error.
+func newPluginDiagnosticsStep(parsed parsedSkillRefSpec, installPath string) GitHubActionStep {
+	quotedInstallPath := fmt.Sprintf("%q", "./"+installPath)
+	diagnosticsCommand := strings.Join([]string{
+		fmt.Sprintf("mkdir -p %q", path.Dir(pluginDiagnosticsLogPath)),
+		"{",
+		fmt.Sprintf("  echo \"=== Agent plugin diagnostics: %s@%s ===\"", parsed.repoPath, parsed.ref),
+		fmt.Sprintf("  find %s -maxdepth 6 -type f | sort", quotedInstallPath),
+		fmt.Sprintf("  md_count=$(find %s -maxdepth 6 -type f -name '*.md' | wc -l)", quotedInstallPath),
+		"  echo \"Markdown files found: ${md_count}\"",
+		"  if [ \"${md_count}\" -eq 0 ]; then",
+		fmt.Sprintf("    echo \"::warning::Agent plugin %s@%s has no markdown files after installation; it may not expose any loadable Copilot agents. Verify the plugin ref points to the branch that publishes materialized agent/skill files (for example a 'marketplace' branch) rather than a source-only manifest branch.\"", parsed.repoPath, parsed.ref),
+		"  fi",
+		"  echo",
+		fmt.Sprintf("} >> %q", pluginDiagnosticsLogPath),
+	}, "\n")
+	diagnosticsStep := []string{"      - name: Diagnose agent plugin " + parsed.repoPath}
+	return FormatStepWithCommandAndEnv(diagnosticsStep, diagnosticsCommand, nil)
 }
 
 func pluginInstallationStepCapacity(pluginCount int) int {

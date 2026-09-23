@@ -147,6 +147,7 @@ func (e *CopilotEngine) GetPluginInstallationSteps(workflowData *WorkflowData) [
 	return generatePluginInstallationSteps(workflowData, pluginInstallSpec{
 		Command:     commandName,
 		InstallArgs: []string{"plugin", "install"},
+		Diagnostics: true,
 	})
 }
 
