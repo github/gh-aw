@@ -25,7 +25,7 @@ func TestJSONSchemaCommand(t *testing.T) {
 		{
 			name:       "audit",
 			schemaName: "audit",
-			oneOfCount: 3,
+			oneOfCount: 4,
 			validOutput: []any{
 				AuditData{
 					Overview:        OverviewData{},
@@ -44,6 +44,15 @@ func TestJSONSchemaCommand(t *testing.T) {
 				},
 				AuditDiff{},
 				[]AuditDiff{{}},
+				GroupedAuditReport{
+					RunsAnalyzed: 1,
+					Entries: []GroupedAuditEntry{{
+						RunID:               42,
+						Code:                AuditFindingWorkflowFailed,
+						Occurrences:         2,
+						RepresentativeEntry: AuditFinding{Code: AuditFindingWorkflowFailed, Title: "Workflow failed"},
+					}},
+				},
 			},
 		},
 		{

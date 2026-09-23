@@ -622,7 +622,7 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.154.0
-      - name: Install Codex CLI in docker-sbx path
+      - name: Install Codex CLI in microVM path
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/engine-cli/bin"
           npm install --ignore-scripts --prefix "${RUNNER_TEMP}/gh-aw/engine-cli" @openai/codex@0.154.0

@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -31,13 +32,20 @@ type SafeJobConfig struct {
 	GitHubToken string                      `yaml:"github-token,omitempty"`
 	Output      string                      `yaml:"output,omitempty"`
 	Max         int                         `yaml:"max,omitempty"` // Maximum number of times this output type may be emitted per run (default: 1)
-	runsOnError error                       `yaml:"-"`
+	// Artifacts declares additional agent-job filesystem paths (files, directories, or globs
+	// rooted under /tmp/gh-aw/) that this job's steps depend on. The compiler persists these
+	// paths in the unified "agent" artifact upload so the job can read them after the agent
+	// job completes. Without declaring a path here, any file the agent writes outside the
+	// compiler's built-in known paths is silently dropped and never reaches this job.
+	Artifacts      []string `yaml:"artifacts,omitempty"`
+	runsOnError    error    `yaml:"-"`
+	artifactsError error    `yaml:"-"`
 }
 
 // parseSafeJobsConfig parses safe-jobs configuration from a jobs map.
 // This function expects a map of job configurations directly (from safe-outputs.jobs).
 // The top-level "safe-jobs" key is NOT supported - only "safe-outputs.jobs" is valid.
-func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJobConfig {
+func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJobConfig { //nolint:largefunc // Sequential field-by-field parsing of the safe-job config map; splitting would obscure the direct mapping to frontmatter keys.
 	if jobsMap == nil {
 		return nil
 	}
@@ -178,11 +186,104 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 			}
 		}
 
+		// Parse artifacts: additional agent-job filesystem paths this job depends on.
+		// Each entry must be rooted under /tmp/gh-aw/ so the compiler's secret redaction
+		// step (which only scans that subtree) covers it before upload.
+		if artifacts, exists := jobConfig["artifacts"]; exists {
+			if artifactsList, ok := artifacts.([]any); ok {
+				for _, artifact := range artifactsList {
+					artifactStr, ok := artifact.(string)
+					if !ok {
+						safeJob.artifactsError = fmt.Errorf("safe-job %q: artifacts entries must be strings", jobName)
+						break
+					}
+					if err := validateSafeJobArtifactPath(artifactStr); err != nil {
+						safeJob.artifactsError = fmt.Errorf("safe-job %q: %w", jobName, err)
+						break
+					}
+					safeJob.Artifacts = append(safeJob.Artifacts, artifactStr)
+				}
+			} else {
+				safeJob.artifactsError = fmt.Errorf("safe-job %q: artifacts must be an array of strings", jobName)
+			}
+		}
+
 		safeJobsLog.Printf("Parsed safe-job configuration: name=%s, has_steps=%v, has_inputs=%v, max=%d", jobName, len(safeJob.Steps) > 0, len(safeJob.Inputs) > 0, safeJob.Max)
 		result[jobName] = safeJob
 	}
 
 	return result
+}
+
+// validateSafeJobArtifactPath validates a single safe-job "artifacts" entry.
+//
+// Two properties must hold before the path is trusted for inclusion in the unified
+// agent artifact upload:
+//  1. It must be rooted under /tmp/gh-aw/ so the compiler's secret-redaction step,
+//     which only scans that subtree, covers it before upload. Path traversal segments
+//     ("..") are rejected outright since they could otherwise be used to smuggle a
+//     path that resolves outside /tmp/gh-aw/ past this prefix check.
+//  2. It must not reference hidden files or directories (any path segment starting
+//     with "."), because the unified "actions/upload-artifact" step does not set
+//     include-hidden-files, whose default is false. A declared hidden path would
+//     therefore pass validation but still be silently dropped from the artifact.
+func validateSafeJobArtifactPath(path string) error {
+	if strings.Contains(path, "${{") {
+		return fmt.Errorf("artifact path %q must be literal and must not contain GitHub Actions expressions", path)
+	}
+	if strings.IndexFunc(path, unicode.IsControl) >= 0 {
+		return fmt.Errorf("artifact path %q must not contain control characters", path)
+	}
+	if !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
+		return fmt.Errorf("artifact path %q must be rooted under %q so it is covered by secret redaction", path, constants.TmpGhAwDirSlash)
+	}
+	for segment := range strings.SplitSeq(path, "/") {
+		if segment == ".." {
+			return fmt.Errorf("artifact path %q must not contain \"..\" path traversal segments", path)
+		}
+		if strings.HasPrefix(segment, ".") && segment != "" {
+			return fmt.Errorf("artifact path %q must not reference hidden files or directories (segment %q starts with \".\"), which are silently dropped by the unified artifact upload", path, segment)
+		}
+	}
+	if !isPathScannedBySecretRedaction(path) {
+		return fmt.Errorf("artifact path %q must end with \"/\" for a directory or use a file extension covered by secret redaction", path)
+	}
+	return nil
+}
+
+// collectSafeJobArtifactPaths gathers all declared artifact paths from custom safe-outputs
+// jobs, sorted by normalized job name for deterministic compiled output. Directory
+// declarations are restricted to recursive globs for extensions covered by secret redaction.
+func collectSafeJobArtifactPaths(jobs map[string]*SafeJobConfig) []string {
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(jobs))
+	for name := range jobs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	var paths []string
+	for _, name := range names {
+		if job := jobs[name]; job != nil {
+			for _, artifactPath := range job.Artifacts {
+				if strings.HasSuffix(artifactPath, "/") {
+					for _, ext := range secretRedactionScannedExtensions {
+						paths = append(paths, artifactPath+"**/*"+ext)
+					}
+					continue
+				}
+				paths = append(paths, artifactPath)
+			}
+		}
+	}
+	return paths
+}
+
+func hasSafeJobArtifactPaths(data *WorkflowData) bool {
+	return data != nil && data.SafeOutputs != nil && len(collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)) > 0
 }
 
 func isEmptySafeJobRunsOn(value any) bool {
@@ -193,7 +294,7 @@ func isEmptySafeJobRunsOn(value any) bool {
 }
 
 // buildSafeJobs creates custom safe-output jobs defined in SafeOutputs.Jobs
-func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool) ([]string, error) {
+func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool) ([]string, error) { //nolint:largefunc // Existing orchestration of job needs, condition, steps, and permissions remains explicit and ordered.
 	if data.SafeOutputs == nil || len(data.SafeOutputs.Jobs) == 0 {
 		return nil, nil
 	}
@@ -247,6 +348,12 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 		// Set runs-on, defaulting to ubuntu-latest when omitted.
 		if jobConfig.runsOnError != nil {
 			return nil, fmt.Errorf("invalid runs-on for safe-job '%s': %w", normalizedJobName, jobConfig.runsOnError)
+		}
+
+		// Reject invalid artifacts declarations up front with a clear, actionable error
+		// rather than letting them surface later as an opaque step-ordering compiler bug.
+		if jobConfig.artifactsError != nil {
+			return nil, fmt.Errorf("invalid artifacts for safe-job '%s': %w", normalizedJobName, jobConfig.artifactsError)
 		}
 		runsOn := jobConfig.RunsOn
 		if runsOn == "" {

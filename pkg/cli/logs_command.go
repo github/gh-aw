@@ -59,7 +59,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs --engine claude           # Filter logs by claude engine
   %[1]s logs --engine codex            # Filter logs by codex engine
   %[1]s logs --engine copilot          # Filter logs by copilot engine
-  %[1]s logs --runtime gvisor          # Filter logs by sandbox agent runtime
+  %[1]s logs --runtime cloud-hypervisor # Filter logs by sandbox agent runtime
   %[1]s logs --firewall                # Filter logs with firewall enabled
   %[1]s logs --no-firewall             # Filter logs without firewall
   %[1]s logs --safe-output missing-tool     # Filter logs with missing-tool messages
@@ -514,7 +514,11 @@ func validateLogsRuntime(runtime string) error {
 		return nil
 	}
 	logsCommandLog.Printf("Validating runtime parameter: %s", runtime)
-	validRuntimes := []string{string(workflow.AgentRuntimeGVisor), string(workflow.AgentRuntimeDockerSbx), string(workflow.AgentRuntimeCloudHypervisor)}
+	validRuntimes := []string{
+		string(workflow.AgentRuntimeDocker),
+		string(workflow.AgentRuntimeDockerSudoIptables),
+		string(workflow.AgentRuntimeCloudHypervisor),
+	}
 	if slices.Contains(validRuntimes, runtime) {
 		return nil
 	}
@@ -613,7 +617,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().String("end-date", "", "Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")
 	addOutputFlag(logsCmd, defaultLogsOutputDir)
 	addEngineFilterFlag(logsCmd)
-	logsCmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., gvisor, docker-sbx, cloud-hypervisor)")
+	logsCmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., cloud-hypervisor)")
 	logsCmd.Flags().String("ref", "", "Filter runs by branch or tag name (e.g., main, v1.0.0)")
 	logsCmd.Flags().Int64("before-run-id", 0, "Filter runs with database ID before this value (exclusive)")
 	logsCmd.Flags().Int64("after-run-id", 0, "Filter runs with database ID after this value (exclusive)")

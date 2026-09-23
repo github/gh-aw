@@ -1,6 +1,6 @@
 ---
 title: Security Architecture
-description: Security architecture for GitHub Agentic Workflows across hosted runners, ARC with Docker-in-Docker, gVisor, and Docker sbx microVM isolation.
+description: Security architecture for GitHub Agentic Workflows across hosted runners, ARC with Docker-in-Docker, and Cloud Hypervisor microVM isolation.
 sidebar:
   order: 3
 disable-agentic-editing: true
@@ -37,7 +37,7 @@ We assume the adversary does not compromise the underlying hardware or cryptogra
 
 AWs run on GitHub-hosted or Linux self-hosted GitHub Actions runners. Self-hosted deployments can include Actions Runner Controller (ARC) pods that use a privileged Docker-in-Docker (DinD) sidecar. The trusted substrate therefore includes the runner host or Kubernetes cluster, CPU, MMU, kernel, and container runtime. With ARC DinD, the runner container sends Docker API commands to the sidecar daemon, which creates the agent, proxy, and MCP containers and enforces their Docker network boundaries.
 
-The default agent runtime uses Docker container isolation. Compatible Linux runners can instead use gVisor's `runsc` user-space kernel, or Docker sbx to place the agent in a KVM-isolated microVM. These runtimes add isolation boundaries but do not remove trust in the runner host, firewall, MCP Gateway, container runtime, kernel, hypervisor, or hardware.
+The default agent runtime uses Docker container isolation. Eligible GitHub-hosted runners can instead use Cloud Hypervisor to place the agent in a KVM-isolated microVM. These runtimes add isolation boundaries but do not remove trust in the runner host, firewall, MCP Gateway, container runtime, kernel, hypervisor, or hardware.
 
 AWs also rely on three trusted infrastructure components: (1) a network firewall that configures connectivity and launches the agent, (2) an API proxy that routes model traffic and may hold endpoint-specific credentials or routing configuration for supported engines, and (3) an MCP Gateway that configures and spawns isolated MCP-server containers. Collectively, the substrate level provides memory and resource isolation, mediation of privileged operations and system calls, and explicit communication boundaries. These guarantees hold even if an untrusted user-level component is fully compromised and executes arbitrary code. If this layer fails, higher-level security guarantees may not hold.
 
@@ -85,7 +85,7 @@ flowchart TB
     end
 
     subgraph Isolation["🛡️ Isolation Layer"]
-        AWF["Agent Workflow Firewall<br/>Docker, gVisor, or sbx Isolation"]
+        AWF["Agent Workflow Firewall<br/>Docker or Cloud Hypervisor Isolation"]
         PROXY["API Proxy<br/>Agent auth-token isolation"]
         MCP["MCP Server Sandboxing<br/>Container Isolation"]
         TOOL["Tool Allowlisting<br/>Explicit Permissions"]
@@ -191,12 +191,10 @@ Runner topology determines where the Docker daemon and workspace live. Agent run
 | --- | --- | --- |
 | GitHub-hosted or Linux self-hosted runner | Docker (default) | AWF launches the agent in a container on an internal Docker network whose only egress path is the Squid proxy. |
 | ARC or another split-daemon DinD runner | Docker (default) | `runner.topology: arc-dind` stages the sysroot and workspace for the sidecar daemon. The privileged DinD sidecar creates the isolated network; the runner container remains unprivileged and does not need `NET_ADMIN`. |
-| Compatible Linux runner | gVisor (`sandbox.agent.runtime: gvisor`) | The agent container runs under `runsc`, which interposes a user-space kernel between the agent and the host kernel. |
-| KVM-capable Linux runner | Docker sbx (`sandbox.agent.runtime: docker-sbx`) | The agent runs inside a hardware-virtualized microVM while the firewall, API proxy, MCP Gateway, and MCP servers remain in host-side containers. |
 | GitHub-hosted Ubuntu x86_64 KVM runner | Cloud Hypervisor (preview) (`sandbox.agent.runtime: cloud-hypervisor`) | The agent runs inside AWF's preview Cloud Hypervisor microVM runtime with scoped KVM access, strict topology isolation, and digest-pinned release assets including `virtiofsd`. |
 
 > [!IMPORTANT]
-> gVisor and Docker sbx are incompatible with `runner.topology: arc-dind`. Installing gVisor invokes `sudo` to register `runsc`, but the agent remains in the default rootless AWF mode. Docker sbx requires KVM access and the `DOCKER_USERNAME` and `DOCKER_PAT` secrets; the compiler derives the privileged setup it needs from `sandbox.agent.runtime: docker-sbx`. The compiler rejects incompatible runtime, topology, and AWF-version combinations; generated Docker sbx workflows fail fast at run time when KVM access or required secrets are unavailable.
+> Cloud Hypervisor is incompatible with `runner.topology: arc-dind`. The compiler rejects incompatible runtime, topology, and AWF-version combinations and verifies the required GitHub-hosted Ubuntu x86_64 KVM environment before agent startup.
 
 ARC DinD preserves AWF's egress policy through Docker network topology rather than host `iptables`: the DinD daemon creates an internal network with no direct internet route and a dual-homed Squid proxy as the sole egress path. See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/) and [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/) for deployment details.
 
@@ -810,8 +808,7 @@ gh aw status
 |-------|-----------|-------------------|
 | **Substrate** | GitHub-hosted, self-hosted, or ARC runner substrate | Memory corruption, privilege escalation, host escape |
 | **Substrate** | Docker daemon on the runner or in an ARC DinD sidecar | Process isolation bypass, shared state access |
-| **Substrate** | gVisor user-space kernel | Exposed host-kernel syscall surface |
-| **Substrate** | Docker sbx KVM microVM | Agent-to-host kernel and memory access |
+| **Substrate** | Cloud Hypervisor KVM microVM | Agent-to-host kernel and memory access |
 | **Substrate** | AWF Docker network and proxy controls | Data exfiltration, unauthorized API calls |
 | **Substrate** | MCP sandboxing (container isolation) | Container escape, unauthorized tool access |
 | **Configuration** | Schema validation, expression allowlist | Invalid configurations, unauthorized expressions |

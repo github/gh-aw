@@ -67,10 +67,6 @@ jobs:
         run: |
           echo "Installing workflows from githubnext/agentics..."
           ./gh-aw add githubnext/agentics/weekly-research
-          ./gh-aw add githubnext/agentics/ci-doctor --force
-          ./gh-aw add githubnext/agentics/workflows/ci-doctor.md --force
-          ./gh-aw add githubnext/agentics/workflows/ci-doctor.md@main --force
-          ./gh-aw add githubnext/agentics/ci-doctor@main --force
           ./gh-aw add githubnext/agentics/issue-triage
           echo "Successfully installed agentics workflows"
 

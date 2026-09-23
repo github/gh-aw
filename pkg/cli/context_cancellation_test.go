@@ -92,7 +92,7 @@ func TestAuditWorkflowRunWithCancellation(t *testing.T) {
 	cancel()
 
 	// Try to audit a run with a cancelled context
-	err := AuditWorkflowRun(ctx, 123456, AuditOptions{
+	_, err := AuditWorkflowRun(ctx, 123456, AuditOptions{
 		OutputDir: "/tmp/test-audit",
 	})
 

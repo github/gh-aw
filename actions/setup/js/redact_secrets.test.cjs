@@ -74,6 +74,17 @@ describe("redact_secrets.cjs", () => {
             expect(fs.readFileSync(path.join(tempDir, "test2.json"), "utf8")).toBe('{"key": "***REDACTED***"}'),
             expect(fs.readFileSync(path.join(tempDir, "test3.log"), "utf8")).toBe("Log: ***REDACTED***"));
         }),
+        it("should remove symbolic links before artifact upload", async () => {
+          const target = path.join(tempDir, "target.json");
+          const link = path.join(tempDir, "linked.json");
+          fs.writeFileSync(target, '{"safe":true}');
+          fs.symlinkSync(target, link);
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+          await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          expect(fs.existsSync(link)).toBe(false);
+          expect(fs.existsSync(target)).toBe(true);
+          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Removed symbolic link before artifact upload"));
+        }),
         it("should use core.info for logging hits", async () => {
           const testFile = path.join(tempDir, "test.txt"),
             secretValue = "sk-1234567890";

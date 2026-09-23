@@ -11,6 +11,9 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 )
 
+// This list must stay in sync with targetExtensions in actions/setup/js/redact_secrets.cjs.
+var secretRedactionScannedExtensions = [...]string{".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"}
+
 var stepOrderLog = logger.New("workflow:step_order_validation")
 
 // StepType represents the type of step being generated
@@ -209,12 +212,10 @@ func isPathScannedBySecretRedaction(artifactPath string) bool {
 	}
 
 	// Path must have one of the scanned extensions that the redact_secrets step covers.
-	// This list must stay in sync with targetExtensions in actions/setup/js/redact_secrets.cjs.
 	// .patch files are git-diff output written to /tmp/gh-aw/ by the safe-outputs MCP server
 	// and are covered by the redact_secrets step before the unified artifact is uploaded.
 	ext := path.Ext(normalizedPath)
-	scannedExtensions := []string{".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"}
-	if slices.Contains(scannedExtensions, ext) {
+	if slices.Contains(secretRedactionScannedExtensions[:], ext) {
 		return true
 	}
 

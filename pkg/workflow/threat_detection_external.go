@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"strconv"
@@ -115,21 +116,23 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	}
 
 	detectionData := &WorkflowData{
-		AI:                engineID,
-		ActionCache:       data.ActionCache,
-		Features:          data.Features,
-		Jobs:              data.Jobs,
-		Permissions:       data.Permissions,
-		ParsedFrontmatter: data.ParsedFrontmatter,
-		CachedPermissions: data.CachedPermissions,
-		ModelCosts:        data.ModelCosts,
-		IsDetectionRun:    true,
-		RunnerConfig:      data.RunnerConfig,
-		TimeoutMinutes:    "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
-		CompiledVersion:   data.CompiledVersion,
+		AI:                   engineID,
+		ActionCache:          data.ActionCache,
+		Features:             data.Features,
+		Jobs:                 data.Jobs,
+		Permissions:          data.Permissions,
+		ParsedFrontmatter:    data.ParsedFrontmatter,
+		CachedPermissions:    data.CachedPermissions,
+		ModelCosts:           data.ModelCosts,
+		IsDetectionRun:       true,
+		RunnerConfig:         data.RunnerConfig,
+		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
+		CompiledVersion:      data.CompiledVersion,
+		ContainerPinMappings: maps.Clone(data.ContainerPinMappings),
 		SandboxConfig: &SandboxConfig{
 			Agent: &AgentSandboxConfig{
-				Type: SandboxTypeAWF,
+				Type:   SandboxTypeAWF,
+				Images: maps.Clone(getSandboxAgentImages(data)),
 			},
 		},
 	}
@@ -145,8 +148,40 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		}
 		detectionData.SandboxConfig.Agent.Version = firewallCopy.Version
 	}
+	if len(detectionData.SandboxConfig.Agent.Images) == 0 {
+		detectionData.SandboxConfig.Agent.Images = buildThreatDetectionContainerImages(detectionData)
+	}
 
 	return detectionData
+}
+
+// buildThreatDetectionContainerImages translates AWF container pin redirects into
+// the closed runtime manifest expected by AWF. A complete manifest is emitted only
+// when at least one required AWF role is redirected.
+func buildThreatDetectionContainerImages(data *WorkflowData) map[string]string {
+	if len(data.ContainerPinMappings) == 0 {
+		return nil
+	}
+
+	imageTag := getAWFImageTag(getFirewallConfig(data))
+	images := make(map[string]string)
+	hasMappedImage := false
+	for _, role := range requiredAWFImageRoles(data) {
+		image := defaultAWFImageForRole(role, imageTag)
+		if applyContainerPinMappingFromData(image, data) != image {
+			hasMappedImage = true
+		}
+		resolved := resolveContainerImage(image, data)
+		if !awfPinnedImagePattern.MatchString(resolved) {
+			threatLog.Printf("Skipping detection container manifest: %s image is not digest-pinned", role)
+			return nil
+		}
+		images[role] = resolved
+	}
+	if !hasMappedImage {
+		return nil
+	}
+	return images
 }
 
 // buildPullAWFContainersStep creates a step that pre-pulls AWF (agent workflow firewall)

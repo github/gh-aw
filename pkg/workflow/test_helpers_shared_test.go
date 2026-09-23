@@ -1,5 +1,14 @@
 package workflow
 
+// flattenSteps returns all lines from a sequence of generated action steps.
+func flattenSteps(steps []GitHubActionStep) []string {
+	var lines []string
+	for _, step := range steps {
+		lines = append(lines, step...)
+	}
+	return lines
+}
+
 // boolPtr returns a pointer to a bool value.
 // This is a shared helper used by both unit and integration tests.
 func boolPtr(b bool) *bool {

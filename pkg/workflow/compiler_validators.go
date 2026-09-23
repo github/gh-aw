@@ -362,22 +362,12 @@ func validateWorkflowConcurrency(workflowData *WorkflowData, markdownPath string
 // emitSandboxRuntimeWarnings warns about deprecated sandbox runtime choices or
 // configurations the compiler cannot honour.
 func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdownPath string) {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig != nil {
-		switch agentConfig.Runtime {
-		case AgentRuntimeGVisor, AgentRuntimeDockerSbx:
-			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
-				fmt.Sprintf("sandbox.agent.runtime: %s is deprecated and will be removed in a future release. "+
-					"Use sandbox.agent.runtime: docker instead.", agentConfig.Runtime)))
-			c.IncrementWarningCount()
-		}
-	}
 	if declaresIgnoredFilesystemAllowWrite(workflowData) {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
 			"sandbox.agent.config.filesystem.allowWrite is ignored for this runtime and was not written to the AWF config. "+
 				"Only sandbox.agent.runtime: cloud-hypervisor enforces the policy without breaking the agent container: "+
-				"the Docker and gVisor runtimes narrow AWF's own writable bind mounts (including its internal /tmp/awf-init mount) "+
-				"to read-only, and docker-sbx rejects the policy outright."))
+				"the Docker runtimes narrow AWF's own writable bind mounts (including its internal /tmp/awf-init mount) "+
+				"to read-only."))
 		c.IncrementWarningCount()
 	}
 }

@@ -109,10 +109,6 @@ const AWFChrootConfigMinVersion Version = "v0.27.1"
 // the agent container from starting in split-filesystem ARC/DinD environments.
 const AWFArcDindMinVersion Version = "v0.27.20"
 
-// AWFContainerRuntimeMinVersion is the minimum AWF version that supports the
-// containerRuntime field in the container config (gh-aw-firewall#6093).
-const AWFContainerRuntimeMinVersion Version = "v0.27.30"
-
 // AWFCloudHypervisorMinVersion is the minimum AWF version that supports the
 // cloud-hypervisor preview runtime and its release assets.
 const AWFCloudHypervisorMinVersion Version = "v0.28.11"
@@ -147,8 +143,8 @@ const AWFRouterImageRoleMinVersion Version = "v0.28.21"
 // AWFFilesystemAllowWriteMinVersion is the minimum AWF version that added
 // filesystem.allowWrite to the AWF config file schema.
 //
-// Note: schema support is not the same as usable enforcement. The compose
-// runtimes (Docker, gVisor) enforce the policy by narrowing AWF's own writable
+// Note: schema support is not the same as usable enforcement. The Docker
+// runtimes enforce the policy by narrowing AWF's own writable
 // bind mounts, including its internal /tmp/awf-init control-plane mount, so any
 // policy that does not cover /tmp prevents the agent container from starting.
 // The compiler therefore only emits the filesystem section for the Cloud
@@ -194,21 +190,9 @@ const AWFDynamicRepositoryEnclaveMinVersion Version = "v0.28.14"
 // under strict config validation.
 const AWFAPIProxyCACertMinVersion Version = "v0.28.10"
 
-// AWFVerifySbxEgressMinVersion is the minimum AWF version that supports
-// network.verifySbxEgress for fail-closed Docker sbx egress verification.
-const AWFVerifySbxEgressMinVersion Version = "v0.28.13"
-
 // AWFHTTPAPITargetMinVersion is the minimum AWF version that supports explicit
 // http:// schemes in apiProxy target hosts.
 const AWFHTTPAPITargetMinVersion Version = "v0.28.13"
-
-// DefaultGVisorVersion is the pinned gVisor release used by the compiler-generated
-// install step. A specific dated release name is used instead of "latest" to ensure
-// reproducible, verifiable installs. Each release provides SHA-512 files for
-// integrity verification before the binaries are installed with root privileges.
-// Bump this constant after reviewing the release notes at
-// https://github.com/google/gvisor/releases.
-const DefaultGVisorVersion = "20250707.0"
 
 // CopilotNoAskUserMinVersion is the minimum Copilot CLI version that supports the --no-ask-user
 // flag, which enables fully autonomous agentic runs by suppressing interactive prompts.

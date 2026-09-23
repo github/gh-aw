@@ -448,14 +448,8 @@ func BuildAWFArgs(config AWFCommandConfig) []string {
 
 func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *FirewallConfig) []string {
 	var awfArgs []string
-	if config.UsesTTY && !isDockerSbxRuntime(config.WorkflowData) && !isCloudHypervisorRuntime(config.WorkflowData) {
+	if config.UsesTTY && !isCloudHypervisorRuntime(config.WorkflowData) {
 		awfArgs = append(awfArgs, "--tty")
-	}
-	if isDockerSbxRuntime(config.WorkflowData) && awfSupportsContainerRuntime(firewallConfig) {
-		awfArgs = append(awfArgs, "--container-runtime", "sbx")
-		awfHelpersLog.Print("Added --container-runtime sbx for docker-sbx microVM runtime")
-	} else if isDockerSbxRuntime(config.WorkflowData) {
-		awfHelpersLog.Printf("Skipping --container-runtime sbx: AWF version %q is older than required minimum %s", getAWFImageTag(firewallConfig), constants.AWFContainerRuntimeMinVersion)
 	}
 	if isCloudHypervisorRuntime(config.WorkflowData) && awfSupportsCloudHypervisor(firewallConfig) {
 		awfArgs = append(awfArgs, "--container-runtime", "cloud-hypervisor", "--cloud-hypervisor-preview", "--cloud-hypervisor-vcpus", strconv.Itoa(constants.DefaultCloudHypervisorVCPUs), "--cloud-hypervisor-memory-mib", strconv.Itoa(constants.DefaultCloudHypervisorMemoryMiB))

@@ -27,6 +27,8 @@ type AuditOptions struct {
 	VariantFilter    string
 	RuntimeFilter    string
 	EvalsOnly        bool
+	Group            bool
+	NoBaseline       bool
 }
 
 type auditRunConfig struct {
@@ -45,6 +47,8 @@ type auditRunConfig struct {
 	variantFilter    string
 	runtimeFilter    string
 	evalsOnly        bool
+	group            bool
+	noBaseline       bool
 	// evalsArtifactRequested is true when evals were requested via --evals or
 	// explicit --artifacts evals, and is used to trigger legacy dedicated-evals
 	// fallback behavior for older runs.

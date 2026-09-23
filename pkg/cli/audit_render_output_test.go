@@ -56,6 +56,105 @@ func TestRenderAuditReportSetsSchemaVersionOnFreshJSONOutput(t *testing.T) {
 	assert.Equal(t, auditSchemaVersion, auditData.SchemaVersion)
 }
 
+func TestBuildRenderedAuditDataSkipsBaseline(t *testing.T) {
+	runDir := t.TempDir()
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID:   42,
+			WorkflowPath: ".github/workflows/test.lock.yml",
+		},
+	}
+
+	auditData := buildRenderedAuditData(context.Background(), processedRun, LogMetrics{}, nil, runDir, AuditOptions{
+		NoBaseline: true,
+	})
+
+	require.NotNil(t, auditData.Comparison)
+	assert.False(t, auditData.Comparison.BaselineFound)
+}
+
+func TestBuildRenderedAuditDataFromCacheSkipsBaseline(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{
+		DatabaseID:   42,
+		WorkflowPath: ".github/workflows/test.lock.yml",
+		LogsPath:     runDir,
+	}
+	require.NoError(t, writeAuditData(runDir, AuditData{
+		CacheSource: auditCacheSourceLogs,
+		Overview:    buildAuditOverview(run, nil),
+	}))
+
+	auditData := buildRenderedAuditDataFromCache(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, runDir, AuditOptions{
+		NoBaseline: true,
+	})
+
+	require.NotNil(t, auditData.Comparison)
+	assert.False(t, auditData.Comparison.BaselineFound)
+}
+
+func TestRenderAuditReportDropsCachedComparisonWithNoBaseline(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+	require.NoError(t, writeAuditData(runDir, AuditData{
+		CacheSource: auditCacheSourceFull,
+		Overview:    buildAuditOverview(run, nil),
+		Comparison:  &AuditComparisonData{BaselineFound: true, Baseline: &AuditComparisonBaseline{RunID: 41}},
+	}))
+
+	stdout, _ := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, AuditOptions{
+			OutputDir:  runDir,
+			JSONOutput: true,
+			NoBaseline: true,
+		})
+	})
+
+	var auditData AuditData
+	require.NoError(t, json.Unmarshal([]byte(stdout), &auditData))
+	require.NotNil(t, auditData.Comparison)
+	assert.False(t, auditData.Comparison.BaselineFound)
+	assert.Nil(t, auditData.Comparison.Baseline)
+
+	// The cached entry must stay intact for later default audits.
+	cached, ok := loadCachedAuditData(runDir, run, auditCacheSourceFull)
+	require.True(t, ok)
+	require.NotNil(t, cached.Comparison)
+	assert.True(t, cached.Comparison.BaselineFound)
+}
+
+func TestRenderAuditReportDoesNotCacheNoBaselineResult(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+
+	_, _ = captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, AuditOptions{
+			OutputDir:  runDir,
+			JSONOutput: true,
+			NoBaseline: true,
+		})
+	})
+
+	_, ok := loadCachedAuditData(runDir, run, auditCacheSourceFull)
+	assert.False(t, ok, "opt-out result must not be persisted as a full cache entry")
+}
+
+func TestRenderAuditReportGroupParsesLogs(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+
+	_, stderr := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, AuditOptions{
+			OutputDir: runDir,
+			Verbose:   true,
+			Parse:     true,
+			Group:     true,
+		})
+	})
+
+	assert.Contains(t, stderr, "No engine detected")
+}
+
 func TestRenderConsoleTokenUsageWarnings(t *testing.T) {
 	output := testutil.CaptureStderr(t, func() {
 		renderConsoleTokenUsage(&TokenUsageSummary{

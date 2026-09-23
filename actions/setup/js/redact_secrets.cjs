@@ -25,7 +25,10 @@ function findFiles(dir, extensions) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.isSymbolicLink()) {
+        fs.unlinkSync(fullPath);
+        core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
+      } else if (entry.isDirectory()) {
         // Recursively search subdirectories
         results.push(...findFiles(fullPath, extensions));
       } else if (entry.isFile()) {
@@ -37,7 +40,7 @@ function findFiles(dir, extensions) {
       }
     }
   } catch (error) {
-    core.warning(`Failed to scan directory ${dir}: ${getErrorMessage(error)}`);
+    throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${dir}: ${getErrorMessage(error)}`, { cause: error });
   }
   return results;
 }

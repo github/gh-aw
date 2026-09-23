@@ -26,8 +26,9 @@ func (c *Compiler) generateUploadAccessLogs(yaml *strings.Builder, tools map[str
 // generateUnifiedArtifactUpload generates a single step that uploads all agent job artifacts
 // This consolidates multiple individual upload steps into one, improving workflow readability
 // and reliability. The step always runs (even on cancellation) and ignores missing files.
+// Workflows with custom safe-job artifacts additionally require successful secret redaction.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string) {
+func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, requireSuccessfulRedaction bool) {
 	if len(paths) == 0 {
 		compilerYamlArtifactsLog.Print("No paths to upload, skipping unified artifact upload")
 		return
@@ -42,7 +43,11 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent artifacts", paths)
 
 	yaml.WriteString("      - name: Upload agent artifacts\n")
-	yaml.WriteString("        if: always()\n")
+	if requireSuccessfulRedaction {
+		yaml.WriteString("        if: always() && steps.redact_secrets.outcome == 'success'\n")
+	} else {
+		yaml.WriteString("        if: always()\n")
+	}
 	yaml.WriteString("        continue-on-error: true\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/upload-artifact"))
 	yaml.WriteString("        with:\n")
@@ -57,6 +62,15 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	yaml.WriteString("          if-no-files-found: ignore\n")
 
 	compilerYamlArtifactsLog.Printf("Generated unified artifact upload step with %d paths", len(paths))
+}
+
+func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
+	var step strings.Builder
+	c.generateSecretRedactionStep(&step, yamlContent, data)
+	yaml.WriteString(strings.Replace(step.String(),
+		"      - name: Redact secrets in logs\n",
+		"      - name: Redact secrets in logs\n        id: redact_secrets\n",
+		1))
 }
 
 // generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing

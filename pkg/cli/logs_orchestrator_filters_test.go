@@ -91,26 +91,26 @@ func TestApplyRunFilters_Runtime(t *testing.T) {
 	}{
 		{
 			name:          "matching runtime passes",
-			awInfo:        `{"agent_runtime":"gvisor"}`,
-			filterRuntime: "gvisor",
+			awInfo:        `{"agent_runtime":"cloud-hypervisor"}`,
+			filterRuntime: "cloud-hypervisor",
 			wantSkip:      false,
 		},
 		{
 			name:          "non-matching runtime skipped",
-			awInfo:        `{"agent_runtime":"docker-sbx"}`,
-			filterRuntime: "gvisor",
+			awInfo:        `{"agent_runtime":"docker"}`,
+			filterRuntime: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "missing aw_info skipped",
 			awInfo:        "", // no file
-			filterRuntime: "gvisor",
+			filterRuntime: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "empty agent_runtime is skipped",
 			awInfo:        `{"agent_runtime":""}`,
-			filterRuntime: "gvisor",
+			filterRuntime: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 	}

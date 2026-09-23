@@ -676,7 +676,7 @@ func TestAuditUsesRunSummaryCache(t *testing.T) {
 	// WorkflowPath is empty in the cached summary, so renderAuditReport will not attempt any
 	// GitHub API calls for baseline comparison either.
 	ctx := t.Context()
-	if err := AuditWorkflowRun(ctx, runID, AuditOptions{
+	if _, err := AuditWorkflowRun(ctx, runID, AuditOptions{
 		OutputDir: tempDir,
 	}); err != nil {
 		t.Fatalf("AuditWorkflowRun failed — cache path not taken (fetchWorkflowRunMetadata was probably called): %v", err)
@@ -1313,31 +1313,31 @@ func TestShouldSkipAuditRun_Runtime(t *testing.T) {
 	}{
 		{
 			name:          "matching runtime is not skipped",
-			awInfoContent: `{"agent_runtime": "gvisor"}`,
-			runtimeFilter: "gvisor",
+			awInfoContent: `{"agent_runtime": "cloud-hypervisor"}`,
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      false,
 		},
 		{
 			name:          "non-matching runtime is skipped",
-			awInfoContent: `{"agent_runtime": "docker-sbx"}`,
-			runtimeFilter: "gvisor",
+			awInfoContent: `{"agent_runtime": "docker"}`,
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "missing aw_info.json is skipped",
 			awInfoContent: "",
-			runtimeFilter: "gvisor",
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "empty agent_runtime is skipped",
 			awInfoContent: `{"agent_runtime": ""}`,
-			runtimeFilter: "gvisor",
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "no runtime filter never skips",
-			awInfoContent: `{"agent_runtime": "docker-sbx"}`,
+			awInfoContent: `{"agent_runtime": "cloud-hypervisor"}`,
 			runtimeFilter: "",
 			wantSkip:      false,
 		},

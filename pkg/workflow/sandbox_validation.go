@@ -144,60 +144,6 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 		return err
 	}
 
-	// Validate gVisor runtime compatibility
-	if agentConfig != nil && agentConfig.Runtime == AgentRuntimeGVisor {
-		// gVisor is incompatible with ARC/DinD topology: the runner has no access to the
-		// DinD sidecar's daemon config or systemd, so runsc install + systemctl restart
-		// cannot succeed.
-		if isArcDindTopology(workflowData) {
-			return NewValidationError(
-				"sandbox.agent.runtime",
-				string(AgentRuntimeGVisor),
-				"gvisor is incompatible with runner.topology: arc-dind",
-				"gVisor requires registering the runsc runtime with Docker via systemctl, which "+
-					"is not possible on ARC DinD runners where the Docker daemon runs in a sidecar. "+
-					"Remove sandbox.agent.runtime: gvisor or change runner.topology.",
-			)
-		}
-
-		sandboxValidationLog.Print("gVisor runtime configured -- topology check passed")
-	}
-
-	// Validate docker-sbx runtime compatibility
-	if agentConfig != nil && agentConfig.Runtime == AgentRuntimeDockerSbx {
-		// docker-sbx is incompatible with ARC/DinD topology: sbx requires KVM which is
-		// not available on ARC DinD runners that typically lack nested virtualisation.
-		if isArcDindTopology(workflowData) {
-			return NewValidationError(
-				"sandbox.agent.runtime",
-				string(AgentRuntimeDockerSbx),
-				"docker-sbx is incompatible with runner.topology: arc-dind",
-				"docker-sbx requires KVM (nested virtualisation) which is typically unavailable "+
-					"on ARC DinD runners. Remove sandbox.agent.runtime: docker-sbx or change runner.topology.",
-			)
-		}
-
-		firewallConfig := getFirewallConfig(workflowData)
-		var configuredVersion string
-		if firewallConfig != nil {
-			configuredVersion = firewallConfig.Version
-		}
-		if !versionAtLeast(configuredVersion, string(constants.DefaultFirewallVersion), string(constants.AWFContainerRuntimeMinVersion)) {
-			effectiveVersion := configuredVersion
-			if effectiveVersion == "" {
-				effectiveVersion = string(constants.DefaultFirewallVersion)
-			}
-			return NewValidationError(
-				"sandbox.agent.runtime",
-				string(AgentRuntimeDockerSbx),
-				fmt.Sprintf("docker-sbx requires AWF %s or newer", constants.AWFContainerRuntimeMinVersion),
-				fmt.Sprintf("docker-sbx emits 'awf --container-runtime sbx', which is only supported in AWF %s+.\n\nThe effective AWF version is %s. Set firewall.version or sandbox.agent.version to %s or newer.", constants.AWFContainerRuntimeMinVersion, effectiveVersion, constants.AWFContainerRuntimeMinVersion),
-			)
-		}
-
-		sandboxValidationLog.Print("docker-sbx runtime configured -- topology and AWF version checks passed")
-	}
-
 	// Validate cloud-hypervisor runtime compatibility
 	if agentConfig != nil && agentConfig.Runtime == AgentRuntimeCloudHypervisor {
 		if isArcDindTopology(workflowData) {
@@ -391,17 +337,6 @@ func validateSandboxRuntimeProfile(workflowData *WorkflowData, agentConfig *Agen
 	}
 
 	profile := resolveSandboxRuntimeProfile(agentConfig)
-
-	// runtime-install controls runner provisioning and is only meaningful for the
-	// runtimes that the compiler provisions (gvisor and docker-sbx).
-	if agentConfig.RuntimeInstall != nil && !profile.SupportsRuntimeInstall {
-		return NewValidationError(
-			"sandbox.agent.runtime-install",
-			strconv.FormatBool(*agentConfig.RuntimeInstall),
-			fmt.Sprintf("sandbox.agent.runtime-install is only supported with sandbox.agent.runtime: %s or %s (current runtime: %s)", AgentRuntimeGVisor, AgentRuntimeDockerSbx, profile.Runtime),
-			fmt.Sprintf("Remove sandbox.agent.runtime-install, or select a runtime that the compiler provisions:\n\nsandbox:\n  agent:\n    runtime: %s\n    runtime-install: false\n\nSee: %s", AgentRuntimeGVisor, constants.DocsSandboxURL),
-		)
-	}
 
 	// Host access (explicit host ports and automatic GitHub Actions services:
 	// connectivity) requires the privileged iptables profile.

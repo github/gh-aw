@@ -52,7 +52,8 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime gvisor   # Skip run unless sandbox agent runtime matches`
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches`
 
 type auditCommandOptions struct {
 	outputDir        string
@@ -67,6 +68,8 @@ type auditCommandOptions struct {
 	variantFilter    string
 	runtimeFilter    string
 	evalsOnly        bool
+	group            bool
+	noBaseline       bool
 }
 
 // NewAuditCommand creates the audit command
@@ -94,8 +97,10 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("stdin", false, "Read workflow run IDs or URLs from stdin (one per line) instead of positional arguments")
 	cmd.Flags().String("experiment", "", "Filter to runs that include this experiment name")
 	cmd.Flags().String("variant", "", "Filter to runs with a specific variant value (requires --experiment)")
-	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., gvisor, docker-sbx, cloud-hypervisor)")
+	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., cloud-hypervisor)")
 	cmd.Flags().Bool("evals", false, "Filter to runs containing evals results (evals.jsonl); automatically downloads the usage artifact (which includes evals) when --artifacts is narrowed")
+	cmd.Flags().Bool("group", false, "Group audit findings by run and finding code, including occurrence counts and a representative entry")
+	cmd.Flags().Bool("no-baseline", false, "Skip baseline lookup and comparison for single-run audits")
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
@@ -109,8 +114,11 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
+	if opts.group {
+		return runAuditGrouped(cmd.Context(), args, opts)
+	}
 	if len(args) == 1 {
-		return runAuditSingle(cmd.Context(), args[0], opts)
+		return runAuditSingle(cmd.Context(), args[0], opts) //nolint:uncheckedsliceindex // len(args) == 1
 	}
 	if opts.evalsOnly {
 		return errors.New(console.FormatErrorWithSuggestions(
@@ -135,6 +143,8 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.variantFilter, _ = cmd.Flags().GetString("variant")
 	opts.runtimeFilter, _ = cmd.Flags().GetString("runtime")
 	opts.evalsOnly, _ = cmd.Flags().GetBool("evals")
+	opts.group, _ = cmd.Flags().GetBool("group")
+	opts.noBaseline, _ = cmd.Flags().GetBool("no-baseline")
 	if opts.variantFilter != "" && opts.experimentFilter == "" {
 		return auditCommandOptions{}, errors.New(console.FormatErrorWithSuggestions(
 			"--variant requires --experiment to be specified",
@@ -195,7 +205,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		return err
 	}
 	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
-	return AuditWorkflowRun(ctx, components.Number, AuditOptions{
+	_, err = AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
 		Repo:             components.Repo,
 		Hostname:         components.Host,
@@ -210,7 +220,10 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		VariantFilter:    opts.variantFilter,
 		RuntimeFilter:    opts.runtimeFilter,
 		EvalsOnly:        opts.evalsOnly,
+		Group:            opts.group,
+		NoBaseline:       opts.noBaseline,
 	})
+	return err
 }
 
 func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
@@ -218,12 +231,19 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 		return nil
 	}
 	parts := strings.SplitN(repoFlag, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" { //nolint:uncheckedsliceindex // len(parts) is checked first
 		return fmt.Errorf("invalid repository format '%s': expected 'owner/repo'", repoFlag)
 	}
-	components.Owner = parts[0]
-	components.Repo = parts[1]
+	components.Owner = parts[0] //nolint:uncheckedsliceindex // len(parts) == 2
+	components.Repo = parts[1]  //nolint:uncheckedsliceindex // len(parts) == 2
 	return nil
+}
+
+func firstAuditArg(args []string) (string, bool) {
+	if len(args) > 0 {
+		return args[0], true
+	}
+	return "", false
 }
 
 // runAuditMulti handles the multi-run diff mode for the audit command.
@@ -232,9 +252,9 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 // URL — job and step specificity is silently normalized to the parent run ID.
 func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir string, verbose, jsonOutput bool, format string, artifacts []string) error {
 	// Parse base run (job/step URLs are accepted; only the run number is used)
-	baseComponents, err := parser.ParseRunURLExtended(args[0])
+	baseComponents, err := parser.ParseRunURLExtended(args[0]) //nolint:uncheckedsliceindex // multi-run mode requires at least two arguments
 	if err != nil {
-		return fmt.Errorf("invalid base run %q: %w", args[0], err)
+		return fmt.Errorf("invalid base run %q: %w", args[0], err) //nolint:uncheckedsliceindex // multi-run mode requires at least two arguments
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL

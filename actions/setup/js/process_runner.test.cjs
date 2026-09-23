@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createRequire } from "module";
+import { createHash } from "crypto";
 
 const require = createRequire(import.meta.url);
 const {
@@ -69,6 +70,21 @@ describe("process_runner.cjs", () => {
       });
       expect(result.exitCode).toBe(0);
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it("writes provided stdin to the child and closes the stream", async () => {
+      const logs = [];
+      const stdin = Buffer.concat([Buffer.from("prompt\n", "utf8"), Buffer.from([0, 0xff]), Buffer.alloc(128 * 1024, 0x42)]);
+      const expectedHash = createHash("sha256").update(stdin).digest("hex");
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", "const chunks=[]; process.stdin.on('data', chunk => chunks.push(chunk)); process.stdin.on('end', () => process.stdout.write(require('crypto').createHash('sha256').update(Buffer.concat(chunks)).digest('hex')));"],
+        attempt: 0,
+        log: msg => logs.push(msg),
+        stdin,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toContain(expectedHash);
     });
 
     it("resolves with the actual non-zero exit code on failure", async () => {
