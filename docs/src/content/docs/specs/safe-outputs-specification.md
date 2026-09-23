@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.5<br>
+**Version**: 1.29.6<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-09-22<br>
+**Publication Date**: 2026-09-23<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -553,7 +553,28 @@ This specification addresses five primary threat scenarios:
 
 *Residual Risk*: A compromised runner may directly manipulate the `.git` directory within the restored cache tarball. Mitigation: restrict runner access to trusted environments and enable repository-level security policies.
 
+**Threat T7: Workspace Checkout Spoofing**
 
+*Attack Vector*: The agent has write access to `$GITHUB_WORKSPACE`, while the safe-outputs MCP server that resolves repository checkouts holds the GitHub token and later performs `git add`/`commit`/`push` in the resolved directory. An adversary directing the agent can plant a directory containing a `.git/config` whose `remote.origin.url` names a different repository, so that the workspace scan used to locate a checkout resolves an attacker-chosen directory.
+
+*Examples*:
+
+- Planting `repos/<name>/.git/config` with a spoofed `remote.origin.url` so patch generation runs over agent-authored history
+- Planting repository-local git configuration (`core.fsmonitor`, `core.sshCommand`, `core.pager`, aliases) intended to execute in the token-bearing process during discovery
+- Relying on a global relaxation of git's dubious-ownership protection to make every workspace directory usable by subsequent privileged git commands
+
+*Architectural Mitigations*:
+
+| Layer | Mechanism | Effectiveness |
+|-------|-----------|---------------|
+| **Manifest precedence** | Compiler-emitted checkout manifest is consulted before any workspace scan | High for declared checkouts |
+| **Scan confinement** | Discovery scans only under `$GITHUB_WORKSPACE`; manifest paths that are absolute or escape the workspace root are rejected | High |
+| **Scoped trust** | `safe.directory` is injected per invocation for the single `git config --get remote.origin.url` read instead of mutating process-wide git trust | High |
+| **Read-only discovery** | Discovery invokes only `git config --get`, which does not run hooks, pagers, or filesystem-monitor processes | High |
+| **Allowlist precedence** | `target-repo`/`allowed-repos` validation (SP6, SP7) occurs before discovery results are used and before any push | High when configured |
+| **Deferred trust** | Durable `safe.directory` trust is granted only to the resolved, allowlist-validated checkout directory at the point of the git write operations | Medium |
+
+*Residual Risk*: A spoofed `remote.origin.url` can still redirect an allowlisted operation to a different workspace directory, so the pushed content is agent-controlled — as it is for any safe output. Two further residuals remain: a `.git` gitdir-link file may point its git directory outside the workspace even though the worktree path is confined, and pushes use the local remote name `origin` rather than a remote URL reconstructed from `GITHUB_SERVER_URL`. Mitigation: configure `allowed-repos`/`allowed-github-references` so the target set is explicit, prefer `checkout:` entries (which populate the manifest and take precedence over the scan) over ad-hoc workspace clones, and rely on branch protection and review for the receiving repository.
 
 **Repository Reference Format**
 
@@ -5081,6 +5102,38 @@ All errors MUST be logged to:
 - Job summary (visible in workflow run summary)
 - STDERR (for local development)
 
+### 9.6 Repository Checkout Resolution Integrity
+
+Safe outputs that operate on a local git tree (`create_pull_request`, `push_to_pull_request_branch`) MUST resolve the directory for an `owner/repo` target before performing any git write operation. Because `$GITHUB_WORKSPACE` is agent-writable while the resolving process holds the GitHub token (Threat T7), implementations MUST satisfy the following requirements.
+
+**Requirement RCR1: Manifest Precedence**
+
+The compiler-emitted checkout manifest MUST be consulted first. A workspace scan MUST be attempted only when no usable manifest entry exists for the target slug.
+
+**Requirement RCR2: Workspace Confinement**
+
+Discovery MUST be confined to `$GITHUB_WORKSPACE`. Manifest paths that are absolute or that escape the workspace root MUST be rejected, and the scan MUST NOT follow symbolic links out of the workspace.
+
+**Requirement RCR3: Scoped Ownership Trust**
+
+The scan MUST NOT relax git's dubious-ownership protection process-wide. Where a scanned repository must be read despite differing directory ownership (for example, the safe-outputs MCP server container reading clones created by the runner user), the implementation MUST scope the `safe.directory` override to the single read-only `git config --get remote.origin.url` invocation, and MUST NOT mutate the process environment. Durable trust MAY be granted only to the resolved checkout directory, after allowlist validation, at the point of the git write operations.
+
+**Requirement RCR4: Read-Only Discovery**
+
+Discovery MUST use git commands that neither execute repository-supplied programs nor mutate repository state. Commands that run hooks, pagers, filesystem monitors, or credential helpers MUST NOT be used to identify a scanned repository.
+
+**Requirement RCR5: Remote Host Constraint**
+
+A scanned repository MUST be bound to an `owner/repo` slug only when its `remote.origin.url` names the GitHub instance the workflow runs against (the host of `GITHUB_SERVER_URL`, or `github.com`). Remotes on any other host MUST be ignored by the scan, so that a planted repository configuration cannot claim an allowlisted slug. Manifest entries are exempt because they are compiler-generated.
+
+**Requirement RCR6: Allowlist Precedence**
+
+Cross-repository allowlist validation (SP6, SP7) MUST succeed before a discovery result is used and before any push, so that discovery can never widen the configured target set.
+
+**Requirement RCR7: Non-Disclosing Failures**
+
+When resolution fails, the error returned to the agent MUST identify the requested slug and the supported remediation (a `checkout:` entry or a workspace clone) and MUST NOT include scanned filesystem paths or credentials.
+
 ---
 
 ## 10. Execution Guarantees
@@ -5945,6 +5998,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.6** (2026-09-23):
+
+- **Added**: Threat T7 "Workspace Checkout Spoofing" to Section 3.2, covering agent-planted repository configurations in `$GITHUB_WORKSPACE` that claim an allowlisted `owner/repo` slug.
+- **Added**: Section 9.6 "Repository Checkout Resolution Integrity" with requirements RCR1–RCR7 (manifest precedence, workspace confinement, scoped ownership trust, read-only discovery, remote host constraint, allowlist precedence, non-disclosing failures).
+- **Updated**: Publication metadata to 1.29.6.
 
 **Version 1.29.5** (2026-09-22):
 

@@ -310,6 +310,37 @@ it.each([null, 0])("counts missing agent accounting as zero when a failed job ne
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_assigned"'));
 });
 
+it("counts a cancelled agent job as zero when GitHub proves execution never started", async () => {
+  const f = evaluate(
+    {
+      "detection/token_usage.jsonl": '{"aic":1}',
+    },
+    [
+      job("agent", {
+        conclusion: "cancelled",
+        runner_id: null,
+        runner_name: null,
+        steps: [],
+      }),
+      job("detection"),
+    ]
+  );
+  await expect(f.result).resolves.toBe(1);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"agent"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"runner_not_assigned"'));
+});
+
+it.each([
+  ["runner metadata is absent", { steps: [] }],
+  ["runner name metadata is absent", { runner_id: null, steps: [] }],
+  ["step metadata is absent", { runner_id: null, runner_name: null }],
+  ["a runner was assigned", { runner_id: 123, runner_name: "GitHub Actions 1", steps: [] }],
+  ["a step was created", { runner_id: 0, runner_name: "", steps: [{ name: "Set up job", conclusion: "cancelled" }] }],
+])("still requires accounting for a cancelled agent job when %s", async (_description, metadata) => {
+  const f = evaluate({}, [job("agent", { conclusion: "cancelled", ...metadata })]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component in run 1 (attempt 1, job 1, conclusion cancelled)");
+});
+
 it("counts missing agent accounting as zero when the agent job failed", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "failure" })]);
   await expect(f.result).resolves.toBe(0);

@@ -36,24 +36,9 @@ func findTokenUsageFile(runDir string) string {
 		return awfAuditPath
 	}
 
-	// Check legacy firewall-audit-logs artifact directory (backward compat for older runs)
-	entries, err := os.ReadDir(runDir)
-	if err != nil {
-		return ""
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasPrefix(name, "firewall-audit-logs") || strings.HasPrefix(name, "firewall-logs") {
-			candidate := filepath.Join(runDir, name, tokenUsageJSONLPath)
-			if fileutil.FileExists(candidate) {
-				tokenUsageLog.Printf("Found token usage file in %s: %s", name, candidate)
-				return candidate
-			}
-		}
+	if legacy := findLegacyAPIProxyLogFile(runDir, tokenUsageJSONLPath); legacy != "" {
+		tokenUsageLog.Printf("Found token usage file in legacy artifact: %s", legacy)
+		return legacy
 	}
 
 	// Walk sandbox directory for any token-usage.jsonl
@@ -142,12 +127,7 @@ func findUsageJSONLFiles(runDir string) []string {
 	return files
 }
 
-func findAPIProxyEventsFile(runDir string) string {
-	primary := filepath.Join(runDir, "sandbox", "firewall", "logs", proxyEventsJSONLPath)
-	if fileutil.FileExists(primary) {
-		return primary
-	}
-
+func findLegacyAPIProxyLogFile(runDir, relativePath string) string {
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
 		return ""
@@ -159,14 +139,27 @@ func findAPIProxyEventsFile(runDir string) string {
 		}
 		name := entry.Name()
 		if strings.HasPrefix(name, "firewall-audit-logs") || strings.HasPrefix(name, "firewall-logs") {
-			candidate := filepath.Join(runDir, name, proxyEventsJSONLPath)
+			candidate := filepath.Join(runDir, name, relativePath)
 			if fileutil.FileExists(candidate) {
 				return candidate
 			}
 		}
 	}
-
 	return ""
+}
+
+func findAPIProxyEventsFile(runDir string) string {
+	primary := filepath.Join(runDir, "sandbox", "firewall", "logs", proxyEventsJSONLPath)
+	if fileutil.FileExists(primary) {
+		return primary
+	}
+
+	awfAuditPath := filepath.Join(runDir, "sandbox", "firewall", "audit", proxyEventsJSONLPath)
+	if fileutil.FileExists(awfAuditPath) {
+		return awfAuditPath
+	}
+
+	return findLegacyAPIProxyLogFile(runDir, proxyEventsJSONLPath)
 }
 
 func findAgentStdioFile(runDir string) string {

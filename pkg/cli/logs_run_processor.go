@@ -269,6 +269,9 @@ func canceledDownloadResult(run WorkflowRun, err error) DownloadResult {
 }
 
 func recordConcurrentDownloadResult(index int, result DownloadResult, results []DownloadResult, completed []bool, onResult func(int, DownloadResult)) {
+	if index < 0 || index >= len(results) || index >= len(completed) {
+		return
+	}
 	results[index] = result
 	completed[index] = true
 	if onResult != nil {
@@ -278,6 +281,9 @@ func recordConcurrentDownloadResult(index int, result DownloadResult, results []
 
 func fillCanceledDownloadResults(runs []WorkflowRun, results []DownloadResult, completed []bool, err error) {
 	for i, run := range runs {
+		if i < 0 || i >= len(completed) || i >= len(results) {
+			continue
+		}
 		if !completed[i] {
 			results[i] = canceledDownloadResult(run, err)
 		}
@@ -557,17 +563,19 @@ func tryLoadCachedRunResult(
 	// Capture the SafeItemsCount before backfill to detect whether the field was healed.
 	safeItemsBefore := result.Run.SafeItemsCount
 	activitySummaryApplied := backfillCacheHitIfNeeded(&result, runOutputDir, params.verbose)
+	steeringBackfillApplied := backfillGatewaySteeringEventsIfNeeded(&result, runOutputDir, params.verbose)
 	// If the backfill populated SafeItemsCount (i.e. it was 0 before and is now non-zero),
 	// persist the healed value back to run_summary.json so downstream readers (e.g.
 	// the api-consumption-report) see the correct count without having to fall back to
 	// usage/activity/summary.json.
-	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || metadataApplied {
+	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || metadataApplied {
 		healed := *summary
 		healed.Run = result.Run
 		healed.Metrics = result.Metrics
 		healed.MCPToolUsage = result.MCPToolUsage
 		healed.WorkingSet = result.WorkingSet
 		healed.SafeOutputs = result.SafeOutputs
+		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
@@ -738,6 +746,11 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 	}
 	result.TokenUsage = tokenUsage
 	backfillRunTokenUsageFromFirewall(metrics, result, tokenUsage)
+	steeringEvents, steeringErr := extractGatewaySteeringEvents(runOutputDir)
+	if steeringErr != nil && verbose {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract gateway steering events for run %d: %v", result.Run.DatabaseID, steeringErr)))
+	}
+	result.GatewaySteeringEvents = steeringEvents
 	rateLimitUsage, rlErr := analyzeGitHubRateLimits(runOutputDir, verbose)
 	if rlErr != nil && verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze GitHub rate limit usage for run %d: %v", result.Run.DatabaseID, rlErr)))
@@ -784,6 +797,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 		SkillActivations:        result.SkillActivations,
 		MCPToolUsage:            result.MCPToolUsage,
 		TokenUsage:              result.TokenUsage,
+		GatewaySteeringEvents:   result.GatewaySteeringEvents,
 		WorkingSet:              result.WorkingSet,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              jobDetails,
@@ -823,6 +837,7 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 			SkillActivations:        result.SkillActivations,
 			MCPToolUsage:            result.MCPToolUsage,
 			TokenUsage:              result.TokenUsage,
+			GatewaySteeringEvents:   result.GatewaySteeringEvents,
 			WorkingSet:              result.WorkingSet,
 			GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 			JobDetails:              jobDetails,
@@ -847,6 +862,25 @@ func backfillCacheHitIfNeeded(result *DownloadResult, runOutputDir string, verbo
 		return false
 	}
 	applyUsageActivitySummaryToResult(usageActivitySummary, result, true)
+	return true
+}
+
+func backfillGatewaySteeringEventsIfNeeded(result *DownloadResult, runOutputDir string, verbose bool) bool {
+	if len(result.GatewaySteeringEvents) > 0 {
+		return false
+	}
+	events, err := extractGatewaySteeringEvents(runOutputDir)
+	if err != nil {
+		logsOrchestratorLog.Printf("Warning: failed to backfill gateway steering events for run %d: %v", result.Run.DatabaseID, err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to backfill gateway steering events for run %d: %v", result.Run.DatabaseID, err)))
+		}
+		return false
+	}
+	if len(events) == 0 {
+		return false
+	}
+	result.GatewaySteeringEvents = events
 	return true
 }
 
