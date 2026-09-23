@@ -344,34 +344,12 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling all workflows..."))
 		upgradeLog.Print("Compiling all workflows")
 
-		// Create and configure compiler
-		compiler := createAndConfigureCompiler(CompileConfig{
-			Verbose:        opts.verbose,
-			WorkflowDir:    opts.workflowDir,
-			Approve:        opts.approve,
-			EngineOverride: opts.engineOverride,
-		})
-
-		// Determine workflow directory
-		workflowsDir := opts.workflowDir
-		if workflowsDir == "" {
-			workflowsDir = constants.GetWorkflowDir()
-		}
-
-		// Compile all workflow files
-		stats, compileErr := compileAllWorkflowFiles(opts.ctx, compiler, workflowsDir, opts.verbose)
-		if compileErr != nil {
+		// Use the shared directory compile pipeline so post-processing, including
+		// maintenance workflow generation and implicit expiry reconciliation, runs.
+		if compileErr := compileWorkflowsForUpdate(opts.ctx, nil, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); compileErr != nil {
 			upgradeLog.Printf("Failed to compile workflows: %v", compileErr)
 			// Don't fail the upgrade if compilation fails - this is non-critical
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to compile workflows: %v", compileErr)))
-		} else if stats != nil {
-			// Print compilation summary
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Compiled %d workflow(s)", stats.Total-stats.Errors)))
-			}
-			if stats.Errors > 0 {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: %d workflow(s) failed to compile", stats.Errors)))
-			}
 		}
 	} else {
 		if opts.noFix {
