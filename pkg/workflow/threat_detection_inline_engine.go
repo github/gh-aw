@@ -84,6 +84,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	if detectionEngineConfig.ID == "" {
 		detectionEngineConfig.ID = engineSetting
 	}
+	if !hasThreatDetectionEngineConfig && originalEngineID != engineSetting {
+		detectionEngineConfig.ID = engineSetting
+		detectionEngineConfig.Version = ""
+	}
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}

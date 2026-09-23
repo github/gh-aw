@@ -364,6 +364,32 @@ func TestBuildDetectionEngineExecutionStepUsesCopilotForPi(t *testing.T) {
 	}
 }
 
+func TestBuildDetectionEngineExecutionStepDoesNotReuseCustomEngineVersion(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.engineCatalog.Register(&EngineDefinition{ID: "goose", DetectionEngine: "copilot"})
+
+	data := &WorkflowData{
+		AI: "goose",
+		EngineConfig: &EngineConfig{
+			ID:      "goose",
+			Version: "1.45.0",
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	steps := compiler.buildDetectionEngineExecutionStep(data)
+	rendered := strings.Join(steps, "")
+
+	if !strings.Contains(rendered, `install_copilot_cli.sh"`) {
+		t.Fatalf("expected detection to install the Copilot CLI, got:\n%s", rendered)
+	}
+	if strings.Contains(rendered, `install_copilot_cli.sh" 1.45.0`) {
+		t.Fatalf("expected detection to avoid passing the Goose version to the Copilot installer, got:\n%s", rendered)
+	}
+}
+
 // TestBuildDetectionEngineExecutionStepArcDindTopology verifies that the detection job
 // correctly propagates arc-dind runner topology from the main workflow data.
 // Regression: before the fix, RunnerConfig was not propagated to threatDetectionData,
