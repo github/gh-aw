@@ -557,6 +557,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.DriveMemoryConfig != nil && len(workflowData.DriveMemoryConfig.Drives) > 0, message: "Using experimental feature: drive-memory"},
 		{enabled: hasContinualExperiment(workflowData.ExperimentConfigs), message: "Using experimental feature: continual experiments"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.Steer, message: "Using experimental feature: safe-outputs steer"},
+		{enabled: slices.Contains(workflowData.ToolProfiles, "go"), message: "Using experimental feature: tools.profile: go"},
 	}
 	for _, warning := range warnings {
 		if warning.enabled {

@@ -453,6 +453,9 @@ for the full driver contract.
 
 #### Go repository tool profile (`tools.profile`)
 
+> [!WARNING]
+> **Experimental:** This profile is in preview. Its configuration and runtime contract may change.
+
 `tools.profile: go` opts the bundled Copilot SDK driver into a no-shell repository tool contract. `profile` accepts either a string or an array, and profiles are merged across [shared workflow imports](/gh-aw/reference/imports/). Omitting the field retains the existing version 1 SDK tool configuration and tool defaults.
 
 ```aw wrap

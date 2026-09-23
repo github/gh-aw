@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.0.1  
+**Version**: 1.0.2<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -935,6 +935,19 @@ The security model uses both compile-time and runtime validation because each la
 3. Controls that can be reliably expressed statically SHOULD be enforced at compile time first to reduce runtime attack surface and operational variance.
 4. Controls that depend on event payloads, credentials, or mutable platform state MUST be enforced at runtime even when a compile-time approximation exists.
 5. Security-critical controls MAY be enforced in both phases when defense-in-depth materially reduces bypass risk.
+
+### 10.9 Experimental Go Repository Profile
+
+**CS-14**: The experimental `tools.profile: go` configuration MUST be identified
+as experimental during compilation. The compiler MUST reject profile
+configurations that do not use the bundled Copilot SDK driver in AWF, explicitly
+disable Bash and CLI proxy access, retain editing, use the compiler-managed root
+checkout, and declare one current-repository `create-pull-request` safe output.
+
+**CS-15**: The compiler MUST generate a closed version 2 tool contract for this
+profile. The contract MUST grant only the fixed native repository tool, approved
+MCP tools, configured editing, and safe-output completion tools; it MUST NOT
+grant arbitrary shell, generic task, CLI proxy, or wildcard MCP access.
 
 ---
 
@@ -2027,6 +2040,15 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.0.2 (Experimental Go Repository Profile)
+
+**Published**: September 23, 2026
+
+- Adds CS-14 and CS-15 for the experimental `tools.profile: go` compiler
+  contract. The compiler must identify the profile as experimental, validate its
+  closed execution configuration, and emit only its fixed native/MCP tool
+  catalog.
 
 ### Version 1.0.1 (Editorial Update)
 

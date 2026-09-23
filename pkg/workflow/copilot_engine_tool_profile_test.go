@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -85,6 +86,16 @@ func TestGoRepositoryProfileDefaultsAndContract(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGoRepositoryProfileEmitsExperimentalWarning(t *testing.T) {
+	var output bytes.Buffer
+	compiler := NewCompiler()
+
+	compiler.emitExperimentalFeatureWarningsTo(parseGoRepositoryProfileTestWorkflow(t), &output)
+
+	assert.Contains(t, output.String(), "Using experimental feature: tools.profile: go")
+	assert.Equal(t, 1, compiler.GetWarningCount())
 }
 
 func TestGoRepositoryProfileMergesFromSharedWorkflow(t *testing.T) {
