@@ -21,12 +21,22 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	runOutputDir := opts.OutputDir
 	processedRun.Run.SafeItemsCount = len(resolveCreatedItems(runOutputDir, processedRun.SafeOutputs))
 	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull)
-	if !ok {
+	if ok {
+		// A cached entry always carries the default (baseline) comparison, so drop it
+		// when the caller opted out of baseline comparison.
+		if opts.NoBaseline {
+			auditData.Comparison = noBaselineComparison()
+		}
+	} else {
 		auditData = buildRenderedAuditDataFromCache(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
 		auditData.CacheSource = auditCacheSourceFull
 		auditData.SchemaVersion = auditSchemaVersion
-		if err := writeAuditData(runOutputDir, auditData); err != nil {
-			return err
+		// Never persist an opt-out result: it would be reused as the full cache entry
+		// by a later default audit and suppress its baseline comparison.
+		if !opts.NoBaseline {
+			if err := writeAuditData(runOutputDir, auditData); err != nil {
+				return err
+			}
 		}
 	}
 	if opts.Group {
@@ -49,18 +59,28 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 	}
 	createdItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	addAuditOutcomeSummary(ctx, &auditData, createdItems)
-	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
-	auditData.Comparison = buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
+	auditData.Comparison = buildRenderedAuditComparison(ctx, processedRun, createdItems, runOutputDir, opts)
 	return auditData
 }
 
 func buildRenderedAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) AuditData {
 	currentCreatedItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
-	currentSnapshot := buildAuditComparisonSnapshot(processedRun, currentCreatedItems)
-	comparison := buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
 	auditData := buildAuditData(ctx, processedRun, metrics, mcpToolUsage)
-	auditData.Comparison = comparison
+	auditData.Comparison = buildRenderedAuditComparison(ctx, processedRun, currentCreatedItems, runOutputDir, opts)
 	return auditData
+}
+
+func buildRenderedAuditComparison(ctx context.Context, processedRun ProcessedRun, createdItems []CreatedItemReport, runOutputDir string, opts AuditOptions) *AuditComparisonData {
+	if opts.NoBaseline {
+		return noBaselineComparison()
+	}
+	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
+	return buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
+}
+
+// noBaselineComparison is the comparison payload used when baseline discovery is disabled.
+func noBaselineComparison() *AuditComparisonData {
+	return &AuditComparisonData{BaselineFound: false}
 }
 
 func renderAuditOutput(auditData AuditData, runOutputDir string, jsonOutput, verbose bool) error {

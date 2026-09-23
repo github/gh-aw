@@ -31,6 +31,7 @@ func TestNewAuditRunConfig(t *testing.T) {
 			JobID:      7,
 			StepNumber: 3,
 			EvalsOnly:  true,
+			NoBaseline: true,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, int64(42), cfg.runID)
@@ -45,6 +46,7 @@ func TestNewAuditRunConfig(t *testing.T) {
 		assert.Equal(t, int64(7), cfg.jobID)
 		assert.Equal(t, 3, cfg.stepNumber)
 		assert.True(t, cfg.evalsOnly)
+		assert.True(t, cfg.noBaseline)
 		assert.True(t, cfg.evalsArtifactRequested)
 	})
 

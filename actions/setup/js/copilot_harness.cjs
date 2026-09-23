@@ -5,8 +5,8 @@
  *
  * Wraps the Copilot CLI command (or @github/copilot-sdk session in SDK mode) with retry logic
  * for failures that occur after the session has been partially executed.  Passes all arguments
- * to the copilot subprocess, forwarding stdout/stderr; stdin is closed since the prompt is
- * delivered via CLI argument, not stdin.
+ * to the copilot subprocess, forwarding stdout/stderr. Small prompt files are delivered as
+ * CLI arguments for compatibility; large prompt files are streamed through stdin.
  *
  * Retry policy (shared by CLI and SDK modes):
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the
@@ -988,24 +988,65 @@ function parseCopilotSDKServerArgsFromEnv(serverArgsEnv, options) {
 }
 
 /**
- * Build a compact fallback prompt that asks the agent to read instructions from disk.
- * @param {string} promptFile
- * @returns {string}
+ * Return whether the argument is an explicit Copilot prompt option that takes
+ * the prompt from argv instead of stdin.
+ * @param {string} arg
+ * @returns {boolean}
  */
-function buildPromptFileFallbackInstruction(promptFile) {
-  return `Read the full instructions from ${promptFile} and execute them exactly as written.`;
+function isPromptOption(arg) {
+  return arg === "-p" || arg === "--prompt";
 }
 
 /**
- * Replace --prompt-file arguments with -p prompt text to support older Copilot CLIs.
- * For files over 100KB, emit a compact fallback prompt that instructs the agent to
- * read and execute the full prompt file from disk.
+ * Return whether the argument is an explicit Copilot prompt option with an
+ * inline value.
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isInlinePromptOption(arg) {
+  return arg.startsWith("--prompt=") || arg.startsWith("-p=");
+}
+
+/**
+ * Remove explicit prompt options so Copilot reads the streamed prompt from stdin.
+ * Dash-prefixed tokens after -p/--prompt are preserved as likely Copilot options;
+ * the harness does not parse Copilot's full option grammar, so dash-prefixed
+ * prompt values are treated as malformed conflicting prompt args.
  * @param {string[]} args
  * @returns {string[]}
  */
-function resolvePromptFileArgs(args) {
+function removeExplicitPromptOptions(args) {
+  /** @type {string[]} */
+  const filteredArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (isPromptOption(arg)) {
+      if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+        i++;
+      }
+      continue;
+    }
+    if (isInlinePromptOption(arg)) {
+      continue;
+    }
+    filteredArgs.push(arg);
+  }
+  return filteredArgs;
+}
+
+/**
+ * Resolve --prompt-file arguments for the Copilot CLI.
+ * Small files are inlined as -p prompt text for compatibility with older Copilot CLIs.
+ * Larger files are removed from the argument list and returned as stdin data so the full
+ * prompt reaches Copilot without being constrained by the operating system's argv limit.
+ * @param {string[]} args
+ * @returns {{args: string[], stdin?: Buffer}}
+ */
+function resolvePromptFileInput(args) {
   /** @type {string[]} */
   const resolvedArgs = [];
+  /** @type {Buffer | undefined} */
+  let promptStdin;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1026,8 +1067,8 @@ function resolvePromptFileArgs(args) {
       log(`resolved --prompt-file: path=${promptFile} size=${stat.size}B`);
 
       if (stat.size > PROMPT_FILE_INLINE_THRESHOLD_BYTES) {
-        log(`prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; using compact fallback prompt`);
-        resolvedArgs.push("-p", buildPromptFileFallbackInstruction(promptFile));
+        log(`prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
+        promptStdin = fs.readFileSync(promptFile);
       } else {
         const promptText = fs.readFileSync(promptFile, "utf8");
         resolvedArgs.push("-p", promptText);
@@ -1041,7 +1082,8 @@ function resolvePromptFileArgs(args) {
     }
   }
 
-  return resolvedArgs;
+  const finalArgs = promptStdin ? removeExplicitPromptOptions(resolvedArgs) : resolvedArgs;
+  return { args: finalArgs, stdin: promptStdin };
 }
 
 /**
@@ -1079,12 +1121,16 @@ async function main() {
   }
 
   // In driver mode the args are the driver command + copilot binary path; no stdin payload.
-  // In CLI mode, args are resolved to inline prompt text.
+  // In CLI mode, prompt-file resolution may return either inline prompt text or stdin data.
   let resolvedArgs;
+  /** @type {Buffer | undefined} */
+  let promptStdin;
   if (copilotSDKMode) {
     resolvedArgs = args;
   } else {
-    resolvedArgs = resolvePromptFileArgs(args);
+    const resolvedPrompt = resolvePromptFileInput(args);
+    resolvedArgs = resolvedPrompt.args;
+    promptStdin = resolvedPrompt.stdin;
   }
 
   // Fetch AWF API proxy reflection data before running the agent.
@@ -1309,6 +1355,7 @@ async function main() {
             log,
             logArgs: safeArgs,
             env: childEnv,
+            stdin: promptStdin,
             postResultWatchdog: safeOutputsPath
               ? {
                   shouldArm: () => hasTerminalSafeOutput(safeOutputsPath),
@@ -1678,7 +1725,6 @@ if (typeof module !== "undefined" && module.exports) {
     PROMPT_FILE_INLINE_THRESHOLD_BYTES,
     appendSafeOutputLine,
     buildMissingToolAlternatives,
-    buildPromptFileFallbackInstruction,
     buildInfrastructureIncompletePayload,
     emitInfrastructureIncomplete,
     emitMissingToolPermissionIssue,
@@ -1725,7 +1771,7 @@ if (typeof module !== "undefined" && module.exports) {
     stopCopilotSDKServer,
     waitForCopilotSDKServer,
     writeCopilotOutputs,
-    resolvePromptFileArgs,
+    resolvePromptFileInput,
     resolveRetryConfig,
     parseCopilotSDKServerArgsFromEnv,
     isCAPIQuotaExceededError,
