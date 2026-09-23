@@ -55,7 +55,7 @@ function allBillableJobsSkipped(components) {
 }
 
 function provesJobExecutionNotStarted(job) {
-  return job.conclusion === "failure" && Object.hasOwn(job, "runner_id") && (job.runner_id === null || job.runner_id === 0) && !job.runner_name && (!Array.isArray(job.steps) || job.steps.length === 0);
+  return (job.conclusion === "failure" || job.conclusion === "cancelled") && Object.hasOwn(job, "runner_id") && (job.runner_id === null || job.runner_id === 0) && !job.runner_name && (!Array.isArray(job.steps) || job.steps.length === 0);
 }
 
 function provesExecutionNotStarted(directory, name, runId, runAttempt) {
