@@ -1,5 +1,7 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { extractRepoSlugFromUrl, extractRemoteHost, isTrustedRemoteHost, normalizeRepoSlug, findGitDirectories, findRepoCheckout, buildRepoCheckoutMap } = require("./find_repo_checkout.cjs");
 const { getPatchPathForBranchInRepo, sanitizeBranchNameForPatch, sanitizeRepoSlugForPatch } = require("./generate_git_patch.cjs");
 const { _resetCache: resetCheckoutManifestCache } = require("./checkout_manifest.cjs");
@@ -541,6 +543,60 @@ exit 1
       const result = findRepoCheckout("owner/analytics", workspaceDir);
 
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("git-scan fallback with a dubious-ownership checkout", () => {
+    let workspaceDir;
+    let originalEnv;
+    let originalCore;
+
+    beforeEach(() => {
+      workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-safedir-git-"));
+      originalEnv = {
+        GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+        GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
+        GITHUB_ENV: process.env.GITHUB_ENV,
+        GITHUB_SERVER_URL: process.env.GITHUB_SERVER_URL,
+      };
+      originalCore = globalThis.core;
+      globalThis.core = { debug: () => {}, error: () => {} };
+      process.env.GIT_CONFIG_GLOBAL = os.devNull;
+      process.env.GIT_CONFIG_NOSYSTEM = "1";
+      process.env.GITHUB_SERVER_URL = "https://github.com";
+      delete process.env.GITHUB_ENV;
+    });
+
+    afterEach(() => {
+      spawnSync("sudo", ["-n", "rm", "-rf", workspaceDir]);
+      for (const [key, value] of Object.entries(originalEnv)) {
+        value === undefined ? delete process.env[key] : (process.env[key] = value);
+      }
+      originalCore === undefined ? delete globalThis.core : (globalThis.core = originalCore);
+    });
+
+    it("discovers a nested checkout using per-invocation safe.directory trust", () => {
+      const sudoAvailable = spawnSync("sudo", ["-n", "true"], { encoding: "utf8" });
+      expect(sudoAvailable.status).toBe(0);
+
+      const nestedRepo = path.join(workspaceDir, "repos", "analytics");
+      fs.mkdirSync(nestedRepo, { recursive: true });
+      expect(spawnSync("git", ["init", "-q"], { cwd: nestedRepo }).status).toBe(0);
+      expect(spawnSync("git", ["remote", "add", "origin", "https://github.com/owner/analytics.git"], { cwd: nestedRepo }).status).toBe(0);
+      expect(spawnSync("sudo", ["-n", "chown", "-R", "12345:12345", nestedRepo]).status).toBe(0);
+
+      const untrustedRead = spawnSync("git", ["config", "--get", "remote.origin.url"], {
+        cwd: nestedRepo,
+        encoding: "utf8",
+        env: process.env,
+      });
+      expect(untrustedRead.status).not.toBe(0);
+
+      expect(findRepoCheckout("owner/analytics", workspaceDir)).toMatchObject({
+        success: true,
+        path: nestedRepo,
+        repoSlug: "owner/analytics",
+      });
     });
   });
 
