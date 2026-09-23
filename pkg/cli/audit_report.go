@@ -54,6 +54,7 @@ type AuditData struct {
 	Noops                   []NoopReport             `json:"noops,omitempty"`
 	MCPFailures             []MCPFailureReport       `json:"mcp_failures,omitempty"`
 	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`
+	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"`
 	FirewallTokenUsage      *TokenUsageSummary       `json:"firewall_token_usage,omitempty"`
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"`
 	FirewallAnalysis        *FirewallAnalysis        `json:"firewall_analysis,omitempty"`
@@ -537,6 +538,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		Noops:                   inputs.processedRun.Noops,
 		MCPFailures:             inputs.processedRun.MCPFailures,
 		SkillActivations:        inputs.processedRun.SkillActivations,
+		GatewaySteeringEvents:   inputs.processedRun.GatewaySteeringEvents,
 		FirewallTokenUsage:      inputs.processedRun.TokenUsage,
 		GitHubRateLimitUsage:    inputs.processedRun.GitHubRateLimitUsage,
 		FirewallAnalysis:        inputs.processedRun.FirewallAnalysis,

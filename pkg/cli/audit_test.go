@@ -174,6 +174,24 @@ func TestProcessedRunFromSummaryBothTurnsZero(t *testing.T) {
 	assert.Equal(t, 0, processed.Run.Turns, "run turns should remain zero when neither Run.Turns nor Metrics.Turns is available")
 }
 
+func TestProcessedRunFromSummaryBackfillsGatewaySteeringEvents(t *testing.T) {
+	t.Parallel()
+	runOutputDir := testutil.TempDir(t, "processed-run-summary-steering")
+	logsDir := filepath.Join(runOutputDir, "sandbox", "firewall", "audit", "api-proxy-logs")
+	require.NoError(t, os.MkdirAll(logsDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "events.jsonl"), []byte(
+		`{"timestamp":"2026-09-23T12:00:00Z","event":"token_steering","message":"[AWF TOKEN WARNING] You are running out of AI Credits."}`+"\n",
+	), 0o644))
+	summary := &RunSummary{RunAnalysis: RunAnalysis{
+		Run: WorkflowRun{DatabaseID: 790},
+	}}
+
+	processed := processedRunFromSummary(summary, runOutputDir)
+
+	require.Len(t, processed.GatewaySteeringEvents, 1)
+	assert.Equal(t, tokenSteeringEventName, processed.GatewaySteeringEvents[0].Type)
+}
+
 func TestBuildAuditData(t *testing.T) {
 	t.Parallel()
 	// Create test data

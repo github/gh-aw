@@ -221,6 +221,54 @@ func TestTryLoadCachedRunResultUsesCacheWhenEvalsNotRequested(t *testing.T) {
 	assert.True(t, result.Cached)
 }
 
+func TestNewRunSummaryCarriesGatewaySteeringEvents(t *testing.T) {
+	t.Parallel()
+	events := []GatewaySteeringEvent{{
+		Type:      tokenSteeringEventName,
+		Message:   "[AWF TOKEN WARNING] You are running out of AI Credits.",
+		Timestamp: "2026-09-23T12:00:00Z",
+	}}
+	result := &DownloadResult{RunAnalysis: RunAnalysis{
+		Run:                   WorkflowRun{DatabaseID: 300},
+		GatewaySteeringEvents: events,
+	}}
+
+	summary := newRunSummary(result, LogMetrics{}, nil, nil)
+
+	assert.Equal(t, events, summary.GatewaySteeringEvents)
+}
+
+func TestTryLoadCachedRunResultBackfillsGatewaySteeringEvents(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       301,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{DatabaseID: 301},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+
+	logsDir := filepath.Join(runOutputDir, "sandbox", "firewall", "audit", "api-proxy-logs")
+	require.NoError(t, os.MkdirAll(logsDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "events.jsonl"), []byte(
+		`{"timestamp":"2026-09-23T12:00:00Z","event":"token_steering","message":"[AWF TOKEN WARNING] You are running out of AI Credits."}`+"\n",
+	), 0o644))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{DatabaseID: 301}, runOutputDir, concurrentRunDownloadParams{})
+	require.True(t, ok)
+	require.NotNil(t, result)
+	require.Len(t, result.GatewaySteeringEvents, 1)
+	assert.Equal(t, tokenSteeringEventName, result.GatewaySteeringEvents[0].Type)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	require.Len(t, reloaded.GatewaySteeringEvents, 1)
+}
+
 func TestTryLoadCachedRunResultBypassesCacheWhenRequestedArtifactIsMissing(t *testing.T) {
 	t.Parallel()
 	runOutputDir := t.TempDir()

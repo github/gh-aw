@@ -215,6 +215,12 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	gatewaySteeringEvents := summary.GatewaySteeringEvents
+	if len(gatewaySteeringEvents) == 0 {
+		if events, err := extractGatewaySteeringEvents(runOutputDir); err == nil && len(events) > 0 {
+			gatewaySteeringEvents = events
+		}
+	}
 	processedRun := ProcessedRun{
 		Run:                     summary.Run,
 		AwContext:               summary.AwContext,
@@ -229,6 +235,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
 		MCPFailures:             summary.MCPFailures,
+		GatewaySteeringEvents:   gatewaySteeringEvents,
 		TokenUsage:              summary.TokenUsage,
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,

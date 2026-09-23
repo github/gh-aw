@@ -10,16 +10,12 @@ import (
 )
 
 func countAPIProxySteeringEvents(runDir string) int {
-	eventsPath := findAPIProxyEventsFile(runDir)
-	if eventsPath == "" {
-		return 0
-	}
-	count, err := parseAPIProxySteeringEvents(eventsPath)
+	events, err := extractGatewaySteeringEvents(runDir)
 	if err != nil {
-		tokenUsageLog.Printf("Failed to parse API proxy events file %s: %v", eventsPath, err)
+		tokenUsageLog.Printf("Failed to parse API proxy steering events in %s: %v", runDir, err)
 		return 0
 	}
-	return count
+	return len(events)
 }
 
 // scanSteeringEntries reads all valid steering proxyEventsEntry records from r.
@@ -46,14 +42,38 @@ func scanSteeringEntries(r io.Reader) ([]proxyEventsEntry, error) {
 	return entries, scanner.Err()
 }
 
-func parseAPIProxySteeringEvents(filePath string) (int, error) {
+func parseAPIProxySteeringEvents(filePath string) ([]GatewaySteeringEvent, error) {
 	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer file.Close()
 	entries, err := scanSteeringEntries(file)
-	return len(entries), err
+	if err != nil {
+		return nil, err
+	}
+	return gatewaySteeringEventsFromEntries(entries), nil
+}
+
+func extractGatewaySteeringEvents(runDir string) ([]GatewaySteeringEvent, error) {
+	eventsPath := findAPIProxyEventsFile(runDir)
+	if eventsPath == "" {
+		return nil, nil
+	}
+
+	return parseAPIProxySteeringEvents(eventsPath)
+}
+
+func gatewaySteeringEventsFromEntries(entries []proxyEventsEntry) []GatewaySteeringEvent {
+	events := make([]GatewaySteeringEvent, 0, len(entries))
+	for _, entry := range entries {
+		events = append(events, GatewaySteeringEvent{
+			Type:      entry.eventName(),
+			Message:   strings.TrimSpace(entry.Message),
+			Timestamp: entry.Timestamp,
+		})
+	}
+	return events
 }
 
 func containsSteeringKeyword(line string) bool {

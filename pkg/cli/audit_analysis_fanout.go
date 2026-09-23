@@ -132,7 +132,7 @@ func launchJobDetailsAnalysis(g *errgroup.Group, gctx context.Context, results *
 	})
 }
 
-// launchFirewallAuditAnalyses exclusively writes policyAnalysis, mcpToolUsage, and tokenUsageSummary.
+// launchFirewallAuditAnalyses exclusively writes policyAnalysis, mcpToolUsage, tokenUsageSummary, and gatewaySteeringEvents.
 func launchFirewallAuditAnalyses(g *errgroup.Group, gctx context.Context, results *auditAnalysisResults, runOutputDir string, verbose bool) {
 	launchFirewallAnalysis(g, gctx, results, runOutputDir, verbose)
 	runAuditAnalysis(g, gctx, verbose, "analyzeFirewallPolicy", "Failed to analyze firewall policy", func(v *PolicyAnalysis) {
@@ -149,6 +149,11 @@ func launchFirewallAuditAnalyses(g *errgroup.Group, gctx context.Context, result
 		results.tokenUsageSummary = v
 	}, func() (*TokenUsageSummary, error) {
 		return analyzeTokenUsage(runOutputDir, verbose)
+	})
+	runAuditAnalysis(g, gctx, verbose, "extractGatewaySteeringEvents", "Failed to extract gateway steering events", func(v []GatewaySteeringEvent) {
+		results.gatewaySteeringEvents = v
+	}, func() ([]GatewaySteeringEvent, error) {
+		return extractGatewaySteeringEvents(runOutputDir)
 	})
 }
 
