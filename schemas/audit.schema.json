@@ -4512,6 +4512,15 @@
         "runs_analyzed": {
           "type": "integer"
         },
+        "skipped_runs": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "integer"
+          }
+        },
         "entries": {
           "type": [
             "null",

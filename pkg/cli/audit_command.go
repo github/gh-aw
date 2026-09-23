@@ -203,7 +203,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		return err
 	}
 	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
-	return AuditWorkflowRun(ctx, components.Number, AuditOptions{
+	_, err = AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
 		Repo:             components.Repo,
 		Hostname:         components.Host,
@@ -220,6 +220,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		EvalsOnly:        opts.evalsOnly,
 		Group:            opts.group,
 	})
+	return err
 }
 
 func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
@@ -236,8 +237,8 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 }
 
 func firstAuditArg(args []string) (string, bool) {
-	for _, arg := range args {
-		return arg, true
+	if len(args) > 0 {
+		return args[0], true
 	}
 	return "", false
 }
@@ -271,12 +272,7 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 	// Parse comparison run IDs (job/step URLs are accepted; only the run number is used)
 	seen := make(map[int64]bool)
 	compareRunIDs := make([]int64, 0, len(args)-1)
-	skippedBase := false
-	for _, arg := range args {
-		if !skippedBase {
-			skippedBase = true
-			continue
-		}
+	for _, arg := range args[1:] {
 		c, err := parser.ParseRunURLExtended(arg)
 		if err != nil {
 			return fmt.Errorf("invalid comparison run %q: %w", arg, err)

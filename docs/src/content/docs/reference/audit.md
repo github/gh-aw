@@ -117,7 +117,7 @@ Working-Set Rebuild Factor measures cumulative context reconstruction relative t
 
 **Diff output** includes network changes (new, removed, and allow/deny flips), anomaly flags, MCP tool invocation changes, run-level metric deltas, token and AIC breakdowns, tokens per turn, per-tool call counts with max input/output sizes, and aggregated bash command usage.
 
-With multiple comparisons, `--json` emits a single object for one comparison or an array for many, while `--format pretty` and `--format markdown` separate each diff with dividers. With `--group`, audit emits `runs_analyzed` and `entries`; each entry contains `run_id`, `code`, `occurrences`, and `representative_entry`.
+With multiple comparisons, `--json` emits a single object for one comparison or an array for many, while `--format pretty` and `--format markdown` separate each diff with dividers. With `--group`, audit emits `runs_analyzed`, `entries`, and (when applicable) `skipped_runs`; each entry contains `run_id`, `code`, `occurrences`, and `representative_entry`. Only actionable findings (severity of low or above) are grouped. Runs excluded by `--experiment`, `--runtime`, or `--evals`, or whose audit data could not be loaded, are listed in `skipped_runs` and excluded from `runs_analyzed`.
 
 When artifacts are present, audit processing also persists extracted skill-activation data into `run_summary.json`, which downstream automation can consume alongside the rendered report.
 

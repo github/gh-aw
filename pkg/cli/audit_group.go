@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -18,6 +19,7 @@ import (
 // GroupedAuditReport represents audit findings grouped by run and stable finding code.
 type GroupedAuditReport struct {
 	RunsAnalyzed int                 `json:"runs_analyzed"`
+	SkippedRuns  []int64             `json:"skipped_runs,omitempty"`
 	Entries      []GroupedAuditEntry `json:"entries"`
 }
 
@@ -34,9 +36,9 @@ func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOption
 	if err != nil {
 		return err
 	}
-	report := GroupedAuditReport{RunsAnalyzed: len(runRequests)}
+	var report GroupedAuditReport
 	for _, request := range runRequests {
-		if err := AuditWorkflowRun(ctx, request.runID, AuditOptions{
+		skipped, err := AuditWorkflowRun(ctx, request.runID, AuditOptions{
 			Owner:            request.owner,
 			Repo:             request.repo,
 			Hostname:         request.hostname,
@@ -48,17 +50,35 @@ func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOption
 			RuntimeFilter:    opts.runtimeFilter,
 			EvalsOnly:        opts.evalsOnly,
 			Group:            true,
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
-		auditData, ok := loadGroupedAuditData(opts.outputDir, request.runID)
-		if !ok {
+		if skipped {
+			report.SkippedRuns = append(report.SkippedRuns, request.runID)
 			continue
 		}
-		report.Entries = append(report.Entries, groupAuditFindingsForRun(request.runID, auditData.KeyFindings)...)
+		report.RunsAnalyzed++
+		recordGroupedAuditRun(opts.outputDir, request.runID, &report)
 	}
 	sortGroupedAuditEntries(report.Entries)
 	return renderGroupedAuditReport(report, opts)
+}
+
+// recordGroupedAuditRun loads the audit data written for runID and, when available, appends
+// its actionable findings (grouped by code) to report.Entries. When the audit data cannot be
+// loaded (missing or corrupt audit.json), the run is recorded in report.SkippedRuns and a
+// warning is printed instead of silently contributing zero entries.
+func recordGroupedAuditRun(outputDir string, runID int64, report *GroupedAuditReport) {
+	auditData, ok := loadGroupedAuditData(outputDir, runID)
+	if !ok {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Sprintf("No audit data found for run %d after processing; skipping", runID)))
+		report.SkippedRuns = append(report.SkippedRuns, runID)
+		return
+	}
+	findings := filterActionableFindings(auditData.KeyFindings)
+	report.Entries = append(report.Entries, groupAuditFindingsForRun(runID, findings)...)
 }
 
 type groupedAuditRunRequest struct {
@@ -173,6 +193,9 @@ func renderGroupedAuditReport(report GroupedAuditReport, opts auditCommandOption
 
 func renderGroupedAuditReportPretty(report GroupedAuditReport) {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Grouped audit findings across %d run(s)", report.RunsAnalyzed)))
+	if len(report.SkippedRuns) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipped run(s): "+formatRunIDList(report.SkippedRuns)))
+	}
 	if len(report.Entries) == 0 {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No audit findings found."))
 		return
@@ -186,6 +209,9 @@ func renderGroupedAuditReportPretty(report GroupedAuditReport) {
 func renderGroupedAuditReportMarkdown(report GroupedAuditReport) {
 	fmt.Fprintf(os.Stdout, "### Grouped Audit Findings\n\n")
 	fmt.Fprintf(os.Stdout, "Runs analyzed: %d\n\n", report.RunsAnalyzed)
+	if len(report.SkippedRuns) > 0 {
+		fmt.Fprintf(os.Stdout, "Skipped run(s): %s\n\n", formatRunIDList(report.SkippedRuns))
+	}
 	if len(report.Entries) == 0 {
 		fmt.Fprintln(os.Stdout, "No audit findings found.")
 		return
@@ -196,6 +222,14 @@ func renderGroupedAuditReportMarkdown(report GroupedAuditReport) {
 		fmt.Fprintf(os.Stdout, "| %d | `%s` | %d | %s |\n",
 			entry.RunID, entry.Code, entry.Occurrences, escapeMarkdownTableCell(entry.RepresentativeEntry.Title))
 	}
+}
+
+func formatRunIDList(runIDs []int64) string {
+	parts := make([]string, 0, len(runIDs))
+	for _, runID := range runIDs {
+		parts = append(parts, strconv.FormatInt(runID, 10))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func escapeMarkdownTableCell(value string) string {
