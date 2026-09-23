@@ -11,6 +11,7 @@ const { createRepositoryWorkspace, inspectRepositoryFile, readRepositoryFile, pa
 const { requireObjectID, stageRepositoryProjection, materializeRepositoryProjection, verifyRepositoryProjection } = require("./copilot_sdk_repo_projection.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { createRepositoryFailure, repositoryCommandError } = require("./copilot_sdk_repo_diagnostics.cjs");
+const { isGoSourceFile, goFormatWriteArgs, goFormatCheckTreeArgs, goVetArgs, goBuildArgs, goTestArgs } = require("./copilot_sdk_repo_go_toolchain.cjs");
 
 const REPOSITORY_ACTIONS = Object.freeze(["status", "diff", "prepare_branch", "format", "readiness", "validate", "commit"]);
 const MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
@@ -189,11 +190,11 @@ function createCopilotSDKRepositoryRuntime(defineTool, profile, options) {
   /** @param {Array<{filename: string, deleted: boolean}>} changes @param {AbortSignal} signal */
   async function formatFiles(changes, signal) {
     const directory = workspace.root;
-    const sourceFiles = changes.filter(change => !change.deleted && change.filename.endsWith(".go")).map(change => change.filename);
+    const sourceFiles = changes.filter(change => !change.deleted && isGoSourceFile(change.filename)).map(change => change.filename);
     for (const filename of sourceFiles) inspectRepositoryFile(directory, filename);
     let output = "";
     for (const group of batches(sourceFiles.map(filename => path.join(directory, filename)))) {
-      output += (await workspace.run("gofmt", ["-w", "-l", ...group], signal)).stdout;
+      output += (await workspace.run("gofmt", goFormatWriteArgs(group), signal)).stdout;
     }
     return { checkedGoFiles: sourceFiles, output };
   }
@@ -251,15 +252,15 @@ function createCopilotSDKRepositoryRuntime(defineTool, profile, options) {
       fs.mkdirSync(directory);
       await materializeRepositoryProjection(workspace, projection, directory, signal);
       if (full) {
-        const formatted = await workspace.run("gofmt", ["-l", "."], signal, { directory });
+        const formatted = await workspace.run("gofmt", goFormatCheckTreeArgs(), signal, { directory });
         if (formatted.stdout.trim()) throw new Error(`Projected Go files need formatting before validation:\n${formatted.stdout}`);
       }
-      const test = await workspace.run("go", full ? ["test", "-count=1", "./..."] : ["test", "-run", "^$", "./..."], signal, { directory });
+      const test = await workspace.run("go", goTestArgs(full), signal, { directory });
       await verifyRepositoryProjection(workspace, projection, directory, signal);
       if (!full) return { result: { test, readiness: "Projected repository tests compiled without selecting tests." }, candidate: null };
-      const vet = await workspace.run("go", ["vet", "./..."], signal, { directory });
+      const vet = await workspace.run("go", goVetArgs(), signal, { directory });
       await verifyRepositoryProjection(workspace, projection, directory, signal);
-      const build = await workspace.withTemporaryDirectory("build-", output => workspace.run("go", ["build", "-o", output, "./..."], signal, { directory }));
+      const build = await workspace.withTemporaryDirectory("build-", output => workspace.run("go", goBuildArgs(output), signal, { directory }));
       await verifyRepositoryProjection(workspace, projection, directory, signal);
       const after = await snapshot(signal);
       if (frozen.fingerprint !== after.fingerprint) throw new Error("Repository changed during validation; rerun validation on the final changes");
