@@ -1175,6 +1175,32 @@ func TestParseSafeJobsConfigArtifacts(t *testing.T) {
 		require.ErrorContains(t, job.artifactsError, "..")
 	})
 
+	t.Run("GitHub Actions expressions are rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/${{ '..' }}/outside.json"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "must be literal")
+	})
+
+	t.Run("control characters are rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/agent/output.json\n/tmp/outside.json"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "control characters")
+	})
+
 	t.Run("double dots within a filename are accepted", func(t *testing.T) {
 		result := c.parseSafeJobsConfig(map[string]any{
 			"publish": map[string]any{

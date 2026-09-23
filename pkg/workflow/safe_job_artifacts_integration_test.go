@@ -61,6 +61,7 @@ func TestSafeJobArtifactsIntegration(t *testing.T) {
 	uploadIndex := strings.Index(agentJob, "name: Upload agent artifacts")
 	require.Greater(t, redactIndex, -1)
 	require.Greater(t, uploadIndex, redactIndex)
+	require.Contains(t, agentJob[uploadIndex:], "if: always() && steps.redact_secrets.outcome == 'success'")
 }
 
 func TestSafeJobArtifactsValidationIntegration(t *testing.T) {
@@ -79,6 +80,12 @@ func TestSafeJobArtifactsValidationIntegration(t *testing.T) {
 			name:              "path traversal",
 			artifactPath:      "/tmp/gh-aw/../outside.json",
 			errorPart:         "path traversal",
+			safeJobValidation: true,
+		},
+		{
+			name:              "GitHub Actions expression",
+			artifactPath:      "/tmp/gh-aw/${{ '..' }}/outside.json",
+			errorPart:         "must be literal",
 			safeJobValidation: true,
 		},
 		{

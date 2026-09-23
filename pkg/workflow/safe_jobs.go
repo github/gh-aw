@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -227,6 +228,12 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 //     include-hidden-files, whose default is false. A declared hidden path would
 //     therefore pass validation but still be silently dropped from the artifact.
 func validateSafeJobArtifactPath(path string) error {
+	if strings.Contains(path, "${{") {
+		return fmt.Errorf("artifact path %q must be literal and must not contain GitHub Actions expressions", path)
+	}
+	if strings.IndexFunc(path, unicode.IsControl) >= 0 {
+		return fmt.Errorf("artifact path %q must not contain control characters", path)
+	}
 	if !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
 		return fmt.Errorf("artifact path %q must be rooted under %q so it is covered by secret redaction", path, constants.TmpGhAwDirSlash)
 	}
@@ -273,6 +280,10 @@ func collectSafeJobArtifactPaths(jobs map[string]*SafeJobConfig) []string {
 		}
 	}
 	return paths
+}
+
+func hasSafeJobArtifactPaths(data *WorkflowData) bool {
+	return data != nil && data.SafeOutputs != nil && len(collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)) > 0
 }
 
 func isEmptySafeJobRunsOn(value any) bool {
