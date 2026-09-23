@@ -257,6 +257,13 @@ func newPluginInstallCommandSteps(spec pluginInstallSpec, parsed parsedSkillRefS
 	return steps
 }
 
+// pluginDiagnosticsMaxDepth bounds the `find` traversal used by newPluginDiagnosticsStep.
+// 6 levels comfortably covers observed plugin layouts (e.g. a repo subpath plugin like
+// "owner/repo/plugins/example" plus nested "agents/" or "skills/" directories) without
+// letting diagnostics scan unrelated deeply-nested vendor/build directories that may be
+// checked out alongside the plugin.
+const pluginDiagnosticsMaxDepth = 6
+
 // newPluginDiagnosticsStep generates a step that records the checked-out plugin's file layout
 // to pluginDiagnosticsLogPath. Awesome Copilot-style plugins that pin a source-only ref (for
 // example a manifest-only default branch instead of a published "marketplace" branch) install
@@ -266,15 +273,18 @@ func newPluginInstallCommandSteps(spec pluginInstallSpec, parsed parsedSkillRefS
 // reporting something concrete to show alongside that runtime error.
 func newPluginDiagnosticsStep(parsed parsedSkillRefSpec, installPath string) GitHubActionStep {
 	quotedInstallPath := fmt.Sprintf("%q", "./"+installPath)
+	pluginLabel := parsed.repoPath + "@" + parsed.ref
+	headerEcho := fmt.Sprintf("echo %s", shellEscapeArg("=== Agent plugin diagnostics: "+pluginLabel+" ==="))
+	warningEcho := fmt.Sprintf("echo %s", shellEscapeArg(fmt.Sprintf("::warning::Agent plugin %s has no markdown files after installation; it may not expose any loadable Copilot agents. Verify the plugin ref points to the branch that publishes materialized agent/skill files (for example a 'marketplace' branch) rather than a source-only manifest branch.", pluginLabel)))
 	diagnosticsCommand := strings.Join([]string{
 		fmt.Sprintf("mkdir -p %q", path.Dir(pluginDiagnosticsLogPath)),
 		"{",
-		fmt.Sprintf("  echo \"=== Agent plugin diagnostics: %s@%s ===\"", parsed.repoPath, parsed.ref),
-		fmt.Sprintf("  find %s -maxdepth 6 -type f | sort", quotedInstallPath),
-		fmt.Sprintf("  md_count=$(find %s -maxdepth 6 -type f -name '*.md' | wc -l)", quotedInstallPath),
+		"  " + headerEcho,
+		fmt.Sprintf("  find %s -maxdepth %d -type f | sort", quotedInstallPath, pluginDiagnosticsMaxDepth),
+		fmt.Sprintf("  md_count=$(find %s -maxdepth %d -type f -name '*.md' | wc -l)", quotedInstallPath, pluginDiagnosticsMaxDepth),
 		"  echo \"Markdown files found: ${md_count}\"",
 		"  if [ \"${md_count}\" -eq 0 ]; then",
-		fmt.Sprintf("    echo \"::warning::Agent plugin %s@%s has no markdown files after installation; it may not expose any loadable Copilot agents. Verify the plugin ref points to the branch that publishes materialized agent/skill files (for example a 'marketplace' branch) rather than a source-only manifest branch.\"", parsed.repoPath, parsed.ref),
+		"    " + warningEcho,
 		"  fi",
 		"  echo",
 		fmt.Sprintf("} >> %q", pluginDiagnosticsLogPath),

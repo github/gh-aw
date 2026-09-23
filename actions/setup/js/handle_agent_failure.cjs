@@ -81,7 +81,14 @@ const ALLOWED_FILES_ERROR_RE = /^(?<summary>.*outside the allowed-files list) \(
  * available, e.g. `No such agent: foo:bar, available: `.
  */
 const COPILOT_AGENT_NOT_FOUND_RE = /No such agent:\s*([^\n,]+),\s*available:\s*([^\n]*)/i;
-/** Path where plugin installation diagnostics are appended (see pluginDiagnosticsLogPath in pkg/workflow/plugin_installation.go). */
+/**
+ * Fallback path for plugin installation diagnostics when GH_AW_AGENT_OUTPUT is unset
+ * (mirrors pluginDiagnosticsLogPath = logsFolder + "plugin-diagnostics.log" in
+ * pkg/workflow/plugin_installation.go / copilot_engine.go). readPluginDiagnosticsLog()
+ * prefers deriving the path from GH_AW_AGENT_OUTPUT — the same directory agent-stdio.log
+ * lives in — so this literal is only a last-resort fallback and does not need to track
+ * every change to logsFolder for normal production runs.
+ */
 const PLUGIN_DIAGNOSTICS_LOG_PATH = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
 
 /**
@@ -2816,7 +2823,7 @@ function detectCopilotOrgBillingErrorFromLog(stdioLogPathOverride) {
  * Detect the Copilot CLI's "No such agent" startup failure, which occurs when `engine.agent`
  * does not match any agent the CLI discovered (for example when a `plugins:` entry is pinned
  * to a ref that does not materialize loadable agent files).
- * @param {string} [stdioLogPathOverride]
+ * @param {string} [stdioLogPathOverride] - Explicit agent-stdio.log path; only used by tests, production callers rely on GH_AW_AGENT_OUTPUT
  * @returns {CopilotAgentNotFoundDetection|null}
  */
 function detectCopilotAgentNotFoundFromLog(stdioLogPathOverride) {
@@ -2847,10 +2854,16 @@ function detectCopilotAgentNotFoundFromLog(stdioLogPathOverride) {
 /**
  * Read the filesystem diagnostics recorded during plugin installation
  * (see pluginDiagnosticsLogPath in pkg/workflow/plugin_installation.go), if present.
+ * The diagnostics file is written to the same logs directory as agent-stdio.log
+ * (both under logsFolder in pkg/workflow/copilot_engine.go), so its path is derived
+ * from GH_AW_AGENT_OUTPUT the same way agent-stdio.log's path is, rather than being
+ * hardcoded separately — keeping the two languages from drifting out of sync.
+ * GH_AW_PLUGIN_DIAGNOSTICS_FILE is an explicit override used by tests.
  * @returns {string} Diagnostics log content, or "" when unavailable
  */
 function readPluginDiagnosticsLog() {
-  const diagnosticsPath = process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE || PLUGIN_DIAGNOSTICS_LOG_PATH;
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const diagnosticsPath = process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "plugin-diagnostics.log") : PLUGIN_DIAGNOSTICS_LOG_PATH);
   try {
     return fs.readFileSync(diagnosticsPath, "utf8").trim();
   } catch {
