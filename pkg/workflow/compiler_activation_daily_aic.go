@@ -14,6 +14,7 @@ import (
 // compiler_activation_daily_aic contains daily AIC guardrail token and step builders.
 
 const dailyAICAppTokenStepID = "daily-aic-app-token"
+const dailyAICDefaultRepoMemoryID = "default"
 
 // buildDailyAICAppTokenMintStep generates a GitHub App token mint step dedicated
 // to the daily AIC guardrail. The minted token is used only for the guardrail API
@@ -192,7 +193,7 @@ func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
 		return RepoMemoryEntry{}, false
 	}
 	for _, memory := range data.RepoMemoryConfig.Memories {
-		if memory.ID == "default" {
+		if memory.ID == dailyAICDefaultRepoMemoryID {
 			return memory, true
 		}
 	}
@@ -200,15 +201,14 @@ func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
 }
 
 func firstRepoMemoryEntry(memories []RepoMemoryEntry) (RepoMemoryEntry, bool) {
-	var first RepoMemoryEntry
-	found := false
-	for _, memory := range memories {
-		if !found {
-			first = memory
-			found = true
-		}
+	if len(memories) == 0 {
+		return RepoMemoryEntry{}, false
 	}
-	return first, found
+	var first RepoMemoryEntry
+	for _, memory := range memories[:1] {
+		first = memory
+	}
+	return first, true
 }
 
 func dailyAICRepoMemoryDir(memory RepoMemoryEntry) string {

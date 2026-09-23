@@ -257,8 +257,9 @@ func validateMaxDailyAICFrontmatter(data *WorkflowData) error {
 	if !ok {
 		return nil
 	}
+	backend, hasBackend := extractMaxDailyAICBackend(raw)
 	if data.MaxDailyAICBackend == "" {
-		data.MaxDailyAICBackend, _ = extractMaxDailyAICBackend(raw)
+		data.MaxDailyAICBackend = backend
 	}
 	// Object form: require a "value" key and validate the value.
 	if m, ok := raw.(map[string]any); ok {
@@ -270,7 +271,7 @@ func validateMaxDailyAICFrontmatter(data *WorkflowData) error {
 	if val, ok := typeutil.ParseIntValue(effective); ok && val < -1 {
 		return fmt.Errorf("%s must be -1 (disable) or a positive integer, got %d", maxDailyAICreditsField, val)
 	}
-	if backend, ok := extractMaxDailyAICBackend(raw); ok {
+	if hasBackend {
 		switch backend {
 		case "", maxDailyAICBackendRepoMemory:
 		default:

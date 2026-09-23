@@ -15,7 +15,7 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerStep(builder *strings.Builder
 		return
 	}
 	builder.WriteString("      - name: Append daily AIC repo-memory ledger\n")
-	builder.WriteString("        if: always()\n")
+	fmt.Fprintf(builder, "        if: always() && %s\n", maxDailyAICreditsConfiguredIfExpr)
 	builder.WriteString("        continue-on-error: true\n")
 	fmt.Fprintf(builder, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	builder.WriteString("        env:\n")

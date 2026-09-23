@@ -5,13 +5,20 @@ const path = require("path");
 const { findJSONLFiles, sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
-const DEFAULT_REPO_MEMORY_DIR = "/tmp/gh-aw/repo-memory/default";
 const LEDGER_SUBDIR = "daily-aic-ledger";
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const USAGE_ROOT = "/tmp/gh-aw";
 
-function ledgerRoot(repoMemoryDir = process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR || DEFAULT_REPO_MEMORY_DIR) {
-  return path.join(repoMemoryDir || DEFAULT_REPO_MEMORY_DIR, LEDGER_SUBDIR);
+function repoMemoryDirOrThrow(repoMemoryDir = process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR) {
+  const resolved = typeof repoMemoryDir === "string" ? repoMemoryDir.trim() : "";
+  if (!resolved) {
+    throw new Error("GH_AW_DAILY_AIC_REPO_MEMORY_DIR is required for the daily AIC repo-memory backend.");
+  }
+  return resolved;
+}
+
+function ledgerRoot(repoMemoryDir) {
+  return path.join(repoMemoryDirOrThrow(repoMemoryDir), LEDGER_SUBDIR);
 }
 
 function utcDay(ms) {
@@ -120,5 +127,6 @@ module.exports = {
   appendLedgerEntry,
   ledgerReadPaths,
   ledgerRoot,
+  repoMemoryDirOrThrow,
   readLedgerEntries,
 };
