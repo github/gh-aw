@@ -1175,6 +1175,18 @@ func TestParseSafeJobsConfigArtifacts(t *testing.T) {
 		require.ErrorContains(t, job.artifactsError, "..")
 	})
 
+	t.Run("double dots within a filename are accepted", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/agent/bundle..json"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.NoError(t, job.artifactsError)
+	})
+
 	t.Run("hidden file path is rejected", func(t *testing.T) {
 		result := c.parseSafeJobsConfig(map[string]any{
 			"publish": map[string]any{
@@ -1199,6 +1211,19 @@ func TestParseSafeJobsConfigArtifacts(t *testing.T) {
 		require.True(t, exists)
 		require.Error(t, job.artifactsError)
 		require.ErrorContains(t, job.artifactsError, "hidden")
+	})
+
+	t.Run("unscannable path is rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/agent/review-bundle-data"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "secret redaction")
 	})
 }
 

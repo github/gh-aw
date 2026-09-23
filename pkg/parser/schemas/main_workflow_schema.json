@@ -12058,7 +12058,7 @@
                 },
                 "artifacts": {
                   "type": "array",
-                  "description": "Additional agent-job filesystem paths (files, directories, or globs) that this job's steps depend on. Each entry must be rooted under '/tmp/gh-aw/' (for example, a subdirectory under '/tmp/gh-aw/agent/' written by the agent), must not contain '..' path traversal segments, and must not reference hidden files or directories (any path segment starting with '.'), since the unified artifact upload does not include hidden files. Without declaring a path here, files the agent writes outside the compiler's built-in known paths are silently dropped and never reach this job.",
+                  "description": "Additional agent-job filesystem paths (files, directories, or globs) that this job's steps depend on. Each entry must be rooted under '/tmp/gh-aw/' (for example, a subdirectory under '/tmp/gh-aw/agent/' written by the agent), directories must end with '/', files must use an extension covered by secret redaction, and entries must not contain '..' path traversal segments or reference hidden files or directories (any path segment starting with '.'), since the unified artifact upload does not include hidden files. Without declaring a path here, files the agent writes outside the compiler's built-in known paths are silently dropped and never reach this job.",
                   "items": {
                     "type": "string",
                     "pattern": "^/tmp/gh-aw/"

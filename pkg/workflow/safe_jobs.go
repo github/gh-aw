@@ -230,13 +230,16 @@ func validateSafeJobArtifactPath(path string) error {
 	if !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
 		return fmt.Errorf("artifact path %q must be rooted under %q so it is covered by secret redaction", path, constants.TmpGhAwDirSlash)
 	}
-	if strings.Contains(path, "..") {
-		return fmt.Errorf("artifact path %q must not contain \"..\" path traversal segments", path)
-	}
-	for _, segment := range strings.Split(path, "/") {
+	for segment := range strings.SplitSeq(path, "/") {
+		if segment == ".." {
+			return fmt.Errorf("artifact path %q must not contain \"..\" path traversal segments", path)
+		}
 		if strings.HasPrefix(segment, ".") && segment != "" {
 			return fmt.Errorf("artifact path %q must not reference hidden files or directories (segment %q starts with \".\"), which are silently dropped by the unified artifact upload", path, segment)
 		}
+	}
+	if !isPathScannedBySecretRedaction(path) {
+		return fmt.Errorf("artifact path %q must end with \"/\" for a directory or use a file extension covered by secret redaction", path)
 	}
 	return nil
 }

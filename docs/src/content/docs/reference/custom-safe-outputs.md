@@ -369,7 +369,7 @@ safe-outputs:
             echo "processing bundle"
 ```
 
-Each entry must be a literal path or glob rooted under `/tmp/gh-aw/` (the same tree the compiler already scans for secrets before upload); paths outside that root, entries containing `..` path traversal segments, and entries referencing hidden files or directories (any path segment starting with `.`, since the unified artifact upload does not include hidden files) are all rejected at compile time. Prefer embedding small values directly in the safe-output item (as plain `string` inputs) when possible — only reach for `artifacts:` when the payload is a directory or multiple files that don't fit in the JSON item itself.
+Each entry must be a literal path or glob rooted under `/tmp/gh-aw/` (the same tree the compiler already scans for secrets before upload). Directory paths must end with `/`, and file paths or globs must use an extension covered by secret redaction (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, or `.patch`). Paths outside that root, entries containing `..` path traversal segments, and entries referencing hidden files or directories (any path segment starting with `.`, since the unified artifact upload does not include hidden files) are all rejected at compile time. Prefer embedding small values directly in the safe-output item (as plain `string` inputs) when possible — only reach for `artifacts:` when the payload is a directory or multiple files that don't fit in the JSON item itself.
 
 ## Inline Script Handlers (`safe-outputs.scripts`)
 
