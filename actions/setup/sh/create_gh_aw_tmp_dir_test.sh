@@ -11,15 +11,13 @@ SCRIPT="${SCRIPT_DIR}/create_gh_aw_tmp_dir.sh"
 
 TESTS_PASSED=0
 TESTS_FAILED=0
-
-RUNNER_TEMP="$(mktemp -d)"
-export RUNNER_TEMP
+TEST_RUNNER_TEMP="$(mktemp -d)"
 
 cleanup() {
   # Restore /tmp/gh-aw to a clean, writable state before removing it.
   chmod -R u+rw /tmp/gh-aw 2>/dev/null || true
   rm -rf /tmp/gh-aw 2>/dev/null || true
-  rm -rf "${RUNNER_TEMP}" 2>/dev/null || true
+  rm -rf "${TEST_RUNNER_TEMP}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -46,9 +44,9 @@ echo ""
 # ── Test 2: Creates expected directories when starting clean ────────────────
 echo "Test 2: Creates expected directories when starting clean"
 rm -rf /tmp/gh-aw
-bash "${SCRIPT}" >/dev/null 2>&1
+RUNNER_TEMP="${TEST_RUNNER_TEMP}" bash "${SCRIPT}" >/dev/null 2>&1
 assert "creates /tmp/gh-aw/agent" "[ -d /tmp/gh-aw/agent ]"
-assert "creates daemon-visible agent directory" "[ -d \"${RUNNER_TEMP}/gh-aw/agent\" ]"
+assert "creates daemon-visible agent directory" "[ -d \"${TEST_RUNNER_TEMP}/gh-aw/agent\" ]"
 assert "creates /tmp/gh-aw/sandbox/firewall/logs" "[ -d /tmp/gh-aw/sandbox/firewall/logs ]"
 assert "creates /tmp/gh-aw/sandbox/firewall/audit" "[ -d /tmp/gh-aw/sandbox/firewall/audit ]"
 echo ""
@@ -58,7 +56,7 @@ echo "Test 3: No-op (no reclaim message) when firewall dir is already writable"
 rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall/logs /tmp/gh-aw/sandbox/firewall/audit
 set +e
-OUTPUT="$(bash "${SCRIPT}" 2>&1)"
+OUTPUT="$(RUNNER_TEMP="${TEST_RUNNER_TEMP}" bash "${SCRIPT}" 2>&1)"
 EXIT_CODE=$?
 set -e
 assert "exits 0 when firewall dir is writable" "[ '${EXIT_CODE}' -eq 0 ]"
@@ -71,7 +69,7 @@ rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall
 chmod 000 /tmp/gh-aw/sandbox/firewall
 set +e
-OUTPUT="$(bash "${SCRIPT}" 2>&1)"
+OUTPUT="$(RUNNER_TEMP="${TEST_RUNNER_TEMP}" bash "${SCRIPT}" 2>&1)"
 EXIT_CODE=$?
 set -e
 chmod u+rwx /tmp/gh-aw/sandbox/firewall 2>/dev/null || true
@@ -84,7 +82,7 @@ rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall/logs /tmp/gh-aw/sandbox/firewall/audit
 chmod 000 /tmp/gh-aw/sandbox/firewall/logs  # parent writable, subdir not
 set +e
-OUTPUT="$(bash "${SCRIPT}" 2>&1)"
+OUTPUT="$(RUNNER_TEMP="${TEST_RUNNER_TEMP}" bash "${SCRIPT}" 2>&1)"
 EXIT_CODE=$?
 set -e
 chmod u+rwx /tmp/gh-aw/sandbox/firewall/logs 2>/dev/null || true
