@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"strconv"
@@ -115,21 +116,23 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	}
 
 	detectionData := &WorkflowData{
-		AI:                engineID,
-		ActionCache:       data.ActionCache,
-		Features:          data.Features,
-		Jobs:              data.Jobs,
-		Permissions:       data.Permissions,
-		ParsedFrontmatter: data.ParsedFrontmatter,
-		CachedPermissions: data.CachedPermissions,
-		ModelCosts:        data.ModelCosts,
-		IsDetectionRun:    true,
-		RunnerConfig:      data.RunnerConfig,
-		TimeoutMinutes:    "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
-		CompiledVersion:   data.CompiledVersion,
+		AI:                   engineID,
+		ActionCache:          data.ActionCache,
+		Features:             data.Features,
+		Jobs:                 data.Jobs,
+		Permissions:          data.Permissions,
+		ParsedFrontmatter:    data.ParsedFrontmatter,
+		CachedPermissions:    data.CachedPermissions,
+		ModelCosts:           data.ModelCosts,
+		IsDetectionRun:       true,
+		RunnerConfig:         data.RunnerConfig,
+		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
+		CompiledVersion:      data.CompiledVersion,
+		ContainerPinMappings: maps.Clone(data.ContainerPinMappings),
 		SandboxConfig: &SandboxConfig{
 			Agent: &AgentSandboxConfig{
-				Type: SandboxTypeAWF,
+				Type:   SandboxTypeAWF,
+				Images: maps.Clone(getSandboxAgentImages(data)),
 			},
 		},
 	}
