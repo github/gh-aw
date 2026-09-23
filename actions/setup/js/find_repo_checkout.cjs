@@ -62,6 +62,79 @@ function extractRepoSlugFromUrl(remoteUrl) {
 }
 
 /**
+ * Extract the host name from a git remote URL
+ * Supports both `https://host[:port]/owner/repo` and `[user@]host:owner/repo` forms.
+ * User info and port are stripped; the result is lowercased.
+ * @param {string} remoteUrl - The git remote URL
+ * @returns {string|null} The host name or null if not parseable
+ */
+function extractRemoteHost(remoteUrl) {
+  if (!remoteUrl) return null;
+  const url = remoteUrl.trim();
+
+  const schemeMatch = url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^/]+)\//);
+  if (schemeMatch) {
+    const authority = schemeMatch[1];
+    const hostPort = authority.includes("@") ? authority.slice(authority.lastIndexOf("@") + 1) : authority;
+    const host = hostPort.replace(/:\d+$/, "");
+    return host ? host.toLowerCase() : null;
+  }
+
+  const sshMatch = url.match(/^(?:[^@/]+@)?([^:/]+):/);
+  if (sshMatch) {
+    return sshMatch[1].toLowerCase();
+  }
+
+  return null;
+}
+
+/**
+ * Determine whether a remote URL discovered by the workspace scan points at the
+ * GitHub instance this workflow runs against.
+ *
+ * Scan results come from `.git/config` files inside `$GITHUB_WORKSPACE`, which the
+ * agent can write. Without a host constraint, a planted config such as
+ * `https://attacker.example/owner/allowed-repo.git` would bind an agent-controlled
+ * directory to an allowlisted `owner/repo` slug, so safe-output git operations would
+ * run in that directory against an unrelated remote. Manifest entries are unaffected:
+ * they are emitted by the compiler and take precedence over the scan.
+ *
+ * @param {string} remoteUrl - The git remote URL
+ * @returns {boolean} True when the remote host is the configured GitHub host
+ */
+function isTrustedRemoteHost(remoteUrl) {
+  const host = extractRemoteHost(remoteUrl);
+  if (!host) return false;
+
+  const trustedHosts = new Set(["github.com"]);
+  const serverUrl = process.env.GITHUB_SERVER_URL;
+  if (serverUrl) {
+    try {
+      const serverHost = new URL(serverUrl).hostname;
+      if (serverHost) trustedHosts.add(serverHost.toLowerCase());
+    } catch {
+      // Malformed GITHUB_SERVER_URL: fall back to the github.com default
+    }
+  }
+
+  return trustedHosts.has(host);
+}
+
+/**
+ * Extract the repo slug from a remote URL discovered by the workspace scan,
+ * rejecting remotes hosted outside the configured GitHub instance.
+ * @param {string} remoteUrl - The git remote URL
+ * @returns {string|null} The repo slug (owner/repo) or null when untrusted or unparseable
+ */
+function extractScannedRepoSlug(remoteUrl) {
+  if (!isTrustedRemoteHost(remoteUrl)) {
+    debugLog(`Ignoring remote on untrusted host: ${remoteUrl}`);
+    return null;
+  }
+  return extractRepoSlugFromUrl(remoteUrl);
+}
+
+/**
  * Find all repositories that contain a .git directory or gitdir-link file
  * @param {string} basePath - The base path to search from
  * @param {number} [maxDepth=5] - Maximum directory depth to search
@@ -233,7 +306,7 @@ function findRepoCheckout(repoSlug, workspaceRoot, options = {}) {
       continue;
     }
 
-    const foundSlug = extractRepoSlugFromUrl(remoteUrl);
+    const foundSlug = extractScannedRepoSlug(remoteUrl);
     debugLog(`Repo at ${repoPath} has slug: ${foundSlug}`);
 
     if (foundSlug === targetSlug) {
@@ -250,7 +323,7 @@ function findRepoCheckout(repoSlug, workspaceRoot, options = {}) {
   // This handles the scenario where only the root is a repo
   const rootRemoteUrl = getRemoteOriginUrl(ws);
   if (rootRemoteUrl) {
-    const rootSlug = extractRepoSlugFromUrl(rootRemoteUrl);
+    const rootSlug = extractScannedRepoSlug(rootRemoteUrl);
     debugLog(`Workspace root has slug: ${rootSlug}`);
     if (rootSlug === targetSlug) {
       return {
@@ -296,7 +369,7 @@ function buildRepoCheckoutMap(workspaceRoot) {
     const remoteUrl = getRemoteOriginUrl(repoPath);
     if (!remoteUrl) continue;
 
-    const slug = extractRepoSlugFromUrl(remoteUrl);
+    const slug = extractScannedRepoSlug(remoteUrl);
     if (slug && !map.has(slug)) {
       map.set(slug, repoPath);
     }
@@ -305,7 +378,7 @@ function buildRepoCheckoutMap(workspaceRoot) {
   // Also check workspace root
   const rootRemoteUrl = getRemoteOriginUrl(ws);
   if (rootRemoteUrl) {
-    const rootSlug = extractRepoSlugFromUrl(rootRemoteUrl);
+    const rootSlug = extractScannedRepoSlug(rootRemoteUrl);
     if (rootSlug && !map.has(rootSlug)) {
       map.set(rootSlug, ws);
     }
@@ -319,6 +392,8 @@ module.exports = {
   findRepoCheckout,
   buildRepoCheckoutMap,
   extractRepoSlugFromUrl,
+  extractRemoteHost,
+  isTrustedRemoteHost,
   normalizeRepoSlug,
   findGitDirectories,
 };

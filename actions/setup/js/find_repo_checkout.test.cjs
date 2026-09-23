@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { extractRepoSlugFromUrl, normalizeRepoSlug, findGitDirectories, findRepoCheckout, buildRepoCheckoutMap } = require("./find_repo_checkout.cjs");
+const { extractRepoSlugFromUrl, extractRemoteHost, isTrustedRemoteHost, normalizeRepoSlug, findGitDirectories, findRepoCheckout, buildRepoCheckoutMap } = require("./find_repo_checkout.cjs");
 const { getPatchPathForBranchInRepo, sanitizeBranchNameForPatch, sanitizeRepoSlugForPatch } = require("./generate_git_patch.cjs");
 const { _resetCache: resetCheckoutManifestCache } = require("./checkout_manifest.cjs");
 
@@ -516,6 +516,68 @@ exit 1
       expect(result.success).toBe(false);
       expect(result.error).toContain("checkout:");
       expect(result.error).toContain("steps:");
+    });
+
+    it("ignores a scanned repository whose remote points at another host", () => {
+      const plantedRepo = path.join(workspaceDir, "repos", "planted");
+      fs.mkdirSync(path.join(plantedRepo, ".git"), { recursive: true });
+      const binDir = path.join(workspaceDir, "bin");
+      fs.mkdirSync(binDir, { recursive: true });
+      const fakeGit = path.join(binDir, "git");
+      fs.writeFileSync(
+        fakeGit,
+        `#!/bin/sh
+if [ "$1" = "config" ] && [ "$2" = "--get" ] && [ "$3" = "remote.origin.url" ]; then
+  echo "https://attacker.example/owner/analytics.git"
+  exit 0
+fi
+exit 1
+`
+      );
+      fs.chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+      process.env.GIT_SCAN_ENV_LOG = path.join(workspaceDir, "git-env.log");
+
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("remote host trust", () => {
+    let oldServerUrl;
+
+    beforeEach(() => {
+      oldServerUrl = process.env.GITHUB_SERVER_URL;
+    });
+
+    afterEach(() => {
+      oldServerUrl === undefined ? delete process.env.GITHUB_SERVER_URL : (process.env.GITHUB_SERVER_URL = oldServerUrl);
+    });
+
+    it("extracts the host from HTTPS and SSH remotes", () => {
+      expect(extractRemoteHost("https://github.com/owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("https://user@github.com/owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("https://github.example.com:8443/owner/repo.git")).toBe("github.example.com");
+      expect(extractRemoteHost("git@github.com:owner/repo.git")).toBe("github.com");
+      expect(extractRemoteHost("/local/path/repo")).toBeNull();
+      expect(extractRemoteHost("")).toBeNull();
+    });
+
+    it("trusts github.com and the configured GitHub server host only", () => {
+      delete process.env.GITHUB_SERVER_URL;
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("git@GitHub.com:owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
+
+      process.env.GITHUB_SERVER_URL = "https://github.example.com";
+      expect(isTrustedRemoteHost("https://github.example.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
+
+      process.env.GITHUB_SERVER_URL = "not a url";
+      expect(isTrustedRemoteHost("https://github.com/owner/repo.git")).toBe(true);
+      expect(isTrustedRemoteHost("https://attacker.example/owner/repo.git")).toBe(false);
     });
   });
 
