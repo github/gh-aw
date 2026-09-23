@@ -26,6 +26,42 @@ describe("check_daily_aic_workflow_guardrail", () => {
     exports = mod.default || mod;
   });
 
+  it("fails closed for the repo-memory backend unless explicitly enabled", async () => {
+    const outputs = {};
+    const setFailed = vi.fn();
+    global.core = {
+      setOutput: (key, value) => {
+        outputs[key] = value;
+      },
+      setFailed,
+      info: vi.fn(),
+      warning: vi.fn(),
+    };
+    global.github = {};
+    global.context = { repo: { owner: "test-owner", repo: "test-repo" } };
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS = "100";
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND = "repo-memory";
+    process.env.GITHUB_EVENT_NAME = "schedule";
+    delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
+    vi.resetModules();
+    const mod = await import("./check_daily_aic_workflow_guardrail.cjs");
+    exports = mod.default || mod;
+
+    try {
+      await exports.main({ repoMemoryDir: scanCacheDirectory });
+      expect(outputs.daily_ai_credits_guardrail_status).toBe("structural_error");
+      expect(outputs.daily_ai_credits_guardrail_error).toContain("untrusted");
+      expect(setFailed).toHaveBeenCalledOnce();
+    } finally {
+      delete global.core;
+      delete global.github;
+      delete global.context;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND;
+      delete process.env.GITHUB_EVENT_NAME;
+    }
+  });
+
   afterEach(() => {
     fs.rmSync(scanCacheDirectory, { recursive: true, force: true });
     delete process.env.GITHUB_EVENT_NAME;

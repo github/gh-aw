@@ -4328,7 +4328,7 @@
     },
     "max-daily-ai-credits": {
       "$ref": "#/$defs/max_daily_ai_credits_limit",
-      "description": "24-hour AI Credits guardrail for runs triggered by the same user. Omit the field to leave the guardrail disabled. Supports GitHub Actions expressions."
+      "description": "24-hour AI Credits guardrail for all runs of this workflow. Omit the field to leave the guardrail disabled. Supports GitHub Actions expressions."
     },
     "max-runs": {
       "$ref": "#/$defs/templatable_positive_integer",
@@ -14068,7 +14068,7 @@
       ]
     },
     "max_daily_ai_credits_limit": {
-      "description": "Maximum AI Credits budget allowed across the last 24 hours for runs of this workflow by the triggering user. Accepts positive integers (including K/M suffix strings and expressions), or an object with a 'value' field and optional guardrail settings. Set to -1 to disable.",
+      "description": "Maximum AI Credits budget allowed across the last 24 hours for all runs of this workflow. Accepts positive integers (including K/M suffix strings and expressions), or an object with a 'value' field and optional guardrail settings. Set to -1 to disable.",
       "oneOf": [
         {
           "$ref": "#/$defs/positive_ai_credits_limit"
@@ -14083,7 +14083,7 @@
         },
         {
           "type": "object",
-          "description": "Object form: specify a 'value' (the credit limit), an optional 'github-app' to mint a dedicated token for the guardrail API calls, and optional error handling.",
+          "description": "Object form: specify a 'value' (the credit limit), an optional 'github-app' to mint a dedicated token for the guardrail API calls, an optional backend, and optional error handling.",
           "properties": {
             "value": {
               "$ref": "#/$defs/positive_ai_credits_limit",
@@ -14096,6 +14096,11 @@
             "continue-on-error": {
               "type": "boolean",
               "description": "When true, an unknown daily AI Credits total produces a warning and allows the workflow to continue. Defaults to false."
+            },
+            "backend": {
+              "type": "string",
+              "enum": ["repo-memory"],
+              "description": "Optional storage backend for the daily AI Credits rolling ledger. Use 'repo-memory' to read and write date-bucketed JSONL ledger files through tools.repo-memory. It selects the memory named 'default', or the first configured memory when no default exists."
             }
           },
           "required": ["value"],

@@ -104,6 +104,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	ctx.toolsResult = toolsResult
 	ctx.workflowData = c.buildInitialWorkflowData(ctx.frontmatter, toolsResult, engineSetup, engineSetup.importsResult)
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
+	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }
 

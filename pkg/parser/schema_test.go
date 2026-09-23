@@ -1288,6 +1288,23 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_MaxDailyAICreditsN
 	}
 }
 
+func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_MaxDailyAICreditsRepoMemoryBackendAllowed(t *testing.T) {
+	t.Parallel()
+
+	validFrontmatter := map[string]any{
+		"on": "push",
+		"max-daily-ai-credits": map[string]any{
+			"value":   1000,
+			"backend": "repo-memory",
+		},
+	}
+
+	err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(validFrontmatter, "/tmp/gh-aw/max-daily-ai-credits-repo-memory-backend-test.md")
+	if err != nil {
+		t.Fatalf("expected max-daily-ai-credits backend=repo-memory to pass schema validation, got: %v", err)
+	}
+}
+
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_SandboxAgentPlatform(t *testing.T) {
 	t.Parallel()
 
