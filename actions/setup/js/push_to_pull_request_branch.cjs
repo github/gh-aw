@@ -665,7 +665,7 @@ async function main(config = {}) {
         if (!checkoutResult.success) {
           return {
             success: false,
-            error: `Repository '${itemRepo}' not found in workspace. Check out the target repo with actions/checkout and set its 'path' input so the checkout can be located. If checking out multiple repositories, ensure each actions/checkout step uses the appropriate 'path' input.`,
+            error: checkoutResult.error,
           };
         }
         repoCwd = checkoutResult.path;

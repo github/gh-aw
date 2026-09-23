@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
+const { execGitSync } = require("./git_helpers.cjs");
 const { validateTargetRepo, parseAllowedRepos, getDefaultTargetRepo } = require("./repo_helpers.cjs");
 const { lookupCheckout, loadAllCheckouts } = require("./checkout_manifest.cjs");
 
@@ -116,17 +116,25 @@ function findGitDirectories(basePath, maxDepth = 5) {
  * runner user that owns clones created by `steps:` entries or a manual
  * `actions/checkout`. Under git's "dubious ownership" protection,
  * `git config --get` silently ignores the repository config and exits 1, so
- * every nested clone would look like it had no remote. Trust each scanned
- * repository path before reading its config to restore discovery of any clone
- * under the workspace.
+ * every nested clone would look like it had no remote. Inject a scoped
+ * safe.directory override for this single config read so discovery works
+ * without mutating process-wide git trust for every scanned workspace path.
  *
  * @param {string} repoPath - Path to the repository root
  * @returns {string|null} The remote URL or null if not found
  */
 function getRemoteOriginUrl(repoPath) {
   try {
-    ensureSafeDirectoryTrust(repoPath, debugLog);
-    const url = execGitSync(["config", "--get", "remote.origin.url"], { cwd: repoPath, suppressLogs: true });
+    const url = execGitSync(["config", "--get", "remote.origin.url"], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "safe.directory",
+        GIT_CONFIG_VALUE_0: path.resolve(repoPath),
+      },
+      suppressLogs: true,
+    });
     return url.trim();
   } catch {
     return null;

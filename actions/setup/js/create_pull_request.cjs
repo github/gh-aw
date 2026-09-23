@@ -1154,7 +1154,7 @@ async function main(config = {}) {
           core.warning(`Repository ${itemRepo} not found in checkout mapping or workspace`);
           return {
             success: false,
-            error: `Repository '${itemRepo}' not found in workspace. Configure it in checkout: with a path to enable multi-repo PR creation.`,
+            error: checkoutResult.error,
           };
         }
       }

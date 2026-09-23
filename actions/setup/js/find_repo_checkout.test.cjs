@@ -440,41 +440,36 @@ describe("find_repo_checkout", () => {
     });
   });
 
-  describe("git-scan fallback trusts scanned repositories (issue #60021)", () => {
+  describe("git-scan fallback reads remotes with scoped safe.directory trust (issue #60021)", () => {
     let workspaceDir;
-    let savedGitConfigEnv;
-
-    /**
-     * Collect the safe.directory values currently injected into the env-var git config chain.
-     * @returns {string[]}
-     */
-    function injectedSafeDirectories() {
-      const count = Number(process.env.GIT_CONFIG_COUNT || "0");
-      const values = [];
-      for (let i = 0; i < count; i++) {
-        if (process.env[`GIT_CONFIG_KEY_${i}`] === "safe.directory") {
-          values.push(process.env[`GIT_CONFIG_VALUE_${i}`]);
-        }
-      }
-      return values;
-    }
+    let oldPath;
+    let oldGitScanEnvLog;
+    let oldGitConfigCount;
+    let oldGitConfigKey0;
+    let oldGitConfigValue0;
+    let oldCore;
 
     beforeEach(() => {
-      savedGitConfigEnv = {};
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith("GIT_CONFIG_")) {
-          savedGitConfigEnv[key] = process.env[key];
-          delete process.env[key];
-        }
-      }
+      oldPath = process.env.PATH;
+      oldGitScanEnvLog = process.env.GIT_SCAN_ENV_LOG;
+      oldGitConfigCount = process.env.GIT_CONFIG_COUNT;
+      oldGitConfigKey0 = process.env.GIT_CONFIG_KEY_0;
+      oldGitConfigValue0 = process.env.GIT_CONFIG_VALUE_0;
+      oldCore = globalThis.core;
+      globalThis.core = { debug: () => {}, error: () => {} };
+      delete process.env.GIT_CONFIG_COUNT;
+      delete process.env.GIT_CONFIG_KEY_0;
+      delete process.env.GIT_CONFIG_VALUE_0;
       workspaceDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "test-safedir-"));
     });
 
     afterEach(() => {
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith("GIT_CONFIG_")) delete process.env[key];
-      }
-      Object.assign(process.env, savedGitConfigEnv);
+      oldPath === undefined ? delete process.env.PATH : (process.env.PATH = oldPath);
+      oldGitScanEnvLog === undefined ? delete process.env.GIT_SCAN_ENV_LOG : (process.env.GIT_SCAN_ENV_LOG = oldGitScanEnvLog);
+      oldGitConfigCount === undefined ? delete process.env.GIT_CONFIG_COUNT : (process.env.GIT_CONFIG_COUNT = oldGitConfigCount);
+      oldGitConfigKey0 === undefined ? delete process.env.GIT_CONFIG_KEY_0 : (process.env.GIT_CONFIG_KEY_0 = oldGitConfigKey0);
+      oldGitConfigValue0 === undefined ? delete process.env.GIT_CONFIG_VALUE_0 : (process.env.GIT_CONFIG_VALUE_0 = oldGitConfigValue0);
+      oldCore === undefined ? delete globalThis.core : (globalThis.core = oldCore);
       try {
         fs.rmSync(workspaceDir, { recursive: true, force: true });
       } catch {
@@ -482,13 +477,37 @@ describe("find_repo_checkout", () => {
       }
     });
 
-    it("registers each scanned repository as a git safe.directory", () => {
+    it("injects safe.directory only for the git config read", () => {
       const nestedRepo = path.join(workspaceDir, "repos", "analytics");
       fs.mkdirSync(path.join(nestedRepo, ".git"), { recursive: true });
+      const binDir = path.join(workspaceDir, "bin");
+      fs.mkdirSync(binDir, { recursive: true });
+      const envLog = path.join(workspaceDir, "git-env.log");
+      const fakeGit = path.join(binDir, "git");
+      fs.writeFileSync(
+        fakeGit,
+        `#!/bin/sh
+printf '%s\\t%s\\t%s\\t%s\\n' "$PWD" "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" >> "$GIT_SCAN_ENV_LOG"
+if [ "$1" = "config" ] && [ "$2" = "--get" ] && [ "$3" = "remote.origin.url" ]; then
+  echo "https://github.com/owner/analytics.git"
+  exit 0
+fi
+exit 1
+`
+      );
+      fs.chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+      process.env.GIT_SCAN_ENV_LOG = envLog;
 
-      findRepoCheckout("owner/analytics", workspaceDir);
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
 
-      expect(injectedSafeDirectories()).toContain(nestedRepo);
+      expect(result.success).toBe(true);
+      expect(result.path).toBe(nestedRepo);
+      expect(process.env.GIT_CONFIG_COUNT).toBeUndefined();
+      expect(process.env.GIT_CONFIG_KEY_0).toBeUndefined();
+      expect(process.env.GIT_CONFIG_VALUE_0).toBeUndefined();
+      const configRead = fs.readFileSync(envLog, "utf8").trim().split("\n")[0].split("\t");
+      expect(configRead).toEqual([nestedRepo, "1", "safe.directory", path.resolve(nestedRepo)]);
     });
 
     it("reports a not-found error that mentions both checkout: and steps: clones", () => {
