@@ -13,7 +13,7 @@ import (
 
 type auditCacheSource string
 
-const auditSchemaVersion = 1
+const auditSchemaVersion = 2
 
 const (
 	auditCacheSourceFull auditCacheSource = "full"
@@ -134,6 +134,9 @@ func hydrateProcessedRunWithCachedAudit(processedRun ProcessedRun) ProcessedRun 
 	}
 	if len(processedRun.MCPFailures) == 0 {
 		processedRun.MCPFailures = audit.MCPFailures
+	}
+	if len(processedRun.GatewaySteeringEvents) == 0 {
+		processedRun.GatewaySteeringEvents = audit.GatewaySteeringEvents
 	}
 	return processedRun
 }

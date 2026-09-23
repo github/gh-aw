@@ -34,6 +34,7 @@ func buildProcessedAuditRun(run WorkflowRun, results auditAnalysisResults) Proce
 		Noops:                   results.noops,
 		MCPFailures:             results.mcpFailures,
 		SkillActivations:        results.skillActivations,
+		GatewaySteeringEvents:   results.gatewaySteeringEvents,
 		TokenUsage:              results.tokenUsageSummary,
 		WorkingSet:              results.workingSet,
 		GitHubRateLimitUsage:    results.rateLimitUsage,
@@ -81,7 +82,8 @@ func buildAuditRunSummary(run WorkflowRun, processedRun ProcessedRun, results au
 			GitHubRateLimitUsage:    results.rateLimitUsage,
 			JobDetails:              results.jobDetails,
 		},
-		PolicyAnalysis: results.policyAnalysis,
-		ArtifactsList:  results.artifacts,
+		PolicyAnalysis:        results.policyAnalysis,
+		GatewaySteeringEvents: results.gatewaySteeringEvents,
+		ArtifactsList:         results.artifacts,
 	}
 }

@@ -2259,6 +2259,31 @@
                     "additionalProperties": false
                   }
                 },
+                "gateway_steering_events": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "firewall_token_usage": {
                   "type": [
                     "null",

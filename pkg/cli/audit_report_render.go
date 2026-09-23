@@ -312,6 +312,7 @@ func renderConsoleWarnings(warnings []ValidationIssue) {
 
 func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleSkillActivations(data.SkillActivations)
+	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
 	renderConsoleMissingTools(data.MissingTools)
 	renderConsoleMCPFailures(data.MCPFailures)
 	renderCompactMCPHealth(data.MCPServerHealth)
@@ -321,6 +322,20 @@ func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleMCPToolUsage(data.MCPToolUsage)
 	if data.FirewallAnalysis != nil && data.FirewallAnalysis.TotalRequests > 0 {
 		renderCompactFirewall(data.FirewallAnalysis)
+	}
+}
+
+func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
+	if len(events) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  gateway_steering_events:")
+	for _, event := range events {
+		line := fmt.Sprintf("    %s: %s", event.Type, event.Message)
+		if event.Timestamp != "" {
+			line += " (" + event.Timestamp + ")"
+		}
+		fmt.Fprintln(os.Stderr, line)
 	}
 }
 

@@ -229,6 +229,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		MissingData:             summary.MissingData,
 		Noops:                   summary.Noops,
 		MCPFailures:             summary.MCPFailures,
+		GatewaySteeringEvents:   summary.GatewaySteeringEvents,
 		TokenUsage:              summary.TokenUsage,
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,

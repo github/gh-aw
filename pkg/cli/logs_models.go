@@ -129,6 +129,7 @@ type ProcessedRun struct {
 	Noops                   []NoopReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
+	GatewaySteeringEvents   []GatewaySteeringEvent
 	MCPToolUsage            *MCPToolUsageData
 	TokenUsage              *TokenUsageSummary
 	WorkingSet              *WorkingSetMetrics
@@ -137,6 +138,13 @@ type ProcessedRun struct {
 	SafeOutputs             []CreatedItemReport
 	cachedData              *RunData
 	cachedAudit             *AuditData
+}
+
+// GatewaySteeringEvent records an AI-credit or timeout warning injected by the gateway.
+type GatewaySteeringEvent struct {
+	Type      string `json:"type" console:"header:Type"`
+	Message   string `json:"message" console:"header:Message"`
+	Timestamp string `json:"timestamp,omitempty" console:"header:Timestamp,omitempty"`
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.
@@ -306,8 +314,9 @@ type RunSummary struct {
 	RunID       int64     `json:"run_id"`       // Workflow run database ID
 	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
 	RunAnalysis
-	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
-	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files
+	PolicyAnalysis        *PolicyAnalysis        `json:"policy_analysis,omitempty"`         // Firewall policy rule attribution
+	GatewaySteeringEvents []GatewaySteeringEvent `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
+	ArtifactsList         []string               `json:"artifacts_list"`                    // List of downloaded artifact files
 }
 
 // DownloadResult represents the result of downloading and processing a workflow run

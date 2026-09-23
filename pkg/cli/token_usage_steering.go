@@ -56,6 +56,34 @@ func parseAPIProxySteeringEvents(filePath string) (int, error) {
 	return len(entries), err
 }
 
+func extractGatewaySteeringEvents(runDir string) ([]GatewaySteeringEvent, error) {
+	eventsPath := findAPIProxyEventsFile(runDir)
+	if eventsPath == "" {
+		return nil, nil
+	}
+
+	file, err := os.Open(filepath.Clean(eventsPath))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	entries, err := scanSteeringEntries(file)
+	if err != nil {
+		return nil, err
+	}
+
+	events := make([]GatewaySteeringEvent, 0, len(entries))
+	for _, entry := range entries {
+		events = append(events, GatewaySteeringEvent{
+			Type:      entry.eventName(),
+			Message:   strings.TrimSpace(entry.Message),
+			Timestamp: entry.Timestamp,
+		})
+	}
+	return events, nil
+}
+
 func containsSteeringKeyword(line string) bool {
 	return strings.Contains(line, "steering") ||
 		strings.Contains(line, "STEERING") ||

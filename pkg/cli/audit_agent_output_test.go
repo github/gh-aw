@@ -361,6 +361,9 @@ func TestAuditDataJSONStructure(t *testing.T) {
 		MCPFailures: []MCPFailureReport{
 			{ServerName: "test-server", Status: "failed"},
 		},
+		GatewaySteeringEvents: []GatewaySteeringEvent{
+			{Type: tokenSteeringEventName, Message: "[AWF TOKEN WARNING] You are running out of AI Credits."},
+		},
 		JobDetails: []JobInfoWithDuration{
 			{JobInfo: JobInfo{Name: "test", Conclusion: "failure"}},
 		},
@@ -388,6 +391,7 @@ func TestAuditDataJSONStructure(t *testing.T) {
 		"downloaded_files",
 		"missing_tools",
 		"mcp_failures",
+		"gateway_steering_events",
 		"tool_usage",
 	}
 

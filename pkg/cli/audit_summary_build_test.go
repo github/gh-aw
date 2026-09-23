@@ -21,6 +21,7 @@ func TestBuildProcessedAuditRun(t *testing.T) {
 		noops:                   []NoopReport{{}},
 		mcpFailures:             []MCPFailureReport{{}},
 		skillActivations:        []SkillActivation{{}},
+		gatewaySteeringEvents:   []GatewaySteeringEvent{{Type: tokenSteeringEventName}},
 		tokenUsageSummary:       &TokenUsageSummary{},
 		rateLimitUsage:          &GitHubRateLimitUsage{},
 		jobDetails:              []JobInfoWithDuration{{}},
@@ -39,6 +40,7 @@ func TestBuildProcessedAuditRun(t *testing.T) {
 	assert.Equal(t, results.noops, processedRun.Noops)
 	assert.Equal(t, results.mcpFailures, processedRun.MCPFailures)
 	assert.Equal(t, results.skillActivations, processedRun.SkillActivations)
+	assert.Equal(t, results.gatewaySteeringEvents, processedRun.GatewaySteeringEvents)
 	assert.Equal(t, results.jobDetails, processedRun.JobDetails)
 }
 
