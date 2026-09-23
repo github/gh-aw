@@ -28,7 +28,6 @@ imports:
   - shared/gh.md
   - shared/reporting-otlp.md
   - shared/otlp.md
-  - shared/token-telemetry-check.md
   - shared/smoke-test-brevity.md
 network:
   allowed: []
