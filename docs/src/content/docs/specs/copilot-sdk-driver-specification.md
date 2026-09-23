@@ -314,7 +314,7 @@ export function canUseWriteTool(config: PermissionConfig): boolean {
 
 ### 5.7 Go Repository Profile
 
-`tools.profile: go` is an experimental, opt-in version 2 contract for the
+`tools.repository: go` is an experimental, opt-in version 2 contract for the
 bundled Copilot SDK driver inside AWF. It MUST preserve explicit `bash: false`
 and `cli-proxy: false`, keep editing enabled, and register the exact custom
 permission `go_repository`. Version 1 defaults remain unchanged when the

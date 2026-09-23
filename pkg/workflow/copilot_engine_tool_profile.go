@@ -17,40 +17,53 @@ const copilotGoRepositoryToolName = "go_repository"
 var goRepositoryLiteralRepoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 func extractToolProfiles(tools map[string]any) ([]string, error) {
+	if repository, exists := tools["repository"]; exists {
+		if _, profileExists := tools["profile"]; profileExists {
+			return nil, errors.New("tools.repository cannot be combined with tools.profile")
+		}
+		return extractToolProfileValues(repository, "tools.repository")
+	}
 	value, exists := tools["profile"]
 	if !exists {
 		return nil, nil
 	}
-	switch profiles := value.(type) {
-	case string:
-		if strings.TrimSpace(profiles) == "" {
-			return nil, errors.New("tools.profile entries must be nonempty strings")
-		}
-		return []string{profiles}, nil
+	switch value.(type) {
 	case map[string]any:
 		// mcp-servers are merged into the tools map for runtime rendering.
 		// Preserve a legacy custom server named "profile".
 		return nil, nil
+	default:
+		return extractToolProfileValues(value, "tools.profile")
+	}
+}
+
+func extractToolProfileValues(value any, field string) ([]string, error) {
+	switch profiles := value.(type) {
+	case string:
+		if strings.TrimSpace(profiles) == "" {
+			return nil, fmt.Errorf("%s entries must be nonempty strings", field)
+		}
+		return []string{profiles}, nil
 	case []any:
 		if len(profiles) == 0 {
-			return nil, errors.New("tools.profile array must not be empty")
+			return nil, fmt.Errorf("%s array must not be empty", field)
 		}
 		result := make([]string, 0, len(profiles))
 		seen := make(map[string]struct{}, len(profiles))
 		for _, profile := range profiles {
 			name, ok := profile.(string)
 			if !ok || strings.TrimSpace(name) == "" {
-				return nil, errors.New("tools.profile entries must be nonempty strings")
+				return nil, fmt.Errorf("%s entries must be nonempty strings", field)
 			}
 			if _, exists := seen[name]; exists {
-				return nil, fmt.Errorf("tools.profile contains duplicate value %q", name)
+				return nil, fmt.Errorf("%s contains duplicate value %q", field, name)
 			}
 			result = append(result, name)
 			seen[name] = struct{}{}
 		}
 		return result, nil
 	default:
-		return nil, errors.New("tools.profile must be a string or an array of strings")
+		return nil, fmt.Errorf("%s must be a string or an array of strings", field)
 	}
 }
 

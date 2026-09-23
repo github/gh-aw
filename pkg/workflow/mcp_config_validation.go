@@ -48,6 +48,7 @@ var builtInToolNames = map[string]bool{
 	"startup-timeout":   true,
 	"cli-proxy":         true,
 	"profile":           true,
+	"repository":        true,
 }
 
 // builtInToolNamesForError is the sorted, comma-separated list of built-in tool names

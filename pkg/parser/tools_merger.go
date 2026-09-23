@@ -49,7 +49,7 @@ func mergeToolsFromJSON(content string) (string, error) {
 }
 
 // MergeTools merges two neutral tool configurations.
-// Supports merging arrays and maps for neutral tools plus the tools.profile string-or-array shorthand.
+// Supports merging arrays and maps for neutral tools plus repository-profile shorthand.
 // Removes all legacy Claude tool merging logic.
 func MergeTools(base, additional map[string]any) (map[string]any, error) {
 	parserLog.Printf("Merging tools: base_keys=%d, additional_keys=%d", len(base), len(additional))
@@ -62,6 +62,11 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 			}
 		}
 	}
+	if repository, exists := base["repository"]; exists {
+		if _, err := normalizeToolProfiles(repository); err != nil {
+			return nil, err
+		}
+	}
 	maps.Copy(result, base)
 
 	for key, newValue := range additional {
@@ -70,6 +75,11 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 				if _, err := normalizeToolProfiles(newValue); err != nil {
 					return nil, err
 				}
+			}
+		}
+		if key == "repository" {
+			if _, err := normalizeToolProfiles(newValue); err != nil {
+				return nil, err
 			}
 		}
 		if existingValue, exists := result[key]; exists {
@@ -137,7 +147,7 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
-	if key == "profile" {
+	if key == "profile" || key == "repository" {
 		merged, err := mergeToolProfiles(existingValue, newValue)
 		return merged, true, err
 	}

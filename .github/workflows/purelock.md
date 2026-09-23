@@ -30,7 +30,6 @@ network:
     - go
     - node
 tools:
-  profile: go
   cache-memory:
     retention-days: 60
     allowed-extensions: [".json"]
@@ -41,6 +40,7 @@ tools:
     mode: local
     min-integrity: none
 imports:
+  - shared/go-repository.md
   - shared/mcp/serena-go.md
   - shared/otlp.md
   - shared/reporting.md

@@ -94,7 +94,7 @@ func TestGoRepositoryProfileEmitsExperimentalWarning(t *testing.T) {
 
 	compiler.emitExperimentalFeatureWarningsTo(parseGoRepositoryProfileTestWorkflow(t), &output)
 
-	assert.Contains(t, output.String(), "Using experimental feature: tools.profile: go")
+	assert.Contains(t, output.String(), "Using experimental feature: tools.repository: go")
 	assert.Equal(t, 1, compiler.GetWarningCount())
 }
 
@@ -141,6 +141,50 @@ tools:
 	require.NoError(t, err)
 	assert.Equal(t, []string{"go"}, data.ToolProfiles)
 	assert.NotContains(t, data.Tools, "profile")
+	require.NoError(t, validateCopilotToolProfile(data))
+}
+
+func TestGoRepositoryComponentCanBeProvidedBySharedWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+description: Shared Go repository component
+tools:
+  repository: go
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	main = strings.Replace(main, "  profile: go\n", "", 1)
+	filename := filepath.Join(dir, "component.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(filename)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go"}, data.ToolProfiles)
+	assert.NotContains(t, data.Tools, "repository")
+	require.NoError(t, validateCopilotToolProfile(data))
+}
+
+func TestGoRepositoryComponentMergesAcrossSharedWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+tools:
+  repository: [go]
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	main = strings.Replace(main, "  profile: go\n", "  repository: go\n", 1)
+	filename := filepath.Join(dir, "component.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(filename)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go"}, data.ToolProfiles)
 	require.NoError(t, validateCopilotToolProfile(data))
 }
 

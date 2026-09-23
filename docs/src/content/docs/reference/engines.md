@@ -451,12 +451,12 @@ engine:
 See [Copilot SDK Driver Specification](/gh-aw/specs/copilot-sdk-driver-specification/)
 for the full driver contract.
 
-#### Go repository tool profile (`tools.profile`)
+#### Go repository tool component (`tools.repository`)
 
 > [!WARNING]
 > **Experimental:** This profile is in preview. Its configuration and runtime contract may change.
 
-`tools.profile: go` opts the bundled Copilot SDK driver into a no-shell repository tool contract. `profile` accepts either a string or an array, and profiles are merged across [shared workflow imports](/gh-aw/reference/imports/). Omitting the field retains the existing version 1 SDK tool configuration and tool defaults.
+`tools.repository: go` opts the bundled Copilot SDK driver into a no-shell repository tool contract. `repository` accepts either a string or an array and merges across [shared workflow imports](/gh-aw/reference/imports/). Import `shared/go-repository.md` to compose this component without repeating the shell and CLI restrictions. Omitting the field retains the existing version 1 SDK tool configuration and tool defaults.
 
 ```aw wrap
 engine:
@@ -467,7 +467,7 @@ engine:
 sandbox:
   agent: awf
 tools:
-  profile: go
+  repository: go
   bash: false
   cli-proxy: false
 safe-outputs:

@@ -5453,6 +5453,24 @@
             }
           ]
         },
+        "repository": {
+          "description": "Experimental compiler-owned repository toolchain. A single toolchain can be provided as a string; multiple toolchains can be provided as an array. The 'go' toolchain requires the bundled Copilot SDK driver inside AWF, explicit bash: false (or []), cli-proxy: false, editing, and a single current-repository create-pull-request target.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["go"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["go"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        },
         "serena": {
           "description": "REMOVED: Built-in support for Serena has been removed. Use the shared/mcp/serena.md workflow instead.",
           "deprecated": true,
