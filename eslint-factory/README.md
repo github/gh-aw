@@ -48,6 +48,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fs-chmod-try-catch`](#require-fs-chmod-try-catch) | Require try/catch around `fs.chmodSync` and `fs.fchmodSync` |
 | [`require-fs-close-sync`](#require-fs-close-sync) | Require `fs.openSync(...)` file descriptors to be closed with `fs.closeSync(fd)` in the same function |
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
+| [`require-fs-sync-rw-try-catch`](#require-fs-sync-rw-try-catch) | Require try/catch around low-level `fs.writeSync` and `fs.readSync` fd read/write calls |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
@@ -394,6 +395,34 @@ try {
   fs.statSync(filePath);
 } catch (err) {
   throw new Error("fs.statSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-fs-sync-rw-try-catch`
+
+Require `fs.writeSync` and `fs.readSync` calls to be wrapped in `try/catch`.
+
+Why: these low-level fd read/write methods throw synchronously on I/O failures (`EPIPE` broken pipe, `EAGAIN` resource unavailable, `EBADF` bad descriptor). Because the surrounding `openSync`/`closeSync` pairing already looks protective, it's easy to leave the actual read/write call unguarded; without a call-site `try/catch`, the entrypoint-level catch produces a generic engine-level stack instead of a specific message that preserves the error as `{ cause }`.
+
+**Detected forms:**
+- `fs.writeSync(fd, data)` — direct call on a known `require("fs")` result.
+- `fs.readSync(fd, buf, offset, length, position)` — direct call on a known `require("fs")` result.
+- `fs["writeSync"](fd, data)` — computed string-literal property access.
+- `const { writeSync } = require("fs"); writeSync(fd, data)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace/default imports: `import fs from "node:fs"; fs.writeSync(1, bytes)`.
+- ESM named imports: `import { readSync } from "fs"; readSync(fd, buf, 0, len, pos)`.
+- Bare unbound identifiers: `writeSync(fd, data)` when `writeSync` is not a locally bound variable.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module (e.g. mocks or unrelated `readSync`/`writeSync` methods on other objects).
+- `try { ... } finally { ... }` without a `catch` clause is still flagged, since a `finally` block does not handle the thrown error.
+
+**Safe alternative:**
+```js
+try {
+  fs.writeSync(1, bytes);
+} catch (err) {
+  throw new Error("fs.writeSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
