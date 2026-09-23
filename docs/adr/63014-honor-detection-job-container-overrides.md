@@ -12,7 +12,7 @@ Threat-detection jobs are derived from the parent workflow configuration, but th
 
 ### Decision
 
-We will propagate `sandbox.agent.images` and `container_pins` into threat-detection workflow data and clone both maps before assigning them to the derived detection configuration. Threat-detection jobs will therefore use the same image-role overrides and repository container-pin mappings as the parent workflow, including during pre-pull step generation. We chose this because the PR evidence shows the architectural intent is configuration consistency across workflow variants, while cloning prevents the derived detection configuration from mutating the parent workflow state.
+We will propagate `sandbox.agent.images` and `container_pins` into threat-detection workflow data and clone both maps before assigning them to the derived detection configuration. When `container_pins` redirects a required default AWF image, the detection job will translate the mappings into a complete `container.images` runtime manifest. Threat-detection jobs will therefore use the same image-role overrides and repository container-pin mappings as the parent workflow during both pre-pull and runtime execution. We chose this because the PR evidence shows the architectural intent is configuration consistency across workflow variants, while cloning prevents the derived detection configuration from mutating the parent workflow state.
 
 ### Alternatives Considered
 
@@ -29,6 +29,7 @@ This would let detection jobs see the same image and pin data with less copying 
 #### Positive
 - Threat-detection jobs now honor the same mirrored or private container image configuration as the primary workflow jobs.
 - Detection pre-pull steps use mapped container references instead of silently falling back to the default AWF registry.
+- Detection runtime configuration uses mapped references instead of starting default-registry images.
 - Cloning the image and pin mappings preserves isolation between parent workflow data and derived detection workflow data.
 
 #### Negative

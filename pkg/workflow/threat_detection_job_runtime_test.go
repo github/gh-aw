@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -341,6 +342,71 @@ func TestBuildPullAWFContainersStepUsesContainerPinMappings(t *testing.T) {
 	}
 	if strings.Contains(steps, source) {
 		t.Errorf("expected detection pull step not to use mapped source image %q; got:\n%s", source, steps)
+	}
+}
+
+func TestBuildThreatDetectionAWFConfigUsesContainerPinMappings(t *testing.T) {
+	const version = "1.2.3"
+	containerPins := map[string]string{}
+	expectedImages := map[string]string{}
+	for i, role := range []string{awfImageRoleSquid, awfImageRoleAgent, awfImageRoleAPIProxy} {
+		source := defaultAWFImageForRole(role, version)
+		target := "mirror.example.com/awf/" + strings.TrimPrefix(source, constants.DefaultFirewallRegistry+"/") +
+			"@sha256:" + strings.Repeat(string(rune('a'+i)), 64)
+		containerPins[source] = target
+		expectedImages[role] = target
+	}
+	data := &WorkflowData{
+		AI: "copilot",
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true, Version: version},
+		},
+		ContainerPinMappings: containerPins,
+	}
+
+	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName:     "copilot",
+		AllowedDomains: "github.com",
+		WorkflowData:   buildThreatDetectionWorkflowData(data, ""),
+	})
+	if err != nil {
+		t.Fatalf("BuildAWFConfigJSON() error = %v", err)
+	}
+
+	var config struct {
+		Container AWFContainerConfig `json:"container"`
+	}
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		t.Fatalf("unmarshal AWF config: %v", err)
+	}
+	if config.Container.ImageTag != "" {
+		t.Errorf("detection imageTag = %q, want empty when mapped images are emitted", config.Container.ImageTag)
+	}
+	for role, target := range expectedImages {
+		if config.Container.Images[role] != target {
+			t.Errorf("detection runtime image %q = %q, want %q", role, config.Container.Images[role], target)
+		}
+	}
+	if strings.Contains(configJSON, constants.DefaultFirewallRegistry) {
+		t.Errorf("detection AWF config must not use the default registry when all required roles are mapped: %s", configJSON)
+	}
+}
+
+func TestBuildThreatDetectionContainerImagesRequiresPinnedOptionalRoles(t *testing.T) {
+	const version = "1.2.3"
+	data := &WorkflowData{
+		RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true, Version: version},
+		},
+		ContainerPinMappings: map[string]string{
+			defaultAWFImageForRole(awfImageRoleSquid, version): "mirror.example.com/awf/squid:" + version +
+				"@sha256:" + strings.Repeat("a", 64),
+		},
+	}
+
+	if images := buildThreatDetectionContainerImages(data); images != nil {
+		t.Errorf("buildThreatDetectionContainerImages() = %v, want nil for unpinned buildTools role", images)
 	}
 }
 

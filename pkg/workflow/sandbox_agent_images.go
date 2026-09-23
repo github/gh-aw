@@ -6,10 +6,10 @@
 // by the enabled feature set must be listed and AWF fails closed instead of falling
 // back to the official registry.
 //
-// The repository-level .github/workflows/aw.json "container_pins" setting can
-// redirect default AWF references for predownload and lock metadata, but it
-// cannot change the role references AWF resolves at runtime. This manifest is
-// authoritative for both runtime role selection and gh-aw's matching predownload.
+// The repository-level .github/workflows/aw.json "container_pins" setting redirects
+// default AWF references for predownload and lock metadata. Detection jobs also
+// translate those redirects into a closed runtime manifest. An explicitly configured
+// manifest remains authoritative for runtime role selection and matching predownload.
 
 package workflow
 
