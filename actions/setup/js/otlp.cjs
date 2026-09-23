@@ -18,7 +18,8 @@
  *
  * Usage (in a `steps:` github-script step inside a shared import):
  *
- *   const otlp = require('/tmp/gh-aw/actions/otlp.cjs');
+ *   const path = require('path');
+ *   const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
  *   const start = Date.now();
  *   // ... do work ...
  *   await otlp.logSpan('my-tool', { 'my-tool.items_processed': 42, 'my-tool.result': 'ok' }, { startMs: start });

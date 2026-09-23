@@ -170,7 +170,8 @@ steps:
     uses: actions/github-script@v8
     with:
       script: |
-        const otlp = require('/tmp/gh-aw/actions/otlp.cjs');
+        const path = require('path');
+        const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
 
         const startMs = Date.now();
         // ... do your tool's work here (e.g. const result = await myTool.run()) ...
@@ -206,7 +207,8 @@ Run the daily report using my-tool results.
 **`logSpan` API**
 
 ```javascript
-const otlp = require('/tmp/gh-aw/actions/otlp.cjs');
+const path = require('path');
+const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
 
 await otlp.logSpan(toolName, attributes, options);
 ```

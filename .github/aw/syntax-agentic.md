@@ -180,6 +180,13 @@ description: Agentic workflow specific frontmatter fields for GitHub Agentic Wor
 
     Every job emits setup and conclusion spans with rich attributes (`gh-aw.job.name`, `gh-aw.workflow.name`, `gh-aw.engine.id`, token usage). All jobs in a run share one trace ID. Dispatched child workflows inherit the parent's trace context via `aw_context`.
 
+    To emit a custom span from a `github-script` step, resolve the helper through `RUNNER_TEMP` rather than a hardcoded `/tmp` path:
+
+    ```javascript
+    const path = require('path');
+    const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
+    ```
+
 - **`runtimes:`** - Runtime environment version overrides (object)
   - Allows customizing runtime versions (e.g., Node.js, Python) or defining new runtimes
   - Runtimes from imported shared workflows are also merged
