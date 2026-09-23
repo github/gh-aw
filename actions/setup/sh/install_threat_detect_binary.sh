@@ -267,4 +267,9 @@ fi
 # Verify installation
 "${THREAT_DETECT_INSTALL_DIR}/${THREAT_DETECT_INSTALL_NAME}" --version
 
+# Publish only the exact verified installation, never a PATH lookup.
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  printf 'binary-path=%s/%s\n' "$THREAT_DETECT_INSTALL_DIR" "$THREAT_DETECT_INSTALL_NAME" >> "$GITHUB_OUTPUT"
+fi
+
 echo "✓ threat-detect installation complete"

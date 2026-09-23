@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,6 +25,15 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 	const emptyMCPServersJSON = `{"mcpServers":{}}`
 	shellCodexConfigPath := constants.ShellMcpConfigDir + "/config.toml"
 	codexHomeConfigPath := constants.TmpMcpConfigDir + "/config.toml"
+	codexHomeDir := constants.TmpMcpConfigDir
+	codexLogsDir := constants.TmpMcpConfigLogsDir
+	if isArcDindTopology(data) {
+		// Stage Codex's writable home with the detector inputs; the runner's
+		// private /tmp/mcp-config is not visible to the DinD daemon.
+		codexHomeDir = constants.ThreatDetectionDir + "/codex-home"
+		codexHomeConfigPath = path.Join(codexHomeDir, "config.toml")
+		codexLogsDir = path.Join(codexHomeDir, "logs")
+	}
 	detectionData := buildExternalDetectorWorkflowData(data, "codex")
 	detectionData.Model = inheritedDetectionModel(data)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
@@ -43,7 +53,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 		"      - name: Prepare Codex config for threat-detect\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        run: |\n",
-		fmt.Sprintf("          mkdir -p %q %q %q\n", constants.ShellMcpConfigDir, constants.TmpMcpConfigDir, constants.TmpMcpConfigLogsDir),
+		fmt.Sprintf("          mkdir -p %q %q %q\n", constants.ShellMcpConfigDir, codexHomeDir, codexLogsDir),
 		fmt.Sprintf("          printf '%%s\\n' %q > %q\n", emptyMCPServersJSON, constants.ShellMcpServersJsonPath),
 		"          # Point Codex at the AWF OpenAI proxy and disable websocket startup.\n",
 		fmt.Sprintf("          cat > %q << %s\n", shellCodexConfigPath, codexConfigDelimiter), //nolint:generatedyamlheredoc // Legacy detector config rendering remains to be migrated.
@@ -260,19 +270,28 @@ type externalDetectorPathSetup struct {
 // name, so the mounted ${RUNNER_TEMP}/gh-aw/bin/ directory must be prepended to
 // PATH in the container command. Non-ARC topologies also need a host-side copy
 // into that mounted directory; ARC/DinD already stages Copilot there during install.
+// Every ARC detection engine also needs the detector binary and prepared inputs
+// staged on the shared volume before AWF starts.
 func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID string) externalDetectorPathSetup {
+	setup := externalDetectorPathSetup{}
+	if isArcDindTopology(data) {
+		setup.hostSetup = `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`
+		setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
+		if engineID == "codex" {
+			setup.commandPrefix += `export CODEX_HOME="${RUNNER_TEMP}/gh-aw/threat-detection/codex-home" && `
+		}
+	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
-		return externalDetectorPathSetup{commandPrefix: codexBYOKAPIKeyExport() + " && "}
+		setup.commandPrefix += codexBYOKAPIKeyExport() + " && "
+		return setup
 	}
 	if engineID != "copilot" {
-		return externalDetectorPathSetup{}
-	}
-	setup := externalDetectorPathSetup{
-		commandPrefix: `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `,
+		return setup
 	}
 	if isArcDindTopology(data) {
 		return setup
 	}
+	setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
 	setup.hostSetup = copilotBinaryPathSetup
 	return setup
 }
@@ -350,11 +369,10 @@ func isAWFBinaryInstallStep(step GitHubActionStep) bool {
 }
 
 func appendThreatDetectionRWMount(mounts []string) []string {
-	threatDetectionMount := constants.ThreatDetectionDir + ":" + constants.ThreatDetectionDir + ":rw"
-	if slices.Contains(mounts, threatDetectionMount) {
+	if slices.Contains(mounts, threatDetectionRWMount) {
 		return mounts
 	}
-	return append(mounts, threatDetectionMount)
+	return append(mounts, threatDetectionRWMount)
 }
 
 // buildExternalDetectorExecutionStep creates the AWF execution step for the external
@@ -471,7 +489,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// no longer writes any step-summary output (see
 	// github/gh-aw-threat-detection#792), so the flag is intentionally omitted here.
 	npmPathSetup := GetNpmBinPathSetup()
-	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection)
+	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection, isArcDindTopology(threatDetectionData))
 
 	// Build the complete AWF command. BuildAWFCommand handles config file setup,
 	// ARC/DinD probes, tool cache mount, and the log tee pattern.
@@ -516,10 +534,14 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		continueOnErrorExpr = data.SafeOutputs.ThreatDetection.ContinueOnErrorExpr
 	}
 
+	executionCondition := detectionStepCondition + " && steps.threat_detect_install.outcome == 'success'"
+	if isArcDindTopology(threatDetectionData) {
+		executionCondition += " && steps.detection_staging_reset.outcome == 'success'"
+	}
 	steps := []string{
 		"      - name: Execute threat detection with AWF\n",
 		"        id: detection_agentic_execution\n",
-		fmt.Sprintf("        if: %s && steps.threat_detect_install.outcome == 'success'\n", detectionStepCondition),
+		fmt.Sprintf("        if: %s\n", executionCondition),
 		"        continue-on-error: true\n",
 		// Bound the step at the workflow level as well as through
 		// GH_AW_TIMEOUT_MINUTES: the env var is only honoured once the binary is
@@ -537,6 +559,9 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// Pass context as environment variables: AWF's --env-all forwards them to
 	// threat-detect without interpolating user-controlled prompt text into a command.
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
+	if isArcDindTopology(threatDetectionData) {
+		steps = append(steps, "          THREAT_DETECT_BINARY: ${{ steps.threat_detect_install.outputs.binary-path }}\n")
+	}
 	steps = append(steps, "        run: |\n")
 	for _, line := range strings.SplitAfter(command, "\n") {
 		if line == "" {
@@ -552,7 +577,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	return steps
 }
 
-func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetectionConfig) string {
+func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetectionConfig, arcDind bool) string {
 	args := []string{
 		"threat-detect",
 		"--engine", shellEscapeArg(engineID),
@@ -570,10 +595,15 @@ func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetec
 		}
 	}
 
-	args = append(args,
-		"--output", shellEscapeArg(constants.ThreatDetectionResultPath),
-		shellEscapeArg(constants.ThreatDetectionDir),
-	)
+	resultPath := shellEscapeArg(constants.ThreatDetectionResultPath)
+	inputPath := shellEscapeArg(constants.ThreatDetectionDir)
+	if arcDind {
+		// These compiler-owned expressions must expand inside the sandbox, with
+		// quotes retained so runner temp paths containing spaces remain single args.
+		resultPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionResultPath))
+		inputPath = strconv.Quote(rewriteArcDindPath(constants.ThreatDetectionDir))
+	}
+	args = append(args, "--output", resultPath, inputPath)
 
 	return fmt.Sprintf("%s && %s", npmPathSetup, strings.Join(args, " "))
 }

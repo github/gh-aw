@@ -17,7 +17,7 @@ sandbox:
 tracker-id: security-red-team
 engine:
   id: opencode
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 strict: true
 network:
   allowed:

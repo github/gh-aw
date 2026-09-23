@@ -51,8 +51,10 @@ tools:
     - grep
     - head
     - ls
+    - nl
     - printf
     - pwd
+    - sed
     - sort
     - tail
     - uniq

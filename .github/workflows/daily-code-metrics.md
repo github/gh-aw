@@ -13,7 +13,7 @@ permissions:
   copilot-requests: write
 tracker-id: daily-code-metrics
 engine: copilot
-model: claude-sonnet-4.5
+model: copilot/auto
 sandbox:
   agent:
     id: awf

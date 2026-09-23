@@ -19,7 +19,7 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Pydantic AI
-model: copilot/claude-sonnet-4-5
+model: copilot/auto
 engine:
   id: pydantic-ai
 strict: true

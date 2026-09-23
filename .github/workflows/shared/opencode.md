@@ -177,7 +177,7 @@ coding agent (BYOK). Import this file and set `engine: opencode` to use it:
 ```yaml
 engine:
   id: opencode
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 imports:
   - shared/opencode.md
 ```

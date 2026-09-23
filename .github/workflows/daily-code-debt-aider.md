@@ -16,7 +16,7 @@ sandbox:
 tracker-id: daily-code-debt-aider
 engine:
   id: aider
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 strict: true
 network:
   allowed: []

@@ -185,7 +185,7 @@ the open-source `dsh` coding agent. Import this file and set
 ```yaml
 engine:
   id: deepseek-harness
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 imports:
   - shared/deepseek-harness.md
 ```

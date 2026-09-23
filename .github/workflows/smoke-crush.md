@@ -20,7 +20,7 @@ permissions:
   pull-requests: read
   copilot-requests: write
 name: Smoke Crush
-model: copilot/claude-sonnet-4.5
+model: copilot/auto
 engine:
   id: crush
 max-turn-cache-misses: 15
