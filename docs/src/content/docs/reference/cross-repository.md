@@ -158,7 +158,9 @@ When `allowed-repos` is specified:
 
 ### Checkout Requirement for `push-to-pull-request-branch`
 
-Unlike other safe output types, `push-to-pull-request-branch` with `target-repo` requires the target repository to be **checked out into the workflow workspace** using the `checkout:` frontmatter field with a `path:` specified. Without a checkout, the agent has no local git history to create and push a patch from.
+Unlike other safe output types, `push-to-pull-request-branch` with `target-repo` requires the target repository to be **checked out into the workflow workspace**. You can use either a `checkout:` frontmatter entry with a `path:` specified or a custom `steps:` entry that clones the repository under `$GITHUB_WORKSPACE`. Without a checkout, the agent has no local git history to create and push a patch from.
+
+Safe outputs first consult the checkout manifest produced by `checkout:` entries, then fall back to scanning `$GITHUB_WORKSPACE` for git repositories and matching them by `remote.origin.url`.
 
 See the [Scheduled Push to Pull Request Branch](#example-scheduled-push-to-pull-request-branch) example and the [Push to PR Branch cross-repo usage](/gh-aw/reference/safe-outputs-pull-requests/#cross-repo-usage) documentation for a complete setup.
 
