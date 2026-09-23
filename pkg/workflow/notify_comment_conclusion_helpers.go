@@ -413,6 +413,13 @@ func buildAgentFailureCacheMemoryVars(data *WorkflowData, mainJobName string) []
 	var envVars []string
 	if data.SafeOutputs.FailureIssueRepo != "" {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_FAILURE_ISSUE_REPO: %q\n", data.SafeOutputs.FailureIssueRepo))
+		// SEC-005: a literal "owner/repo" written in the frontmatter is trusted
+		// compile-time configuration. Values built from GitHub Actions expressions are
+		// resolved at runtime from caller-controlled data (e.g. reusable-workflow inputs),
+		// so flag them for allowlist validation by the failure-reporting scripts.
+		if hasExpressionMarker(data.SafeOutputs.FailureIssueRepo) {
+			envVars = append(envVars, "          GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION: \"true\"\n")
+		}
 	}
 	if timeoutValue := strings.TrimPrefix(data.TimeoutMinutes, "timeout-minutes: "); timeoutValue != "" {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_TIMEOUT_MINUTES: %q\n", timeoutValue))
