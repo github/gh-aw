@@ -136,15 +136,17 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 
 func extractCopilotAllowedTools(args []string) []string {
 	allowed := map[string]struct{}{"read": {}}
-	for i := 0; i < len(args)-1; i++ {
-		if args[i] != "--allow-tool" {
+	expectTool := false
+	for _, arg := range args {
+		if !expectTool {
+			expectTool = arg == "--allow-tool"
 			continue
 		}
-		value := strings.TrimSpace(args[i+1])
+		value := strings.TrimSpace(arg)
 		if value != "" && !strings.HasPrefix(value, "--") {
 			allowed[value] = struct{}{}
 		}
-		i++
+		expectTool = false
 	}
 	result := make([]string, 0, len(allowed))
 	for value := range allowed {
@@ -165,10 +167,9 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 			Bash:     isCopilotBashToolEnabled(workflowData),
 			Edit:     isCopilotEditToolEnabled(tools, workflowData),
 			WebFetch: isCopilotToolValueEnabled(tools, "web-fetch"),
-			// The Copilot SDK runtime cannot authorize or execute web-search (see
-			// WebSearch: false in copilot_engine.go), so never advertise it as SDK-visible
-			// even if the workflow declares tools.web-search.
-			WebSearch: false,
+			// The Copilot SDK runtime exposes web_search as a built-in tool when the
+			// installed Copilot CLI is new enough to support it.
+			WebSearch: isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig),
 			MCP:       hasCopilotSDKMCPTools(workflowData),
 			CLIProxy:  workflowData.ParsedTools != nil && workflowData.ParsedTools.CLIProxy,
 		},

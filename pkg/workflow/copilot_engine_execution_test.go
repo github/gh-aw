@@ -134,6 +134,28 @@ func TestCopilotEngineExecutionStepsWithWebFetchKeepsBuiltinToolSchema(t *testin
 	}
 }
 
+func TestCopilotEngineExecutionStepsWithWebSearchKeepsBuiltinToolSchema(t *testing.T) {
+	engine := NewCopilotEngine()
+	workflowData := &WorkflowData{
+		Name: "test-workflow",
+		Tools: map[string]any{
+			"web-search": nil,
+		},
+	}
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+	if len(steps) != 1 {
+		t.Fatalf("Expected 1 execution step, got %d", len(steps))
+	}
+
+	stepContent := strings.Join([]string(steps[0]), "\n")
+	if strings.Contains(stepContent, "--disable-builtin-mcps") {
+		t.Fatalf("Expected web-search workflows to keep Copilot built-in tool schema enabled, got:\n%s", stepContent)
+	}
+	if !strings.Contains(stepContent, "--allow-tool web_search") {
+		t.Fatalf("Expected web-search workflows to allow web_search, got:\n%s", stepContent)
+	}
+}
+
 func TestCopilotEngineExecutionStepsWithWebFetchAndWildcardBashScopesTools(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{

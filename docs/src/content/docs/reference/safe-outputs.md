@@ -1810,6 +1810,26 @@ safe-outputs:
 
 Both approaches prevent noise while preserving actionable signals, but exclusion syntax is more concise when most categories should be reported.
 
+#### Reusable Workflows (Dynamic Configuration via Inputs)
+
+`report-failure-as-issue` (and `report-failed-jobs`, `failure-issue-repo`) accept a GitHub Actions expression instead of a literal value, so a `workflow_call`-triggered workflow can let each caller decide whether failures become issues:
+
+```yaml wrap
+on:
+  workflow_call:
+    inputs:
+      report-failure-as-issue:
+        description: When true, agent failures are reported as GitHub issues
+        required: false
+        type: boolean
+        default: true
+safe-outputs:
+  report-failure-as-issue: ${{ inputs.report-failure-as-issue }}
+  create-issue:
+```
+
+Callers that want to silence failure issues then pass `report-failure-as-issue: false` when invoking the reusable workflow, without editing its source. This avoids maintaining a separate copy of the workflow (or a post-compile patch of the generated `.lock.yml`) just to toggle failure reporting per caller.
+
 ### Failure Issue Repository (`failure-issue-repo:`)
 
 Redirects failure tracking issues to a different repository. Useful when the current repository has issues disabled (e.g. `github/docs-internal`).
@@ -1820,7 +1840,9 @@ safe-outputs:
   create-issue:
 ```
 
-The value must be in `owner/repo` format. The `GITHUB_TOKEN` used must have permission to create issues in the target repository. When not set, failure issues are created in the current repository.
+The value must be in `owner/repo` format, or a GitHub Actions expression that resolves to that format at runtime (e.g. `${{ inputs.failure-issue-repo }}` for a reusable workflow). The `GITHUB_TOKEN` used must have permission to create issues in the target repository. When not set, failure issues are created in the current repository.
+
+A literal `owner/repo` value is trusted compile-time configuration and may point at any repository. A value that comes from an expression is resolved at runtime from caller-supplied data, so it is validated before use: it must belong to the same owner as the repository running the workflow, otherwise it is ignored (with a warning) and failure issues are created in the current repository.
 
 ### Group Reports (`group-reports:`)
 
