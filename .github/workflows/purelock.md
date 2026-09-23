@@ -187,9 +187,12 @@ shell, task, or CLI-proxy access.
 
 ## Precomputed inputs
 
-- `/tmp/gh-aw/purelock/candidates.json` — the complete ranked candidate set.
-- `/tmp/gh-aw/purelock/candidates.md` — compact candidate table.
-- `/tmp/gh-aw/purelock/func-coverage.txt` — coverage used for ranking.
+- `/tmp/gh-aw/purelock/candidates.json` — the complete ranked candidate set;
+  select only from this file.
+- `/tmp/gh-aw/purelock/candidates.md` — a human-readable summary of the ranked
+  candidates.
+- `/tmp/gh-aw/purelock/func-coverage.txt` — coverage evidence used by the
+  precompute job to rank candidates; do not regenerate it.
 
 ## Select, write, and validate tests
 
@@ -205,10 +208,12 @@ shell, task, or CLI-proxy access.
    values, and applicable Unicode or overflow inputs. Use `testify` assertions
    consistent with adjacent tests; keep tests deterministic and parallel only
    when their inputs are independent.
-4. Call `go_repository.format`, then `go_repository.readiness` and
-   `go_repository.validate`. If any operation fails, revert the test change,
-   record the candidate as `noop` in cache memory, and complete with
-   `safeoutputs-noop`.
+4. Call `go_repository.format`, which formats changed eligible Go files; then
+   call `go_repository.readiness`, which compiles the projected repository's
+   tests; finally call `go_repository.validate`, which checks Go formatting
+   across the projected tree and runs `go test -count=1 ./...`, `go vet ./...`,
+   and `go build`. If any operation fails, revert the test change, record the
+   candidate as `noop` in cache memory, and complete with `safeoutputs-noop`.
 5. On successful validation, call `go_repository.commit`, then
    `safeoutputs-create_pull_request` with a draft title
    `[purelock] Lock down <FuncName> with a pure-function test suite`. Explain
