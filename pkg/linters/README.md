@@ -67,6 +67,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
 - `stringsindexhasprefix` — reports `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) and their yoda-order variants that should use `strings.HasPrefix(s, sub)` or `!strings.HasPrefix(s, sub)` instead.
 - `stringsjoinone` — reports `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is never used and the call is equivalent to just `s`.
+- `stringsplitseq` — reports `strings.Split()` calls used directly in range loops that should use `strings.SplitSeq()` for iteration without allocation (available in Go 1.22+).
 - `timeafterleak` — reports `time.After` calls used as the channel-receive expression in a `select` case inside a `for` or `range` loop that leak a timer channel on each iteration when another case fires first.
 - `timesleepnocontext` — reports `time.Sleep` calls inside functions that already receive a `context.Context`, where a context-aware `select` should be used instead.
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
@@ -168,6 +169,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexhasprefix` | Custom `go/analysis` analyzer that flags `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) that should use `strings.HasPrefix` or `!strings.HasPrefix` |
 | `stringsjoinone` | Custom `go/analysis` analyzer that flags `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is unused and the call is equivalent to just `s` |
+| `stringsplitseq` | Custom `go/analysis` analyzer that flags `strings.Split()` calls used directly in range loops that should use `strings.SplitSeq()` for iteration without allocation |
 | `timeafterleak` | Custom `go/analysis` analyzer that flags `time.After` in `select` cases inside loops that leak a timer channel on each iteration when another case fires first |
 | `timesleepnocontext` | Custom `go/analysis` analyzer that flags `time.Sleep` calls in context-aware functions |
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
