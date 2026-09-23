@@ -14105,7 +14105,7 @@
             "backend": {
               "type": "string",
               "enum": ["repo-memory"],
-              "description": "Optional storage backend for the daily AI Credits rolling ledger. Use 'repo-memory' to read and write date-bucketed JSONL ledger files through tools.repo-memory."
+              "description": "Optional storage backend for the daily AI Credits rolling ledger. Use 'repo-memory' to read and write date-bucketed JSONL ledger files through tools.repo-memory. It selects the memory named 'default', or the first configured memory when no default exists."
             }
           },
           "required": ["value"],
