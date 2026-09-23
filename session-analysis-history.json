@@ -76,6 +76,17 @@
    "orphan_rate_pct": 0.0,
    "data_quality": "metadata-only (conv-logs empty 27th+ day)",
    "notes": "58.0% completion (29 succ/8 fail/10 action_required/3 cancelled), +22pts vs 09-17 (36%), 2nd-highest of 27 recorded days (behind 09-02's 78%). EXPERIMENTAL human_batch_merge_cascade_control (roll=8): 3 independent merge_invalidation_cascades (PRs #61599/#61600/#61602) clustered within a 67s window across 3 branches, all merged_by the SAME human (pelikhan) back-to-back -- clean positive control confirming ordinary per-branch cascades (tight 1-2s offsets matching own merge) vs 09-16's dispatcher-driven cross_branch_scheduled_cascade. true_agentic streak still not restored: 8/10=80% (2 cancelled), 3rd consecutive day since the 09-16 break. provenance_inversion reverted to 72.4% bot-driven (21/29), lower edge of the 72-86% band, ending the 2-day 100% streak. burst_vs_isolated_success_gap INVERTED for the first time (burst-fired 59.5% > isolated 53.8%) after 8/8 days of the opposite direction. 4 branches (bump-mcpg-version-0425 46%/82.6%succ -- highest branch success on record, fix-install-awf-binary-failure 28%/28.6%succ, fix-claude-engine-experiments-model 14%/42.9%succ, fix-slash-command-crlf-activation 12%/50%succ). Orphan 0/14 open PRs, 27th consecutive healthy day (26-day baseline 0.0%)."
+  },
+  {
+   "date": "2026-09-23",
+   "sessions": 50,
+   "completion_pct": 24.0,
+   "avg_dur_min": 31.51,
+   "median_dur_min": 0.0,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 31st+ day)",
+   "notes": "24.0% completion (12 success/8 failure/30 action_required), -7.7pts vs 30-day mean 31.7% (range 4-78%), down from 09-22 (40%). true_agentic_100pct_streak: 3rd consecutive full-recovery day (5/5: 4x Addressing comment on PR #62776 + 1x Running Copilot cloud agent), after 09-19 (3/3) and 09-22 (7/7). provenance_inversion: only 58.3% of successes (7/12) bot-driven -- lowest share of the last 30 recorded days, below the historical 72-86% band. NEW pr_terminal_event_cascade (refines merge_invalidation_cascade): PR #62815 CLOSED WITHOUT MERGING at 04:01:42Z; 1s later 8 in-flight runs across 5 workflows (Agentic Commands x5, Stale Lock Files, Content Moderation, AI Moderator) on copilot/fix-github-actions-job-again flipped to failure simultaneously -- largest cascade on record (prior peak 6 on 09-13), first confirmed close-triggered (not merge-triggered) instance. Perpetually-blocked gates unchanged (CGO/CJS/CWI/Doc Build-Deploy/Squad = 0% success, 22/50=44% of runs). New workflow observed: 'Stale Lock Files' (4 firings), not seen in 09-13..09-22 snapshots. Duration proxy inflated by the cascade artifact (180-190.55min gaps on 8 runs); 20 nonzero entries average 78.8min. 3 branches (add-opt-in-shell-free-profile 36/50=72%/25.0%succ, fix-github-actions-job-again 12/50=24%/25.0%succ, fix-github-actions-job 2/50=4%/0%succ). Orphans 0/17 open PRs -> 0% NORMAL, 31st consecutive healthy day (30-day baseline 0.0%). Standard run (roll=37, no experimental strategy)."
   }
  ],
  "last_updated": "2026-09-18",
