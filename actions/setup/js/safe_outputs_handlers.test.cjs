@@ -1879,8 +1879,8 @@ describe("safe_outputs_handlers", () => {
       const responseData = JSON.parse(result.content[0].text);
       expect(responseData.result).toBe("error");
       expect(responseData.error).toContain("Repository 'test-owner/test-repo' not found in workspace");
-      expect(responseData.error).toContain("actions/checkout");
-      expect(responseData.error).toContain("'path' input");
+      expect(responseData.error).toContain("checkout:");
+      expect(responseData.error).toContain("steps:");
     });
 
     it("should return error when configured target-repo checkout is not found and entry.repo is not set", async () => {
@@ -1897,8 +1897,8 @@ describe("safe_outputs_handlers", () => {
       const responseData = JSON.parse(result.content[0].text);
       expect(responseData.result).toBe("error");
       expect(responseData.error).toContain("Repository 'test-owner/test-repo' not found in workspace");
-      expect(responseData.error).toContain("actions/checkout");
-      expect(responseData.error).toContain("'path' input");
+      expect(responseData.error).toContain("checkout:");
+      expect(responseData.error).toContain("steps:");
     });
 
     it("should use patch_workspace_path when target repo resolves from GH_AW_TARGET_REPO_SLUG", async () => {

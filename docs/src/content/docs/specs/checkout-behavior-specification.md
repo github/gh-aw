@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.1.0  
+**Version**: 1.2.0<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-07-08  
+**Publication Date**: 2026-09-23<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -115,6 +115,22 @@ Runtime lookup (`find_repo_checkout`) MUST prefer manifest paths and MUST reject
 
 Checkout-manifest generation MUST include enough per-checkout auth metadata to resolve default branches and safe_outputs repo targeting without relying on implicit defaults.  
 The manifest (or manifest-construction env) MUST NOT persist resolved token values to disk.
+
+### 3.5 Workspace Git-Scan Fallback
+
+When no usable manifest entry exists for a requested `owner/repo` target, runtime lookup MAY fall back to scanning `$GITHUB_WORKSPACE` for git repositories and matching them by `remote.origin.url`. This fallback exists because repositories cloned by a `steps:` entry or a manual `actions/checkout` are absent from the manifest.
+
+The fallback is an agent-influenced trust boundary: the agent can write anywhere under `$GITHUB_WORKSPACE`, while the safe-outputs MCP server that performs the lookup holds the GitHub token. Implementations MUST therefore satisfy all of the following:
+
+- **Manifest precedence**: the scan MUST run only after manifest lookup fails to yield an existing, in-workspace path.
+- **Scan confinement**: the scan MUST NOT descend outside `$GITHUB_WORKSPACE` and MUST NOT follow symbolic links out of it.
+- **Scoped ownership trust**: the safe-outputs MCP server container runs under a uid that differs from the runner user owning workspace clones, so `git config --get` would otherwise fail git's dubious-ownership check and silently report a missing remote. The implementation MUST scope the `safe.directory` override to that single read-only invocation (for example via `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_*`/`GIT_CONFIG_VALUE_*` on the child process environment) and MUST NOT mutate the process environment or grant process-wide trust to scanned directories.
+- **Read-only discovery**: discovery MUST use only git commands that cannot execute repository-supplied programs (no hooks, pagers, filesystem monitors, or credential helpers).
+- **Remote host constraint**: a scanned repository MUST be bound to an `owner/repo` slug only when its `remote.origin.url` host matches the host of `GITHUB_SERVER_URL` or `github.com`; remotes on other hosts MUST be ignored.
+- **Deferred durable trust**: durable `safe.directory` trust MUST be granted only to the resolved checkout directory, after cross-repository allowlist validation, at the point where git write operations are performed.
+- **Non-disclosing failure**: the not-found error MUST name the requested slug and the supported remediation (`checkout:` entry or workspace clone) without returning scanned filesystem paths to the agent.
+
+See also Threat T7 and requirements RCR1–RCR7 in the [Safe Outputs MCP Gateway Specification](/gh-aw/specs/safe-outputs-specification/).
 
 ---
 
@@ -267,6 +283,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-013**: Checkout-manifest generation includes safe_outputs auth metadata without persisting resolved tokens
 - **T-CHK-014**: Checkout-manifest path resolution MUST reject paths that are absolute (e.g., `/etc/passwd`) or escape the workspace root (e.g., `../../sensitive`); rejected paths MUST produce an error and MUST NOT be used for checkout or file lookup
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
+- **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
 
 ### 7.2 Compliance Checklist
 
@@ -282,6 +299,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout-manifest generation requirements | T-CHK-013 | C1/C2 | Required |
 | Checkout-manifest path-escape rejection | T-CHK-014 | C2 | Required |
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
+| Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
 
 ### 7.3 Safeguards
 
@@ -292,6 +310,8 @@ The following MUST-level norms govern credential and token safety during checkou
 2. **Manifest path rejection**: Checkout-manifest paths that are absolute or that escape the workspace root MUST be rejected before any file I/O is performed against them. The rejection MUST produce an actionable error message (see §3.4 and T-CHK-014).
 
 3. **Credential cleanup**: When `force-clean-git-credentials: true` is active and `keep-credentials-for-push` is not, all credential-bearing git config sections MUST be removed from `.git/config` and `.git/modules/**/config` before the agent step completes.
+
+4. **Scan trust scoping**: The workspace git-scan fallback MUST NOT grant process-wide git ownership trust to scanned directories, and MUST NOT bind a scanned directory to an `owner/repo` slug when its remote host is neither the host of `GITHUB_SERVER_URL` nor `github.com` (see §3.5 and T-CHK-016).
 
 ---
 
@@ -322,6 +342,11 @@ The following MUST-level norms govern credential and token safety during checkou
 ---
 
 ## 9. Change Log
+
+### Version 1.2.0 (Working Draft)
+
+- Added §3.5: workspace git-scan fallback requirements covering manifest precedence, scan confinement, per-invocation `safe.directory` scoping, read-only discovery, remote host constraint, deferred durable trust, and non-disclosing failure messages.
+- Added T-CHK-016 to §7.1 and the §7.2 compliance checklist, and a scan trust-scoping safeguard to §7.3.
 
 ### Version 1.1.0 (Working Draft)
 
