@@ -66,8 +66,10 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 
 	for key, newValue := range additional {
 		if key == "profile" {
-			if _, err := normalizeToolProfiles(newValue); err != nil {
-				return nil, err
+			if _, isMCPServer := newValue.(map[string]any); !isMCPServer {
+				if _, err := normalizeToolProfiles(newValue); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if existingValue, exists := result[key]; exists {

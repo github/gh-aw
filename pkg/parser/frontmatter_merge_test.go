@@ -89,6 +89,15 @@ func TestMergeTools(t *testing.T) {
 			},
 		},
 		{
+			name:       "preserve an imported MCP server named profile",
+			base:       map[string]any{"bash": false},
+			additional: map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+			expected: map[string]any{
+				"bash":    false,
+				"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"},
+			},
+		},
+		{
 			name: "merge neutral tools with maps (no Claude-specific logic)",
 			base: map[string]any{
 				"github": map[string]any{

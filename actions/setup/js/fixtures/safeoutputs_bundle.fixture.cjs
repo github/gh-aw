@@ -11,7 +11,7 @@ function copySafeOutputsBundle(destination) {
   assert.ok(block, "setup.sh must declare the safe-outputs bundle");
   const files = [...block[1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
   assert.ok(files.length, "safe-outputs bundle must not be empty");
-  fs.mkdirSync(destination);
+  fs.mkdirSync(destination, { recursive: true });
   for (const filename of files) {
     assert.equal(path.basename(filename), filename, "bundle entries must be literal basenames");
     assert.ok(filename.endsWith(".cjs"), "bundle entries must be CommonJS modules");
