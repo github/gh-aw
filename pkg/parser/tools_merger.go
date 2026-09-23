@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -48,15 +49,27 @@ func mergeToolsFromJSON(content string) (string, error) {
 }
 
 // MergeTools merges two neutral tool configurations.
-// Only supports merging arrays and maps for neutral tools (bash, web-fetch, web-search, edit, mcp-*).
+// Supports merging arrays and maps for neutral tools plus the tools.profile string-or-array shorthand.
 // Removes all legacy Claude tool merging logic.
 func MergeTools(base, additional map[string]any) (map[string]any, error) {
 	parserLog.Printf("Merging tools: base_keys=%d, additional_keys=%d", len(base), len(additional))
 	result := make(map[string]any)
 
+	if profile, exists := base["profile"]; exists {
+		if _, isMCPServer := profile.(map[string]any); !isMCPServer {
+			if _, err := normalizeToolProfiles(profile); err != nil {
+				return nil, err
+			}
+		}
+	}
 	maps.Copy(result, base)
 
 	for key, newValue := range additional {
+		if key == "profile" {
+			if _, err := normalizeToolProfiles(newValue); err != nil {
+				return nil, err
+			}
+		}
 		if existingValue, exists := result[key]; exists {
 			mergedValue, merged, err := mergeExistingToolValue(key, existingValue, newValue)
 			if err != nil {
@@ -81,6 +94,11 @@ func marshalSingleToolObject(content string) (string, error, bool) {
 	}
 	if len(singleObj) == 0 {
 		return "", nil, false
+	}
+	if profile, exists := singleObj["profile"]; exists {
+		if _, err := normalizeToolProfiles(profile); err != nil {
+			return "", err, true
+		}
 	}
 	result, err := json.Marshal(singleObj)
 	if err != nil {
@@ -117,6 +135,10 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
+	if key == "profile" {
+		merged, err := mergeToolProfiles(existingValue, newValue)
+		return merged, true, err
+	}
 	if existingArray, ok := existingValue.([]any); ok {
 		if newArray, ok := newValue.([]any); ok {
 			return mergeAllowedArrays(existingArray, newArray), true, nil
@@ -143,6 +165,59 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 	return recursiveMerged, true, nil
 }
 
+func mergeToolProfiles(existingValue, newValue any) ([]any, error) {
+	if _, isMCPServer := existingValue.(map[string]any); isMCPServer {
+		return nil, errors.New("tools.profile cannot be combined with mcp-servers.profile")
+	}
+	existingProfiles, err := normalizeToolProfiles(existingValue)
+	if err != nil {
+		return nil, err
+	}
+	newProfiles, err := normalizeToolProfiles(newValue)
+	if err != nil {
+		return nil, err
+	}
+	merged := make([]any, 0, len(existingProfiles)+len(newProfiles))
+	seen := make(map[string]struct{}, len(existingProfiles)+len(newProfiles))
+	for _, profile := range append(existingProfiles, newProfiles...) {
+		if !setutil.Contains(seen, profile) {
+			merged = append(merged, profile)
+			seen[profile] = struct{}{}
+		}
+	}
+	return merged, nil
+}
+
+func normalizeToolProfiles(value any) ([]string, error) {
+	var values []any
+	switch profiles := value.(type) {
+	case string:
+		values = []any{profiles}
+	case []any:
+		if len(profiles) == 0 {
+			return nil, errors.New("tools.profile array must not be empty")
+		}
+		values = profiles
+	default:
+		return nil, errors.New("tools.profile must be a string or an array")
+	}
+
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		profile, ok := value.(string)
+		if !ok || strings.TrimSpace(profile) == "" {
+			return nil, errors.New("tools.profile entries must be nonempty strings")
+		}
+		if setutil.Contains(seen, profile) {
+			return nil, fmt.Errorf("tools.profile contains duplicate value %q", profile)
+		}
+		result = append(result, profile)
+		seen[profile] = struct{}{}
+	}
+	return result, nil
+}
+
 func mergeMCPIfApplicable(key string, existingMap, newMap map[string]any) (map[string]any, bool, error) {
 	if !hasMCPType(existingMap) || !hasMCPType(newMap) {
 		return nil, false, nil
@@ -163,8 +238,8 @@ func hasMCPType(tool map[string]any) bool {
 	if !ok {
 		return false
 	}
-	mcpType, _ := mcpMap["type"].(string)
-	return IsMCPType(mcpType)
+	mcpType, ok := mcpMap["type"].(string)
+	return ok && IsMCPType(mcpType)
 }
 
 func mergeAllowedSubfieldIfPresent(existingMap, newMap map[string]any) (map[string]any, bool) {

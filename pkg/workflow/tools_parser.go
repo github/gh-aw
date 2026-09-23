@@ -81,7 +81,7 @@ func parseCommaSeparatedOrNewlineList(s string) []string {
 func toAnySlice(ss []string) []any {
 	out := make([]any, len(ss))
 	for i, s := range ss {
-		out[i] = s
+		out[i] = s //nolint:uncheckedsliceindex // i is provided by ranging over out's source-sized slice
 	}
 	return out
 }
@@ -105,6 +105,7 @@ var knownTools = map[string]struct{}{
 	"timeout":           {},
 	"startup-timeout":   {},
 	"cli-proxy":         {},
+	"profile":           {},
 }
 
 func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing tool parsing remains centralized.
@@ -180,7 +181,8 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 	// Extract custom MCP tools (anything not in the known list)
 	customCount := 0
 	for name, config := range toolsMap {
-		if !setutil.Contains(knownTools, name) {
+		_, isProfileMCPServer := config.(map[string]any)
+		if !setutil.Contains(knownTools, name) || (name == "profile" && isProfileMCPServer) {
 			tools.Custom[name] = parseMCPServerConfig(config)
 			customCount++
 		}

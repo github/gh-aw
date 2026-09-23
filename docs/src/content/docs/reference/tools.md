@@ -228,6 +228,17 @@ tools:
 
 With `cli-proxy: false` and an MCP-backed GitHub mode (`local` or `remote`), MCP servers (including `safeoutputs`) remain available through the MCP protocol, and the CLI-only instructions are omitted from the generated prompt. Run `gh aw fix` to add the explicit setting to existing workflows.
 
+## Tool profiles
+
+Agentic engine integrations can provide opt-in tool profiles through `tools.profile`. Use a string for one profile or an array for multiple profiles:
+
+```yaml
+tools:
+  profile: [profile-a, profile-b]
+```
+
+Profiles from imported shared workflows are merged in declaration order, with duplicates removed. Profile names must be nonempty strings; the availability and behavior of each profile are defined by the selected agentic engine integration.
+
 ## Tool Timeout Configuration
 
 ### Tool Operation Timeout (`tools.timeout`)

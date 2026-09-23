@@ -79,6 +79,17 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 }
 
 func prepareToolsForDefaults(data *WorkflowData) error {
+	profileValue, profileExists := data.Tools["profile"]
+	profiles, err := extractToolProfiles(data.Tools)
+	if err != nil {
+		return err
+	}
+	data.ToolProfiles = profiles
+	if profileExists {
+		if _, isMCPServer := profileValue.(map[string]any); !isMCPServer {
+			delete(data.Tools, "profile")
+		}
+	}
 	data.ExplicitlyDisabledTools = collectExplicitlyDisabledTools(data.Tools)
 	return expandJiraToolConfig(data.Tools)
 }
@@ -202,8 +213,8 @@ func applyDefaultPermissions(data *WorkflowData) {
 	// is stored in workflow-level indentation (2 spaces) and later re-indented for jobs.
 	lines := strings.Split(yaml, "\n")
 	for i := 1; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "      ") {
-			lines[i] = "  " + lines[i][6:]
+		if strings.HasPrefix(lines[i], "      ") { //nolint:uncheckedsliceindex // i is bounded by the loop condition
+			lines[i] = "  " + lines[i][6:] //nolint:uncheckedsliceindex // the prefix check guarantees six bytes
 		}
 	}
 	data.Permissions = strings.Join(lines, "\n")
@@ -366,11 +377,17 @@ func (c *Compiler) buildLabelCommandEventsMap(data *WorkflowData) (map[string]an
 func mergeLabelCommandOtherEvents(labelEventsMap map[string]any, otherEvents map[string]any) {
 	for eventKey, eventVal := range otherEvents {
 		if existing, exists := labelEventsMap[eventKey]; exists {
-			existingMap, _ := existing.(map[string]any)
-			userMap, _ := eventVal.(map[string]any)
-			if existingMap != nil && userMap != nil {
-				existingTypes, _ := existingMap["types"].([]any)
-				userTypes, _ := userMap["types"].([]any)
+			existingMap, existingIsMap := existing.(map[string]any)
+			userMap, userIsMap := eventVal.(map[string]any)
+			if existingIsMap && userIsMap {
+				existingTypes, existingHasTypes := existingMap["types"].([]any)
+				userTypes, userHasTypes := userMap["types"].([]any)
+				if !existingHasTypes {
+					existingTypes = nil
+				}
+				if !userHasTypes {
+					userTypes = nil
+				}
 				merged := make([]any, 0, typeutil.SafeAllocationCapacity(len(existingTypes), len(userTypes)))
 				merged = append(merged, existingTypes...)
 				merged = append(merged, userTypes...)
@@ -706,7 +723,7 @@ func (c *Compiler) applyDefaultTools(tools map[string]any, safeOutputs *SafeOutp
 			if safeOutputs == nil || !needsGitCommands(safeOutputs) {
 				defaultCommands := make([]any, len(constants.DefaultBashTools))
 				for i, cmd := range constants.DefaultBashTools {
-					defaultCommands[i] = cmd
+					defaultCommands[i] = cmd //nolint:uncheckedsliceindex // both slices share the same length
 				}
 				tools["bash"] = defaultCommands
 			}

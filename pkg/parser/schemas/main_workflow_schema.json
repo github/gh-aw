@@ -5435,6 +5435,26 @@
           "description": "When true, each user-facing MCP server is mounted as a standalone CLI tool on PATH. The agent can then call MCP servers via shell commands (e.g. 'github issue_read --method get ...'). CLI-mounted servers remain in the MCP gateway config so their containers can start, and are removed only from the agent's final config during convert_gateway_config_*.sh processing. Default: false.",
           "examples": [true]
         },
+        "profile": {
+          "description": "Opt-in tool profiles interpreted by agentic engine integrations. A single profile can be provided as a string; multiple profiles can be provided as an array and are merged across imports.",
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        },
         "serena": {
           "description": "REMOVED: Built-in support for Serena has been removed. Use the shared/mcp/serena.md workflow instead.",
           "deprecated": true,

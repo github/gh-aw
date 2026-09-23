@@ -68,6 +68,27 @@ func TestMergeTools(t *testing.T) {
 			},
 		},
 		{
+			name:       "merge tool profiles from string and array",
+			base:       map[string]any{"profile": "go"},
+			additional: map[string]any{"profile": []any{"go"}},
+			expected:   map[string]any{"profile": []any{"go"}},
+		},
+		{
+			name:       "merge tool profiles in declaration order",
+			base:       map[string]any{"profile": []any{"go"}},
+			additional: map[string]any{"profile": "future"},
+			expected:   map[string]any{"profile": []any{"go", "future"}},
+		},
+		{
+			name:       "preserve a premerged MCP server named profile",
+			base:       map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+			additional: map[string]any{"bash": false},
+			expected: map[string]any{
+				"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"},
+				"bash":    false,
+			},
+		},
+		{
 			name: "merge neutral tools with maps (no Claude-specific logic)",
 			base: map[string]any{
 				"github": map[string]any{
@@ -330,6 +351,28 @@ func TestMergeTools(t *testing.T) {
 	}
 }
 
+func TestMergeToolsRejectsInvalidProfileValue(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		base       map[string]any
+		additional map[string]any
+	}{
+		{name: "invalid base type", base: map[string]any{"profile": true}, additional: map[string]any{}},
+		{name: "invalid additional type", base: map[string]any{}, additional: map[string]any{"profile": true}},
+		{name: "empty array", base: map[string]any{}, additional: map[string]any{"profile": []any{}}},
+		{name: "mixed array", base: map[string]any{}, additional: map[string]any{"profile": []any{"go", 7}}},
+		{name: "duplicate array", base: map[string]any{}, additional: map[string]any{"profile": []any{"go", "go"}}},
+		{name: "blank profile", base: map[string]any{}, additional: map[string]any{"profile": ""}},
+		{name: "MCP server collision", base: map[string]any{"profile": map[string]any{"type": "http"}}, additional: map[string]any{"profile": "go"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := MergeTools(test.base, test.additional); err == nil {
+				t.Fatal("MergeTools() must reject an invalid imported profile value")
+			}
+		})
+	}
+}
+
 func TestMergeToolsFromJSON(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -342,6 +385,11 @@ func TestMergeToolsFromJSON(t *testing.T) {
 			content:  `{"tool1": {"enabled": true}, "tool2": {"enabled": false}}`,
 			expected: `{"tool1":{"enabled":true},"tool2":{"enabled":false}}`,
 			wantErr:  false,
+		},
+		{
+			name:    "single invalid profile object",
+			content: `{"profile":[]}`,
+			wantErr: true,
 		},
 		{
 			name: "multiple JSON objects on separate lines",

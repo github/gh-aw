@@ -47,6 +47,7 @@ var builtInToolNames = map[string]bool{
 	"timeout":           true,
 	"startup-timeout":   true,
 	"cli-proxy":         true,
+	"profile":           true,
 }
 
 // builtInToolNamesForError is the sorted, comma-separated list of built-in tool names
@@ -68,8 +69,10 @@ func ValidateMCPConfigs(tools map[string]any) error {
 	for _, toolName := range toolNames {
 		toolConfig := tools[toolName]
 
-		// Skip built-in tools - they have their own schema validation
-		if builtInToolNames[toolName] && toolName != "linear" {
+		// Skip built-in tools - they have their own schema validation. A map-shaped
+		// "profile" entry can be a custom MCP server merged from mcp-servers.
+		_, isMap := toolConfig.(map[string]any)
+		if builtInToolNames[toolName] && toolName != "linear" && (toolName != "profile" || !isMap) {
 			mcpValidationLog.Printf("Skipping MCP validation for built-in tool: %s", toolName)
 			continue
 		}
