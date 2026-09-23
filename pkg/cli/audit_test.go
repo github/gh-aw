@@ -1313,31 +1313,31 @@ func TestShouldSkipAuditRun_Runtime(t *testing.T) {
 	}{
 		{
 			name:          "matching runtime is not skipped",
-			awInfoContent: `{"agent_runtime": "gvisor"}`,
-			runtimeFilter: "gvisor",
+			awInfoContent: `{"agent_runtime": "cloud-hypervisor"}`,
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      false,
 		},
 		{
 			name:          "non-matching runtime is skipped",
-			awInfoContent: `{"agent_runtime": "docker-sbx"}`,
-			runtimeFilter: "gvisor",
+			awInfoContent: `{"agent_runtime": "docker"}`,
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "missing aw_info.json is skipped",
 			awInfoContent: "",
-			runtimeFilter: "gvisor",
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "empty agent_runtime is skipped",
 			awInfoContent: `{"agent_runtime": ""}`,
-			runtimeFilter: "gvisor",
+			runtimeFilter: "cloud-hypervisor",
 			wantSkip:      true,
 		},
 		{
 			name:          "no runtime filter never skips",
-			awInfoContent: `{"agent_runtime": "docker-sbx"}`,
+			awInfoContent: `{"agent_runtime": "cloud-hypervisor"}`,
 			runtimeFilter: "",
 			wantSkip:      false,
 		},

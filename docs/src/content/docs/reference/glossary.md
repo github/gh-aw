@@ -1285,7 +1285,7 @@ An interactive web-based editor for authoring, compiling, and previewing agentic
 
 ### Audit (`gh aw audit`)
 
-A CLI command that downloads workflow run artifacts and logs, analyzes MCP tool usage and network behavior, and generates a structured Markdown or JSON report. The report covers failure analysis, tool usage, MCP server status, firewall activity, token/cost metrics, behavior fingerprint, and safe-output summary. Accepts a numeric run ID or any GitHub Actions run or job URL. Both `gh aw audit` and `gh aw logs` accept a `--runtime` flag (for example, `--runtime gvisor` or `--runtime docker-sbx`) that filters results to runs whose [`sandbox.agent.runtime`](#sandboxagentruntime) matches the given value, using the value persisted in each run's `aw_info.json`. See [Audit Commands](/gh-aw/reference/audit/).
+A CLI command that downloads workflow run artifacts and logs, analyzes MCP tool usage and network behavior, and generates a structured Markdown or JSON report. The report covers failure analysis, tool usage, MCP server status, firewall activity, token/cost metrics, behavior fingerprint, and safe-output summary. Accepts a numeric run ID or any GitHub Actions run or job URL. Both `gh aw audit` and `gh aw logs` accept a `--runtime` flag (for example, `--runtime cloud-hypervisor`) that filters results to runs whose [`sandbox.agent.runtime`](#sandboxagentruntime) matches the given value, using the value persisted in each run's `aw_info.json`. See [Audit Commands](/gh-aw/reference/audit/).
 
 ### Audit Diff (multi-run mode)
 
@@ -1580,8 +1580,6 @@ A `sandbox.agent` field that selects the sandbox security and topology profile. 
 
 - `docker` (default) — Default Docker runtime, rootless AWF, network isolation.
 - `docker-sudo-iptables` — Docker with privileged AWF, legacy `iptables` networking, and host/service access.
-- `gvisor` — gVisor with strict network isolation.
-- `docker-sbx` — KVM microVM; the compiler handles the required privileged setup.
 - `cloud-hypervisor` — Preview KVM runtime with its required privileged launcher.
 
 Omitting `runtime` is equivalent to `runtime: docker`. The removed `sandbox.agent.sudo` and `sandbox.agent.legacy-security` fields are migrated by `gh aw fix --write`. See [Sandbox Configuration](/gh-aw/reference/sandbox/) and [Agent Runtimes](/gh-aw/reference/agent-runtimes/).
@@ -1646,8 +1644,8 @@ See [Sandbox Configuration](/gh-aw/reference/sandbox/).
 
 A `sandbox.agent` field that selects the container runtime used to execute the AI agent. Supported values:
 
-- `gvisor` — Runs the agent container under [gVisor](#gvisor-runsc) (`runsc`) for kernel-level isolation. Best for workflows processing untrusted input.
-- `docker-sbx` — Runs the agent inside a [docker-sbx](#docker-sbx) KVM-isolated microVM while keeping infrastructure containers on the host.
+- `docker` — Runs the agent under Docker with rootless AWF and network isolation.
+- `docker-sudo-iptables` — Runs the agent under Docker with privileged AWF, legacy iptables networking, and host/service access.
 - `cloud-hypervisor` — Runs the agent inside AWF's preview Cloud Hypervisor microVM runtime (GitHub-hosted Ubuntu x86_64 with `/dev/kvm` only).
 
 When omitted, the default Docker runtime is used. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
@@ -1655,16 +1653,8 @@ When omitted, the default Docker runtime is used. See [Sandbox Configuration](/g
 ```aw wrap
 sandbox:
   agent:
-    runtime: gvisor
+    runtime: cloud-hypervisor
 ```
-
-### gVisor (runsc)
-
-A container runtime from Google that interposes a user-space kernel between the containerized application and the host OS kernel. When `sandbox.agent.runtime: gvisor` is set, the agent container runs under gVisor's `runsc` runtime, providing stronger isolation than standard Docker — useful for workflows that process untrusted input. gh-aw installs and registers gVisor automatically before the agent container starts. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
-
-### docker-sbx
-
-A KVM-hardware-virtualized microVM runtime. When `sandbox.agent.runtime: docker-sbx` is set, the AI agent runs inside a hardware-isolated microVM while infrastructure containers (MCP servers, gateway, etc.) remain on the host. Provides stronger isolation than gVisor for workloads that require full hardware-virtualization boundaries. gh-aw automatically refreshes Docker Hub OAuth credentials immediately before agent execution to prevent token expiry errors. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
 
 ### cloud-hypervisor
 

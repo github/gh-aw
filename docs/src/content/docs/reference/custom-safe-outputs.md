@@ -235,6 +235,7 @@ The agent uses read-only tools to query, then calls the safe-job which executes 
 | `env` | object | No | Environment variables for all steps |
 | `if` | string | No | Conditional execution expression |
 | `timeout-minutes` | number | No | Maximum job duration (GitHub Actions default: 360) |
+| `artifacts` | array of strings | No | Agent-job filesystem paths this job depends on (see [Depending on Agent-Job Files](#depending-on-agent-job-files)) |
 
 ### Job Ordering (`needs:`)
 
@@ -341,6 +342,34 @@ The `inputs:` schema serves as both the MCP tool definition visible to the agent
 > A custom job runs **once per workflow run**, not once per tool call. If the agent calls the tool multiple times, every call is collected into the `.items[]` array of the single `GH_AW_AGENT_OUTPUT` file. Your job must iterate over `.items[]` (for example with `jq -c '.items[] | select(.type == "my_job")'`) to process all calls. Reading only `.items[0]` silently drops every call after the first — the run still succeeds, so the data loss is easy to miss.
 >
 > Because inline [scripts](#inline-script-handlers-safe-outputsscripts) cannot access repository secrets, any per-item handler that needs a secret (for example to call an external API with a token) must be a job — and therefore must loop over `.items[]` itself.
+
+### Depending on Agent-Job Files
+
+The agent job only uploads a fixed set of paths as its artifact (logs, patches, `agent_output.json`, and a few other compiler-managed files). If your job's `inputs` reference a filesystem path the agent wrote during the run (for example a directory the prompt instructed the agent to populate under `/tmp/gh-aw/agent/`), that path is **not** included by default and is silently dropped — the custom job will fail trying to read a file that was never uploaded.
+
+Declare any such paths with `artifacts:` so the compiler persists them in the unified agent artifact upload:
+
+```yaml wrap
+safe-outputs:
+  jobs:
+    publish-review-bundle:
+      description: "Publish a prepared directory as a workflow artifact"
+      runs-on: ubuntu-latest
+      artifacts:
+        - /tmp/gh-aw/agent/review-bundles/
+      inputs:
+        source_dir:
+          description: "Directory under /tmp/gh-aw/agent/ containing prepared files"
+          required: true
+          type: string
+      steps:
+        - run: |
+            # $GH_AW_AGENT_OUTPUT's directory contains the downloaded agent artifact,
+            # so the declared path above is available under that same root here.
+            echo "processing bundle"
+```
+
+Each entry must be a literal path or glob rooted under `/tmp/gh-aw/` (the same tree the compiler already scans for secrets before upload); GitHub Actions expressions and control characters are rejected. Directory paths must end with `/`; the compiler expands them to recursive globs so only files with extensions covered by secret redaction (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, or `.patch`) are persisted. File paths or globs must use one of those extensions. Paths outside that root, entries containing `..` path traversal segments, and entries referencing hidden files or directories (any path segment starting with `.`, since the unified artifact upload does not include hidden files) are all rejected at compile time. The redaction pass also removes symbolic links before upload so they cannot resolve outside the scanned tree. Prefer embedding small values directly in the safe-output item (as plain `string` inputs) when possible — only reach for `artifacts:` when the payload is a directory or multiple files that don't fit in the JSON item itself.
 
 ## Inline Script Handlers (`safe-outputs.scripts`)
 

@@ -79,16 +79,16 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 	}
 
 	insertIndex := -1
-	for i := runIndex + 1; i < len(step); i++ {
-		if strings.HasPrefix(strings.TrimSpace(step[i]), "GH_AW_AWF_ENGINE_NAME=") {
-			insertIndex = i
+	for offset, line := range step[runIndex+1:] {
+		if strings.HasPrefix(strings.TrimSpace(line), "GH_AW_AWF_ENGINE_NAME=") {
+			insertIndex = runIndex + 1 + offset
 			break
 		}
 	}
 	if insertIndex < 0 {
 		insertIndex = runIndex + 1
-		for insertIndex < len(step) {
-			trimmed := strings.TrimSpace(step[insertIndex])
+		for _, line := range step[insertIndex:] {
+			trimmed := strings.TrimSpace(line)
 			if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
 				insertIndex++
 				continue
@@ -594,17 +594,6 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// connects to via host.docker.internal:18443.
 	c.generateStartCliProxyStep(yaml, data)
 
-	// Refresh sbx credentials immediately before AWF execution. Docker Hub OAuth
-	// tokens obtained during the daemon-setup step can expire between workflow steps,
-	// causing "user is not authenticated to Docker" errors when AWF calls `sbx create`.
-	if isDockerSbxRuntime(data) {
-		refreshStep := generateDockerSbxCredentialRefreshStep()
-		for _, line := range refreshStep {
-			yaml.WriteString(line)
-			yaml.WriteString("\n")
-		}
-	}
-
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
@@ -659,7 +648,11 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
-	c.generateSecretRedactionStep(yaml, yaml.String(), data)
+	if hasSafeJobArtifactPaths(data) {
+		c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
+	} else {
+		c.generateSecretRedactionStep(yaml, yaml.String(), data)
+	}
 
 	// Append the agent step summary to the real $GITHUB_STEP_SUMMARY after secrets are redacted.
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside

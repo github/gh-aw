@@ -135,11 +135,11 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 			CooldownEnabled:   false,
 		},
 	)
-	if isDockerSbxRuntime(workflowData) || isCloudHypervisorRuntime(workflowData) {
-		npmSteps = append(npmSteps, GenerateDockerSbxNpmCLIInstallStep(
+	if isCloudHypervisorRuntime(workflowData) {
+		npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
 			"@anthropic-ai/claude-code",
 			version,
-			"Install Claude Code CLI in docker-sbx path",
+			"Install Claude Code CLI in microVM path",
 			"claude",
 			true,
 			false,
@@ -401,8 +401,8 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 		// We prepend GetNpmBinPathSetup() to the engine command so it runs inside the AWF container.
 		npmPathSetup := GetNpmBinPathSetup()
 		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
-		if dockerSbxCLIPath := GetDockerSbxNpmCLIPathSetup(workflowData); dockerSbxCLIPath != "" {
-			claudeCommandWithPath = fmt.Sprintf("%s && %s", dockerSbxCLIPath, claudeCommandWithPath)
+		if microVMCLIPath := GetMicroVMNpmCLIPathSetup(workflowData); microVMCLIPath != "" {
+			claudeCommandWithPath = fmt.Sprintf("%s && %s", microVMCLIPath, claudeCommandWithPath)
 		}
 		// Add MCP CLI bin directory to PATH when cli-proxy is enabled.
 		if mcpCLIPath := GetMCPCLIPathSetup(workflowData); mcpCLIPath != "" {

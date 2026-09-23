@@ -7,7 +7,6 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -71,27 +70,6 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfig.Network.Isolation = true
 		awfConfig.Network.TopologyAttach = buildAWFTopologyAttachList(config.WorkflowData)
 		awfConfigLog.Printf("Network section: isolation enabled with %d topology attachments", len(awfConfig.Network.TopologyAttach))
-	}
-
-	// Docker sbx microVMs resolve host services via
-	// host.docker.internal
-	// (the Docker bridge gateway, 172.17.0.1). Allow this domain so AWF's network
-	// policy permits connections from the microVM to the api-proxy, MCP gateway, and
-	// Squid proxy that are all published on the host bridge.
-	if isDockerSbxRuntime(config.WorkflowData) {
-		if awfConfig.Network == nil {
-			awfConfig.Network = &AWFNetworkConfig{}
-		}
-		const hostDockerInternal = "host.docker.internal"
-		if !slices.Contains(awfConfig.Network.AllowDomains, hostDockerInternal) {
-			awfConfig.Network.AllowDomains = append(awfConfig.Network.AllowDomains, hostDockerInternal)
-			awfConfigLog.Printf("Network section: added %s for microVM runtime routing", hostDockerInternal)
-		}
-		if awfSupportsVerifySbxEgress(firewallConfig) {
-			awfConfig.Network.VerifySbxEgress = true
-		} else {
-			awfConfigLog.Printf("Skipping network.verifySbxEgress: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFVerifySbxEgressMinVersion)
-		}
 	}
 
 	// ── Filesystem section ───────────────────────────────────────────────────
@@ -304,25 +282,15 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	if len(containerImages) > 0 {
 		awfImageTag = ""
 	}
-	agentRuntime := getAgentContainerRuntime(config.WorkflowData)
 	agentTimeout := 0
-	if isDockerSbxRuntime(config.WorkflowData) || isCloudHypervisorRuntime(config.WorkflowData) {
+	if isCloudHypervisorRuntime(config.WorkflowData) {
 		agentTimeout = resolveAWFContainerAgentTimeoutMinutes(config.WorkflowData)
 	}
-	// containerRuntime is only emitted when the effective AWF version supports it.
-	// Gate here to avoid sending an unrecognised field to older AWF binaries.
-	if !awfSupportsContainerRuntime(firewallConfig) {
-		if agentRuntime != "" {
-			awfConfigLog.Printf("Skipping containerRuntime: AWF version %q requires at least %s (gh-aw-firewall#6093)", getAWFImageTag(firewallConfig), constants.AWFContainerRuntimeMinVersion)
-		}
-		agentRuntime = ""
-	}
-	if awfImageTag != "" || isArcDindTopology(config.WorkflowData) || agentRuntime != "" || agentTimeout > 0 || len(containerImages) > 0 {
+	if awfImageTag != "" || isArcDindTopology(config.WorkflowData) || agentTimeout > 0 || len(containerImages) > 0 {
 		container := &AWFContainerConfig{
-			ImageTag:         awfImageTag,
-			AgentTimeout:     agentTimeout,
-			ContainerRuntime: agentRuntime,
-			Images:           containerImages,
+			ImageTag:     awfImageTag,
+			AgentTimeout: agentTimeout,
+			Images:       containerImages,
 		}
 		// NOTE: dockerHostPathPrefix is intentionally NOT set for arc-dind topology.
 		// With sysroot-stage active, the Docker daemon can access all needed paths:
@@ -335,9 +303,6 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfig.Container = container
 		if awfImageTag != "" {
 			awfConfigLog.Printf("Container section: image_tag=%s", awfImageTag)
-		}
-		if agentRuntime != "" {
-			awfConfigLog.Printf("Container section: containerRuntime=%s", agentRuntime)
 		}
 		if agentTimeout > 0 {
 			awfConfigLog.Printf("Container section: agentTimeout=%d", agentTimeout)
@@ -391,7 +356,7 @@ func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {
 }
 
 func resolveAWFContainerAgentTimeoutMinutes(workflowData *WorkflowData) int {
-	// Reuse the workflow-level default timeout so docker-sbx inherits the same
+	// Reuse the workflow-level default timeout so Cloud Hypervisor inherits the same
 	// runtime ceiling when top-level timeout-minutes is omitted or non-numeric.
 	defaultTimeout := compilerenv.ResolveDefaultTimeoutMinutes(int(constants.DefaultAgenticWorkflowTimeout / time.Minute))
 	if workflowData == nil || workflowData.TimeoutMinutes == "" {

@@ -12,9 +12,7 @@ var sandboxRuntimeProfileCodemodLog = logger.New("cli:codemod_sandbox_runtime_pr
 const (
 	sandboxRuntimeDocker             = "docker"
 	sandboxRuntimeDockerSudoIptables = "docker-sudo-iptables"
-	sandboxRuntimeDockerSbx          = "docker-sbx"
 	sandboxRuntimeCloudHypervisor    = "cloud-hypervisor"
-	sandboxRuntimeGvisor             = "gvisor"
 )
 
 // getSandboxRuntimeProfileCodemod creates a codemod that migrates the removed
@@ -23,13 +21,8 @@ const (
 //
 //	sudo: false (or omitted)          -> runtime omitted (equivalent to runtime: docker)
 //	legacy-security: enable           -> runtime: docker-sudo-iptables
-//	runtime: docker-sbx + sudo: true  -> runtime: docker-sbx
 //	sudo: true (no other runtime)     -> runtime: docker-sudo-iptables
-//	runtime: gvisor + sudo/legacy     -> runtime: gvisor (sudo/legacy-security are dropped)
 //
-// gVisor combined with privileged security options keeps the strict 'runtime: gvisor'
-// isolation and simply drops the no-longer-supported 'sudo'/'legacy-security' fields,
-// since gVisor's network isolation already takes precedence over the privileged intent.
 // Other mixed profiles that cannot be migrated unambiguously return an actionable error
 // so the author can choose between strict isolation and the privileged iptables profile.
 func getSandboxRuntimeProfileCodemod() Codemod {
@@ -94,23 +87,13 @@ func resolveMigratedSandboxRuntime(runtime string, sudoEnabled, legacyEnabled bo
 	switch runtime {
 	case "", sandboxRuntimeDocker, sandboxRuntimeDockerSudoIptables:
 		return sandboxRuntimeDockerSudoIptables, nil
-	case sandboxRuntimeDockerSbx, sandboxRuntimeCloudHypervisor:
-		// These runtimes only used sudo as an installation marker; the compiler now
+	case sandboxRuntimeCloudHypervisor:
+		// This runtime only used sudo as an installation marker; the compiler now
 		// derives the required privileges, so the runtime is kept unchanged.
 		if legacyEnabled {
 			return "", mixedSandboxProfileError(runtime)
 		}
 		return "", nil
-	case sandboxRuntimeGvisor:
-		// gVisor combined with privileged security options is no longer a supported
-		// combination. gVisor's strict network isolation takes precedence, so keep
-		// 'runtime: gvisor' and drop the 'sudo'/'legacy-security' fields instead of
-		// aborting the fix pass so `gh aw fix --write` can still repair the file.
-		sandboxRuntimeProfileCodemodLog.Printf(
-			"sandbox.agent.runtime: gvisor combined with privileged security options is not supported; keeping %q and dropping sudo/legacy-security",
-			sandboxRuntimeGvisor,
-		)
-		return sandboxRuntimeGvisor, nil
 	default:
 		return "", mixedSandboxProfileError(runtime)
 	}
@@ -129,7 +112,7 @@ func mixedSandboxProfileError(runtime string) error {
 // sandbox.agent block. When targetRuntime is non-empty and the block has no runtime
 // key yet, the first removed key is replaced by the runtime key so the profile is
 // preserved in place. When the block already has a runtime key but its value differs
-// from targetRuntime (for example gVisor migrating to the privileged iptables profile),
+// from targetRuntime (for example an unsupported runtime migrating to the privileged iptables profile),
 // the existing runtime line's value is rewritten in place.
 func migrateSandboxAgentSecurityLines(lines []string, oldRuntime, targetRuntime string) ([]string, bool) {
 	start, end, indent, found := findSandboxAgentBlock(lines)

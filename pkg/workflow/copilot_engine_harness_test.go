@@ -60,8 +60,6 @@ func TestCopilotEngineHarnessScript(t *testing.T) {
 		runtime AgentRuntime
 	}{
 		{name: "Docker"},
-		{name: "gVisor", runtime: AgentRuntimeGVisor},
-		{name: "docker-sbx", runtime: AgentRuntimeDockerSbx},
 	} {
 		t.Run("AWF execution stages activated Copilot CLI binary for "+tt.name, func(t *testing.T) {
 			workflowData := &WorkflowData{

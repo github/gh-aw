@@ -74,6 +74,10 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		if data.CommentMemoryConfig != nil {
 			paths = append(paths, constants.TmpCommentMemoryDir)
 		}
+		// Custom safe-outputs jobs can declare additional agent-job filesystem paths
+		// (via safe-outputs.jobs.*.artifacts) that their steps depend on. Persist them
+		// in the unified agent artifact so they survive into the downstream job.
+		paths = append(paths, collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)...)
 	}
 
 	// Collect git patch path if safe-outputs with PR operations is configured.
@@ -274,7 +278,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
 	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix)
-	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix)
+	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, hasSafeJobArtifactPaths(data))
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its files
 	// live in the workspace. When a checkout: entry targets an external repository without a path

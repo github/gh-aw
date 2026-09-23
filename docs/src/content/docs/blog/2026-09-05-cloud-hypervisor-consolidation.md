@@ -8,7 +8,7 @@ metadata:
   seoDescription: "Learn why gh-aw deprecated the gVisor and Docker sbx runtimes and is consolidating microVM support on Cloud Hypervisor."
 ---
 
-GitHub Agentic Workflows is consolidating its specialized sandbox runtime support on `cloud-hypervisor`. The `gvisor` and `docker-sbx` runtime options are deprecated and will be removed in a future release.
+GitHub Agentic Workflows has consolidated its specialized sandbox runtime support on `cloud-hypervisor`. The `gvisor` and `docker-sbx` runtime options have been removed.
 
 `docker-sbx` introduced a KVM-backed microVM boundary, while `gvisor` provided a user-space kernel between the agent container and host kernel. Maintaining both paths alongside Cloud Hypervisor created separate installation, compatibility, and troubleshooting surfaces. Consolidating on one microVM implementation makes the stronger isolation path more consistent and easier to evolve.
 

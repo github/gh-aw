@@ -2943,7 +2943,7 @@ func TestMainWorkflowSchema_SandboxAgentRuntime(t *testing.T) {
 		}
 	}
 
-	for _, runtime := range []string{"docker", "docker-sudo-iptables", "gvisor", "docker-sbx", "cloud-hypervisor"} {
+	for _, runtime := range []string{"docker", "docker-sudo-iptables", "cloud-hypervisor"} {
 		t.Run("runtime: "+runtime+" is accepted", func(t *testing.T) {
 			t.Parallel()
 
@@ -2955,15 +2955,17 @@ func TestMainWorkflowSchema_SandboxAgentRuntime(t *testing.T) {
 		})
 	}
 
-	t.Run("unknown runtime is rejected", func(t *testing.T) {
-		t.Parallel()
+	for _, runtime := range []string{"podman", "gvisor", "docker-sbx"} {
+		t.Run("runtime: "+runtime+" is rejected", func(t *testing.T) {
+			t.Parallel()
 
-		frontmatter := agentFrontmatter(map[string]any{"id": "awf", "runtime": "podman"})
-		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/sandbox-agent-runtime-unknown-test.md")
-		if err == nil {
-			t.Error("expected an unsupported sandbox.agent.runtime to be rejected by schema validation")
-		}
-	})
+			frontmatter := agentFrontmatter(map[string]any{"id": "awf", "runtime": runtime})
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/sandbox-agent-runtime-unknown-"+runtime+"-test.md")
+			if err == nil {
+				t.Errorf("expected sandbox.agent.runtime: %s to be rejected by schema validation", runtime)
+			}
+		})
+	}
 
 	for _, removed := range []struct {
 		name  string
