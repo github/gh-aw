@@ -40,6 +40,7 @@ The package is designed for use both in the main CLI binary and in WebAssembly c
 | `InlineSkill` | struct | A single inline skill definition extracted via the `## skill: \`name\`` syntax |
 | `BodyLevelImport` | struct | A `{{#runtime-import}}` directive found in the markdown body, with `Path` (workspace-root-relative) and `Optional` flag |
 | `PromptImportEntry` | struct | A single import contribution to prompt assembly; either a runtime-import path or inlined markdown |
+| `ValidationError` | struct | Input validation error embedding `validationerror.Payload`; detectable via `errors.As(err, &validationerror.ValidationError)` |
 
 ### Functions
 
@@ -154,6 +155,7 @@ The package is designed for use both in the main CLI binary and in WebAssembly c
 | `FormatImportCycleError` | `func(*ImportCycleError) error` | Formats a cycle error with the import chain |
 | `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context |
 | `NewFormattedParserError` | `func(formatted string) *FormattedParserError` | Creates a pre-formatted parser error |
+| `NewValidationError` | `func(field, value, reason, suggestion string) *ValidationError` | Creates a `ValidationError` embedding `validationerror.Payload`, for uniform detection via `errors.As` |
 | `FormatYAMLError` | `func(err error, frontmatterLineOffset int, sourceYAML string) string` | Formats a YAML error with source code context, adjusting line numbers by the frontmatter offset |
 | `TranslateYAMLMessage` | `func(message string) string` | Translates a cryptic YAML parser message to a user-friendly description |
 
@@ -327,11 +329,11 @@ This appendix is generated from the current non-test Go source files in this pac
 
 | Category | Count |
 |----------|------:|
-| Types | 24 |
+| Types | 26 |
 | Constants | 10 |
-| Variables | 5 |
-| Functions and methods | 96 |
-| Additional symbols documented in this appendix | 19 |
+| Variables | 7 |
+| Functions and methods | 107 |
+| Additional symbols documented in this appendix | 22 |
 
 ### Additional types
 
@@ -364,17 +366,17 @@ This appendix is generated from the current non-test Go source files in this pac
 | `import_cache.go` | `(*ImportCache).Get` | `func (*ImportCache).Get(owner, repo, path, sha string) (string, bool)` | Get retrieves a cached file path if it exists sha parameter should be the resolved commit SHA |
 | `import_cache.go` | `(*ImportCache).GetCacheDir` | `func (*ImportCache).GetCacheDir() string` | GetCacheDir returns the base cache directory path |
 | `import_cache.go` | `(*ImportCache).Set` | `func (*ImportCache).Set(owner, repo, path, sha string, content []byte) (string, error)` | Set stores a new cache entry by saving the content to the cache directory sha parameter should be the resolved commit SHA |
+| `import_error.go` | `(*ImportCycleError).Error` | `func (*ImportCycleError).Error() string` | Implements the `error` interface for `ImportCycleError`. |
+| `import_error.go` | `(*FormattedParserError).Error` | `func (*FormattedParserError).Error() string` | Implements the `error` interface for `FormattedParserError`, returning the pre-formatted message. |
 | `import_error.go` | `(*FormattedParserError).Unwrap` | `func (*FormattedParserError).Unwrap() error` | Exported function or method declared in `import_error.go`. |
+| `validation_error.go` | `(*ValidationError).Error` | `func (*ValidationError).Error() string` | Implements the `error` interface for `ValidationError`, formatting field/reason/suggestion into a message. |
 | `schema_validation.go` | `IsImportSafeSharedWorkflowOn` | `func IsImportSafeSharedWorkflowOn(onValue any) bool` | IsImportSafeSharedWorkflowOn validates whether an imported `on:` block is restricted to safe shared-workflow triggers. |
-| `mcp.go` | `IsSimpleSecretExpression` | `func IsSimpleSecretExpression(value string) bool` | Reports whether value is a direct GitHub Actions secrets reference without additional expression operators. |
-| `linear_toolsets.go` | `ParseLinearToolsets` | `func ParseLinearToolsets(value any) ([]string, error)` | Validates and expands Linear toolsets into MCP tool names. |
-| `linear_toolsets.go` | `ValidateLinearAllowedForToolsets` | `func ValidateLinearAllowedForToolsets(allowed, toolsetTools []string) error` | Checks that every allowed pattern selects at least one tool from the configured Linear toolsets. |
 
 <!-- END SOURCE-VERIFIED EXPORT COVERAGE -->
 
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review.
+Reviewed against recent source updates on 2026-07-24; no additional public-contract deltas were identified beyond the sections above. Re-verified on 2026-08-14; no public-contract changes since the last review (only internal schema-suggestions refactoring landed). Re-verified on 2026-08-29; no public-contract deltas since the last review. Re-verified on 2026-09-03; no public-contract deltas since the last review. Re-verified on 2026-09-08; added `ParseLinearToolsets`, `ValidateLinearAllowedForToolsets`, and `IsSimpleSecretExpression` (Linear toolset support and secret-expression validation) to the MCP Configuration public API table, which were previously undocumented. Re-verified on 2026-09-13; no public-contract deltas since the last review. Re-verified on 2026-09-23; added the previously undocumented `ValidationError` type and `NewValidationError` constructor to the Public API section, added the three exported `Error() string` methods (`*ImportCycleError`, `*FormattedParserError`, `*ValidationError`) to the export-coverage appendix, and removed duplicate appendix rows for `ParseLinearToolsets`/`ValidateLinearAllowedForToolsets`/`IsSimpleSecretExpression` that were already documented above; corrected the export-coverage summary counts to match current source (26 types, 107 functions/methods, 22 additional appendix symbols).
 
 ---
 
