@@ -332,6 +332,8 @@ it("counts a cancelled agent job as zero when GitHub proves execution never star
 
 it.each([
   ["runner metadata is absent", { steps: [] }],
+  ["runner name metadata is absent", { runner_id: null, steps: [] }],
+  ["step metadata is absent", { runner_id: null, runner_name: null }],
   ["a runner was assigned", { runner_id: 123, runner_name: "GitHub Actions 1", steps: [] }],
   ["a step was created", { runner_id: 0, runner_name: "", steps: [{ name: "Set up job", conclusion: "cancelled" }] }],
 ])("still requires accounting for a cancelled agent job when %s", async (_description, metadata) => {
