@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -46,6 +47,7 @@ It accepts workflow IDs (basename without .md) or full filenames.`,
   ` + string(constants.CLIExtensionPrefix) + ` list ci-                           # List workflows with 'ci-' in name
   ` + string(constants.CLIExtensionPrefix) + ` list --repo github/gh-aw ci-      # List workflows from github/gh-aw with 'ci-' in name
   ` + string(constants.CLIExtensionPrefix) + ` list --json                        # Output in JSON format
+  ` + string(constants.CLIExtensionPrefix) + ` list --stale                       # List workflows with stale or missing lock files
   ` + string(constants.CLIExtensionPrefix) + ` list --label automation            # List workflows with 'automation' label`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var pattern string
@@ -59,19 +61,21 @@ It accepts workflow IDs (basename without .md) or full filenames.`,
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			jsonFlag, _ := cmd.Flags().GetBool("json")
 			labelFilter, _ := cmd.Flags().GetString("label")
+			staleOnly, _ := cmd.Flags().GetBool("stale")
 
 			// --dir overrides the local workflow directory when no remote repo is specified.
 			// When --repo is set, --path is used for the remote repository path instead.
 			if dir != "" && repo == "" {
 				path = dir
 			}
-			return RunListWorkflows(cmd.Context(), repo, path, pattern, verbose, jsonFlag, labelFilter)
+			return RunListWorkflows(cmd.Context(), repo, path, pattern, verbose, jsonFlag, labelFilter, staleOnly)
 		},
 	}
 
 	addRepoFlag(cmd)
 	addJSONFlag(cmd)
 	cmd.Flags().String("label", "", "Filter workflows by label")
+	cmd.Flags().Bool("stale", false, "List workflows with stale or missing lock files (local only)")
 	cmd.Flags().String("path", constants.GetWorkflowDir(), "Path to workflows directory in the remote repository (used with --repo)")
 	cmd.Flags().StringP("dir", "d", "", "Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows; ignored when --repo is set)")
 
@@ -83,14 +87,17 @@ It accepts workflow IDs (basename without .md) or full filenames.`,
 }
 
 // RunListWorkflows lists workflows without checking GitHub status
-func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose bool, jsonOutput bool, labelFilter string) error {
-	listWorkflowsLog.Printf("Listing workflows: repo=%s, path=%s, pattern=%s, jsonOutput=%v, labelFilter=%s", repo, path, pattern, jsonOutput, labelFilter)
+func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose bool, jsonOutput bool, labelFilter string, staleOnly bool) error {
+	listWorkflowsLog.Printf("Listing workflows: repo=%s, path=%s, pattern=%s, jsonOutput=%v, labelFilter=%s, staleOnly=%v", repo, path, pattern, jsonOutput, labelFilter, staleOnly)
 
 	var mdFiles []string
 	var err error
 	var isRemote bool
 
 	if repo != "" {
+		if staleOnly {
+			return errors.New("--stale cannot be used with --repo because remote workflow compilation status is unavailable")
+		}
 		// List workflows from remote repository
 		isRemote = true
 		if verbose && !jsonOutput {
@@ -132,7 +139,7 @@ func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose b
 	}
 
 	// Build workflow list
-	var workflows []WorkflowListItem
+	workflows := make([]WorkflowListItem, 0)
 
 	// Shared import cache across all iterations to avoid re-creating it for every workflow
 	importCache := parser.NewImportCache("")
@@ -166,6 +173,9 @@ func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose b
 
 			if _, err := os.Stat(lockFile); err == nil {
 				compiled = isCompiledUpToDateWithCache(file, lockFile, importCache)
+			}
+			if staleOnly && compiled == "Yes" {
+				continue
 			}
 
 			// Extract "on" field and labels from frontmatter

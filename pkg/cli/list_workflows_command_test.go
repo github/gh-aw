@@ -28,19 +28,19 @@ func TestRunListWorkflows_JSONOutput(t *testing.T) {
 
 	// Test JSON output without pattern
 	t.Run("JSON output without pattern", func(t *testing.T) {
-		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, true, "")
+		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, true, "", false)
 		require.NoError(t, err, "RunListWorkflows with JSON flag should not error")
 	})
 
 	// Test JSON output with pattern
 	t.Run("JSON output with pattern", func(t *testing.T) {
-		err := RunListWorkflows(t.Context(), "", ".github/workflows", "smoke", false, true, "")
+		err := RunListWorkflows(t.Context(), "", ".github/workflows", "smoke", false, true, "", false)
 		require.NoError(t, err, "RunListWorkflows with JSON flag and pattern should not error")
 	})
 
 	// Test JSON output with label filter
 	t.Run("JSON output with label filter", func(t *testing.T) {
-		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, true, "test")
+		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, true, "test", false)
 		require.NoError(t, err, "RunListWorkflows with JSON flag and label filter should not error")
 	})
 }
@@ -97,13 +97,13 @@ func TestRunListWorkflows_TextOutput(t *testing.T) {
 
 	// Test text output
 	t.Run("Text output without pattern", func(t *testing.T) {
-		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, false, "")
+		err := RunListWorkflows(t.Context(), "", ".github/workflows", "", false, false, "", false)
 		require.NoError(t, err, "RunListWorkflows without JSON flag should not error")
 	})
 
 	// Test text output with pattern
 	t.Run("Text output with pattern", func(t *testing.T) {
-		err := RunListWorkflows(t.Context(), "", ".github/workflows", "ci-", false, false, "")
+		err := RunListWorkflows(t.Context(), "", ".github/workflows", "ci-", false, false, "", false)
 		require.NoError(t, err, "RunListWorkflows with pattern should not error")
 	})
 }
@@ -124,6 +124,9 @@ func TestNewListCommand(t *testing.T) {
 
 	labelFlag := cmd.Flags().Lookup("label")
 	assert.NotNil(t, labelFlag, "Command should have --label flag")
+
+	staleFlag := cmd.Flags().Lookup("stale")
+	assert.NotNil(t, staleFlag, "Command should have --stale flag")
 }
 
 // captureListOutput calls RunListWorkflows and returns the captured stdout as a string.
@@ -134,7 +137,7 @@ func captureListOutput(t *testing.T, dir, pattern string) string {
 	require.NoError(t, err, "Should create pipe")
 	os.Stdout = w
 
-	runErr := RunListWorkflows(t.Context(), "", dir, pattern, false, true, "")
+	runErr := RunListWorkflows(t.Context(), "", dir, pattern, false, true, "", false)
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -181,6 +184,9 @@ name: test-workflow
 		require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal JSON output")
 		require.Len(t, items, 1, "Should have one workflow")
 		assert.Equal(t, "Yes", items[0].Compiled, "Compiled should be Yes when hash matches")
+
+		output = captureStaleListOutput(t, tmpDir)
+		require.Equal(t, "[]\n", output, "Stale output should be empty when the lock file matches")
 	})
 
 	t.Run("compiled No when hash mismatches", func(t *testing.T) {
@@ -196,6 +202,11 @@ name: test-workflow
 		require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal JSON output")
 		require.Len(t, items, 1, "Should have one workflow")
 		assert.Equal(t, "No", items[0].Compiled, "Compiled should be No when hash mismatches")
+
+		output = captureStaleListOutput(t, tmpDir)
+		require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal stale JSON output")
+		require.Len(t, items, 1, "Should include workflow with stale lock file")
+		assert.Equal(t, "No", items[0].Compiled, "Stale workflow should retain compilation status")
 	})
 
 	t.Run("compiled NA when no lock file", func(t *testing.T) {
@@ -208,5 +219,33 @@ name: test-workflow
 		require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal JSON output")
 		require.Len(t, items, 1, "Should have one workflow")
 		assert.Equal(t, "N/A", items[0].Compiled, "Compiled should be N/A when no lock file exists")
+
+		output = captureStaleListOutput(t, tmpDir)
+		require.NoError(t, json.Unmarshal([]byte(output), &items), "Should unmarshal stale JSON output")
+		require.Len(t, items, 1, "Should include workflow with missing lock file")
+		assert.Equal(t, "N/A", items[0].Compiled, "Missing lock file should retain compilation status")
 	})
+}
+
+func TestRunListWorkflows_StaleOnlyRejectsRemoteRepository(t *testing.T) {
+	err := RunListWorkflows(t.Context(), "owner/repo", ".github/workflows", "", false, false, "", true)
+	require.EqualError(t, err, "--stale cannot be used with --repo because remote workflow compilation status is unavailable")
+}
+
+func captureStaleListOutput(t *testing.T, dir string) string {
+	t.Helper()
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err, "Should create pipe")
+	os.Stdout = w
+
+	runErr := RunListWorkflows(t.Context(), "", dir, "", false, true, "", true)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	require.NoError(t, runErr, "RunListWorkflows with stale filter should not error")
+	return buf.String()
 }
