@@ -175,9 +175,17 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		args = append(args, "--allow-tool", "web_fetch")
 	}
 
+	// Handle web-search builtin tool (Copilot CLI uses web_search with underscore)
+	if isCopilotToolValueEnabled(tools, "web-search") {
+		copilotEngineToolsLog.Print("Web-search tool enabled, adding web_search permission")
+		// web-search -> web_search
+		args = append(args, "--allow-tool", "web_search")
+	}
+
 	// Built-in tool names that should be skipped when processing MCP servers
 	// Note: GitHub is NOT included here because it needs MCP configuration in CLI mode
 	// Note: web-fetch is NOT included here because it needs explicit --allow-tool argument
+	// Note: web-search is handled above with an explicit --allow-tool argument
 	builtInTools := map[string]struct {
 	}{
 		"bash":         {},

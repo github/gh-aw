@@ -233,8 +233,9 @@ func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) ([]string, 
 	copilotArgs := e.buildCopilotBaseArgs(sandboxEnabled)
 
 	// Disable Copilot CLI built-in MCP servers unless a workflow opts into
-	// web-fetch. The CLI exposes web_fetch through its built-in tool schema, so
-	// disabling built-ins would leave --allow-tool web_fetch with no callable tool.
+	// web-fetch or web-search. The CLI exposes web_fetch and web_search through its
+	// built-in tool schema, so disabling built-ins would leave --allow-tool with no
+	// callable tool.
 	if !copilotNeedsBuiltinMCPs(workflowData) {
 		copilotArgs = append(copilotArgs, "--disable-builtin-mcps")
 	}
@@ -269,7 +270,8 @@ func copilotNeedsBuiltinMCPs(workflowData *WorkflowData) bool {
 	if workflowData == nil || workflowData.Tools == nil || isCopilotSDKMode(workflowData) {
 		return false
 	}
-	return isCopilotToolValueEnabled(workflowData.Tools, "web-fetch")
+	return isCopilotToolValueEnabled(workflowData.Tools, "web-fetch") ||
+		isCopilotToolValueEnabled(workflowData.Tools, "web-search")
 }
 
 func (e *CopilotEngine) buildCopilotBaseArgs(sandboxEnabled bool) []string {

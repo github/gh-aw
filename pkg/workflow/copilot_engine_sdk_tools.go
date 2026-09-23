@@ -165,10 +165,9 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 			Bash:     isCopilotBashToolEnabled(workflowData),
 			Edit:     isCopilotEditToolEnabled(tools, workflowData),
 			WebFetch: isCopilotToolValueEnabled(tools, "web-fetch"),
-			// The Copilot SDK runtime cannot authorize or execute web-search (see
-			// WebSearch: false in copilot_engine.go), so never advertise it as SDK-visible
-			// even if the workflow declares tools.web-search.
-			WebSearch: false,
+			// The Copilot SDK runtime exposes web_search as a built-in tool, so it is
+			// advertised whenever the workflow declares tools.web-search.
+			WebSearch: isCopilotToolValueEnabled(tools, "web-search"),
 			MCP:       hasCopilotSDKMCPTools(workflowData),
 			CLIProxy:  workflowData.ParsedTools != nil && workflowData.ParsedTools.CLIProxy,
 		},
