@@ -790,20 +790,20 @@ async function handleRequest(server, request, defaultHandler) {
         };
       }
 
-      const schemaValidationError = validateArgumentsAgainstSchema(args, tool.inputSchema);
-      if (schemaValidationError) {
-        throw {
-          code: -32602,
-          message: formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema),
-        };
-      }
-
       // SM-IS-01: Validate per-string input length limits (default 10 KB, or explicit schema maxLength when set).
       const oversizedFields = validateStringInputLengths(args, tool.inputSchema);
       if (oversizedFields.length) {
         throw {
           code: -32602,
           message: buildStringLengthValidationError(name, oversizedFields),
+        };
+      }
+
+      const schemaValidationError = validateArgumentsAgainstSchema(args, tool.inputSchema);
+      if (schemaValidationError) {
+        throw {
+          code: -32602,
+          message: formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema),
         };
       }
 
@@ -967,16 +967,16 @@ async function handleMessage(server, req, defaultHandler) {
         return;
       }
 
-      const schemaValidationError = validateArgumentsAgainstSchema(args, tool.inputSchema);
-      if (schemaValidationError) {
-        server.replyError(id, -32602, formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema));
-        return;
-      }
-
       // SM-IS-01: Validate per-string input length limits (default 10 KB, or explicit schema maxLength when set).
       const oversized = validateStringInputLengths(args, tool.inputSchema);
       if (oversized.length) {
         server.replyError(id, -32602, buildStringLengthValidationError(name, oversized));
+        return;
+      }
+
+      const schemaValidationError = validateArgumentsAgainstSchema(args, tool.inputSchema);
+      if (schemaValidationError) {
+        server.replyError(id, -32602, formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema));
         return;
       }
 
