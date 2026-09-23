@@ -457,6 +457,34 @@ func TestFindTokenUsageFile(t *testing.T) {
 	})
 }
 
+func TestFindAPIProxyEventsFile(t *testing.T) {
+	t.Run("finds in sandbox/firewall/audit path", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-events")
+		auditDir := filepath.Join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(auditDir, 0o755))
+		eventsFile := filepath.Join(auditDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+
+		result := findAPIProxyEventsFile(tmpDir)
+		assert.Equal(t, eventsFile, result, "should find file in AWF audit path")
+	})
+
+	t.Run("prefers sandbox/firewall/logs over sandbox/firewall/audit when both exist", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-events")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		auditDir := filepath.Join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		require.NoError(t, os.MkdirAll(auditDir, 0o755))
+		logsFile := filepath.Join(logsDir, "events.jsonl")
+		auditFile := filepath.Join(auditDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(logsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+		require.NoError(t, os.WriteFile(auditFile, []byte(`{"event":"timeout_steering"}`+"\n"), 0o644))
+
+		result := findAPIProxyEventsFile(tmpDir)
+		assert.Equal(t, logsFile, result, "should prefer primary logs path over AWF audit path")
+	})
+}
+
 func TestAnalyzeTokenUsageAICOnly(t *testing.T) {
 	t.Run("sums agent and detection usage artifact jsonl files", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "analyze-token-usage-aic-only")
@@ -819,6 +847,15 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		}, events[0])
 		assert.Equal(t, timeoutSteeringEventName, events[1].Type)
 		assert.Contains(t, events[1].Message, "running out of time")
+	})
+
+	t.Run("returns nil when no events file exists", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "extract-gateway-steering-events-missing")
+
+		events, err := extractGatewaySteeringEvents(tmpDir)
+
+		require.NoError(t, err)
+		assert.Nil(t, events)
 	})
 
 	t.Run("falls back to agent_usage.json when token-usage.jsonl is missing", func(t *testing.T) {

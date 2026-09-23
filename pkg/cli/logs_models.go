@@ -290,6 +290,7 @@ type RunAnalysis struct {
 	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`       // Detected skill invocations
 	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
 	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
+	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
 	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
 	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details
@@ -314,9 +315,8 @@ type RunSummary struct {
 	RunID       int64     `json:"run_id"`       // Workflow run database ID
 	ProcessedAt time.Time `json:"processed_at"` // When this summary was created
 	RunAnalysis
-	PolicyAnalysis        *PolicyAnalysis        `json:"policy_analysis,omitempty"`         // Firewall policy rule attribution
-	GatewaySteeringEvents []GatewaySteeringEvent `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
-	ArtifactsList         []string               `json:"artifacts_list"`                    // List of downloaded artifact files
+	PolicyAnalysis *PolicyAnalysis `json:"policy_analysis,omitempty"` // Firewall policy rule attribution
+	ArtifactsList  []string        `json:"artifacts_list"`            // List of downloaded artifact files
 }
 
 // DownloadResult represents the result of downloading and processing a workflow run

@@ -78,12 +78,12 @@ func buildAuditRunSummary(run WorkflowRun, processedRun ProcessedRun, results au
 			SkillActivations:        results.skillActivations,
 			MCPToolUsage:            results.mcpToolUsage,
 			TokenUsage:              results.tokenUsageSummary,
+			GatewaySteeringEvents:   results.gatewaySteeringEvents,
 			WorkingSet:              results.workingSet,
 			GitHubRateLimitUsage:    results.rateLimitUsage,
 			JobDetails:              results.jobDetails,
 		},
-		PolicyAnalysis:        results.policyAnalysis,
-		GatewaySteeringEvents: results.gatewaySteeringEvents,
-		ArtifactsList:         results.artifacts,
+		PolicyAnalysis: results.policyAnalysis,
+		ArtifactsList:  results.artifacts,
 	}
 }
