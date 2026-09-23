@@ -5,7 +5,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { neutralizeWorkflowCommands } = require("./sanitized_logging.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
-const { BUILT_IN_PATTERNS } = require("./redact_secrets.cjs");
+const { collectCredentialLiterals } = require("./redact_secrets.cjs");
 
 const MAX_REPOSITORY_FAILURE_BYTES = 8192;
 const MAX_REPOSITORY_DIAGNOSTIC_PATHS = 20;
@@ -27,13 +27,9 @@ function failureEnvelope(diagnostic) {
 /** @param {string[]} inputs @param {string[]} supplied */
 function diagnosticMasks(inputs, supplied) {
   const content = inputs.join("\n");
-  const values = [...supplied, ...collectAddMaskedValues(content.replace(/\r\n?/g, "\n"))];
-  for (const { pattern } of BUILT_IN_PATTERNS) {
-    for (const value of content.match(pattern) ?? []) values.push(value);
-  }
-  for (const match of content.matchAll(/\b(?:proxy-)?authorization\b["']?[ \t]*[:=][ \t]*["']?([^\r\n"']+)/gi)) values.push(match[1].trim());
-  for (const match of content.matchAll(/\b[a-z][a-z0-9+.-]*:\/\/([^\s/?#"'<>]+)@/gi)) values.push(match[1]);
-  for (const match of content.matchAll(/[?&](?:access_token|token|api[_-]?key|key|auth|authorization|password|sig|signature)=([^&#\s"'<>]+)/gi)) values.push(match[1]);
+  // Reuse the shared credential scanners rather than re-deriving them here, so the
+  // diagnostic redaction surface stays in step with artifact and step-summary redaction.
+  const values = [...supplied, ...collectAddMaskedValues(content.replace(/\r\n?/g, "\n")), ...collectCredentialLiterals(content)];
   return [...new Set(values.flatMap(value => [value, value.replace(/^(?:Bearer|Basic|token)[ \t]+/i, "")]).filter(Boolean))].sort((left, right) => right.length - left.length);
 }
 

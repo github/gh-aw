@@ -81,6 +81,45 @@ const BUILT_IN_PATTERNS = [
 ];
 
 /**
+ * Contextual credential patterns.
+ *
+ * Unlike {@link BUILT_IN_PATTERNS}, these values have no recognisable prefix and are
+ * only identifiable from the syntax that surrounds them (an Authorization header, URL
+ * userinfo, or a credential-bearing query parameter). Each pattern MUST capture the
+ * credential itself in group 1 so the surrounding syntax is never treated as a secret.
+ */
+const CREDENTIAL_CONTEXT_PATTERNS = [
+  { name: "Authorization header", pattern: /\b(?:proxy-)?authorization\b["']?[ \t]*[:=][ \t]*["']?([^\r\n"']+)/gi },
+  { name: "URL userinfo", pattern: /\b[a-z][a-z0-9+.-]*:\/\/([^\s/?#"'<>]+)@/gi },
+  { name: "URL query credential", pattern: /[?&](?:access_token|token|api[_-]?key|key|auth|authorization|password|sig|signature)=([^&#\s"'<>]+)/gi },
+];
+
+/**
+ * Collects every credential-shaped literal found in `content`, combining the built-in
+ * prefixed patterns with the contextual ones.
+ *
+ * This is the shared, side-effect-free counterpart to {@link redactBuiltInPatterns}: it
+ * performs no logging and no replacement, so it is safe to call from contexts (such as
+ * the Copilot SDK driver) where the `core` global is not installed. Callers that need
+ * redacted text should pass the result to `applyAddMaskRedaction` or `redactSecrets`.
+ *
+ * @param {string} content - Text to scan for credential-shaped values
+ * @returns {string[]} Matched credential literals, in discovery order and possibly duplicated
+ */
+function collectCredentialLiterals(content) {
+  /** @type {string[]} */
+  const values = [];
+  if (typeof content !== "string" || content.length === 0) return values;
+  for (const { pattern } of BUILT_IN_PATTERNS) {
+    for (const value of content.match(pattern) ?? []) values.push(value);
+  }
+  for (const { pattern } of CREDENTIAL_CONTEXT_PATTERNS) {
+    for (const match of content.matchAll(pattern)) values.push(match[1].trim());
+  }
+  return values.filter(Boolean);
+}
+
+/**
  * MCP gateway configuration files that may contain bearer tokens.
  * These are the canonical paths produced by the gateway setup scripts.
  * The list is defined as a module-level constant so tests can replace entries.
@@ -382,4 +421,15 @@ async function redactFilesInDir(dir) {
   }
 }
 
-module.exports = { main, redactFilesInDir, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };
+module.exports = {
+  main,
+  redactFilesInDir,
+  redactSecrets,
+  redactBuiltInPatterns,
+  redactStepSummaryContent,
+  extractMCPGatewayTokens,
+  collectCredentialLiterals,
+  BUILT_IN_PATTERNS,
+  CREDENTIAL_CONTEXT_PATTERNS,
+  MCP_GATEWAY_CONFIG_PATHS,
+};

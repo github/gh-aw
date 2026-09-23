@@ -840,4 +840,61 @@ Custom secret: my-secret-123456789012`;
       }
     });
   });
+  describe("collectCredentialLiterals", () => {
+    const { collectCredentialLiterals, CREDENTIAL_CONTEXT_PATTERNS } = require("./redact_secrets.cjs");
+    // Built by concatenation so no credential-shaped literal appears in this source file.
+    const BEARER_VALUE = ["Bearer", "s3cr3t-value"].join(" ");
+    const BEARER_HEADER = ["Authorization", BEARER_VALUE].join(": ");
+    const USERINFO = ["user", "p4ssw0rd"].join(":");
+
+    it("collects built-in prefixed credential patterns", () => {
+      const token = `ghp_${"a".repeat(36)}`;
+      expect(collectCredentialLiterals(`fatal: could not read ${token} from remote`)).toContain(token);
+    });
+
+    it("collects Authorization header values including the scheme prefix", () => {
+      expect(collectCredentialLiterals(BEARER_HEADER)).toContain(BEARER_VALUE);
+      expect(collectCredentialLiterals('proxy-authorization = "Basic Zm9v"')).toContain("Basic Zm9v");
+    });
+
+    it("collects URL userinfo credentials without the scheme or host", () => {
+      const values = collectCredentialLiterals(`remote: https://${USERINFO}@github.com/o/r.git`);
+      expect(values).toContain(USERINFO);
+      expect(values.some(value => value.includes("github.com"))).toBe(false);
+    });
+
+    it("collects credential-bearing query parameters", () => {
+      const values = collectCredentialLiterals("GET /x?foo=1&access_token=zzz9&api-key=qqq8 HTTP/1.1");
+      expect(values).toContain("zzz9");
+      expect(values).toContain("qqq8");
+      expect(values).not.toContain("1");
+    });
+
+    it("returns an empty array for empty or non-string input", () => {
+      expect(collectCredentialLiterals("")).toEqual([]);
+      expect(collectCredentialLiterals(/** @type {any} */ undefined)).toEqual([]);
+      expect(collectCredentialLiterals(/** @type {any} */ null)).toEqual([]);
+    });
+
+    it("returns no values for content without credentials", () => {
+      expect(collectCredentialLiterals("go vet ./... reported 3 issues")).toEqual([]);
+    });
+
+    it("never yields empty strings", () => {
+      expect(collectCredentialLiterals(`Authorization:\n${BEARER_HEADER}`)).not.toContain("");
+    });
+
+    it("captures every contextual credential in group 1", () => {
+      for (const { name, pattern } of CREDENTIAL_CONTEXT_PATTERNS) {
+        expect(new RegExp(pattern.source).exec("")).toBeNull();
+        expect(pattern.flags, name).toContain("g");
+        expect(pattern.flags, name).toContain("i");
+      }
+    });
+
+    it("is stateless across repeated calls despite global regex flags", () => {
+      const content = BEARER_HEADER;
+      expect(collectCredentialLiterals(content)).toEqual(collectCredentialLiterals(content));
+    });
+  });
 });
