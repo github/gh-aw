@@ -12,7 +12,7 @@ import (
 func TestPrepareToolsForDefaultsExtractsProfiles(t *testing.T) {
 	data := &WorkflowData{
 		Tools: map[string]any{
-			"profile": []any{"go", "future"},
+			"profile": []any{" go ", "future"},
 			"bash":    false,
 		},
 	}

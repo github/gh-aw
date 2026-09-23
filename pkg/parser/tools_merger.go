@@ -57,7 +57,7 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 
 	if profile, exists := base["profile"]; exists {
 		if _, isMCPServer := profile.(map[string]any); !isMCPServer {
-			if _, err := normalizeToolProfiles(profile); err != nil {
+			if _, err := NormalizeToolProfiles(profile); err != nil {
 				return nil, err
 			}
 		}
@@ -67,7 +67,7 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 	for key, newValue := range additional {
 		if key == "profile" {
 			if _, isMCPServer := newValue.(map[string]any); !isMCPServer {
-				if _, err := normalizeToolProfiles(newValue); err != nil {
+				if _, err := NormalizeToolProfiles(newValue); err != nil {
 					return nil, err
 				}
 			}
@@ -99,7 +99,7 @@ func marshalSingleToolObject(content string) (string, error, bool) {
 	}
 	if profile, exists := singleObj["profile"]; exists {
 		if _, isMCPServer := profile.(map[string]any); !isMCPServer {
-			if _, err := normalizeToolProfiles(profile); err != nil {
+			if _, err := NormalizeToolProfiles(profile); err != nil {
 				return "", err, true
 			}
 		}
@@ -178,11 +178,11 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 }
 
 func mergeToolProfiles(existingValue, newValue any) ([]any, error) {
-	existingProfiles, err := normalizeToolProfiles(existingValue)
+	existingProfiles, err := NormalizeToolProfiles(existingValue)
 	if err != nil {
 		return nil, err
 	}
-	newProfiles, err := normalizeToolProfiles(newValue)
+	newProfiles, err := NormalizeToolProfiles(newValue)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,8 @@ func mergeToolProfiles(existingValue, newValue any) ([]any, error) {
 	return merged, nil
 }
 
-func normalizeToolProfiles(value any) ([]string, error) {
+// NormalizeToolProfiles validates a profile selector and returns canonical profile names.
+func NormalizeToolProfiles(value any) ([]string, error) {
 	var values []any
 	switch profiles := value.(type) {
 	case string:
@@ -218,6 +219,7 @@ func normalizeToolProfiles(value any) ([]string, error) {
 		if !ok || strings.TrimSpace(profile) == "" {
 			return nil, errors.New("tools.profile entries must be nonempty strings")
 		}
+		profile = strings.TrimSpace(profile)
 		if setutil.Contains(seen, profile) {
 			return nil, fmt.Errorf("tools.profile contains duplicate value %q", profile)
 		}

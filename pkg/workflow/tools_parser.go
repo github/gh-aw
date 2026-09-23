@@ -181,8 +181,8 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 	// Extract custom MCP tools (anything not in the known list)
 	customCount := 0
 	for name, config := range toolsMap {
-		_, isProfileMCPServer := config.(map[string]any)
-		if !setutil.Contains(knownTools, name) || (name == "profile" && isProfileMCPServer) {
+		_, isMapConfig := config.(map[string]any)
+		if !setutil.Contains(knownTools, name) || (name == "profile" && isMapConfig) {
 			tools.Custom[name] = parseMCPServerConfig(config)
 			customCount++
 		}

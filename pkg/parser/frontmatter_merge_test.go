@@ -74,6 +74,12 @@ func TestMergeTools(t *testing.T) {
 			expected:   map[string]any{"profile": []any{"go"}},
 		},
 		{
+			name:       "normalize profile whitespace",
+			base:       map[string]any{"profile": " go "},
+			additional: map[string]any{"profile": "go"},
+			expected:   map[string]any{"profile": []any{"go"}},
+		},
+		{
 			name:       "merge tool profiles in declaration order",
 			base:       map[string]any{"profile": []any{"go"}},
 			additional: map[string]any{"profile": "future"},
