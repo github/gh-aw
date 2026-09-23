@@ -162,6 +162,8 @@ function applyAddLabelsItemSchema(tool, configuredSchema) {
   if (!configuredSchema || typeof configuredSchema !== "object" || Array.isArray(configuredSchema)) {
     return;
   }
+  /** @type {any} */
+  const schema = configuredSchema;
   const labelsSchema = tool.inputSchema?.properties?.labels;
   if (!labelsSchema?.items) {
     return;
@@ -172,15 +174,15 @@ function applyAddLabelsItemSchema(tool, configuredSchema) {
     return;
   }
 
-  const configuredProperties = configuredSchema.properties && typeof configuredSchema.properties === "object" && !Array.isArray(configuredSchema.properties) ? configuredSchema.properties : {};
+  const configuredProperties = schema.properties ?? {};
   const properties = { ...(objectSchema.properties ?? {}) };
   for (const [name, propertySchema] of Object.entries(configuredProperties)) {
     properties[name] = { ...(properties[name] ?? {}), ...propertySchema };
   }
   labelsSchema.items = {
     ...objectSchema,
-    ...configuredSchema,
-    required: Array.from(new Set([...(objectSchema.required ?? []), ...(configuredSchema.required ?? [])])),
+    ...schema,
+    required: Array.from(new Set([...(objectSchema.required ?? []), ...(schema.required ?? [])])),
     properties,
     additionalProperties: false,
   };
@@ -421,7 +423,9 @@ async function main() {
         }
       }
       if (tool.name === "add_labels") {
-        applyAddLabelsItemSchema(enhancedTool, config.add_labels?.item_schema);
+        /** @type {any} */
+        const addLabelsConfig = config.add_labels;
+        applyAddLabelsItemSchema(enhancedTool, addLabelsConfig?.item_schema);
       }
 
       if (tool.name === "add_comment") {
