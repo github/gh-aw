@@ -132,7 +132,8 @@ steps:
     with:
       script: |
         const fs   = require('fs');
-        const otlp = require('/tmp/gh-aw/actions/otlp.cjs');
+        const path = require('path');
+        const otlp = require(path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'otlp.cjs'));
 
         // qmd writes index stats to /tmp/gh-aw/qmd/stats.json after indexing.
         let indexSize = 0;
