@@ -6020,10 +6020,28 @@ describe("handle_agent_failure", () => {
       delete process.env.GH_AW_FAILURE_CATEGORIES_FILTER;
       delete process.env.GH_AW_FAILURE_EXCLUDED_CATEGORIES_FILTER;
       delete process.env.GH_AW_INFERENCE_ACCESS_ERROR;
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      delete process.env.GH_AW_GROUP_REPORTS;
 
       if (tmpDir && fs.existsSync(tmpDir)) {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
+    });
+
+    it("does not create a grouped parent when the only failure category is excluded", async () => {
+      const { createIssueMock } = setupGithubMock();
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
+      process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "agent_output.json");
+      process.env.GH_AW_GROUP_REPORTS = "true";
+      process.env.GH_AW_FAILURE_EXCLUDED_CATEGORIES_FILTER = JSON.stringify(["missing_data"]);
+      fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({ items: [{ type: "missing_data", reason: "required input unavailable" }] }));
+
+      await main();
+
+      expect(createIssueMock).not.toHaveBeenCalled();
+      expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('Searching for parent issue: "[aw] Failed runs"'));
+      expect(global.core.info).toHaveBeenCalledWith("Agent emitted 1 missing_data message(s) - activating failure handling");
+      expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Skipping failure issue creation: failure categories match exclude filter. Categories: [missing_data]"));
     });
 
     it.each([
