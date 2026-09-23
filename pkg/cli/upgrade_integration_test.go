@@ -61,15 +61,15 @@ permissions:
   contents: read
   actions: read
 engine: copilot
-strict: true
-timeout-minutes: 5
+safe-outputs:
+  add-comment:
 ---
 
 Say hello.
 `
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644), "should create sample workflow")
 
-	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--no-fix", "--skip-extension-upgrade")
+	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--no-actions", "--skip-extension-upgrade")
 	upgradeCmd.Dir = setup.tempDir
 	upgradeOutput, upgradeErr := upgradeCmd.CombinedOutput()
 	upgradeOutputStr := string(upgradeOutput)
@@ -79,4 +79,11 @@ Say hello.
 	require.NoError(t, err, "expected actions-lock.json to be preserved after upgrade")
 	_, err = os.Stat(filepath.Join(awDir, "logs"))
 	require.NoError(t, err, "expected .github/aw/logs to be preserved after upgrade")
+
+	lockContent, err := os.ReadFile(filepath.Join(setup.tempDir, ".github", "workflows", "example.lock.yml"))
+	require.NoError(t, err, "expected upgrade to compile the workflow")
+	assert.Contains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`)
+
+	_, err = os.Stat(filepath.Join(setup.tempDir, ".github", "workflows", "agentics-maintenance.yml"))
+	require.True(t, os.IsNotExist(err), "implicit expiry alone must not generate maintenance")
 }
