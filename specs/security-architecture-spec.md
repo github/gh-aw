@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.0.2<br>
+**Version**: 1.0.1  
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -2040,15 +2040,6 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
-
-### Version 1.0.2 (Experimental Go Repository Profile)
-
-**Published**: September 23, 2026
-
-- Adds CS-14 and CS-15 for the experimental `tools.profile: go` compiler
-  contract. The compiler must identify the profile as experimental, validate its
-  closed execution configuration, and emit only its fixed native/MCP tool
-  catalog.
 
 ### Version 1.0.1 (Editorial Update)
 
