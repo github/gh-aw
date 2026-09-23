@@ -3,8 +3,6 @@ package workflow
 import (
 	"fmt"
 	"strings"
-
-	"github.com/github/gh-aw/pkg/constants"
 )
 
 func (c *Compiler) generateDailyAICRepoMemoryLedgerStep(builder *strings.Builder, data *WorkflowData) {
@@ -18,7 +16,7 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerStep(builder *strings.Builder
 	fmt.Fprintf(builder, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	builder.WriteString("        env:\n")
 	fmt.Fprintf(builder, "          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID)
-	fmt.Fprintf(builder, "          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s%s\n", constants.TmpRepoMemoryDir, entry.ID)
+	fmt.Fprintf(builder, "          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s\n", dailyAICRepoMemoryDir(entry))
 	builder.WriteString("          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
 	builder.WriteString("        with:\n")
 	builder.WriteString("          script: |\n")

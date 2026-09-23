@@ -25,6 +25,7 @@ const INTEGER_FORMATTER = new Intl.NumberFormat("en-US");
 const MAX_LEGACY_AGENT_LOG_BYTES = 10 * 1024 * 1024;
 const ENGINE_HARNESS_MARKER = /\[[^\]\r\n]+-harness\]/i;
 const AWF_STARTUP_FAILURE_MARKER = /Fatal error:|Process exiting with code:|Refusing to use symlink as bind mountpoint|mcp gateway[^\r\n]{0,80}(?:startup failed|failed to start|startup error)/i;
+const REPO_MEMORY_BACKEND = "repo-memory";
 
 /**
  * @returns {Promise<any>}
@@ -650,7 +651,7 @@ async function main(options = {}) {
 
   const token = process.env.GH_AW_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
   const backend = dailyAICBackend();
-  if (!token && backend !== "repo-memory") {
+  if (!token && backend !== REPO_MEMORY_BACKEND) {
     const message = "Daily workflow AI Credits are unknown: no artifact lookup token.";
     core.setOutput("daily_ai_credits_guardrail_status", "structural_error");
     core.setOutput("daily_ai_credits_guardrail_error", message);
@@ -664,7 +665,7 @@ async function main(options = {}) {
     const budget = createAPIBudget();
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || process.env.GH_AW_WORKFLOW_ID || "workflow";
     let actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || process.env.GITHUB_ACTOR || "";
-    if (backend === "repo-memory") {
+    if (backend === REPO_MEMORY_BACKEND) {
       const repository = `${context.repo.owner}/${context.repo.repo}`;
       const countedRuns = readLedgerEntries({
         repoMemoryDir: options.repoMemoryDir || process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR,

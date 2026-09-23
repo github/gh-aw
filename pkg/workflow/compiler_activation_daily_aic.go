@@ -140,7 +140,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, fmt.Sprintf("          %s: %q\n", maxDailyAICBackendEnvVar, data.MaxDailyAICBackend))
 	}
 	if entry, ok := dailyAICRepoMemoryEntry(data); ok {
-		steps = append(steps, fmt.Sprintf("          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s%s\n", constants.TmpRepoMemoryDir, entry.ID))
+		steps = append(steps, fmt.Sprintf("          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s\n", dailyAICRepoMemoryDir(entry)))
 	}
 	steps = append(steps, fmt.Sprintf("          GH_AW_MAX_AI_CREDITS: %s\n", dailyAICMaxCreditsEnvValue(data)))
 	steps = append(steps, "        with:\n")
@@ -184,6 +184,9 @@ func (c *Compiler) buildDailyAICScanObservationRestoreStep(data *WorkflowData) [
 	}
 }
 
+// dailyAICRepoMemoryEntry selects the repo-memory ledger for the repo-memory
+// daily AIC backend. It prefers the memory with id "default" and otherwise
+// falls back to the first configured memory.
 func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
 	if data == nil || data.MaxDailyAICBackend != maxDailyAICBackendRepoMemory || data.RepoMemoryConfig == nil {
 		return RepoMemoryEntry{}, false
@@ -193,12 +196,16 @@ func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
 			return memory, true
 		}
 	}
-	if len(data.RepoMemoryConfig.Memories) > 0 {
-		for _, memory := range data.RepoMemoryConfig.Memories {
+	for index, memory := range data.RepoMemoryConfig.Memories {
+		if index == 0 {
 			return memory, true
 		}
 	}
 	return RepoMemoryEntry{}, false
+}
+
+func dailyAICRepoMemoryDir(memory RepoMemoryEntry) string {
+	return constants.TmpRepoMemoryDir + memory.ID
 }
 
 func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
@@ -213,7 +220,7 @@ func buildDailyAICRepoMemoryCloneStep(memory RepoMemoryEntry) []string {
 	if memory.Wiki {
 		memoryLabel = "wiki-memory"
 	}
-	memoryDir := constants.TmpRepoMemoryDir + memory.ID
+	memoryDir := dailyAICRepoMemoryDir(memory)
 	return []string{
 		fmt.Sprintf("      - name: Clone daily AIC %s ledger (%s)\n", memoryLabel, memory.ID),
 		fmt.Sprintf("        if: %s\n", maxDailyAICreditsConfiguredIfExpr),
