@@ -435,7 +435,7 @@ type AwInfo struct {
 	AwfVersion      string              `json:"awf_version,omitempty"`      // AWF firewall version (new name)
 	FirewallVersion string              `json:"firewall_version,omitempty"` // AWF firewall version (old name, for backward compatibility)
 	AwmgVersion     string              `json:"awmg_version,omitempty"`     // MCP gateway version
-	AgentRuntime    string              `json:"agent_runtime,omitempty"`    // sandbox.agent.runtime value (e.g., "gvisor", "docker-sbx", "cloud-hypervisor"); empty when unset
+	AgentRuntime    string              `json:"agent_runtime,omitempty"`    // sandbox.agent.runtime value (e.g., "cloud-hypervisor"); empty when unset
 	CacheMemory     bool                `json:"cache_memory"`               // true when the workflow declares tools.cache-memory
 	Steps           AwInfoSteps         `json:"steps,omitzero"`             // Steps metadata
 	CreatedAt       string              `json:"created_at"`

@@ -280,7 +280,6 @@ function buildFailureMatchCategories(options) {
   if (options.hasMissingData) categories.push("missing_data");
   if (options.hasCacheMissMisconfiguration) categories.push("cache_miss_misconfiguration");
   if (options.secretVerificationFailed) categories.push("secret_verification_failed");
-  if (options.hasDockerSbxSecretsFailed) categories.push("docker_sbx_secrets_missing");
   if (options.inferenceAccessError) categories.push("inference_access_error");
   if (options.copilotOrgBillingError) categories.push("copilot_org_billing_error");
   if (options.mcpPolicyError) categories.push("mcp_policy_error");
@@ -334,7 +333,6 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.hasAssignmentErrors
  * @param {boolean} options.http400ResponseError
  * @param {boolean} options.unknownModelAICredits
- * @param {boolean} [options.hasDockerSbxSecretsFailed]
  * @param {boolean} [options.copilotOrgBillingError]
  * @param {boolean} [options.missingModelPricingError]
  * @param {string} [options.missingModelPricingModelName]
@@ -365,7 +363,6 @@ function buildFailureIssueTitle(options) {
   if (options.hasOAuthTokenCheckFailed) return `[aw] ${workflowName} has OAuth token misconfiguration`;
   if (options.hasStaleLockFileFailed) return `[aw] ${workflowName} has stale lock file`;
   if (options.shellExpansionGuardRejected) return `[aw] ${workflowName} hit shell expansion guard rejection`;
-  if (options.hasDockerSbxSecretsFailed) return `[aw] ${workflowName} is missing docker-sbx Docker Hub secrets`;
   if (options.copilotOrgBillingError) return `[aw] ${workflowName} hit Copilot organization billing error`;
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
@@ -2717,18 +2714,6 @@ function buildSecretVerificationContext(secretVerificationResult, engineSecretFa
 }
 
 /**
- * Build a docker-sbx setup context from the dedicated runtime guidance template.
- * @param {string} dockerSbxSecretsResult
- * @returns {string}
- */
-function buildDockerSbxSecretsContext(dockerSbxSecretsResult) {
-  if (dockerSbxSecretsResult !== "failed") {
-    return "";
-  }
-  return renderPromptTemplate("docker_sbx_secrets_missing.md");
-}
-
-/**
  * Check whether agent-stdio.log contains a terminal_reason: "completed" result entry,
  * indicating the agent finished its task successfully despite a non-zero job exit code.
  * Log lines may be prefixed with a timestamp (e.g. "2026-04-27T21:45:00.080Z  {JSON}").
@@ -3584,7 +3569,6 @@ async function main() {
     const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
     const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
     const secretVerificationResult = process.env.GH_AW_SECRET_VERIFICATION_RESULT || "";
-    const dockerSbxSecretsResult = process.env.GH_AW_DOCKER_SBX_SECRETS_RESULT || "";
     const engineSecretFailureMessage = process.env.GH_AW_ENGINE_SECRET_FAILURE_MESSAGE || "";
     const assignmentErrors = process.env.GH_AW_ASSIGNMENT_ERRORS || "";
     const assignmentErrorCount = process.env.GH_AW_ASSIGNMENT_ERROR_COUNT || "0";
@@ -3911,15 +3895,12 @@ async function main() {
     // OR a cache-miss was detected after cache restore succeeded (configuration problem)
     // OR the agent reported missing tools or missing data (treated as agent failures by default)
     // OR the secret validation step failed (engine secret missing)
-    // OR docker-sbx is configured but its required Docker Hub secrets are missing.
     // BUT skip if we only have noop outputs (that's a successful no-action scenario)
     const hasSecretVerificationFailed = secretVerificationResult === "failed";
-    const hasDockerSbxSecretsFailed = dockerSbxSecretsResult === "failed";
     if (
       agentConclusion !== "failure" &&
       !isTimedOut &&
       !hasSecretVerificationFailed &&
-      !hasDockerSbxSecretsFailed &&
       !hasAssignmentErrors &&
       !hasAssignCopilotFailures &&
       !hasSkillInstallFailures &&
@@ -3942,7 +3923,7 @@ async function main() {
       !hasToolDenialsExceeded
     ) {
       core.info(
-        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification/docker-sbx-secret errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
+        `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
       );
       return;
     }
@@ -4068,7 +4049,6 @@ async function main() {
       unknownModelAICredits,
       missingModelPricingError,
       missingModelPricingModelName,
-      hasDockerSbxSecretsFailed,
       copilotOrgBillingError,
     });
     const failureCategories = buildFailureMatchCategories({
@@ -4088,7 +4068,6 @@ async function main() {
       hasMissingData,
       hasCacheMissMisconfiguration,
       secretVerificationFailed: hasSecretVerificationFailed,
-      hasDockerSbxSecretsFailed,
       inferenceAccessError,
       copilotOrgBillingError,
       mcpPolicyError,
@@ -4310,7 +4289,6 @@ async function main() {
           workflow_source_url: workflowSourceURL,
           secret_verification_failed: String(hasSecretVerificationFailed),
           secret_verification_context: buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage),
-          docker_sbx_secrets_context: buildDockerSbxSecretsContext(dockerSbxSecretsResult),
           credential_auth_error_context: credentialAuthErrorContext,
           copilot_org_billing_error_context: copilotOrgBillingErrorContext,
           assignment_errors_context: assignmentErrorsContext,
@@ -4548,7 +4526,6 @@ async function main() {
           pull_request_info: pullRequest ? `  \n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})` : "",
           secret_verification_failed: String(hasSecretVerificationFailed),
           secret_verification_context: buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage),
-          docker_sbx_secrets_context: buildDockerSbxSecretsContext(dockerSbxSecretsResult),
           credential_auth_error_context: credentialAuthErrorContext,
           copilot_org_billing_error_context: copilotOrgBillingErrorContext,
           assignment_errors_context: assignmentErrorsContext,
@@ -4733,7 +4710,6 @@ module.exports = {
   detectAndHandleFailureCascade,
   findRecentFailureIssues,
   buildSecretVerificationContext,
-  buildDockerSbxSecretsContext,
   CASCADE_WINDOW_MINUTES,
   CASCADE_WINDOW_MS,
   CASCADE_THRESHOLD,

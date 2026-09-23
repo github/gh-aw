@@ -52,7 +52,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
-  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime gvisor   # Skip run unless sandbox agent runtime matches`
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches`
 
 type auditCommandOptions struct {
 	outputDir        string
@@ -94,7 +94,7 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("stdin", false, "Read workflow run IDs or URLs from stdin (one per line) instead of positional arguments")
 	cmd.Flags().String("experiment", "", "Filter to runs that include this experiment name")
 	cmd.Flags().String("variant", "", "Filter to runs with a specific variant value (requires --experiment)")
-	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., gvisor, docker-sbx, cloud-hypervisor)")
+	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., cloud-hypervisor)")
 	cmd.Flags().Bool("evals", false, "Filter to runs containing evals results (evals.jsonl); automatically downloads the usage artifact (which includes evals) when --artifacts is narrowed")
 	RegisterDirFlagCompletion(cmd, "output")
 }

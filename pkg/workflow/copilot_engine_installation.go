@@ -460,27 +460,3 @@ func generateDockerComposeInstallStep() GitHubActionStep {
 		`          docker compose version`,
 	})
 }
-
-// generateGVisorInstallStep creates a GitHub Actions step that downloads, installs,
-// and verifies the gVisor (runsc) container runtime. This step must run BEFORE the
-// AWF invocation step so that Docker can start the agent container under runsc.
-//
-// Key implementation notes:
-//   - Pins to constants.DefaultGVisorVersion rather than "latest" for reproducible,
-//     verifiable installs. Each binary is verified against its official SHA-512 file
-//     before being installed with root privileges, matching the pattern used by the
-//     adjacent AWF installer.
-//   - Uses uname -m directly (x86_64, aarch64) — gVisor download URLs use raw arch names.
-//   - Restarts Docker with `systemctl restart` (NOT reload): Docker's SIGHUP reload does
-//     not call setHostGatewayIP(), which breaks --add-host host.docker.internal:host-gateway.
-//   - Downloads both runsc and containerd-shim-runsc-v1; the shim is required for Docker's
-//     containerd integration.
-//   - Script source: actions/setup/sh/sudo_gvisor_install.sh (requires sudo).
-func generateGVisorInstallStep() GitHubActionStep {
-	version := constants.DefaultGVisorVersion
-	return GitHubActionStep([]string{
-		"      - name: Install gVisor (runsc)",
-		"        # runner-guard:ignore RGS-012 -- pinned release, SHA-512 verified artifacts, download-only step (no outbound secret transmission).",
-		`        run: bash "${RUNNER_TEMP}/gh-aw/actions/sudo_gvisor_install.sh" ` + version,
-	})
-}

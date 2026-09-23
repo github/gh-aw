@@ -265,11 +265,11 @@ describe("generate_aw_info.cjs", () => {
   });
 
   it("should set agent_runtime from env var", async () => {
-    process.env.GH_AW_INFO_AGENT_RUNTIME = "gvisor";
+    process.env.GH_AW_INFO_AGENT_RUNTIME = "cloud-hypervisor";
     await main(mockCore, mockContext);
 
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
-    expect(awInfo.agent_runtime).toBe("gvisor");
+    expect(awInfo.agent_runtime).toBe("cloud-hypervisor");
   });
 
   it("should default agent_runtime to empty string when not set", async () => {

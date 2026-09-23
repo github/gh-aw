@@ -175,20 +175,6 @@ func appendAWFInstallationSteps(steps []GitHubActionStep, workflowData *Workflow
 		awfVersion = firewallConfig.Version
 	}
 
-	// gVisor must be installed and registered BEFORE AWF starts the agent container.
-	if isGVisorRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
-		steps = append(steps, generateGVisorInstallStep())
-	}
-
-	// docker-sbx must be installed, authenticated, and smoke-tested BEFORE AWF
-	// starts so the microVM runtime is ready when AWF launches the agent.
-	if isDockerSbxRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
-		steps = append(steps, generateDockerSbxKVMCheckStep())
-		steps = append(steps, generateDockerSbxSecretsCheckStep())
-		steps = append(steps, generateDockerSbxInstallStep())
-		steps = append(steps, generateDockerSbxAuthAndDaemonStep())
-		steps = append(steps, generateDockerSbxPreFlightStep())
-	}
 	if isCloudHypervisorRuntime(workflowData) {
 		steps = append(steps, generateCloudHypervisorKVMAccessStep())
 		steps = append(steps, generateCloudHypervisorHostPreflightStep())
@@ -240,11 +226,11 @@ func GetNpmBinPathSetup() string {
 	return `: "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr '\n' ':')"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true`
 }
 
-// GenerateDockerSbxNpmCLIInstallStep installs an npm CLI into a runner path that is
-// visible inside microVM runtimes (docker-sbx/cloud-hypervisor), then creates a
+// GenerateMicroVMNpmCLIInstallStep installs an npm CLI into a runner path that is
+// visible inside the Cloud Hypervisor microVM, then creates a
 // stable bin/ symlink from
 // ${RUNNER_TEMP}/gh-aw/engine-cli/bin/<command> to the package's node_modules/.bin entry.
-func GenerateDockerSbxNpmCLIInstallStep(packageName, version, stepName, commandName string, runInstallScripts bool, cooldownEnabled bool) GitHubActionStep {
+func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandName string, runInstallScripts bool, cooldownEnabled bool) GitHubActionStep {
 	ignoreScriptsFlag := "--ignore-scripts "
 	if runInstallScripts {
 		ignoreScriptsFlag = ""
@@ -283,10 +269,10 @@ func GenerateDockerSbxNpmCLIInstallStep(packageName, version, stepName, commandN
 	return installStep
 }
 
-// GetDockerSbxNpmCLIPathSetup returns the PATH export needed for npm CLIs that were
+// GetMicroVMNpmCLIPathSetup returns the PATH export needed for npm CLIs that were
 // staged into ${RUNNER_TEMP}/gh-aw/engine-cli/bin for microVM runs.
-func GetDockerSbxNpmCLIPathSetup(workflowData *WorkflowData) string {
-	if !isDockerSbxRuntime(workflowData) && !isCloudHypervisorRuntime(workflowData) {
+func GetMicroVMNpmCLIPathSetup(workflowData *WorkflowData) string {
+	if !isCloudHypervisorRuntime(workflowData) {
 		return ""
 	}
 	return `export PATH="${RUNNER_TEMP}/gh-aw/engine-cli/bin:$PATH"`

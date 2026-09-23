@@ -228,7 +228,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 			CooldownEnabled:   install.Cooldown,
 		},
 	)
-	// microVM runtimes (docker-sbx/cloud-hypervisor) do not mount the runner tool cache,
+	// Cloud Hypervisor does not mount the runner tool cache,
 	// so a global npm install is invisible inside the sandbox. Stage a second copy of the
 	// CLI under ${RUNNER_TEMP}/gh-aw/engine-cli, which is mounted into the sandbox, exactly
 	// as the Claude and Codex engines do.
@@ -236,11 +236,11 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	if binaryName == "" && behavior.Execution != nil {
 		binaryName = behavior.Execution.CommandName
 	}
-	if binaryName != "" && (isDockerSbxRuntime(workflowData) || isCloudHypervisorRuntime(workflowData)) {
-		npmSteps = append(npmSteps, GenerateDockerSbxNpmCLIInstallStep(
+	if binaryName != "" && isCloudHypervisorRuntime(workflowData) {
+		npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
 			install.PackageName,
 			version,
-			install.StepName+" in docker-sbx path",
+			install.StepName+" in microVM path",
 			binaryName,
 			install.PostInstallScripts,
 			install.Cooldown,
@@ -690,8 +690,8 @@ func (e *BehaviorDefinedEngine) buildFirewallCommand(exec *EngineExecutionDefini
 	engineCommandWithPath := fmt.Sprintf("export no_proxy=\"${NO_PROXY:-}\" && %s && %s", GetNpmBinPathSetup(), engineCommand)
 	// microVM runtimes stage the engine CLI under ${RUNNER_TEMP}/gh-aw/engine-cli/bin
 	// because the runner tool cache is not mounted inside the sandbox.
-	if dockerSbxCLIPath := GetDockerSbxNpmCLIPathSetup(workflowData); dockerSbxCLIPath != "" {
-		engineCommandWithPath = fmt.Sprintf("%s && %s", dockerSbxCLIPath, engineCommandWithPath)
+	if microVMCLIPath := GetMicroVMNpmCLIPathSetup(workflowData); microVMCLIPath != "" {
+		engineCommandWithPath = fmt.Sprintf("%s && %s", microVMCLIPath, engineCommandWithPath)
 	}
 	if mcpCLIPath := GetMCPCLIPathSetup(workflowData); mcpCLIPath != "" {
 		engineCommandWithPath = fmt.Sprintf("%s && %s", mcpCLIPath, engineCommandWithPath)

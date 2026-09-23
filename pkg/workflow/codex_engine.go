@@ -157,8 +157,8 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		"codex",
 		workflowData,
 	)
-	if isDockerSbxRuntime(workflowData) || isCloudHypervisorRuntime(workflowData) {
-		steps = append(steps, generateCodexDockerSbxCLIInstallStep(workflowData))
+	if isCloudHypervisorRuntime(workflowData) {
+		steps = append(steps, generateCodexMicroVMCLIInstallStep(workflowData))
 	}
 
 	// Add AWF installation step if firewall is enabled
@@ -170,21 +170,6 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 			awfVersion = firewallConfig.Version
 		}
 
-		// gVisor must be installed and registered BEFORE AWF starts the agent container.
-		if isGVisorRuntime(workflowData) && isRuntimeInstallEnabled(workflowData) {
-			steps = append(steps, generateGVisorInstallStep())
-		}
-
-		// docker-sbx must be installed, authenticated, and smoke-tested BEFORE AWF.
-		if isDockerSbxRuntime(workflowData) {
-			if isRuntimeInstallEnabled(workflowData) {
-				steps = append(steps, generateDockerSbxKVMCheckStep())
-				steps = append(steps, generateDockerSbxSecretsCheckStep())
-				steps = append(steps, generateDockerSbxInstallStep())
-				steps = append(steps, generateDockerSbxAuthAndDaemonStep())
-				steps = append(steps, generateDockerSbxPreFlightStep())
-			}
-		}
 		if isCloudHypervisorRuntime(workflowData) {
 			steps = append(steps, generateCloudHypervisorKVMAccessStep())
 			steps = append(steps, generateCloudHypervisorHostPreflightStep())
@@ -201,15 +186,15 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 	return steps
 }
 
-func generateCodexDockerSbxCLIInstallStep(workflowData *WorkflowData) GitHubActionStep {
+func generateCodexMicroVMCLIInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	version := string(constants.DefaultCodexVersion)
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
 		version = workflowData.EngineConfig.Version
 	}
-	return GenerateDockerSbxNpmCLIInstallStep(
+	return GenerateMicroVMNpmCLIInstallStep(
 		"@openai/codex",
 		version,
-		"Install Codex CLI in docker-sbx path",
+		"Install Codex CLI in microVM path",
 		"codex",
 		false,
 		false,
@@ -382,8 +367,8 @@ func (e *CodexEngine) buildCodexExecutionCommand(workflowData *WorkflowData, log
 		} else {
 			codexCommandWithSetup = fmt.Sprintf(`%s && INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s`, GetNpmBinPathSetup(), codexCommand)
 		}
-		if dockerSbxCLIPath := GetDockerSbxNpmCLIPathSetup(workflowData); dockerSbxCLIPath != "" {
-			codexCommandWithSetup = fmt.Sprintf("%s && %s", dockerSbxCLIPath, codexCommandWithSetup)
+		if microVMCLIPath := GetMicroVMNpmCLIPathSetup(workflowData); microVMCLIPath != "" {
+			codexCommandWithSetup = fmt.Sprintf("%s && %s", microVMCLIPath, codexCommandWithSetup)
 		}
 		if mcpCLIPath := GetMCPCLIPathSetup(workflowData); mcpCLIPath != "" {
 			codexCommandWithSetup = fmt.Sprintf("%s && %s", mcpCLIPath, codexCommandWithSetup)

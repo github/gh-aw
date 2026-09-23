@@ -115,44 +115,6 @@ func getAgentConfig(workflowData *WorkflowData) *AgentSandboxConfig {
 	return workflowData.SandboxConfig.Agent
 }
 
-// getAgentContainerRuntime returns the container runtime string for the AWF config,
-// or an empty string if no custom runtime is configured.
-// docker-sbx and cloud-hypervisor are excluded because they are not OCI runtimes;
-// they pass --container-runtime via CLI flags in BuildAWFArgs instead.
-func getAgentContainerRuntime(workflowData *WorkflowData) string {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return ""
-	}
-	// Only gVisor is an OCI runtime that AWF passes through as
-	// container.containerRuntime. The docker/docker-sudo-iptables profiles use the
-	// default Docker runtime, and docker-sbx/cloud-hypervisor pass
-	// --container-runtime via CLI flags in BuildAWFArgs instead.
-	if agentConfig.Runtime != AgentRuntimeGVisor {
-		return ""
-	}
-	return string(AgentRuntimeGVisor)
-}
-
-// isGVisorRuntime returns true when the agent container should use gVisor (runsc).
-func isGVisorRuntime(workflowData *WorkflowData) bool {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return false
-	}
-	return agentConfig.Runtime == AgentRuntimeGVisor
-}
-
-// isDockerSbxRuntime returns true when the agent should run inside a Docker sbx
-// microVM (KVM-based hypervisor isolation).
-func isDockerSbxRuntime(workflowData *WorkflowData) bool {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return false
-	}
-	return agentConfig.Runtime == AgentRuntimeDockerSbx
-}
-
 // isCloudHypervisorRuntime returns true when the agent should run inside a Cloud
 // Hypervisor microVM (preview).
 func isCloudHypervisorRuntime(workflowData *WorkflowData) bool {
@@ -176,25 +138,6 @@ func declaresIgnoredFilesystemAllowWrite(workflowData *WorkflowData) bool {
 		return false
 	}
 	return agentConfig.Config.Filesystem.AllowWrite != nil
-}
-
-// isRuntimeInstallEnabled returns true when runtime installation steps should be
-// generated (the default). Returns false only when sandbox.agent.runtime-install is
-// explicitly set to false AND a runtime (gVisor or docker-sbx) is configured.
-// When no runtime is set, the field has no effect and true is returned.
-func isRuntimeInstallEnabled(workflowData *WorkflowData) bool {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return true
-	}
-	// Noop when the runtime does not provision anything on the runner.
-	if !resolveSandboxRuntimeProfile(agentConfig).SupportsRuntimeInstall {
-		return true
-	}
-	if agentConfig.RuntimeInstall != nil && !*agentConfig.RuntimeInstall {
-		return false
-	}
-	return true
 }
 
 func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {

@@ -136,7 +136,7 @@ Use tests that match the changed behavior:
 | Definitions, catalog, and known imports | `engine_definition_test.go`, `engine_catalog_test.go` |
 | Embedded definitions | `engine_definition_loader_test.go` |
 | Real shared workflow harness | `aider_workflow_test.go` |
-| Sandboxed CLI visibility | `docker_sbx_test.go` |
+| Sandboxed CLI visibility | `cloud_hypervisor_test.go` |
 | Generated smoke workflows | `compiled_lock_files_test.go` |
 
 Test both definition parsing and the generated installation/execution steps.

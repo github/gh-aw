@@ -49,10 +49,6 @@
           "type": "boolean",
           "description": "Experimental: enforce egress via Docker network topology (an internal network with no internet route plus a dual-homed Squid proxy) instead of host iptables. Requires no sudo/NET_ADMIN, so it works inside ARC/Kubernetes DinD runners. Not yet supported together with dnsOverHttps or enableHostAccess. Maps to the --network-isolation CLI flag."
         },
-        "verifySbxEgress": {
-          "type": "boolean",
-          "description": "Fail before agent startup unless Docker sbx blocks a direct request made with all proxy environment variables removed. Intended for orchestrators that start the sbx daemon with DOCKER_SANDBOXES_PROXY chained to AWF Squid. Maps to --verify-sbx-egress."
-        },
         "topologyAttach": {
           "type": "array",
           "items": {
@@ -97,7 +93,7 @@
               }
             ]
           },
-          "description": "Guest-visible absolute paths that may be writable. When present, existing writable host bind mounts are made read-only outside these paths. An empty array makes all non-internal host bind mounts read-only. Paths must exist and cannot use glob patterns. This option is supported by the Docker and gVisor compose runtimes and by the Cloud Hypervisor microVM runtime; it is rejected with the sbx runtime and with Docker-in-Docker agent execution."
+          "description": "Guest-visible absolute paths that may be writable. When present, existing writable host bind mounts are made read-only outside these paths. An empty array makes all non-internal host bind mounts read-only. Paths must exist and cannot use glob patterns. This option is supported by the Docker and Cloud Hypervisor runtimes; it is rejected with Docker-in-Docker agent execution."
         }
       }
     },
@@ -702,11 +698,6 @@
             "pattern": "^/[^:]+:/[^:]+(:(ro|rw))?$"
           },
           "description": "Custom volume mounts for the agent container. Format: \"/host_path:/container_path[:ro|rw]\" (both paths must be absolute). In chroot mode, container paths are automatically prefixed with /host."
-        },
-        "containerRuntime": {
-          "type": "string",
-          "enum": ["gvisor", "sbx", "cloud-hypervisor"],
-          "description": "Runtime for the primary agent. \"gvisor\" uses runsc in Docker Compose. \"sbx\" uses a Docker sbx microVM. \"cloud-hypervisor\" selects the explicit Linux/KVM Cloud Hypervisor v53.0 workload preview (GitHub-hosted Ubuntu x86_64 KVM runners only). Infrastructure containers always use the default runc runtime."
         }
       },
       "allOf": [
@@ -1371,7 +1362,7 @@
           },
           "runtime": {
             "type": "string",
-            "enum": ["docker", "gvisor", "sbx", "cloud-hypervisor"],
+            "enum": ["docker", "cloud-hypervisor"],
             "default": "docker",
             "description": "Trusted enclave executor runtime. cloud-hypervisor is reserved behind the ADR 0002 implementation gates and currently fails closed before execution."
           },

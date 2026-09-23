@@ -128,23 +128,6 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		assert.NotContains(t, jsonStr, `"platform":`, "platform should be absent when sandbox agent is disabled")
 	})
 
-	t.Run("enables sbx egress verification for docker-sbx", func(t *testing.T) {
-		config := AWFCommandConfig{
-			EngineName: "copilot",
-			WorkflowData: &WorkflowData{
-				NetworkPermissions: &NetworkPermissions{
-					Firewall: &FirewallConfig{Enabled: true},
-				},
-				SandboxConfig: &SandboxConfig{
-					Agent: &AgentSandboxConfig{Runtime: AgentRuntimeDockerSbx},
-				},
-			},
-		}
-		jsonStr, err := BuildAWFConfigJSON(config)
-		require.NoError(t, err)
-		assert.Contains(t, jsonStr, `"verifySbxEgress":true`)
-	})
-
 	t.Run("blocked domains are included in the network section", func(t *testing.T) {
 		config := AWFCommandConfig{
 			EngineName:     "copilot",
@@ -216,8 +199,8 @@ func TestBuildAWFConfigJSON(t *testing.T) {
 		assert.NotContains(t, jsonStr, `"filesystem"`)
 	})
 
-	t.Run("filesystem allowWrite is omitted for the compose runtimes", func(t *testing.T) {
-		for _, runtime := range []AgentRuntime{"", AgentRuntimeDocker, AgentRuntimeGVisor, AgentRuntimeDockerSbx} {
+	t.Run("filesystem allowWrite is omitted for the Docker runtimes", func(t *testing.T) {
+		for _, runtime := range []AgentRuntime{"", AgentRuntimeDocker, AgentRuntimeDockerSudoIptables} {
 			config := AWFCommandConfig{
 				EngineName: "copilot",
 				WorkflowData: &WorkflowData{
@@ -2010,16 +1993,6 @@ func TestValidateAWFConfigJSON_AllowsMaxTurnCacheMisses(t *testing.T) {
 func TestValidateAWFConfigJSON_AllowsFilesystemAllowWrite(t *testing.T) {
 	err := validateAWFConfigJSON(`{"filesystem":{"allowWrite":[]}}`)
 	require.NoError(t, err, "filesystem.allowWrite should pass AWF config schema validation")
-}
-
-func TestValidateAWFConfigJSON_AllowsSbxContainerRuntime(t *testing.T) {
-	err := validateAWFConfigJSON(`{"container":{"containerRuntime":"sbx"}}`)
-	require.NoError(t, err, "container.containerRuntime=sbx should pass compile-time schema validation")
-}
-
-func TestValidateAWFConfigJSON_AllowsGVisorContainerRuntime(t *testing.T) {
-	err := validateAWFConfigJSON(`{"container":{"containerRuntime":"gvisor"}}`)
-	require.NoError(t, err, "container.containerRuntime=gvisor should pass compile-time schema validation")
 }
 
 func TestValidateAWFConfigJSON_RejectsUnknownContainerRuntime(t *testing.T) {

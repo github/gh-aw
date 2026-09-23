@@ -40,15 +40,6 @@ func (c *Compiler) buildMainJobCondition(data *WorkflowData, activationJobCreate
 			jobCondition = RenderCondition(BuildAnd(&ExpressionNode{Expression: stripExpressionWrapper(jobCondition)}, guard))
 		}
 	}
-	if activationJobCreated && isDockerSbxRuntime(data) {
-		compilerMainJobLog.Print("Applying docker-sbx secret guardrail to main job condition")
-		guard := &ExpressionNode{Expression: fmt.Sprintf("needs.%s.outputs.docker_sbx_secrets_result != 'failed'", constants.ActivationJobName)}
-		if jobCondition == "" {
-			jobCondition = RenderCondition(guard)
-		} else {
-			jobCondition = RenderCondition(BuildAnd(&ExpressionNode{Expression: stripExpressionWrapper(jobCondition)}, guard))
-		}
-	}
 	compilerMainJobLog.Printf("Built main job condition: activationJobCreated=%v, hasCondition=%v", activationJobCreated, jobCondition != "")
 	return jobCondition
 }

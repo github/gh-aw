@@ -24,7 +24,7 @@ Load these additional files only when relevant:
 - [serena-tool.md](serena-tool.md)
 - [linter-workflows.md](linter-workflows.md)
 - [release-workflow.md](release-workflow.md) whenever a workflow creates or updates release notes
-- [agent-runtime-instructions.md](agent-runtime-instructions.md) for changes involving Docker, gVisor, Docker sbx, ARC DinD, self-hosted runners, or `sandbox.agent.runtime-install`
+- [agent-runtime-instructions.md](agent-runtime-instructions.md) for changes involving Docker, Cloud Hypervisor, ARC DinD, or self-hosted runners
 - [skills.md](skills.md) when the user asks to add specific skills or agent plugins
 
 ## Scope

@@ -1575,12 +1575,12 @@ on:
   # Format 2: string
   stale-check: "full"
 
-  # Controls whether the activation job creates or updates a notification issue
-  # when the workflow is compiled with a blocked compile-agentic version. Set to
-  # false to suppress only that notification issue while keeping the
-  # blocked-version check itself (and its hard failure) active. This is
-  # independent of 'check-for-updates' (which disables the whole check) and
-  # 'safe-outputs.report-failure-as-issue' (which also gates the notification).
+  # Controls whether the activation job creates or updates a notification issue when
+  # the workflow is compiled with a blocked compile-agentic version. Set to false to
+  # suppress only that notification issue while keeping the blocked-version check
+  # itself (and its hard failure) active. This is independent of 'check-for-updates'
+  # (which disables the whole check) and 'safe-outputs.report-failure-as-issue'
+  # (which also gates the notification).
   # (optional)
   report-blocked-version: true
 
@@ -2321,23 +2321,12 @@ sandbox:
     # Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs
     # Docker with a privileged AWF, legacy iptables networking, and host/service
     # access (required for allow-host-ports and GitHub Actions services:
-    # connectivity); 'gvisor' runs the agent under gVisor's runsc runtime with strict
-    # network isolation; 'docker-sbx' runs the agent inside a Docker sbx KVM microVM
-    # (requires DOCKER_PAT and DOCKER_USERNAME secrets and a KVM-capable runner; the
-    # compiler handles the required privileged setup); 'cloud-hypervisor' runs the
-    # agent in AWF's preview Cloud Hypervisor microVM runtime on GitHub-hosted Ubuntu
-    # x86_64, sized at 2 vCPUs and 4096 MiB. Omitting runtime is equivalent to
-    # 'docker'. gvisor, docker-sbx and cloud-hypervisor are incompatible with
-    # runner.topology: arc-dind.
+    # connectivity); 'cloud-hypervisor' runs the agent in AWF's preview Cloud
+    # Hypervisor microVM runtime on GitHub-hosted Ubuntu x86_64, sized at 2 vCPUs and
+    # 4096 MiB. Omitting runtime is equivalent to 'docker'. cloud-hypervisor is
+    # incompatible with runner.topology: arc-dind.
     # (optional)
     runtime: "docker"
-
-    # Controls generation of sandbox runtime installation steps. Only valid with
-    # runtime: gvisor or runtime: docker-sbx. Defaults to true. Set to false when the
-    # runtime is already installed on the runner; docker-sbx credential refresh still
-    # runs.
-    # (optional)
-    runtime-install: true
 
     # Custom sandbox runtime configuration. Note: Network configuration is controlled
     # by the top-level 'network' field, not here.
@@ -3410,8 +3399,9 @@ max-daily-ai-credits: 1
 # Format 3: string
 max-daily-ai-credits: "example-value"
 
-# Format 4: Object form: specify a 'value' (the credit limit) and an optional
-# 'github-app' to mint a dedicated token for the guardrail API calls.
+# Format 4: Object form: specify a 'value' (the credit limit), an optional
+# 'github-app' to mint a dedicated token for the guardrail API calls, and optional
+# error handling.
 max-daily-ai-credits:
   # The maximum AI Credits budget (positive integer, K/M suffix, or expression). To
   # disable the guardrail, use the scalar form `max-daily-ai-credits: -1` instead.
@@ -3621,6 +3611,11 @@ max-daily-ai-credits:
       # rejected by the compiler). GitHub App-only permission.
       # (optional)
       workflows: "read"
+
+  # When true, an unknown daily AI Credits total produces a warning and allows the
+  # workflow to continue. Defaults to false.
+  # (optional)
+  continue-on-error: true
 
 # MCP server definitions
 # (optional)
@@ -4064,7 +4059,7 @@ tools:
     # Optional Linear API key or OAuth access token secret reference. Defaults to ${{
     # secrets.LINEAR_API_KEY }}.
     # (optional)
-    token: "${{ secrets.LINEAR_API_KEY }}"
+    token: "example-value"
 
     # Linear MCP toolset name(s) to enable. Toolsets are expanded to gateway-enforced
     # allowed tools.
@@ -4083,13 +4078,14 @@ tools:
     # List of allowed Linear MCP tool names or wildcard patterns. When toolsets are
     # set, every pattern must match a tool in those toolsets.
     # (optional)
-    allowed: ["*"]
+    allowed: []
       # Array of strings
 
     # Whether failure to connect to Linear should fail MCP gateway startup. Defaults
     # to true.
     # (optional)
     required: true
+
   # Jira tools provided by Atlassian's remote Rovo MCP service. This integration
   # supports non-interactive CI/CD authentication only.
   # (optional)
@@ -4105,8 +4101,9 @@ tools:
     # (optional)
     url: "example-value"
 
-    # Approved read-only Jira MCP tools the agent may call. Required; all-tools access
-    # and write-capable tools are not supported.
+    # Approved read-only Jira MCP tools the agent may call. Required; write-capable
+    # tools are not supported. "*" expands to all approved read-only tools; the full,
+    # unrestricted MCP tool set can never be enabled.
     allowed: []
       # Array of strings
 
@@ -4694,6 +4691,11 @@ safe-outputs:
     # '[analysis] ')
     # (optional)
     title-prefix: "example-value"
+
+    # Deterministic template appended after the agent-generated issue body. Available
+    # placeholders: {workflow_name}, {run_url}.
+    # (optional)
+    body-footer: "example-value"
 
     # Require create_issue tool calls to include a temporary_id.
     # (optional)
@@ -9261,6 +9263,11 @@ safe-outputs:
     # (optional)
     title-prefix: "example-value"
 
+    # Deterministic template appended after the agent-generated pull request body.
+    # Available placeholders: {workflow_name}, {run_url}.
+    # (optional)
+    body-footer: "example-value"
+
     # Optional list of labels to attach to the pull request. Accepts an array of label
     # names or a GitHub Actions expression resolving to a comma-separated list (e.g.
     # '${{ inputs.labels }}').
@@ -12348,6 +12355,446 @@ safe-outputs:
   # Format 2: Enable code scanning autofix creation with default configuration (max:
   # 10)
   autofix-code-scanning-alert: null
+
+  # Experimental. Create Azure DevOps work items through a trusted safe-output
+  # handler. Using this field emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-create-work-item:
+    # (optional)
+    work-item-type: "example-value"
+
+    # (optional)
+    description-field: "example-value"
+
+    # (optional)
+    area-path: "example-value"
+
+    # (optional)
+    iteration-path: "example-value"
+
+    # (optional)
+    assignee: "example-value"
+
+    # (optional)
+    tags: []
+      # Array of strings
+
+    # (optional)
+    allowed-tags: []
+      # Array of strings
+
+    # (optional)
+    custom-fields:
+      {}
+
+    # (optional)
+    artifact-link:
+      # (optional)
+      enabled: true
+
+      # (optional)
+      repository: "example-value"
+
+      # (optional)
+      branch: "example-value"
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-create-work-item: null
+
+  # Experimental. Update explicitly scoped Azure DevOps work items and explicitly
+  # enabled fields. Using this field emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-update-work-item:
+    # Accepted formats:
+
+    # Format 1: integer
+    target: 1
+
+    # Format 3: array
+    target: []
+      # Array items: integer
+
+    # Format 4: string
+    target: "example-value"
+
+    # (optional)
+    status: true
+
+    # (optional)
+    title: true
+
+    # (optional)
+    body: true
+
+    # (optional)
+    markdown-body: true
+
+    # (optional)
+    title-prefix: "example-value"
+
+    # (optional)
+    tag-prefix: "example-value"
+
+    # (optional)
+    area-path: true
+
+    # (optional)
+    iteration-path: true
+
+    # (optional)
+    assignee: true
+
+    # (optional)
+    tags: true
+
+    # (optional)
+    allowed-tags: []
+      # Array of strings
+
+    # (optional)
+    allowed-area-prefixes: []
+      # Array of strings
+
+    # (optional)
+    allowed-iteration-prefixes: []
+      # Array of strings
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-update-work-item: null
+
+  # Experimental. Comment on explicitly scoped Azure DevOps work items. Using this
+  # field emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-comment-on-work-item:
+    # Accepted formats:
+
+    # Format 1: integer
+    target: 1
+
+    # Format 3: array
+    target: []
+      # Array items: integer
+
+    # Format 4: string
+    target: "example-value"
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-comment-on-work-item: null
+
+  # Experimental. Assign an Azure DevOps identity to a work item. Using this field
+  # emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-assign-work-item:
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    target: 1
+
+    # Format 3: array
+    target: []
+      # Array items: integer
+
+    # Format 4: string
+    target: "example-value"
+
+    # (optional)
+    allowed: []
+      # Array of strings
+
+    # (optional)
+    blocked: []
+      # Array of strings
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-assign-work-item: null
+
+  # Experimental. Link explicitly scoped Azure DevOps work items. Using this field
+  # emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-link-work-items:
+    # Accepted formats:
+
+    # Format 1: integer
+    target: 1
+
+    # Format 3: array
+    target: []
+      # Array items: integer
+
+    # Format 4: string
+    target: "example-value"
+
+    # (optional)
+    allowed-link-types: []
+      # Array of strings
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-link-work-items: null
+
+  # Experimental. Upload a staged workspace file to an Azure DevOps work item. Using
+  # this field emits a compile-time warning.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: object
+  ado-upload-workitem-attachment:
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    target: 1
+
+    # Format 3: array
+    target: []
+      # Array items: integer
+
+    # Format 4: string
+    target: "example-value"
+
+    # (optional)
+    max-file-size: 1
+
+    # (optional)
+    allowed-extensions: []
+      # Array of strings
+
+    # (optional)
+    comment-prefix: "example-value"
+
+    # A positive integer value that may also be specified as a GitHub Actions
+    # expression string that resolves to an integer at runtime (e.g. '${{
+    # inputs.max-runs }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max: "example-value"
+
+    # A boolean value that may also be specified as a GitHub Actions expression string
+    # that resolves to a boolean at runtime (e.g. '${{ inputs.my-flag }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    staged: true
+
+    # Format 2: GitHub Actions expression that resolves to a boolean at runtime
+    staged: "example-value"
+
+    # Internal hidden feature. Optional declarative sample payloads for deterministic
+    # safe-output replay.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: array
+    samples: []
+      # Array items: object
+
+    # Format 2: object
+    samples:
+      {}
+
+  # Format 2: null
+  ado-upload-workitem-attachment: null
 
   # Enable AI agents to create GitHub Check Runs that surface analysis results in
   # the PR checks UI. Requires checks: write permission.
@@ -16105,9 +16552,10 @@ safe-outputs:
     github-token-for-extra-empty-commit: "example-value"
 
     # When true (default), if pushing to the PR branch fails due to a
-    # non-fast-forward/diverged branch, create a fallback pull request that targets
-    # the original PR branch. Set to false to disable this behavior and avoid
-    # requiring pull-requests: write permission.
+    # non-fast-forward/diverged branch or an exhausted workflow-permission check
+    # timeout, create a fallback pull request that targets the original PR branch. Set
+    # to false to disable this behavior and avoid requiring pull-requests: write
+    # permission.
     # (optional)
     fallback-as-pull-request: true
 
@@ -21305,6 +21753,12 @@ safe-outputs:
     # (optional)
     environment: "example-value"
 
+    # Optional HTTPS base URL for a mirror of pinned threat-detect release assets. The
+    # compiler appends the pinned release tag and asset name; compiler-supplied
+    # SHA-256 digests remain authoritative.
+    # (optional)
+    artifact-base-url: "example-value"
+
     # When true (default), detection failures produce warnings and allow safe outputs
     # to proceed with a caution notice and 'needs-review' label. When false, detection
     # failures block safe outputs entirely. Accepts a boolean literal or a GitHub
@@ -21530,6 +21984,13 @@ safe-outputs:
   # (optional)
   footer: true
 
+  # Deterministic template appended to every safe output body, in addition to
+  # handler-specific body-footer content and independently of the generated
+  # attribution footer. Imported body footers are additive. Available placeholders:
+  # {workflow_name}, {run_url}.
+  # (optional)
+  body-footer: "example-value"
+
   # When set to false or "false", disables all activation and fallback comments
   # entirely (run-started, run-success, run-failure, PR/issue creation links).
   # Supports templatable boolean values including GitHub Actions expressions (e.g.
@@ -21558,7 +22019,7 @@ safe-outputs:
   # categories must match included AND not match excluded. Common categories:
   # agent_failure, timed_out, missing_safe_outputs, report_incomplete, missing_tool,
   # missing_data, inference_access_error, mcp_policy_error,
-  # ai_credits_rate_limit_error, max_ai_credits_exceeded.
+  # ai_credits_rate_limit_error, max_ai_credits_exceeded, daily_ai_credits_unknown.
   report-failure-as-issue: []
     # Array items: string
 
@@ -23271,8 +23732,8 @@ import-schema:
 model: "example-value"
 
 # ⚠️ Experimental. Deterministic graders for workflow-run observations. Built-in
-# graders use execution artifacts, custom graders use inline scripts, and the
-# operational-value grader uses a repository evaluator.
+# graders use execution artifacts, custom graders use inline JavaScript, and the
+# operational-value grader uses either inline Bash or a repository Bash evaluator.
 # (optional)
 graders:
   {}

@@ -54,28 +54,6 @@ func TestExtractAgentSandboxConfigPlatform(t *testing.T) {
 	})
 }
 
-func TestExtractAgentSandboxConfigRuntimeInstall(t *testing.T) {
-	compiler := &Compiler{}
-
-	t.Run("extracts sandbox.agent.runtime-install from object format", func(t *testing.T) {
-		config := compiler.extractAgentSandboxConfig(map[string]any{
-			"id":              "awf",
-			"runtime-install": false,
-		})
-
-		require.NotNil(t, config, "Should extract agent sandbox config")
-		require.NotNil(t, config.RuntimeInstall, "Should extract sandbox.agent.runtime-install")
-		assert.False(t, *config.RuntimeInstall, "Should preserve sandbox.agent.runtime-install value")
-	})
-
-	t.Run("runtime-install is nil when absent", func(t *testing.T) {
-		config := compiler.extractAgentSandboxConfig(map[string]any{"id": "awf"})
-
-		require.NotNil(t, config, "Should extract agent sandbox config")
-		assert.Nil(t, config.RuntimeInstall, "RuntimeInstall should be nil when not configured")
-	})
-}
-
 func TestExtractAgentSandboxConfigRuntimeProfile(t *testing.T) {
 	compiler := &Compiler{}
 

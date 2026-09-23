@@ -2926,7 +2926,7 @@ func TestMainWorkflowSchema_SandboxAgentRuntime(t *testing.T) {
 		}
 	}
 
-	for _, runtime := range []string{"docker", "docker-sudo-iptables", "gvisor", "docker-sbx", "cloud-hypervisor"} {
+	for _, runtime := range []string{"docker", "docker-sudo-iptables", "cloud-hypervisor"} {
 		t.Run("runtime: "+runtime+" is accepted", func(t *testing.T) {
 			t.Parallel()
 

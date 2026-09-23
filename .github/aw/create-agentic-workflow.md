@@ -30,7 +30,7 @@ Load these topic files only when relevant:
 - [report.md](report.md) for reporting output structure and recurring report lifecycle
 - [release-workflow.md](release-workflow.md) whenever a workflow creates or updates release notes, including workflows that also build, test, or publish a GitHub release
 - [linter-workflows.md](linter-workflows.md) for mining, refining, or applying custom linter rules
-- [agent-runtime-instructions.md](agent-runtime-instructions.md) when choosing or debugging Docker, gVisor, Docker sbx, ARC DinD, self-hosted runners, or `sandbox.agent.runtime-install`
+- [agent-runtime-instructions.md](agent-runtime-instructions.md) when choosing or debugging Docker, Cloud Hypervisor, ARC DinD, or self-hosted runners
 - [skills.md](skills.md) when the user asks for specific skills or agent plugins
 
 ## Skills and Plugins
