@@ -472,6 +472,14 @@ Two flags control the workflow directory location, with different purposes:
 
 Fast enumeration without GitHub API queries. For detailed status including enabled/disabled state and run information, use `status` instead.
 
+For local workflows, `compiled` is `Yes` when the source frontmatter matches the generated `.lock.yml`, `No` when the hashes differ, and `N/A` when the lock file is missing. Use JSON output to fail a pull request check if any lock file is stale or missing:
+
+```bash
+gh aw list --json | jq -e 'all(.[]; .compiled == "Yes")'
+```
+
+Run the check from the repository root. If it fails, run `gh aw compile <workflow-id>` for each reported workflow and commit the regenerated `.lock.yml` files with their sources.
+
 #### `status`
 
 List workflows with state, enabled/disabled status, and labels. With `--ref`, includes latest run status. Use `--json` to inspect the raw `on` data, including schedules.
