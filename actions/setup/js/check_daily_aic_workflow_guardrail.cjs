@@ -546,7 +546,7 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
  * @param {string} actorLogin
  * @param {number} threshold
  * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number}>} countedRuns
- * @param {{remaining:number,limit:number,used:number,reset:string}} rateLimit
+ * @param {{remaining:number,limit:number,used:number,reset:string} | null} rateLimit
  * @param {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} meta
  * @returns {string}
  */
@@ -570,12 +570,13 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
   const minMaxAICFormatted = noRunData ? "— / —" : `${formatAICCredits(stats.min)} / ${formatAICCredits(stats.max)}`;
 
   const noteLines = [];
-  if (meta.truncatedByRateLimit) {
+  if (meta.truncatedByRateLimit && rateLimit) {
     noteLines.push(`- Stopped early to preserve GitHub API rate limit headroom (${rateLimit.remaining} remaining, reserve ${RATE_LIMIT_RESERVE}).`);
   }
   if (meta.candidateRunsCount > meta.inspectedRunsCount) {
     noteLines.push(`- Considered ${meta.candidateRunsCount} prior runs in the 24h window and inspected ${meta.inspectedRunsCount}.`);
   }
+  const apiRows = rateLimit ? [`| API remaining | ${formatInteger(rateLimit.remaining)} / ${formatInteger(rateLimit.limit)} |`, `| API used | ${formatInteger(rateLimit.used)} |`, `| API reset | ${rateLimit.reset || "unknown"} |`] : [];
   return [
     `**Workflow:** ${workflowName || "workflow"}`,
     `**Actor:** ${actorLogin || "unknown"}`,
@@ -590,9 +591,7 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
     `| Avg AIC / run | ${avgAICFormatted} |`,
     `| Std dev AIC | ${stddevAICFormatted} |`,
     `| Min / Max AIC | ${minMaxAICFormatted} |`,
-    `| API remaining | ${formatInteger(rateLimit.remaining)} / ${formatInteger(rateLimit.limit)} |`,
-    `| API used | ${formatInteger(rateLimit.used)} |`,
-    `| API reset | ${rateLimit.reset || "unknown"} |`,
+    ...apiRows,
     "",
     "Previous runs counted in the last 24 hours:",
     "",
@@ -608,7 +607,7 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
  * @param {string} actorLogin
  * @param {number} threshold
  * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number}>} countedRuns
- * @param {{remaining:number,limit:number,used:number,reset:string}} rateLimit
+ * @param {{remaining:number,limit:number,used:number,reset:string} | null} rateLimit
  * @param {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} meta
  * @returns {Promise<void>}
  */
@@ -680,7 +679,7 @@ async function main(options = {}) {
         aic: entry.aic,
       }));
       const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
-      const rateLimit = budget.snapshot();
+      const rateLimit = null;
       const summaryMeta = {
         candidateRunsCount: countedRuns.length,
         inspectedRunsCount: countedRuns.length,

@@ -84,6 +84,9 @@ func extractMaxDailyAICContinueOnError(raw any) (bool, bool) {
 	return continueOnError, true
 }
 
+// extractMaxDailyAICBackend reads the optional backend key from an
+// already-unwrapped max-daily-ai-credits object and reports whether it was
+// present.
 func extractMaxDailyAICBackend(raw any) (string, bool) {
 	rawMap, ok := raw.(map[string]any)
 	if !ok {

@@ -196,12 +196,19 @@ func dailyAICRepoMemoryEntry(data *WorkflowData) (RepoMemoryEntry, bool) {
 			return memory, true
 		}
 	}
-	for index, memory := range data.RepoMemoryConfig.Memories {
-		if index == 0 {
-			return memory, true
+	return firstRepoMemoryEntry(data.RepoMemoryConfig.Memories)
+}
+
+func firstRepoMemoryEntry(memories []RepoMemoryEntry) (RepoMemoryEntry, bool) {
+	var first RepoMemoryEntry
+	found := false
+	for _, memory := range memories {
+		if !found {
+			first = memory
+			found = true
 		}
 	}
-	return RepoMemoryEntry{}, false
+	return first, found
 }
 
 func dailyAICRepoMemoryDir(memory RepoMemoryEntry) string {

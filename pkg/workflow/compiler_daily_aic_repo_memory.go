@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+// generateDailyAICRepoMemoryLedgerStep appends the current run's AIC usage to
+// the repo-memory ledger when the repo-memory backend is configured. It must run
+// before the repo-memory artifact upload so the existing push job persists the
+// ledger update.
 func (c *Compiler) generateDailyAICRepoMemoryLedgerStep(builder *strings.Builder, data *WorkflowData) {
 	entry, ok := dailyAICRepoMemoryEntry(data)
 	if !ok {
