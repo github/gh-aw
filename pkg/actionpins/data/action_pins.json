@@ -108,10 +108,10 @@
       "version": "v0.24.2",
       "sha": "3ad7283483fc7af8ff2b4ea19663c2d5ca935e26"
     },
-    "astral-sh/setup-uv@v10.1.0": {
+    "astral-sh/setup-uv@v10.2.0": {
       "repo": "astral-sh/setup-uv",
-      "version": "v10.1.0",
-      "sha": "bec219d24cd3e171d82865faccec33120bb574f4"
+      "version": "v10.2.0",
+      "sha": "c18668ad3cf93ea998bef934396af7bb5c839dc7"
     },
     "denoland/setup-deno@v2.0.5": {
       "repo": "denoland/setup-deno",
@@ -153,20 +153,20 @@
       "version": "v9.0.18",
       "sha": "c42a2821e3ef0cee1b1bc20b7eecbb2bfa7a83b4"
     },
-    "haskell-actions/setup@v2.11.0": {
+    "haskell-actions/setup@v2.12.1": {
       "repo": "haskell-actions/setup",
-      "version": "v2.11.0",
-      "sha": "cd0d9bdd65b20557f41bea4dbe43d0b5fbbfe553"
+      "version": "v2.12.1",
+      "sha": "0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d"
     },
     "oven-sh/setup-bun@v2.2.0": {
       "repo": "oven-sh/setup-bun",
       "version": "v2.2.0",
       "sha": "0c5077e51419868618aeaa5fe8019c62421857d6"
     },
-    "ruby/setup-ruby@v1.324.0": {
+    "ruby/setup-ruby@v1.325.0": {
       "repo": "ruby/setup-ruby",
-      "version": "v1.324.0",
-      "sha": "a0102e0972be65f351c307e2d64b9314a57c8073"
+      "version": "v1.325.0",
+      "sha": "e8944e80fb94b20106697132f8c20c665fab29e9"
     },
     "safedep/pmg@v1": {
       "repo": "safedep/pmg",
