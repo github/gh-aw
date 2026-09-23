@@ -132,3 +132,61 @@
   resolved cleanly this run). Filed a new issue rather than folding into either existing chain.
   Recommend a hard-failure gate on `push_repo_memory` if `metrics/latest.json`'s timestamp is
   unchanged, since a `success` conclusion currently masks this from failure-rate-based monitoring.
+## RESOLVED — 2026-09-23T04:37Z (Workflow Health Manager)
+- **Metrics Collector "success-but-empty" defect (#62731 filed 09-22, PR #62670) is fixed and
+  merged.** PR github/gh-aw#62670 (merged 2026-09-22T16:55:53Z, closing #62656) added a
+  content-based post-run gate to `metrics-collector.md`: the run now fails loudly if
+  `metrics/latest.json`'s timestamp is unchanged/missing/stale, or if no `metrics/daily/*.json`
+  was written, instead of reporting a silent green success. Verified via re-run
+  35811175614 (2026-09-23T02:38Z): it now correctly **fails** with
+  `ERROR: metrics/latest.json timestamp is unchanged (2026-09-01T02:50:27Z). No new metrics were
+  collected.` — the gate works as designed. #62731 remains open (tracks the deeper root cause:
+  why codex stops after ~3 tool calls, agentic_fraction 0 — noted by the PR author as
+  "engine/model behavior not resolvable from this repo"). **DO NOT close #62731** — the underlying
+  early-termination behavior is still unresolved, only the silent-success masking is fixed.
+- `metrics/latest.json` is still stale at 2026-09-01 (22 days, 11th consecutive affected run) —
+  now failing loudly instead of silently, which is the intended interim behavior per PR #62670.
+  Continued cross-checking `failing-workflows.json` entries live via `gh run list`/job logs this
+  run.
+
+## New — 2026-09-23T04:37Z (Workflow Health Manager)
+- **`daily-fact.md` (residual P2 watch item) confirmed NOT an EACCES recurrence — new, distinct,
+  unfixed defect: mempalace MCP server connection refused.** 15/15 most recent scheduled runs
+  (2026-09-02 → 2026-09-22) failed with the identical signature:
+  `dial tcp 172.17.0.1:8765: connect: connection refused` when the codex MCP-server-check step
+  tries to reach the in-job `mempalace` HTTP server (`shared/mcp/mempalace.md`, backgrounded via
+  `python -m mempalace.mcp_server ... &` on port 8765). The step logs show `pip install
+  mempalace==3.2.0` succeeds and the start command is invoked (`MemPalace MCP server started (PID
+  ...)`), but the server is never reachable at the health-check stage ~30-50s later — no crash
+  traceback surfaces in the captured job log (server's own stdout/stderr is redirected to
+  `/tmp/gh-aw/mcp-logs/mempalace/server.log`, which isn't uploaded/visible from the Action log).
+  This long predates the cloud-hypervisor EACCES chain (same signature back to at least
+  2026-09-02, 15 for 15) and is unaffected by PR github/gh-aw#62406 (still on `cloud-hypervisor`,
+  per that PR's own description, but the failure is unrelated to hypervisor/exec-permission
+  errors — it is a plain MCP-server-not-ready failure). **Filed as a new maintenance issue this
+  run** (see Actions Taken) since no existing tracker covers the mempalace-specific signature —
+  the generic `[aw] Daily Fact failed` auto-issues (#62666, #62383, #61617, ...) all self-expire
+  without root-cause attribution. Suggested fix direction: increase the startup wait before the
+  MCP gateway's health check reaches `mempalace`, or add an explicit readiness probe/retry in
+  `shared/mcp/mempalace.md`'s "Start MemPalace MCP Server" step (currently just backgrounds the
+  process with no wait-for-port logic), or surface `/tmp/gh-aw/mcp-logs/mempalace/server.log` on
+  failure for real root-cause diagnosis.
+- Re-verified `failing-workflows.json`'s 4 entries live:
+  - **lint-monster**: fully recovered (2/2 most recent scheduled runs successful post-#62406).
+  - **daily-firewall-report**: fully recovered — latest run (2026-09-23T02:29Z) succeeded
+    end-to-end (agent, safe_outputs, evals, cache_memory all green); prior day's run was
+    `cancelled` (not a failure).
+  - **daily-go-test-parallelizer**: remains fully healthy (all recent runs successful).
+  - **cjs**: plain GH Actions workflow (path-triggered CI on JS/model-data changes), out of `gh
+    aw` scope — 1 `action_required` was an approval gate, not a failure.
+- Compilation status unchanged: 299/299 workflows have lock files (100%), compile-validate clean.
+
+## Actions Taken This Run (2026-09-23)
+- Verified PR github/gh-aw#62670 merged and its post-run gate is functioning as designed (caught
+  the very staleness it was built to catch, on its very next scheduled run).
+- Root-caused `daily-fact`'s recurring failure as a distinct, previously-mislabeled mempalace
+  MCP-server-startup timing issue (not EACCES/cloud-hypervisor) — 15/15 recent runs affected.
+- Filed one new maintenance issue for the mempalace startup-race root cause (see created issue).
+- No dashboard issue created this run (material delta below the threshold for a full dashboard
+  refresh — only new issue is the mempalace root-cause finding; #62310/#62311 remain correctly
+  closed as resolved; #62731 correctly left open).
