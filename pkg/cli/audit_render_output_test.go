@@ -139,6 +139,22 @@ func TestRenderAuditReportDoesNotCacheNoBaselineResult(t *testing.T) {
 	assert.False(t, ok, "opt-out result must not be persisted as a full cache entry")
 }
 
+func TestRenderAuditReportGroupParsesLogs(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+
+	_, stderr := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, AuditOptions{
+			OutputDir: runDir,
+			Verbose:   true,
+			Parse:     true,
+			Group:     true,
+		})
+	})
+
+	assert.Contains(t, stderr, "No engine detected")
+}
+
 func TestRenderConsoleTokenUsageWarnings(t *testing.T) {
 	output := testutil.CaptureStderr(t, func() {
 		renderConsoleTokenUsage(&TokenUsageSummary{

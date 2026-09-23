@@ -44,6 +44,7 @@ func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOption
 			Hostname:         request.hostname,
 			OutputDir:        opts.outputDir,
 			Verbose:          opts.verbose,
+			Parse:            opts.parse,
 			ArtifactSets:     opts.artifacts,
 			ExperimentFilter: opts.experimentFilter,
 			VariantFilter:    opts.variantFilter,
