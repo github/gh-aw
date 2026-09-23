@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-04",
-    "workflow_name": "Contribution Check",
-    "workflow_file": "contribution-check",
-    "total_tokens_analyzed": 1694564,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "estimated_savings_per_run": 200000
-  },
-  {
     "date": "2026-06-05",
     "workflow_name": "Workflow Normalizer",
     "workflow_file": "workflow-normalizer",
@@ -282,5 +273,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 25
+  },
+  {
+    "date": "2026-09-23",
+    "workflow_name": "CLI Consistency Checker",
+    "workflow_file": "cli-consistency-checker",
+    "total_aic_analyzed": 240.17921,
+    "runs_audited": 15,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 95
   }
 ]
