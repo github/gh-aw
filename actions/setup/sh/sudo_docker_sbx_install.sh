@@ -10,8 +10,8 @@ set +o histexpand
 #
 # Key notes:
 #   - Adds the Docker apt repository deterministically (pinned GPG key fetched to a
-#     file, signed-by apt source line) instead of piping the get.docker.com
-#     convenience script into a root shell. See:
+#     file, signed-by apt source line) instead of piping a convenience script into
+#     a root shell. See:
 #     https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
 
 set -euo pipefail
@@ -19,15 +19,29 @@ set -euo pipefail
 echo "::group::Install docker-sbx"
 KEYRING_PATH="/etc/apt/keyrings/docker.asc"
 SOURCE_LIST="/etc/apt/sources.list.d/docker.list"
-DISTRO_ID="$(. /etc/os-release && echo "$ID")"
-DISTRO_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+# Update only after verifying a replacement fingerprint against Docker's published signing-key documentation.
+DOCKER_GPG_FINGERPRINT="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+. /etc/os-release
+DISTRO_ID="${ID:-}"
+DISTRO_CODENAME="${VERSION_CODENAME:-}"
+
+if [[ -z "${DISTRO_ID}" || -z "${DISTRO_CODENAME}" ]]; then
+  echo "Docker apt repository requires ID and VERSION_CODENAME in /etc/os-release." >&2
+  exit 1
+fi
 
 echo "Adding Docker apt repository for ${DISTRO_ID} ${DISTRO_CODENAME}..."
 sudo install -m 0755 -d /etc/apt/keyrings
-# runner-guard:ignore RGS-012 -- fetches Docker's GPG signing key to a file (never piped to a shell); the key is used only to verify the signed-by apt repository below.
-curl -fsSL "https://download.docker.com/linux/${DISTRO_ID}/gpg" -o /tmp/docker.asc
-sudo install -m 0644 /tmp/docker.asc "${KEYRING_PATH}"
-rm -f /tmp/docker.asc
+KEY_TMP="$(mktemp)"
+trap 'rm -f "${KEY_TMP}"' EXIT
+# runner-guard:ignore RGS-012 -- fetches Docker's GPG signing key to a temporary file (never piped to a shell); the key fingerprint is verified before it is used to verify the signed-by apt repository below.
+curl -fsSL "https://download.docker.com/linux/${DISTRO_ID}/gpg" -o "${KEY_TMP}"
+KEY_FINGERPRINT="$(gpg --show-keys --with-colons "${KEY_TMP}" | awk -F: '$1 == "fpr" { print $10; exit }')"
+if [[ "${KEY_FINGERPRINT}" != "${DOCKER_GPG_FINGERPRINT}" ]]; then
+  echo "Downloaded Docker GPG key fingerprint does not match the expected fingerprint." >&2
+  exit 1
+fi
+sudo install -m 0644 "${KEY_TMP}" "${KEYRING_PATH}"
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=${KEYRING_PATH}] https://download.docker.com/linux/${DISTRO_ID} ${DISTRO_CODENAME} stable" \
   | sudo tee "${SOURCE_LIST}" > /dev/null

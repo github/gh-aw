@@ -705,8 +705,9 @@ func TestDockerSbxShellScriptContent(t *testing.T) {
 	shDir := filepath.Join(wd, "..", "..", "actions", "setup", "sh")
 
 	tests := []struct {
-		script   string
-		contains []string
+		script      string
+		contains    []string
+		notContains []string
 	}{
 		{
 			script: "docker_sbx_kvm_check.sh",
@@ -724,7 +725,10 @@ func TestDockerSbxShellScriptContent(t *testing.T) {
 			script: "sudo_docker_sbx_install.sh",
 			contains: []string{
 				"sudo", "apt-get install", "docker-sbx", "sbx version", "/dev/kvm",
+				"DOCKER_GPG_FINGERPRINT", "gpg --show-keys", "mktemp", "signed-by=",
+				"VERSION_CODENAME", "download.docker.com",
 			},
+			notContains: []string{"get.docker.com", "| sudo REPO_ONLY=1 sh"},
 		},
 		{
 			script: "docker_sbx_daemon.sh",
@@ -758,6 +762,9 @@ func TestDockerSbxShellScriptContent(t *testing.T) {
 			require.NoError(t, err, "script file must exist: %s", tc.script)
 			for _, s := range tc.contains {
 				assert.Contains(t, string(content), s, "script %s must contain %q", tc.script, s)
+			}
+			for _, s := range tc.notContains {
+				assert.NotContains(t, string(content), s, "script %s must not contain %q", tc.script, s)
 			}
 		})
 	}
