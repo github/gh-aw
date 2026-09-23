@@ -46,18 +46,23 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 	}
 	createdItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	addAuditOutcomeSummary(ctx, &auditData, createdItems)
-	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
-	auditData.Comparison = buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
+	auditData.Comparison = buildRenderedAuditComparison(ctx, processedRun, createdItems, runOutputDir, opts)
 	return auditData
 }
 
 func buildRenderedAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, runOutputDir string, opts AuditOptions) AuditData {
 	currentCreatedItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
-	currentSnapshot := buildAuditComparisonSnapshot(processedRun, currentCreatedItems)
-	comparison := buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
 	auditData := buildAuditData(ctx, processedRun, metrics, mcpToolUsage)
-	auditData.Comparison = comparison
+	auditData.Comparison = buildRenderedAuditComparison(ctx, processedRun, currentCreatedItems, runOutputDir, opts)
 	return auditData
+}
+
+func buildRenderedAuditComparison(ctx context.Context, processedRun ProcessedRun, createdItems []CreatedItemReport, runOutputDir string, opts AuditOptions) *AuditComparisonData {
+	if opts.NoBaseline {
+		return &AuditComparisonData{BaselineFound: false}
+	}
+	currentSnapshot := buildAuditComparisonSnapshot(processedRun, createdItems)
+	return buildAuditComparisonForRun(ctx, processedRun, currentSnapshot, runOutputDir, opts.Owner, opts.Repo, opts.Hostname, opts.Verbose)
 }
 
 func renderAuditOutput(auditData AuditData, runOutputDir string, jsonOutput, verbose bool) error {

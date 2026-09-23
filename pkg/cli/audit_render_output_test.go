@@ -56,6 +56,43 @@ func TestRenderAuditReportSetsSchemaVersionOnFreshJSONOutput(t *testing.T) {
 	assert.Equal(t, auditSchemaVersion, auditData.SchemaVersion)
 }
 
+func TestBuildRenderedAuditDataSkipsBaseline(t *testing.T) {
+	runDir := t.TempDir()
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID:   42,
+			WorkflowPath: ".github/workflows/test.lock.yml",
+		},
+	}
+
+	auditData := buildRenderedAuditData(context.Background(), processedRun, LogMetrics{}, nil, runDir, AuditOptions{
+		NoBaseline: true,
+	})
+
+	require.NotNil(t, auditData.Comparison)
+	assert.False(t, auditData.Comparison.BaselineFound)
+}
+
+func TestBuildRenderedAuditDataFromCacheSkipsBaseline(t *testing.T) {
+	runDir := t.TempDir()
+	run := WorkflowRun{
+		DatabaseID:   42,
+		WorkflowPath: ".github/workflows/test.lock.yml",
+		LogsPath:     runDir,
+	}
+	require.NoError(t, writeAuditData(runDir, AuditData{
+		CacheSource: auditCacheSourceLogs,
+		Overview:    buildAuditOverview(run, nil),
+	}))
+
+	auditData := buildRenderedAuditDataFromCache(context.Background(), ProcessedRun{Run: run}, LogMetrics{}, nil, runDir, AuditOptions{
+		NoBaseline: true,
+	})
+
+	require.NotNil(t, auditData.Comparison)
+	assert.False(t, auditData.Comparison.BaselineFound)
+}
+
 func TestRenderConsoleTokenUsageWarnings(t *testing.T) {
 	output := testutil.CaptureStderr(t, func() {
 		renderConsoleTokenUsage(&TokenUsageSummary{
