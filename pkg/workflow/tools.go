@@ -80,16 +80,13 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 }
 
 func prepareToolsForDefaults(data *WorkflowData) error {
-	_, repositoryExists := data.Tools["repository"]
 	profileValue, profileExists := data.Tools["profile"]
 	profiles, err := extractToolProfiles(data.Tools)
 	if err != nil {
 		return err
 	}
 	data.ToolProfiles = profiles
-	if repositoryExists {
-		delete(data.Tools, "repository")
-	}
+	delete(data.Tools, "repository")
 	if profileExists {
 		if _, isMCPServer := profileValue.(map[string]any); !isMCPServer {
 			delete(data.Tools, "profile")

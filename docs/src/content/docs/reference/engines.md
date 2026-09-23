@@ -454,7 +454,7 @@ for the full driver contract.
 #### Go repository tool component (`tools.repository`)
 
 > [!WARNING]
-> **Experimental:** This profile is in preview. Its configuration and runtime contract may change.
+> **Experimental:** This component is in preview. Its configuration and runtime contract may change.
 
 `tools.repository: go` opts the bundled Copilot SDK driver into a no-shell repository tool contract. `repository` accepts either a string or an array and merges across [shared workflow imports](/gh-aw/reference/imports/). Import `shared/go-repository.md` to compose this component without repeating the shell and CLI restrictions. Omitting the field retains the existing version 1 SDK tool configuration and tool defaults.
 
@@ -474,18 +474,18 @@ safe-outputs:
   create-pull-request:
 ```
 
-The equivalent array form is `profile: [go]`. Profiles from imported workflows
+The equivalent array form is `repository: [go]`. Components from imported workflows
 are combined with duplicate entries removed.
 
 The effective engine must be Copilot with SDK and AWF enabled. Bash must be explicitly disabled with `false` or `[]`, CLI proxy must be explicitly `false`, and editing must be enabled (the normal PR editing default applies). Native preflight requires both `safeoutputs-create_pull_request` and `safeoutputs-noop`: the implicit noop default is supported, but `safe-outputs.noop: false` is rejected at compile time. GitHub access uses MCP, not `gh-proxy` or `cli` mode. Custom engine commands, drivers, harness scripts, arguments, working directories, agents, and extensions are not supported. Bundled harness **policy** settings, including `max-retries: 0`, remain supported.
 
 The initial scope is one compiler-managed, non-sparse current-repository checkout at the workspace root and one current-repository `create-pull-request` target. Leave `checkout.repository` unset. `target-repo` may be omitted, exactly `${{ github.repository }}`, or a literal `owner/repo`. A literal target may have no `allowed-repos` entries or exactly one matching literal repository, compared case-insensitively. An omitted/current-expression target may have no entries or exactly `["${{ github.repository }}"]`. Wildcards, other expressions, mismatched allowlists, and multiple entries are rejected; the compiler preserves accepted target and allowlist values in the publication configuration.
 
-Compilation checks repository syntax and single-target scope, not repository identity: it does not guess a Git remote or use the compiler's ambient repository as authority. Before any model session, the runtime verifies projected `target-repo` and `current_checkout_repo`, when present, against `GITHUB_REPOSITORY` and fails closed on a foreign literal. Alternate checkout paths, additional checkouts, custom `actions/checkout` steps, wiki checkouts, submodules, fork targets, and `push-to-pull-request-branch` remain unsupported. Overriding `GH_AW_ENGINE_CWD`, `GITHUB_WORKSPACE`, `GITHUB_REPOSITORY`, or `RUNNER_TEMP` through workflow, engine, or sandbox agent environment settings is also unsupported. Evaluation and detection engines do not inherit the profile; explicit nested profile declarations are rejected.
+Compilation checks repository syntax and single-target scope, not repository identity: it does not guess a Git remote or use the compiler's ambient repository as authority. Before any model session, the runtime verifies projected `target-repo` and `current_checkout_repo`, when present, against `GITHUB_REPOSITORY` and fails closed on a foreign literal. Alternate checkout paths, additional checkouts, custom `actions/checkout` steps, wiki checkouts, submodules, fork targets, and `push-to-pull-request-branch` remain unsupported. Overriding `GH_AW_ENGINE_CWD`, `GITHUB_WORKSPACE`, `GITHUB_REPOSITORY`, or `RUNNER_TEMP` through workflow, engine, or sandbox agent environment settings is also unsupported. Evaluation and detection engines do not inherit the component; explicit nested component declarations are rejected.
 
-The profile selects the native `go_repository` tool with actions `status`, `diff`, `prepare_branch`, `format`, `readiness`, `validate`, and `commit`. Only `prepare_branch` accepts a `branch` argument; the other actions accept no additional inputs. The tool does not accept commands, arbitrary arguments, paths, or environment overrides. Repository execution stays inside the existing AWF invocation, not an MCP script. The intended catalog retains native `view`/`grep`/`glob`, configured editors, and permitted native MCP tools, without Bash, `write_bash`, generic delegation tools, or CLI-proxy fallbacks. Before model inference, the runtime must discover canonical MCP tool names and lock the concrete allowed catalog, without a wildcard fallback. An MCP server named `go_repository` conflicts with the profile and is rejected.
+The component selects the native `go_repository` tool with actions `status`, `diff`, `prepare_branch`, `format`, `readiness`, `validate`, and `commit`. Only `prepare_branch` accepts a `branch` argument; the other actions accept no additional inputs. The tool does not accept commands, arbitrary arguments, paths, or environment overrides. Repository execution stays inside the existing AWF invocation, not an MCP script. The intended catalog retains native `view`/`grep`/`glob`, configured editors, and permitted native MCP tools, without Bash, `write_bash`, generic delegation tools, or CLI-proxy fallbacks. Before model inference, the runtime must discover canonical MCP tool names and lock the concrete allowed catalog, without a wildcard fallback. An MCP server named `go_repository` conflicts with the component and is rejected.
 
-The compiler emits version **2** in `GH_AW_COPILOT_SDK_TOOL_CONFIG` only for this profile. It retains the existing capability, permission, and explicit-disable fields; sets `bash` and `cliProxy` capabilities to `false`; and adds exactly `go_repository` to the sorted tool permissions, without shell or unrestricted grants. Its additional `profile` object contains:
+The compiler emits version **2** in `GH_AW_COPILOT_SDK_TOOL_CONFIG` only for this component. It retains the existing capability, permission, and explicit-disable fields; sets `bash` and `cliProxy` capabilities to `false`; and adds exactly `go_repository` to the sorted tool permissions, without shell or unrestricted grants. Its additional `profile` object contains:
 
 | Field | Value |
 |-------|-------|
@@ -493,7 +493,7 @@ The compiler emits version **2** in `GH_AW_COPILOT_SDK_TOOL_CONFIG` only for thi
 | `repositoryDefaultBranch` | `${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}`, bound in the execution step to `${{ github.event.repository.default_branch }}` |
 | `policy` | The normalized create-PR checkout, branch, file-protection, exclusion, and patch-limit policy, projected before later-job expression neutralization |
 
-Credentials, app configuration, publication counts, draft/staging settings, and publication recovery configuration are not copied into the profile. An omitted `base_branch` remains omitted: repository default-branch metadata does not replace the normal PR base selection and never falls back to an invented `main`.
+Credentials, app configuration, publication counts, draft/staging settings, and publication recovery configuration are not copied into the component. An omitted `base_branch` remains omitted: repository default-branch metadata does not replace the normal PR base selection and never falls back to an invented `main`.
 
 Policy expressions support workflow `inputs`, `vars`, and selected non-secret GitHub repository/branch/run metadata. Secret, `env`, `steps`, and `needs` references are rejected rather than converted into empty restrictions; job outputs are not guaranteed to be non-secret or available to the agent. `protected-files.exclude` entries must be literal because their normalization happens at compile time. Literal `${ENV_NAME}` placeholders are reserved for compiler transport, not authored policy. Simple expressions reuse the safe-output environment bindings, for example:
 

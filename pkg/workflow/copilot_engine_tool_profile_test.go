@@ -188,6 +188,25 @@ tools:
 	require.NoError(t, validateCopilotToolProfile(data))
 }
 
+func TestGoRepositoryComponentRejectsLegacyProfileFromSharedWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---
+tools:
+  profile: go
+---
+`), 0o600))
+	main := strings.Replace(goRepositoryProfileTestMarkdown,
+		"on: workflow_dispatch\n",
+		"on: workflow_dispatch\nimports:\n  - shared.md\n",
+		1)
+	main = strings.Replace(main, "  profile: go\n", "  repository: go\n", 1)
+	filename := filepath.Join(dir, "component.md")
+	require.NoError(t, os.WriteFile(filename, []byte(main), 0o600))
+
+	_, err := NewCompiler().ParseWorkflowFile(filename)
+	require.ErrorContains(t, err, "tools.repository cannot be combined with tools.profile")
+}
+
 func TestGoRepositoryProfileRejectsMalformedSharedWorkflowValue(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(`---

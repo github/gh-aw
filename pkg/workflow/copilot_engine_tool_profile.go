@@ -19,7 +19,10 @@ var goRepositoryLiteralRepoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-
 func extractToolProfiles(tools map[string]any) ([]string, error) {
 	if repository, exists := tools["repository"]; exists {
 		if _, profileExists := tools["profile"]; profileExists {
-			return nil, errors.New("tools.repository cannot be combined with tools.profile")
+			return nil, errors.New("tools.repository cannot be combined with tools.profile; use tools.repository exclusively, including in shared workflow imports")
+		}
+		if _, isMCPServer := repository.(map[string]any); isMCPServer {
+			return nil, errors.New("tools.repository is reserved for compiler-owned repository toolchains; define custom MCP servers under mcp-servers")
 		}
 		return extractToolProfileValues(repository, "tools.repository")
 	}
