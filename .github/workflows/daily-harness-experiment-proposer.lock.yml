@@ -1985,8 +1985,9 @@ jobs:
     needs:
       - activation
       - agent
+      - evals
       - safe_outputs
-    if: always() && (!cancelled()) && needs.agent.result == 'success'
+    if: always() && (!cancelled()) && needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
     permissions:
       contents: write
