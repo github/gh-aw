@@ -2664,7 +2664,7 @@ jobs:
       - safe_outputs
     if: >
       always() && (!cancelled()) && (needs.detection.result == 'success' || needs.detection.result == 'skipped') &&
-      needs.agent.result == 'success'
+      needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
     permissions:
       contents: write
