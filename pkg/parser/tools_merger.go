@@ -66,8 +66,10 @@ func MergeTools(base, additional map[string]any) (map[string]any, error) {
 
 	for key, newValue := range additional {
 		if key == "profile" {
-			if _, err := normalizeToolProfiles(newValue); err != nil {
-				return nil, err
+			if _, isMCPServer := newValue.(map[string]any); !isMCPServer {
+				if _, err := normalizeToolProfiles(newValue); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if existingValue, exists := result[key]; exists {
@@ -96,8 +98,10 @@ func marshalSingleToolObject(content string) (string, error, bool) {
 		return "", nil, false
 	}
 	if profile, exists := singleObj["profile"]; exists {
-		if _, err := normalizeToolProfiles(profile); err != nil {
-			return "", err, true
+		if _, isMCPServer := profile.(map[string]any); !isMCPServer {
+			if _, err := normalizeToolProfiles(profile); err != nil {
+				return "", err, true
+			}
 		}
 	}
 	result, err := json.Marshal(singleObj)
@@ -136,8 +140,16 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
 	if key == "profile" {
-		merged, err := mergeToolProfiles(existingValue, newValue)
-		return merged, true, err
+		_, existingIsMCPServer := existingValue.(map[string]any)
+		_, newIsMCPServer := newValue.(map[string]any)
+		if existingIsMCPServer != newIsMCPServer {
+			return nil, false, errors.New("tools.profile cannot be combined with mcp-servers.profile")
+		}
+		if !existingIsMCPServer {
+			merged, err := mergeToolProfiles(existingValue, newValue)
+			return merged, true, err
+		}
+		// Let map-shaped MCP server configurations use the normal map merge path.
 	}
 	if existingArray, ok := existingValue.([]any); ok {
 		if newArray, ok := newValue.([]any); ok {
@@ -166,9 +178,6 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 }
 
 func mergeToolProfiles(existingValue, newValue any) ([]any, error) {
-	if _, isMCPServer := existingValue.(map[string]any); isMCPServer {
-		return nil, errors.New("tools.profile cannot be combined with mcp-servers.profile")
-	}
 	existingProfiles, err := normalizeToolProfiles(existingValue)
 	if err != nil {
 		return nil, err

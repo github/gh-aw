@@ -89,6 +89,21 @@ func TestMergeTools(t *testing.T) {
 			},
 		},
 		{
+			name:       "preserve an imported MCP server named profile",
+			base:       map[string]any{"bash": false},
+			additional: map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+			expected: map[string]any{
+				"bash":    false,
+				"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"},
+			},
+		},
+		{
+			name:       "merge MCP servers named profile",
+			base:       map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+			additional: map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+			expected:   map[string]any{"profile": map[string]any{"type": "http", "url": "https://example.invalid/mcp"}},
+		},
+		{
 			name: "merge neutral tools with maps (no Claude-specific logic)",
 			base: map[string]any{
 				"github": map[string]any{
@@ -364,6 +379,7 @@ func TestMergeToolsRejectsInvalidProfileValue(t *testing.T) {
 		{name: "duplicate array", base: map[string]any{}, additional: map[string]any{"profile": []any{"go", "go"}}},
 		{name: "blank profile", base: map[string]any{}, additional: map[string]any{"profile": ""}},
 		{name: "MCP server collision", base: map[string]any{"profile": map[string]any{"type": "http"}}, additional: map[string]any{"profile": "go"}},
+		{name: "reverse MCP server collision", base: map[string]any{"profile": "go"}, additional: map[string]any{"profile": map[string]any{"type": "http"}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := MergeTools(test.base, test.additional); err == nil {
