@@ -73,7 +73,7 @@ func ValidateMCPConfigs(tools map[string]any) error {
 		// map-shaped "profile" entry can be a legacy custom MCP server merged
 		// from mcp-servers rather than the tools.profile selector.
 		_, isMap := toolConfig.(map[string]any)
-		if builtInToolNames[toolName] && toolName != "linear" && !(toolName == "profile" && isMap) {
+		if builtInToolNames[toolName] && toolName != "linear" && (toolName != "profile" || !isMap) {
 			mcpValidationLog.Printf("Skipping MCP validation for built-in tool: %s", toolName)
 			continue
 		}

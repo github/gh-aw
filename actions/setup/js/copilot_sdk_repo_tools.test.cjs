@@ -27,9 +27,22 @@ afterEach(async () => {
   vi.restoreAllMocks();
   for (const fixture of fixtures.splice(0)) {
     await fixture.runtime?.close();
+    restoreWritePermissions(fixture.scratch);
     fs.rmSync(fixture.scratch, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
+
+function restoreWritePermissions(directory) {
+  const stat = fs.lstatSync(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+  for (const entry of fs.readdirSync(directory)) {
+    const child = path.join(directory, entry);
+    const childStat = fs.lstatSync(child);
+    if (childStat.isDirectory() && !childStat.isSymbolicLink()) restoreWritePermissions(child);
+    fs.chmodSync(child, childStat.mode | 0o200);
+  }
+  fs.chmodSync(directory, stat.mode | 0o700);
+}
 
 async function directProcess(options) {
   try {
