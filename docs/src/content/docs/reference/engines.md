@@ -520,7 +520,7 @@ In SDK mode, gh-aw injects required runtime values:
 - `COPILOT_SDK_URI`
 - `COPILOT_CONNECTION_TOKEN`
 
-When MCP servers are configured, SDK execution copies the already-converted `$HOME/.copilot/mcp-config.json` byte-for-byte to `${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json` before entering AWF. The staging directory is private and the file is mode `600`. `GH_AW_MCP_CONFIG` is exported only after directory creation, copying, and permission changes succeed; any failure terminates execution explicitly. ARC/DinD HOME setup happens before staging. This uses the existing runtime-temp mount and adds no artifact. Non-SDK execution retains the home config path; workflows without MCP servers do not stage a config.
+When MCP servers are configured, SDK execution runs `stage_copilot_sdk_mcp_config.sh`, which copies the already-converted `$HOME/.copilot/mcp-config.json` byte-for-byte to `${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json` before entering AWF. The staging directory is private and the file is mode `600`. `GH_AW_MCP_CONFIG` is exported only after directory creation, copying, and permission changes succeed; any failure terminates execution explicitly. ARC/DinD HOME setup happens before staging. This uses the existing runtime-temp mount and adds no artifact. Non-SDK execution retains the home config path; workflows without MCP servers do not stage a config.
 
 `COPILOT_MODEL` is required and must be set to the model to use
 (e.g. `gpt-4o`, `claude-sonnet-4`). Drivers MUST fail fast when

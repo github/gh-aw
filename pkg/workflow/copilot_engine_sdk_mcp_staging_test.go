@@ -33,8 +33,7 @@ func TestCopilotSDKMCPStagingExportMatrix(t *testing.T) {
 			script := buildCopilotMCPConfigExport(data)
 			assert.Contains(t, script, `export XDG_CONFIG_HOME="$HOME"`)
 			if test.sdk && test.mcp {
-				assert.Contains(t, script, `cp "$HOME/.copilot/mcp-config.json" "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"`)
-				assert.Contains(t, script, `chmod 600 "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"`)
+				assert.Contains(t, script, `bash "${RUNNER_TEMP}/gh-aw/actions/stage_copilot_sdk_mcp_config.sh" || exit 1`)
 				assert.Contains(t, script, `export GH_AW_MCP_CONFIG="${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"`)
 			} else {
 				assert.NotContains(t, script, "cp ")
@@ -50,6 +49,17 @@ func TestCopilotSDKMCPStagingExportMatrix(t *testing.T) {
 	}
 }
 
+// installStagingScript copies the repository's staging script into the fake runner
+// temp so the generated command executes the real, shipped implementation.
+func installStagingScript(t *testing.T, runnerTemp string) {
+	t.Helper()
+	source, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "sh", "stage_copilot_sdk_mcp_config.sh"))
+	require.NoError(t, err)
+	actionsDir := filepath.Join(runnerTemp, "gh-aw", "actions")
+	require.NoError(t, os.MkdirAll(actionsDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(actionsDir, "stage_copilot_sdk_mcp_config.sh"), source, 0o700))
+}
+
 func TestCopilotSDKMCPStagingExecutesFailClosed(t *testing.T) {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
@@ -63,13 +73,13 @@ func TestCopilotSDKMCPStagingExecutesFailClosed(t *testing.T) {
 		wantError     string
 	}{
 		{name: "byte preserving success"},
-		{name: "mkdir failure", inject: "mkdir() { return 31; }\n", wantError: "Failed to create"},
-		{name: "copy failure", inject: "cp() { return 31; }\n", wantError: "Failed to stage"},
+		{name: "mkdir failure", inject: "mkdir() { return 31; }\nexport -f mkdir\n", wantError: "Failed to create"},
+		{name: "copy failure", inject: "cp() { return 31; }\nexport -f cp\n", wantError: "Failed to stage"},
 		{name: "missing source", missingSource: true, wantError: "Failed to stage"},
-		{name: "directory chmod failure", inject: "chmod() { return 31; }\n", wantError: "Failed to secure"},
+		{name: "directory chmod failure", inject: "chmod() { return 31; }\nexport -f chmod\n", wantError: "Failed to secure"},
 		{
 			name:      "file chmod failure",
-			inject:    "chmod() { if [ \"$1\" = 600 ]; then return 31; fi; command chmod \"$@\"; }\n",
+			inject:    "chmod() { if [ \"$1\" = 600 ]; then return 31; fi; command chmod \"$@\"; }\nexport -f chmod\n",
 			wantError: "Failed to secure",
 		},
 		{name: "missing runner temp", missingTemp: true, wantError: "RUNNER_TEMP is required"},
@@ -86,6 +96,7 @@ func TestCopilotSDKMCPStagingExecutesFailClosed(t *testing.T) {
 			staged := filepath.Join(runnerTemp, "gh-aw", "mcp-config", "copilot-sdk.json")
 			require.NoError(t, os.MkdirAll(filepath.Dir(staged), 0o700))
 			require.NoError(t, os.WriteFile(staged, []byte("stale config"), 0o600))
+			installStagingScript(t, runnerTemp)
 			launchMarker := filepath.Join(root, "launched")
 			exportMarker := filepath.Join(root, "exported")
 			data := &WorkflowData{
@@ -142,15 +153,15 @@ func TestCopilotSDKMCPStagingAfterARCHomeBeforeAWF(t *testing.T) {
 	require.Len(t, steps, 1, "staging belongs in the existing execution step")
 	script := strings.Join([]string(steps[0]), "\n")
 	home := strings.Index(script, `export HOME=`)
-	copyConfig := strings.Index(script, `cp "$HOME/.copilot/mcp-config.json"`)
+	stageConfig := strings.Index(script, `gh-aw/actions/stage_copilot_sdk_mcp_config.sh`)
 	exportConfig := strings.Index(script, `export GH_AW_MCP_CONFIG="${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"`)
 	harness := strings.Index(script, `copilot_harness.cjs`)
 	require.NotEqual(t, -1, home)
-	require.NotEqual(t, -1, copyConfig)
+	require.NotEqual(t, -1, stageConfig)
 	require.NotEqual(t, -1, exportConfig)
 	require.NotEqual(t, -1, harness)
-	assert.Less(t, home, copyConfig)
-	assert.Less(t, copyConfig, exportConfig)
+	assert.Less(t, home, stageConfig)
+	assert.Less(t, stageConfig, exportConfig)
 	assert.Less(t, exportConfig, harness)
 	assert.Contains(t, script, `--mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro"`)
 }

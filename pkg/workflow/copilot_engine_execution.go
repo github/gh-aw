@@ -106,7 +106,8 @@ func buildCopilotSettingsCleanupAndExitCodeTrap() string {
 //
 // Exported only when the workflow has MCP servers:
 //   - SDK: GH_AW_MCP_CONFIG=${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json,
-//     after copying the converted home config into the existing AWF temp mount.
+//     after stage_copilot_sdk_mcp_config.sh copies the converted home config into the
+//     existing AWF temp mount.
 //   - CLI: GH_AW_MCP_CONFIG=$HOME/.copilot/mcp-config.json
 func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
 	var b strings.Builder
@@ -117,22 +118,7 @@ func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
   echo "RUNNER_TEMP is required to stage Copilot SDK MCP config" >&2
   exit 1
 fi
-if ! (umask 077 && mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-config"); then
-  echo "Failed to create Copilot SDK MCP config directory" >&2
-  exit 1
-fi
-if ! chmod 700 "${RUNNER_TEMP}/gh-aw/mcp-config"; then
-  echo "Failed to secure Copilot SDK MCP config directory" >&2
-  exit 1
-fi
-if ! (umask 077 && cp "$HOME/.copilot/mcp-config.json" "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"); then
-  echo "Failed to stage Copilot SDK MCP config" >&2
-  exit 1
-fi
-if ! chmod 600 "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"; then
-  echo "Failed to secure Copilot SDK MCP config" >&2
-  exit 1
-fi
+bash "${RUNNER_TEMP}/gh-aw/actions/stage_copilot_sdk_mcp_config.sh" || exit 1
 export GH_AW_MCP_CONFIG="${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"
 `)
 		} else {

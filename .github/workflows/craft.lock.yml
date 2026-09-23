@@ -957,22 +957,7 @@ jobs:
             echo "RUNNER_TEMP is required to stage Copilot SDK MCP config" >&2
             exit 1
           fi
-          if ! (umask 077 && mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-config"); then
-            echo "Failed to create Copilot SDK MCP config directory" >&2
-            exit 1
-          fi
-          if ! chmod 700 "${RUNNER_TEMP}/gh-aw/mcp-config"; then
-            echo "Failed to secure Copilot SDK MCP config directory" >&2
-            exit 1
-          fi
-          if ! (umask 077 && cp "$HOME/.copilot/mcp-config.json" "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"); then
-            echo "Failed to stage Copilot SDK MCP config" >&2
-            exit 1
-          fi
-          if ! chmod 600 "${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"; then
-            echo "Failed to secure Copilot SDK MCP config" >&2
-            exit 1
-          fi
+          bash "${RUNNER_TEMP}/gh-aw/actions/stage_copilot_sdk_mcp_config.sh" || exit 1
           export GH_AW_MCP_CONFIG="${RUNNER_TEMP}/gh-aw/mcp-config/copilot-sdk.json"
           GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
           if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
