@@ -28,7 +28,7 @@ func TestUpgradeCommand_OnExistingRepository(t *testing.T) {
 }
 
 func TestInitAndUpgradeWithEmptyAWDirectory(t *testing.T) {
-	const reconciledImplicitExpiry = `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`
+	const noImplicitExpiry = `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`
 
 	setup := setupIntegrationTest(t)
 	defer setup.cleanup()
@@ -84,7 +84,7 @@ Say hello.
 
 	lockContent, err := os.ReadFile(filepath.Join(setup.tempDir, ".github", "workflows", "example.lock.yml"))
 	require.NoError(t, err, "expected upgrade to compile the workflow")
-	assert.Contains(t, string(lockContent), reconciledImplicitExpiry)
+	assert.Contains(t, string(lockContent), noImplicitExpiry)
 
 	_, err = os.Stat(filepath.Join(setup.tempDir, ".github", "workflows", "agentics-maintenance.yml"))
 	require.True(t, os.IsNotExist(err), "implicit expiry alone must not generate maintenance")
