@@ -12,6 +12,9 @@ SCRIPT="${SCRIPT_DIR}/create_gh_aw_tmp_dir.sh"
 TESTS_PASSED=0
 TESTS_FAILED=0
 
+RUNNER_TEMP="$(mktemp -d)"
+export RUNNER_TEMP
+
 cleanup() {
   # Restore /tmp/gh-aw to a clean, writable state before removing it.
   chmod -R u+rw /tmp/gh-aw 2>/dev/null || true
@@ -19,9 +22,6 @@ cleanup() {
   rm -rf "${RUNNER_TEMP}" 2>/dev/null || true
 }
 trap cleanup EXIT
-
-RUNNER_TEMP="$(mktemp -d)"
-export RUNNER_TEMP
 
 assert() {
   local name="$1"

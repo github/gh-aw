@@ -27,6 +27,8 @@ if [ -d /tmp/gh-aw/sandbox/firewall ] && \
 fi
 
 mkdir -p /tmp/gh-aw/agent
+# ARC/DinD maps this runner-side path into the AWF chroot as /tmp/gh-aw.
+# Safe-output payloads are staged in its agent subdirectory.
 if [[ -n "${RUNNER_TEMP:-}" ]]; then
   mkdir -p "${RUNNER_TEMP}/gh-aw/agent"
 fi
