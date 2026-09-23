@@ -17,24 +17,17 @@ A [study of 15 open-source repositories](https://github.com/githubnext/repo-assi
 
 On each scheduled run, Repo Assist reads live repository data and selects three tasks using weights that change with the backlog. A repository with many unlabelled issues receives more labelling and investigation work. As the backlog clears, the workflow spends more time on engineering investments, testing, performance, documentation, and forward-looking improvements.
 
-Across runs, Repo Assist can:
+Across runs, Repo Assist can label and investigate issues and pull requests, implement focused fixes as draft pull requests, improve dependencies, CI, code, performance, tests, and documentation, maintain its own pull requests by addressing CI failures and merge conflicts, nudge authors of stale pull requests, and continue work that advances the repository's goals.
 
-- label and investigate issues and pull requests;
-- implement focused issue fixes as draft pull requests;
-- improve dependencies, CI, code, performance, tests, and documentation;
-- maintain its own pull requests by addressing CI failures and merge conflicts;
-- nudge authors of stale pull requests; and
-- propose or continue work that advances the repository's goals.
-
-The workflow uses repository memory to cover the backlog systematically and avoid repeating work. It also maintains a rolling monthly activity issue so maintainers can review its actions and suggested next steps in one place. The complete task list, selection weights, and behavioral guidelines are documented in the [Repo Assist documentation](https://github.com/githubnext/agentics/blob/main/docs/repo-assist.md).
+The workflow uses repository memory to cover the backlog systematically and avoid repeating work. It also keeps a rolling monthly activity issue so maintainers can review its actions and suggested next steps in one place. The complete task list, selection weights, and behavioral guidelines are documented in the [Repo Assist documentation](https://github.com/githubnext/agentics/blob/main/docs/repo-assist.md).
 
 ## What Maintainers Still Own
 
-Repo Assist supports repository maintenance; it does not replace maintainership. Maintainers still set project direction, define contribution and coding policies, review proposed changes, decide what to merge or release, and respond where human context or judgment is required. Add repository-specific instructions to `AGENTS.md` so coding runs can follow the project's build, test, style, and contribution conventions.
+Repo Assist supports repository maintenance; it does not replace maintainership. Maintainers still set project direction, define contribution and coding policies, review proposed changes, decide what to merge or release, and respond where human context or judgment is required. Add repository-specific instructions to `AGENTS.md` so coding runs follow the project's build, test, style, and contribution conventions.
 
-The workflow favors small changes, avoids breaking public APIs, and discusses new dependencies before adding them. These are operating guidelines rather than a guarantee that every suggestion is correct. Review its comments and draft pull requests as contributor work, and monitor the monthly activity issue to decide whether its schedule and permissions match the repository's review capacity.
+The workflow favors small changes, avoids breaking public APIs, and discusses new dependencies before adding them, but those are operating guidelines rather than a guarantee that every suggestion is correct. Review its comments and draft pull requests as contributor work, and use the monthly activity issue to decide whether its schedule and permissions match the repository's review capacity.
 
-Repo Assist also does not guarantee that pull request CI starts automatically. Workflows created with the repository's `GITHUB_TOKEN` may need a separate CI-trigger configuration. Public repositories should consider the abuse risk before enabling automatic CI for agent-created pull requests.
+Repo Assist also does not guarantee that pull request CI starts automatically. Workflows created with the repository's `GITHUB_TOKEN` may need separate CI-trigger configuration, and public repositories should consider abuse risk before enabling automatic CI for agent-created pull requests.
 
 ## Install and Use Repo Assist
 
@@ -50,7 +43,7 @@ Commit the generated workflow to the default branch to enable its schedule. Once
 gh aw run repo-assist
 ```
 
-Maintainers can also invoke it in context by starting an issue or pull request comment with `/repo-assist`, followed by a specific instruction. For example:
+Maintainers can also invoke it from an issue or pull request comment that starts with `/repo-assist`, followed by a specific instruction. For example:
 
 ```text
 /repo-assist investigate this bug and suggest a fix
@@ -60,9 +53,9 @@ An on-demand invocation follows the instruction instead of selecting scheduled t
 
 ## What This Workflow Demonstrates
 
-Repo Assist combines several GitHub Agentic Workflow capabilities in one reusable workflow: scheduled and command-driven triggers, deterministic preprocessing, adaptive task selection, repository memory, GitHub tools, and safe outputs. Safe outputs constrain the GitHub mutations the agent can request, while integrity filtering controls which repository content enters its context. These controls define boundaries for the workflow; they do not remove the need to review its configuration and output.
+Repo Assist combines scheduled and command-driven triggers, deterministic preprocessing, adaptive task selection, repository memory, GitHub tools, and safe outputs in one reusable workflow. Safe outputs constrain the GitHub mutations the agent can request, while integrity filtering controls which repository content enters its context. Those controls define the workflow's boundaries; they do not remove the need to review its configuration and output.
 
-Use the generated Repo Assist workflow as a working example when designing repository-specific maintenance automation. Inspect its permissions, tools, safe outputs, network access, schedule, and prompts, then narrow or adapt them to the repository's policies and maintainer capacity.
+Use the generated Repo Assist workflow as a working example for repository-specific maintenance automation. Inspect its permissions, tools, safe outputs, network access, schedule, and prompts, then narrow or adapt them to the repository's policies and maintainer capacity.
 
 ## Learn More
 
