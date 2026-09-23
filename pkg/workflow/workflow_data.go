@@ -55,6 +55,7 @@ type WorkflowData struct {
 	Redirect                       string           // optional redirect field describing a moved workflow location
 	TrackerID                      string           // optional tracker identifier for created assets (min 8 chars, alphanumeric + hyphens/underscores)
 	MaxDailyAICredits              *string          // optional 24-hour per-workflow AIC threshold (numeric string or GitHub Actions expression)
+	MaxDailyAICBackend             string           // optional backend for the daily AIC guardrail ("repo-memory" for git-backed JSONL ledger)
 	MaxDailyAICreditsGitHubApp     *GitHubAppConfig // optional GitHub App for minting the token used by the daily AIC guardrail
 	MaxDailyAICContinueOnError     bool             // when true, unknown/unverifiable daily AIC accounting is a warning instead of failing closed
 	ImportedFiles                  []string         // list of files imported via imports field (rendered as comment in lock file)

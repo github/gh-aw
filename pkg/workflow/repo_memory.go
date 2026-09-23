@@ -564,6 +564,8 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	steps := c.buildPushRepoMemorySetupAndCheckoutSteps(data, setupActionRef)
 	_, hasConsolidatedSafeOutputsJob := c.jobManager.GetJob(string(constants.SafeOutputsJobName))
 	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data, hasConsolidatedSafeOutputsJob)...)
+	hasEvals := data.Evals != nil && data.Evals.HasEvals()
+	steps = append(steps, c.generateDailyAICRepoMemoryLedgerSteps(data, hasEvals)...)
 
 	useRequire := setupActionRef != ""
 	for _, memory := range data.RepoMemoryConfig.Memories {
@@ -576,6 +578,9 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled)
 	if hasConsolidatedSafeOutputsJob {
 		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
+	}
+	if hasEvals {
+		jobNeeds = append(jobNeeds, string(constants.EvalsJobName))
 	}
 	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
 
@@ -725,18 +730,18 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 
 // buildPushRepoMemoryJobCondition computes the job condition and needs list.
 func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) (string, []string) {
-	agentSucceeded := BuildEquals(
+	agentCompleted := BuildNotEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
-		BuildStringLiteral("success"),
+		BuildStringLiteral("skipped"),
 	)
 	notCancelled := &NotNode{Child: BuildFunctionCall("cancelled")}
 	jobNeeds := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
 	var jobCondition string
 	if threatDetectionEnabled {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentSucceeded))
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentSucceeded))
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentCompleted))
 	}
 	return jobCondition, jobNeeds
 }
