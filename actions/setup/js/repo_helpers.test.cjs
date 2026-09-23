@@ -581,3 +581,46 @@ describe("resolveExecutionOwnerRepo", () => {
     expect(() => resolveExecutionOwnerRepo()).toThrow(/Invalid GH_AW_TARGET_REPO_SLUG/);
   });
 });
+
+describe("resolveFailureIssueRepo", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    delete process.env.GH_AW_FAILURE_ISSUE_REPO;
+    delete process.env.GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION;
+  });
+
+  it("should return null when no failure issue repo is configured", async () => {
+    const { resolveFailureIssueRepo } = await import("./repo_helpers.cjs");
+    expect(resolveFailureIssueRepo("ctx-owner/ctx-repo")).toBeNull();
+  });
+
+  it("should trust a compile-time literal pointing at another owner", async () => {
+    process.env.GH_AW_FAILURE_ISSUE_REPO = "other-owner/failure-repo";
+    const { resolveFailureIssueRepo } = await import("./repo_helpers.cjs");
+    expect(resolveFailureIssueRepo("ctx-owner/ctx-repo")).toEqual({ owner: "other-owner", repo: "failure-repo" });
+  });
+
+  it("should allow an expression-derived repo within the current owner", async () => {
+    process.env.GH_AW_FAILURE_ISSUE_REPO = "ctx-owner/failure-repo";
+    process.env.GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION = "true";
+    const { resolveFailureIssueRepo } = await import("./repo_helpers.cjs");
+    expect(resolveFailureIssueRepo("ctx-owner/ctx-repo")).toEqual({ owner: "ctx-owner", repo: "failure-repo" });
+  });
+
+  it("should reject an expression-derived repo outside the current owner", async () => {
+    process.env.GH_AW_FAILURE_ISSUE_REPO = "attacker-owner/exfil";
+    process.env.GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION = "true";
+    const warn = vi.fn();
+    const { resolveFailureIssueRepo } = await import("./repo_helpers.cjs");
+    expect(resolveFailureIssueRepo("ctx-owner/ctx-repo", warn)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("attacker-owner/exfil"));
+  });
+
+  it("should ignore a malformed value", async () => {
+    process.env.GH_AW_FAILURE_ISSUE_REPO = "not-a-repo";
+    const warn = vi.fn();
+    const { resolveFailureIssueRepo } = await import("./repo_helpers.cjs");
+    expect(resolveFailureIssueRepo("ctx-owner/ctx-repo", warn)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("not-a-repo"));
+  });
+});

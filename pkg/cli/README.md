@@ -808,7 +808,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | `generate_action_metadata_command.go` | `GenerateActionMetadataCommand` | `func GenerateActionMetadataCommand() error` | Generates `action.yml` and README.md files for JavaScript modules. |
 | `hash_command.go` | `RunHashFrontmatter` | `func RunHashFrontmatter(workflowPath string) error` | Computes and prints the frontmatter hash for a workflow. |
 | `includes.go` | `FetchIncludeFromSource` | `func FetchIncludeFromSource(ctx context.Context, includePath string, baseSpec *WorkflowSpec, verbose bool) ([]byte, string, error)` | Fetches include content and its `#fragment` section from a local or remote source. |
-| `list_workflows_command.go` | `RunListWorkflows` | `func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose bool, jsonOutput bool, labelFilter string) error` | Lists workflows without checking their GitHub Actions status. |
+| `list_workflows_command.go` | `RunListWorkflows` | `func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose bool, jsonOutput bool, labelFilter string, staleOnly bool) error` | Lists workflows without checking their GitHub Actions status. |
 | `logs_artifact_set.go` | `ResolveArtifactFilter` | `func ResolveArtifactFilter(sets []string) []string` | Resolves named artifact sets to a filter list; returns nil for `ArtifactSetAll`. |
 | `logs_artifact_set.go` | `ValidArtifactSetNames` | `func ValidArtifactSetNames() []string` | Returns the valid artifact set names, derived dynamically from the artifact-set map. |
 | `logs_artifact_set.go` | `ValidateArtifactSets` | `func ValidateArtifactSets(sets []string) error` | Validates artifact set names, returning an error listing any unrecognized names. |
