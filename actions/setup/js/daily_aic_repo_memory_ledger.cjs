@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { findJSONLFiles, sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
 
 const DEFAULT_REPO_MEMORY_DIR = "/tmp/gh-aw/repo-memory/default";
 const LEDGER_SUBDIR = "daily-aic-ledger";
@@ -65,10 +66,22 @@ function readLedgerEntries({ repoMemoryDir, repository, workflowId, actor, now =
 
 function appendLedgerEntry(entry, repoMemoryDir, now = Date.now()) {
   const root = ledgerRoot(repoMemoryDir);
-  fs.mkdirSync(root, { recursive: true });
-  fs.appendFileSync(ledgerPathForDay(root, utcDay(now)), `${JSON.stringify(entry)}\n`, "utf8");
+  try {
+    fs.mkdirSync(root, { recursive: true });
+  } catch (error) {
+    throw new Error(`Failed to create daily AIC repo-memory ledger directory ${root}: ${getErrorMessage(error)}`, { cause: error });
+  }
+  const ledgerPath = ledgerPathForDay(root, utcDay(now));
+  try {
+    fs.appendFileSync(ledgerPath, `${JSON.stringify(entry)}\n`, "utf8");
+  } catch (error) {
+    throw new Error(`Failed to append daily AIC repo-memory ledger entry to ${ledgerPath}: ${getErrorMessage(error)}`, { cause: error });
+  }
 }
 
+/**
+ * @param {{ repoMemoryDir?: string, usageRoot?: string, now?: number }} [options]
+ */
 function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_ROOT, now = Date.now() } = {}) {
   const runId = Number(process.env.GITHUB_RUN_ID || 0);
   const repository = process.env.GITHUB_REPOSITORY || "";
