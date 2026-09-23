@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execGitSync } = require("./git_helpers.cjs");
+const { execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
 const { validateTargetRepo, parseAllowedRepos, getDefaultTargetRepo } = require("./repo_helpers.cjs");
 const { lookupCheckout, loadAllCheckouts } = require("./checkout_manifest.cjs");
 
@@ -111,12 +111,22 @@ function findGitDirectories(basePath, maxDepth = 5) {
 
 /**
  * Get the remote origin URL for a git repository
+ *
+ * The safe-outputs server runs inside a container whose uid differs from the
+ * runner user that owns clones created by `steps:` entries or a manual
+ * `actions/checkout`. Under git's "dubious ownership" protection,
+ * `git config --get` silently ignores the repository config and exits 1, so
+ * every nested clone would look like it had no remote. Trust each scanned
+ * repository path before reading its config to restore discovery of any clone
+ * under the workspace.
+ *
  * @param {string} repoPath - Path to the repository root
  * @returns {string|null} The remote URL or null if not found
  */
 function getRemoteOriginUrl(repoPath) {
   try {
-    const url = execGitSync(["config", "--get", "remote.origin.url"], { cwd: repoPath });
+    ensureSafeDirectoryTrust(repoPath, debugLog);
+    const url = execGitSync(["config", "--get", "remote.origin.url"], { cwd: repoPath, suppressLogs: true });
     return url.trim();
   } catch {
     return null;
@@ -245,7 +255,7 @@ function findRepoCheckout(repoSlug, workspaceRoot, options = {}) {
 
   return {
     success: false,
-    error: `Repository '${repoSlug}' not found in workspace. Make sure it's checked out using actions/checkout with a path.`,
+    error: `Repository '${repoSlug}' not found in workspace. Make sure it's checked out under $GITHUB_WORKSPACE, either via a 'checkout:' frontmatter entry or by cloning it into the workspace in a 'steps:' entry.`,
     searchedPaths: gitDirs,
   };
 }

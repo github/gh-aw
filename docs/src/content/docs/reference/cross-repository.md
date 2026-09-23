@@ -160,6 +160,8 @@ When `allowed-repos` is specified:
 
 Unlike other safe output types, `push-to-pull-request-branch` with `target-repo` requires the target repository to be **checked out into the workflow workspace** using the `checkout:` frontmatter field with a `path:` specified. Without a checkout, the agent has no local git history to create and push a patch from.
 
+Repositories cloned into the workspace by a custom `steps:` entry (for example a scripted `git clone` into `repos/<name>`) are also discovered: safe outputs first consult the checkout manifest produced by `checkout:` entries, then fall back to scanning `$GITHUB_WORKSPACE` for git repositories and matching them by `remote.origin.url`.
+
 See the [Scheduled Push to Pull Request Branch](#example-scheduled-push-to-pull-request-branch) example and the [Push to PR Branch cross-repo usage](/gh-aw/reference/safe-outputs-pull-requests/#cross-repo-usage) documentation for a complete setup.
 
 ## Examples

@@ -440,6 +440,66 @@ describe("find_repo_checkout", () => {
     });
   });
 
+  describe("git-scan fallback trusts scanned repositories (issue #60021)", () => {
+    let workspaceDir;
+    let savedGitConfigEnv;
+
+    /**
+     * Collect the safe.directory values currently injected into the env-var git config chain.
+     * @returns {string[]}
+     */
+    function injectedSafeDirectories() {
+      const count = Number(process.env.GIT_CONFIG_COUNT || "0");
+      const values = [];
+      for (let i = 0; i < count; i++) {
+        if (process.env[`GIT_CONFIG_KEY_${i}`] === "safe.directory") {
+          values.push(process.env[`GIT_CONFIG_VALUE_${i}`]);
+        }
+      }
+      return values;
+    }
+
+    beforeEach(() => {
+      savedGitConfigEnv = {};
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith("GIT_CONFIG_")) {
+          savedGitConfigEnv[key] = process.env[key];
+          delete process.env[key];
+        }
+      }
+      workspaceDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "test-safedir-"));
+    });
+
+    afterEach(() => {
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith("GIT_CONFIG_")) delete process.env[key];
+      }
+      Object.assign(process.env, savedGitConfigEnv);
+      try {
+        fs.rmSync(workspaceDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    });
+
+    it("registers each scanned repository as a git safe.directory", () => {
+      const nestedRepo = path.join(workspaceDir, "repos", "analytics");
+      fs.mkdirSync(path.join(nestedRepo, ".git"), { recursive: true });
+
+      findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(injectedSafeDirectories()).toContain(nestedRepo);
+    });
+
+    it("reports a not-found error that mentions both checkout: and steps: clones", () => {
+      const result = findRepoCheckout("owner/analytics", workspaceDir);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("checkout:");
+      expect(result.error).toContain("steps:");
+    });
+  });
+
   describe("buildRepoCheckoutMap", () => {
     let testDir;
 
