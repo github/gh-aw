@@ -27,6 +27,9 @@ if [ -d /tmp/gh-aw/sandbox/firewall ] && \
 fi
 
 mkdir -p /tmp/gh-aw/agent
+if [[ -n "${RUNNER_TEMP:-}" ]]; then
+  mkdir -p "${RUNNER_TEMP}/gh-aw/agent"
+fi
 mkdir -p /tmp/gh-aw/sandbox/agent/logs
 # Pre-create the firewall sandbox dirs as the runner user (uid=1001) before AWF starts.
 # If the stale directory was successfully removed above, these create fresh dirs.

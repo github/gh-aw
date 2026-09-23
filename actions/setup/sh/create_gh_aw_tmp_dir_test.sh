@@ -16,8 +16,12 @@ cleanup() {
   # Restore /tmp/gh-aw to a clean, writable state before removing it.
   chmod -R u+rw /tmp/gh-aw 2>/dev/null || true
   rm -rf /tmp/gh-aw 2>/dev/null || true
+  rm -rf "${RUNNER_TEMP}" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+RUNNER_TEMP="$(mktemp -d)"
+export RUNNER_TEMP
 
 assert() {
   local name="$1"
@@ -44,6 +48,7 @@ echo "Test 2: Creates expected directories when starting clean"
 rm -rf /tmp/gh-aw
 bash "${SCRIPT}" >/dev/null 2>&1
 assert "creates /tmp/gh-aw/agent" "[ -d /tmp/gh-aw/agent ]"
+assert "creates daemon-visible agent directory" "[ -d \"${RUNNER_TEMP}/gh-aw/agent\" ]"
 assert "creates /tmp/gh-aw/sandbox/firewall/logs" "[ -d /tmp/gh-aw/sandbox/firewall/logs ]"
 assert "creates /tmp/gh-aw/sandbox/firewall/audit" "[ -d /tmp/gh-aw/sandbox/firewall/audit ]"
 echo ""
