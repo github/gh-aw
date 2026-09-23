@@ -794,7 +794,7 @@ async function handleRequest(server, request, defaultHandler) {
       if (schemaValidationError) {
         throw {
           code: -32602,
-          message: formatSchemaValidationError(name, args, schemaValidationError),
+          message: formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema),
         };
       }
 
@@ -969,7 +969,7 @@ async function handleMessage(server, req, defaultHandler) {
 
       const schemaValidationError = validateArgumentsAgainstSchema(args, tool.inputSchema);
       if (schemaValidationError) {
-        server.replyError(id, -32602, formatSchemaValidationError(name, args, schemaValidationError));
+        server.replyError(id, -32602, formatSchemaValidationError(name, args, schemaValidationError, tool.inputSchema));
         return;
       }
 

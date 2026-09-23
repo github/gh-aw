@@ -579,5 +579,22 @@ describe("mcp_scripts_validation.cjs", () => {
       expect(message).toContain("Required fields: name, rationale, confidence");
       expect(message).toContain('Received: \"bug\"');
     });
+
+    it("formats workflow-specific add_labels required fields", async () => {
+      const { formatSchemaValidationError } = await import("./mcp_scripts_validation.cjs");
+      const inputSchema = {
+        properties: {
+          labels: {
+            items: {
+              type: "object",
+              required: ["name", "confidence"],
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain("Required fields: name, confidence");
+      expect(message).not.toContain("Required fields: name, rationale, confidence");
+    });
   });
 });

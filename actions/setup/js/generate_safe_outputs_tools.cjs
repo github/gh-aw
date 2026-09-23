@@ -152,6 +152,43 @@ function makeIntentFieldDescriptionsRequired(tool) {
 }
 
 /**
+ * Merge a workflow-provided labels item schema into the built-in object schema.
+ * Frontmatter validation guarantees that the configured schema can only narrow
+ * supported fields, so built-in constraints remain in force.
+ * @param {{inputSchema?: {properties?: Record<string, any>}}} tool
+ * @param {unknown} configuredSchema
+ */
+function applyAddLabelsItemSchema(tool, configuredSchema) {
+  if (!configuredSchema || typeof configuredSchema !== "object" || Array.isArray(configuredSchema)) {
+    return;
+  }
+  const labelsSchema = tool.inputSchema?.properties?.labels;
+  if (!labelsSchema?.items) {
+    return;
+  }
+  const currentItems = labelsSchema.items;
+  const objectSchema = Array.isArray(currentItems.oneOf) ? currentItems.oneOf.find(/** @param {{type?: string}} schema */ schema => schema.type === "object") : currentItems.type === "object" ? currentItems : undefined;
+  if (!objectSchema) {
+    return;
+  }
+
+  const configuredProperties = configuredSchema.properties && typeof configuredSchema.properties === "object" && !Array.isArray(configuredSchema.properties) ? configuredSchema.properties : {};
+  const properties = { ...(objectSchema.properties ?? {}) };
+  for (const [name, propertySchema] of Object.entries(configuredProperties)) {
+    properties[name] = { ...(properties[name] ?? {}), ...propertySchema };
+  }
+  labelsSchema.items = {
+    ...objectSchema,
+    ...configuredSchema,
+    required: Array.from(new Set([...(objectSchema.required ?? []), ...(configuredSchema.required ?? [])])),
+    properties,
+    additionalProperties: false,
+  };
+  labelsSchema.description =
+    `Labels to add. Each label must be an object matching this workflow's item-schema; plain string label names are not permitted. Required fields: ${labelsSchema.items.required.join(", ")}. ` + "Labels must exist in the repository.";
+}
+
+/**
  * Update add_comment description to match runtime-safe-output permissions.
  * @param {string} description
  * @param {unknown} addCommentConfig
@@ -382,6 +419,9 @@ async function main() {
             labelsSchema.description = ADD_LABELS_OPTIONAL_FIELD_DESC;
           }
         }
+      }
+      if (tool.name === "add_labels") {
+        applyAddLabelsItemSchema(enhancedTool, config.add_labels?.item_schema);
       }
 
       if (tool.name === "add_comment") {

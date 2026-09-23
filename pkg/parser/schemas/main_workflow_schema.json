@@ -9182,6 +9182,107 @@
                   "type": "boolean",
                   "description": "Enable issue-intent metadata support (rationale/confidence/suggest) for this output type."
                 },
+                "item-schema": {
+                  "type": "object",
+                  "description": "Optional JSON Schema that narrows each labels item. The schema is merged with the built-in object schema and may only require supported fields or restrict their values.",
+                  "required": ["type"],
+                  "properties": {
+                    "type": {
+                      "const": "object"
+                    },
+                    "required": {
+                      "type": "array",
+                      "items": {
+                        "enum": ["name", "rationale", "confidence", "suggest"]
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    },
+                    "additionalProperties": {
+                      "const": false
+                    },
+                    "properties": {
+                      "type": "object",
+                      "minProperties": 1,
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "object",
+                          "required": ["type"],
+                          "additionalProperties": false,
+                          "properties": {
+                            "type": {
+                              "const": "string"
+                            },
+                            "enum": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "minItems": 1,
+                              "uniqueItems": true
+                            }
+                          }
+                        },
+                        "rationale": {
+                          "type": "object",
+                          "required": ["type"],
+                          "additionalProperties": false,
+                          "properties": {
+                            "type": {
+                              "const": "string"
+                            },
+                            "enum": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "minItems": 1,
+                              "uniqueItems": true
+                            }
+                          }
+                        },
+                        "confidence": {
+                          "type": "object",
+                          "required": ["type"],
+                          "additionalProperties": false,
+                          "properties": {
+                            "type": {
+                              "const": "string"
+                            },
+                            "enum": {
+                              "type": "array",
+                              "items": {
+                                "enum": ["LOW", "MEDIUM", "HIGH"]
+                              },
+                              "minItems": 1,
+                              "uniqueItems": true
+                            }
+                          }
+                        },
+                        "suggest": {
+                          "type": "object",
+                          "required": ["type"],
+                          "additionalProperties": false,
+                          "properties": {
+                            "type": {
+                              "const": "boolean"
+                            },
+                            "enum": {
+                              "type": "array",
+                              "items": {
+                                "type": "boolean"
+                              },
+                              "minItems": 1,
+                              "uniqueItems": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
                 "create-if-missing": {
                   "type": "boolean",
                   "description": "When true, automatically creates labels that don't already exist in the target repository. Default (omitted or false) rejects labels that don't already exist."

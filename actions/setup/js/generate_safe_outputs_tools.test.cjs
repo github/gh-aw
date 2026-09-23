@@ -604,6 +604,72 @@ describe("generate_safe_outputs_tools", () => {
     expect(disabledTool.inputSchema.properties.labels.items.oneOf).toBeDefined();
   });
 
+  it("merges add_labels item_schema with the built-in object schema", () => {
+    const addLabelsSourceTool = {
+      name: "add_labels",
+      description: "Adds labels.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            minItems: 1,
+            items: {
+              oneOf: [
+                { type: "string" },
+                {
+                  type: "object",
+                  required: ["name"],
+                  properties: {
+                    name: { type: "string", description: "Label name." },
+                    rationale: { type: "string", maxLength: 280 },
+                    confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+                    suggest: { type: "boolean" },
+                  },
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+        },
+        required: ["labels"],
+      },
+    };
+    fs.writeFileSync(toolsSourcePath, JSON.stringify([addLabelsSourceTool]));
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        add_labels: {
+          item_schema: {
+            type: "object",
+            required: ["name", "confidence"],
+            additionalProperties: false,
+            properties: {
+              name: { type: "string" },
+              confidence: { type: "string", enum: ["HIGH", "MEDIUM"] },
+              suggest: { type: "boolean" },
+            },
+          },
+        },
+      })
+    );
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    const items = result[0].inputSchema.properties.labels.items;
+    expect(items.oneOf).toBeUndefined();
+    expect(items.type).toBe("object");
+    expect(items.required).toEqual(["name", "confidence"]);
+    expect(items.additionalProperties).toBe(false);
+    expect(items.properties.confidence.enum).toEqual(["HIGH", "MEDIUM"]);
+    expect(items.properties.rationale.maxLength).toBe(280);
+    expect(items.properties.name.description).toBe("Label name.");
+    expect(result[0].inputSchema.properties.labels.description).toContain("Required fields: name, confidence");
+    expect(result[0].inputSchema.properties.labels.description).toContain("plain string label names are not permitted");
+  });
+
   it("reflects required/optional/absent intent fields per tool configuration", () => {
     fs.writeFileSync(
       toolsSourcePath,

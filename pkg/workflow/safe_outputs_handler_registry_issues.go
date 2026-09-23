@@ -161,6 +161,9 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "add-labels", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()
+		if len(c.ItemSchema) > 0 {
+			config["item_schema"] = c.ItemSchema
+		}
 		// If config is empty, it means add_labels was explicitly configured with no options
 		// (null config), which means "allow any labels". Return non-nil empty map to
 		// indicate the handler is enabled.
@@ -193,9 +196,9 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			return nil
 		}
 		c := cfg.ReplaceLabel
-		transitions := make([]map[string]string, len(c.AllowedTransitions))
-		for i, t := range c.AllowedTransitions {
-			transitions[i] = map[string]string{"from": t.From, "to": t.To}
+		transitions := make([]map[string]string, 0, len(c.AllowedTransitions))
+		for _, t := range c.AllowedTransitions {
+			transitions = append(transitions, map[string]string{"from": t.From, "to": t.To})
 		}
 		config := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).

@@ -483,6 +483,8 @@ Use `required-labels` to only add labels to issues/PRs that already have **all**
 
 By default, labels that don't already exist in the target repository are rejected with an error. Set `create-if-missing: true` to automatically create any missing labels before they are applied.
 
+Use `item-schema` to require structured label items or narrow their accepted values. The schema is merged with the built-in label object schema, so it can only require `name`, `rationale`, `confidence`, or `suggest` and restrict those fields with compatible types or enums. The narrowed schema is enforced by the MCP tool, allowing the agent to correct invalid calls immediately.
+
 ```yaml wrap
 safe-outputs:
   add-labels:
@@ -495,6 +497,15 @@ safe-outputs:
     required-labels: [automated, bot]  # only operate if item has ALL of these labels
     required-title-prefix: "[bot] "    # only operate if item title starts with this prefix
     create-if-missing: true            # auto-create labels that don't already exist (default: false)
+    item-schema:
+      type: object
+      required: [name, confidence]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
+        suggest: { type: boolean }
+        rationale: { type: string }
 ```
 
 #### Blocked Label Patterns
@@ -524,6 +535,8 @@ safe-outputs:
 ### Remove Labels (`remove-labels:`)
 
 Removes labels from issues or PRs. Specify `allowed` to restrict which labels can be removed (specific labels or glob patterns), or `blocked` to prevent removal of specific label patterns. If a label is not present on the item, it will be silently skipped.
+
+`remove_labels` accepts structured label objects for compatibility, but ignores their `rationale`, `confidence`, and `suggest` fields.
 
 Use `required-labels` to only remove labels from issues/PRs that already have **all** of the specified labels. Use `required-title-prefix` to only remove labels from issues/PRs whose title starts with the given prefix.
 

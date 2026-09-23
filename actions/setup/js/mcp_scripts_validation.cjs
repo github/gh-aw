@@ -280,16 +280,17 @@ function validateValueAgainstSchema(value, schema) {
   return validateSchemaNode(value, schema, "", { skipRequiredAtRoot: false });
 }
 
-function formatSchemaValidationError(toolName, args, error) {
+function formatSchemaValidationError(toolName, args, error, inputSchema) {
   if (toolName === "add_labels" && typeof error?.path === "string" && /^labels\[\d+\]$/.test(error.path) && Array.isArray(args?.labels)) {
     const index = Number(error.path.match(/^labels\[(\d+)\]$/)?.[1] || -1);
     const receivedLabel = index >= 0 ? args.labels[index] : undefined;
     if (typeof receivedLabel === "string") {
+      const requiredFields = inputSchema?.properties?.labels?.items?.required;
       return [
         "Invalid arguments for add_labels:",
         `  ${error.path} must be an object (string shorthand is not supported).`,
         '  Expected: {"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}',
-        "  Required fields: name, rationale, confidence",
+        `  Required fields: ${Array.isArray(requiredFields) ? requiredFields.join(", ") : "name, rationale, confidence"}`,
         `  Received: ${JSON.stringify(receivedLabel)}`,
       ].join("\n");
     }
