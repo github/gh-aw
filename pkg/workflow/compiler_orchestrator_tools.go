@@ -402,7 +402,7 @@ func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, ag
 			return err
 		}
 	}
-	c.validateWebSearchSupport(tools, agenticEngine)
+	c.validateWebSearchSupport(frontmatter, tools, agenticEngine)
 	c.validateBareModeSupport(frontmatter, agenticEngine)
 	return nil
 }

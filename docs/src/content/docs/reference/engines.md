@@ -53,7 +53,7 @@ Not all features are available across all engines. The table below summarizes pe
 | `engine.max-turns` (deprecated nested alias) | ❌ | ✅ | ❌ | ❌ | ❌ |
 | `max-continuations` | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `tools.web-fetch` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `tools.web-search` | via MCP | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
+| `tools.web-search` | ✅ (native, opt-in) | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
 | `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ (no-op; already bare) |
@@ -62,7 +62,7 @@ Not all features are available across all engines. The table below summarizes pe
 | Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
 
-`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude and Codex have native web search support; Codex requires explicit `tools: web-search:` configuration. Copilot and Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
+`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support; Codex and Copilot require explicit `tools: web-search:` configuration. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
 
 ## Shared imported engines
 

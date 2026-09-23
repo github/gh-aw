@@ -584,10 +584,10 @@ func TestMCPServer_WindowsSmokeCommands(t *testing.T) {
 		t.Skip("Windows-only integration test")
 	}
 
-	binaryPath := "../../gh-aw.exe"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw.exe binary not found")
-	}
+	// Use the shared binary lookup so the path is absolute: setupMCPServerTest
+	// changes the working directory to a temp dir before resolving it, so a
+	// relative path would resolve against the temp dir and fail to exec.
+	binaryPath := testutil.RequireGhAwBinary(t)
 
 	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
 	defer cancel()

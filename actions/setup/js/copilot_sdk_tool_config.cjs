@@ -200,10 +200,9 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   availableTools.addBuiltIn(COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
   if (config.capabilities.bash) availableTools.addBuiltIn(COPILOT_SDK_SHELL_BUILTIN_TOOLS);
   if (config.capabilities.edit) availableTools.addBuiltIn(COPILOT_SDK_EDIT_BUILTIN_TOOLS);
-  // The compiler currently always emits webSearch: false (the Copilot SDK runtime
-  // cannot authorize/execute web-search); this branch is kept ready for when a
-  // real implementation and permission are wired, guarded by the parity check
-  // above so a stray webSearch: true without a matching permission fails closed.
+  // web_search is a Copilot SDK built-in tool; the compiler emits webSearch: true
+  // only when the workflow declares tools.web-search, and the parity check above
+  // makes a stray webSearch: true without a matching permission fail closed.
   if (config.capabilities.webSearch) availableTools.addBuiltIn("web_search");
   if (config.capabilities.mcp) availableTools.addMcp("*");
   // cliProxy mounts MCP servers as CLI wrapper scripts on PATH; those scripts are
