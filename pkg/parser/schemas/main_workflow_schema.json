@@ -12348,10 +12348,19 @@
           "examples": [false, true, "${{ inputs.report-failure-as-issue }}", ["agent_failure", "missing_safe_outputs"], ["!inference_access_error", "!ai_credits_rate_limit_error"]]
         },
         "failure-issue-repo": {
-          "type": "string",
-          "description": "Repository to create failure tracking issues in, in the format 'owner/repo'. Useful when the current repository has issues disabled. Defaults to the current repository.",
-          "pattern": "^[^/]+/[^/]+$",
-          "examples": ["github/docs-engineering", "myorg/infra-alerts"]
+          "description": "Repository to create failure tracking issues in, in the format 'owner/repo'. Useful when the current repository has issues disabled. Defaults to the current repository. Supports GitHub Actions expressions (e.g. '${{ inputs.failure-issue-repo }}') so reusable workflows can let callers configure this at runtime.",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[^/]+/[^/]+$"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$\\{\\{.*\\}\\}$",
+              "description": "GitHub Actions expression that resolves to an 'owner/repo' string at runtime"
+            }
+          ],
+          "examples": ["github/docs-engineering", "myorg/infra-alerts", "${{ inputs.failure-issue-repo }}"]
         },
         "report-failed-jobs": {
           "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable. Supports GitHub Actions expressions.",
