@@ -119,15 +119,22 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 	// Stage all files before creating PR
 	addWorkflowPRLog.Print("Staging workflow files")
 	if err := tracker.StageAllFiles(opts.Verbose); err != nil {
-		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
+		addWorkflowPRLog.Printf("Failed to stage workflow files: %v", err)
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil {
+			addWorkflowPRLog.Printf("Failed to rollback files after staging failure: %v", rollbackErr)
+			if opts.Verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
+			}
 		}
 		return 0, "", fmt.Errorf("failed to stage workflow files: %w", err)
 	}
 
 	// Update .gitattributes and stage it if changed
-	if err := stageGitAttributesIfChanged(); err != nil && opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to stage .gitattributes: %v", err)))
+	if err := stageGitAttributesIfChanged(); err != nil {
+		addWorkflowPRLog.Printf("Failed to stage .gitattributes: %v", err)
+		if opts.Verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to stage .gitattributes: %v", err)))
+		}
 	}
 
 	// Commit changes
@@ -147,6 +154,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 	prBody = buildAddWorkflowPRBody(workflows, opts)
 
 	if err := commitChanges(commitMessage, opts.Verbose); err != nil {
+		addWorkflowPRLog.Printf("Failed to commit workflow files on branch %s: %v", branchName, err)
 		// Don't rollback - leave the workflow files on disk for manual recovery.
 		// Return a richly formatted error with clear instructions so the user can
 		// commit and push manually. The top-level error handler will print this.

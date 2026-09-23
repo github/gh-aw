@@ -51,6 +51,7 @@ func compileWorkflowWithRefreshAndActionRef(ctx context.Context, filePath string
 
 	// Ensure .gitattributes marks .lock.yml files as generated
 	if _, err := ensureGitAttributes(); err != nil {
+		addWorkflowCompilationLog.Printf("Failed to update .gitattributes: %v", err)
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
 		}
@@ -173,6 +174,7 @@ func compileSafeOutputsWorkflowDependencies(ctx context.Context, workflowFile, l
 	}
 
 	workflowsDir := filepath.Dir(workflowFile)
+	addWorkflowCompilationLog.Printf("Resolved %d %s name(s) for %s", len(workflowNames), label, workflowFile)
 
 	for _, name := range workflowNames {
 		mdPath := filepath.Join(workflowsDir, name+".md")
@@ -180,10 +182,12 @@ func compileSafeOutputsWorkflowDependencies(ctx context.Context, workflowFile, l
 
 		// Skip if the .md is not present locally.
 		if _, mdErr := os.Stat(mdPath); mdErr != nil {
+			addWorkflowCompilationLog.Printf("Skipping %s %s: markdown file not found locally", label, mdPath)
 			continue
 		}
 		// Skip recompilation when a lock already exists, unless --force was specified.
 		if !opts.force && fileutil.FileExists(lockPath) {
+			addWorkflowCompilationLog.Printf("Skipping %s %s: lock file already exists (force=%v)", label, mdPath, opts.force)
 			continue
 		}
 
