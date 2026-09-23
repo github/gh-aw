@@ -51,8 +51,15 @@ assert "creates /tmp/gh-aw/sandbox/firewall/logs" "[ -d /tmp/gh-aw/sandbox/firew
 assert "creates /tmp/gh-aw/sandbox/firewall/audit" "[ -d /tmp/gh-aw/sandbox/firewall/audit ]"
 echo ""
 
-# ── Test 3: No-op when firewall dir already exists and is writable ───────────
-echo "Test 3: No-op (no reclaim message) when firewall dir is already writable"
+# ── Test 3: Works when RUNNER_TEMP is unset ──────────────────────────────────
+echo "Test 3: Creates runner directory when RUNNER_TEMP is unset"
+rm -rf /tmp/gh-aw
+env -u RUNNER_TEMP bash "${SCRIPT}" >/dev/null 2>&1
+assert "creates /tmp/gh-aw/agent without RUNNER_TEMP" "[ -d /tmp/gh-aw/agent ]"
+echo ""
+
+# ── Test 4: No-op when firewall dir already exists and is writable ───────────
+echo "Test 4: No-op (no reclaim message) when firewall dir is already writable"
 rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall/logs /tmp/gh-aw/sandbox/firewall/audit
 set +e
@@ -63,8 +70,8 @@ assert "exits 0 when firewall dir is writable" "[ '${EXIT_CODE}' -eq 0 ]"
 assert "does not print reclaim message" "! printf '%s' \"${OUTPUT}\" | grep -q 'Pre-flight'"
 echo ""
 
-# ── Test 4: Guard fires when firewall parent dir is not writable ─────────────
-echo "Test 4: Guard fires when firewall dir is not writable"
+# ── Test 5: Guard fires when firewall parent dir is not writable ─────────────
+echo "Test 5: Guard fires when firewall dir is not writable"
 rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall
 chmod 000 /tmp/gh-aw/sandbox/firewall
@@ -76,8 +83,8 @@ chmod u+rwx /tmp/gh-aw/sandbox/firewall 2>/dev/null || true
 assert "prints Pre-flight reclaim message when parent is non-writable" "printf '%s' \"${OUTPUT}\" | grep -q 'Pre-flight'"
 echo ""
 
-# ── Test 5: Guard fires when subdirs are non-writable (parent is writable) ───
-echo "Test 5: Guard fires when a firewall subdir is non-writable even if parent is writable"
+# ── Test 6: Guard fires when subdirs are non-writable (parent is writable) ───
+echo "Test 6: Guard fires when a firewall subdir is non-writable even if parent is writable"
 rm -rf /tmp/gh-aw
 mkdir -p /tmp/gh-aw/sandbox/firewall/logs /tmp/gh-aw/sandbox/firewall/audit
 chmod 000 /tmp/gh-aw/sandbox/firewall/logs  # parent writable, subdir not
