@@ -98,7 +98,8 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				"Maximum 5 label(s)",
+				"Maximum 5 label(s) can be added per call.",
+				"Maximum 5 add_labels call(s) can be made.",
 				`Only these labels are allowed: ["bug" "enhancement" "question"]`,
 			},
 		},
@@ -116,8 +117,24 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				"Maximum 3 label(s)",
+				"Maximum 3 label(s) can be added per call.",
+				"Maximum 3 add_labels call(s) can be made.",
 				`Only these labels are allowed: ["bug" "feature request" "good first issue" "help wanted"]`,
+			},
+		},
+		{
+			name:            "add_labels caps the per-call limit at 100",
+			toolName:        "add_labels",
+			baseDescription: "Add labels to an issue.",
+			safeOutputs: &SafeOutputsConfig{
+				AddLabels: &AddLabelsConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("101")},
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"Maximum 100 label(s) can be added per call.",
+				"Maximum 101 add_labels call(s) can be made.",
 			},
 		},
 		{

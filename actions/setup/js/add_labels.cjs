@@ -29,7 +29,6 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
 const { attachExecutionState, fetchIssueState, normalizeLabelNames } = require("./safe_output_execution_metadata.cjs");
-const { MAX_LABELS } = require("./constants.cjs");
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
@@ -37,6 +36,9 @@ const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates } = requir
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
 const { SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { deterministicLabelColor } = require("./create_labels.cjs");
+
+/** Maximum labels GitHub permits on a single issue or pull request. */
+const MAX_LABELS_PER_ADD_LABELS_CALL = 100;
 
 /**
  * @param {{ rationale?: string, confidence?: string, suggest?: boolean } | null | undefined} spec
@@ -240,6 +242,7 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
 const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
+    const maxLabelsPerCall = Math.min(maxCount, MAX_LABELS_PER_ADD_LABELS_CALL);
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
     const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
@@ -408,14 +411,14 @@ const main = createCountGatedHandler({
       }
 
       // Enforce max limits on labels before validation
-      const limitResult = tryEnforceArrayLimit(requestedLabelNames, MAX_LABELS, "labels");
+      const limitResult = tryEnforceArrayLimit(requestedLabelNames, maxLabelsPerCall, "labels");
       if (!limitResult.success) {
         core.warning(`Label limit exceeded: ${limitResult.error}`);
         return { success: false, error: limitResult.error };
       }
 
       // Use validation helper to sanitize and validate labels
-      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxCount, blockedPatterns);
+      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxLabelsPerCall, blockedPatterns);
 
       if (!labelsResult.valid) {
         // If no valid labels, log info and return gracefully
