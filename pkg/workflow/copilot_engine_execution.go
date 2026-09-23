@@ -109,6 +109,12 @@ func buildCopilotSettingsCleanupAndExitCodeTrap() string {
 //     after stage_copilot_sdk_mcp_config.sh copies the converted home config into the
 //     existing AWF temp mount.
 //   - CLI: GH_AW_MCP_CONFIG=$HOME/.copilot/mcp-config.json
+//
+// The inline RUNNER_TEMP guard intentionally repeats the script's own guard: the
+// script path itself is resolved from RUNNER_TEMP, so an unset value must be reported
+// here rather than as a missing-file error. The script keeps its guard so it also
+// fails closed when invoked directly. The explicit `|| exit 1` keeps staging
+// fail-closed even if the surrounding shell runs without errexit.
 func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
 	var b strings.Builder
 	b.WriteString("export XDG_CONFIG_HOME=\"$HOME\"\n")
