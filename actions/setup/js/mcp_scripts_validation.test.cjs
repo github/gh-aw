@@ -568,6 +568,32 @@ describe("mcp_scripts_validation.cjs", () => {
       });
       expect(validateArgumentsAgainstSchema({ labels: [{ name: "bug", confidence: "HIGH" }] }, schema)).toBeNull();
     });
+
+    it("enforces maxLength on nested string values", async () => {
+      const { validateArgumentsAgainstSchema } = await import("./mcp_scripts_validation.cjs");
+      const schema = {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                rationale: { type: "string", maxLength: 280 },
+              },
+              required: ["name"],
+            },
+          },
+        },
+      };
+
+      expect(validateArgumentsAgainstSchema({ labels: [{ name: "bug", rationale: "x".repeat(281) }] }, schema)).toMatchObject({
+        path: "labels[0].rationale",
+        message: "must be at most 280 characters",
+      });
+      expect(validateArgumentsAgainstSchema({ labels: [{ name: "bug", rationale: "x".repeat(280) }] }, schema)).toBeNull();
+    });
   });
 
   describe("formatSchemaValidationError", () => {
@@ -595,6 +621,28 @@ describe("mcp_scripts_validation.cjs", () => {
       const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
       expect(message).toContain("Required fields: name, confidence");
       expect(message).not.toContain("Required fields: name, rationale, confidence");
+    });
+
+    it("builds the add_labels example from the effective item schema", async () => {
+      const { formatSchemaValidationError } = await import("./mcp_scripts_validation.cjs");
+      const inputSchema = {
+        properties: {
+          labels: {
+            items: {
+              type: "object",
+              required: ["name", "confidence", "suggest"],
+              properties: {
+                name: { type: "string" },
+                confidence: { type: "string", enum: ["LOW"] },
+                suggest: { type: "boolean" },
+              },
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain('Expected: {"name":"bug","confidence":"LOW","suggest":false}');
+      expect(message).toContain("Required fields: name, confidence, suggest");
     });
   });
 });

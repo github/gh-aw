@@ -224,6 +224,18 @@ function validateSchemaNode(value, schema, path, options = {}) {
     }
   }
 
+  if (typeof value === "string" && typeof schema.maxLength === "number") {
+    const characterLength = Array.from(value).length;
+    if (characterLength > schema.maxLength) {
+      return {
+        path,
+        message: `must be at most ${schema.maxLength} characters`,
+        expected: `maxLength ${schema.maxLength}`,
+        received: `${characterLength} characters`,
+      };
+    }
+  }
+
   if (isPlainObject(value)) {
     if (!options.skipRequiredAtRoot || path !== "") {
       const required = Array.isArray(schema.required) ? schema.required : [];
@@ -280,17 +292,73 @@ function validateValueAgainstSchema(value, schema) {
   return validateSchemaNode(value, schema, "", { skipRequiredAtRoot: false });
 }
 
+/**
+ * Build an example value for a single property from its schema.
+ * @param {string} field
+ * @param {any} propertySchema
+ * @returns {any}
+ */
+function exampleValueForProperty(field, propertySchema) {
+  const schema = isPlainObject(propertySchema) ? propertySchema : {};
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    return schema.enum[schema.enum.length - 1];
+  }
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  switch (type) {
+    case "boolean":
+      return false;
+    case "number":
+    case "integer":
+      return 1;
+    case "array":
+      return [];
+    case "object":
+      return {};
+    default:
+      return EXAMPLE_LABEL_FIELD_VALUES[field] || field;
+  }
+}
+
+const EXAMPLE_LABEL_FIELD_VALUES = {
+  name: "bug",
+  rationale: "Why this label applies",
+  confidence: "HIGH",
+};
+
+const DEFAULT_LABEL_REQUIRED_FIELDS = ["name", "rationale", "confidence"];
+
+/**
+ * Build a schema-compliant example label object from the effective item schema.
+ * Falls back to the default intent fields when no schema is available.
+ * @param {string[]} required
+ * @param {any} itemSchema
+ * @returns {string}
+ */
+function buildLabelExample(required, itemSchema) {
+  const schema = isPlainObject(itemSchema) ? itemSchema : {};
+  const properties = isPlainObject(schema.properties) ? schema.properties : {};
+  /** @type {Record<string, any>} */
+  const example = {};
+  for (const field of required) {
+    example[field] = exampleValueForProperty(field, properties[field]);
+  }
+  return JSON.stringify(example);
+}
+
 function formatSchemaValidationError(toolName, args, error, inputSchema) {
   if (toolName === "add_labels" && typeof error?.path === "string" && /^labels\[\d+\]$/.test(error.path) && Array.isArray(args?.labels)) {
     const index = Number(error.path.match(/^labels\[(\d+)\]$/)?.[1] || -1);
     const receivedLabel = index >= 0 ? args.labels[index] : undefined;
     if (typeof receivedLabel === "string") {
-      const requiredFields = inputSchema?.properties?.labels?.items?.required;
+      const itemSchema = inputSchema?.properties?.labels?.items;
+      const objectSchema = Array.isArray(itemSchema?.oneOf) ? itemSchema.oneOf.find(/** @param {any} option */ option => option?.type === "object") : itemSchema;
+      const schemaRequired = objectSchema?.required;
+      const requiredFields = Array.isArray(schemaRequired) && schemaRequired.length > 0 ? schemaRequired : DEFAULT_LABEL_REQUIRED_FIELDS;
       return [
         "Invalid arguments for add_labels:",
         `  ${error.path} must be an object (string shorthand is not supported).`,
-        '  Expected: {"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}',
-        `  Required fields: ${Array.isArray(requiredFields) ? requiredFields.join(", ") : "name, rationale, confidence"}`,
+        `  Expected: ${buildLabelExample(requiredFields, objectSchema)}`,
+        `  Required fields: ${requiredFields.join(", ")}`,
         `  Received: ${JSON.stringify(receivedLabel)}`,
       ].join("\n");
     }
