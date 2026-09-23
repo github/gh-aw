@@ -36,7 +36,7 @@ func TestRenderCachedAuditIfAvailableBypassesCacheWhenExplicitEvalsArtifactReque
 	}
 	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
 
-	done, err := renderCachedAuditIfAvailable(context.Background(), auditRunConfig{
+	done, _, err := renderCachedAuditIfAvailable(context.Background(), auditRunConfig{
 		runID:                  123,
 		outputDir:              runOutputDir,
 		verbose:                false,

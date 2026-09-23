@@ -23,39 +23,41 @@ import (
 // If experimentFilter is non-empty, the run is skipped when its experiment artifact does
 // not contain an assignment for that experiment name. If variantFilter is also non-empty,
 // the assigned variant must equal variantFilter.
-func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) error {
+// The returned bool reports whether the run was skipped (excluded by --experiment,
+// --runtime, or --evals filtering) rather than fully analyzed and reported.
+func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (bool, error) {
 	cfg, err := newAuditRunConfig(runID, opts)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := ensureAuditNotCancelled(ctx); err != nil {
-		return err
+		return false, err
 	}
 	announceAuditRun(cfg)
 	if cfg.jobID > 0 {
-		return auditJobRun(cfg.jobOptions())
+		return false, auditJobRun(cfg.jobOptions())
 	}
-	if done, err := renderCachedAuditIfAvailable(ctx, cfg); done {
-		return err
+	if done, skipped, err := renderCachedAuditIfAvailable(ctx, cfg); done {
+		return skipped, err
 	}
 	run, err := prepareAuditWorkflowRun(ctx, cfg)
 	if err != nil {
-		return err
+		return false, err
 	}
 	results, err := collectAuditAnalysisResults(ctx, run, cfg.outputDir, cfg.verbose, artifactMatchesFilter(constants.AgentArtifactName.String(), cfg.artifactFilter))
 	if err != nil {
-		return err
+		return false, err
 	}
 	run = applyAuditMetrics(run, results)
 	processedRun := buildProcessedAuditRun(run, results)
 	saveAuditRunSummary(cfg.outputDir, run, processedRun, results, cfg.verbose)
 	if shouldSkipAuditRun(cfg.runID, cfg.outputDir, cfg.experimentFilter, cfg.variantFilter, cfg.runtimeFilter) {
-		return nil
+		return true, nil
 	}
 	if shouldSkipForEvals(ctx, cfg, run) {
-		return nil
+		return true, nil
 	}
-	return renderAuditReport(ctx, processedRun, results.metrics, results.mcpToolUsage, cfg.auditOptions())
+	return false, renderAuditReport(ctx, processedRun, results.metrics, results.mcpToolUsage, cfg.auditOptions())
 }
 
 func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
@@ -78,6 +80,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		variantFilter:          opts.VariantFilter,
 		runtimeFilter:          opts.RuntimeFilter,
 		evalsOnly:              opts.EvalsOnly,
+		group:                  opts.Group,
 		noBaseline:             opts.NoBaseline,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
@@ -159,21 +162,26 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 		Parse:      cfg.parse,
 		JSONOutput: cfg.jsonOutput,
 		EvalsOnly:  cfg.evalsOnly,
+		Group:      cfg.group,
 		NoBaseline: cfg.noBaseline,
 	}
 }
 
-func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (bool, error) {
+// renderCachedAuditIfAvailable attempts to render an audit report from a cached run
+// summary. It returns done=true when no further processing is needed (either because
+// the cached report was rendered or the run was skipped by filtering), along with
+// whether the run was skipped and any error encountered.
+func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done bool, skipped bool, err error) {
 	summary, ok := loadRunSummary(cfg.outputDir, cfg.verbose)
 	if !ok {
-		return false, nil
+		return false, false, nil
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
 	if cfg.verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))))
 	}
 	if shouldSkipAuditRun(cfg.runID, cfg.outputDir, cfg.experimentFilter, cfg.variantFilter, cfg.runtimeFilter) {
-		return true, nil
+		return true, true, nil
 	}
 	// When evals are requested but evals are not present locally (e.g., the run was
 	// cached before evals were included in the usage artifact), bypass the cache
@@ -182,17 +190,17 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (bool
 	if cfg.evalsArtifactRequested && !runHasEvals(cfg.outputDir, cfg.verbose) &&
 		!ensureEvalsResultsFromBranch(ctx, summary.Run, cfg.outputDir, cfg.owner, cfg.repo, cfg.hostname, cfg.verbose) {
 		auditLog.Printf("Cache miss for run %d evals: evals not present locally, bypassing cache", cfg.runID)
-		return false, nil
+		return false, false, nil
 	}
 	if auditNeedsDetectionArtifact(cfg, summary) {
 		auditLog.Printf("Cache miss for run %d threat detection: detection artifact not present locally, bypassing cache", cfg.runID)
 		if err := invalidateCompleteArtifactDownloadMarker(cfg.outputDir); err != nil {
-			return false, err
+			return false, false, err
 		}
-		return false, nil
+		return false, false, nil
 	}
 	processedRun := processedRunFromSummary(summary, cfg.outputDir)
-	return true, renderAuditReport(ctx, processedRun, summary.Metrics, summary.MCPToolUsage, cfg.auditOptions())
+	return true, false, renderAuditReport(ctx, processedRun, summary.Metrics, summary.MCPToolUsage, cfg.auditOptions())
 }
 
 func invalidateCompleteArtifactDownloadMarker(runOutputDir string) error {

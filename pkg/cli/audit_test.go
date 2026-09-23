@@ -676,7 +676,7 @@ func TestAuditUsesRunSummaryCache(t *testing.T) {
 	// WorkflowPath is empty in the cached summary, so renderAuditReport will not attempt any
 	// GitHub API calls for baseline comparison either.
 	ctx := t.Context()
-	if err := AuditWorkflowRun(ctx, runID, AuditOptions{
+	if _, err := AuditWorkflowRun(ctx, runID, AuditOptions{
 		OutputDir: tempDir,
 	}); err != nil {
 		t.Fatalf("AuditWorkflowRun failed — cache path not taken (fetchWorkflowRunMetadata was probably called): %v", err)

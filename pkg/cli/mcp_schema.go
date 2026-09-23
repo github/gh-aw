@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -215,7 +216,11 @@ func generateAuditOutputSchema() (*jsonschema.Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{auditData, auditDiff, auditDiffs}}, nil
+	groupedAudit, err := GenerateOutputSchema[GroupedAuditReport]()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{auditData, auditDiff, auditDiffs, groupedAudit}}, nil
 }
 
 func generateLogsOutputSchema() (*jsonschema.Schema, error) {
@@ -335,6 +340,10 @@ func generateCrossRunAuditOutputSchema() (*jsonschema.Schema, error) {
 }
 
 func replaceArrayItemSchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	lastProperty, err := lastSchemaPathProperty(path)
+	if err != nil {
+		return err
+	}
 	target := schema
 	for _, property := range path {
 		var ok bool
@@ -344,30 +353,42 @@ func replaceArrayItemSchema(schema *jsonschema.Schema, path []string, replacemen
 		}
 	}
 	if target.Items == nil {
-		return fmt.Errorf("schema property %q is not an array", path[len(path)-1])
+		return fmt.Errorf("schema property %q is not an array", lastProperty)
 	}
 	target.Items = replacement
 	return nil
 }
 
 func replacePropertySchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	lastProperty, err := lastSchemaPathProperty(path)
+	if err != nil {
+		return err
+	}
 	target := schema
-	for _, property := range path[:len(path)-1] {
+	remaining := len(path)
+	for _, property := range path {
+		remaining--
+		if remaining == 0 {
+			break
+		}
 		var ok bool
 		target, ok = target.Properties[property]
 		if !ok {
 			return fmt.Errorf("schema property %q not found", property)
 		}
 	}
-	property := path[len(path)-1]
-	if _, ok := target.Properties[property]; !ok {
-		return fmt.Errorf("schema property %q not found", property)
+	if _, ok := target.Properties[lastProperty]; !ok {
+		return fmt.Errorf("schema property %q not found", lastProperty)
 	}
-	target.Properties[property] = replacement
+	target.Properties[lastProperty] = replacement
 	return nil
 }
 
 func replaceMapValueSchema(schema *jsonschema.Schema, path []string, replacement *jsonschema.Schema) error {
+	lastProperty, err := lastSchemaPathProperty(path)
+	if err != nil {
+		return err
+	}
 	target := schema
 	for _, property := range path {
 		var ok bool
@@ -377,10 +398,23 @@ func replaceMapValueSchema(schema *jsonschema.Schema, path []string, replacement
 		}
 	}
 	if target.AdditionalProperties == nil {
-		return fmt.Errorf("schema property %q is not a map", path[len(path)-1])
+		return fmt.Errorf("schema property %q is not a map", lastProperty)
 	}
 	target.AdditionalProperties = replacement
 	return nil
+}
+
+func lastSchemaPathProperty(path []string) (string, error) {
+	var last string
+	ok := false
+	for _, property := range path {
+		last = property
+		ok = true
+	}
+	if !ok {
+		return "", errors.New("schema property path must not be empty")
+	}
+	return last, nil
 }
 
 func generateSchemaWithDefaults[T any](defaults map[string]any) (*jsonschema.Schema, error) {
