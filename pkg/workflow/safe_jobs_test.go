@@ -1161,6 +1161,45 @@ func TestParseSafeJobsConfigArtifacts(t *testing.T) {
 		require.True(t, exists)
 		require.Error(t, job.artifactsError)
 	})
+
+	t.Run("path traversal segments are rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/../outside.json"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "..")
+	})
+
+	t.Run("hidden file path is rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/agent/bundle/.manifest"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "hidden")
+	})
+
+	t.Run("hidden directory path is rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/gh-aw/agent/.cache/data.json"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "hidden")
+	})
 }
 
 func TestBuildSafeJobsRejectsInvalidArtifacts(t *testing.T) {

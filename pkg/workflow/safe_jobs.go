@@ -196,8 +196,8 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 						safeJob.artifactsError = fmt.Errorf("safe-job %q: artifacts entries must be strings", jobName)
 						break
 					}
-					if !strings.HasPrefix(artifactStr, constants.TmpGhAwDirSlash) {
-						safeJob.artifactsError = fmt.Errorf("safe-job %q: artifact path %q must be rooted under %q so it is covered by secret redaction", jobName, artifactStr, constants.TmpGhAwDirSlash)
+					if err := validateSafeJobArtifactPath(artifactStr); err != nil {
+						safeJob.artifactsError = fmt.Errorf("safe-job %q: %w", jobName, err)
 						break
 					}
 					safeJob.Artifacts = append(safeJob.Artifacts, artifactStr)
@@ -212,6 +212,33 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 	}
 
 	return result
+}
+
+// validateSafeJobArtifactPath validates a single safe-job "artifacts" entry.
+//
+// Two properties must hold before the path is trusted for inclusion in the unified
+// agent artifact upload:
+//  1. It must be rooted under /tmp/gh-aw/ so the compiler's secret-redaction step,
+//     which only scans that subtree, covers it before upload. Path traversal segments
+//     ("..") are rejected outright since they could otherwise be used to smuggle a
+//     path that resolves outside /tmp/gh-aw/ past this prefix check.
+//  2. It must not reference hidden files or directories (any path segment starting
+//     with "."), because the unified "actions/upload-artifact" step does not set
+//     include-hidden-files, whose default is false. A declared hidden path would
+//     therefore pass validation but still be silently dropped from the artifact.
+func validateSafeJobArtifactPath(path string) error {
+	if !strings.HasPrefix(path, constants.TmpGhAwDirSlash) {
+		return fmt.Errorf("artifact path %q must be rooted under %q so it is covered by secret redaction", path, constants.TmpGhAwDirSlash)
+	}
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("artifact path %q must not contain \"..\" path traversal segments", path)
+	}
+	for _, segment := range strings.Split(path, "/") {
+		if strings.HasPrefix(segment, ".") && segment != "" {
+			return fmt.Errorf("artifact path %q must not reference hidden files or directories (segment %q starts with \".\"), which are silently dropped by the unified artifact upload", path, segment)
+		}
+	}
+	return nil
 }
 
 // collectSafeJobArtifactPaths gathers all declared artifact paths from custom safe-outputs
