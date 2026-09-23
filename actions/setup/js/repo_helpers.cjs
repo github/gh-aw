@@ -325,6 +325,48 @@ function resolveExecutionOwnerRepo() {
   return { owner: context.repo.owner, repo: context.repo.repo };
 }
 
+/**
+ * Resolve the configured failure-issue repository (`GH_AW_FAILURE_ISSUE_REPO`).
+ *
+ * SEC-005: when the value was written as a literal "owner/repo" in the workflow
+ * frontmatter it is trusted compile-time configuration. When it was written as a GitHub
+ * Actions expression (for example `${{ inputs.failure-issue-repo }}` in a reusable
+ * workflow) the compiler sets `GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION` to "true"; the
+ * resolved value is then caller-controlled at runtime and is validated with
+ * `validateTargetRepo` against an explicit allowlist limited to the current repository
+ * owner before any API use.
+ *
+ * @param {string} defaultRepoSlug - Current repository slug ("owner/repo") used as the default
+ * @param {(message: string) => void} [warn] - Optional warning sink for rejected values
+ * @returns {RepoParts|null} Parsed owner/repo when a usable override is configured, otherwise null
+ */
+function resolveFailureIssueRepo(defaultRepoSlug, warn) {
+  const configured = (process.env.GH_AW_FAILURE_ISSUE_REPO || "").trim();
+  if (!configured) {
+    return null;
+  }
+  const parsed = parseRepoSlug(configured);
+  if (!parsed) {
+    if (warn) {
+      warn(`Ignoring invalid failure-issue-repo value "${configured}"; expected "owner/repo" format`);
+    }
+    return null;
+  }
+  if (process.env.GH_AW_FAILURE_ISSUE_REPO_FROM_EXPRESSION !== "true") {
+    return parsed;
+  }
+  const defaultOwner = parseRepoSlug(defaultRepoSlug)?.owner;
+  const allowedRepos = parseAllowedRepos(defaultOwner ? `${defaultOwner}/*` : "");
+  const validation = validateTargetRepo(`${parsed.owner}/${parsed.repo}`, defaultRepoSlug, allowedRepos);
+  if (!validation.valid) {
+    if (warn) {
+      warn(`Ignoring runtime failure-issue-repo value "${parsed.owner}/${parsed.repo}": expression-provided repositories must belong to the "${defaultOwner}" owner`);
+    }
+    return null;
+  }
+  return parsed;
+}
+
 module.exports = {
   parseAllowedRepos,
   getDefaultTargetRepo,
@@ -335,4 +377,5 @@ module.exports = {
   resolveTargetRepoConfig,
   resolveAndValidateRepo,
   resolveExecutionOwnerRepo,
+  resolveFailureIssueRepo,
 };

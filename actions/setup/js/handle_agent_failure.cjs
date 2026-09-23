@@ -27,6 +27,7 @@ const { parseBoolTemplatable } = require("./templatable.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp_gateway_log.cjs");
 const { readDedupedTokenUsage, TOKEN_USAGE_PATHS } = require("./parse_token_usage.cjs");
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
+const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -3976,20 +3977,21 @@ async function main() {
     }
 
     // Determine the failure issue repository destination.
-    // SEC-005: GH_AW_FAILURE_ISSUE_REPO is set in the workflow frontmatter at compile time
-    // and is therefore a trusted compile-time configuration value. No validateTargetRepo
-    // allowlist check is required; the frontmatter trust boundary provides the equivalent
-    // security guarantee.
-    // If GH_AW_FAILURE_ISSUE_REPO is set, use that repo instead of the current repo
-    const failureIssueRepo = process.env.GH_AW_FAILURE_ISSUE_REPO || "";
+    // SEC-005: a literal GH_AW_FAILURE_ISSUE_REPO is set in the workflow frontmatter at
+    // compile time and is therefore trusted configuration. When the frontmatter used a
+    // GitHub Actions expression (e.g. a reusable-workflow input) the value is resolved at
+    // runtime from caller-controlled data, so resolveFailureIssueRepo validates it with
+    // validateTargetRepo against an allowlist scoped to the current repository owner.
+    const { owner: contextOwner, repo: contextRepo } = context.repo;
+    const failureRepoParts = resolveFailureIssueRepo(`${contextOwner}/${contextRepo}`, message => core.warning(message));
     let owner, repo;
-    if (failureIssueRepo && failureIssueRepo.includes("/")) {
-      const parts = failureIssueRepo.split("/");
-      owner = parts[0];
-      repo = parts[1];
+    if (failureRepoParts) {
+      owner = failureRepoParts.owner;
+      repo = failureRepoParts.repo;
       core.info(`Using configured failure issue repo: ${owner}/${repo}`);
     } else {
-      ({ owner, repo } = context.repo);
+      owner = contextOwner;
+      repo = contextRepo;
     }
 
     /** @type {{ number: number, labels: Array<string | { name?: string | null }> } | null} */

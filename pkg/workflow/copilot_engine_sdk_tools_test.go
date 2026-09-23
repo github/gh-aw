@@ -93,13 +93,14 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 			args: []string{
 				"--allow-tool", "write",
 				"--allow-tool", "web_fetch",
+				"--allow-tool", "web_search",
 				"--allow-tool", "shell",
 				"--allow-tool", "github",
 			},
 			capabilities: copilotSDKToolCapabilities{
-				Bash: true, Edit: true, WebFetch: true, WebSearch: false, MCP: true, CLIProxy: true,
+				Bash: true, Edit: true, WebFetch: true, WebSearch: true, MCP: true, CLIProxy: true,
 			},
-			permissions: []string{"github", "read", "shell", "web_fetch", "write"},
+			permissions: []string{"github", "read", "shell", "web_fetch", "web_search", "write"},
 		},
 		{
 			name: "empty bash allowlist is explicitly disabled",
@@ -112,6 +113,20 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 			capabilities: copilotSDKToolCapabilities{},
 			permissions:  []string{"read"},
 			disabled:     []string{"bash"},
+		},
+		{
+			name: "web-search hidden for older pinned Copilot CLI",
+			workflowData: &WorkflowData{
+				EngineConfig: &EngineConfig{CopilotSDK: true, Version: "1.0.86"},
+				Tools: map[string]any{
+					"web-search": nil,
+				},
+				ParsedTools: NewTools(map[string]any{
+					"web-search": nil,
+				}),
+			},
+			capabilities: copilotSDKToolCapabilities{},
+			permissions:  []string{"read"},
 		},
 		{
 			// Default-tool resolution re-adds a "github" entry for steering issue comments

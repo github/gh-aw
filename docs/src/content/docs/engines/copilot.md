@@ -49,7 +49,7 @@ Analyze the repository and create a concise daily status report covering:
 
 ## Capabilities and limitations
 
-Copilot supports the broadest set of `gh-aw` engine-specific features: native custom-agent selection with `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlisting. Copilot CLI does not provide native `tools.web-search`; configure a supported MCP search integration when the workflow requires web search. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+Copilot supports the broadest set of `gh-aw` engine-specific features: native custom-agent selection with `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlisting. Copilot CLI provides native `tools.web-search` through its built-in `web_search` tool; declare `tools: web-search:` to enable it, including in workflows that do not use GitHub repository tools. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
 ## GitHub Agentic Workflows vs. Copilot CLI in GitHub Actions
 

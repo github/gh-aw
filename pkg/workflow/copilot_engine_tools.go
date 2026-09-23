@@ -175,9 +175,21 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		args = append(args, "--allow-tool", "web_fetch")
 	}
 
+	// Handle web-search builtin tool (Copilot CLI uses web_search with underscore)
+	var engineConfig *EngineConfig
+	if workflowData != nil {
+		engineConfig = workflowData.EngineConfig
+	}
+	if isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(engineConfig) {
+		copilotEngineToolsLog.Print("Web-search tool enabled, adding web_search permission")
+		// web-search -> web_search
+		args = append(args, "--allow-tool", "web_search")
+	}
+
 	// Built-in tool names that should be skipped when processing MCP servers
 	// Note: GitHub is NOT included here because it needs MCP configuration in CLI mode
 	// Note: web-fetch is NOT included here because it needs explicit --allow-tool argument
+	// Note: web-search is handled above with an explicit --allow-tool argument
 	builtInTools := map[string]struct {
 	}{
 		"bash":         {},
@@ -267,8 +279,12 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	// all become "jq"), producing duplicate --allow-tool shell(jq) entries.
 	if len(args) > 0 {
 		var values []string
-		for i := 1; i < len(args); i += 2 {
-			values = append(values, args[i])
+		expectValue := false
+		for _, arg := range args {
+			if expectValue {
+				values = append(values, arg)
+			}
+			expectValue = !expectValue
 		}
 		sort.Strings(values)
 
@@ -301,10 +317,16 @@ func (e *CopilotEngine) generateCopilotToolArgumentsComment(tools map[string]any
 	comment.WriteString(indent + "# Copilot CLI tool arguments (sorted):\n")
 
 	// Group flag-value pairs for better readability
-	for i := 0; i < len(toolArgs); i += 2 {
-		if i+1 < len(toolArgs) {
-			fmt.Fprintf(&comment, "%s# %s %s\n", indent, toolArgs[i], toolArgs[i+1])
+	var flag string
+	expectValue := false
+	for _, arg := range toolArgs {
+		if !expectValue {
+			flag = arg
+			expectValue = true
+			continue
 		}
+		fmt.Fprintf(&comment, "%s# %s %s\n", indent, flag, arg)
+		expectValue = false
 	}
 
 	return comment.String()

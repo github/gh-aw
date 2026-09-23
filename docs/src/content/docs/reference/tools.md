@@ -125,7 +125,7 @@ tools:
 
 **Note:** Some engines require third-party Model Context Protocol (MCP) servers for web search. See [Using Web Search](/gh-aw/reference/web-search/).
 
-For the **Codex** and **Claude** engines, `web-search:` is disabled by default. Web search is only enabled when `web-search:` is explicitly declared in the `tools:` block. Without this declaration, Codex runs with `-c web_search="disabled"` and Claude does not receive the `WebSearch` tool.
+For the **Codex**, **Claude**, and **Copilot** engines, `web-search:` is disabled by default. Web search is only enabled when `web-search:` is explicitly declared in the `tools:` block. Without this declaration, Codex runs with `-c web_search="disabled"`, Claude does not receive the `WebSearch` tool, and Copilot CLI is not granted `--allow-tool web_search`.
 
 ### Playwright Tool (`playwright:`)
 
