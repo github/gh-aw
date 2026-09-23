@@ -36,11 +36,20 @@ KEY_TMP="$(mktemp)"
 trap 'rm -f "${KEY_TMP}"' EXIT
 # runner-guard:ignore RGS-012 -- fetches Docker's GPG signing key to a temporary file (never piped to a shell); the key fingerprint is verified before it is used to verify the signed-by apt repository below.
 curl -fsSL "https://download.docker.com/linux/${DISTRO_ID}/gpg" -o "${KEY_TMP}"
-KEY_FINGERPRINT="$(gpg --show-keys --with-colons "${KEY_TMP}" | awk -F: '$1 == "fpr" { print $10; exit }')"
-if [[ "${KEY_FINGERPRINT}" != "${DOCKER_GPG_FINGERPRINT}" ]]; then
-  echo "Downloaded Docker GPG key fingerprint does not match the expected fingerprint." >&2
+mapfile -t KEY_FINGERPRINTS < <(
+  gpg --show-keys --with-colons "${KEY_TMP}" \
+    | awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; primary = 0 }'
+)
+if (( ${#KEY_FINGERPRINTS[@]} == 0 )); then
+  echo "Downloaded Docker GPG key contains no primary key fingerprint." >&2
   exit 1
 fi
+for key_fingerprint in "${KEY_FINGERPRINTS[@]}"; do
+  if [[ "${key_fingerprint}" != "${DOCKER_GPG_FINGERPRINT}" ]]; then
+    echo "Downloaded Docker GPG key fingerprint does not match the expected fingerprint." >&2
+    exit 1
+  fi
+done
 sudo install -m 0644 "${KEY_TMP}" "${KEYRING_PATH}"
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=${KEYRING_PATH}] https://download.docker.com/linux/${DISTRO_ID} ${DISTRO_CODENAME} stable" \

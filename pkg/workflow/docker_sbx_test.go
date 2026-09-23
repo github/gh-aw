@@ -726,7 +726,8 @@ func TestDockerSbxShellScriptContent(t *testing.T) {
 			contains: []string{
 				"sudo", "apt-get install", "docker-sbx", "sbx version", "/dev/kvm",
 				"DOCKER_GPG_FINGERPRINT", "gpg --show-keys", "mktemp", "signed-by=",
-				"VERSION_CODENAME", "download.docker.com",
+				"VERSION_CODENAME", "download.docker.com", "mapfile -t KEY_FINGERPRINTS",
+				"${#KEY_FINGERPRINTS[@]} == 0", `for key_fingerprint in "${KEY_FINGERPRINTS[@]}"`,
 			},
 			notContains: []string{"get.docker.com", "| sudo REPO_ONLY=1 sh"},
 		},
