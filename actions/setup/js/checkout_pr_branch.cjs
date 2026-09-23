@@ -214,12 +214,12 @@ function logCheckoutStrategy(eventName, strategy, reason) {
 
 /**
  * Ensure checkout step only runs in trusted runtime contexts.
- * - repository must not be a fork
+ * - workflow_dispatch PR replay must not run in a forked repository
  * - triggering actor must have write-or-higher repository permission
  */
 async function assertTrustedCheckoutRuntime() {
   const repository = context.payload.repository;
-  if (repository?.fork === true) {
+  if (context.eventName === "workflow_dispatch" && repository?.fork === true) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
   }
 
@@ -232,7 +232,7 @@ async function assertTrustedCheckoutRuntime() {
 
   // Bot and app actors (e.g. Copilot, dependabot[bot]) are not regular GitHub
   // users and cannot be resolved via the collaborators API (returns 404).
-  // Trust them implicitly: the non-fork repository check above already ensures
+  // Trust them implicitly: the workflow_dispatch repository check above ensures
   // the workflow is running in a controlled context.
   const senderType = context.payload.sender?.type;
   if (senderType === "Bot") {

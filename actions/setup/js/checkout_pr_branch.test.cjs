@@ -270,15 +270,15 @@ If the pull request is still open, verify that:
     });
 
     describe("runtime checkout safety assertions", () => {
-      it("should fail when runtime repository context is a fork", async () => {
+      it("should allow a same-repository PR when the runtime repository is itself a fork", async () => {
         mockContext.payload.repository.fork = true;
 
         await runScript();
 
-        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
-        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
-        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
-        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout in forked repository runtime context"));
+        expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
+        expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
       });
 
       it("should fail when actor does not have write-or-higher permission", async () => {
@@ -633,6 +633,17 @@ If the pull request is still open, verify that:
 
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should refuse PR replay when the runtime repository is a fork", async () => {
+      mockContext.payload.repository.fork = true;
+
+      await runScript();
+
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout in forked repository runtime context"));
     });
 
     it("should skip checkout when aw_context item_type is not pull_request", async () => {
