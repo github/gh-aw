@@ -187,11 +187,14 @@ Create an issue.
 // guarding against regressions in the pattern declared in main_workflow_schema.json.
 func TestFailureIssueRepoSchemaValidation(t *testing.T) {
 	tests := []struct {
-		name  string
-		value string
+		name      string
+		value     string
+		expectErr bool
 	}{
 		{name: "literal owner/repo", value: "github/docs-engineering"},
 		{name: "templatable expression", value: "${{ inputs.failure-issue-repo }}"},
+		{name: "expression pair containing a literal slash", value: "${{ inputs.owner }}/${{ inputs.repo }}"},
+		{name: "malformed literal is rejected", value: "not-a-valid-repo", expectErr: true},
 	}
 
 	for _, tt := range tests {
@@ -227,6 +230,11 @@ Create an issue.
 
 			compiler := NewCompiler()
 			err := compiler.CompileWorkflow(testFile)
+			if tt.expectErr {
+				require.Error(t, err, "Workflow with invalid safe-outputs.failure-issue-repo should fail to compile")
+				require.Contains(t, err.Error(), "failure-issue-repo", "Error should identify the offending field")
+				return
+			}
 			require.NoError(t, err, "Workflow with safe-outputs.failure-issue-repo should compile without errors")
 		})
 	}

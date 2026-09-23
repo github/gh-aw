@@ -21564,7 +21564,9 @@ safe-outputs:
 
   # Repository to create failure tracking issues in, in the format 'owner/repo'.
   # Useful when the current repository has issues disabled. Defaults to the current
-  # repository.
+  # repository. Supports GitHub Actions expressions (e.g. '${{
+  # inputs.failure-issue-repo }}') so reusable workflows can let callers configure
+  # this at runtime.
   # (optional)
   failure-issue-repo: "example-value"
 

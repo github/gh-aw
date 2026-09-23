@@ -12349,17 +12349,8 @@
         },
         "failure-issue-repo": {
           "description": "Repository to create failure tracking issues in, in the format 'owner/repo'. Useful when the current repository has issues disabled. Defaults to the current repository. Supports GitHub Actions expressions (e.g. '${{ inputs.failure-issue-repo }}') so reusable workflows can let callers configure this at runtime.",
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^[^/]+/[^/]+$"
-            },
-            {
-              "type": "string",
-              "pattern": "^\\$\\{\\{.*\\}\\}$",
-              "description": "GitHub Actions expression that resolves to an 'owner/repo' string at runtime"
-            }
-          ],
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$|^\\$\\{\\{.*\\}\\}$",
           "examples": ["github/docs-engineering", "myorg/infra-alerts", "${{ inputs.failure-issue-repo }}"]
         },
         "report-failed-jobs": {

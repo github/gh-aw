@@ -1842,6 +1842,8 @@ safe-outputs:
 
 The value must be in `owner/repo` format, or a GitHub Actions expression that resolves to that format at runtime (e.g. `${{ inputs.failure-issue-repo }}` for a reusable workflow). The `GITHUB_TOKEN` used must have permission to create issues in the target repository. When not set, failure issues are created in the current repository.
 
+A literal `owner/repo` value is trusted compile-time configuration and may point at any repository. A value that comes from an expression is resolved at runtime from caller-supplied data, so it is validated before use: it must belong to the same owner as the repository running the workflow, otherwise it is ignored (with a warning) and failure issues are created in the current repository.
+
 ### Group Reports (`group-reports:`)
 
 Controls whether failed workflow runs are grouped under a parent "[aw] Failed runs" issue. This is opt-in and defaults to `false`.
