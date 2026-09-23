@@ -29,7 +29,9 @@ on:
           }
           core.info(`has_changes=${hasChanges}`);
           core.setOutput('has_changes', hasChanges ? 'true' : 'false');
-max-daily-ai-credits: 10000
+max-daily-ai-credits:
+  value: 10000
+  backend: repo-memory
 permissions:
   contents: read
   issues: read

@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -245,6 +246,168 @@ func TestBuildPullAWFContainersStepPropagatesFeatures(t *testing.T) {
 			t.Error("Expected no cli-proxy image in pull step when cli-proxy feature flag is not set")
 		}
 	})
+}
+
+func TestBuildThreatDetectionWorkflowDataPropagatesImageOverrides(t *testing.T) {
+	images := map[string]string{
+		awfImageRoleSquid:    "mirror.example.com/awf/squid:v1@sha256:" + strings.Repeat("a", 64),
+		awfImageRoleAgent:    "mirror.example.com/awf/agent:v1@sha256:" + strings.Repeat("b", 64),
+		awfImageRoleAPIProxy: "mirror.example.com/awf/api-proxy:v1@sha256:" + strings.Repeat("c", 64),
+	}
+	containerPins := map[string]string{
+		"ghcr.io/github/gh-aw-firewall/squid:v1": images[awfImageRoleSquid],
+	}
+	data := &WorkflowData{
+		AI: "copilot",
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{
+				Type:   SandboxTypeAWF,
+				Images: images,
+			},
+		},
+		ContainerPinMappings: containerPins,
+	}
+
+	detectionData := buildThreatDetectionWorkflowData(data, "")
+
+	for role, image := range images {
+		if detectionData.SandboxConfig.Agent.Images[role] != image {
+			t.Errorf("detection image %q = %q, want %q", role, detectionData.SandboxConfig.Agent.Images[role], image)
+		}
+	}
+	for source, target := range containerPins {
+		if detectionData.ContainerPinMappings[source] != target {
+			t.Errorf("detection container pin %q = %q, want %q", source, detectionData.ContainerPinMappings[source], target)
+		}
+	}
+
+	detectionData.SandboxConfig.Agent.Images[awfImageRoleSquid] = "changed"
+	detectionData.ContainerPinMappings["ghcr.io/github/gh-aw-firewall/squid:v1"] = "changed"
+	if images[awfImageRoleSquid] == "changed" {
+		t.Error("detection image overrides must not alias the parent map")
+	}
+	if containerPins["ghcr.io/github/gh-aw-firewall/squid:v1"] == "changed" {
+		t.Error("detection container pin mappings must not alias the parent map")
+	}
+}
+
+func TestBuildPullAWFContainersStepUsesSandboxAgentImages(t *testing.T) {
+	compiler := NewCompiler()
+	mirrorRegistry := "mirror.example.com/awf/"
+	data := &WorkflowData{
+		AI: "copilot",
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{
+				Type: SandboxTypeAWF,
+				Images: map[string]string{
+					awfImageRoleSquid:    mirrorRegistry + "squid:v1@sha256:" + strings.Repeat("a", 64),
+					awfImageRoleAgent:    mirrorRegistry + "agent:v1@sha256:" + strings.Repeat("b", 64),
+					awfImageRoleAPIProxy: mirrorRegistry + "api-proxy:v1@sha256:" + strings.Repeat("c", 64),
+				},
+			},
+		},
+	}
+
+	steps := strings.Join(compiler.buildPullAWFContainersStep(data), "")
+
+	if !strings.Contains(steps, mirrorRegistry) {
+		t.Errorf("expected detection pull step to use sandbox.agent.images overrides; got:\n%s", steps)
+	}
+	if strings.Contains(steps, constants.DefaultFirewallRegistry) {
+		t.Errorf("expected detection pull step not to use default AWF registry; got:\n%s", steps)
+	}
+}
+
+func TestBuildPullAWFContainersStepUsesContainerPinMappings(t *testing.T) {
+	compiler := NewCompiler()
+	source := constants.DefaultFirewallRegistry + "/squid:1.2.3"
+	target := "mirror.example.com/awf/squid:1.2.3@sha256:" + strings.Repeat("a", 64)
+	data := &WorkflowData{
+		AI: "copilot",
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{
+				Type:    SandboxTypeAWF,
+				Version: "v1.2.3",
+			},
+		},
+		ContainerPinMappings: map[string]string{
+			source: target,
+		},
+	}
+
+	steps := strings.Join(compiler.buildPullAWFContainersStep(data), "")
+
+	if !strings.Contains(steps, target) {
+		t.Errorf("expected detection pull step to use container_pins mapping %q; got:\n%s", target, steps)
+	}
+	if strings.Contains(steps, source) {
+		t.Errorf("expected detection pull step not to use mapped source image %q; got:\n%s", source, steps)
+	}
+}
+
+func TestBuildThreatDetectionAWFConfigUsesContainerPinMappings(t *testing.T) {
+	const version = "1.2.3"
+	containerPins := map[string]string{}
+	expectedImages := map[string]string{}
+	for i, role := range []string{awfImageRoleSquid, awfImageRoleAgent, awfImageRoleAPIProxy} {
+		source := defaultAWFImageForRole(role, version)
+		target := "mirror.example.com/awf/" + strings.TrimPrefix(source, constants.DefaultFirewallRegistry+"/") +
+			"@sha256:" + strings.Repeat(string(rune('a'+i)), 64)
+		containerPins[source] = target
+		expectedImages[role] = target
+	}
+	data := &WorkflowData{
+		AI: "copilot",
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true, Version: version},
+		},
+		ContainerPinMappings: containerPins,
+	}
+
+	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName:     "copilot",
+		AllowedDomains: "github.com",
+		WorkflowData:   buildThreatDetectionWorkflowData(data, ""),
+	})
+	if err != nil {
+		t.Fatalf("BuildAWFConfigJSON() error = %v", err)
+	}
+
+	var config struct {
+		Container AWFContainerConfig `json:"container"`
+	}
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		t.Fatalf("unmarshal AWF config: %v", err)
+	}
+	if config.Container.ImageTag != "" {
+		t.Errorf("detection imageTag = %q, want empty when mapped images are emitted", config.Container.ImageTag)
+	}
+	for role, target := range expectedImages {
+		if config.Container.Images[role] != target {
+			t.Errorf("detection runtime image %q = %q, want %q", role, config.Container.Images[role], target)
+		}
+	}
+	if strings.Contains(configJSON, constants.DefaultFirewallRegistry) {
+		t.Errorf("detection AWF config must not use the default registry when all required roles are mapped: %s", configJSON)
+	}
+}
+
+func TestBuildThreatDetectionContainerImagesRequiresPinnedOptionalRoles(t *testing.T) {
+	const version = "1.2.3"
+	data := &WorkflowData{
+		RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true, Version: version},
+		},
+		ContainerPinMappings: map[string]string{
+			defaultAWFImageForRole(awfImageRoleSquid, version): "mirror.example.com/awf/squid:" + version +
+				"@sha256:" + strings.Repeat("a", 64),
+		},
+	}
+
+	if images := buildThreatDetectionContainerImages(data); images != nil {
+		t.Errorf("buildThreatDetectionContainerImages() = %v, want nil for unpinned buildTools role", images)
+	}
 }
 
 func TestBuildPullAWFContainersStepPropagatesRunnerTopology(t *testing.T) {

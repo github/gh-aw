@@ -4026,22 +4026,6 @@ async function main() {
     });
     const actionFailureIssueExpiresHours = getActionFailureIssueExpiresHours();
 
-    // Check if parent issue creation is enabled (defaults to false)
-    const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
-
-    // Ensure parent issue exists first (only if enabled)
-    let parentIssue;
-    if (groupReports) {
-      try {
-        parentIssue = await ensureParentIssue(null, owner, repo, actionFailureIssueExpiresHours);
-      } catch (error) {
-        core.warning(`Could not create parent issue, proceeding without parent: ${getErrorMessage(error)}`);
-        // Continue without parent issue
-      }
-    } else {
-      core.info("Parent issue creation is disabled (group-reports: false)");
-    }
-
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
     const issueTitle = buildFailureIssueTitle({
@@ -4162,6 +4146,22 @@ async function main() {
       if (!shouldCreateIssue) {
         return;
       }
+    }
+
+    // Check if parent issue creation is enabled (defaults to false)
+    const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
+
+    // Ensure parent issue exists first (only if enabled)
+    let parentIssue;
+    if (groupReports) {
+      try {
+        parentIssue = await ensureParentIssue(null, owner, repo, actionFailureIssueExpiresHours);
+      } catch (error) {
+        core.warning(`Could not create parent issue, proceeding without parent: ${getErrorMessage(error)}`);
+        // Continue without parent issue
+      }
+    } else {
+      core.info("Parent issue creation is disabled (group-reports: false)");
     }
 
     core.info(`Checking for existing issue with precise failure metadata for title: "${issueTitle}"`);

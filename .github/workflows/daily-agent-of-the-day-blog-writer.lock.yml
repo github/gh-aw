@@ -128,6 +128,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -487,6 +488,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -1400,6 +1402,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -1727,6 +1730,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2016,6 +2020,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2287,6 +2292,7 @@ jobs:
           sparse-checkout: |
             actions/setup
           sparse-checkout-cone-mode: true
+          fetch-depth: 1
           clean: false
           persist-credentials: false
 
@@ -2309,6 +2315,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2370,6 +2377,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2432,6 +2440,7 @@ jobs:
           sparse-checkout: |
             actions/setup
           sparse-checkout-cone-mode: true
+          fetch-depth: 1
           clean: false
           persist-credentials: false
 
@@ -2440,10 +2449,11 @@ jobs:
       - activation
       - agent
       - detection
+      - evals
       - safe_outputs
     if: >
       always() && (!cancelled()) && (needs.detection.result == 'success' || needs.detection.result == 'skipped') &&
-      needs.agent.result == 'success'
+      needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
     permissions:
       contents: write
@@ -2461,6 +2471,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2534,6 +2545,7 @@ jobs:
           sparse-checkout: |
             actions/setup
           sparse-checkout-cone-mode: true
+          fetch-depth: 1
           clean: false
           persist-credentials: false
 
@@ -2589,6 +2601,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2690,6 +2703,7 @@ jobs:
           sparse-checkout: |
             actions/setup
           sparse-checkout-cone-mode: true
+          fetch-depth: 1
           clean: false
           persist-credentials: false
 
@@ -2714,6 +2728,7 @@ jobs:
           repository: github/gh-aw
           sparse-checkout: |
             actions
+          fetch-depth: 1
           clean: false
           persist-credentials: false
       - name: Setup Scripts
@@ -2800,5 +2815,6 @@ jobs:
           sparse-checkout: |
             actions/setup
           sparse-checkout-cone-mode: true
+          fetch-depth: 1
           clean: false
           persist-credentials: false
