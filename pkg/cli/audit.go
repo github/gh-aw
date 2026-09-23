@@ -67,6 +67,7 @@ type auditAnalysisResults struct {
 	noops                   []NoopReport
 	mcpFailures             []MCPFailureReport
 	skillActivations        []SkillActivation
+	gatewaySteeringEvents   []GatewaySteeringEvent
 	accessAnalysis          *DomainAnalysis
 	firewallAnalysis        *FirewallAnalysis
 	policyAnalysis          *PolicyAnalysis

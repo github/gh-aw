@@ -68,6 +68,21 @@ func TestRenderConsoleTokenUsageWarnings(t *testing.T) {
 	assert.Contains(t, output, "fallback accounting was used")
 }
 
+func TestRenderConsoleGatewaySteeringEvents(t *testing.T) {
+	output := testutil.CaptureStderr(t, func() {
+		renderConsoleGatewaySteeringEvents([]GatewaySteeringEvent{{
+			Type:      tokenSteeringEventName,
+			Message:   "[AWF TOKEN WARNING] You are running out of AI Credits.",
+			Timestamp: "2026-09-23T12:00:00Z",
+		}})
+	})
+
+	assert.Contains(t, output, "gateway_steering_events:")
+	assert.Contains(t, output, tokenSteeringEventName)
+	assert.Contains(t, output, "running out of AI Credits")
+	assert.Contains(t, output, "2026-09-23T12:00:00Z")
+}
+
 func TestRenderAuditCompletion(t *testing.T) {
 	outputDir := t.TempDir()
 

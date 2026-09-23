@@ -129,6 +129,7 @@ type ProcessedRun struct {
 	Noops                   []NoopReport
 	MCPFailures             []MCPFailureReport
 	SkillActivations        []SkillActivation
+	GatewaySteeringEvents   []GatewaySteeringEvent
 	MCPToolUsage            *MCPToolUsageData
 	TokenUsage              *TokenUsageSummary
 	WorkingSet              *WorkingSetMetrics
@@ -137,6 +138,13 @@ type ProcessedRun struct {
 	SafeOutputs             []CreatedItemReport
 	cachedData              *RunData
 	cachedAudit             *AuditData
+}
+
+// GatewaySteeringEvent records an AI-credit or timeout warning injected by the gateway.
+type GatewaySteeringEvent struct {
+	Type      string `json:"type" console:"header:Type"`
+	Message   string `json:"message" console:"header:Message"`
+	Timestamp string `json:"timestamp,omitempty" console:"header:Timestamp,omitempty"`
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.
@@ -282,6 +290,7 @@ type RunAnalysis struct {
 	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`       // Detected skill invocations
 	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
 	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
+	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
 	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
 	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details

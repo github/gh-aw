@@ -13,7 +13,7 @@ const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { replaceTemporaryIdReferences, replaceTemporaryIdReferencesInPatch, getOrGenerateTemporaryId } = require("./temporary_id.cjs");
-const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo, resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { addExpirationToFooter } = require("./ephemerals.cjs");
 const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
@@ -507,8 +507,11 @@ async function createFallbackIssue(githubClient, repoParts, title, body, labels,
       if (status === 410) {
         const originalTarget = `${payload.owner}/${payload.repo}`;
         triedOwnerRepos.add(originalTarget.toLowerCase());
-        const failureRepo = parseRepo(process.env.GH_AW_FAILURE_ISSUE_REPO || "");
-        const workflowRepo = parseRepo(process.env.GITHUB_REPOSITORY || "");
+        const workflowRepoSlug = process.env.GITHUB_REPOSITORY || "";
+        // SEC-005: validate expression-derived failure-issue-repo values before using
+        // them as an API target (literal frontmatter values stay trusted).
+        const failureRepo = resolveFailureIssueRepo(workflowRepoSlug, message => core.warning(message));
+        const workflowRepo = parseRepo(workflowRepoSlug);
         const alt = [failureRepo, workflowRepo].find(r => r !== null && !triedOwnerRepos.has(`${r.owner}/${r.repo}`.toLowerCase()));
 
         if (alt) {

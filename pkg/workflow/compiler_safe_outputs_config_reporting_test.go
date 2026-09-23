@@ -181,6 +181,65 @@ Create an issue.
 	require.NoError(t, err, "Workflow with safe-outputs.report-failed-jobs should compile without errors")
 }
 
+// TestFailureIssueRepoSchemaValidation ensures that failure-issue-repo accepts both a
+// literal "owner/repo" string and a GitHub Actions expression (e.g. so reusable
+// workflows can let callers configure the target repo via a workflow_call input),
+// guarding against regressions in the pattern declared in main_workflow_schema.json.
+func TestFailureIssueRepoSchemaValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		expectErr bool
+	}{
+		{name: "literal owner/repo", value: "github/docs-engineering"},
+		{name: "templatable expression", value: "${{ inputs.failure-issue-repo }}"},
+		{name: "expression pair containing a literal slash", value: "${{ inputs.owner }}/${{ inputs.repo }}"},
+		{name: "malformed literal is rejected", value: "not-a-valid-repo", expectErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "failure-issue-repo-schema-test")
+
+			testContent := `---
+on:
+  workflow_call:
+    inputs:
+      failure-issue-repo:
+        description: Repository to report failures in
+        required: false
+        type: string
+        default: ''
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  create-issue:
+    max: 1
+  failure-issue-repo: ` + tt.value + `
+timeout-minutes: 5
+---
+
+# Test Workflow
+
+Create an issue.
+`
+
+			testFile := filepath.Join(tmpDir, "test-failure-issue-repo.md")
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644), "Failed to write test workflow markdown")
+
+			compiler := NewCompiler()
+			err := compiler.CompileWorkflow(testFile)
+			if tt.expectErr {
+				require.Error(t, err, "Workflow with invalid safe-outputs.failure-issue-repo should fail to compile")
+				require.Contains(t, err.Error(), "failure-issue-repo", "Error should identify the offending field")
+				return
+			}
+			require.NoError(t, err, "Workflow with safe-outputs.failure-issue-repo should compile without errors")
+		})
+	}
+}
+
 // TestDataModeConfig tests parsing of the data structured-output global field
 func TestDataModeConfig(t *testing.T) {
 	tests := []struct {

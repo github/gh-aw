@@ -33,6 +33,7 @@ func TestRunSummaryAndDownloadResultEmbedRunAnalysis(t *testing.T) {
 		"SkillActivations":        {},
 		"MCPToolUsage":            {},
 		"TokenUsage":              {},
+		"GatewaySteeringEvents":   {},
 		"GitHubRateLimitUsage":    {},
 		"JobDetails":              {},
 	}
