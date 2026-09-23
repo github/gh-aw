@@ -4505,6 +4505,77 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "runs_analyzed": {
+          "type": "integer"
+        },
+        "entries": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "integer"
+              },
+              "code": {
+                "type": "string"
+              },
+              "occurrences": {
+                "type": "integer"
+              },
+              "representative_entry": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "impact": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "category",
+                  "severity",
+                  "title",
+                  "description"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "run_id",
+              "code",
+              "occurrences",
+              "representative_entry"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runs_analyzed",
+        "entries"
+      ],
+      "additionalProperties": false
     }
   ]
 }

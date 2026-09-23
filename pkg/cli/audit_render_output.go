@@ -29,6 +29,9 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 			return err
 		}
 	}
+	if opts.Group {
+		return nil
+	}
 	if err := renderAuditOutput(auditData, runOutputDir, opts.JSONOutput, opts.Verbose); err != nil {
 		return err
 	}

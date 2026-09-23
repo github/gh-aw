@@ -78,6 +78,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		variantFilter:          opts.VariantFilter,
 		runtimeFilter:          opts.RuntimeFilter,
 		evalsOnly:              opts.EvalsOnly,
+		group:                  opts.Group,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
 }
@@ -158,6 +159,7 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 		Parse:      cfg.parse,
 		JSONOutput: cfg.jsonOutput,
 		EvalsOnly:  cfg.evalsOnly,
+		Group:      cfg.group,
 	}
 }
 

@@ -52,6 +52,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime gvisor   # Skip run unless sandbox agent runtime matches`
 
 type auditCommandOptions struct {
@@ -67,6 +68,7 @@ type auditCommandOptions struct {
 	variantFilter    string
 	runtimeFilter    string
 	evalsOnly        bool
+	group            bool
 }
 
 // NewAuditCommand creates the audit command
@@ -96,6 +98,7 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("variant", "", "Filter to runs with a specific variant value (requires --experiment)")
 	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., gvisor, docker-sbx, cloud-hypervisor)")
 	cmd.Flags().Bool("evals", false, "Filter to runs containing evals results (evals.jsonl); automatically downloads the usage artifact (which includes evals) when --artifacts is narrowed")
+	cmd.Flags().Bool("group", false, "Group audit findings by run and finding code, including occurrence counts and a representative entry")
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
@@ -109,8 +112,12 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
+	if opts.group {
+		return runAuditGrouped(cmd.Context(), args, opts)
+	}
 	if len(args) == 1 {
-		return runAuditSingle(cmd.Context(), args[0], opts)
+		runArg, _ := firstAuditArg(args)
+		return runAuditSingle(cmd.Context(), runArg, opts)
 	}
 	if opts.evalsOnly {
 		return errors.New(console.FormatErrorWithSuggestions(
@@ -135,6 +142,7 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.variantFilter, _ = cmd.Flags().GetString("variant")
 	opts.runtimeFilter, _ = cmd.Flags().GetString("runtime")
 	opts.evalsOnly, _ = cmd.Flags().GetBool("evals")
+	opts.group, _ = cmd.Flags().GetBool("group")
 	if opts.variantFilter != "" && opts.experimentFilter == "" {
 		return auditCommandOptions{}, errors.New(console.FormatErrorWithSuggestions(
 			"--variant requires --experiment to be specified",
@@ -210,6 +218,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		VariantFilter:    opts.variantFilter,
 		RuntimeFilter:    opts.runtimeFilter,
 		EvalsOnly:        opts.evalsOnly,
+		Group:            opts.group,
 	})
 }
 
@@ -217,13 +226,20 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 	if repoFlag == "" || components.Owner != "" {
 		return nil
 	}
-	parts := strings.SplitN(repoFlag, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	owner, repo, ok := strings.Cut(repoFlag, "/")
+	if !ok || owner == "" || repo == "" {
 		return fmt.Errorf("invalid repository format '%s': expected 'owner/repo'", repoFlag)
 	}
-	components.Owner = parts[0]
-	components.Repo = parts[1]
+	components.Owner = owner
+	components.Repo = repo
 	return nil
+}
+
+func firstAuditArg(args []string) (string, bool) {
+	for _, arg := range args {
+		return arg, true
+	}
+	return "", false
 }
 
 // runAuditMulti handles the multi-run diff mode for the audit command.
@@ -232,9 +248,16 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 // URL — job and step specificity is silently normalized to the parent run ID.
 func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir string, verbose, jsonOutput bool, format string, artifacts []string) error {
 	// Parse base run (job/step URLs are accepted; only the run number is used)
-	baseComponents, err := parser.ParseRunURLExtended(args[0])
+	baseArg, ok := firstAuditArg(args)
+	if !ok {
+		return errors.New(console.FormatErrorWithSuggestions(
+			"at least one run ID or URL is required",
+			[]string{"Provide a run ID or URL as a positional argument"},
+		))
+	}
+	baseComponents, err := parser.ParseRunURLExtended(baseArg)
 	if err != nil {
-		return fmt.Errorf("invalid base run %q: %w", args[0], err)
+		return fmt.Errorf("invalid base run %q: %w", baseArg, err)
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL
@@ -248,7 +271,12 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 	// Parse comparison run IDs (job/step URLs are accepted; only the run number is used)
 	seen := make(map[int64]bool)
 	compareRunIDs := make([]int64, 0, len(args)-1)
-	for _, arg := range args[1:] {
+	skippedBase := false
+	for _, arg := range args {
+		if !skippedBase {
+			skippedBase = true
+			continue
+		}
 		c, err := parser.ParseRunURLExtended(arg)
 		if err != nil {
 			return fmt.Errorf("invalid comparison run %q: %w", arg, err)

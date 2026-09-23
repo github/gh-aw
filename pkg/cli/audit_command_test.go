@@ -111,6 +111,7 @@ func TestGetAuditCommandOptions(t *testing.T) {
 		assert.Equal(t, "pretty", opts.format)
 		assert.False(t, opts.parse)
 		assert.False(t, opts.evalsOnly)
+		assert.False(t, opts.group)
 		assert.Empty(t, opts.artifacts)
 	})
 
@@ -154,7 +155,7 @@ func TestGetAuditCommandOptions(t *testing.T) {
 func TestRegisterAuditCommandFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewAuditCommand()
-	for _, name := range []string{"output", "json", "repo", "parse", "format", "artifacts", "stdin", "experiment", "variant", "runtime", "evals"} {
+	for _, name := range []string{"output", "json", "repo", "parse", "format", "artifacts", "stdin", "experiment", "variant", "runtime", "evals", "group"} {
 		assert.NotNil(t, cmd.Flags().Lookup(name), "expected flag %q to be registered", name)
 	}
 }
