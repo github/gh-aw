@@ -631,7 +631,7 @@ Daily AIC guardrail with repo-memory ledger`
 	cloneIdx := strings.Index(lockStr, "Clone daily AIC repo-memory ledger for hydration")
 	resetIdx := strings.Index(lockStr, "Reset untrusted daily AIC repo-memory ledger artifact")
 	hydrateIdx := strings.Index(lockStr, "Hydrate daily AIC repo-memory ledger from trusted branch")
-	if cloneIdx < 0 || resetIdx < 0 || hydrateIdx < 0 || !(cloneIdx < resetIdx && resetIdx < hydrateIdx && hydrateIdx < appendIdx) {
+	if cloneIdx < 0 || resetIdx < 0 || hydrateIdx < 0 || cloneIdx >= resetIdx || resetIdx >= hydrateIdx || hydrateIdx >= appendIdx {
 		t.Fatal("expected the ledger to be hydrated from a trusted branch clone (in order: clone, reset, hydrate, append) so accumulated history is not discarded")
 	}
 	if !strings.Contains(lockStr, "cp -a \"$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger/.\" \"$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger/\"") {

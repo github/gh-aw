@@ -46,8 +46,11 @@ describe("daily_aic_repo_memory_ledger", () => {
 
   it("appends current run AIC to the current UTC bucket", () => {
     const repoMemoryDir = path.join(directory, "memory");
+    const rawUsageDir = path.join(directory, "raw");
     const usageDir = path.join(directory, "usage");
+    fs.mkdirSync(rawUsageDir, { recursive: true });
     fs.mkdirSync(usageDir, { recursive: true });
+    fs.writeFileSync(path.join(rawUsageDir, "agent_usage.jsonl"), `${JSON.stringify({ aic: 100 })}\n`, "utf8");
     fs.writeFileSync(path.join(usageDir, "agent_usage.jsonl"), `${JSON.stringify({ aic: 3 })}\n${JSON.stringify({ usage: { aic: 4 } })}\n`, "utf8");
     process.env.GITHUB_RUN_ID = "42";
     process.env.GITHUB_REPOSITORY = "owner/repo";

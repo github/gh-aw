@@ -23,7 +23,13 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(prefix, hasEvals, c.getActionPin)...)
 	ledgerDir := dailyAICRepoMemoryDir(entry)
 	hydrationDir := dailyAICLedgerHydrationDir(entry)
-	steps = append(steps,
+	steps = append(steps, buildDailyAICRepoMemoryHydrationSteps(entry, ledgerDir, hydrationDir)...)
+	steps = append(steps, buildDailyAICRepoMemoryAppendStep(data, ledgerDir))
+	return steps
+}
+
+func buildDailyAICRepoMemoryHydrationSteps(entry RepoMemoryEntry, ledgerDir, hydrationDir string) []string {
+	return []string{
 		"      - name: Collect daily AIC repo-memory usage files\n",
 		"        if: always()\n",
 		"        continue-on-error: true\n",
@@ -50,12 +56,15 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s\n", ledgerDir),
 		fmt.Sprintf("          GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR: %s\n", hydrationDir),
-		"        run: |\n"+
-			"          mkdir -p \"$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger\"\n"+
-			"          if [ -d \"$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger\" ]; then\n"+
-			"            cp -a \"$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger/.\" \"$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger/\"\n"+
+		"        run: |\n" +
+			"          mkdir -p \"$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger\"\n" +
+			"          if [ -d \"$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger\" ]; then\n" +
+			"            cp -a \"$GH_AW_DAILY_AIC_LEDGER_SOURCE_DIR/daily-aic-ledger/.\" \"$GH_AW_DAILY_AIC_REPO_MEMORY_DIR/daily-aic-ledger/\"\n" +
 			"          fi\n",
-	)
+	}
+}
+
+func buildDailyAICRepoMemoryAppendStep(data *WorkflowData, ledgerDir string) string {
 	var builder strings.Builder
 	builder.WriteString("      - name: Append daily AIC repo-memory ledger\n")
 	builder.WriteString("        if: always()\n")
@@ -74,6 +83,5 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 	builder.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	builder.WriteString("            const { appendCurrentRunLedgerEntry } = require('" + SetupActionDestination + "/daily_aic_repo_memory_ledger.cjs');\n")
 	builder.WriteString("            appendCurrentRunLedgerEntry();\n")
-	steps = append(steps, builder.String())
-	return steps
+	return builder.String()
 }

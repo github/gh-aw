@@ -8,6 +8,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const LEDGER_SUBDIR = "daily-aic-ledger";
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const USAGE_ROOT = "/tmp/gh-aw";
+const USAGE_STAGING_ROOT = path.join(USAGE_ROOT, "usage");
 
 function repoMemoryDirOrThrow(repoMemoryDir = process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR) {
   const resolved = typeof repoMemoryDir === "string" ? repoMemoryDir.trim() : "";
@@ -88,7 +89,7 @@ function appendLedgerEntry(entry, repoMemoryDir, now = Date.now()) {
 /**
  * @param {{ repoMemoryDir?: string, usageRoot?: string, now?: number }} [options]
  */
-function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_ROOT, now = Date.now() } = {}) {
+function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_STAGING_ROOT, now = Date.now() } = {}) {
   const runId = Number(process.env.GITHUB_RUN_ID || 0);
   const repository = process.env.GITHUB_REPOSITORY || "";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || process.env.GITHUB_WORKFLOW || "";
@@ -122,6 +123,7 @@ function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_ROOT, no
 module.exports = {
   LEDGER_SUBDIR,
   WINDOW_MS,
+  USAGE_STAGING_ROOT,
   appendCurrentRunLedgerEntry,
   appendLedgerEntry,
   ledgerReadPaths,
