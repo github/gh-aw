@@ -54,10 +54,16 @@ Use `--strict` for production-quality validation.
 
 Run `gh aw list` from the repository root and check the `COMPILED` column. `No` means the source frontmatter does not match the existing `.lock.yml`; `N/A` means the lock file is missing.
 
-For an automated check, use `--stale` to list only workflows with stale or missing lock files:
+To inspect stale or missing lock files interactively, use `--stale`:
 
 ```bash
 gh aw list --stale
+```
+
+For an automated check that fails when any lock file is stale or missing, use:
+
+```bash
+gh aw list --json | jq -e 'all(.[]; .compiled == "Yes")'
 ```
 
 Recompile any stale workflows and commit each generated `.lock.yml` with its source:
