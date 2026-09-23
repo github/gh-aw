@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { findJSONLFiles, sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
+const { findJSONLFiles, isDailyAICUsageJSONLFile, sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const LEDGER_SUBDIR = "daily-aic-ledger";
@@ -97,7 +97,7 @@ function appendCurrentRunLedgerEntry({ repoMemoryDir, usageRoot = USAGE_ROOT, no
     core.warning("[daily-workflow-aic] Skipping repo-memory ledger write: missing run, repository, or workflow identity.");
     return;
   }
-  const usageFiles = findJSONLFiles(usageRoot).filter(file => /(?:^|[/\\])(?:agent_usage|detection_usage|evals|token_usage)[^/\\]*\.jsonl$/.test(file));
+  const usageFiles = findJSONLFiles(usageRoot).filter(isDailyAICUsageJSONLFile);
   const aic = sumAICFromUsageJSONLFiles(usageFiles);
   if (!Number.isFinite(aic) || aic < 0) {
     core.warning(`[daily-workflow-aic] Skipping repo-memory ledger write: computed AIC is ${aic}.`);

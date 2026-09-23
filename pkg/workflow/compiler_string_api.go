@@ -153,6 +153,7 @@ func (c *Compiler) ParseWorkflowString(content string, virtualPath string) (*Wor
 	// Build initial workflow data structure
 	workflowData := c.buildInitialWorkflowData(parseResult.frontmatterResult, toolsResult, engineSetup, engineSetup.importsResult)
 	workflowData.WorkflowID = GetWorkflowIDFromPath(cleanPath)
+	resolveMaxDailyAICBackendIntoWorkflowData(workflowData, parseResult.frontmatterResult.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 
 	// Validate bash tool configuration
 	if err := validateBashToolConfig(workflowData.ParsedTools, workflowData.Name); err != nil {

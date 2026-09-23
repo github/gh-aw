@@ -136,6 +136,13 @@ func resolveMaxDailyAICBackend(frontmatter map[string]any, importedJSON string) 
 	return backend
 }
 
+func resolveMaxDailyAICBackendIntoWorkflowData(data *WorkflowData, frontmatter map[string]any, importedJSON string) {
+	if data == nil {
+		return
+	}
+	data.MaxDailyAICBackend = resolveMaxDailyAICBackend(frontmatter, importedJSON)
+}
+
 // parseMaxDailyAICValue normalizes max-daily-ai-credits
 // values into a runtime-ready string.
 //
@@ -258,9 +265,6 @@ func validateMaxDailyAICFrontmatter(data *WorkflowData) error {
 		return nil
 	}
 	backend, hasBackend := extractMaxDailyAICBackend(raw)
-	if data.MaxDailyAICBackend == "" {
-		data.MaxDailyAICBackend = backend
-	}
 	// Object form: require a "value" key and validate the value.
 	if m, ok := raw.(map[string]any); ok {
 		if _, hasValue := m["value"]; !hasValue {
