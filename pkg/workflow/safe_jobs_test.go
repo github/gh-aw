@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1112,4 +1113,124 @@ func TestMergeSafeJobsFromIncludedConfigsRejectsMacOSRunner(t *testing.T) {
 }`})
 
 	require.ErrorContains(t, err, "safe-outputs.jobs.notify.runs-on")
+}
+
+func TestParseSafeJobsConfigArtifacts(t *testing.T) {
+	c := NewCompiler()
+
+	t.Run("valid artifacts are parsed", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{
+					"/tmp/gh-aw/agent/review-bundles/",
+					"/tmp/gh-aw/agent/review-bundles/*.json",
+				},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists, "Expected 'publish' job to exist")
+		require.Equal(t, []string{
+			"/tmp/gh-aw/agent/review-bundles/",
+			"/tmp/gh-aw/agent/review-bundles/*.json",
+		}, job.Artifacts)
+		require.NoError(t, job.artifactsError)
+	})
+
+	t.Run("path outside /tmp/gh-aw/ is rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{"/tmp/other/path"},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+		require.ErrorContains(t, job.artifactsError, "/tmp/gh-aw/")
+	})
+
+	t.Run("non-string entry is rejected", func(t *testing.T) {
+		result := c.parseSafeJobsConfig(map[string]any{
+			"publish": map[string]any{
+				"artifacts": []any{123},
+			},
+		})
+
+		job, exists := result["publish"]
+		require.True(t, exists)
+		require.Error(t, job.artifactsError)
+	})
+}
+
+func TestBuildSafeJobsRejectsInvalidArtifacts(t *testing.T) {
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			Jobs: map[string]*SafeJobConfig{
+				"publish": {
+					Inputs: map[string]*InputDefinition{
+						"message": {Description: "msg", Type: "string"},
+					},
+				},
+			},
+		},
+	}
+	data.SafeOutputs.Jobs["publish"].artifactsError = errors.New("bad artifact")
+
+	c := NewCompiler()
+	_, err := c.buildSafeJobs(data, false)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid artifacts for safe-job 'publish'")
+}
+
+func TestCollectSafeJobArtifactPaths(t *testing.T) {
+	paths := collectSafeJobArtifactPaths(map[string]*SafeJobConfig{
+		"zeta": {Artifacts: []string{"/tmp/gh-aw/agent/zeta/"}},
+		"alpha": {Artifacts: []string{
+			"/tmp/gh-aw/agent/alpha/",
+			"/tmp/gh-aw/agent/alpha/extra.json",
+		}},
+	})
+
+	require.Equal(t, []string{
+		"/tmp/gh-aw/agent/alpha/",
+		"/tmp/gh-aw/agent/alpha/extra.json",
+		"/tmp/gh-aw/agent/zeta/",
+	}, paths)
+}
+
+func TestCompileSafeJobArtifactsIncludedInAgentUpload(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "safe-job-artifacts")
+	workflowPath := filepath.Join(tmpDir, "safe-job-artifacts.md")
+	content := `---
+on: workflow_dispatch
+permissions: read-all
+engine: copilot
+safe-outputs:
+  jobs:
+    publish-review-bundle:
+      description: "Publish a prepared directory as a workflow artifact"
+      runs-on: ubuntu-latest
+      artifacts:
+        - /tmp/gh-aw/agent/review-bundles/
+      inputs:
+        source_dir:
+          description: "Directory containing prepared files"
+          required: true
+          type: string
+      steps:
+        - run: echo hi
+---
+
+# Test
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o644))
+
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+
+	compiled, err := os.ReadFile(filepath.Join(tmpDir, "safe-job-artifacts.lock.yml"))
+	require.NoError(t, err)
+	agentJob := extractJobSection(string(compiled), "agent")
+	require.Contains(t, agentJob, "/tmp/gh-aw/agent/review-bundles/")
 }

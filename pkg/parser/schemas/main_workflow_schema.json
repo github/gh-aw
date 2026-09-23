@@ -12056,6 +12056,14 @@
                   "type": "string",
                   "description": "Agent output field to use as input for this safe job (alias for output)"
                 },
+                "artifacts": {
+                  "type": "array",
+                  "description": "Additional agent-job filesystem paths (files, directories, or globs) that this job's steps depend on. Each entry must be rooted under '/tmp/gh-aw/' (for example, a subdirectory under '/tmp/gh-aw/agent/' written by the agent). Without declaring a path here, files the agent writes outside the compiler's built-in known paths are silently dropped and never reach this job.",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/tmp/gh-aw/"
+                  }
+                },
                 "github-app": {
                   "$ref": "#/$defs/github_app",
                   "description": "GitHub App authentication. Mints a short-lived installation access token via actions/create-github-app-token. Mutually exclusive with github-token."

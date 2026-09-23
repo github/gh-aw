@@ -74,6 +74,10 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		if data.CommentMemoryConfig != nil {
 			paths = append(paths, constants.TmpCommentMemoryDir)
 		}
+		// Custom safe-outputs jobs can declare additional agent-job filesystem paths
+		// (via safe-outputs.jobs.*.artifacts) that their steps depend on. Persist them
+		// in the unified agent artifact so they survive into the downstream job.
+		paths = append(paths, collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)...)
 	}
 
 	// Collect git patch path if safe-outputs with PR operations is configured.
