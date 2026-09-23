@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.2.0  
+**Version**: 1.2.0<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-09-23  
+**Publication Date**: 2026-09-23<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document

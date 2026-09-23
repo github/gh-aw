@@ -574,7 +574,7 @@ This specification addresses five primary threat scenarios:
 | **Allowlist precedence** | `target-repo`/`allowed-repos` validation (SP6, SP7) occurs before discovery results are used and before any push | High when configured |
 | **Deferred trust** | Durable `safe.directory` trust is granted only to the resolved, allowlist-validated checkout directory at the point of the git write operations | Medium |
 
-*Residual Risk*: A spoofed `remote.origin.url` can still redirect an allowlisted operation to a different workspace directory, so the pushed content is agent-controlled — as it is for any safe output. Mitigation: configure `allowed-repos`/`allowed-github-references` so the target set is explicit, prefer `checkout:` entries (which populate the manifest and take precedence over the scan) over ad-hoc workspace clones, and rely on branch protection and review for the receiving repository.
+*Residual Risk*: A spoofed `remote.origin.url` can still redirect an allowlisted operation to a different workspace directory, so the pushed content is agent-controlled — as it is for any safe output. Two further residuals remain: a `.git` gitdir-link file may point its git directory outside the workspace even though the worktree path is confined, and pushes use the local remote name `origin` rather than a remote URL reconstructed from `GITHUB_SERVER_URL`. Mitigation: configure `allowed-repos`/`allowed-github-references` so the target set is explicit, prefer `checkout:` entries (which populate the manifest and take precedence over the scan) over ad-hoc workspace clones, and rely on branch protection and review for the receiving repository.
 
 **Repository Reference Format**
 
