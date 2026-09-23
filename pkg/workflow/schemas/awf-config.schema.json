@@ -728,13 +728,13 @@
     },
     "cloudHypervisor": {
       "type": "object",
-      "description": "Cloud Hypervisor v53.0 microVM preview configuration. Requires either container.containerRuntime: \"cloud-hypervisor\" or enclaves[].runtime: \"cloud-hypervisor\", plus previewEnabled, to execute workloads; supported only on GitHub-hosted Ubuntu x86_64 KVM runners.",
+      "description": "Cloud Hypervisor v53.0 microVM preview configuration. Requires the --container-runtime cloud-hypervisor CLI flag (or enclaves[].runtime: \"cloud-hypervisor\"), plus previewEnabled, to execute workloads; supported only on GitHub-hosted Ubuntu x86_64 KVM runners.",
       "additionalProperties": false,
       "properties": {
         "previewEnabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable the Cloud Hypervisor v53.0 workload-execution preview. Requires either container.containerRuntime: \"cloud-hypervisor\" or enclaves[].runtime: \"cloud-hypervisor\", plus a GitHub-hosted Ubuntu x86_64 KVM runner."
+          "description": "Enable the Cloud Hypervisor v53.0 workload-execution preview. Requires the --container-runtime cloud-hypervisor CLI flag (or enclaves[].runtime: \"cloud-hypervisor\"), plus a GitHub-hosted Ubuntu x86_64 KVM runner."
         },
         "mountPolicy": {
           "type": "string",
