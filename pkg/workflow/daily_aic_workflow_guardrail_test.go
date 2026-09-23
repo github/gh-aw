@@ -611,6 +611,9 @@ Daily AIC guardrail with repo-memory ledger`
 	if !strings.Contains(lockStr, "GH_AW_MAX_DAILY_AI_CREDITS_BACKEND: \"repo-memory\"") {
 		t.Fatal("expected activation guardrail to receive repo-memory backend env")
 	}
+	if !strings.Contains(lockStr, "GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC: ${{ vars.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC || 'false' }}") {
+		t.Fatal("expected repo-memory backend to require explicit insecure opt-in")
+	}
 	if !strings.Contains(lockStr, "Clone daily AIC repo-memory ledger (default)") {
 		t.Fatal("expected activation to clone repo-memory ledger")
 	}
@@ -753,5 +756,26 @@ Daily AIC guardrail with dedicated GitHub App`
 	}
 	if !strings.Contains(lockStr, `GH_AW_MAX_DAILY_AI_CREDITS: "10000"`) {
 		t.Fatal("expected activation job env to include the guardrail threshold from the object form")
+	}
+}
+
+func TestDailyAICRepoMemorySelectionAndValidation(t *testing.T) {
+	t.Parallel()
+
+	data := &WorkflowData{
+		MaxDailyAICBackend: maxDailyAICBackendRepoMemory,
+		RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{
+			{ID: "first"},
+			{ID: "second"},
+		}},
+	}
+	entry, ok := dailyAICRepoMemoryEntry(data)
+	if !ok || entry.ID != "first" {
+		t.Fatalf("expected first configured repo-memory entry, got %+v", entry)
+	}
+
+	data.RepoMemoryConfig = nil
+	if err := validateMaxDailyAICFrontmatter(data); err == nil || !strings.Contains(err.Error(), "requires tools.repo-memory") {
+		t.Fatalf("expected imported repo-memory backend to require repo-memory, got %v", err)
 	}
 }

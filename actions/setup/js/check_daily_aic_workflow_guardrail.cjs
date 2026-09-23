@@ -660,17 +660,21 @@ async function main(options = {}) {
 
   // API failures stop this scan; do not spend more quota on the next history run.
   try {
-    const githubClient = createRateLimitAwareGithub(github);
-    const budget = createAPIBudget();
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || process.env.GH_AW_WORKFLOW_ID || "workflow";
     let actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || process.env.GITHUB_ACTOR || "";
     if (backend === REPO_MEMORY_BACKEND) {
+      if (process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC !== "true") {
+        const message = "Daily workflow AI Credits repo-memory ledger is untrusted; set GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC to true to explicitly allow it.";
+        core.setOutput("daily_ai_credits_guardrail_status", "structural_error");
+        core.setOutput("daily_ai_credits_guardrail_error", message);
+        core.setFailed(message);
+        return;
+      }
       const repository = `${context.repo.owner}/${context.repo.repo}`;
       const countedRuns = readLedgerEntries({
         repoMemoryDir: options.repoMemoryDir || process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR,
         repository,
         workflowId: process.env.GH_AW_WORKFLOW_ID || workflowName,
-        actor: actorLogin,
       }).map(entry => ({
         id: entry.run_id,
         html_url: entry.run_url || "",
@@ -705,6 +709,8 @@ async function main(options = {}) {
       core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold}.`);
       return;
     }
+    const githubClient = createRateLimitAwareGithub(github);
+    const budget = createAPIBudget();
     const artifactClient = await module.exports.getArtifactClient(budget.observe);
     const { countedRuns, candidateRunsCount, cacheHits, current } = await scanDailyAIC({
       github: githubClient,

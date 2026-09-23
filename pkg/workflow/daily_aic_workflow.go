@@ -257,33 +257,32 @@ func hasMaxDailyAICFrontmatterConfig(data *WorkflowData) bool {
 // are accepted; GitHub Actions expressions are passed through unchanged for
 // runtime evaluation.
 func validateMaxDailyAICFrontmatter(data *WorkflowData) error {
-	if data == nil || data.RawFrontmatter == nil {
+	if data == nil {
 		return nil
 	}
 	raw, ok := data.RawFrontmatter[maxDailyAICreditsField]
-	if !ok {
-		return nil
-	}
-	backend, hasBackend := extractMaxDailyAICBackend(raw)
-	// Object form: require a "value" key and validate the value.
-	if m, ok := raw.(map[string]any); ok {
-		if _, hasValue := m["value"]; !hasValue {
-			return fmt.Errorf("%s object form requires a 'value' field", maxDailyAICreditsField)
+	if ok {
+		backend, hasBackend := extractMaxDailyAICBackend(raw)
+		// Object form: require a "value" key and validate the value.
+		if m, ok := raw.(map[string]any); ok {
+			if _, hasValue := m["value"]; !hasValue {
+				return fmt.Errorf("%s object form requires a 'value' field", maxDailyAICreditsField)
+			}
+		}
+		effective := extractMaxDailyAICObjectValue(raw)
+		if val, ok := typeutil.ParseIntValue(effective); ok && val < -1 {
+			return fmt.Errorf("%s must be -1 (disable) or a positive integer, got %d", maxDailyAICreditsField, val)
+		}
+		if hasBackend {
+			switch backend {
+			case "", maxDailyAICBackendRepoMemory:
+			default:
+				return fmt.Errorf("%s backend must be %q, got %q", maxDailyAICreditsField, maxDailyAICBackendRepoMemory, backend)
+			}
 		}
 	}
-	effective := extractMaxDailyAICObjectValue(raw)
-	if val, ok := typeutil.ParseIntValue(effective); ok && val < -1 {
-		return fmt.Errorf("%s must be -1 (disable) or a positive integer, got %d", maxDailyAICreditsField, val)
-	}
-	if hasBackend {
-		switch backend {
-		case "", maxDailyAICBackendRepoMemory:
-		default:
-			return fmt.Errorf("%s backend must be %q, got %q", maxDailyAICreditsField, maxDailyAICBackendRepoMemory, backend)
-		}
-		if backend == maxDailyAICBackendRepoMemory && (data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0) {
-			return fmt.Errorf("%s backend %q requires tools.repo-memory", maxDailyAICreditsField, maxDailyAICBackendRepoMemory)
-		}
+	if data.MaxDailyAICBackend == maxDailyAICBackendRepoMemory && (data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0) {
+		return fmt.Errorf("%s backend %q requires tools.repo-memory", maxDailyAICreditsField, maxDailyAICBackendRepoMemory)
 	}
 	return nil
 }

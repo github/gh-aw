@@ -21,7 +21,7 @@ describe("daily_aic_repo_memory_ledger", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  it("reads current and previous UTC day buckets and filters by repository, workflow, actor, and window", () => {
+  it("reads current and previous UTC day buckets and filters by repository, workflow, and window", () => {
     const repoMemoryDir = path.join(directory, "memory");
     const root = ledger.ledgerRoot(repoMemoryDir);
     fs.mkdirSync(root, { recursive: true });
@@ -41,15 +41,7 @@ describe("daily_aic_repo_memory_ledger", () => {
     fs.writeFileSync(path.join(root, "2026-09-23.jsonl"), [JSON.stringify(currentEntry), JSON.stringify(otherActor)].join("\n"), "utf8");
     fs.writeFileSync(path.join(root, "2026-09-22.jsonl"), [JSON.stringify(previousEntry), JSON.stringify(staleEntry)].join("\n"), "utf8");
 
-    expect(
-      ledger.readLedgerEntries({
-        repoMemoryDir,
-        repository: "owner/repo",
-        workflowId: "triage",
-        actor: "monalisa",
-        now,
-      })
-    ).toEqual([currentEntry, previousEntry]);
+    expect(ledger.readLedgerEntries({ repoMemoryDir, repository: "owner/repo", workflowId: "triage", now })).toEqual([currentEntry, otherActor, previousEntry]);
   });
 
   it("appends current run AIC to the current UTC bucket", () => {

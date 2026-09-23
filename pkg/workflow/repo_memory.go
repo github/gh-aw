@@ -725,18 +725,18 @@ func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob 
 
 // buildPushRepoMemoryJobCondition computes the job condition and needs list.
 func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) (string, []string) {
-	agentSucceeded := BuildEquals(
+	agentCompleted := BuildNotEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
-		BuildStringLiteral("success"),
+		BuildStringLiteral("skipped"),
 	)
 	notCancelled := &NotNode{Child: BuildFunctionCall("cancelled")}
 	jobNeeds := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
 	var jobCondition string
 	if threatDetectionEnabled {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentSucceeded))
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentSucceeded))
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentCompleted))
 	}
 	return jobCondition, jobNeeds
 }

@@ -19,6 +19,9 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerStep(builder *strings.Builder
 	builder.WriteString("        continue-on-error: true\n")
 	fmt.Fprintf(builder, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	builder.WriteString("        env:\n")
+	for _, line := range buildTemplatableIntEnvVar(maxDailyAICreditsEnvVar, data.MaxDailyAICredits) {
+		builder.WriteString(line)
+	}
 	fmt.Fprintf(builder, "          GH_AW_WORKFLOW_ID: %q\n", data.WorkflowID)
 	fmt.Fprintf(builder, "          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s\n", dailyAICRepoMemoryDir(entry))
 	builder.WriteString("          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")

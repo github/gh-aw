@@ -33,15 +33,14 @@ function ledgerReadPaths(root, now = Date.now()) {
   return [ledgerPathForDay(root, utcDay(now)), ledgerPathForDay(root, utcDay(now - WINDOW_MS))].filter((value, index, array) => array.indexOf(value) === index);
 }
 
-function validEntry(entry, repository, workflowId, actor, now = Date.now()) {
+function validEntry(entry, repository, workflowId, now = Date.now()) {
   if (entry?.version !== 1) return false;
   if (entry.repository !== repository || entry.workflow_id !== workflowId) return false;
-  if (actor && entry.actor !== actor) return false;
   const timestamp = Date.parse(entry.timestamp);
   return Number.isFinite(timestamp) && timestamp >= now - WINDOW_MS && timestamp <= now && Number.isSafeInteger(entry.run_id) && entry.run_id > 0 && Number.isFinite(entry.aic) && entry.aic >= 0;
 }
 
-function readLedgerEntries({ repoMemoryDir, repository, workflowId, actor, now = Date.now() }) {
+function readLedgerEntries({ repoMemoryDir, repository, workflowId, now = Date.now() }) {
   const root = ledgerRoot(repoMemoryDir);
   const entriesByRun = new Map();
   for (const filePath of ledgerReadPaths(root, now)) {
@@ -56,7 +55,7 @@ function readLedgerEntries({ repoMemoryDir, repository, workflowId, actor, now =
       if (!trimmed) continue;
       try {
         const entry = JSON.parse(trimmed);
-        if (!validEntry(entry, repository, workflowId, actor, now)) continue;
+        if (!validEntry(entry, repository, workflowId, now)) continue;
         const prior = entriesByRun.get(entry.run_id);
         const entryTimestamp = Date.parse(entry.timestamp);
         const priorTimestamp = prior ? Date.parse(prior.timestamp) : NaN;
