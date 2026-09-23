@@ -1,3 +1,3 @@
 {
-  "sub_agent_strategy": "single_agent"
+  "sub_agent_strategy": "sub_agents"
 }
