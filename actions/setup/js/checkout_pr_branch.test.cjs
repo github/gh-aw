@@ -431,6 +431,29 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine originating actor"));
       });
 
+      it("should reject github-actions bot PR dispatch without centralized router markers", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to identify centralized workflow_dispatch"));
+      });
+
       it("should not trust a propagated actor from a third-party bot dispatcher", async () => {
         mockContext.eventName = "workflow_dispatch";
         mockContext.actor = "third-party-bot[bot]";

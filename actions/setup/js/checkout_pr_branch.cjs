@@ -35,6 +35,9 @@ const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs")
 const { detectForkPR } = require("./pr_helpers.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
 const TRUSTED_CHECKOUT_PERMISSIONS = ["write", "maintain", "admin"];
+// Centralized command/label routing uses the repository GITHUB_TOKEN, whose
+// GitHub-authenticated actor is fixed to this platform identity.
+const CENTRALIZED_ROUTER_ACTOR = "github-actions[bot]";
 const PR_HEAD_BASE_REF = "refs/remotes/origin/pr-head";
 
 /**
@@ -241,17 +244,18 @@ async function assertTrustedCheckoutRuntime(awContext) {
   // the repository's centralized router runs as github-actions[bot].
   // command_name and trigger_label are the router's command/label markers;
   // arbitrary bot/app dispatchers must be validated as themselves.
-  if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]" && senderType === "Bot") {
+  if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR && senderType === "Bot") {
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
-    if (commandName || triggerLabel) {
-      const propagatedActor = typeof awContext?.actor === "string" ? awContext.actor.trim() : "";
-      if (!propagatedActor) {
-        throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
-      }
-      actor = propagatedActor;
-      core.info(`Validating centralized workflow_dispatch against originating actor '${actor}'`);
+    if (!commandName && !triggerLabel) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to identify centralized workflow_dispatch");
     }
+    const propagatedActor = typeof awContext?.actor === "string" ? awContext.actor.trim() : "";
+    if (!propagatedActor) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
+    }
+    actor = propagatedActor;
+    core.info(`Validating centralized workflow_dispatch against originating actor '${actor}'`);
   }
   if (!actor) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");

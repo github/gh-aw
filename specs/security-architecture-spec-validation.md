@@ -439,7 +439,7 @@ if (!pullRequest && eventName === "workflow_dispatch") {
 }
 ```
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; they fail closed when that actor is absent. Bot/app identity is treated as an identity signal only; it does not bypass the write-or-higher repository permission floor.
+Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; they fail closed when the command/label marker or actor is absent. Bot/app identity is treated as an identity signal only; it does not bypass the write-or-higher repository permission floor.
 
 ```js
 async function assertTrustedCheckoutRuntime() {
@@ -476,6 +476,7 @@ async function assertTrustedCheckoutRuntime() {
 | centralized `workflow_dispatch` validates the originating `aw_context.actor`, not `github-actions[bot]` | actor trust |
 | centralized `workflow_dispatch` without `aw_context.actor` is rejected | actor trust (fail closed) |
 | centralized actor propagation without `sender.type == "Bot"` is rejected | actor trust (identity signal) |
+| `github-actions[bot]` PR dispatch without centralized command/label markers is rejected | actor trust (fail closed) |
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 | native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |
 

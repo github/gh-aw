@@ -219,6 +219,24 @@ func TestFormalRS05a_CentralizedDispatchRequiresBotSenderSignal(t *testing.T) {
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
+func TestFormalRS05a_CentralizedDispatchWithoutRouterMarkersRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"actor":       "trusted-maintainer",
+		"item_type":   "pull_request",
+		"item_number": 123,
+		"repo":        "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "missing centralized router markers must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to identify centralized workflow_dispatch")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
 func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {
 	scenario := rs05aDefaultBridgeScenario(t, nil)
 	scenario.AwContextRaw = "{not-valid-json"
