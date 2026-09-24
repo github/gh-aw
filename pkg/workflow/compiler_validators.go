@@ -32,6 +32,13 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
+	// Dynamic checkout expressions must not embed secrets directly: the resolved
+	// expression is serialized once into the GH_AW_DYNAMIC_CHECKOUTS runtime JSON
+	// payload, so secrets used there would not be statically listed as env vars.
+	if err := c.validateDynamicCheckoutSecretsUsage(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list.
 	// In non-strict mode, ${{ toJSON(secrets) }} occurrences were already warned about above;
 	// neutralize them so the allowlist does not re-surface them as errors.

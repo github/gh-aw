@@ -50,6 +50,22 @@ enforces unique paths, and removes checkout credentials before the agent starts.
 App authentication, `current`, and additional `fetch` patterns remain available only in
 statically declared checkout entries.
 
+The resolved expression is serialized once into a single runtime JSON payload
+(`GH_AW_DYNAMIC_CHECKOUTS`), so it must not reference `secrets.*` directly — doing so
+would embed the secret's value into that payload instead of a statically declared
+environment variable, hiding the secret usage from auditing and static analysis.
+Declare any secret the expression needs in the workflow's top-level `env:` section and
+reference it through `env.NAME` instead:
+
+```yaml wrap
+env:
+  CHECKOUT_TOKEN: ${{ secrets.MY_TOKEN }}
+checkout: ${{ fromJSON(format('[{"repository":"{0}","github-token":"{1}"}]', inputs.repo, env.CHECKOUT_TOKEN)) }}
+```
+
+Compilation fails (or warns, in non-strict mode) if a dynamic checkout expression
+references `secrets.*` directly.
+
 You can also use `checkout:` to check out additional repositories alongside the main repository:
 
 ```yaml wrap
