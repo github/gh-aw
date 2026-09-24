@@ -1879,7 +1879,7 @@ jobs:
       - agent
       - evals
       - safe_outputs
-    if: always() && (!cancelled())
+    if: always() && (!cancelled()) && needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
     permissions:
       contents: write
