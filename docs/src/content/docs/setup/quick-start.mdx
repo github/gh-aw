@@ -107,6 +107,18 @@ gh aw add-wizard githubnext/agentics/repo-status
 
 `add-wizard` accepts workflow references in `<owner>/<repo>/<workflow-name>` format. In this guide, `githubnext/agentics` is the public [githubnext/agentics](https://github.com/githubnext/agentics) examples repository, and `repo-status` is one of the sample workflows it publishes.
 
+`repo-status` gathers recent repository activity (issues, PRs, discussions, releases, code changes) and opens a GitHub issue summarizing productivity insights, community highlights, and recommended next steps, as described in its frontmatter:
+
+```yaml
+description: |
+  This workflow creates daily repo status reports. It gathers recent repository
+  activity (issues, PRs, discussions, releases, code changes) and generates
+  engaging GitHub issues with productivity insights, community highlights,
+  and project recommendations.
+```
+
+See the full source at [`workflows/repo-status.md`](https://github.com/githubnext/agentics/blob/main/workflows/repo-status.md?plain=1).
+
 This will take you through an interactive process to:
 
 1. **Check prerequisites** - Verify repository permissions.
@@ -135,6 +147,8 @@ If organization billing is enabled in your organization, you can choose **Use co
 **Setting up `ANTHROPIC_API_KEY`:**
 1. Create an API key in [Anthropic Console](https://console.anthropic.com/settings/keys).
 2. Add it as a repository secret from your repository root with `gh secret set ANTHROPIC_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#anthropic_api_key) for more detail.
+
+To avoid a long-lived key, configure [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif).
 
 Follow [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/) for the complete setup.
 
