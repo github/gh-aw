@@ -113,6 +113,7 @@ gh aw audit <run-id>                # Audit a single run
 gh aw audit <run-id> --json         # JSON output
 gh aw audit <base-id> <compare-id>  # Diff two runs (regression detection)
 gh aw audit <id1> <id2> <id3> --json  # Multi-run diff
+gh aw audit <id1> <id2> --group     # Grouped findings: one entry per [run, code] with occurrence counts
 ```
 
 **MCP equivalent**: `audit` tool (single run) / `audit-diff` tool (multi-run comparison)
