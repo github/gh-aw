@@ -34,6 +34,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
 	"github.com/github/gh-aw/pkg/linters/lenstringzero"
+	"github.com/github/gh-aw/pkg/linters/loopappendinefficency"
 	"github.com/github/gh-aw/pkg/linters/logfatallibrary"
 	"github.com/github/gh-aw/pkg/linters/manualmutexunlock"
 	"github.com/github/gh-aw/pkg/linters/manualpathconcat"
@@ -149,6 +150,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	jsonmarshalignoredeerror.Analyzer,
 	lenstringzero.Analyzer,
 	lenstringsplit.Analyzer,
+	loopappendinefficency.Analyzer,
 	timeafterleak.Analyzer,
 	timesleepnocontext.Analyzer,
 	timenowsub.Analyzer,
