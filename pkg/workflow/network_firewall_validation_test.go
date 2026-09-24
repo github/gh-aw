@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -261,10 +262,13 @@ func TestValidateNetworkFirewallConfig_Integration(t *testing.T) {
 
 func TestValidateHostedWebPolicy(t *testing.T) {
 	tests := []struct {
-		name    string
-		engine  string
-		policy  *HostedWebPolicy
-		wantErr string
+		name            string
+		engine          string
+		runtime         string
+		policy          *HostedWebPolicy
+		explicitNetwork bool
+		firewallVersion string
+		wantErr         string
 	}{
 		{
 			name:   "allows a lowercase allowlist",
@@ -296,6 +300,43 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			wantErr: "lowercase DNS hostname",
 		},
 		{
+			name:    "rejects duplicate domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com", "docs.github.com"}},
+			wantErr: "duplicate domain",
+		},
+		{
+			name:    "rejects overlong domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 61) + ".com"}},
+			wantErr: "253 characters or fewer",
+		},
+		{
+			name:   "accepts Codex runtime alias",
+			engine: "codex-experimental",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:    "accepts custom engine backed by Codex runtime",
+			engine:  "my-codex-wrapper",
+			runtime: "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:            "rejects explicit policy with older AWF",
+			engine:          "claude",
+			policy:          &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			firewallVersion: "v0.28.24",
+			wantErr:         "requires AWF",
+		},
+		{
+			name:            "rejects implicit deny with older AWF",
+			engine:          "claude",
+			explicitNetwork: true,
+			firewallVersion: "v0.28.24",
+			wantErr:         "requires AWF",
+		},
+		{
 			name:    "rejects unsupported engine",
 			engine:  "copilot",
 			policy:  &HostedWebPolicy{Enabled: false},
@@ -305,9 +346,20 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateHostedWebPolicy(&WorkflowData{
+			network := &NetworkPermissions{
+				HostedWeb:         tt.policy,
+				ExplicitlyDefined: tt.explicitNetwork,
+			}
+			if tt.firewallVersion != "" {
+				network.Firewall = &FirewallConfig{Version: tt.firewallVersion}
+			}
+			compiler := NewCompiler()
+			if tt.runtime != "" {
+				compiler.engineCatalog.Register(&EngineDefinition{ID: tt.engine, RuntimeID: tt.runtime})
+			}
+			err := compiler.validateHostedWebPolicy(&WorkflowData{
 				EngineConfig:       &EngineConfig{ID: tt.engine},
-				NetworkPermissions: &NetworkPermissions{HostedWeb: tt.policy},
+				NetworkPermissions: network,
 			})
 			if tt.wantErr == "" {
 				assert.NoError(t, err)

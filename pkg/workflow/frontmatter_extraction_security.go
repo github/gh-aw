@@ -91,7 +91,7 @@ func extractHostedWebPolicy(hostedWeb any) *HostedWebPolicy {
 		}
 		return policy
 	}
-	return nil
+	return &HostedWebPolicy{Enabled: true}
 }
 
 func extractStringSlice(value any) []string {

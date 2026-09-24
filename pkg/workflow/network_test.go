@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,6 +141,49 @@ strict: false
 		network := config.ToMap()["network"].(map[string]any)
 		if hostedWeb, ok := network["hosted-web"].(bool); !ok || hostedWeb {
 			t.Fatalf("Expected disabled hosted web policy to serialize as false, got %#v", hostedWeb)
+		}
+	})
+
+	t.Run("Hosted web policy JSON unmarshal", func(t *testing.T) {
+		var disabled HostedWebPolicy
+		if err := json.Unmarshal([]byte(`false`), &disabled); err != nil {
+			t.Fatalf("Failed to unmarshal disabled hosted web policy: %v", err)
+		}
+		if disabled.Enabled {
+			t.Fatalf("Expected disabled hosted web policy, got %#v", disabled)
+		}
+
+		var enabled HostedWebPolicy
+		if err := json.Unmarshal([]byte(`{"allowed":["docs.github.com"]}`), &enabled); err != nil {
+			t.Fatalf("Failed to unmarshal enabled hosted web policy: %v", err)
+		}
+		if !enabled.Enabled || len(enabled.Allowed) != 1 || enabled.Allowed[0] != "docs.github.com" {
+			t.Fatalf("Unexpected enabled hosted web policy: %#v", enabled)
+		}
+
+		var malformed HostedWebPolicy
+		if err := json.Unmarshal([]byte(`"oops"`), &malformed); err == nil {
+			t.Fatal("Expected malformed hosted web policy JSON to fail")
+		}
+	})
+
+	t.Run("Reject malformed hosted web scalar", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: claude
+network:
+  hosted-web: "true"
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		_, err := compiler.ParseWorkflowFile(filePath)
+		if err == nil || !strings.Contains(err.Error(), "hosted-web") {
+			t.Fatalf("Expected malformed hosted web policy to fail validation, got %v", err)
 		}
 	})
 

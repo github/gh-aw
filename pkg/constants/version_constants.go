@@ -190,6 +190,10 @@ const AWFDynamicRepositoryEnclaveMinVersion Version = "v0.28.14"
 // under strict config validation.
 const AWFAPIProxyCACertMinVersion Version = "v0.28.10"
 
+// AWFHostedWebMinVersion is the minimum AWF version that supports
+// apiProxy.hostedWeb in awf-config.json.
+const AWFHostedWebMinVersion Version = "v0.28.25"
+
 // AWFHTTPAPITargetMinVersion is the minimum AWF version that supports explicit
 // http:// schemes in apiProxy target hosts.
 const AWFHTTPAPITargetMinVersion Version = "v0.28.13"

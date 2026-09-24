@@ -137,7 +137,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		MaxAICredits:        maxAICredits,
 		EnableTokenSteering: tokenSteeringEnabled,
 	}
-	if hostedWeb := buildHostedWebConfig(config.EngineName, config.WorkflowData); hostedWeb != nil {
+	if hostedWeb := buildHostedWebConfig(config.EngineName, config.EngineRuntimeID, config.WorkflowData, firewallConfig); hostedWeb != nil {
 		apiProxy.HostedWeb = hostedWeb
 		awfConfigLog.Printf("API proxy: hosted web policy configured for %s", config.EngineName)
 	}
@@ -350,8 +350,16 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	return jsonStr, nil
 }
 
-func buildHostedWebConfig(engineName string, workflowData *WorkflowData) *AWFHostedWebConfig {
+func buildHostedWebConfig(engineName, engineRuntimeID string, workflowData *WorkflowData, firewallConfig *FirewallConfig) *AWFHostedWebConfig {
 	if workflowData == nil || workflowData.NetworkPermissions == nil {
+		return nil
+	}
+	runtimeID := hostedWebRuntimeID(engineName, engineRuntimeID)
+	if runtimeID != "claude" && runtimeID != "codex" {
+		return nil
+	}
+	if !awfSupportsHostedWeb(firewallConfig) {
+		awfConfigLog.Printf("Skipping apiProxy.hostedWeb: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFHostedWebMinVersion)
 		return nil
 	}
 
@@ -369,7 +377,7 @@ func buildHostedWebConfig(engineName string, workflowData *WorkflowData) *AWFHos
 		BlockedDomains: policy.Blocked,
 		MaxUses:        policy.MaxUses,
 	}
-	switch strings.ToLower(engineName) {
+	switch runtimeID {
 	case "claude":
 		return &AWFHostedWebConfig{Claude: awfPolicy}
 	case "codex":
@@ -377,6 +385,20 @@ func buildHostedWebConfig(engineName string, workflowData *WorkflowData) *AWFHos
 	default:
 		return nil
 	}
+}
+
+func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
+	if engineRuntimeID != "" {
+		return strings.ToLower(engineRuntimeID)
+	}
+	engineName = strings.ToLower(engineName)
+	if strings.HasPrefix(engineName, "claude") {
+		return "claude"
+	}
+	if strings.HasPrefix(engineName, "codex") {
+		return "codex"
+	}
+	return engineName
 }
 
 func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {

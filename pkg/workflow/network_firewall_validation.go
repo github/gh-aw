@@ -132,14 +132,35 @@ func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) er
 	return nil
 }
 
-func validateHostedWebPolicy(workflowData *WorkflowData) error {
-	if workflowData == nil || workflowData.NetworkPermissions == nil || workflowData.NetworkPermissions.HostedWeb == nil {
+func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.NetworkPermissions == nil || (workflowData.NetworkPermissions.HostedWeb == nil && !workflowData.NetworkPermissions.ExplicitlyDefined) {
 		return nil
 	}
 
 	policy := workflowData.NetworkPermissions.HostedWeb
-	if workflowData.EngineConfig == nil || (workflowData.EngineConfig.ID != "claude" && workflowData.EngineConfig.ID != "codex") {
+	runtimeID, err := c.resolveHostedWebRuntimeID(workflowData)
+	if err != nil {
+		return err
+	}
+	if runtimeID != "claude" && runtimeID != "codex" {
+		if policy == nil {
+			return nil
+		}
 		return errors.New("network.hosted-web is only supported by the claude and codex engines")
+	}
+	firewallConfig := getFirewallConfig(workflowData)
+	if !awfSupportsHostedWeb(firewallConfig) {
+		awfTag := getAWFImageTag(firewallConfig)
+		networkFirewallValidationLog.Printf("Rejecting network.hosted-web: AWF tag %q predates %s", awfTag, constants.AWFHostedWebMinVersion)
+		return NewValidationError(
+			"network.hosted-web",
+			awfTag,
+			fmt.Sprintf("requires AWF %s or newer; pinned version %q rejects apiProxy.hostedWeb", constants.AWFHostedWebMinVersion, awfTag),
+			fmt.Sprintf("Set network.firewall.version or sandbox.agent.version to %s or newer:\n\nnetwork:\n  firewall:\n    version: %s", constants.AWFHostedWebMinVersion, constants.AWFHostedWebMinVersion),
+		)
+	}
+	if policy == nil {
+		return nil
 	}
 	if !policy.Enabled {
 		if len(policy.Allowed) > 0 || len(policy.Blocked) > 0 || policy.MaxUses != 0 {
@@ -156,12 +177,42 @@ func validateHostedWebPolicy(workflowData *WorkflowData) error {
 	if policy.MaxUses < 0 {
 		return errors.New("network.hosted-web.max-uses must be a positive integer")
 	}
-	for _, domain := range policy.Allowed {
-		if err := validateHostedWebDomain(domain); err != nil {
-			return err
+	if err := validateHostedWebDomains("allowed", policy.Allowed); err != nil {
+		return err
+	}
+	if err := validateHostedWebDomains("blocked", policy.Blocked); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string, error) {
+	if workflowData == nil || workflowData.EngineConfig == nil {
+		return "", nil
+	}
+	engineID := workflowData.EngineConfig.ID
+	if workflowData.EngineConfig.IsInlineDefinition {
+		return strings.ToLower(engineID), nil
+	}
+	if c != nil && c.engineCatalog != nil {
+		resolved, err := c.engineCatalog.Resolve(engineID, workflowData.EngineConfig)
+		if err != nil {
+			return "", err
+		}
+		if resolved != nil && resolved.Runtime != nil {
+			return strings.ToLower(resolved.Runtime.GetID()), nil
 		}
 	}
-	for _, domain := range policy.Blocked {
+	return hostedWebRuntimeID(engineID, ""), nil
+}
+
+func validateHostedWebDomains(field string, domains []string) error {
+	seen := map[string]struct{}{}
+	for _, domain := range domains {
+		if _, ok := seen[domain]; ok {
+			return fmt.Errorf("network.hosted-web.%s contains duplicate domain %q", field, domain)
+		}
+		seen[domain] = struct{}{}
 		if err := validateHostedWebDomain(domain); err != nil {
 			return err
 		}
@@ -172,6 +223,9 @@ func validateHostedWebPolicy(workflowData *WorkflowData) error {
 var hostedWebDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
 
 func validateHostedWebDomain(domain string) error {
+	if len(domain) > 253 {
+		return fmt.Errorf("network.hosted-web domain %q must be 253 characters or fewer", domain)
+	}
 	if !hostedWebDomainPattern.MatchString(domain) || net.ParseIP(domain) != nil || domain == "localhost" {
 		return fmt.Errorf("network.hosted-web domain %q must be a lowercase DNS hostname with at least two labels", domain)
 	}
