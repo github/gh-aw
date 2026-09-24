@@ -27,7 +27,7 @@ func TestUpgradeCommand_OnExistingRepository(t *testing.T) {
 	assert.Contains(t, outputStr, "Upgrade complete", "Should report upgrade complete")
 }
 
-func TestInitAndUpgradeWithEmptyAWDirectory(t *testing.T) {
+func TestUpgradeCompilesWithEmptyAWDirectory(t *testing.T) {
 	const noImplicitExpiry = `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`
 
 	setup := setupIntegrationTest(t)
