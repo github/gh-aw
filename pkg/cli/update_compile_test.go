@@ -13,11 +13,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// updateCompileVersionGlobalsMu serializes tests in this file that mutate the
+// updateCompileVersionGlobalsMu guards tests in this file that mutate the
 // process-wide compiler version and release-build globals (via SetVersionInfo /
-// workflow.SetIsRelease). These tests intentionally avoid t.Parallel(), but the
-// lock guards against future refactors introducing parallelism that could race
-// on the shared state or observe a partially-restored value.
+// workflow.SetIsRelease).
+//
+// The primary safety guarantee is that these tests never call t.Parallel():
+// Go's test runner completes every non-parallel test in a package — including
+// its t.Cleanup restoration — before releasing any t.Parallel()-marked tests
+// to run concurrently, so the mutation is fully reverted before parallel
+// tests observe the globals. This mutex is a defense-in-depth measure only:
+// it does not synchronize with the many other pkg/cli tests elsewhere in the
+// package that mutate the same globals without taking this lock, so it
+// cannot prevent a race if one of those tests were changed to call
+// t.Parallel() in the future. Any test added to this file that mutates these
+// globals must acquire this lock and must not call t.Parallel().
 var updateCompileVersionGlobalsMu sync.Mutex
 
 func TestNewUpdateCompileConfigMatchesCompileCommandDefaults(t *testing.T) {
