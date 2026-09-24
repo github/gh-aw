@@ -39,6 +39,10 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 			}
 		}
 	}
+	if opts.Group {
+		parseAuditLogsIfRequested(runID, runOutputDir, opts)
+		return nil
+	}
 	if err := renderAuditOutput(auditData, runOutputDir, opts.JSONOutput, opts.Verbose); err != nil {
 		return err
 	}

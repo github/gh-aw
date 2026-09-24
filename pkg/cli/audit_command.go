@@ -52,6 +52,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --format markdown  # Markdown diff output for PR comments
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 --group # Group findings by run and audit code
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --runtime cloud-hypervisor   # Skip run unless sandbox agent runtime matches`
 
 type auditCommandOptions struct {
@@ -67,6 +68,7 @@ type auditCommandOptions struct {
 	variantFilter    string
 	runtimeFilter    string
 	evalsOnly        bool
+	group            bool
 	noBaseline       bool
 }
 
@@ -97,6 +99,7 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("variant", "", "Filter to runs with a specific variant value (requires --experiment)")
 	cmd.Flags().String("runtime", "", "Filter to runs using a specific sandbox agent runtime (e.g., cloud-hypervisor)")
 	cmd.Flags().Bool("evals", false, "Filter to runs containing evals results (evals.jsonl); automatically downloads the usage artifact (which includes evals) when --artifacts is narrowed")
+	cmd.Flags().Bool("group", false, "Group audit findings by run and finding code, including occurrence counts and a representative entry")
 	cmd.Flags().Bool("no-baseline", false, "Skip baseline lookup and comparison for single-run audits")
 	RegisterDirFlagCompletion(cmd, "output")
 }
@@ -111,6 +114,9 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
+	if opts.group {
+		return runAuditGrouped(cmd.Context(), args, opts)
+	}
 	if len(args) == 1 {
 		return runAuditSingle(cmd.Context(), args[0], opts) //nolint:uncheckedsliceindex // len(args) == 1
 	}
@@ -137,6 +143,7 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.variantFilter, _ = cmd.Flags().GetString("variant")
 	opts.runtimeFilter, _ = cmd.Flags().GetString("runtime")
 	opts.evalsOnly, _ = cmd.Flags().GetBool("evals")
+	opts.group, _ = cmd.Flags().GetBool("group")
 	opts.noBaseline, _ = cmd.Flags().GetBool("no-baseline")
 	if opts.variantFilter != "" && opts.experimentFilter == "" {
 		return auditCommandOptions{}, errors.New(console.FormatErrorWithSuggestions(
@@ -198,7 +205,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		return err
 	}
 	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
-	return AuditWorkflowRun(ctx, components.Number, AuditOptions{
+	_, err = AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
 		Repo:             components.Repo,
 		Hostname:         components.Host,
@@ -213,8 +220,10 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		VariantFilter:    opts.variantFilter,
 		RuntimeFilter:    opts.runtimeFilter,
 		EvalsOnly:        opts.evalsOnly,
+		Group:            opts.group,
 		NoBaseline:       opts.noBaseline,
 	})
+	return err
 }
 
 func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents) error {
@@ -228,6 +237,13 @@ func applyAuditRepoFlag(repoFlag string, components *parser.GitHubURLComponents)
 	components.Owner = parts[0] //nolint:uncheckedsliceindex // len(parts) == 2
 	components.Repo = parts[1]  //nolint:uncheckedsliceindex // len(parts) == 2
 	return nil
+}
+
+func firstAuditArg(args []string) (string, bool) {
+	if len(args) > 0 {
+		return args[0], true
+	}
+	return "", false
 }
 
 // runAuditMulti handles the multi-run diff mode for the audit command.
