@@ -136,6 +136,9 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	if workflowData == nil || workflowData.NetworkPermissions == nil || (workflowData.NetworkPermissions.HostedWeb == nil && !workflowData.NetworkPermissions.ExplicitlyDefined) {
 		return nil
 	}
+	if workflowData.NetworkPermissions.InvalidHostedWeb {
+		return errors.New("network.hosted-web must be false or an object policy")
+	}
 
 	policy := workflowData.NetworkPermissions.HostedWeb
 	runtimeID, err := c.resolveHostedWebRuntimeID(workflowData)
@@ -192,7 +195,7 @@ func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string
 	}
 	engineID := workflowData.EngineConfig.ID
 	if workflowData.EngineConfig.IsInlineDefinition {
-		return strings.ToLower(engineID), nil
+		return hostedWebRuntimeID(engineID, ""), nil
 	}
 	if c != nil && c.engineCatalog != nil {
 		resolved, err := c.engineCatalog.Resolve(engineID, workflowData.EngineConfig)

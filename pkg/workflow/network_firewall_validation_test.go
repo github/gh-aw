@@ -265,6 +265,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 		name            string
 		engine          string
 		runtime         string
+		inline          bool
 		policy          *HostedWebPolicy
 		explicitNetwork bool
 		firewallVersion string
@@ -323,6 +324,12 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
 		},
 		{
+			name:   "accepts inline Claude runtime prefix",
+			engine: "claude-custom",
+			inline: true,
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
 			name:            "rejects explicit policy with older AWF",
 			engine:          "claude",
 			policy:          &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
@@ -358,7 +365,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 				compiler.engineCatalog.Register(&EngineDefinition{ID: tt.engine, RuntimeID: tt.runtime})
 			}
 			err := compiler.validateHostedWebPolicy(&WorkflowData{
-				EngineConfig:       &EngineConfig{ID: tt.engine},
+				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline},
 				NetworkPermissions: network,
 			})
 			if tt.wantErr == "" {

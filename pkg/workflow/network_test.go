@@ -187,6 +187,24 @@ strict: false
 		}
 	})
 
+	t.Run("Raw extraction marks malformed hosted web values invalid", func(t *testing.T) {
+		networkPermissions := compiler.extractNetworkPermissions(map[string]any{
+			"network": map[string]any{
+				"hosted-web": []any{"docs.github.com"},
+			},
+		})
+		if networkPermissions == nil || !networkPermissions.InvalidHostedWeb {
+			t.Fatalf("Expected malformed hosted web policy to be marked invalid, got %#v", networkPermissions)
+		}
+		err := compiler.validateHostedWebPolicy(&WorkflowData{
+			EngineConfig:       &EngineConfig{ID: "claude"},
+			NetworkPermissions: networkPermissions,
+		})
+		if err == nil || !strings.Contains(err.Error(), "false or an object policy") {
+			t.Fatalf("Expected invalid hosted web policy validation error, got %v", err)
+		}
+	})
+
 	t.Run("No network permissions specified", func(t *testing.T) {
 		yamlContent := `---
 on: push

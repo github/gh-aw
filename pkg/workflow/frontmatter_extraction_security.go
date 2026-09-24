@@ -61,7 +61,7 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 			}
 
 			if hostedWeb, hasHostedWeb := networkObj["hosted-web"]; hasHostedWeb {
-				permissions.HostedWeb = extractHostedWebPolicy(hostedWeb)
+				applyHostedWebPolicy(permissions, hostedWeb)
 			}
 
 			return permissions
@@ -71,11 +71,19 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 	return nil
 }
 
-func extractHostedWebPolicy(hostedWeb any) *HostedWebPolicy {
+func applyHostedWebPolicy(permissions *NetworkPermissions, hostedWeb any) {
+	if policy, ok := extractHostedWebPolicy(hostedWeb); ok {
+		permissions.HostedWeb = policy
+	} else {
+		permissions.InvalidHostedWeb = true
+	}
+}
+
+func extractHostedWebPolicy(hostedWeb any) (*HostedWebPolicy, bool) {
 	switch hostedWeb := hostedWeb.(type) {
 	case bool:
 		if !hostedWeb {
-			return &HostedWebPolicy{}
+			return &HostedWebPolicy{}, true
 		}
 	case map[string]any:
 		policy := &HostedWebPolicy{Enabled: true}
@@ -89,9 +97,9 @@ func extractHostedWebPolicy(hostedWeb any) *HostedWebPolicy {
 		case float64:
 			policy.MaxUses = int(maxUses)
 		}
-		return policy
+		return policy, true
 	}
-	return &HostedWebPolicy{Enabled: true}
+	return nil, false
 }
 
 func extractStringSlice(value any) []string {
