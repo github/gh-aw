@@ -13,7 +13,9 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"sort"
 	"strings"
@@ -127,6 +129,52 @@ func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) er
 	}
 
 	networkFirewallValidationLog.Print("Network allowed domains validation passed")
+	return nil
+}
+
+func validateHostedWebPolicy(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.NetworkPermissions == nil || workflowData.NetworkPermissions.HostedWeb == nil {
+		return nil
+	}
+
+	policy := workflowData.NetworkPermissions.HostedWeb
+	if workflowData.EngineConfig == nil || (workflowData.EngineConfig.ID != "claude" && workflowData.EngineConfig.ID != "codex") {
+		return errors.New("network.hosted-web is only supported by the claude and codex engines")
+	}
+	if !policy.Enabled {
+		if len(policy.Allowed) > 0 || len(policy.Blocked) > 0 || policy.MaxUses != 0 {
+			return errors.New("network.hosted-web: enabled: false cannot be combined with allowed, blocked, or max-uses")
+		}
+		return nil
+	}
+	if len(policy.Allowed) == 0 && len(policy.Blocked) == 0 {
+		return errors.New("network.hosted-web: enabled: true requires exactly one non-empty allowed or blocked list")
+	}
+	if len(policy.Allowed) > 0 && len(policy.Blocked) > 0 {
+		return errors.New("network.hosted-web: allowed and blocked cannot both be set")
+	}
+	if policy.MaxUses < 0 {
+		return errors.New("network.hosted-web.max-uses must be a positive integer")
+	}
+	for _, domain := range policy.Allowed {
+		if err := validateHostedWebDomain(domain); err != nil {
+			return err
+		}
+	}
+	for _, domain := range policy.Blocked {
+		if err := validateHostedWebDomain(domain); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var hostedWebDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
+
+func validateHostedWebDomain(domain string) error {
+	if !hostedWebDomainPattern.MatchString(domain) || net.ParseIP(domain) != nil || domain == "localhost" {
+		return fmt.Errorf("network.hosted-web domain %q must be a lowercase DNS hostname with at least two labels", domain)
+	}
 	return nil
 }
 

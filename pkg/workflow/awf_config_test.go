@@ -57,6 +57,80 @@ func TestResolveAWFContainerAgentTimeoutMinutes(t *testing.T) {
 	})
 }
 
+func TestBuildAWFConfigJSON_HostedWebPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		engine     string
+		network    *NetworkPermissions
+		wantPolicy map[string]any
+	}{
+		{
+			name:   "Claude allowlist",
+			engine: "claude",
+			network: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{
+					Enabled: true,
+					Allowed: []string{"docs.github.com"},
+					MaxUses: 5,
+				},
+			},
+			wantPolicy: map[string]any{
+				"claude": map[string]any{
+					"enabled":        true,
+					"allowedDomains": []any{"docs.github.com"},
+					"maxUses":        float64(5),
+				},
+			},
+		},
+		{
+			name:   "Codex blocklist",
+			engine: "codex",
+			network: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{
+					Enabled: true,
+					Blocked: []string{"example.com"},
+				},
+			},
+			wantPolicy: map[string]any{
+				"codex": map[string]any{
+					"enabled":        true,
+					"blockedDomains": []any{"example.com"},
+				},
+			},
+		},
+		{
+			name:   "Network policy defaults to deny",
+			engine: "claude",
+			network: &NetworkPermissions{
+				ExplicitlyDefined: true,
+			},
+			wantPolicy: map[string]any{
+				"claude": map[string]any{
+					"enabled": false,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonStr, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName: tt.engine,
+				WorkflowData: &WorkflowData{
+					EngineConfig:       &EngineConfig{ID: tt.engine},
+					NetworkPermissions: tt.network,
+				},
+			})
+			require.NoError(t, err)
+
+			var config map[string]any
+			require.NoError(t, json.Unmarshal([]byte(jsonStr), &config))
+			assert.Equal(t, tt.wantPolicy, config["apiProxy"].(map[string]any)["hostedWeb"])
+			require.NoError(t, validateAWFConfigJSON(jsonStr))
+		})
+	}
+}
+
 // TestBuildAWFConfigJSON verifies that BuildAWFConfigJSON produces a valid JSON config
 // that contains the expected network, apiProxy, and container fields.
 func TestBuildAWFConfigJSON(t *testing.T) {

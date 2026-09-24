@@ -169,11 +169,22 @@ type EngineAuthConfig struct {
 // Ecosystem identifiers in the Allowed list are expanded to their corresponding domain lists.
 // See GetAllowedDomains() for the list of supported ecosystem identifiers.
 type NetworkPermissions struct {
-	Allowed           []string        `yaml:"allowed,omitempty"` // List of allowed domains or ecosystem identifiers (e.g., "defaults", "github", "python")
-	AllowedInput      bool            `yaml:"allowed-input,omitempty"`
-	Blocked           []string        `yaml:"blocked,omitempty"`  // List of blocked domains (takes precedence over allowed)
-	Firewall          *FirewallConfig `yaml:"firewall,omitempty"` // AWF firewall configuration (see firewall.go)
-	ExplicitlyDefined bool            `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
+	Allowed           []string         `yaml:"allowed,omitempty"` // List of allowed domains or ecosystem identifiers (e.g., "defaults", "github", "python")
+	AllowedInput      bool             `yaml:"allowed-input,omitempty"`
+	Blocked           []string         `yaml:"blocked,omitempty"` // List of blocked domains (takes precedence over allowed)
+	HostedWeb         *HostedWebPolicy `yaml:"hosted-web,omitempty" json:"hosted-web,omitempty"`
+	Firewall          *FirewallConfig  `yaml:"firewall,omitempty"` // AWF firewall configuration (see firewall.go)
+	ExplicitlyDefined bool             `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
+}
+
+// HostedWebPolicy controls provider-hosted web search and fetch tools.
+// Its domain lists are deliberately independent from network.allowed because hosted
+// retrieval executes outside the AWF network boundary.
+type HostedWebPolicy struct {
+	Enabled bool     `yaml:"enabled" json:"enabled"`
+	Allowed []string `yaml:"allowed,omitempty" json:"allowed,omitempty"`
+	Blocked []string `yaml:"blocked,omitempty" json:"blocked,omitempty"`
+	MaxUses int      `yaml:"max-uses,omitempty" json:"max-uses,omitempty"`
 }
 
 // EngineNetworkConfig combines engine configuration with top-level network permissions

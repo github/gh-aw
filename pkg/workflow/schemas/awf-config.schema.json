@@ -124,6 +124,18 @@
           "enum": ["5m", "1h"],
           "description": "TTL for Anthropic cache tail optimization. Only applies when anthropicAutoCache is enabled. Allowed values: \"5m\" or \"1h\"."
         },
+        "hostedWeb": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "claude": {
+              "$ref": "#/$defs/hostedWebPolicy"
+            },
+            "codex": {
+              "$ref": "#/$defs/hostedWebPolicy"
+            }
+          }
+        },
         "maxEffectiveTokens": {
           "type": "integer",
           "minimum": 1,
@@ -1428,6 +1440,65 @@
     }
   },
   "$defs": {
+    "hostedWebPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowedDomains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+          }
+        },
+        "blockedDomains": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+          }
+        },
+        "maxUses": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "not": {
+        "required": ["allowedDomains", "blockedDomains"]
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "enabled": { "const": false }
+          },
+          "not": {
+            "anyOf": [{ "required": ["allowedDomains"] }, { "required": ["blockedDomains"] }, { "required": ["maxUses"] }]
+          }
+        },
+        {
+          "properties": {
+            "enabled": { "const": true }
+          },
+          "required": ["allowedDomains"]
+        },
+        {
+          "properties": {
+            "enabled": { "const": true }
+          },
+          "required": ["blockedDomains"]
+        }
+      ]
+    },
     "digestPinnedImage": {
       "type": "string",
       "pattern": "^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+(?::[0-9]{1,5})?|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?:[0-9]{1,5}|localhost)/[a-z0-9]+(?:(?:[._]|__|[-]+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|[-]+)[a-z0-9]+)*)*:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[a-f0-9]{64}$",

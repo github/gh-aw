@@ -137,6 +137,10 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		MaxAICredits:        maxAICredits,
 		EnableTokenSteering: tokenSteeringEnabled,
 	}
+	if hostedWeb := buildHostedWebConfig(config.EngineName, config.WorkflowData); hostedWeb != nil {
+		apiProxy.HostedWeb = hostedWeb
+		awfConfigLog.Printf("API proxy: hosted web policy configured for %s", config.EngineName)
+	}
 
 	if !enableTokenSteering {
 		awfConfigLog.Print("Disabling apiProxy.enableTokenSteering")
@@ -344,6 +348,35 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 
 	return jsonStr, nil
+}
+
+func buildHostedWebConfig(engineName string, workflowData *WorkflowData) *AWFHostedWebConfig {
+	if workflowData == nil || workflowData.NetworkPermissions == nil {
+		return nil
+	}
+
+	policy := workflowData.NetworkPermissions.HostedWeb
+	if policy == nil {
+		if !workflowData.NetworkPermissions.ExplicitlyDefined {
+			return nil
+		}
+		policy = &HostedWebPolicy{}
+	}
+
+	awfPolicy := &AWFHostedWebPolicy{
+		Enabled:        policy.Enabled,
+		AllowedDomains: policy.Allowed,
+		BlockedDomains: policy.Blocked,
+		MaxUses:        policy.MaxUses,
+	}
+	switch strings.ToLower(engineName) {
+	case "claude":
+		return &AWFHostedWebConfig{Claude: awfPolicy}
+	case "codex":
+		return &AWFHostedWebConfig{Codex: awfPolicy}
+	default:
+		return nil
+	}
 }
 
 func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {

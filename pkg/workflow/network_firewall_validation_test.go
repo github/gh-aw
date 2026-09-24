@@ -258,3 +258,62 @@ func TestValidateNetworkFirewallConfig_Integration(t *testing.T) {
 		assert.NoError(t, err, "Compiler should accept workflow with allow-urls and ssl-bump enabled")
 	})
 }
+
+func TestValidateHostedWebPolicy(t *testing.T) {
+	tests := []struct {
+		name    string
+		engine  string
+		policy  *HostedWebPolicy
+		wantErr string
+	}{
+		{
+			name:   "allows a lowercase allowlist",
+			engine: "claude",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+		},
+		{
+			name:    "requires a policy list when enabled",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true},
+			wantErr: "requires exactly one",
+		},
+		{
+			name:    "rejects simultaneous lists",
+			engine:  "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, Blocked: []string{"example.com"}},
+			wantErr: "cannot both be set",
+		},
+		{
+			name:    "rejects uppercase domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"Docs.GitHub.com"}},
+			wantErr: "lowercase DNS hostname",
+		},
+		{
+			name:    "rejects IP addresses",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"192.0.2.1"}},
+			wantErr: "lowercase DNS hostname",
+		},
+		{
+			name:    "rejects unsupported engine",
+			engine:  "copilot",
+			policy:  &HostedWebPolicy{Enabled: false},
+			wantErr: "only supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateHostedWebPolicy(&WorkflowData{
+				EngineConfig:       &EngineConfig{ID: tt.engine},
+				NetworkPermissions: &NetworkPermissions{HostedWeb: tt.policy},
+			})
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
+}

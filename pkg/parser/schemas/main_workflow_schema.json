@@ -3595,6 +3595,62 @@
                 "description": "Domain name or ecosystem identifier to block. Supports wildcards like '*.example.com' (matches sub.example.com, deep.nested.example.com, and example.com itself) and ecosystem names like 'python', 'node'."
               },
               "$comment": "Blocked domains are subtracted from the allowed list. Useful for blocking specific domains or ecosystems within broader allowed categories."
+            },
+            "hosted-web": {
+              "type": "object",
+              "description": "Policy for Claude and Codex provider-hosted web search and fetch tools. This is independent from network.allowed because hosted retrieval runs on provider infrastructure.",
+              "additionalProperties": false,
+              "required": ["enabled"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "When false, hosted web tool calls are rejected. When true, exactly one of allowed or blocked is required."
+                },
+                "allowed": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+                  }
+                },
+                "blocked": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+                  }
+                },
+                "max-uses": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "oneOf": [
+                {
+                  "properties": {
+                    "enabled": { "const": false }
+                  },
+                  "not": {
+                    "anyOf": [{ "required": ["allowed"] }, { "required": ["blocked"] }, { "required": ["max-uses"] }]
+                  }
+                },
+                {
+                  "properties": {
+                    "enabled": { "const": true }
+                  },
+                  "required": ["allowed"],
+                  "not": { "required": ["blocked"] }
+                },
+                {
+                  "properties": {
+                    "enabled": { "const": true }
+                  },
+                  "required": ["blocked"],
+                  "not": { "required": ["allowed"] }
+                }
+              ]
             }
           },
           "additionalProperties": false
