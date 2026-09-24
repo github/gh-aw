@@ -37,6 +37,18 @@ func TestParseFrontmatterConfigDynamicCheckoutTrimsExpression(t *testing.T) {
 	assert.Equal(t, []DynamicCheckoutConfig{{Expression: "${{ fromJSON(inputs.checkouts) }}", AllowedRepos: []string{"${{ fromJSON(inputs.allowed_repos) }}"}}}, config.DynamicCheckouts)
 }
 
+func TestParseFrontmatterConfigDynamicCheckoutRequiresAllowedRepos(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"dynamic": "${{ fromJSON(inputs.checkouts) }}",
+		},
+	})
+
+	require.ErrorContains(t, err, "requires allowed-repos")
+}
+
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 	compiler := NewCompiler()
 	steps := compiler.generateDynamicCheckoutSteps(

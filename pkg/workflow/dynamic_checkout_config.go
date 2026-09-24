@@ -19,12 +19,12 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	if !hasExpression || !isExpression(expression) {
 		return DynamicCheckoutConfig{}, false, nil
 	}
-	if len(raw) != 2 {
-		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
-	}
 	allowed, ok := raw["allowed-repos"]
 	if !ok {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout requires allowed-repos")
+	}
+	if len(raw) != 2 {
+		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
 	if err != nil || len(allowedRepos) == 0 {
