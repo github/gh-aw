@@ -5,7 +5,7 @@
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
 
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { assembleMarkdownBodyParts, ensureBlankLineAfterDetails } = require("./markdown_body_helpers.cjs");
 const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { generateWorkflowCallIdMarker, matchesWorkflowId } = require("./generate_footer.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
@@ -888,6 +888,8 @@ async function main(config = {}) {
     if (callerWorkflowId) {
       processedBody += "\n" + generateWorkflowCallIdMarker(callerWorkflowId);
     }
+
+    processedBody = ensureBlankLineAfterDetails(processedBody);
 
     // Enforce max limits again after adding footer and metadata
     // This ensures the final body (including generated content) doesn't exceed limits

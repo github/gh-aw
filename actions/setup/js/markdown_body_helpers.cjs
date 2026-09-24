@@ -65,7 +65,56 @@ function assembleMarkdownBodyParts(params) {
   return { detectionCaution, footer, noFooterMarker };
 }
 
+/**
+ * Ensure a blank line follows every closing `</details>` tag so that markdown
+ * placed directly after a collapsible block is still rendered by GitHub.
+ * Closing tags inside fenced code blocks are left untouched, as are tags that
+ * are part of another construct (for example blockquoted alerts) or that share
+ * their line with other content.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function ensureBlankLineAfterDetails(markdown) {
+  if (!markdown || typeof markdown !== "string" || !markdown.includes("</details>")) {
+    return markdown;
+  }
+
+  const lines = markdown.split("\n");
+  /** @type {string[]} */
+  const result = [];
+  let fenceMarker = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+      if (!fenceMarker) {
+        fenceMarker = marker;
+      } else if (marker === fenceMarker) {
+        fenceMarker = "";
+      }
+    }
+
+    result.push(line);
+
+    if (fenceMarker || !/^\s*<\/details>\s*$/.test(line)) {
+      continue;
+    }
+
+    const nextLine = lines[i + 1];
+    if (nextLine === undefined || nextLine.trim() === "") {
+      continue;
+    }
+
+    result.push("");
+  }
+
+  return result.join("\n");
+}
+
 module.exports = {
   buildGeneratedFooter,
   assembleMarkdownBodyParts,
+  ensureBlankLineAfterDetails,
 };

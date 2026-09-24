@@ -17,7 +17,7 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo, resolveFailureIssueRepo
 const { addExpirationToFooter } = require("./ephemerals.cjs");
 const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { assembleMarkdownBodyParts, ensureBlankLineAfterDetails } = require("./markdown_body_helpers.cjs");
 const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
@@ -1648,7 +1648,7 @@ async function main(config = {}) {
       // Snapshot the body content (without footer) for use in protected-files fallback ordering.
       // The protected-files section must appear before the footer (including guard notices such as
       // the integrity-filtering note) so that the footer always comes last in the issue body.
-      const mainBodyContent = bodyLines.join("\n").trim();
+      const mainBodyContent = ensureBlankLineAfterDetails(bodyLines.join("\n").trim());
       const issueSafeMainBodyContent = neutralizeClosingKeywordsForIssueBody(mainBodyContent);
 
       // Generate footer using messages template system (respects custom messages.footer config)
@@ -1715,7 +1715,7 @@ async function main(config = {}) {
       bodyLines.push("");
 
       // Prepare the body content
-      const body = bodyLines.join("\n").trim();
+      const body = ensureBlankLineAfterDetails(bodyLines.join("\n").trim());
       const issueSafeBody = neutralizeClosingKeywordsForIssueBody(body);
       // Footer section (footer + workflow-id marker) used when ordering protected-files notices
       const footerContent = footerParts.join("\n\n");

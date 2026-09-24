@@ -17,7 +17,7 @@ const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_titl
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { createExpirationLine, generateFooterWithExpiration, addExpirationToFooter } = require("./ephemerals.cjs");
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { assembleMarkdownBodyParts, ensureBlankLineAfterDetails } = require("./markdown_body_helpers.cjs");
 const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
@@ -612,7 +612,7 @@ async function main(config = {}) {
     }
 
     bodyLines.push("");
-    const body = bodyLines.join("\n").trim();
+    const body = ensureBlankLineAfterDetails(bodyLines.join("\n").trim());
 
     core.info(`Creating discussion in ${qualifiedItemRepo} with title: ${title}`);
 
