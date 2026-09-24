@@ -20,7 +20,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Codex", DefaultCodexVersion, "0.154.0"},
 		{"Pi CLI", DefaultPiVersion, "0.87.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.25"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.26"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.2"},
 	}
 
