@@ -73,6 +73,76 @@ This is a test workflow with network permissions.`
 		}
 	})
 
+	t.Run("Extract hosted web policy", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: claude
+network:
+  hosted-web:
+    allowed:
+      - docs.github.com
+    max-uses: 5
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		workflowData, err := compiler.ParseWorkflowFile(filePath)
+		if err != nil {
+			t.Fatalf("Failed to parse workflow: %v", err)
+		}
+
+		policy := workflowData.NetworkPermissions.HostedWeb
+		if policy == nil || !policy.Enabled {
+			t.Fatal("Expected hosted web policy to be enabled")
+		}
+		if len(policy.Allowed) != 1 || policy.Allowed[0] != "docs.github.com" || policy.MaxUses != 5 {
+			t.Errorf("Unexpected hosted web policy: %#v", policy)
+		}
+	})
+
+	t.Run("Extract disabled hosted web policy", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: codex
+network:
+  hosted-web: false
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		workflowData, err := compiler.ParseWorkflowFile(filePath)
+		if err != nil {
+			t.Fatalf("Failed to parse workflow: %v", err)
+		}
+
+		policy := workflowData.NetworkPermissions.HostedWeb
+		if policy == nil || policy.Enabled {
+			t.Fatalf("Expected hosted web policy to be disabled, got %#v", policy)
+		}
+	})
+
+	t.Run("Round trip disabled hosted web policy", func(t *testing.T) {
+		config, err := ParseFrontmatterConfig(map[string]any{
+			"network": map[string]any{"hosted-web": false},
+		})
+		if err != nil {
+			t.Fatalf("Failed to parse frontmatter config: %v", err)
+		}
+
+		network := config.ToMap()["network"].(map[string]any)
+		if hostedWeb, ok := network["hosted-web"].(bool); !ok || hostedWeb {
+			t.Fatalf("Expected disabled hosted web policy to serialize as false, got %#v", hostedWeb)
+		}
+	})
+
 	t.Run("No network permissions specified", func(t *testing.T) {
 		yamlContent := `---
 on: push

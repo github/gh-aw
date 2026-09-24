@@ -60,7 +60,7 @@ func ExtractMapField(frontmatter map[string]any, key string) map[string]any {
 
 // ToMap converts FrontmatterConfig back to map[string]any for backward compatibility
 // This allows gradual migration from map[string]any to strongly-typed config
-func (fc *FrontmatterConfig) ToMap() map[string]any {
+func (fc *FrontmatterConfig) ToMap() map[string]any { //nolint:largefunc // Serialization preserves backwards-compatible field ordering.
 	frontmatterTypesLog.Printf("Converting FrontmatterConfig to map: name=%s", fc.Name)
 	result := make(map[string]any)
 
@@ -151,7 +151,7 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 	if fc.Network != nil {
 		// Convert NetworkPermissions to map format
 		// If allowed list is just ["defaults"], convert to string format "defaults"
-		if len(fc.Network.Allowed) == 1 && fc.Network.Allowed[0] == "defaults" && !fc.Network.AllowedInput && fc.Network.Firewall == nil && fc.Network.HostedWeb == nil && len(fc.Network.Blocked) == 0 {
+		if len(fc.Network.Allowed) == 1 && fc.Network.Allowed[0] == "defaults" && !fc.Network.AllowedInput && fc.Network.Firewall == nil && fc.Network.HostedWeb == nil && len(fc.Network.Blocked) == 0 { //nolint:uncheckedsliceindex // The length check ensures index zero exists.
 			result["network"] = "defaults"
 		} else {
 			networkMap := make(map[string]any)
@@ -165,7 +165,11 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 				networkMap["blocked"] = fc.Network.Blocked
 			}
 			if fc.Network.HostedWeb != nil {
-				networkMap["hosted-web"] = fc.Network.HostedWeb
+				if fc.Network.HostedWeb.Enabled {
+					networkMap["hosted-web"] = fc.Network.HostedWeb
+				} else {
+					networkMap["hosted-web"] = false
+				}
 			}
 			if fc.Network.Firewall != nil {
 				networkMap["firewall"] = fc.Network.Firewall
@@ -256,9 +260,9 @@ func githubAppConfigToMap(app *GitHubAppConfig) map[string]any {
 		result["owner"] = app.Owner
 	}
 	if len(app.Repositories) > 0 {
-		repositories := make([]any, len(app.Repositories))
-		for i, repository := range app.Repositories {
-			repositories[i] = repository
+		repositories := make([]any, 0, len(app.Repositories))
+		for _, repository := range app.Repositories {
+			repositories = append(repositories, repository)
 		}
 		result["repositories"] = repositories
 	}
@@ -352,7 +356,7 @@ func runtimesConfigToMap(config *RuntimesConfig) map[string]any {
 }
 
 // permissionsConfigToMap converts PermissionsConfig back to map[string]any
-func permissionsConfigToMap(config *PermissionsConfig) map[string]any {
+func permissionsConfigToMap(config *PermissionsConfig) map[string]any { //nolint:largefunc // Permission scopes remain an explicit mapping.
 	if config == nil {
 		return nil
 	}

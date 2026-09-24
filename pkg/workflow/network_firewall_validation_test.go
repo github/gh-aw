@@ -272,7 +272,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
 		},
 		{
-			name:    "requires a policy list when enabled",
+			name:    "requires a policy list",
 			engine:  "claude",
 			policy:  &HostedWebPolicy{Enabled: true},
 			wantErr: "requires exactly one",

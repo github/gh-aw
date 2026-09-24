@@ -56,13 +56,12 @@ network:
   allowed:
     - defaults
   hosted-web:
-    enabled: true
     allowed:
       - docs.github.com
     max-uses: 5
 ```
 
-`allowed` and `blocked` are mutually exclusive, contain lowercase DNS hostnames only, and are never derived from `network.allowed`. A policy with `enabled: true` requires one non-empty list. Use `enabled: false` to reject hosted web tool calls. When `network` is configured for Claude or Codex without `hosted-web`, gh-aw emits `enabled: false` for that engine.
+`allowed` and `blocked` are mutually exclusive, contain lowercase DNS hostnames only, and are never derived from `network.allowed`. The presence of `hosted-web` enables it and requires one non-empty list. Use `hosted-web: false` to reject hosted web tool calls. When `network` is configured for Claude or Codex without `hosted-web`, gh-aw emits `enabled: false` for that engine.
 
 ## Protocol-Specific Domain Filtering
 

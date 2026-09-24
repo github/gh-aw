@@ -60,7 +60,7 @@ func validateNetworkFirewallConfig(networkPermissions *NetworkPermissions) error
 }
 
 // validateNetworkAllowedDomains validates the allowed domains in network configuration
-func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) error {
+func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) error { //nolint:largefunc // Domain validation preserves detailed diagnostics.
 	if network == nil || len(network.Allowed) == 0 {
 		return nil
 	}
@@ -143,12 +143,12 @@ func validateHostedWebPolicy(workflowData *WorkflowData) error {
 	}
 	if !policy.Enabled {
 		if len(policy.Allowed) > 0 || len(policy.Blocked) > 0 || policy.MaxUses != 0 {
-			return errors.New("network.hosted-web: enabled: false cannot be combined with allowed, blocked, or max-uses")
+			return errors.New("network.hosted-web: false cannot be combined with allowed, blocked, or max-uses")
 		}
 		return nil
 	}
 	if len(policy.Allowed) == 0 && len(policy.Blocked) == 0 {
-		return errors.New("network.hosted-web: enabled: true requires exactly one non-empty allowed or blocked list")
+		return errors.New("network.hosted-web requires exactly one non-empty allowed or blocked list")
 	}
 	if len(policy.Allowed) > 0 && len(policy.Blocked) > 0 {
 		return errors.New("network.hosted-web: allowed and blocked cannot both be set")
@@ -227,7 +227,7 @@ func getValidEcosystemIdentifiers() []string {
 var domainPattern = regexp.MustCompile(`^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 
 // validateDomainPattern validates a single domain pattern
-func validateDomainPattern(domain string) error {
+func validateDomainPattern(domain string) error { //nolint:largefunc // Domain validation preserves detailed diagnostics.
 	// Check for empty domain
 	if domain == "" {
 		return NewValidationError(
