@@ -968,7 +968,7 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(diskRunDir, runAPIResponseFileName),
-		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success"}`, diskCachedRunID),
+		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success","path":".github/workflows/disk-cached.lock.yml"}`, diskCachedRunID),
 		0o600,
 	))
 	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
@@ -976,7 +976,7 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 		RunID:       diskCachedRunID,
 		ProcessedAt: time.Now(),
 		RunAnalysis: RunAnalysis{
-			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", Status: "completed", Conclusion: "success"},
+			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", WorkflowPath: ".github/workflows/disk-cached.lock.yml", Status: "completed", Conclusion: "success"},
 		},
 	}, false))
 	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))
@@ -986,7 +986,7 @@ func TestDownloadWorkflowLogsReportsCollectionStatsForJSONLAndDiskCacheHits(t *t
 	jsonlUpdatedAt := time.Now().Add(-time.Hour).Truncate(time.Second)
 	cachedJSONLPath := filepath.Join(outputDir, "cached-logs.jsonl")
 	cachedRecord := fmt.Sprintf(
-		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
+		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"workflow_path":".github/workflows/jsonl-cached.lock.yml","status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
 		jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339),
 	)
 	require.NoError(t, os.WriteFile(cachedJSONLPath, []byte(cachedRecord), 0o600))
@@ -1047,7 +1047,7 @@ func TestDownloadWorkflowLogsRendersDownloadStatsForFreshDownloadWithoutCachedJS
 		"if [ \"$1\" = \"api\" ]; then\n" +
 		"  case \"$*\" in\n" +
 		"  *artifacts*) printf '%s\\n' \"usage\" ;;\n" +
-		fmt.Sprintf("  *) printf '%%s\\n' '{\"id\":%d,\"status\":\"completed\",\"conclusion\":\"success\",\"repository\":{\"full_name\":\"owner/repo\"}}' ;;\n", runID) +
+		fmt.Sprintf("  *) printf '%%s\\n' '{\"id\":%d,\"status\":\"completed\",\"conclusion\":\"success\",\"path\":\".github/workflows/fresh.lock.yml\",\"repository\":{\"full_name\":\"owner/repo\"}}' ;;\n", runID) +
 		"  esac\n" +
 		"  exit 0\n" +
 		"fi\n" +
@@ -1200,7 +1200,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	fakeGHScript := "#!/bin/sh\n" +
 		"case \"$*\" in\n" +
 		fmt.Sprintf("  *\"/runs/%d --jq\"*) cat <<'EOF'\n", diskCachedRunID) +
-		fmt.Sprintf(`{"databaseId":%d,"number":1,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"Disk Cached","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:01:00Z","repository":"owner/repo"}`+"\n", diskCachedRunID, diskCachedRunID) +
+		fmt.Sprintf(`{"databaseId":%d,"number":1,"htmlUrl":"https://github.com/owner/repo/actions/runs/%d","status":"completed","conclusion":"success","workflowName":"Disk Cached","workflowPath":".github/workflows/disk-cached.lock.yml","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:01:00Z","repository":"owner/repo"}`+"\n", diskCachedRunID, diskCachedRunID) +
 		"EOF\n" +
 		"    ;;\n" +
 		fmt.Sprintf("  *\"/runs/%d --jq\"*) cat <<'EOF'\n", jsonlCachedRunID) +
@@ -1217,7 +1217,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	require.NoError(t, os.MkdirAll(diskRunDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(diskRunDir, runAPIResponseFileName),
-		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success","repository":{"full_name":"owner/repo"}}`, diskCachedRunID),
+		fmt.Appendf(nil, `{"id":%d,"status":"completed","conclusion":"success","path":".github/workflows/disk-cached.lock.yml","repository":{"full_name":"owner/repo"}}`, diskCachedRunID),
 		0o600,
 	))
 	require.NoError(t, saveRunSummary(diskRunDir, &RunSummary{
@@ -1225,7 +1225,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 		RunID:       diskCachedRunID,
 		ProcessedAt: time.Now(),
 		RunAnalysis: RunAnalysis{
-			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", Status: "completed", Conclusion: "success"},
+			Run: WorkflowRun{DatabaseID: diskCachedRunID, WorkflowName: "Disk Cached", WorkflowPath: ".github/workflows/disk-cached.lock.yml", Status: "completed", Conclusion: "success"},
 		},
 	}, false))
 	require.NoError(t, markArtifactDownloaded(diskRunDir, constants.UsageArtifactName.String()))
@@ -1233,7 +1233,7 @@ func TestDownloadWorkflowLogsFromStdinReportsCollectionStatsForJSONLAndDiskCache
 	// Run 202: JSONL cache hit — known only via --cached-jsonl.
 	cachedJSONLPath := filepath.Join(outputDir, "cached-logs.jsonl")
 	cachedRecord := fmt.Sprintf(
-		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
+		`{"schema_version":2,"kind":"run","run":{"run_id":%d,"workflow_path":".github/workflows/jsonl-cached.lock.yml","status":"completed","conclusion":"success","run_attempt":"1","updated_at":%q,"repository":"owner/repo"}}`+"\n",
 		jsonlCachedRunID, jsonlUpdatedAt.Format(time.RFC3339),
 	)
 	require.NoError(t, os.WriteFile(cachedJSONLPath, []byte(cachedRecord), 0o600))
