@@ -1,62 +1,191 @@
 {
-  "date": "2026-09-08",
-  "total_prs": 1000,
-  "merged": 808,
-  "closed": 188,
-  "open": 4,
-  "merge_rate": 0.811,
+  "date": "2026-09-24",
+  "total_prs": 726,
+  "merged": 584,
+  "closed": 136,
+  "open": 6,
+  "merge_rate": 0.804,
   "categories": {
     "bug_fix": {
-      "total": 783,
-      "merged": 654,
-      "closed": 125,
-      "open": 4,
-      "rate": 0.84
+      "total": 337,
+      "merged": 279,
+      "closed": 58,
+      "open": 0,
+      "rate": 0.828
     },
     "feature": {
-      "total": 177,
-      "merged": 123,
-      "closed": 54,
+      "total": 287,
+      "merged": 221,
+      "closed": 66,
       "open": 0,
-      "rate": 0.695
-    },
-    "other": {
-      "total": 25,
-      "merged": 18,
-      "closed": 7,
-      "open": 0,
-      "rate": 0.72
-    },
-    "documentation": {
-      "total": 6,
-      "merged": 4,
-      "closed": 2,
-      "open": 0,
-      "rate": 0.667
+      "rate": 0.77
     },
     "testing": {
-      "total": 7,
-      "merged": 7,
-      "closed": 0,
+      "total": 40,
+      "merged": 37,
+      "closed": 3,
       "open": 0,
-      "rate": 1.0
+      "rate": 0.925
+    },
+    "documentation": {
+      "total": 13,
+      "merged": 12,
+      "closed": 1,
+      "open": 0,
+      "rate": 0.923
     },
     "refactor": {
       "total": 2,
-      "merged": 2,
-      "closed": 0,
+      "merged": 1,
+      "closed": 1,
       "open": 0,
-      "rate": 1.0
+      "rate": 0.5
+    },
+    "other": {
+      "total": 41,
+      "merged": 34,
+      "closed": 7,
+      "open": 0,
+      "rate": 0.829
     }
   },
   "structural": {
-    "code_block_merged_pct": 83.5,
-    "code_block_closed_pct": 65.4,
-    "bullet_list_merged_pct": 97.0,
-    "bullet_list_closed_pct": 98.9,
-    "wip_merged_pct": 0.4,
-    "wip_closed_pct": 1.1,
-    "avg_words_merged": 181.7,
-    "avg_words_closed": 308.0
+    "code_block_merged_pct": 77.9,
+    "code_block_closed_pct": 61.8,
+    "bullet_list_merged_pct": 96.2,
+    "bullet_list_closed_pct": 96.3,
+    "wip_merged_pct": null,
+    "avg_words_merged": 145.0,
+    "avg_words_closed": 137.7
+  },
+  "top_merged_keywords": [
+    [
+      "github",
+      258
+    ],
+    [
+      "yaml",
+      243
+    ],
+    [
+      "run",
+      230
+    ],
+    [
+      "coverage",
+      198
+    ],
+    [
+      "changes",
+      197
+    ],
+    [
+      "only",
+      195
+    ],
+    [
+      "generated",
+      185
+    ],
+    [
+      "agent",
+      179
+    ],
+    [
+      "lock",
+      172
+    ],
+    [
+      "before",
+      155
+    ],
+    [
+      "model",
+      155
+    ],
+    [
+      "existing",
+      151
+    ],
+    [
+      "output",
+      146
+    ],
+    [
+      "engine",
+      140
+    ],
+    [
+      "configuration",
+      135
+    ]
+  ],
+  "top_closed_keywords": [
+    [
+      "json",
+      69
+    ],
+    [
+      "only",
+      61
+    ],
+    [
+      "run",
+      61
+    ],
+    [
+      "evidence",
+      61
+    ],
+    [
+      "github",
+      60
+    ],
+    [
+      "value",
+      60
+    ],
+    [
+      "operational",
+      60
+    ],
+    [
+      "lock",
+      59
+    ],
+    [
+      "study",
+      56
+    ],
+    [
+      "agent",
+      54
+    ],
+    [
+      "output",
+      52
+    ],
+    [
+      "metric",
+      51
+    ],
+    [
+      "record",
+      50
+    ],
+    [
+      "intent",
+      50
+    ],
+    [
+      "deterministic",
+      49
+    ]
+  ],
+  "operational_value_pattern": {
+    "total": 93,
+    "merged": 32,
+    "closed": 61,
+    "rate": 0.344
   }
 }
