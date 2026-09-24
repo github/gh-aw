@@ -80,8 +80,8 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 }
 
 func (c *Compiler) validateDynamicCheckoutExpressions(workflowData *WorkflowData) error {
-	for _, err := range workflowData.DynamicCheckoutErrors {
-		return err
+	if len(workflowData.DynamicCheckoutErrors) > 0 {
+		return errors.Join(workflowData.DynamicCheckoutErrors...)
 	}
 	if err := c.validateDynamicCheckoutSecretsUsage(workflowData); err != nil {
 		return err

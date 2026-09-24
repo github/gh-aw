@@ -42,8 +42,8 @@ func parseStringArrayOrExpression(value any) ([]string, error) {
 		return nil, errors.New("expected array")
 	}
 	result := make([]string, 0, len(values))
-	for _, value := range values {
-		repository, ok := value.(string)
+	for _, item := range values {
+		repository, ok := item.(string)
 		if !ok || !strings.Contains(repository, "/") {
 			return nil, errors.New("expected repository names")
 		}
