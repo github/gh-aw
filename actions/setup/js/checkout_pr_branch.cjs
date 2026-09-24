@@ -241,9 +241,9 @@ async function assertTrustedCheckoutRuntime() {
 
   // Bot and app actors (e.g. Copilot, dependabot[bot]) are not regular GitHub
   // users and cannot be resolved via the collaborators API (returns 404).
-  // Trust them based on the event payload's own identity signal: `sender.type`
-  // is set by GitHub itself and cannot be spoofed by the actor, so a "Bot"
-  // sender identifies an app installation acting on this repository.
+  // Trust them based on the event payload's own identity signal, independently
+  // of the workflow_dispatch-only fork check above: GitHub sets `sender.type`,
+  // so a "Bot" sender identifies an app installation acting on this repository.
   const senderType = context.payload.sender?.type;
   if (senderType === "Bot") {
     core.info(`Runtime safety check passed for bot/app actor '${actor}' (sender type: ${senderType})`);
