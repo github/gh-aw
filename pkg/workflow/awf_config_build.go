@@ -419,7 +419,7 @@ func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
 	if engineName == runtimeID {
 		return true
 	}
-	if !strings.HasPrefix(engineName, runtimeID) || len(engineName) == len(runtimeID) {
+	if !strings.HasPrefix(engineName, runtimeID) {
 		return false
 	}
 	suffix := strings.TrimPrefix(engineName, runtimeID)

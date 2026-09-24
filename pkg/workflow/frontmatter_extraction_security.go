@@ -79,6 +79,8 @@ func applyHostedWebPolicy(permissions *NetworkPermissions, hostedWeb any) {
 	}
 }
 
+// extractHostedWebPolicy accepts hosted-web: false for explicit disablement;
+// enablement is represented by the object form, not by hosted-web: true.
 func extractHostedWebPolicy(hostedWeb any) (*HostedWebPolicy, bool) {
 	switch hostedWeb := hostedWeb.(type) {
 	case bool:
