@@ -28,6 +28,7 @@ describe("normalizeCheckout", () => {
   it("rejects traversal and unsupported fields", () => {
     expect(() => normalizeCheckout({ repository: "owner/repo", path: "../repo" }, "/workspace")).toThrow("relative path");
     expect(() => normalizeCheckout({ repository: "owner/repo", fetch: ["main"] }, "/workspace")).toThrow("field 'fetch' is not supported");
+    expect(() => normalizeCheckout({ repository: "owner/repo", current: true }, "/workspace")).toThrow("field 'current' is not supported");
   });
 });
 
@@ -52,12 +53,29 @@ describe("checkoutRepository", () => {
       workspace,
       runGit,
       serverURL: "https://github.com",
+      overrideToken: "fallback-token",
       maskSecret: () => {},
     });
 
     expect(result.default_branch).toBe("main");
     expect(calls[0]).toContain("http.https://github.com/.extraheader=AUTHORIZATION: basic eC1hY2Nlc3MtdG9rZW46c2VjcmV0");
     expect(calls.some(args => args.includes("--unset-all"))).toBe(true);
+  });
+
+  it("rejects a symlinked parent before creating directories outside the workspace", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-workspace-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-outside-"));
+    fs.symlinkSync(outside, path.join(workspace, "linked"));
+    const checkout = normalizeCheckout({ repository: "owner/repo", path: "linked/nested/repo" }, workspace);
+
+    await expect(
+      checkoutRepository(checkout, {
+        workspace,
+        runGit: async () => "",
+        maskSecret: () => {},
+      })
+    ).rejects.toThrow("traverses a symbolic link");
+    expect(fs.existsSync(path.join(outside, "nested"))).toBe(false);
   });
 });
 

@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
-const supportedFields = new Set(["repository", "ref", "path", "github-token", "token", "fetch-depth", "sparse-checkout", "submodules", "lfs", "current", "wiki"]);
+const supportedFields = new Set(["repository", "ref", "path", "github-token", "token", "fetch-depth", "sparse-checkout", "submodules", "lfs", "wiki"]);
 
 function parseDynamicCheckouts(value = process.env.GH_AW_DYNAMIC_CHECKOUTS || "") {
   if (!value.trim()) {
@@ -37,9 +37,6 @@ function normalizeCheckout(entry, workspace) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
     throw new Error(`dynamic checkout repository must use owner/repo format, got '${repository}'`);
   }
-  if (entry.current !== undefined && typeof entry.current !== "boolean") {
-    throw new Error("dynamic checkout current must be a boolean");
-  }
   if (entry.lfs !== undefined && typeof entry.lfs !== "boolean") {
     throw new Error("dynamic checkout lfs must be a boolean");
   }
@@ -68,13 +65,11 @@ function normalizeCheckout(entry, workspace) {
     repository,
     ref: String(entry.ref || "").trim(),
     path: checkoutPath,
-    target: path.resolve(workspace, checkoutPath),
     token: String(entry["github-token"] || entry.token || ""),
     fetchDepth,
     sparseCheckout: String(entry["sparse-checkout"] || ""),
     submodules: entry.submodules,
     lfs: entry.lfs === true,
-    current: entry.current === true,
   };
 }
 
@@ -99,20 +94,37 @@ function credentialArgs(serverURL, token, maskSecret = value => core.setSecret(v
 async function checkoutRepository(checkout, options = {}) {
   const workspace = options.workspace || process.env.GITHUB_WORKSPACE || "";
   const serverURL = (options.serverURL || process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
-  const token = options.overrideToken || checkout.token || process.env.GH_TOKEN || "";
+  const token = checkout.token || options.overrideToken || process.env.GH_TOKEN || "";
   const persistCredentials = options.persistCredentials === true;
   const runGit = options.runGit || defaultRunGit;
 
   let workspaceReal;
+  let checkoutTarget;
   try {
     workspaceReal = fs.realpathSync(workspace);
-    if (fs.existsSync(checkout.target)) {
+    checkoutTarget = path.join(workspaceReal, checkout.path);
+    if (fs.existsSync(checkoutTarget)) {
       throw new Error(`dynamic checkout path already exists: ${checkout.path}`);
     }
-    fs.mkdirSync(path.dirname(checkout.target), { recursive: true });
-    const parentReal = fs.realpathSync(path.dirname(checkout.target));
-    if (parentReal !== workspaceReal && !parentReal.startsWith(workspaceReal + path.sep)) {
-      throw new Error(`dynamic checkout path escapes the workspace through a symbolic link: ${checkout.path}`);
+
+    let parent = workspaceReal;
+    const parentSegments = path
+      .dirname(checkout.path)
+      .split(path.sep)
+      .filter(segment => segment && segment !== ".");
+    for (const segment of parentSegments) {
+      const candidate = path.join(parent, segment);
+      if (fs.existsSync(candidate)) {
+        if (fs.lstatSync(candidate).isSymbolicLink()) {
+          throw new Error(`dynamic checkout path traverses a symbolic link: ${checkout.path}`);
+        }
+      } else {
+        fs.mkdirSync(candidate);
+      }
+      parent = fs.realpathSync(candidate);
+      if (parent !== workspaceReal && !parent.startsWith(workspaceReal + path.sep)) {
+        throw new Error(`dynamic checkout path escapes the workspace: ${checkout.path}`);
+      }
     }
   } catch (error) {
     throw new Error(`failed to prepare dynamic checkout path '${checkout.path}': ${getErrorMessage(error)}`, { cause: error });
@@ -123,18 +135,18 @@ async function checkoutRepository(checkout, options = {}) {
   if (checkout.fetchDepth > 0) {
     cloneArgs.push("--depth", String(checkout.fetchDepth));
   }
-  cloneArgs.push(`${serverURL}/${checkout.repository}.git`, checkout.target);
+  cloneArgs.push(`${serverURL}/${checkout.repository}.git`, checkoutTarget);
 
   core.info(`Checking out ${checkout.repository} into ${checkout.path}`);
   await runGit(cloneArgs);
   if (checkout.ref) {
-    const fetchArgs = [...authArgs, "-C", checkout.target, "fetch", "--no-tags"];
+    const fetchArgs = [...authArgs, "-C", checkoutTarget, "fetch", "--no-tags"];
     if (checkout.fetchDepth > 0) {
       fetchArgs.push("--depth", String(checkout.fetchDepth));
     }
     fetchArgs.push("origin", checkout.ref);
     await runGit(fetchArgs);
-    await runGit(["-C", checkout.target, "checkout", "--force", "FETCH_HEAD"]);
+    await runGit(["-C", checkoutTarget, "checkout", "--force", "FETCH_HEAD"]);
   }
 
   if (checkout.sparseCheckout.trim()) {
@@ -142,26 +154,26 @@ async function checkoutRepository(checkout, options = {}) {
       .split(/\r?\n/)
       .map(pattern => pattern.trim())
       .filter(Boolean);
-    await runGit(["-C", checkout.target, "sparse-checkout", "set", "--no-cone", ...patterns]);
+    await runGit(["-C", checkoutTarget, "sparse-checkout", "set", "--no-cone", ...patterns]);
   }
   if (checkout.submodules === true || checkout.submodules === "true" || checkout.submodules === "recursive") {
-    const args = [...authArgs, "-C", checkout.target, "submodule", "update", "--init"];
+    const args = [...authArgs, "-C", checkoutTarget, "submodule", "update", "--init"];
     if (checkout.submodules === "recursive") {
       args.push("--recursive");
     }
     await runGit(args);
   }
   if (checkout.lfs) {
-    await runGit([...authArgs, "-C", checkout.target, "lfs", "pull"]);
+    await runGit([...authArgs, "-C", checkoutTarget, "lfs", "pull"]);
   }
 
   const credentialKey = `http.${serverURL}/.extraheader`;
   if (persistCredentials && token) {
     const encoded = Buffer.from(`x-access-token:${token}`).toString("base64");
-    await runGit(["-C", checkout.target, "config", credentialKey, `AUTHORIZATION: basic ${encoded}`]);
+    await runGit(["-C", checkoutTarget, "config", credentialKey, `AUTHORIZATION: basic ${encoded}`]);
   } else {
     try {
-      await runGit(["-C", checkout.target, "config", "--unset-all", credentialKey]);
+      await runGit(["-C", checkoutTarget, "config", "--unset-all", credentialKey]);
     } catch (error) {
       core.debug(`No persisted credential needed removal: ${getErrorMessage(error)}`);
     }
@@ -169,7 +181,7 @@ async function checkoutRepository(checkout, options = {}) {
 
   let defaultBranch = "";
   try {
-    defaultBranch = (await runGit(["-C", checkout.target, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])).replace(/^origin\//, "");
+    defaultBranch = (await runGit(["-C", checkoutTarget, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])).replace(/^origin\//, "");
   } catch (error) {
     core.debug(`Could not resolve dynamic checkout default branch: ${getErrorMessage(error)}`);
   }
@@ -177,7 +189,6 @@ async function checkoutRepository(checkout, options = {}) {
     repository: checkout.repository,
     path: checkout.path,
     default_branch: defaultBranch,
-    current: checkout.current,
   };
 }
 
@@ -210,9 +221,6 @@ async function main(options = {}) {
   }
   const checkouts = parseDynamicCheckouts(options.value);
   const normalized = checkouts.map(entry => normalizeCheckout(entry, workspace));
-  if (normalized.filter(entry => entry.current).length > 1) {
-    throw new Error("only one dynamic checkout may set current: true");
-  }
   if (new Set(normalized.map(entry => entry.path.toLowerCase())).size !== normalized.length) {
     throw new Error("dynamic checkout paths must be unique");
   }

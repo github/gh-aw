@@ -38,5 +38,5 @@ func buildDynamicCheckoutsPromptContent(expressions []string) string {
 	}
 	return "- **dynamic checkouts**: Additional repositories were selected and checked out at runtime. " +
 		"Inspect the workspace directories and `$RUNNER_TEMP/gh-aw/safeoutputs/checkout-manifest.json` " +
-		"to identify their repository names, paths, and current target. These checkouts are shallow and credential-free.\n"
+		"to identify their repository names and paths. These checkouts are shallow and credential-free.\n"
 }
