@@ -236,6 +236,8 @@ async function assertTrustedCheckoutRuntime(awContext) {
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR
   // are retained as event/runtime-compatible fallbacks.
   let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  // Only the repository's centralized router may propagate actor identity.
+  // Arbitrary bot/app dispatchers must be validated as themselves.
   if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]") {
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";

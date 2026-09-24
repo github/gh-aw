@@ -430,6 +430,33 @@ If the pull request is still open, verify that:
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine originating actor"));
       });
+
+      it("should not trust a propagated actor from a third-party bot dispatcher", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "third-party-bot[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "third-party-bot[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: { permission: "read" },
+        });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "third-party-bot[bot]" }));
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
+      });
     });
 
     it("should handle git fetch errors", async () => {
