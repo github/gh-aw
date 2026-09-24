@@ -66,7 +66,7 @@ func (c *Compiler) generateInitialAndCheckoutSteps(yaml *strings.Builder, data *
 	for _, line := range additionalLines {
 		yaml.WriteString(line)
 	}
-	for _, step := range c.generateDynamicCheckoutSteps(data.CheckoutExpressions, "", false) {
+	for _, step := range c.generateDynamicCheckoutSteps(data.DynamicCheckouts, "", false) {
 		yaml.WriteString(step)
 	}
 

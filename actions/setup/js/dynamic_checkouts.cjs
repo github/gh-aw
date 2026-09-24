@@ -26,6 +26,19 @@ function parseDynamicCheckouts(value = process.env.GH_AW_DYNAMIC_CHECKOUTS || ""
   return entries;
 }
 
+function parseAllowedRepos(value = process.env.GH_AW_DYNAMIC_CHECKOUT_ALLOWED_REPOS || "") {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`dynamic checkout allowed-repos must resolve to a JSON array: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some(repository => typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))) {
+    throw new Error("dynamic checkout allowed-repos must resolve to a non-empty array of owner/repo names");
+  }
+  return new Set(parsed.map(repository => repository.toLowerCase()));
+}
+
 function normalizeCheckout(entry, workspace) {
   for (const field of Object.keys(entry)) {
     if (!supportedFields.has(field)) {
@@ -61,9 +74,13 @@ function normalizeCheckout(entry, workspace) {
   if (entry.wiki === true) {
     repository += ".wiki";
   }
+  const ref = String(entry.ref || "").trim();
+  if (ref.startsWith("-")) {
+    throw new Error("dynamic checkout ref must not start with '-'");
+  }
   return {
     repository,
-    ref: String(entry.ref || "").trim(),
+    ref,
     path: checkoutPath,
     token: String(entry["github-token"] || entry.token || ""),
     fetchDepth,
@@ -71,6 +88,12 @@ function normalizeCheckout(entry, workspace) {
     submodules: entry.submodules,
     lfs: entry.lfs === true,
   };
+}
+
+function assertSafeSparsePatterns(patterns) {
+  if (patterns.some(pattern => pattern.startsWith("-"))) {
+    throw new Error("dynamic checkout sparse-checkout patterns must not start with '-'");
+  }
 }
 
 async function defaultRunGit(args, options = {}) {
@@ -131,6 +154,7 @@ async function checkoutRepository(checkout, options = {}) {
   }
 
   const authArgs = credentialArgs(serverURL, token, options.maskSecret);
+  const worktreeOptions = { env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" } };
   const cloneArgs = [...authArgs, "clone", "--no-tags"];
   if (checkout.fetchDepth > 0) {
     cloneArgs.push("--depth", String(checkout.fetchDepth));
@@ -138,15 +162,15 @@ async function checkoutRepository(checkout, options = {}) {
   cloneArgs.push(`${serverURL}/${checkout.repository}.git`, checkoutTarget);
 
   core.info(`Checking out ${checkout.repository} into ${checkout.path}`);
-  await runGit(cloneArgs);
+  await runGit(cloneArgs, worktreeOptions);
   if (checkout.ref) {
     const fetchArgs = [...authArgs, "-C", checkoutTarget, "fetch", "--no-tags"];
     if (checkout.fetchDepth > 0) {
       fetchArgs.push("--depth", String(checkout.fetchDepth));
     }
-    fetchArgs.push("origin", checkout.ref);
+    fetchArgs.push("origin", "--", checkout.ref);
     await runGit(fetchArgs);
-    await runGit(["-C", checkoutTarget, "checkout", "--force", "FETCH_HEAD"]);
+    await runGit(["-C", checkoutTarget, "checkout", "--force", "FETCH_HEAD"], worktreeOptions);
   }
 
   if (checkout.sparseCheckout.trim()) {
@@ -154,14 +178,15 @@ async function checkoutRepository(checkout, options = {}) {
       .split(/\r?\n/)
       .map(pattern => pattern.trim())
       .filter(Boolean);
-    await runGit(["-C", checkoutTarget, "sparse-checkout", "set", "--no-cone", ...patterns]);
+    assertSafeSparsePatterns(patterns);
+    await runGit(["-C", checkoutTarget, "sparse-checkout", "set", "--no-cone", "--", ...patterns], worktreeOptions);
   }
   if (checkout.submodules === true || checkout.submodules === "true" || checkout.submodules === "recursive") {
     const args = [...authArgs, "-C", checkoutTarget, "submodule", "update", "--init"];
     if (checkout.submodules === "recursive") {
       args.push("--recursive");
     }
-    await runGit(args);
+    await runGit(args, worktreeOptions);
   }
   if (checkout.lfs) {
     await runGit([...authArgs, "-C", checkoutTarget, "lfs", "pull"]);
@@ -221,6 +246,12 @@ async function main(options = {}) {
   }
   const checkouts = parseDynamicCheckouts(options.value);
   const normalized = checkouts.map(entry => normalizeCheckout(entry, workspace));
+  const allowedRepos = parseAllowedRepos(options.allowedRepos);
+  for (const checkout of normalized) {
+    if (!allowedRepos.has(checkout.repository.toLowerCase())) {
+      throw new Error(`dynamic checkout repository '${checkout.repository}' is not in allowed-repos`);
+    }
+  }
   if (new Set(normalized.map(entry => entry.path.toLowerCase())).size !== normalized.length) {
     throw new Error("dynamic checkout paths must be unique");
   }
@@ -246,6 +277,7 @@ module.exports = {
   checkoutRepository,
   main,
   normalizeCheckout,
+  parseAllowedRepos,
   parseDynamicCheckouts,
   writeManifest,
 };

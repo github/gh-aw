@@ -97,8 +97,11 @@ func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, err
 			config.CheckoutDisabled = true
 			config.CheckoutExplicitlyDisabled = true
 			frontmatterTypesLog.Print("Checkout disabled via checkout: false")
-		} else if checkoutExpression, ok := config.Checkout.(string); ok && isExpression(checkoutExpression) {
-			config.CheckoutExpressions = []string{checkoutExpression}
+		} else if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(config.Checkout); ok {
+			if err != nil {
+				return nil, err
+			}
+			config.DynamicCheckouts = []DynamicCheckoutConfig{dynamicCheckout}
 			frontmatterTypesLog.Print("Parsed expression-valued checkout configuration")
 		} else {
 			checkoutConfigs, err := ParseCheckoutConfigs(config.Checkout)

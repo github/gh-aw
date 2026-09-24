@@ -33,11 +33,15 @@ checkout:
 
 ### Dynamic Checkout Sets
 
-Use a GitHub Actions expression when the repositories are only known at runtime. The
-expression must resolve to one checkout object or an array of checkout objects:
+Use a dynamic checkout declaration when repositories are only known at runtime. The
+expression must resolve to one checkout object or an array of checkout objects. To
+prevent untrusted input from selecting arbitrary repositories, `allowed-repos` is
+required and may itself be a GitHub Actions expression resolving to an array:
 
 ```yaml wrap
-checkout: ${{ fromJSON(inputs.checkouts) }}
+checkout:
+  dynamic: ${{ fromJSON(inputs.checkouts) }}
+  allowed-repos: ${{ fromJSON(inputs.allowed-repos) }}
 ```
 
 Dynamic entries are checked out in addition to the default workflow repository. Each
@@ -60,11 +64,18 @@ reference it through `env.NAME` instead:
 ```yaml wrap
 env:
   CHECKOUT_TOKEN: ${{ secrets.MY_TOKEN }}
-checkout: ${{ fromJSON(format('[{"repository":"{0}","github-token":"{1}"}]', inputs.repo, env.CHECKOUT_TOKEN)) }}
+checkout:
+  dynamic: ${{ fromJSON(format('[{"repository":"{0}","github-token":"{1}"}]', inputs.repo, env.CHECKOUT_TOKEN)) }}
+  allowed-repos:
+    - owner/repository
 ```
 
 Compilation fails (or warns, in non-strict mode) if a dynamic checkout expression
 references `secrets.*` directly.
+
+Dynamic checkout expressions are evaluated in both the agent and `safe_outputs` jobs.
+They cannot reference agent-job step outputs (`steps.*`); use workflow inputs,
+`github.*`, `vars.*`, or top-level `env.*` values instead.
 
 You can also use `checkout:` to check out additional repositories alongside the main repository:
 

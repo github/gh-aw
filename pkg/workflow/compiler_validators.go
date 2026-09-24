@@ -24,18 +24,11 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
-	// Check for secrets serialization expressions FIRST — before the general allowlist —
-	// to provide a specific, actionable error/warning message.
-	// In strict mode this returns an error that stops further validation.
-	// In non-strict mode it emits a warning and continues.
 	if err := c.validateSecretsSerializationExpressions(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
-	// Dynamic checkout expressions must not embed secrets directly: the resolved
-	// expression is serialized once into the GH_AW_DYNAMIC_CHECKOUTS runtime JSON
-	// payload, so secrets used there would not be statically listed as env vars.
-	if err := c.validateDynamicCheckoutSecretsUsage(workflowData); err != nil {
+	if err := c.validateDynamicCheckoutExpressions(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
@@ -48,6 +41,7 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
 			markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
 		}
+
 		if err := validateExpressionSafety(markdownForAllowlist); err != nil {
 			return formatCompilerError(markdownPath, "error", err.Error(), err)
 		}
@@ -83,6 +77,13 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	}
 
 	return nil
+}
+
+func (c *Compiler) validateDynamicCheckoutExpressions(workflowData *WorkflowData) error {
+	if err := c.validateDynamicCheckoutSecretsUsage(workflowData); err != nil {
+		return err
+	}
+	return c.validateDynamicCheckoutContexts(workflowData)
 }
 
 func runtimeImportValidationMarkdown(workflowData *WorkflowData) string {

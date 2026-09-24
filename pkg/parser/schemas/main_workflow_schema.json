@@ -13281,9 +13281,24 @@
           "description": "Set to false to disable the default checkout step. The agent job will not check out any repository (dev-mode checkouts are unaffected)."
         },
         {
-          "type": "string",
-          "pattern": "^\\s*\\$\\{\\{[\\s\\S]+\\}\\}\\s*$",
-          "description": "A GitHub Actions expression that resolves at runtime to one checkout object or an array of checkout objects. Dynamic entries are additional checkouts and must identify a repository."
+          "type": "object",
+          "required": ["dynamic", "allowed-repos"],
+          "properties": {
+            "dynamic": {
+              "type": "string",
+              "pattern": "^\\s*\\$\\{\\{[\\s\\S]+\\}\\}\\s*$",
+              "description": "GitHub Actions expression resolving to one checkout object or an array of checkout objects."
+            },
+            "allowed-repos": {
+              "oneOf": [
+                { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+                { "type": "string", "pattern": "^\\s*\\$\\{\\{[\\s\\S]+\\}\\}\\s*$" }
+              ],
+              "description": "Repositories permitted for dynamic checkout, or an expression resolving to their array."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Runtime checkout configuration with a required repository allowlist."
         }
       ]
     },

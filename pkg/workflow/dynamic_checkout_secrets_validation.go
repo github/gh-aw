@@ -75,7 +75,7 @@ func findDynamicCheckoutSecretsExpressions(expressions []string) []string {
 // In strict mode this returns an error; in non-strict mode it emits a warning to
 // stderr and increments the compiler warning count.
 func (c *Compiler) validateDynamicCheckoutSecretsUsage(workflowData *WorkflowData) error {
-	found := findDynamicCheckoutSecretsExpressions(workflowData.CheckoutExpressions)
+	found := findDynamicCheckoutSecretsExpressions(dynamicCheckoutExpressions(workflowData.DynamicCheckouts))
 	if len(found) == 0 {
 		dynamicCheckoutSecretsLog.Printf("No dynamic checkout secrets usage found")
 		return nil

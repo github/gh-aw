@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -8,14 +9,27 @@ import (
 // generateDynamicCheckoutSteps emits one runtime checkout step per expression-valued
 // checkout declaration. GitHub Actions cannot expand an expression into a variable
 // number of steps, so the bundled script performs the additional checkouts with git.
-func (c *Compiler) generateDynamicCheckoutSteps(expressions []string, overrideToken string, persistCredentials bool) []string {
+func (c *Compiler) generateDynamicCheckoutSteps(checkouts []DynamicCheckoutConfig, overrideToken string, persistCredentials bool) []string {
 	var steps []string
-	for index, expression := range expressions {
+	for index, checkout := range checkouts {
 		var step strings.Builder
 		fmt.Fprintf(&step, "      - name: Checkout dynamic repositories (%d)\n", index+1)
 		fmt.Fprintf(&step, "        uses: %s\n", c.getActionPin("actions/github-script"))
 		step.WriteString("        env:\n")
-		fmt.Fprintf(&step, "          GH_AW_DYNAMIC_CHECKOUTS: %s\n", wrapExpressionWithToJSON(expression))
+		fmt.Fprintf(&step, "          GH_AW_DYNAMIC_CHECKOUTS: %s\n", wrapExpressionWithToJSON(checkout.Expression))
+		allowedReposExpression := ""
+		if len(checkout.AllowedRepos) == 1 {
+			for _, allowedRepoExpression := range checkout.AllowedRepos {
+				if isExpression(allowedRepoExpression) {
+					allowedReposExpression = allowedRepoExpression
+				}
+			}
+		}
+		if allowedReposExpression != "" {
+			fmt.Fprintf(&step, "          GH_AW_DYNAMIC_CHECKOUT_ALLOWED_REPOS: %s\n", wrapExpressionWithToJSON(allowedReposExpression))
+		} else if allowedReposJSON, err := json.Marshal(checkout.AllowedRepos); err == nil {
+			writeYAMLEnv(&step, "          ", "GH_AW_DYNAMIC_CHECKOUT_ALLOWED_REPOS", string(allowedReposJSON))
+		}
 		step.WriteString("          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\n")
 		if overrideToken != "" {
 			fmt.Fprintf(&step, "          GH_AW_DYNAMIC_CHECKOUT_TOKEN: %s\n", overrideToken)
@@ -32,8 +46,8 @@ func (c *Compiler) generateDynamicCheckoutSteps(expressions []string, overrideTo
 	return steps
 }
 
-func buildDynamicCheckoutsPromptContent(expressions []string) string {
-	if len(expressions) == 0 {
+func buildDynamicCheckoutsPromptContent(checkouts []DynamicCheckoutConfig) string {
+	if len(checkouts) == 0 {
 		return ""
 	}
 	return "- **dynamic checkouts**: Additional repositories were selected and checked out at runtime. " +

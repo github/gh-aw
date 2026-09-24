@@ -94,7 +94,7 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string { //n
 		condition,
 	)...)
 	steps = append(steps, injectStepCondition(
-		c.generateDynamicCheckoutSteps(data.CheckoutExpressions, prCheckoutToken, true),
+		c.generateDynamicCheckoutSteps(data.DynamicCheckouts, prCheckoutToken, true),
 		condition,
 	)...)
 

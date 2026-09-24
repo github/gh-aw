@@ -8,23 +8,39 @@ import (
 )
 
 func TestParseFrontmatterConfigDynamicCheckout(t *testing.T) {
-	expression := "${{ fromJSON(inputs.checkouts) }}"
 	config, err := ParseFrontmatterConfig(map[string]any{
-		"name":     "dynamic-checkout",
-		"engine":   "copilot",
-		"checkout": expression,
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"dynamic":       "${{ fromJSON(inputs.checkouts) }}",
+			"allowed-repos": []any{"owner/repo"},
+		},
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{expression}, config.CheckoutExpressions)
+	assert.Equal(t, []DynamicCheckoutConfig{{Expression: "${{ fromJSON(inputs.checkouts) }}", AllowedRepos: []string{"owner/repo"}}}, config.DynamicCheckouts)
 	assert.Empty(t, config.CheckoutConfigs)
 	assert.False(t, config.CheckoutDisabled)
+}
+
+func TestParseFrontmatterConfigDynamicCheckoutTrimsExpression(t *testing.T) {
+	config, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"dynamic":       "  ${{ fromJSON(inputs.checkouts) }}  ",
+			"allowed-repos": "${{ fromJSON(inputs.allowed_repos) }}",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []DynamicCheckoutConfig{{Expression: "${{ fromJSON(inputs.checkouts) }}", AllowedRepos: []string{"${{ fromJSON(inputs.allowed_repos) }}"}}}, config.DynamicCheckouts)
 }
 
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 	compiler := NewCompiler()
 	steps := compiler.generateDynamicCheckoutSteps(
-		[]string{"${{ fromJSON(inputs.checkouts) }}"},
+		[]DynamicCheckoutConfig{{Expression: "${{ fromJSON(inputs.checkouts) }}", AllowedRepos: []string{"owner/repo"}}},
 		"${{ secrets.PUSH_TOKEN }}",
 		true,
 	)
@@ -32,6 +48,7 @@ func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 	require.Len(t, steps, 1)
 	assert.Contains(t, steps[0], "name: Checkout dynamic repositories (1)")
 	assert.Contains(t, steps[0], "GH_AW_DYNAMIC_CHECKOUTS: ${{ toJSON(fromJSON(inputs.checkouts)) }}")
+	assert.Contains(t, steps[0], "GH_AW_DYNAMIC_CHECKOUT_ALLOWED_REPOS: \"[\\\"owner/repo\\\"]\"")
 	assert.Contains(t, steps[0], "GH_AW_DYNAMIC_CHECKOUT_TOKEN: ${{ secrets.PUSH_TOKEN }}")
 	assert.Contains(t, steps[0], "GH_AW_DYNAMIC_CHECKOUT_PERSIST_CREDENTIALS: true")
 	assert.Contains(t, steps[0], "dynamic_checkouts.cjs")
@@ -39,7 +56,7 @@ func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 
 func TestGenerateDynamicCheckoutStepsPreservesToJSON(t *testing.T) {
 	compiler := NewCompiler()
-	steps := compiler.generateDynamicCheckoutSteps([]string{"${{ toJSON(inputs.checkouts) }}"}, "", false)
+	steps := compiler.generateDynamicCheckoutSteps([]DynamicCheckoutConfig{{Expression: "${{ toJSON(inputs.checkouts) }}", AllowedRepos: []string{"${{ inputs.allowed_repos }}"}}}, "", false)
 
 	require.Len(t, steps, 1)
 	assert.Contains(t, steps[0], "GH_AW_DYNAMIC_CHECKOUTS: ${{ toJSON(inputs.checkouts) }}")
@@ -47,7 +64,7 @@ func TestGenerateDynamicCheckoutStepsPreservesToJSON(t *testing.T) {
 }
 
 func TestBuildDynamicCheckoutsPromptContent(t *testing.T) {
-	content := buildDynamicCheckoutsPromptContent([]string{"${{ inputs.checkouts }}"})
+	content := buildDynamicCheckoutsPromptContent([]DynamicCheckoutConfig{{Expression: "${{ inputs.checkouts }}"}})
 
 	assert.Contains(t, content, "selected and checked out at runtime")
 	assert.Contains(t, content, "checkout-manifest.json")

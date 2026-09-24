@@ -113,7 +113,7 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 	// (e.g. due to unrecognised tool config shapes like bash: ["*"]).
 	if toolsResult.parsedFrontmatter != nil {
 		workflowData.CheckoutConfigs = toolsResult.parsedFrontmatter.CheckoutConfigs
-		workflowData.CheckoutExpressions = toolsResult.parsedFrontmatter.CheckoutExpressions
+		workflowData.DynamicCheckouts = toolsResult.parsedFrontmatter.DynamicCheckouts
 		workflowData.CheckoutDisabled = toolsResult.parsedFrontmatter.CheckoutDisabled
 		workflowData.CheckoutExplicitlyDisabled = toolsResult.parsedFrontmatter.CheckoutExplicitlyDisabled
 		workflowData.CheckoutSkipDefault = toolsResult.parsedFrontmatter.CheckoutSkipDefault
@@ -122,8 +122,8 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 			if checkoutValue, ok := rawCheckout.(bool); ok && !checkoutValue {
 				workflowData.CheckoutDisabled = true
 				workflowData.CheckoutExplicitlyDisabled = true
-			} else if checkoutExpression, ok := rawCheckout.(string); ok && isExpression(checkoutExpression) {
-				workflowData.CheckoutExpressions = append(workflowData.CheckoutExpressions, checkoutExpression)
+			} else if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(rawCheckout); ok && err == nil {
+				workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
 			} else if configs, err := ParseCheckoutConfigs(rawCheckout); err == nil {
 				workflowData.CheckoutConfigs = configs
 			}
@@ -150,8 +150,8 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 				workflowBuilderLog.Printf("Failed to unmarshal imported checkout JSON: %v", err)
 				continue
 			}
-			if checkoutExpression, ok := raw.(string); ok && isExpression(checkoutExpression) {
-				workflowData.CheckoutExpressions = append(workflowData.CheckoutExpressions, checkoutExpression)
+			if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(raw); ok && err == nil {
+				workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
 				continue
 			}
 			importedConfigs, err := ParseCheckoutConfigs(raw)
@@ -167,7 +167,7 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 	// checkout: entries (own repo, imports) are configured, since that leaves the
 	// agent with no working-directory checkout at all (effectively equivalent to
 	// checkout: false, but without the explicit intent that flag signals).
-	if workflowData.CheckoutSkipDefault && !workflowData.CheckoutDisabled && len(workflowData.CheckoutConfigs) == 0 && len(workflowData.CheckoutExpressions) == 0 {
+	if workflowData.CheckoutSkipDefault && !workflowData.CheckoutDisabled && len(workflowData.CheckoutConfigs) == 0 && len(workflowData.DynamicCheckouts) == 0 {
 		warningMsg := "permissions.contents: none skips the default workflow-repository checkout, " +
 			"but no other checkout: entries are configured; the agent job will have no repository " +
 			"checked out. Add a target checkout: entry, or set checkout: false to make the intent explicit."
@@ -190,7 +190,7 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 		// suppresses the checkout_pr_branch.cjs step regardless of checkout configuration.
 		workflowData.IsPullRequestTarget = true
 
-		if !workflowData.CheckoutDisabled && len(workflowData.CheckoutConfigs) == 0 && len(workflowData.CheckoutExpressions) == 0 {
+		if !workflowData.CheckoutDisabled && len(workflowData.CheckoutConfigs) == 0 && len(workflowData.DynamicCheckouts) == 0 {
 			if _, checkoutExplicitlySet := result.Frontmatter["checkout"]; !checkoutExplicitlySet {
 				workflowBuilderLog.Print("Auto-disabling checkout for pull_request_target workflow")
 				workflowData.CheckoutDisabled = true

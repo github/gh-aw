@@ -135,9 +135,13 @@ func TestValidateDynamicCheckoutSecretsUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			compiler := NewCompiler()
 			compiler.strictMode = tt.strictMode
+			checkouts := make([]DynamicCheckoutConfig, 0, len(tt.expressions))
+			for _, expression := range tt.expressions {
+				checkouts = append(checkouts, DynamicCheckoutConfig{Expression: expression, AllowedRepos: []string{"owner/repo"}})
+			}
 			workflowData := &WorkflowData{
-				CheckoutExpressions: tt.expressions,
-				RawFrontmatter:      tt.rawFrontmatter,
+				DynamicCheckouts: checkouts,
+				RawFrontmatter:   tt.rawFrontmatter,
 			}
 
 			warningsBefore := compiler.GetWarningCount()

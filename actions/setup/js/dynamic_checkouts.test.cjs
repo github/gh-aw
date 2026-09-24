@@ -5,12 +5,23 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-const { checkoutRepository, normalizeCheckout, parseDynamicCheckouts, writeManifest } = require("./dynamic_checkouts.cjs");
+const { checkoutRepository, normalizeCheckout, parseAllowedRepos, parseDynamicCheckouts, writeManifest } = require("./dynamic_checkouts.cjs");
 
 describe("parseDynamicCheckouts", () => {
   it("accepts one object or an array", () => {
     expect(parseDynamicCheckouts('{"repository":"owner/repo"}')).toHaveLength(1);
     expect(parseDynamicCheckouts('[{"repository":"owner/a"},{"repository":"owner/b"}]')).toHaveLength(2);
+  });
+
+  describe("parseAllowedRepos", () => {
+    it("accepts a non-empty repository allowlist", () => {
+      expect(parseAllowedRepos('["owner/repo"]')).toEqual(new Set(["owner/repo"]));
+    });
+
+    it("rejects a missing or malformed allowlist", () => {
+      expect(() => parseAllowedRepos("")).toThrow("must resolve");
+      expect(() => parseAllowedRepos('["not-a-repository"]')).toThrow("owner/repo");
+    });
   });
 
   it("rejects scalar results", () => {
@@ -29,6 +40,7 @@ describe("normalizeCheckout", () => {
     expect(() => normalizeCheckout({ repository: "owner/repo", path: "../repo" }, "/workspace")).toThrow("relative path");
     expect(() => normalizeCheckout({ repository: "owner/repo", fetch: ["main"] }, "/workspace")).toThrow("field 'fetch' is not supported");
     expect(() => normalizeCheckout({ repository: "owner/repo", current: true }, "/workspace")).toThrow("field 'current' is not supported");
+    expect(() => normalizeCheckout({ repository: "owner/repo", ref: "--upload-pack=evil" }, "/workspace")).toThrow("ref must not start");
   });
 });
 
@@ -76,6 +88,46 @@ describe("checkoutRepository", () => {
       })
     ).rejects.toThrow("traverses a symbolic link");
     expect(fs.existsSync(path.join(outside, "nested"))).toBe(false);
+  });
+
+  it("terminates Git options and disables LFS smudging until lfs pull", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-"));
+    const target = path.join(workspace, "repo");
+    const calls = [];
+    const runGit = async (args, options) => {
+      calls.push({ args, options });
+      if (args.includes("clone")) {
+        fs.mkdirSync(path.join(target, ".git"), { recursive: true });
+      }
+      return "";
+    };
+    const checkout = normalizeCheckout({ repository: "owner/repo", ref: "main", "sparse-checkout": "src\nREADME.md", submodules: true }, workspace);
+
+    await checkoutRepository(checkout, { workspace, runGit, maskSecret: () => {} });
+
+    expect(calls.find(call => call.args.includes("fetch")).args.slice(-3)).toEqual(["origin", "--", "main"]);
+    expect(calls.find(call => call.args.includes("sparse-checkout")).args).toContain("--");
+    for (const call of calls.filter(call => call.args.includes("clone") || call.args.includes("checkout") || call.args.includes("sparse-checkout") || call.args.includes("submodule"))) {
+      expect(call.options.env.GIT_LFS_SKIP_SMUDGE).toBe("1");
+    }
+  });
+
+  it("rejects option-like sparse checkout patterns", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-"));
+    const target = path.join(workspace, "repo");
+    const checkout = normalizeCheckout({ repository: "owner/repo", "sparse-checkout": "--stdin" }, workspace);
+    await expect(
+      checkoutRepository(checkout, {
+        workspace,
+        maskSecret: () => {},
+        runGit: async args => {
+          if (args.includes("clone")) {
+            fs.mkdirSync(path.join(target, ".git"), { recursive: true });
+          }
+          return "";
+        },
+      })
+    ).rejects.toThrow("patterns must not start");
   });
 });
 
