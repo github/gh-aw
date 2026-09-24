@@ -11,29 +11,34 @@ import (
 
 func TestValidateMainWorkflowFrontmatter_HostedWebDomainConstraints(t *testing.T) {
 	tests := []struct {
-		name    string
-		field   string
-		domains []any
+		name        string
+		field       string
+		domains     []any
+		wantMessage string
 	}{
 		{
-			name:    "duplicate allowed domains",
-			field:   "allowed",
-			domains: []any{"docs.github.com", "docs.github.com"},
+			name:        "duplicate allowed domains",
+			field:       "allowed",
+			domains:     []any{"docs.github.com", "docs.github.com"},
+			wantMessage: "'allowed': items at 0 and 1 are equal",
 		},
 		{
-			name:    "allowed hostname longer than 253 characters",
-			field:   "allowed",
-			domains: []any{strings.Repeat("a.", 126) + "com"},
+			name:        "allowed hostname longer than 253 characters",
+			field:       "allowed",
+			domains:     []any{strings.Repeat("a.", 126) + "com"},
+			wantMessage: "maxLength: got 255, want 253",
 		},
 		{
-			name:    "duplicate blocked domains",
-			field:   "blocked",
-			domains: []any{"docs.github.com", "docs.github.com"},
+			name:        "duplicate blocked domains",
+			field:       "blocked",
+			domains:     []any{"docs.github.com", "docs.github.com"},
+			wantMessage: "'blocked': items at 0 and 1 are equal",
 		},
 		{
-			name:    "blocked hostname longer than 253 characters",
-			field:   "blocked",
-			domains: []any{strings.Repeat("a.", 126) + "com"},
+			name:        "blocked hostname longer than 253 characters",
+			field:       "blocked",
+			domains:     []any{strings.Repeat("a.", 126) + "com"},
+			wantMessage: "maxLength: got 255, want 253",
 		},
 	}
 
@@ -47,6 +52,8 @@ func TestValidateMainWorkflowFrontmatter_HostedWebDomainConstraints(t *testing.T
 				},
 			}, "workflow.md")
 			require.Error(t, err)
+			require.ErrorContains(t, err, "'hosted-web'")
+			require.ErrorContains(t, err, tt.wantMessage)
 		})
 	}
 }
@@ -63,4 +70,5 @@ func TestValidateMainWorkflowFrontmatter_HostedWebRejectsEnabledField(t *testing
 		},
 	}, "workflow.md")
 	require.Error(t, err)
+	require.ErrorContains(t, err, "Unknown property: enabled")
 }

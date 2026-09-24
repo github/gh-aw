@@ -209,6 +209,16 @@ func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string
 	return hostedWebRuntimeID(engineID, ""), nil
 }
 
+func guardResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {
+	runtimeID := strings.ToLower(resolvedRuntimeID)
+	if registeredEngine || hostedWebRuntimeID(engineID, "") == runtimeID {
+		return runtimeID
+	}
+	// EngineCatalog.Resolve has a broad historical prefix fallback; avoid treating
+	// unrelated unregistered names (for example "codexbridge") as hosted-web-capable.
+	return strings.ToLower(engineID)
+}
+
 func validateHostedWebDomains(field string, domains []string) error {
 	seen := map[string]struct{}{}
 	for _, domain := range domains {
