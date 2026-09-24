@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -138,6 +139,31 @@ func TestSkipUnverifiedWorkflowRun(t *testing.T) {
 
 		assert.False(t, result.Skipped)
 	})
+}
+
+func TestIsFailureWithoutArtifacts(t *testing.T) {
+	assert.True(t, isFailureWithoutArtifacts(ErrNoArtifacts, "failure"))
+	assert.False(t, isFailureWithoutArtifacts(ErrNoArtifacts, "success"))
+	assert.False(t, isFailureWithoutArtifacts(errors.New("download failed"), "failure"))
+}
+
+func TestHandleArtifactDownloadErrorRetainsFailureWithoutArtifacts(t *testing.T) {
+	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{Conclusion: "failure"}}}
+
+	handleArtifactDownloadError(result, ErrNoArtifacts, false)
+
+	assert.False(t, result.Skipped)
+	assert.Empty(t, result.Metrics)
+}
+
+func TestApplyKnownWorkflowPathOverridesCachedPath(t *testing.T) {
+	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+		WorkflowPath: ".github/workflows/stale.lock.yml",
+	}}}
+
+	applyKnownWorkflowPath(result, WorkflowRun{WorkflowPath: ".github/workflows/ci.yml"})
+
+	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
 }
 
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {

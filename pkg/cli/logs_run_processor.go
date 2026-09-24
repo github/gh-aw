@@ -329,7 +329,7 @@ func handleArtifactDownloadError(result *DownloadResult, err error, verbose bool
 		result.Error = err
 	} else if errors.Is(err, ErrNoArtifacts) {
 		logsOrchestratorLog.Printf("No artifacts available for run %d (conclusion=%s)", run.DatabaseID, run.Conclusion)
-		if isFailureConclusion(run.Conclusion) {
+		if isFailureWithoutArtifacts(err, run.Conclusion) {
 			result.Metrics = LogMetrics{}
 			// ErrorCount will be populated by buildProcessedRun via fetchJobStatuses.
 		} else {
@@ -374,17 +374,19 @@ func processSingleRunDownload(
 	perRunParams := resolveRunRepoContext(run, params)
 
 	result, ok, err := prepareRunDownload(ctx, run, runOutputDir, perRunParams, params.storageLimit)
+	applyKnownWorkflowPath(result, run)
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
+		if !isFailureWithoutArtifacts(err, result.Run.Conclusion) {
+			skipUnverifiedWorkflowRun(result, params.verbose)
+		}
 	} else if ok {
 		inferMissingWorkflowPath(result, runOutputDir)
-		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
-			skipNonAgenticWorkflowRun(result, params.verbose)
-		} else {
-			logsOrchestratorLog.Printf("Cache hit for run %d, using cached summary", run.DatabaseID)
-		}
 	} else {
 		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
+	}
+	if err == nil && !result.Skipped && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		skipNonAgenticWorkflowRun(result, params.verbose)
 	}
 
 	completed := completedCount.Add(1)
@@ -452,15 +454,11 @@ func downloadAndTimeRunArtifacts(
 			logsOrchestratorLog.Printf("failed to compute download size for run %d: %v", run.DatabaseID, sizeErr)
 		}
 		analyzeRunArtifacts(ctx, result, runOutputDir, params.verbose, params.artifactFilter)
-		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
-			skipNonAgenticWorkflowRun(result, params.verbose)
-		}
 		return nil
 	})
 
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
-		skipUnverifiedWorkflowRun(result, params.verbose)
 		return
 	}
 }
@@ -501,6 +499,16 @@ func skipNonAgenticWorkflowRun(result *DownloadResult, verbose bool) {
 func skipUnverifiedWorkflowRun(result *DownloadResult, verbose bool) {
 	if !result.Skipped && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
 		skipNonAgenticWorkflowRun(result, verbose)
+	}
+}
+
+func isFailureWithoutArtifacts(err error, conclusion string) bool {
+	return errors.Is(err, ErrNoArtifacts) && isFailureConclusion(conclusion)
+}
+
+func applyKnownWorkflowPath(result *DownloadResult, run WorkflowRun) {
+	if run.WorkflowPath != "" {
+		result.Run.WorkflowPath = run.WorkflowPath
 	}
 }
 

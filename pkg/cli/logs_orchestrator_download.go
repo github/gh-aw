@@ -60,7 +60,7 @@ func (s *logsCollectionStats) recordResult(result DownloadResult) {
 	if s == nil {
 		return
 	}
-	if result.Cached {
+	if result.Cached && !result.Skipped {
 		s.cachedReports.Add(1)
 		return
 	}

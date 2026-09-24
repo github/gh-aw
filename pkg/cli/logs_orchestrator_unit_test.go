@@ -852,6 +852,7 @@ func TestLogsCollectionStatsReportsDiscoveredDownloadedAndCached(t *testing.T) {
 	stats.recordResult(DownloadResult{})
 	stats.recordResult(DownloadResult{Cached: true})
 	stats.recordResult(DownloadResult{Cached: true, CachedRun: &RunData{RunID: 42}})
+	stats.recordResult(DownloadResult{Cached: true, Skipped: true})
 	stats.recordResult(DownloadResult{Skipped: true})
 
 	_, stderr := captureOutput(t, func() error {
