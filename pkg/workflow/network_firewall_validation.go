@@ -203,7 +203,7 @@ func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string
 			return "", err
 		}
 		if resolved != nil && resolved.Runtime != nil {
-			return sanitizeResolvedHostedWebRuntimeID(engineID, resolved.Runtime.GetID(), c.engineCatalog.Get(engineID) != nil), nil
+			return guardResolvedHostedWebRuntimeID(engineID, resolved.Runtime.GetID(), c.engineCatalog.Get(engineID) != nil), nil
 		}
 	}
 	return hostedWebRuntimeID(engineID, ""), nil

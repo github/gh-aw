@@ -401,7 +401,7 @@ func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
 	return engineName
 }
 
-func sanitizeResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {
+func guardResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {
 	runtimeID := strings.ToLower(resolvedRuntimeID)
 	if registeredEngine || hostedWebRuntimeID(engineID, "") == runtimeID {
 		return runtimeID

@@ -318,6 +318,11 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
 		},
 		{
+			name:   "accepts Claude runtime underscore alias",
+			engine: "claude_custom",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
 			name:    "rejects unrelated Codex prefix",
 			engine:  "codexbridge",
 			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
