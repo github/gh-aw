@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-06-05",
-    "workflow_name": "Workflow Normalizer",
-    "workflow_file": "workflow-normalizer",
-    "total_aic_analyzed": 589.05318,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 250
-  },
-  {
     "date": "2026-06-06",
     "workflow_name": "Code Simplifier",
     "workflow_file": "code-simplifier",
@@ -283,5 +273,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 95
+  },
+  {
+    "date": "2026-09-24",
+    "workflow_name": "Claude Code User Documentation Review",
+    "workflow_file": "claude-code-user-docs-review",
+    "total_aic_analyzed": 2821.37,
+    "runs_audited": 10,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 85
   }
 ]
