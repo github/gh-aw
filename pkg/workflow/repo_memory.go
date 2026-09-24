@@ -741,6 +741,7 @@ func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) 
 		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
+		// Only the detection-enabled job has a skipped dependency to gate on.
 		jobCondition = RenderCondition(BuildAnd(BuildFunctionCall("always"), notCancelled))
 	}
 	return jobCondition, jobNeeds
