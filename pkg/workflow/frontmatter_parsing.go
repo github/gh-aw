@@ -9,7 +9,7 @@ import (
 // ParseFrontmatterConfig creates a FrontmatterConfig from a raw frontmatter map
 // This provides a single entry point for converting untyped frontmatter into
 // a structured configuration with better error handling.
-func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, error) {
+func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, error) { //nolint:largefunc // Existing frontmatter parsing remains centralized.
 	frontmatterTypesLog.Printf("Parsing frontmatter config with %d fields", len(frontmatter))
 	var config FrontmatterConfig
 
@@ -90,12 +90,16 @@ func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, err
 		frontmatterTypesLog.Print("Skipping default checkout: permissions.contents is none")
 	}
 
-	// Parse checkout field - supports single object, array of objects, or false to disable
+	// Parse checkout field - supports a single object, an array of objects, a GitHub
+	// Actions expression resolving to either shape, or false to disable.
 	if config.Checkout != nil {
 		if checkoutValue, ok := config.Checkout.(bool); ok && !checkoutValue {
 			config.CheckoutDisabled = true
 			config.CheckoutExplicitlyDisabled = true
 			frontmatterTypesLog.Print("Checkout disabled via checkout: false")
+		} else if checkoutExpression, ok := config.Checkout.(string); ok && isExpression(checkoutExpression) {
+			config.CheckoutExpressions = []string{checkoutExpression}
+			frontmatterTypesLog.Print("Parsed expression-valued checkout configuration")
 		} else {
 			checkoutConfigs, err := ParseCheckoutConfigs(config.Checkout)
 			if err == nil {
@@ -190,7 +194,7 @@ func parseOnNeedsConfig(on map[string]any) ([]string, error) {
 }
 
 // parseRuntimesConfig converts a map[string]any to RuntimesConfig
-func parseRuntimesConfig(runtimes map[string]any) (*RuntimesConfig, error) {
+func parseRuntimesConfig(runtimes map[string]any) (*RuntimesConfig, error) { //nolint:largefunc // Existing runtime parsing remains centralized.
 	config := &RuntimesConfig{}
 
 	for runtimeID, configAny := range runtimes {
@@ -229,8 +233,14 @@ func parseRuntimesConfig(runtimes map[string]any) (*RuntimesConfig, error) {
 		}
 
 		// Extract action-repo and action-version overrides (optional)
-		actionRepo, _ := configMap["action-repo"].(string)
-		actionVersion, _ := configMap["action-version"].(string)
+		actionRepo, actionRepoOK := configMap["action-repo"].(string)
+		if !actionRepoOK {
+			actionRepo = ""
+		}
+		actionVersion, actionVersionOK := configMap["action-version"].(string)
+		if !actionVersionOK {
+			actionVersion = ""
+		}
 
 		// Extract run-install-scripts flag (optional)
 		var runInstallScripts *bool
@@ -291,7 +301,7 @@ func parseRuntimesConfig(runtimes map[string]any) (*RuntimesConfig, error) {
 }
 
 // parsePermissionsConfig converts a map[string]any to PermissionsConfig
-func parsePermissionsConfig(permissions map[string]any) (*PermissionsConfig, error) {
+func parsePermissionsConfig(permissions map[string]any) (*PermissionsConfig, error) { //nolint:largefunc // Existing permissions parsing remains centralized.
 	config := &PermissionsConfig{}
 
 	// Check if it's a shorthand permission (single string value)

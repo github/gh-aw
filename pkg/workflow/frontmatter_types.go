@@ -464,6 +464,7 @@ type FrontmatterConfig struct {
 	// Set to false to disable the default checkout step entirely.
 	Checkout                   any               `json:"checkout,omitempty"` // Raw value (object, array, or false)
 	CheckoutConfigs            []*CheckoutConfig `json:"-"`                  // Parsed checkout configs (not in JSON)
+	CheckoutExpressions        []string          `json:"-"`                  // Runtime expressions resolving to checkout config objects or arrays
 	CheckoutDisabled           bool              `json:"-"`                  // true when checkout: false is set in frontmatter
 	CheckoutExplicitlyDisabled bool              `json:"-"`                  // true only when checkout: false is explicitly written by the user in frontmatter
 	CheckoutSkipDefault        bool              `json:"-"`                  // true when permissions.contents: none skips only the default workflow-repository checkout

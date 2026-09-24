@@ -31,6 +31,25 @@ checkout:
     private-key: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
+### Dynamic Checkout Sets
+
+Use a GitHub Actions expression when the repositories are only known at runtime. The
+expression must resolve to one checkout object or an array of checkout objects:
+
+```yaml wrap
+checkout: ${{ fromJSON(inputs.checkouts) }}
+```
+
+Dynamic entries are checked out in addition to the default workflow repository. Each
+entry must set `repository`; `path` defaults to the repository name. Dynamic entries
+support `repository`, `ref`, `path`, `github-token` (or `token`), `fetch-depth`,
+`sparse-checkout`, `submodules`, `lfs`, `wiki`, and `current`.
+
+The runtime validates repository names, prevents paths from escaping the workspace,
+enforces unique paths and at most one `current: true` entry, and removes checkout
+credentials before the agent starts. GitHub App authentication and additional `fetch`
+patterns remain available only in statically declared checkout entries.
+
 You can also use `checkout:` to check out additional repositories alongside the main repository:
 
 ```yaml wrap

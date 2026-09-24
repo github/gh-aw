@@ -122,7 +122,17 @@ function buildCheckoutManifest(entries, options = {}) {
     throw new Error(`Failed to create directory ${manifestDir}: ${getErrorMessage(err)}`, { cause: err });
   }
   const manifestPath = path.join(manifestDir, "checkout-manifest.json");
-  const manifest = {};
+  let manifest = {};
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const existing = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+        manifest = existing;
+      }
+    }
+  } catch (error) {
+    core.debug(`checkout-manifest: ignoring unreadable existing manifest: ${getErrorMessage(error)}`);
+  }
   core.info(`checkout-manifest: building manifest for ${entries.length} checkout entries`);
 
   for (const entry of entries) {

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -29,7 +30,7 @@ var consolidatedSafeOutputsStepsLog = logger.New("workflow:compiler_safe_outputs
 // branch per target repository at apply time (it runs `git fetch origin <base>` and
 // branches from `origin/<base>` in the target repo's directory), so a checkout-time base
 // ref is unnecessary. This is the same mechanism the multi-repo path already relied on.
-func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
+func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string { //nolint:largefunc // Checkout step ordering is kept together.
 	consolidatedSafeOutputsStepsLog.Print("Building shared PR checkout steps (mirroring agent job layout)")
 
 	// Build the same CheckoutManager the agent job builds from the workflow's checkout: config.
@@ -92,6 +93,10 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 		checkoutMgr.GenerateAdditionalCheckoutSteps(c.getActionPin),
 		condition,
 	)...)
+	steps = append(steps, injectStepCondition(
+		c.generateDynamicCheckoutSteps(data.CheckoutExpressions, prCheckoutToken, true),
+		condition,
+	)...)
 
 	// Configure Git credentials so the safe_outputs job can push. The agent job never
 	// pushes, so this step has no agent-job equivalent. Reuse the token resolved above so
@@ -151,7 +156,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 // steps that must precede the handler manager step. For each registered handler that has a
 // per-handler github-app configured, a dedicated token step is minted whose permissions are
 // scoped to only that handler's needs (principle of least privilege).
-func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
+func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string { //nolint:largefunc // Existing token step assembly remains centralized.
 	if data.SafeOutputs == nil {
 		return nil
 	}
@@ -330,7 +335,7 @@ func buildCustomScriptFilesStep(scripts map[string]*SafeScriptConfig) ([]string,
 		scriptConfig := scripts[scriptName]
 		normalizedName := stringutil.NormalizeSafeOutputIdentifier(scriptName)
 		filename := safeOutputScriptFilename(normalizedName)
-		filePath := SetupActionDestinationShell + "/" + filename
+		filePath := path.Join(SetupActionDestinationShell, filename)
 		scriptContent := generateSafeOutputScriptContent(scriptName, scriptConfig)
 		delimiter := GenerateHeredocDelimiterFromContent("SAFE_OUTPUT_SCRIPT_"+strings.ToUpper(normalizedName), scriptContent)
 
@@ -352,7 +357,7 @@ func buildCustomScriptFilesStep(scripts map[string]*SafeScriptConfig) ([]string,
 // manager step: the agent output reference, allowed-domains configuration, URL policy,
 // GitHub server/API URLs, custom handler registration maps, and the delegated per-handler
 // config env vars.
-func (c *Compiler) addSafeOutputCoreEnvVars(steps *[]string, data *WorkflowData) error {
+func (c *Compiler) addSafeOutputCoreEnvVars(steps *[]string, data *WorkflowData) error { //nolint:largefunc // Existing environment assembly remains centralized.
 	*steps = append(*steps, "          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
 	*steps = append(*steps, "          GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}\n")
 
@@ -470,7 +475,7 @@ func isCITriggerTokenDisabled(safeOutputs *SafeOutputsConfig) bool {
 // addSafeOutputTokenEnvVars appends token-related environment variables required by the
 // handler manager step: the CI-trigger token, project URL/token, assign-to-agent token,
 // agent-session token, and the optional GITHUB_TOKEN override for cross-repo PR operations.
-func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData) {
+func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData) { //nolint:largefunc // Existing token environment assembly remains centralized.
 	addCITriggerTokenEnvVar(steps, data)
 
 	// Add GH_AW_PROJECT_URL and GH_AW_PROJECT_GITHUB_TOKEN environment variables for project operations.

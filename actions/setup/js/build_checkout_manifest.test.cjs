@@ -157,4 +157,22 @@ describe("build_checkout_manifest.cjs", () => {
     const fileContents = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     expect(fileContents).toEqual(manifest);
   });
+
+  it("preserves dynamic entries already written to the manifest", () => {
+    const workspace = createTempDir("checkout-manifest-workspace-");
+    const runnerTemp = createTempDir("checkout-manifest-runner-temp-");
+    tempDirs.push(workspace, runnerTemp);
+    const manifestDir = path.join(runnerTemp, "gh-aw", "safeoutputs");
+    fs.mkdirSync(manifestDir, { recursive: true });
+    fs.writeFileSync(path.join(manifestDir, "checkout-manifest.json"), JSON.stringify({ "owner/dynamic": { repository: "owner/dynamic", path: "dynamic", default_branch: "main" } }));
+
+    const { manifest } = buildCheckoutManifest([{ repository: "owner/static", path: "static" }], {
+      workspace,
+      runnerTemp,
+      runGH: () => "main\n",
+    });
+
+    expect(manifest).toHaveProperty("owner/dynamic");
+    expect(manifest).toHaveProperty("owner/static");
+  });
 });

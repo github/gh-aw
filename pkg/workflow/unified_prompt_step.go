@@ -172,8 +172,9 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 		if data.TrialMode && data.TrialLogicalRepo != "" {
 			combinedPromptText = applyTrialLogicalRepoToGitHubContext(combinedPromptText, data.TrialLogicalRepo)
 		}
-		if checkoutsContent := buildCheckoutsPromptContent(data.CheckoutConfigs); checkoutsContent != "" {
-			unifiedPromptLog.Printf("Injecting checkout list into GitHub context (%d checkouts)", len(data.CheckoutConfigs))
+		checkoutsContent := buildCheckoutsPromptContent(data.CheckoutConfigs) + buildDynamicCheckoutsPromptContent(data.CheckoutExpressions)
+		if checkoutsContent != "" {
+			unifiedPromptLog.Printf("Injecting checkout context into GitHub context (%d static, %d dynamic)", len(data.CheckoutConfigs), len(data.CheckoutExpressions))
 			const closeTag = "</github-context>"
 			if idx := strings.LastIndex(combinedPromptText, closeTag); idx >= 0 {
 				combinedPromptText = combinedPromptText[:idx] + checkoutsContent + combinedPromptText[idx:]

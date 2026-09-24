@@ -66,6 +66,9 @@ func (c *Compiler) generateInitialAndCheckoutSteps(yaml *strings.Builder, data *
 	for _, line := range additionalLines {
 		yaml.WriteString(line)
 	}
+	for _, step := range c.generateDynamicCheckoutSteps(data.CheckoutExpressions, "", false) {
+		yaml.WriteString(step)
+	}
 
 	// Emit a manifest step that records the path and resolved default branch for each
 	// non-default cross-repo checkout. The safe-outputs MCP server reads this file to
@@ -231,10 +234,10 @@ func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
 
 	// Split on @ to get path and ref
 	parts := strings.Split(cleanSpec, "@")
-	pathPart := parts[0]
-	ref = "main" // default ref
+	pathPart := parts[0] //nolint:uncheckedsliceindex // strings.Split always returns at least one element.
+	ref = "main"         // default ref
 	if len(parts) > 1 {
-		ref = parts[1]
+		ref = parts[1] //nolint:uncheckedsliceindex // len(parts) is checked above.
 	}
 
 	// Parse path: owner/repo
@@ -243,8 +246,8 @@ func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
 		return "", "", ""
 	}
 
-	owner = slashParts[0]
-	repo = slashParts[1]
+	owner = slashParts[0] //nolint:uncheckedsliceindex // len(slashParts) == 2.
+	repo = slashParts[1]  //nolint:uncheckedsliceindex // len(slashParts) == 2.
 
 	return owner, repo, ref
 }

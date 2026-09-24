@@ -13262,7 +13262,7 @@
       "additionalProperties": false
     },
     "checkout": {
-      "description": "Checkout configuration for the agent job. Controls how actions/checkout is invoked. Can be a single checkout configuration, an array for multiple checkouts, or false to disable the default checkout step entirely (dev-mode checkouts are unaffected).",
+      "description": "Checkout configuration for the agent job. Controls how repositories are checked out. Can be a single checkout configuration, an array for multiple checkouts, a GitHub Actions expression resolving to either shape, or false to disable the default checkout step entirely (dev-mode checkouts are unaffected).",
       "oneOf": [
         {
           "$ref": "#/$defs/checkoutConfig",
@@ -13279,6 +13279,11 @@
           "type": "boolean",
           "enum": [false],
           "description": "Set to false to disable the default checkout step. The agent job will not check out any repository (dev-mode checkouts are unaffected)."
+        },
+        {
+          "type": "string",
+          "pattern": "^\\s*\\$\\{\\{[\\s\\S]+\\}\\}\\s*$",
+          "description": "A GitHub Actions expression that resolves at runtime to one checkout object or an array of checkout objects. Dynamic entries are additional checkouts and must identify a repository."
         }
       ]
     },
