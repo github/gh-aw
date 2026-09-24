@@ -611,11 +611,11 @@ func TestCachedLogsCollectorDoesNotRewriteCachedRun(t *testing.T) {
 	writer := newCachedLogsJSONLWriter(path)
 	cached := RunData{RunID: 42}
 	collector := &orderedLogsRunCollector{
-		candidates: []ProcessedRun{
-			{Run: WorkflowRun{DatabaseID: 41}},
-			{Run: WorkflowRun{DatabaseID: 42}, cachedData: &cached},
+		chunkSize: 2,
+		acceptedRuns: map[int]ProcessedRun{
+			0: {Run: WorkflowRun{DatabaseID: 41}},
+			1: {Run: WorkflowRun{DatabaseID: 42}, cachedData: &cached},
 		},
-		accepted: []bool{true, true},
 	}
 
 	processedRuns, batchProcessed := collector.appendAccepted(nil, 0, writer)

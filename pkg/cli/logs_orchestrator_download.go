@@ -140,12 +140,14 @@ func formatDownloadByteSize(bytes int64) string {
 	if bytes < unit {
 		return fmt.Sprintf("%dB", bytes)
 	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
+	size := float64(bytes) / unit
+	for _, suffix := range []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"} {
+		if size < unit {
+			return fmt.Sprintf("%.1f%s", size, suffix)
+		}
+		size /= unit
 	}
-	return fmt.Sprintf("%.1f%ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1fEiB", size)
 }
 
 // renderLogsDownloadStatsSummary prints an end-of-run informational line
@@ -847,30 +849,31 @@ type orderedLogsRunCollector struct {
 	ctx                 context.Context
 	opts                processWorkflowRunBatchOptions
 	processedBase       int
-	candidates          []ProcessedRun
-	accepted            []bool
+	chunkSize           int
+	acceptedRuns        map[int]ProcessedRun
 	acceptedCount       int
-	pendingResults      []DownloadResult
-	resultReady         []bool
-	resultResolved      []chan struct{}
+	pendingResults      map[int]DownloadResult
+	resultReady         map[int]bool
+	resultResolved      map[int]chan struct{}
 	nextResult          int
 	storageLimitReached bool
 	mu                  sync.Mutex
 }
 
 func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, opts processWorkflowRunBatchOptions) *orderedLogsRunCollector {
+	resultResolved := make(map[int]chan struct{}, chunkSize)
+	for i := range chunkSize {
+		resultResolved[i] = make(chan struct{})
+	}
 	collector := &orderedLogsRunCollector{
 		ctx:            ctx,
 		opts:           opts,
 		processedBase:  count,
-		candidates:     make([]ProcessedRun, chunkSize),
-		accepted:       make([]bool, chunkSize),
-		pendingResults: make([]DownloadResult, chunkSize),
-		resultReady:    make([]bool, chunkSize),
-		resultResolved: make([]chan struct{}, chunkSize),
-	}
-	for i := range collector.resultResolved {
-		collector.resultResolved[i] = make(chan struct{})
+		chunkSize:      chunkSize,
+		acceptedRuns:   make(map[int]ProcessedRun, chunkSize),
+		pendingResults: make(map[int]DownloadResult, chunkSize),
+		resultReady:    make(map[int]bool, chunkSize),
+		resultResolved: resultResolved,
 	}
 	return collector
 }
@@ -885,18 +888,29 @@ func (c *orderedLogsRunCollector) onResult(index int, result DownloadResult) {
 func (c *orderedLogsRunCollector) recordResult(index int, result DownloadResult) <-chan struct{} {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	resolved, ok := c.resultResolved[index]
+	if index < 0 || index >= c.chunkSize || !ok {
+		resolved := make(chan struct{})
+		close(resolved)
+		return resolved
+	}
 	c.pendingResults[index] = result
 	c.resultReady[index] = true
-	for c.nextResult < len(c.pendingResults) && c.resultReady[c.nextResult] {
+	for c.nextResult < c.chunkSize && c.resultReady[c.nextResult] {
 		c.processReadyResult(c.nextResult)
-		close(c.resultResolved[c.nextResult])
+		if readyResolved, ok := c.resultResolved[c.nextResult]; ok {
+			close(readyResolved)
+		}
 		c.nextResult++
 	}
-	return c.resultResolved[index]
+	return resolved
 }
 
 func (c *orderedLogsRunCollector) processReadyResult(index int) {
-	result := c.pendingResults[index]
+	result, ok := c.pendingResults[index]
+	if index < 0 || index >= c.chunkSize || !ok {
+		return
+	}
 	c.opts.collectionStats.recordResult(result)
 	if c.processedBase+c.acceptedCount >= c.opts.count || c.opts.countLimit.isReached() {
 		finalizeLogsRunDownload(c.opts.storageLimit, result)
@@ -904,8 +918,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	}
 	if result.CachedRun != nil {
 		if c.opts.countLimit.tryAdd() {
-			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
-			c.accepted[index] = true
+			c.acceptedRuns[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
 			c.acceptedCount++
 		}
 		return
@@ -921,20 +934,20 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	parseWorkflowRunArtifacts(result, processedRun, c.opts.parse, c.opts.verbose)
 	finalizeLogsRunDownload(c.opts.storageLimit, result)
 	if c.opts.countLimit.tryAdd() {
-		c.candidates[index] = processedRun
-		c.accepted[index] = true
+		c.acceptedRuns[index] = processedRun
 		c.acceptedCount++
 	}
 }
 
 func (c *orderedLogsRunCollector) appendAccepted(processedRuns []ProcessedRun, batchProcessed int, writer *cachedLogsJSONLWriter) ([]ProcessedRun, int) {
-	for i := range c.candidates {
-		if !c.accepted[i] {
+	for i := range c.chunkSize {
+		candidate, ok := c.acceptedRuns[i]
+		if !ok {
 			continue
 		}
-		processedRuns = append(processedRuns, c.candidates[i])
+		processedRuns = append(processedRuns, candidate)
 		batchProcessed++
-		if err := writer.Append(c.candidates[i]); err != nil {
+		if err := writer.Append(candidate); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 	}
