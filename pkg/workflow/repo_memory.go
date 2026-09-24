@@ -741,7 +741,7 @@ func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) 
 		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
-		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentCompleted))
+		jobCondition = RenderCondition(BuildAnd(BuildFunctionCall("always"), notCancelled))
 	}
 	return jobCondition, jobNeeds
 }

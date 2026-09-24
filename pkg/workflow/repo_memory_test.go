@@ -1425,11 +1425,8 @@ func TestPushRepoMemoryJobHasNoConcurrencyGroup(t *testing.T) {
 	assert.Equal(t, pushRepoMemoryTimeoutMinutes, pushJob.TimeoutMinutes, "push_repo_memory job should expose an explicit retry ceiling")
 }
 
-// TestPushRepoMemoryJobConditionGatesOnAgentNotSkipped verifies that the push_repo_memory
-// job condition uses needs.agent.result != 'skipped' and !cancelled() so the job does not
-// run on no-op workflow invocations (e.g. bot comments where pre_activation is skipped)
-// or after workflow cancellation.
-func TestPushRepoMemoryJobConditionGatesOnAgentNotSkipped(t *testing.T) {
+// TestPushRepoMemoryJobConditions verifies conditions for the push_repo_memory job.
+func TestPushRepoMemoryJobConditions(t *testing.T) {
 	data := &WorkflowData{
 		RepoMemoryConfig: &RepoMemoryConfig{
 			Memories: []RepoMemoryEntry{
@@ -1446,9 +1443,9 @@ func TestPushRepoMemoryJobConditionGatesOnAgentNotSkipped(t *testing.T) {
 		require.NotNil(t, pushJob, "Should produce a push job")
 
 		assert.Equal(t,
-			"always() && (!cancelled()) && needs.agent.result != 'skipped'",
+			"always() && (!cancelled())",
 			pushJob.If,
-			"Condition should run for completed agent jobs, including failures",
+			"Condition should run unless the workflow is cancelled",
 		)
 	})
 
