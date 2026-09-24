@@ -19,7 +19,7 @@ import (
 type rs05aBridgeScenario struct {
 	AwContextProvided bool   `json:"awContextProvided"`
 	AwContextRaw      string `json:"awContextRaw"`
-	RepositoryFork    bool   `json:"repositoryFork"`
+	RepositoryFork    any    `json:"repositoryFork"`
 	Actor             string `json:"actor"`
 	SenderType        string `json:"senderType"`
 	Permission        string `json:"permission"`
@@ -106,6 +106,26 @@ func TestFormalRS05a_ActorTrustForkRejected(t *testing.T) {
 	assert.Empty(t, result.PermissionCalls, "RS-05a forked runtime repository must block before permission lookup")
 	assertRS05aFailedContains(t, result, "Refusing PR checkout in forked repository runtime context")
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_UnverifiableForkStatusRejected(t *testing.T) {
+	for _, forkStatus := range []any{nil, "false", 0} {
+		t.Run(fmt.Sprintf("fork=%v", forkStatus), func(t *testing.T) {
+			scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+				"item_type":   "pull_request",
+				"item_number": 123,
+				"repo":        "test-owner/test-repo",
+			})
+			scenario.RepositoryFork = forkStatus
+
+			result := runRS05aBridge(t, scenario)
+
+			assertRS05aNoFetch(t, result)
+			assert.Empty(t, result.PermissionCalls, "unverifiable fork status must block before permission lookup")
+			assertRS05aFailedContains(t, result, "unable to verify repository is not a fork")
+			assertRS05aOutput(t, result, "checkout_pr_success", "false")
+		})
+	}
 }
 
 func TestFormalRS05a_ActorTrustInsufficientPermissionRejected(t *testing.T) {
@@ -213,9 +233,27 @@ func TestFormalRS05a_CentralizedDispatchRequiresBotSenderSignal(t *testing.T) {
 	result := runRS05aBridge(t, scenario)
 
 	assertRS05aNoFetch(t, result)
-	require.Len(t, result.PermissionCalls, 1)
-	assert.Equal(t, "github-actions[bot]", result.PermissionCalls[0]["username"], "propagated actor requires GitHub's Bot sender signal")
-	assertRS05aFailedContains(t, result, "requires write or higher")
+	assert.Empty(t, result.PermissionCalls, "missing Bot sender signal must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to verify centralized workflow_dispatch identity")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_CentralizedDispatchRejectsRouterAsOriginatingActor(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "github-actions[bot]",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "router cannot authorize itself as the originating actor")
+	assertRS05aFailedContains(t, result, "must identify an originating actor")
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
@@ -299,6 +337,22 @@ func TestFormalRS05a_ZeroItemNumberTreatedAsFalsy(t *testing.T) {
 
 			assertRS05aCheckoutSkipped(t, result)
 			assert.Empty(t, result.PermissionCalls, "RS-05a falsy item_number must block before actor trust")
+		})
+	}
+}
+
+func TestFormalRS05a_AdversarialItemNumbersBlockedBeforeTrustGate(t *testing.T) {
+	for _, itemNumber := range []any{true, false, " 123", "123 ", "1e3", "0x7b", "123.0", "-1", -1, 1.5, float64(9007199254740992), map[string]any{}, []any{123}} {
+		t.Run(fmt.Sprintf("item_number=%v", itemNumber), func(t *testing.T) {
+			result := runRS05aBridge(t, rs05aDefaultBridgeScenario(t, map[string]any{
+				"item_type":   "pull_request",
+				"item_number": itemNumber,
+				"repo":        "test-owner/test-repo",
+			}))
+
+			assertRS05aCheckoutSkipped(t, result)
+			assert.Empty(t, result.PermissionCalls, "non-canonical item_number must block before actor trust")
+			assert.Empty(t, result.PullCalls, "non-canonical item_number must block before pull request API access")
 		})
 	}
 }
@@ -419,7 +473,7 @@ global.context = {
   sha: "abc123",
   repo: { owner: "test-owner", repo: "test-repo" },
   payload: {
-    repository: { fork: Boolean(scenario.repositoryFork) },
+    repository: { fork: scenario.repositoryFork },
     sender: {
       login: scenario.actor || "trusted-maintainer",
       type: scenario.senderType || "User",

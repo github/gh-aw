@@ -473,11 +473,15 @@ async function assertTrustedCheckoutRuntime() {
 | same-repo PR checkout allowed when runtime repository is itself a fork (`pull_request`) | fork-runtime rejection scope |
 | `workflow_dispatch` PR replay rejected when runtime repository is a fork | fork-runtime rejection |
 | `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
+| missing, null, string, or numeric `repository.fork` rejected before permission/git operations | fork-runtime rejection (malformed metadata) |
+| coercible/non-canonical `item_number` values rejected before actor/API/git operations | item_number validation |
 | bot/app actor with write-or-higher repository permission allowed | actor trust |
 | bot/app actor without write-or-higher repository permission rejected for `workflow_dispatch`, `issue_comment`, and `pull_request_review_comment` | actor trust |
 | centralized `workflow_dispatch` validates the originating `aw_context.actor`, not `github-actions[bot]` | actor trust |
 | centralized `workflow_dispatch` without `aw_context.actor` is rejected | actor trust (fail closed) |
 | centralized actor propagation without `sender.type == "Bot"` is rejected | actor trust (identity signal) |
+| centralized dispatch naming the router itself as originating actor is rejected | actor trust (fail closed) |
+| propagated non-collaborator actor is rejected | actor trust (permission floor) |
 | `github-actions[bot]` PR dispatch without centralized command/label markers is rejected | actor trust (fail closed) |
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 | native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |

@@ -216,6 +216,23 @@ function logCheckoutStrategy(eventName, strategy, reason) {
 }
 
 /**
+ * Parse a canonical positive decimal pull request number without coercing
+ * booleans, exponent notation, hexadecimal, whitespace, or fractional values.
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function parsePullRequestNumber(value) {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+/**
  * Ensure checkout step only runs in trusted runtime contexts.
  * - workflow_dispatch PR replay must not run in a forked repository
  * - triggering actor must have write-or-higher repository permission
@@ -234,6 +251,9 @@ async function assertTrustedCheckoutRuntime(awContext) {
     if (repository.fork === true) {
       throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
     }
+    if (repository.fork !== false) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to verify repository is not a fork for workflow_dispatch");
+    }
   }
 
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR
@@ -244,7 +264,10 @@ async function assertTrustedCheckoutRuntime(awContext) {
   // repository workflows using GITHUB_TOKEN run as github-actions[bot].
   // Only trusted workflows may hold actions:write. command_name and
   // trigger_label are shape checks, not additional proof of provenance.
-  if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR && senderType === "Bot") {
+  if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR) {
+    if (senderType !== "Bot") {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to verify centralized workflow_dispatch identity");
+    }
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
     if (!commandName && !triggerLabel) {
@@ -253,6 +276,9 @@ async function assertTrustedCheckoutRuntime(awContext) {
     const propagatedActor = typeof awContext?.actor === "string" ? awContext.actor.trim() : "";
     if (!propagatedActor) {
       throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
+    }
+    if (propagatedActor === CENTRALIZED_ROUTER_ACTOR) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: centralized workflow_dispatch must identify an originating actor");
     }
     actor = propagatedActor;
     core.info(`Validating centralized workflow_dispatch against originating actor '${actor}'`);
@@ -326,8 +352,8 @@ async function main() {
       try {
         const awContext = JSON.parse(awContextStr);
         workflowDispatchAwContext = awContext;
-        const prNumber = Number(awContext.item_number);
-        if (awContext.item_type === "pull_request" && Number.isInteger(prNumber) && prNumber > 0) {
+        const prNumber = parsePullRequestNumber(awContext.item_number);
+        if (awContext.item_type === "pull_request" && prNumber !== null) {
           if (awContext.repo) {
             const currentRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (awContext.repo !== currentRepo) {
