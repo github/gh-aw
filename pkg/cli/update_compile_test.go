@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,4 +93,57 @@ Say hello.
 	require.NoError(t, err)
 	require.Contains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`)
 	require.NotContains(t, string(lockContent), `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "168"`)
+}
+
+func TestUpdateCompilation_RegeneratesGeneratedWorkflowsWithCurrentVersion(t *testing.T) {
+	// Deliberately not t.Parallel(): this test mutates the process-wide
+	// compiler version/release globals (SetVersionInfo / workflow.SetIsRelease),
+	// following the same convention used by other pkg/cli tests that touch
+	// these globals. Go's test runner completes every non-parallel test in a
+	// package — including its t.Cleanup restoration below — before releasing
+	// any t.Parallel()-marked tests to run concurrently, so the mutation is
+	// fully reverted before any parallel test can observe it.
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+	t.Chdir(tempDir)
+
+	initCmd := exec.Command("git", "init", "--quiet")
+	initCmd.Dir = tempDir
+	require.NoError(t, initCmd.Run())
+
+	originalVersion := GetVersion()
+	originalRelease := workflow.IsRelease()
+	SetVersionInfo("v1.2.3")
+	workflow.SetIsRelease(true)
+	t.Cleanup(func() {
+		SetVersionInfo(originalVersion)
+		workflow.SetIsRelease(originalRelease)
+	})
+
+	workflowPath := filepath.Join(workflowsDir, "example.md")
+	workflowContent := `---
+name: Example
+on:
+  slash_command:
+    name: example
+    strategy: centralized
+engine: copilot
+safe-outputs:
+  create-issue:
+    expires: 24
+---
+
+Say hello.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644))
+
+	require.NoError(t, compileWorkflowsForUpdate(context.Background(), nil, "", "", false, false))
+
+	for _, filename := range []string{"agentic_commands.yml", "agentics-maintenance.yml"} {
+		content, err := os.ReadFile(filepath.Join(workflowsDir, filename))
+		require.NoError(t, err, "expected update compilation to generate %s", filename)
+		require.Contains(t, string(content), "github/gh-aw-actions/setup@v1.2.3")
+		require.NotContains(t, string(content), "github/gh-aw-actions/setup@dev")
+	}
 }
