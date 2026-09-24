@@ -74,6 +74,7 @@ module.exports = [
       "gh-aw-custom/require-getexecoutput-exitcode-check": "warn",
       "gh-aw-custom/prefer-actions-exec-over-child-process": "warn",
       "gh-aw-custom/no-misplaced-error-code-definition": "warn",
+      "gh-aw-custom/require-lstatsync-try-catch": "warn",
     },
   },
   {

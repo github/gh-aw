@@ -50,6 +50,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
+| [`require-lstatsync-try-catch`](#require-lstatsync-try-catch) | Require try/catch around `fs.lstatSync` and `fs.readlinkSync` calls |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
@@ -543,6 +544,32 @@ try {
   // use tmpDir here
 } catch (err) {
   throw new Error("fs.mkdtempSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
+
+### `require-lstatsync-try-catch`
+
+Require `fs.lstatSync` and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: both methods throw synchronously on missing paths, permission errors, or broken symlinks. These calls are concentrated in symlink-traversal guards and audit-log cleanup, where an unguarded throw skips the security check entirely instead of failing with actionable, call-site-specific context.
+
+**Detected forms:**
+- `fs.lstatSync(path)` and `fs.readlinkSync(path)` — direct calls on a known `require("fs")` result.
+- `fs["lstatSync"](path)` — computed string-literal property access.
+- `const { lstatSync } = require("fs"); lstatSync(path)` — destructured binding from `require("fs")` or `require("node:fs")`.
+- ESM namespace and named imports of either method.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- Calls already inside a `try` block with a `catch` clause.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
+
+**Safe alternative:**
+```js
+try {
+  const stat = fs.lstatSync(path);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
 
