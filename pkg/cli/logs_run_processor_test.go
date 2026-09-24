@@ -91,6 +91,27 @@ func TestInferMissingWorkflowPathFromAwInfo(t *testing.T) {
 	assert.True(t, isAgenticWorkflowPath(result.Run.WorkflowPath))
 }
 
+func TestSkipUnverifiedWorkflowRun(t *testing.T) {
+	t.Run("pathless failure is skipped", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: 1}}}
+
+		skipUnverifiedWorkflowRun(result, false)
+
+		assert.True(t, result.Skipped)
+	})
+
+	t.Run("agentic failure is retained", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   2,
+			WorkflowPath: ".github/workflows/research.lock.yml",
+		}}}
+
+		skipUnverifiedWorkflowRun(result, false)
+
+		assert.False(t, result.Skipped)
+	})
+}
+
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

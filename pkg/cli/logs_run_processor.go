@@ -460,6 +460,7 @@ func downloadAndTimeRunArtifacts(
 
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
+		skipUnverifiedWorkflowRun(result, params.verbose)
 		return
 	}
 }
@@ -494,6 +495,12 @@ func skipNonAgenticWorkflowRun(result *DownloadResult, verbose bool) {
 	logsOrchestratorLog.Printf("Skipping non-agentic workflow run: run=%d, workflow_path=%s", result.Run.DatabaseID, result.Run.WorkflowPath)
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d because workflow path %q is not an agentic .lock.yml workflow", result.Run.DatabaseID, result.Run.WorkflowPath)))
+	}
+}
+
+func skipUnverifiedWorkflowRun(result *DownloadResult, verbose bool) {
+	if !result.Skipped && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		skipNonAgenticWorkflowRun(result, verbose)
 	}
 }
 
