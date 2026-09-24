@@ -325,14 +325,14 @@ Test workflow.`
 
 // TestCompileWorkflow_UnresolvedFirewallImageRecordsResolutionFailure is a
 // regression test for gh-aw#51248: when a gh-aw-firewall image has no cached or
-// embedded digest pin (e.g. a workflow explicitly pins a version that predates
-// the current default and has never been resolved locally), the compiler must
+// embedded digest pin (e.g. a workflow explicitly pins a version that has never
+// been resolved locally), the compiler must
 // not silently emit the bare tag with no trace. It must record a resolution
 // failure in the manifest so the gap is auditable, matching the issue's
 // complaint that "resolution_failures in the manifest does not mention these
 // images".
 func TestCompileWorkflow_UnresolvedFirewallImageRecordsResolutionFailure(t *testing.T) {
-	const unresolvedVersion = "v0.1.2-unresolved-test"
+	const unresolvedVersion = "v99.99.99"
 	imageTag := strings.TrimPrefix(unresolvedVersion, "v")
 
 	frontmatter := `---
