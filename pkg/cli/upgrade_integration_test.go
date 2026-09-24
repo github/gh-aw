@@ -63,6 +63,8 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+strict: true
+timeout-minutes: 5
 safe-outputs:
   add-comment:
 ---
@@ -71,7 +73,7 @@ Say hello.
 `
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644), "should create sample workflow")
 
-	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--no-actions", "--skip-extension-upgrade")
+	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--approve", "--no-actions", "--skip-extension-upgrade")
 	upgradeCmd.Dir = setup.tempDir
 	upgradeOutput, upgradeErr := upgradeCmd.CombinedOutput()
 	upgradeOutputStr := string(upgradeOutput)
