@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,207 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIsAgenticWorkflowPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "agentic workflow",
+			path: ".github/workflows/research.lock.yml",
+			want: true,
+		},
+		{
+			name: "regular yml workflow",
+			path: ".github/workflows/ci.yml",
+			want: false,
+		},
+		{
+			name: "regular yaml workflow",
+			path: ".github/workflows/ci.yaml",
+			want: false,
+		},
+		{
+			name: "missing workflow path",
+			path: "",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isAgenticWorkflowPath(tt.path))
+		})
+	}
+}
+
+func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
+	updatedAt := time.Now()
+	run := WorkflowRun{
+		DatabaseID: 2,
+		Status:     "completed",
+		Conclusion: "success",
+		Attempt:    1,
+		UpdatedAt:  updatedAt,
+		Repository: "owner/repo",
+	}
+	cachedRuns := cachedLogsRuns{
+		2: {RunData: RunData{
+			RunID:        2,
+			WorkflowPath: ".github/workflows/ci.yml",
+			Status:       "completed",
+			Conclusion:   "success",
+			RunAttempt:   "1",
+			UpdatedAt:    updatedAt,
+			Repository:   "owner/repo",
+		}},
+	}
+
+	_, ok := cachedJSONDownloadResult(run, cachedRuns, runFilterOpts{})
+
+	assert.False(t, ok)
+}
+
+func TestCachedJSONDownloadResultRejectsRegularCurrentWorkflow(t *testing.T) {
+	updatedAt := time.Now()
+	run := WorkflowRun{
+		DatabaseID:   2,
+		WorkflowPath: ".github/workflows/ci.yml",
+		Status:       "completed",
+		Conclusion:   "success",
+		Attempt:      1,
+		UpdatedAt:    updatedAt,
+		Repository:   "owner/repo",
+	}
+	cachedRuns := cachedLogsRuns{
+		2: {RunData: RunData{
+			RunID:        2,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+			Status:       "completed",
+			Conclusion:   "success",
+			RunAttempt:   "1",
+			UpdatedAt:    updatedAt,
+			Repository:   "owner/repo",
+		}},
+	}
+
+	_, ok := cachedJSONDownloadResult(run, cachedRuns, runFilterOpts{})
+
+	assert.False(t, ok)
+}
+
+func TestInferMissingWorkflowPathFromAwInfo(t *testing.T) {
+	runDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "aw_info.json"),
+		[]byte(`{"workflow_name":"Weekly Research"}`),
+		0o600,
+	))
+	result := &DownloadResult{}
+
+	inferMissingWorkflowPath(result, runDir)
+
+	assert.Equal(t, ".github/workflows/weekly-research.lock.yml", result.Run.WorkflowPath)
+	assert.True(t, isAgenticWorkflowPath(result.Run.WorkflowPath))
+}
+
+func TestSkipUnverifiedWorkflowRun(t *testing.T) {
+	t.Run("pathless failure is skipped", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{DatabaseID: 1}}}
+
+		skipUnverifiedWorkflowRun(result, false)
+
+		assert.True(t, result.Skipped)
+	})
+
+	t.Run("agentic failure is retained", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   2,
+			WorkflowPath: ".github/workflows/research.lock.yml",
+		}}}
+
+		skipUnverifiedWorkflowRun(result, false)
+
+		assert.False(t, result.Skipped)
+	})
+}
+
+func TestIsFailureWithoutArtifacts(t *testing.T) {
+	assert.True(t, isFailureWithoutArtifacts(ErrNoArtifacts, "failure"))
+	assert.False(t, isFailureWithoutArtifacts(ErrNoArtifacts, "success"))
+	assert.False(t, isFailureWithoutArtifacts(errors.New("download failed"), "failure"))
+}
+
+func TestHandleArtifactDownloadErrorRetainsFailureWithoutArtifacts(t *testing.T) {
+	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{Conclusion: "failure"}}}
+
+	handleArtifactDownloadError(result, ErrNoArtifacts, false)
+
+	assert.False(t, result.Skipped)
+	assert.Empty(t, result.Metrics)
+}
+
+func TestApplyKnownWorkflowPathOverridesCachedPath(t *testing.T) {
+	result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+		WorkflowPath: ".github/workflows/stale.lock.yml",
+	}}}
+
+	applyKnownWorkflowPath(result, WorkflowRun{WorkflowPath: ".github/workflows/ci.yml"})
+
+	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
+}
+
+func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
+	t.Run("agentic current path is retained", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   10,
+			WorkflowPath: ".github/workflows/agentic.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{WorkflowPath: ".github/workflows/agentic.lock.yml"}, false, false)
+
+		assert.False(t, result.Skipped)
+		assert.Equal(t, ".github/workflows/agentic.lock.yml", result.Run.WorkflowPath)
+	})
+
+	t.Run("regular current path is skipped", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   11,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{WorkflowPath: ".github/workflows/ci.yml"}, true, false)
+
+		assert.True(t, result.Skipped)
+		assert.Empty(t, result.Run.WorkflowPath)
+	})
+
+	t.Run("unverified empty current path clears stale cached path", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   12,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{}, false, false)
+
+		assert.True(t, result.Skipped)
+		assert.Empty(t, result.Run.WorkflowPath)
+	})
+
+	t.Run("verified empty current path preserves metadata path", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   13,
+			WorkflowPath: ".github/workflows/agentic.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{}, true, false)
+
+		assert.False(t, result.Skipped)
+		assert.Equal(t, ".github/workflows/agentic.lock.yml", result.Run.WorkflowPath)
+	})
+}
 
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
 	t.Parallel()
@@ -219,6 +421,112 @@ func TestTryLoadCachedRunResultUsesCacheWhenEvalsNotRequested(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, result)
 	assert.True(t, result.Cached)
+}
+
+func TestTryLoadCachedRunResultRejectsStaleRegularWorkflowPath(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       130,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   130,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{
+		DatabaseID:   130,
+		WorkflowPath: ".github/workflows/ci.yml",
+	}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Cached)
+	assert.True(t, result.Skipped)
+	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/stale.lock.yml", reloaded.Run.WorkflowPath)
+}
+
+func TestTryLoadCachedRunResultDoesNotPersistRejectedCurrentPathAfterMetadataRefresh(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       132,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   132,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runOutputDir, runAPIResponseFileName),
+		[]byte(`{"id":132,"status":"completed","conclusion":"success","name":"Refreshed Agentic","path":".github/workflows/refreshed.lock.yml"}`),
+		0o600,
+	))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{
+		DatabaseID:   132,
+		WorkflowPath: ".github/workflows/ci.yml",
+	}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Skipped)
+	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/refreshed.lock.yml", reloaded.Run.WorkflowPath)
+	assert.NotEqual(t, ".github/workflows/ci.yml", reloaded.Run.WorkflowPath)
+}
+
+func TestTryLoadCachedRunResultClearsStalePathWhenMetadataOmitsPath(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       131,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   131,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runOutputDir, runAPIResponseFileName),
+		[]byte(`{"id":131,"status":"completed","conclusion":"success"}`),
+		0o600,
+	))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{DatabaseID: 131}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Cached)
+	assert.True(t, result.Skipped)
+	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/stale.lock.yml", reloaded.Run.WorkflowPath)
 }
 
 func TestNewRunSummaryCarriesGatewaySteeringEvents(t *testing.T) {

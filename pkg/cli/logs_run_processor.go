@@ -292,7 +292,7 @@ func fillCanceledDownloadResults(runs []WorkflowRun, results []DownloadResult, c
 
 func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filters runFilterOpts) (DownloadResult, bool) {
 	cachedRun, ok := cachedRuns.lookup(run, filters)
-	if !ok {
+	if !ok || (run.WorkflowPath != "" && !isAgenticWorkflowPath(run.WorkflowPath)) || !isAgenticWorkflowPath(cachedRun.WorkflowPath) {
 		return DownloadResult{}, false
 	}
 	cachedAudit := cachedRuns[run.DatabaseID].Audit
@@ -329,7 +329,7 @@ func handleArtifactDownloadError(result *DownloadResult, err error, verbose bool
 		result.Error = err
 	} else if errors.Is(err, ErrNoArtifacts) {
 		logsOrchestratorLog.Printf("No artifacts available for run %d (conclusion=%s)", run.DatabaseID, run.Conclusion)
-		if isFailureConclusion(run.Conclusion) {
+		if isFailureWithoutArtifacts(err, run.Conclusion) {
 			result.Metrics = LogMetrics{}
 			// ErrorCount will be populated by buildProcessedRun via fetchJobStatuses.
 		} else {
@@ -374,12 +374,19 @@ func processSingleRunDownload(
 	perRunParams := resolveRunRepoContext(run, params)
 
 	result, ok, err := prepareRunDownload(ctx, run, runOutputDir, perRunParams, params.storageLimit)
+	applyKnownWorkflowPath(result, run)
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
-	} else if !ok {
-		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
+		if !isFailureWithoutArtifacts(err, result.Run.Conclusion) {
+			skipUnverifiedWorkflowRun(result, params.verbose)
+		}
+	} else if ok {
+		inferMissingWorkflowPath(result, runOutputDir)
 	} else {
-		logsOrchestratorLog.Printf("Cache hit for run %d, using cached summary", run.DatabaseID)
+		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
+	}
+	if err == nil && !result.Skipped && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		skipNonAgenticWorkflowRun(result, params.verbose)
 	}
 
 	completed := completedCount.Add(1)
@@ -425,10 +432,8 @@ func downloadAndTimeRunArtifacts(
 			logsOrchestratorLog.Printf("failed to compute pre-download size for run %d: %v", run.DatabaseID, sizeErr)
 		}
 		downloadStart = time.Now()
-		if metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, perRunParams.dlOwner, perRunParams.dlRepo, perRunParams.dlHost, params.verbose); err != nil {
-			logsOrchestratorLog.Printf("Failed to fetch workflow run metadata for run %d: %v", run.DatabaseID, err)
-		} else {
-			applyWorkflowRunMetadata(&result.Run, metadata)
+		if !shouldDownloadAgenticWorkflowRun(ctx, run, runOutputDir, perRunParams, params.verbose, result) {
+			return nil
 		}
 		if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: run.DatabaseID, outputDir: runOutputDir, verbose: params.verbose, owner: perRunParams.dlOwner, repo: perRunParams.dlRepo, hostname: perRunParams.dlHost, artifactFilter: params.artifactFilter}); err != nil {
 			return err
@@ -455,6 +460,55 @@ func downloadAndTimeRunArtifacts(
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
 		return
+	}
+}
+
+func shouldDownloadAgenticWorkflowRun(
+	ctx context.Context,
+	run WorkflowRun,
+	runOutputDir string,
+	perRunParams concurrentRunDownloadParams,
+	verbose bool,
+	result *DownloadResult,
+) bool {
+	metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, perRunParams.dlOwner, perRunParams.dlRepo, perRunParams.dlHost, verbose)
+	if err != nil {
+		logsOrchestratorLog.Printf("Failed to fetch workflow run metadata for run %d: %v", run.DatabaseID, err)
+	} else {
+		applyWorkflowRunMetadata(&result.Run, metadata)
+	}
+	if result.Run.WorkflowPath == "" || isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		return true
+	}
+	skipNonAgenticWorkflowRun(result, verbose)
+	return false
+}
+
+func isAgenticWorkflowPath(workflowPath string) bool {
+	return strings.HasSuffix(workflowPath, ".lock.yml")
+}
+
+func skipNonAgenticWorkflowRun(result *DownloadResult, verbose bool) {
+	result.Skipped = true
+	logsOrchestratorLog.Printf("Skipping non-agentic workflow run: run=%d, workflow_path=%s", result.Run.DatabaseID, result.Run.WorkflowPath)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d because workflow path %q is not an agentic .lock.yml workflow", result.Run.DatabaseID, result.Run.WorkflowPath)))
+	}
+}
+
+func skipUnverifiedWorkflowRun(result *DownloadResult, verbose bool) {
+	if !result.Skipped && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		skipNonAgenticWorkflowRun(result, verbose)
+	}
+}
+
+func isFailureWithoutArtifacts(err error, conclusion string) bool {
+	return errors.Is(err, ErrNoArtifacts) && isFailureConclusion(conclusion)
+}
+
+func applyKnownWorkflowPath(result *DownloadResult, run WorkflowRun) {
+	if run.WorkflowPath != "" {
+		result.Run.WorkflowPath = run.WorkflowPath
 	}
 }
 
@@ -558,7 +612,7 @@ func tryLoadCachedRunResult(
 		LogsPath:    runOutputDir,
 		Cached:      true,
 	}
-	metadataApplied := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
+	metadataRefresh := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
 	// Re-apply the usage activity backfill to heal stale cache entries.
 	// Capture the SafeItemsCount before backfill to detect whether the field was healed.
 	safeItemsBefore := result.Run.SafeItemsCount
@@ -568,7 +622,7 @@ func tryLoadCachedRunResult(
 	// persist the healed value back to run_summary.json so downstream readers (e.g.
 	// the api-consumption-report) see the correct count without having to fall back to
 	// usage/activity/summary.json.
-	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || metadataApplied {
+	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || metadataRefresh.Applied {
 		healed := *summary
 		healed.Run = result.Run
 		healed.Metrics = result.Metrics
@@ -580,24 +634,54 @@ func tryLoadCachedRunResult(
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
 	}
+	applyCachedRunWorkflowPathGate(&result, run, metadataRefresh.WorkflowPathVerified, params.verbose)
 	return &result, true
 }
 
-func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) bool {
+// applyCachedRunWorkflowPathGate enforces current workflow-path trust for cache hits.
+// An explicit current non-agentic path skips the cached result. When no current path
+// is available and metadata did not verify one, the stale cached path is cleared only
+// in memory so the result fails closed without rewriting the persisted summary.
+func applyCachedRunWorkflowPathGate(result *DownloadResult, run WorkflowRun, workflowPathVerified bool, verbose bool) {
+	if run.WorkflowPath != "" {
+		result.Run.WorkflowPath = run.WorkflowPath
+		if !isAgenticWorkflowPath(run.WorkflowPath) {
+			skipNonAgenticWorkflowRun(result, verbose)
+			result.Run.WorkflowPath = ""
+		}
+		return
+	}
+	if !workflowPathVerified {
+		result.Run.WorkflowPath = ""
+		skipUnverifiedWorkflowRun(result, verbose)
+	}
+}
+
+type cachedRunMetadataRefresh struct {
+	// Applied reports whether non-empty current metadata changed the cached run summary.
+	Applied bool
+	// WorkflowPathVerified reports whether current metadata contained an authoritative workflow path.
+	WorkflowPathVerified bool
+}
+
+func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) cachedRunMetadataRefresh {
 	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo)
 	if err == nil && needsRefresh {
 		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	}
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false
+		return cachedRunMetadataRefresh{}
 	}
 	metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, params.dlOwner, params.dlRepo, params.dlHost, params.verbose)
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false
+		return cachedRunMetadataRefresh{}
 	}
-	return applyWorkflowRunMetadata(cachedRun, metadata)
+	return cachedRunMetadataRefresh{
+		Applied:              applyWorkflowRunMetadata(cachedRun, metadata),
+		WorkflowPathVerified: metadata.WorkflowPath != "",
+	}
 }
 
 // analyzeRunArtifacts populates a DownloadResult with all analysis data derived from
@@ -646,15 +730,7 @@ func extractRunMetricsAndMetadata(result *DownloadResult, runOutputDir string, v
 	result.Run.AvgTimeBetweenTurns = metrics.AvgTimeBetweenTurns
 	result.Run.LogsPath = runOutputDir
 
-	// If the GitHub API returned an empty workflow path (e.g. for scheduled or agentic
-	// workflow runs), infer it from aw_info.json so the cached RunSummary and downstream
-	// consumers have a usable identifier.
-	if result.Run.WorkflowPath == "" {
-		awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
-		if info, err := parseAwInfo(awInfoPath, false); err == nil && info != nil && info.WorkflowName != "" {
-			result.Run.WorkflowPath = inferWorkflowPathFromDisplayName(info.WorkflowName)
-		}
-	}
+	inferMissingWorkflowPath(result, runOutputDir)
 
 	// Calculate duration and billable minutes from GitHub API timestamps.
 	// This mirrors the identical computation in audit.go for consistency.
@@ -663,6 +739,16 @@ func extractRunMetricsAndMetadata(result *DownloadResult, runOutputDir string, v
 		result.Run.ActionMinutes = math.Ceil(result.Run.Duration.Minutes())
 	}
 	return metrics
+}
+
+func inferMissingWorkflowPath(result *DownloadResult, runOutputDir string) {
+	if result.Run.WorkflowPath != "" {
+		return
+	}
+	awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
+	if info, err := parseAwInfo(awInfoPath, false); err == nil && info != nil && info.WorkflowName != "" {
+		result.Run.WorkflowPath = inferWorkflowPathFromDisplayName(info.WorkflowName)
+	}
 }
 
 // applyRunSecurityAnalysis runs access-log, firewall, and redacted-domain analyses and
