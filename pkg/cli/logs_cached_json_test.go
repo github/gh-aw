@@ -582,6 +582,7 @@ func TestCachedLogsJSONLExistingRecordAvoidsDuplicateWork(t *testing.T) {
 	require.NoError(t, writer.Append(ProcessedRun{Run: WorkflowRun{
 		DatabaseID: 42, Repository: "github/gh-aw", Status: "completed",
 		Conclusion: "success", Attempt: 1, UpdatedAt: updatedAt,
+		WorkflowPath: ".github/workflows/cached.lock.yml",
 	}}))
 	before, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -731,6 +732,7 @@ func TestDownloadRunArtifactsConcurrentReusesCachedJSONRecord(t *testing.T) {
 	cached := RunData{
 		RunID:        42,
 		WorkflowName: "cached-workflow",
+		WorkflowPath: ".github/workflows/cached-workflow.lock.yml",
 		Repository:   "github/gh-aw",
 		Status:       "completed",
 		Conclusion:   "success",
