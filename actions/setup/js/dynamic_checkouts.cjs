@@ -127,8 +127,16 @@ async function checkoutRepository(checkout, options = {}) {
   try {
     workspaceReal = fs.realpathSync(workspace);
     checkoutTarget = path.join(workspaceReal, checkout.path);
-    if (fs.existsSync(checkoutTarget)) {
+    try {
+      const targetStats = fs.lstatSync(checkoutTarget);
+      if (targetStats.isSymbolicLink()) {
+        throw new Error(`dynamic checkout path is a symbolic link: ${checkout.path}`);
+      }
       throw new Error(`dynamic checkout path already exists: ${checkout.path}`);
+    } catch (error) {
+      if (!error || error.code !== "ENOENT") {
+        throw error;
+      }
     }
 
     let parent = workspaceReal;

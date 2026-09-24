@@ -41,7 +41,8 @@ required and may itself be a GitHub Actions expression resolving to an array:
 ```yaml wrap
 checkout:
   dynamic: ${{ fromJSON(inputs.checkouts) }}
-  allowed-repos: ${{ fromJSON(inputs.allowed-repos) }}
+  # Use trusted configuration for this allowlist, not caller-controlled input.
+  allowed-repos: ${{ fromJSON(vars.ALLOWED_DYNAMIC_CHECKOUT_REPOS) }}
 ```
 
 Dynamic entries are checked out in addition to the default workflow repository. Each
@@ -65,10 +66,14 @@ reference it through `env.NAME` instead:
 env:
   CHECKOUT_TOKEN: ${{ secrets.MY_TOKEN }}
 checkout:
-  dynamic: ${{ fromJSON(format('[{"repository":"{0}","github-token":"{1}"}]', inputs.repo, env.CHECKOUT_TOKEN)) }}
+  dynamic: ${{ fromJSON(inputs.checkouts) }}
   allowed-repos:
     - owner/repository
 ```
+
+The `inputs.checkouts` value should already be valid JSON for one checkout object
+or an array of checkout objects. Do not build that JSON by concatenating or
+formatting caller-controlled strings.
 
 Compilation fails (or warns, in non-strict mode) if a dynamic checkout expression
 references `secrets.*` directly.

@@ -90,6 +90,22 @@ describe("checkoutRepository", () => {
     expect(fs.existsSync(path.join(outside, "nested"))).toBe(false);
   });
 
+  it("rejects a symlinked checkout path before clone", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-workspace-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-outside-"));
+    fs.symlinkSync(path.join(outside, "repo"), path.join(workspace, "repo"));
+    const checkout = normalizeCheckout({ repository: "owner/repo" }, workspace);
+
+    await expect(
+      checkoutRepository(checkout, {
+        workspace,
+        runGit: async () => "",
+        maskSecret: () => {},
+      })
+    ).rejects.toThrow("path is a symbolic link");
+    expect(fs.existsSync(path.join(outside, "repo"))).toBe(false);
+  });
+
   it("terminates Git options and disables LFS smudging until lfs pull", async () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-"));
     const target = path.join(workspace, "repo");
