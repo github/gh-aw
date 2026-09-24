@@ -1425,7 +1425,8 @@ func TestPushRepoMemoryJobHasNoConcurrencyGroup(t *testing.T) {
 	assert.Equal(t, pushRepoMemoryTimeoutMinutes, pushJob.TimeoutMinutes, "push_repo_memory job should expose an explicit retry ceiling")
 }
 
-// TestPushRepoMemoryJobConditions verifies detection-dependent push_repo_memory conditions.
+// TestPushRepoMemoryJobConditions verifies disabled detection only gates cancellation, while
+// enabled detection also gates the agent and detection results.
 func TestPushRepoMemoryJobConditions(t *testing.T) {
 	data := &WorkflowData{
 		RepoMemoryConfig: &RepoMemoryConfig{
