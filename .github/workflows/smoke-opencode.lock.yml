@@ -705,7 +705,7 @@ jobs:
                 }
               },
               "add_labels": {
-                "defaultMax": 5,
+                "defaultMax": 10,
                 "fields": {
                   "item_number": {
                     "issueNumberOrTemporaryId": true

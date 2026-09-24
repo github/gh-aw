@@ -412,15 +412,19 @@ const main = createCountGatedHandler({
         };
       }
 
-      // Enforce max limits on labels before validation
-      const limitResult = tryEnforceArrayLimit(requestedLabelNames, maxLabelsPerCall, "labels");
+      const limitResult = tryEnforceArrayLimit(requestedLabelNames, MAX_LABELS_PER_ADD_LABELS_CALL, "labels");
       if (!limitResult.success) {
         core.warning(`Label limit exceeded: ${limitResult.error}`);
         return { success: false, error: limitResult.error };
       }
 
+      const labelsToValidate = requestedLabelNames.slice(0, maxLabelsPerCall);
+      if (labelsToValidate.length < requestedLabelNames.length) {
+        core.warning(`Label limit reached; skipped labels: ${requestedLabelNames.slice(maxLabelsPerCall).join(", ")}`);
+      }
+
       // Use validation helper to sanitize and validate labels
-      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxLabelsPerCall, blockedPatterns);
+      const labelsResult = validateLabels(labelsToValidate, allowedLabels, maxLabelsPerCall, blockedPatterns);
 
       if (!labelsResult.valid) {
         // If no valid labels, log info and return gracefully

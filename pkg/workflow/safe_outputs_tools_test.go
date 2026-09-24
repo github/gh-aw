@@ -141,6 +141,21 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 		},
 		{
+			name:            "add_labels with dynamic max explains runtime limits",
+			toolName:        "add_labels",
+			baseDescription: "Add labels to an issue.",
+			safeOutputs: &SafeOutputsConfig{
+				AddLabels: &AddLabelsConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("${{ inputs.max_labels }}")},
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"The runtime max expression controls add_labels calls.",
+				"Maximum 10 label(s) can be added per call.",
+			},
+		},
+		{
 			name:            "create_discussion with category",
 			toolName:        "create_discussion",
 			baseDescription: "Create a discussion.",

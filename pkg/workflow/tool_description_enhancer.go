@@ -419,12 +419,18 @@ func addLabelsConstraints(config *AddLabelsConfig) []string {
 	return buildConstraints(config, func(config *AddLabelsConfig, constraints *[]string) {
 		if max := templatableIntValue(config.Max); max > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Maximum %d add_labels call(s) can be made.", max))
+		} else if config.Max != nil && isExpression(*config.Max) {
+			*constraints = append(*constraints, "The runtime max expression controls add_labels calls.")
 		}
 		maxAddedLabels := templatableIntValue(config.MaxAddedLabels)
-		if maxAddedLabels <= 0 {
+		if config.MaxAddedLabels != nil && isExpression(*config.MaxAddedLabels) {
+			*constraints = append(*constraints, fmt.Sprintf("The runtime max-added-labels expression controls labels per call, capped at %d.", maxLabelsPerAddLabelsCall))
+		} else if maxAddedLabels <= 0 {
 			maxAddedLabels = 10
+			*constraints = append(*constraints, fmt.Sprintf("Maximum %d label(s) can be added per call.", maxAddedLabels))
+		} else {
+			*constraints = append(*constraints, fmt.Sprintf("Maximum %d label(s) can be added per call.", min(maxAddedLabels, maxLabelsPerAddLabelsCall)))
 		}
-		*constraints = append(*constraints, fmt.Sprintf("Maximum %d label(s) can be added per call.", min(maxAddedLabels, maxLabelsPerAddLabelsCall)))
 		if len(config.Allowed) > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Only these labels are allowed: %s.", formatStringList(config.Allowed)))
 		}
