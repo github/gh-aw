@@ -60,7 +60,7 @@ func (s *logsCollectionStats) recordResult(result DownloadResult) {
 	if s == nil {
 		return
 	}
-	if result.Cached {
+	if result.Cached && !result.Skipped {
 		s.cachedReports.Add(1)
 		return
 	}
@@ -145,7 +145,7 @@ func formatDownloadByteSize(bytes int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f%ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f%ciB", float64(bytes)/float64(div), "KMGTPE"[exp]) //nolint:uncheckedsliceindex // exp is bounded by the int64 byte range.
 }
 
 // renderLogsDownloadStatsSummary prints an end-of-run informational line
@@ -847,6 +847,7 @@ type orderedLogsRunCollector struct {
 	ctx                 context.Context
 	opts                processWorkflowRunBatchOptions
 	processedBase       int
+	chunkSize           int
 	candidates          []ProcessedRun
 	accepted            []bool
 	acceptedCount       int
@@ -863,6 +864,7 @@ func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, o
 		ctx:            ctx,
 		opts:           opts,
 		processedBase:  count,
+		chunkSize:      chunkSize,
 		candidates:     make([]ProcessedRun, chunkSize),
 		accepted:       make([]bool, chunkSize),
 		pendingResults: make([]DownloadResult, chunkSize),
@@ -870,7 +872,7 @@ func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, o
 		resultResolved: make([]chan struct{}, chunkSize),
 	}
 	for i := range collector.resultResolved {
-		collector.resultResolved[i] = make(chan struct{})
+		collector.resultResolved[i] = make(chan struct{}) //nolint:uncheckedsliceindex // i comes from ranging over resultResolved.
 	}
 	return collector
 }
@@ -885,18 +887,29 @@ func (c *orderedLogsRunCollector) onResult(index int, result DownloadResult) {
 func (c *orderedLogsRunCollector) recordResult(index int, result DownloadResult) <-chan struct{} {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.pendingResults[index] = result
-	c.resultReady[index] = true
-	for c.nextResult < len(c.pendingResults) && c.resultReady[c.nextResult] {
+	if index < 0 || index >= c.chunkSize {
+		message := fmt.Sprintf("Ordered run result index %d is out of range (chunk size %d); processing result without ordering guarantees.", index, c.chunkSize)
+		logsOrchestratorLog.Print(message)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+		c.opts.collectionStats.recordResult(result)
+		finalizeLogsRunDownload(c.opts.storageLimit, result)
+		closed := make(chan struct{})
+		close(closed)
+		return closed
+	}
+	resolved := c.resultResolved[index]                             //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches resultResolved length.
+	c.pendingResults[index] = result                                //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches pendingResults length.
+	c.resultReady[index] = true                                     //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches resultReady length.
+	for c.nextResult < c.chunkSize && c.resultReady[c.nextResult] { //nolint:uncheckedsliceindex // nextResult is bounded by chunkSize, which matches resultReady length.
 		c.processReadyResult(c.nextResult)
-		close(c.resultResolved[c.nextResult])
+		close(c.resultResolved[c.nextResult]) //nolint:uncheckedsliceindex // nextResult is bounded by chunkSize, which matches resultResolved length.
 		c.nextResult++
 	}
-	return c.resultResolved[index]
+	return resolved
 }
 
 func (c *orderedLogsRunCollector) processReadyResult(index int) {
-	result := c.pendingResults[index]
+	result := c.pendingResults[index] //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches pendingResults length.
 	c.opts.collectionStats.recordResult(result)
 	if c.processedBase+c.acceptedCount >= c.opts.count || c.opts.countLimit.isReached() {
 		finalizeLogsRunDownload(c.opts.storageLimit, result)
@@ -904,8 +917,8 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	}
 	if result.CachedRun != nil {
 		if c.opts.countLimit.tryAdd() {
-			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
-			c.accepted[index] = true
+			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir) //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
+			c.accepted[index] = true                                                                                  //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 			c.acceptedCount++
 		}
 		return
@@ -921,20 +934,21 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	parseWorkflowRunArtifacts(result, processedRun, c.opts.parse, c.opts.verbose)
 	finalizeLogsRunDownload(c.opts.storageLimit, result)
 	if c.opts.countLimit.tryAdd() {
-		c.candidates[index] = processedRun
-		c.accepted[index] = true
+		c.candidates[index] = processedRun //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
+		c.accepted[index] = true           //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 		c.acceptedCount++
 	}
 }
 
 func (c *orderedLogsRunCollector) appendAccepted(processedRuns []ProcessedRun, batchProcessed int, writer *cachedLogsJSONLWriter) ([]ProcessedRun, int) {
-	for i := range c.candidates {
-		if !c.accepted[i] {
+	for i, accepted := range c.accepted {
+		if !accepted {
 			continue
 		}
-		processedRuns = append(processedRuns, c.candidates[i])
+		candidate := c.candidates[i] //nolint:uncheckedsliceindex // i comes from accepted; candidates is allocated with the same chunkSize.
+		processedRuns = append(processedRuns, candidate)
 		batchProcessed++
-		if err := writer.Append(c.candidates[i]); err != nil {
+		if err := writer.Append(candidate); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 	}
