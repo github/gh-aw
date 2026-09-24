@@ -292,7 +292,7 @@ func fillCanceledDownloadResults(runs []WorkflowRun, results []DownloadResult, c
 
 func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filters runFilterOpts) (DownloadResult, bool) {
 	cachedRun, ok := cachedRuns.lookup(run, filters)
-	if !ok || !isAgenticWorkflowPath(cachedRun.WorkflowPath) {
+	if !ok || (run.WorkflowPath != "" && !isAgenticWorkflowPath(run.WorkflowPath)) || !isAgenticWorkflowPath(cachedRun.WorkflowPath) {
 		return DownloadResult{}, false
 	}
 	cachedAudit := cachedRuns[run.DatabaseID].Audit

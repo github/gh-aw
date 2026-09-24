@@ -76,6 +76,34 @@ func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestCachedJSONDownloadResultRejectsRegularCurrentWorkflow(t *testing.T) {
+	updatedAt := time.Now()
+	run := WorkflowRun{
+		DatabaseID:   2,
+		WorkflowPath: ".github/workflows/ci.yml",
+		Status:       "completed",
+		Conclusion:   "success",
+		Attempt:      1,
+		UpdatedAt:    updatedAt,
+		Repository:   "owner/repo",
+	}
+	cachedRuns := cachedLogsRuns{
+		2: {RunData: RunData{
+			RunID:        2,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+			Status:       "completed",
+			Conclusion:   "success",
+			RunAttempt:   "1",
+			UpdatedAt:    updatedAt,
+			Repository:   "owner/repo",
+		}},
+	}
+
+	_, ok := cachedJSONDownloadResult(run, cachedRuns, runFilterOpts{})
+
+	assert.False(t, ok)
+}
+
 func TestInferMissingWorkflowPathFromAwInfo(t *testing.T) {
 	runDir := t.TempDir()
 	require.NoError(t, os.WriteFile(
