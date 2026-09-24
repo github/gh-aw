@@ -318,6 +318,12 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
 		},
 		{
+			name:    "rejects unrelated Codex prefix",
+			engine:  "codexbridge",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			wantErr: "only supported",
+		},
+		{
 			name:    "accepts custom engine backed by Codex runtime",
 			engine:  "my-codex-wrapper",
 			runtime: "codex",

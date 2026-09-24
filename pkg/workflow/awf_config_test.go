@@ -168,6 +168,23 @@ func TestBuildAWFConfigJSON_HostedWebSkippedForOlderAWF(t *testing.T) {
 	assert.NotContains(t, config["apiProxy"].(map[string]any), "hostedWeb")
 }
 
+func TestBuildAWFConfigJSON_HostedWebDoesNotInferUnrelatedPrefix(t *testing.T) {
+	jsonStr, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName: "codexbridge",
+		WorkflowData: &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "codexbridge"},
+			NetworkPermissions: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &config))
+	assert.NotContains(t, config["apiProxy"].(map[string]any), "hostedWeb")
+}
+
 // TestBuildAWFConfigJSON verifies that BuildAWFConfigJSON produces a valid JSON config
 // that contains the expected network, apiProxy, and container fields.
 func TestBuildAWFConfigJSON(t *testing.T) {

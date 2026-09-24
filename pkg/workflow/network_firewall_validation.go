@@ -143,7 +143,7 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	policy := workflowData.NetworkPermissions.HostedWeb
 	runtimeID, err := c.resolveHostedWebRuntimeID(workflowData)
 	if err != nil {
-		return err
+		return fmt.Errorf("network.hosted-web: failed to resolve engine runtime: %w", err)
 	}
 	if runtimeID != "claude" && runtimeID != "codex" {
 		if policy == nil {
@@ -203,7 +203,11 @@ func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string
 			return "", err
 		}
 		if resolved != nil && resolved.Runtime != nil {
-			return strings.ToLower(resolved.Runtime.GetID()), nil
+			runtimeID := strings.ToLower(resolved.Runtime.GetID())
+			if c.engineCatalog.Get(engineID) != nil || hostedWebRuntimeID(engineID, "") == runtimeID {
+				return runtimeID, nil
+			}
+			return strings.ToLower(engineID), nil
 		}
 	}
 	return hostedWebRuntimeID(engineID, ""), nil

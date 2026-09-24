@@ -392,13 +392,24 @@ func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
 		return strings.ToLower(engineRuntimeID)
 	}
 	engineName = strings.ToLower(engineName)
-	if strings.HasPrefix(engineName, "claude") {
+	if hasHostedWebRuntimeAlias(engineName, "claude") {
 		return "claude"
 	}
-	if strings.HasPrefix(engineName, "codex") {
+	if hasHostedWebRuntimeAlias(engineName, "codex") {
 		return "codex"
 	}
 	return engineName
+}
+
+func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
+	if engineName == runtimeID {
+		return true
+	}
+	if !strings.HasPrefix(engineName, runtimeID) || len(engineName) == len(runtimeID) {
+		return false
+	}
+	suffix := strings.TrimPrefix(engineName, runtimeID)
+	return strings.HasPrefix(suffix, "-") || strings.HasPrefix(suffix, "_")
 }
 
 func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {
