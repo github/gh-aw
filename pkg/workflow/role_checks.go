@@ -351,13 +351,7 @@ func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string 
 }
 
 func rolesAreAll(roles []string) bool {
-	if len(roles) != 1 {
-		return false
-	}
-	for _, role := range roles {
-		return role == "all"
-	}
-	return false
+	return slices.Equal(roles, []string{"all"})
 }
 
 // needsRoleCheck determines if the workflow needs permission checks with full context
