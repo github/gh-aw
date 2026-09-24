@@ -417,6 +417,7 @@ safe-outputs:
   add-labels:
     allowed: [triage, bug, enhancement, needs-review]
     max: 5
+    max-added-labels: 12
 ---
 
 # Test Output Label Max Count Configuration
@@ -462,6 +463,9 @@ This workflow tests the output labels max configuration parsing.
 	expectedMaxCount := 5
 	if templatableIntValue(workflowData.SafeOutputs.AddLabels.Max) != expectedMaxCount {
 		t.Errorf("Expected max to be %d, got %v", expectedMaxCount, workflowData.SafeOutputs.AddLabels.Max)
+	}
+	if templatableIntValue(workflowData.SafeOutputs.AddLabels.MaxAddedLabels) != 12 {
+		t.Errorf("Expected max-added-labels to be 12, got %v", workflowData.SafeOutputs.AddLabels.MaxAddedLabels)
 	}
 }
 

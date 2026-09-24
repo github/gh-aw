@@ -103,6 +103,16 @@ func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	}
 }
 
+func TestAddLabelsValidationConfigDefaultMax(t *testing.T) {
+	config, ok := ValidationConfig["add_labels"]
+	if !ok {
+		t.Fatal("add_labels not found in ValidationConfig")
+	}
+	if config.DefaultMax != 10 {
+		t.Errorf("add_labels DefaultMax = %d, want 10", config.DefaultMax)
+	}
+}
+
 func TestJiraCreateIssueValidationPreservesTemporaryID(t *testing.T) {
 	config := ValidationConfig["jira_create_issue"]
 	temporaryID := config.Fields["temporary_id"]

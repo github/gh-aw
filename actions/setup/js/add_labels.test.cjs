@@ -1387,7 +1387,24 @@ describe("add_labels", () => {
     it("should allow the configured maximum labels per operation", async () => {
       const labels = Array.from({ length: 16 }, (_, index) => `label${index + 1}`);
       mockGithub._repoLabels = labels;
-      const handler = await main({ max: 25 });
+      const handler = await main({ max: 25, max_added_labels: 16 });
+      const addLabelsCalls = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        addLabelsCalls.push(params);
+        return {};
+      };
+
+      const result = await handler({ item_number: 100, labels }, {});
+
+      expect(result.success).toBe(true);
+      expect(addLabelsCalls).toHaveLength(1);
+      expect(addLabelsCalls[0].labels).toEqual(labels);
+    });
+
+    it("should allow GitHub's 100-label limit per operation", async () => {
+      const labels = Array.from({ length: 100 }, (_, index) => `label${index + 1}`);
+      mockGithub._repoLabels = labels;
+      const handler = await main({ max: 1, max_added_labels: 100 });
       const addLabelsCalls = [];
       mockGithub.rest.issues.addLabels = async params => {
         addLabelsCalls.push(params);
@@ -1403,7 +1420,7 @@ describe("add_labels", () => {
 
     it("should cap labels per operation at GitHub's 100-label limit", async () => {
       const labels = Array.from({ length: 101 }, (_, index) => `label${index + 1}`);
-      const handler = await main({ max: 101 });
+      const handler = await main({ max: 1, max_added_labels: 101 });
 
       const result = await handler({ item_number: 100, labels }, {});
 

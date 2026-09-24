@@ -107,6 +107,9 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 		if err := checkMaxField("add_labels", config.AddLabels.Max); err != nil {
 			return err
 		}
+		if err := checkMaxField("add_labels.max-added-labels", config.AddLabels.MaxAddedLabels); err != nil {
+			return err
+		}
 	}
 	if config.AddReviewer != nil {
 		if err := checkMaxField("add_reviewer", config.AddReviewer.Max); err != nil {

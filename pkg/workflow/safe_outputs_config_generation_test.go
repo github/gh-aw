@@ -668,6 +668,7 @@ func TestGenerateSafeOutputsConfigAddLabelsCreateIfMissing(t *testing.T) {
 			AddLabels: &AddLabelsConfig{
 				BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("5")},
 				CreateIfMissing:      &trueVal,
+				MaxAddedLabels:       strPtr("10"),
 			},
 		},
 	}
@@ -685,6 +686,9 @@ func TestGenerateSafeOutputsConfigAddLabelsCreateIfMissing(t *testing.T) {
 	createIfMissing, ok := addLabelsConfig["create_if_missing"]
 	require.True(t, ok, "Expected create_if_missing field in add_labels config")
 	assert.Equal(t, true, createIfMissing, "create_if_missing should be true")
+	maxAddedLabels, ok := addLabelsConfig["max_added_labels"].(float64)
+	require.True(t, ok, "Expected max_added_labels field in add_labels config")
+	assert.Equal(t, 10, int(maxAddedLabels), "max_added_labels should match configuration")
 
 	// When CreateIfMissing is nil (default), the field should be omitted entirely.
 	dataDefault := &WorkflowData{

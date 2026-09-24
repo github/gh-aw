@@ -39,6 +39,7 @@ const { deterministicLabelColor } = require("./create_labels.cjs");
 
 /** Maximum labels GitHub permits on a single issue or pull request. */
 const MAX_LABELS_PER_ADD_LABELS_CALL = 100;
+const DEFAULT_MAX_ADDED_LABELS = 10;
 
 /**
  * @param {{ rationale?: string, confidence?: string, suggest?: boolean } | null | undefined} spec
@@ -242,7 +243,8 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
 const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
-    const maxLabelsPerCall = Math.min(maxCount, MAX_LABELS_PER_ADD_LABELS_CALL);
+    const configuredMaxAddedLabels = Number(config.max_added_labels);
+    const maxLabelsPerCall = Number.isSafeInteger(configuredMaxAddedLabels) && configuredMaxAddedLabels > 0 ? Math.min(configuredMaxAddedLabels, MAX_LABELS_PER_ADD_LABELS_CALL) : DEFAULT_MAX_ADDED_LABELS;
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
     const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
