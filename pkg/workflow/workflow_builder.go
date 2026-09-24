@@ -122,8 +122,12 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 			if checkoutValue, ok := rawCheckout.(bool); ok && !checkoutValue {
 				workflowData.CheckoutDisabled = true
 				workflowData.CheckoutExplicitlyDisabled = true
-			} else if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(rawCheckout); ok && err == nil {
-				workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
+			} else if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(rawCheckout); ok {
+				if err != nil {
+					workflowData.DynamicCheckoutErrors = append(workflowData.DynamicCheckoutErrors, err)
+				} else {
+					workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
+				}
 			} else if configs, err := ParseCheckoutConfigs(rawCheckout); err == nil {
 				workflowData.CheckoutConfigs = configs
 			}
@@ -150,8 +154,12 @@ func (c *Compiler) buildInitialWorkflowData( //nolint:largefunc // Existing work
 				workflowBuilderLog.Printf("Failed to unmarshal imported checkout JSON: %v", err)
 				continue
 			}
-			if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(raw); ok && err == nil {
-				workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
+			if dynamicCheckout, ok, err := parseDynamicCheckoutConfig(raw); ok {
+				if err != nil {
+					workflowData.DynamicCheckoutErrors = append(workflowData.DynamicCheckoutErrors, err)
+				} else {
+					workflowData.DynamicCheckouts = append(workflowData.DynamicCheckouts, dynamicCheckout)
+				}
 				continue
 			}
 			importedConfigs, err := ParseCheckoutConfigs(raw)

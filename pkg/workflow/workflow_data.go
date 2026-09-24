@@ -181,6 +181,7 @@ type WorkflowData struct {
 	InlinedImports                 bool                            // if true, inline all imports at compile time (from inlined-imports frontmatter field)
 	CheckoutConfigs                []*CheckoutConfig               // user-configured checkout settings from frontmatter
 	DynamicCheckouts               []DynamicCheckoutConfig         // Runtime checkout expressions and their repository allowlists
+	DynamicCheckoutErrors          []error                         // Deferred parsing errors from fallback and imported checkout handling
 	CheckoutDisabled               bool                            // true when checkout: false is set in frontmatter, or auto-disabled for pull_request_target
 	CheckoutExplicitlyDisabled     bool                            // true only when checkout: false is explicitly set in frontmatter (not auto-disabled)
 	CheckoutSkipDefault            bool                            // true when permissions.contents: none skips only the default workflow-repository checkout
