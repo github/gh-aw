@@ -12,7 +12,7 @@ Provider-hosted Claude and Codex web tools run outside AWF's network boundary, s
 
 ### Decision
 
-We will add a dedicated `network.hosted-web` frontmatter policy for provider-hosted web access and compile it into `apiProxy.hostedWeb` engine-specific configuration for Claude and Codex. The policy will be deny-by-default when a workflow declares network restrictions for those engines without an explicit hosted-web policy, and it will validate only lowercase DNS hostnames plus optional usage limits rather than reusing `network.allowed`. We chose this because the PR evidence shows hosted web retrieval happens outside the sandbox network boundary, so it requires a separate trusted-proxy policy surface with explicit enablement and independent domain allow/block lists.
+We will add a dedicated `network.hosted-web` frontmatter policy for provider-hosted web access and compile it into `apiProxy.hostedWeb` engine-specific configuration for Claude and Codex. The object form enables hosted web by its presence, while `hosted-web: false` disables it. The policy will be deny-by-default when a workflow declares network restrictions for those engines without an explicit hosted-web policy, and it will validate only lowercase DNS hostnames plus optional usage limits rather than reusing `network.allowed`. We chose this because the PR evidence shows hosted web retrieval happens outside the sandbox network boundary, so it requires a separate trusted-proxy policy surface with independent domain allow/block lists.
 
 ### Alternatives Considered
 

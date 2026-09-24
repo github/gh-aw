@@ -18,7 +18,7 @@ func TestCompileWorkflow_FirewallImagesPinnedForAWF0270(t *testing.T) {
 
 	frontmatter := `---
 on: workflow_dispatch
-engine: claude
+engine: copilot
 sandbox:
   agent:
     id: awf
@@ -337,7 +337,7 @@ func TestCompileWorkflow_UnresolvedFirewallImageRecordsResolutionFailure(t *test
 
 	frontmatter := `---
 on: workflow_dispatch
-engine: claude
+engine: copilot
 sandbox:
   agent:
     id: awf
