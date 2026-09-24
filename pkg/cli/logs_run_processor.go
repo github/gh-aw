@@ -612,7 +612,8 @@ func tryLoadCachedRunResult(
 		LogsPath:    runOutputDir,
 		Cached:      true,
 	}
-	metadataApplied := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
+	metadataResolved, metadataApplied := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
+	applyKnownWorkflowPath(&result, run)
 	// Re-apply the usage activity backfill to heal stale cache entries.
 	// Capture the SafeItemsCount before backfill to detect whether the field was healed.
 	safeItemsBefore := result.Run.SafeItemsCount
@@ -634,24 +635,43 @@ func tryLoadCachedRunResult(
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
 	}
+	applyCachedRunWorkflowPathGate(&result, run, metadataResolved, params.verbose)
 	return &result, true
 }
 
-func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) bool {
+func applyCachedRunWorkflowPathGate(result *DownloadResult, run WorkflowRun, metadataResolved bool, verbose bool) {
+	if run.WorkflowPath != "" {
+		if !isAgenticWorkflowPath(run.WorkflowPath) {
+			skipNonAgenticWorkflowRun(result, verbose)
+		}
+		return
+	}
+	if !metadataResolved {
+		result.Run.WorkflowPath = ""
+		skipUnverifiedWorkflowRun(result, verbose)
+	}
+}
+
+func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) (bool, bool) {
 	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo)
 	if err == nil && needsRefresh {
 		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	}
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false
+		return false, false
 	}
 	metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, params.dlOwner, params.dlRepo, params.dlHost, params.verbose)
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false
+		return false, false
 	}
-	return applyWorkflowRunMetadata(cachedRun, metadata)
+	metadataApplied := applyWorkflowRunMetadata(cachedRun, metadata)
+	if cachedRun.WorkflowPath != metadata.WorkflowPath {
+		cachedRun.WorkflowPath = metadata.WorkflowPath
+		metadataApplied = true
+	}
+	return true, metadataApplied
 }
 
 // analyzeRunArtifacts populates a DownloadResult with all analysis data derived from

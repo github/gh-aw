@@ -373,6 +373,65 @@ func TestTryLoadCachedRunResultUsesCacheWhenEvalsNotRequested(t *testing.T) {
 	assert.True(t, result.Cached)
 }
 
+func TestTryLoadCachedRunResultRejectsStaleRegularWorkflowPath(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       130,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   130,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{
+		DatabaseID:   130,
+		WorkflowPath: ".github/workflows/ci.yml",
+	}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Cached)
+	assert.True(t, result.Skipped)
+	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
+}
+
+func TestTryLoadCachedRunResultClearsStalePathWhenMetadataOmitsPath(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       131,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   131,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runOutputDir, runAPIResponseFileName),
+		[]byte(`{"id":131,"status":"completed","conclusion":"success"}`),
+		0o600,
+	))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{DatabaseID: 131}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Cached)
+	assert.Empty(t, result.Run.WorkflowPath)
+}
+
 func TestNewRunSummaryCarriesGatewaySteeringEvents(t *testing.T) {
 	t.Parallel()
 	events := []GatewaySteeringEvent{{
