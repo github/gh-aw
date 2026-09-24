@@ -234,7 +234,20 @@ async function assertTrustedCheckoutRuntime() {
 
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR
   // are retained as event/runtime-compatible fallbacks.
-  const actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]") {
+    const awContext = JSON.parse(context.payload.inputs?.aw_context || "{}");
+    const commandName = typeof awContext.command_name === "string" ? awContext.command_name.trim() : "";
+    const triggerLabel = typeof awContext.trigger_label === "string" ? awContext.trigger_label.trim() : "";
+    if (commandName || triggerLabel) {
+      const propagatedActor = typeof awContext.actor === "string" ? awContext.actor.trim() : "";
+      if (!propagatedActor) {
+        throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
+      }
+      actor = propagatedActor;
+      core.info(`Validating centralized workflow_dispatch against originating actor '${actor}'`);
+    }
+  }
   if (!actor) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");
   }

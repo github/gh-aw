@@ -439,7 +439,7 @@ if (!pullRequest && eventName === "workflow_dispatch") {
 }
 ```
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call (lines 247–248) and the `exec.exec("git", [...])` array invocation (lines 305–310) that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Bot/app identity (`sender.type == "Bot"`) is treated as an identity signal only; it does not bypass the write-or-higher repository permission floor.
+Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher and fail closed when that actor is absent. Bot/app identity (`sender.type == "Bot"`) is treated as an identity signal only; it does not bypass the write-or-higher repository permission floor.
 
 ```js
 async function assertTrustedCheckoutRuntime() {
@@ -473,10 +473,12 @@ async function assertTrustedCheckoutRuntime() {
 | `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
 | bot/app actor with write-or-higher repository permission allowed | actor trust |
 | bot/app actor without write-or-higher repository permission rejected for `workflow_dispatch`, `issue_comment`, and `pull_request_review_comment` | actor trust |
+| centralized `workflow_dispatch` validates the originating `aw_context.actor`, not `github-actions[bot]` | actor trust |
+| centralized `workflow_dispatch` without `aw_context.actor` is rejected | actor trust (fail closed) |
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 | native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |
 
-**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection, fail-closed behavior for missing `repository` data, and the invariant that bot/app identity does not bypass the write-or-higher repository permission floor. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
+**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection, fail-closed behavior for missing `repository` data, originating-actor validation for centralized dispatches, and the invariant that bot/app identity does not bypass the write-or-higher repository permission floor. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
 
 ---
 

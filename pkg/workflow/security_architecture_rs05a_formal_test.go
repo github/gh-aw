@@ -160,6 +160,44 @@ func TestFormalRS05a_ActorTrustBotWithoutWritePermissionRejected(t *testing.T) {
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
+func TestFormalRS05a_CentralizedDispatchValidatesOriginatingActor(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "trusted-maintainer",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aCheckoutSucceeded(t, result)
+	assertRS05aFetchedPullHeadRef(t, result, 123)
+	require.Len(t, result.PermissionCalls, 1)
+	assert.Equal(t, "trusted-maintainer", result.PermissionCalls[0]["username"], "centralized dispatch must validate the originating actor, not the dispatcher bot")
+	assert.Contains(t, result.Info, "Validating centralized workflow_dispatch against originating actor 'trusted-maintainer'")
+}
+
+func TestFormalRS05a_CentralizedDispatchWithoutOriginatingActorRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "missing originating actor must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to determine originating actor")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
 func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {
 	scenario := rs05aDefaultBridgeScenario(t, nil)
 	scenario.AwContextRaw = "{not-valid-json"

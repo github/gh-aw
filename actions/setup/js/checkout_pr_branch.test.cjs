@@ -383,6 +383,53 @@ If the pull request is still open, verify that:
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
+
+      it("should validate centralized workflow_dispatch using the originating aw_context actor", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockCore.info).toHaveBeenCalledWith("Validating centralized workflow_dispatch against originating actor 'trusted-maintainer'");
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "github-actions[bot]" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      });
+
+      it("should reject centralized workflow_dispatch without an originating aw_context actor", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine originating actor"));
+      });
     });
 
     it("should handle git fetch errors", async () => {
