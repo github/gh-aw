@@ -236,11 +236,12 @@ async function assertTrustedCheckoutRuntime(awContext) {
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR
   // are retained as event/runtime-compatible fallbacks.
   let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  const senderType = context.payload.sender?.type;
   // GitHub attributes direct dispatches to their initiating user/app, while
   // the repository's centralized router runs as github-actions[bot].
   // command_name and trigger_label are the router's command/label markers;
   // arbitrary bot/app dispatchers must be validated as themselves.
-  if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]") {
+  if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]" && senderType === "Bot") {
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
     if (commandName || triggerLabel) {
@@ -260,8 +261,6 @@ async function assertTrustedCheckoutRuntime(awContext) {
   // event identity (`sender.type === "Bot"`), but that signal only proves the
   // account type. They still must satisfy the same repository permission floor
   // below; the workflow_dispatch-only fork check above is independent.
-  const senderType = context.payload.sender?.type;
-
   try {
     const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
       owner: context.repo.owner,

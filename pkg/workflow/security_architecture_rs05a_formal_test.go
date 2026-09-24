@@ -198,6 +198,27 @@ func TestFormalRS05a_CentralizedDispatchWithoutOriginatingActorRejected(t *testi
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
+func TestFormalRS05a_CentralizedDispatchRequiresBotSenderSignal(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "trusted-maintainer",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "User"
+	scenario.Permission = "read"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	require.Len(t, result.PermissionCalls, 1)
+	assert.Equal(t, "github-actions[bot]", result.PermissionCalls[0]["username"], "propagated actor requires GitHub's Bot sender signal")
+	assertRS05aFailedContains(t, result, "requires write or higher")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
 func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {
 	scenario := rs05aDefaultBridgeScenario(t, nil)
 	scenario.AwContextRaw = "{not-valid-json"

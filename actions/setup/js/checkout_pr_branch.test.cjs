@@ -457,6 +457,33 @@ If the pull request is still open, verify that:
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
+
+      it("should not trust a propagated actor without GitHub's Bot sender signal", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "User" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: { permission: "read" },
+        });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "github-actions[bot]" }));
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
+      });
     });
 
     it("should handle git fetch errors", async () => {
