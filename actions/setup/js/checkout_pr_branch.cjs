@@ -216,8 +216,9 @@ function logCheckoutStrategy(eventName, strategy, reason) {
  * Ensure checkout step only runs in trusted runtime contexts.
  * - workflow_dispatch PR replay must not run in a forked repository
  * - triggering actor must have write-or-higher repository permission
+ * @param {Record<string, any> | undefined} awContext Parsed workflow_dispatch context
  */
-async function assertTrustedCheckoutRuntime() {
+async function assertTrustedCheckoutRuntime(awContext) {
   if (context.eventName === "workflow_dispatch") {
     const repository = context.payload.repository;
     // Fork status can only be verified when the payload carries repository
@@ -236,11 +237,10 @@ async function assertTrustedCheckoutRuntime() {
   // are retained as event/runtime-compatible fallbacks.
   let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
   if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]") {
-    const awContext = JSON.parse(context.payload.inputs?.aw_context || "{}");
-    const commandName = typeof awContext.command_name === "string" ? awContext.command_name.trim() : "";
-    const triggerLabel = typeof awContext.trigger_label === "string" ? awContext.trigger_label.trim() : "";
+    const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
+    const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
     if (commandName || triggerLabel) {
-      const propagatedActor = typeof awContext.actor === "string" ? awContext.actor.trim() : "";
+      const propagatedActor = typeof awContext?.actor === "string" ? awContext.actor.trim() : "";
       if (!propagatedActor) {
         throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
       }
@@ -300,6 +300,8 @@ async function main() {
   // For issue_comment events on PRs, context.payload.pull_request is not set;
   // instead context.payload.issue.pull_request indicates the issue is a PR.
   let pullRequest = context.payload.pull_request;
+  /** @type {Record<string, any> | undefined} */
+  let workflowDispatchAwContext;
 
   // Handle issue_comment (and similar) events triggered on a PR
   if (!pullRequest && context.payload.issue?.pull_request) {
@@ -316,6 +318,7 @@ async function main() {
     if (awContextStr) {
       try {
         const awContext = JSON.parse(awContextStr);
+        workflowDispatchAwContext = awContext;
         const prNumber = Number(awContext.item_number);
         if (awContext.item_type === "pull_request" && Number.isInteger(prNumber) && prNumber > 0) {
           if (awContext.repo) {
@@ -359,7 +362,7 @@ async function main() {
   }
 
   try {
-    await assertTrustedCheckoutRuntime();
+    await assertTrustedCheckoutRuntime(workflowDispatchAwContext);
 
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);
