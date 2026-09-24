@@ -1,5 +1,17 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-24 snapshot
+- 50 sessions; **44.0% completion** (22 success/8 failure/20 action_required), +20pts vs 09-23 (24%), above ~31% mean.
+- **true_agentic 5/5=100%**, 4th consecutive full-recovery day (09-19 3/3, 09-22 7/7, 09-23 5/5).
+- **provenance_inversion back in band**: 77.3% bot-driven (17/22), confirms 09-23's 58.3% low was a one-off.
+- **NEW RECORD pr_terminal_event_cascade** (2nd instance): PR #63069 closed w/o merging 04:14:22Z → 8 runs/6 workflows failed 1s later + Squad Implement Worker action_required 7s later = 9 invalidated, beats prior peak 8 (09-23).
+- Smaller `merge_invalidation_cascade`: PR #63048 merged → Squad Implement Worker action_required 7s later (1 run, tied smallest on record).
+- Gates partly broke pattern: Doc Build-Deploy 0/4 unchanged, but CGO/CWI 1/5 (20%) posted first partial passes, both on merged branch improve-agent-detection.
+- burst_vs_isolated: isolated 71.4% (5/7) vs burst-fired 39.5% (17/43), 1.8x gap (narrower than usual 3-8x).
+- 4 branches: allow-add-labels-max-control 20/50=25.0%succ, ensure-empty-new-line-after-details 19/50=42.1%succ (cascade branch), fix-assert-trusted-checkout-runtime 6/50=83.3%succ, improve-agent-detection 5/50=80.0%succ (merged).
+- Duration: raw mean 20.12m/median 4.06m (cascade-inflated).
+- Orphans 0/18 → 0% NORMAL, 32nd healthy day. Conv logs empty 32nd+ day. Standard run (roll=53).
+
 ## 2026-09-23 snapshot
 - 50 sessions; **24.0% raw completion** (12 success, 8 failure, 30 action_required), -7.7pts vs 30-day mean 31.7% (range 4-78%), down from 09-22 (40%). No run recorded for 09-21 (gap in daily cadence).
 - **true_agentic_100pct_streak: 3rd consecutive full-recovery day** — 5/5 true-agentic runs succeeded (4x "Addressing comment on PR #62776" + 1x "Running Copilot cloud agent"), following 09-19 (3/3) and 09-22 (7/7).
