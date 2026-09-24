@@ -27,7 +27,9 @@ func TestUpgradeCommand_OnExistingRepository(t *testing.T) {
 	assert.Contains(t, outputStr, "Upgrade complete", "Should report upgrade complete")
 }
 
-func TestInitAndUpgradeWithEmptyAWDirectory(t *testing.T) {
+func TestUpgradeCompilesAndPreservesAWDirectory(t *testing.T) {
+	const noImplicitExpiry = `GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "0"`
+
 	setup := setupIntegrationTest(t)
 	defer setup.cleanup()
 
@@ -63,13 +65,15 @@ permissions:
 engine: copilot
 strict: true
 timeout-minutes: 5
+safe-outputs:
+  add-comment:
 ---
 
 Say hello.
 `
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644), "should create sample workflow")
 
-	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--no-fix", "--skip-extension-upgrade")
+	upgradeCmd := exec.Command(setup.binaryPath, "upgrade", "--approve", "--no-actions", "--skip-extension-upgrade")
 	upgradeCmd.Dir = setup.tempDir
 	upgradeOutput, upgradeErr := upgradeCmd.CombinedOutput()
 	upgradeOutputStr := string(upgradeOutput)
@@ -79,4 +83,45 @@ Say hello.
 	require.NoError(t, err, "expected actions-lock.json to be preserved after upgrade")
 	_, err = os.Stat(filepath.Join(awDir, "logs"))
 	require.NoError(t, err, "expected .github/aw/logs to be preserved after upgrade")
+
+	lockContent, err := os.ReadFile(filepath.Join(setup.tempDir, ".github", "workflows", "example.lock.yml"))
+	require.NoError(t, err, "expected upgrade to compile the workflow")
+	assert.Contains(t, string(lockContent), noImplicitExpiry)
+
+	_, err = os.Stat(filepath.Join(setup.tempDir, ".github", "workflows", "agentics-maintenance.yml"))
+	require.True(t, os.IsNotExist(err), "expected maintenance workflow to not be generated for implicit expiry")
+}
+
+func TestUpgradeNoFixSkipsCompilation(t *testing.T) {
+	setup := setupIntegrationTest(t)
+	defer setup.cleanup()
+
+	initGit := exec.Command("git", "init", "--quiet")
+	initGit.Dir = setup.tempDir
+	require.NoError(t, initGit.Run(), "git init should succeed")
+
+	initCmd := exec.Command(setup.binaryPath, "init")
+	initCmd.Dir = setup.tempDir
+	initOutput, initErr := initCmd.CombinedOutput()
+	require.NoError(t, initErr, "init command should succeed, output: %s", initOutput)
+
+	workflowPath := filepath.Join(setup.tempDir, ".github", "workflows", "example.md")
+	workflowContent := `---
+name: Example Agentic Workflow
+on:
+  workflow_dispatch:
+engine: copilot
+---
+
+Say hello.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644))
+
+	noFixCmd := exec.Command(setup.binaryPath, "upgrade", "--no-fix", "--skip-extension-upgrade")
+	noFixCmd.Dir = setup.tempDir
+	noFixOutput, noFixErr := noFixCmd.CombinedOutput()
+	require.NoError(t, noFixErr, "upgrade --no-fix should succeed, output: %s", noFixOutput)
+
+	_, err := os.Stat(filepath.Join(setup.tempDir, ".github", "workflows", "example.lock.yml"))
+	require.True(t, os.IsNotExist(err), "--no-fix should skip compilation")
 }

@@ -33,6 +33,8 @@ type UpgradeConfig struct {
 }
 
 // NewUpgradeCommand creates the upgrade command
+//
+//nolint:largefunc // Cobra requires the command's complete discoverable flag surface to be registered together.
 func NewUpgradeCommand(validateEngine func(string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
@@ -77,6 +79,7 @@ This command always upgrades all Markdown files in .github/workflows.`,
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --audit --json              # Output audit results in JSON format
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --pre-releases              # Include pre-release versions when upgrading the extension (stable releases are the default)`,
 		Args: cobra.NoArgs,
+		//nolint:largefunc // Interdependent flag validation must run before dispatch so no caller bypasses it.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			dir, _ := cmd.Flags().GetString("dir")
@@ -232,6 +235,8 @@ type upgradeOptions struct {
 }
 
 // runUpgradeCommand executes the upgrade process
+//
+//nolint:largefunc // Upgrade side effects require ordered progress reporting and independent failure handling.
 func runUpgradeCommand(opts upgradeOptions) error {
 	upgradeLog.Printf("Running upgrade command: verbose=%v, workflowDir=%s, noFix=%v, noCompile=%v, noActions=%v, disabledCodemodIDs=%v, skipExtensionUpgrade=%v",
 		opts.verbose, opts.workflowDir, opts.noFix, opts.noCompile, opts.noActions, opts.disabledCodemodIDs, opts.skipExtensionUpgrade)
@@ -344,34 +349,12 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling all workflows..."))
 		upgradeLog.Print("Compiling all workflows")
 
-		// Create and configure compiler
-		compiler := createAndConfigureCompiler(CompileConfig{
-			Verbose:        opts.verbose,
-			WorkflowDir:    opts.workflowDir,
-			Approve:        opts.approve,
-			EngineOverride: opts.engineOverride,
-		})
-
-		// Determine workflow directory
-		workflowsDir := opts.workflowDir
-		if workflowsDir == "" {
-			workflowsDir = constants.GetWorkflowDir()
-		}
-
-		// Compile all workflow files
-		stats, compileErr := compileAllWorkflowFiles(opts.ctx, compiler, workflowsDir, opts.verbose)
-		if compileErr != nil {
+		// Use the shared directory compile pipeline so post-processing, including
+		// maintenance workflow generation and implicit expiry reconciliation, runs.
+		if compileErr := compileWorkflowsForUpdate(opts.ctx, nil, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); compileErr != nil {
 			upgradeLog.Printf("Failed to compile workflows: %v", compileErr)
 			// Don't fail the upgrade if compilation fails - this is non-critical
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to compile workflows: %v", compileErr)))
-		} else if stats != nil {
-			// Print compilation summary
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Compiled %d workflow(s)", stats.Total-stats.Errors)))
-			}
-			if stats.Errors > 0 {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: %d workflow(s) failed to compile", stats.Errors)))
-			}
 		}
 	} else {
 		if opts.noFix {
