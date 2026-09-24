@@ -292,7 +292,7 @@ func fillCanceledDownloadResults(runs []WorkflowRun, results []DownloadResult, c
 
 func cachedJSONDownloadResult(run WorkflowRun, cachedRuns cachedLogsRuns, filters runFilterOpts) (DownloadResult, bool) {
 	cachedRun, ok := cachedRuns.lookup(run, filters)
-	if !ok {
+	if !ok || !isAgenticWorkflowPath(cachedRun.WorkflowPath) {
 		return DownloadResult{}, false
 	}
 	cachedAudit := cachedRuns[run.DatabaseID].Audit
@@ -376,6 +376,8 @@ func processSingleRunDownload(
 	result, ok, err := prepareRunDownload(ctx, run, runOutputDir, perRunParams, params.storageLimit)
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
+	} else if ok && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		skipNonAgenticWorkflowRun(result, params.verbose)
 	} else if !ok {
 		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
 	} else {
@@ -430,6 +432,10 @@ func downloadAndTimeRunArtifacts(
 		} else {
 			applyWorkflowRunMetadata(&result.Run, metadata)
 		}
+		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+			skipNonAgenticWorkflowRun(result, params.verbose)
+			return nil
+		}
 		if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: run.DatabaseID, outputDir: runOutputDir, verbose: params.verbose, owner: perRunParams.dlOwner, repo: perRunParams.dlRepo, hostname: perRunParams.dlHost, artifactFilter: params.artifactFilter}); err != nil {
 			return err
 		}
@@ -455,6 +461,18 @@ func downloadAndTimeRunArtifacts(
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
 		return
+	}
+}
+
+func isAgenticWorkflowPath(workflowPath string) bool {
+	return strings.HasSuffix(workflowPath, ".lock.yml")
+}
+
+func skipNonAgenticWorkflowRun(result *DownloadResult, verbose bool) {
+	result.Skipped = true
+	logsOrchestratorLog.Printf("Skipping non-agentic workflow run: run=%d, workflow_path=%s", result.Run.DatabaseID, result.Run.WorkflowPath)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d because workflow path %q is not an agentic .lock.yml workflow", result.Run.DatabaseID, result.Run.WorkflowPath)))
 	}
 }
 

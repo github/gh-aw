@@ -14,6 +14,68 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIsAgenticWorkflowPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "agentic workflow",
+			path: ".github/workflows/research.lock.yml",
+			want: true,
+		},
+		{
+			name: "regular yml workflow",
+			path: ".github/workflows/ci.yml",
+			want: false,
+		},
+		{
+			name: "regular yaml workflow",
+			path: ".github/workflows/ci.yaml",
+			want: false,
+		},
+		{
+			name: "missing workflow path",
+			path: "",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isAgenticWorkflowPath(tt.path))
+		})
+	}
+}
+
+func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
+	updatedAt := time.Now()
+	run := WorkflowRun{
+		DatabaseID: 2,
+		Status:     "completed",
+		Conclusion: "success",
+		Attempt:    1,
+		UpdatedAt:  updatedAt,
+		Repository: "owner/repo",
+	}
+	cachedRuns := cachedLogsRuns{
+		2: {RunData: RunData{
+			RunID:        2,
+			WorkflowPath: ".github/workflows/ci.yml",
+			Status:       "completed",
+			Conclusion:   "success",
+			RunAttempt:   "1",
+			UpdatedAt:    updatedAt,
+			Repository:   "owner/repo",
+		}},
+	}
+
+	_, ok := cachedJSONDownloadResult(run, cachedRuns, runFilterOpts{})
+
+	assert.False(t, ok)
+}
+
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

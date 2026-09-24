@@ -680,9 +680,9 @@ func TestAppendProcessedWorkflowRunsPreservesNewestPrefixOnCancellation(t *testi
 	}
 
 	processed, count, _ := appendProcessedWorkflowRuns(ctx, nil, []WorkflowRun{
-		{DatabaseID: 1},
-		{DatabaseID: 2},
-		{DatabaseID: 3},
+		{DatabaseID: 1, WorkflowPath: ".github/workflows/first.lock.yml"},
+		{DatabaseID: 2, WorkflowPath: ".github/workflows/second.lock.yml"},
+		{DatabaseID: 3, WorkflowPath: ".github/workflows/third.lock.yml"},
 	}, 0, processWorkflowRunBatchOptions{
 		count:                  1,
 		maxConcurrentDownloads: 2,
