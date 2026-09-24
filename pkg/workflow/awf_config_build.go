@@ -401,6 +401,16 @@ func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
 	return engineName
 }
 
+func sanitizeResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {
+	runtimeID := strings.ToLower(resolvedRuntimeID)
+	if registeredEngine || hostedWebRuntimeID(engineID, "") == runtimeID {
+		return runtimeID
+	}
+	// EngineCatalog.Resolve has a broad historical prefix fallback; avoid treating
+	// unrelated unregistered names (for example "codexbridge") as hosted-web-capable.
+	return strings.ToLower(engineID)
+}
+
 // hasHostedWebRuntimeAlias treats engineName as an alias of runtimeID only when it
 // is exactly runtimeID or uses the legacy runtime-prefixed form runtimeID-* or
 // runtimeID_*. This preserves supported aliases such as codex-experimental without

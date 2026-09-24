@@ -85,6 +85,7 @@ func extractHostedWebPolicy(hostedWeb any) (*HostedWebPolicy, bool) {
 		if !hostedWeb {
 			return &HostedWebPolicy{}, true
 		}
+		return nil, false
 	case map[string]any:
 		policy := &HostedWebPolicy{Enabled: true}
 		policy.Allowed = extractStringSlice(hostedWeb["allowed"])
