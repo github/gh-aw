@@ -343,7 +343,7 @@ func TestCopilotPluginInstallationSteps(t *testing.T) {
 			Plugins: []string{"octo-org/agent-plugin@" + testPluginSHA},
 		})
 
-		require.Len(t, steps, 2)
+		require.Len(t, steps, 3)
 		checkout := strings.Join(steps[0], "\n")
 		assert.Contains(t, checkout, "name: Checkout agent plugin octo-org/agent-plugin")
 		assert.Contains(t, checkout, "uses: actions/checkout@")
@@ -356,6 +356,11 @@ func TestCopilotPluginInstallationSteps(t *testing.T) {
 		install := strings.Join(steps[1], "\n")
 		assert.Contains(t, install, "name: Install agent plugin octo-org/agent-plugin")
 		assert.Contains(t, install, "copilot plugin install ./.gh-aw-plugins/plugin-0")
+
+		diagnostics := strings.Join(steps[2], "\n")
+		assert.Contains(t, diagnostics, "name: Diagnose agent plugin octo-org/agent-plugin")
+		assert.Contains(t, diagnostics, "find \"./.gh-aw-plugins/plugin-0\" -maxdepth 6 -type f")
+		assert.Contains(t, diagnostics, "plugin-diagnostics.log")
 	})
 
 	t.Run("installs a plugin from a repository subpath", func(t *testing.T) {
@@ -363,9 +368,10 @@ func TestCopilotPluginInstallationSteps(t *testing.T) {
 			Plugins: []string{"octo-org/agent-plugins/plugins/example@" + testPluginSHA},
 		})
 
-		require.Len(t, steps, 2)
+		require.Len(t, steps, 3)
 		assert.Contains(t, strings.Join(steps[0], "\n"), "repository: octo-org/agent-plugins")
 		assert.Contains(t, strings.Join(steps[1], "\n"), "copilot plugin install ./.gh-aw-plugins/plugin-0/plugins/example")
+		assert.Contains(t, strings.Join(steps[2], "\n"), "name: Diagnose agent plugin octo-org/agent-plugins/plugins/example")
 	})
 
 	t.Run("uses a custom engine command", func(t *testing.T) {
@@ -374,7 +380,7 @@ func TestCopilotPluginInstallationSteps(t *testing.T) {
 			Plugins:      []string{"octo-org/agent-plugin@" + testPluginSHA},
 		})
 
-		require.Len(t, steps, 2)
+		require.Len(t, steps, 3)
 		assert.Contains(t, strings.Join(steps[1], "\n"), "/opt/copilot plugin install")
 	})
 
