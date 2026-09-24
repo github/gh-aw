@@ -371,7 +371,40 @@ activation:
 
 ---
 
-### 7a. workflow_dispatch + aw_context PR Checkout Validation (Section 11.3 - RS-05a)
+### 7a. workflow_run Repository Validation (Section 11.3 - RS-05)
+
+**Specification Claim**:
+> **RS-05**: For `workflow_run` triggers, the implementation MUST short-circuit safely for non-`workflow_run` triggers, fail closed when workflow-run repository metadata is absent, require repository ID match, and reject forked upstream workflow runs.
+
+**Implementation Validation** (`pkg/workflow/role_checks.go`):
+
+```go
+eventNotWorkflowRun := BuildNotEquals(BuildPropertyAccess("github.event_name"), BuildStringLiteral("workflow_run"))
+workflowRunPayloadPresent := BuildNotEquals(BuildPropertyAccess("github.event.workflow_run"), BuildNullLiteral())
+workflowRunRepositoryPresent := BuildNotEquals(BuildPropertyAccess("github.event.workflow_run.repository"), BuildNullLiteral())
+repoIDCheck := BuildEquals(BuildPropertyAccess("github.event.workflow_run.repository.id"), BuildPropertyAccess("github.repository_id"))
+notFromForkCheck := &NotNode{Child: BuildPropertyAccess("github.event.workflow_run.repository.fork")}
+repoSafetyCheck := BuildAnd(workflowRunPayloadPresent, BuildAnd(workflowRunRepositoryPresent, BuildAnd(repoIDCheck, notFromForkCheck)))
+combinedCheck := BuildOr(eventNotWorkflowRun, repoSafetyCheck)
+```
+
+The rendered job condition is a runtime policy gate. It permits non-`workflow_run` triggers without touching `github.event.workflow_run.*`, and for `workflow_run` events requires both parent objects before evaluating repository identity and fork status.
+
+**Formal test coverage** (`pkg/workflow/security_architecture_sg_formal_test.go`):
+
+| Test | RS-05 property |
+|------|----------------|
+| `TestFormalRS003_WorkflowRunRepositoryValidation` asserts `github.event_name != 'workflow_run'` | cross-trigger short-circuit |
+| `TestFormalRS003_WorkflowRunRepositoryValidation` asserts `github.event.workflow_run != null` | workflow_run payload presence |
+| `TestFormalRS003_WorkflowRunRepositoryValidation` asserts `github.event.workflow_run.repository != null` | repository payload presence / fail closed |
+| `TestFormalRS003_WorkflowRunRepositoryValidation` asserts repository ID equality | repository identity |
+| `TestFormalRS003_WorkflowRunRepositoryValidation` asserts `!(github.event.workflow_run.repository.fork)` | fork rejection |
+
+**Status**: ✅ **VERIFIED** — RS-05 is enforced by the generated runtime `if:` policy and has formal coverage for trigger scoping, nullability, repository identity, and fork rejection.
+
+---
+
+### 7b. workflow_dispatch + aw_context PR Checkout Validation (Section 11.3 - RS-05a)
 
 **Specification Claim**:
 > **RS-05a**: For `workflow_dispatch` triggers where the `aw_context` input encodes a pull request context, the implementation MUST enforce: repository scope check, actor trust, parse resilience, and ref isolation.
@@ -406,7 +439,7 @@ if (!pullRequest && eventName === "workflow_dispatch") {
 }
 ```
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call (lines 247–248) and the `exec.exec("git", [...])` array invocation (lines 305–310) that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent:
+Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call (lines 247–248) and the `exec.exec("git", [...])` array invocation (lines 305–310) that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Bot/app identity (`sender.type == "Bot"`) is treated as an identity signal only; it does not bypass the write-or-higher repository permission floor.
 
 ```js
 async function assertTrustedCheckoutRuntime() {
@@ -438,10 +471,12 @@ async function assertTrustedCheckoutRuntime() {
 | same-repo PR checkout allowed when runtime repository is itself a fork (`pull_request`) | fork-runtime rejection scope |
 | `workflow_dispatch` PR replay rejected when runtime repository is a fork | fork-runtime rejection |
 | `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
+| bot/app actor with write-or-higher repository permission allowed | actor trust |
+| bot/app actor without write-or-higher repository permission rejected for `workflow_dispatch`, `issue_comment`, and `pull_request_review_comment` | actor trust |
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 | native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |
 
-**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection and its fail-closed behavior for missing `repository` data. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
+**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection, fail-closed behavior for missing `repository` data, and the invariant that bot/app identity does not bypass the write-or-higher repository permission floor. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
 
 ---
 
@@ -587,6 +622,7 @@ concurrency:
 | **9.1** | Threat Detection (TD-01) | ✅ Verified | `detection:` job |
 | **10.6** | Action Pinning (CS-10) | ✅ Verified | All `uses:` statements |
 | **11.1** | Timestamp Validation (RS-01, RS-02) | ✅ Verified | `activation.steps` |
+| **11.3** | workflow_run Repository Validation (RS-05) | ✅ Verified | `role_checks.go`, `TestFormalRS003_WorkflowRunRepositoryValidation` |
 | **11.3** | workflow_dispatch PR Checkout (RS-05a) | ✅ Verified | `checkout_pr_branch.cjs` lines 200–230 |
 | **11.8** | Concurrency Control (RS-16 to RS-22) | ✅ Verified | `concurrency:` blocks |
 
@@ -688,7 +724,7 @@ This section audits the compliance test matrix defined in `security-architecture
 | Sandbox Isolation | T-SI-001 to T-SI-007 | ⚠️ PARTIALLY EVIDENCED | §8c adds compiled-workflow and runtime-script evidence for AWF chrooting, docker-host indirection, environment filtering, MCP/tool mounts, and composed sandbox/firewall operation; direct runtime host-visibility proof remains outstanding (tracked in [#48686](https://github.com/github/gh-aw/issues/48686)) |
 | Threat Detection | T-TD-001 to T-TD-007 | ⚠️ PARTIALLY EVIDENCED | TD-01 (automatic threat detection) verified via `detection:` job; T-TD-002 (prompt injection), T-TD-003 (secret leaks), T-TD-004 (malicious patches), T-TD-005 (custom prompt), T-TD-006 (engine override), T-TD-007 (workflow failure on detection) lack dedicated evidence entries |
 | Compilation-Time Security | T-CS-001 to T-CS-006, T-SG07-001, T-SG07-002 | ✅ EVIDENCED | T-CS-001 via `TestFormalCS001_SchemaValidationRejectsUnknownField`; T-CS-002 via `TestFormalCS002_ExpressionSafetyRejectsUnauthorizedExpression`; T-CS-003 via `TestFormalSG02_AgentJobHasNoWritePermissions`; T-CS-004 via `TestFormal_P9_CompilationValidatesBeforeEmit`; T-CS-005 via CS-10 evidence in §10; T-CS-006 via `TestStrictModeDeprecatedFields`; T-SG07-001/T-SG07-002 via `TestFormalSG07_FailSecureOnSecurityError` and `TestFormal_P9_CompilationValidatesBeforeEmit`. |
-| Runtime Security | T-RS-001 to T-RS-011 | ✅ EVIDENCED | RS-01/RS-02 (timestamp validation) and RS-16 to RS-22 (concurrency control) remain evidenced; RS-05a (`workflow_dispatch` + `aw_context` PR checkout) evidenced in §7a; T-RS-003 via `TestFormalRS003_WorkflowRunRepositoryValidation`; T-RS-004 via `TestFormalRS004_RuntimeRoleValidation`; T-RS-005 via `TestFormalRS005_RuntimeTokenValidation`; T-RS-006 via `TestFormalRS006_AWFNetworkPolicyValidation`; T-RS-007 via `TestFormalRS007_MCPNetworkPolicyValidation`; T-RS-008 via `TestFormalRS008_OutputTargetValidation`. |
+| Runtime Security | T-RS-001 to T-RS-011 | ✅ EVIDENCED | RS-01/RS-02 (timestamp validation) and RS-16 to RS-22 (concurrency control) remain evidenced; RS-05 (`workflow_run` repository validation) evidenced in §7a; RS-05a (`workflow_dispatch` + `aw_context` PR checkout) evidenced in §7b; T-RS-003 via `TestFormalRS003_WorkflowRunRepositoryValidation`; T-RS-004 via `TestFormalRS004_RuntimeRoleValidation`; T-RS-005 via `TestFormalRS005_RuntimeTokenValidation`; T-RS-006 via `TestFormalRS006_AWFNetworkPolicyValidation`; T-RS-007 via `TestFormalRS007_MCPNetworkPolicyValidation`; T-RS-008 via `TestFormalRS008_OutputTargetValidation`. |
 | Companion MCP Access-Control | T-GH-047 to T-GH-060 | ⚠️ PARTIALLY EVIDENCED | Deferred to companion specifications (`scratchpad/github-mcp-access-control-specification.md`, `scratchpad/guard-policies-specification.md`); not directly evidenced in this document |
 
 ### Gap Summary

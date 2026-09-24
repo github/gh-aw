@@ -651,8 +651,16 @@ T-RS-003 repository validation for workflow_run.
 
 	yamlOut, err := compiler.CompileToYAML(wd, "workflow.md")
 	require.NoError(t, err)
+	assert.Contains(t, yamlOut, "github.event_name != 'workflow_run'",
+		"T-RS-003: compiled workflow_run trigger must short-circuit safely for non-workflow_run events")
+	assert.Contains(t, yamlOut, "github.event.workflow_run != null",
+		"T-RS-003: compiled workflow_run trigger must guard workflow_run payload access")
+	assert.Contains(t, yamlOut, "github.event.workflow_run.repository != null",
+		"T-RS-003: compiled workflow_run trigger must fail closed when repository metadata is absent")
 	assert.Contains(t, yamlOut, "github.event.workflow_run.repository.id == github.repository_id",
 		"T-RS-003: compiled workflow_run trigger must include repository ID safety check")
+	assert.Contains(t, yamlOut, "!(github.event.workflow_run.repository.fork)",
+		"T-RS-003: compiled workflow_run trigger must reject forked upstream workflow runs")
 }
 
 // TestFormalRS004_RuntimeRoleValidation (T-RS-004)

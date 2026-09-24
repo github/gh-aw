@@ -963,6 +963,8 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 ```
 
 **RS-05**: For `workflow_run` triggers, the implementation MUST validate:
+- Trigger scoping: non-`workflow_run` triggers in the same workflow MUST short-circuit before any `github.event.workflow_run.*` field access.
+- Payload presence: `github.event.workflow_run` and `github.event.workflow_run.repository` MUST be present before repository fields are evaluated; a missing payload MUST fail closed for `workflow_run`.
 - Repository ID match: `github.event.workflow_run.repository.id == github.repository_id`
 - Not from fork: `!github.event.workflow_run.repository.fork`
 
@@ -971,7 +973,7 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 1. **Repository scope**: If `aw_context.repo` is present, the implementation MUST compare it against the current repository identity (`context.repo.owner/context.repo.repo`). A mismatch MUST cause checkout to be skipped with a warning; cross-repository PR checkout is NOT supported.
 2. **Actor trust**: The triggering actor MUST satisfy `assertTrustedCheckoutRuntime()`, which enforces two properties with different scopes:
    - **Fork-runtime rejection** (`workflow_dispatch` PR replay ONLY): the runtime repository MUST NOT be a fork. This check MUST NOT be evaluated for other PR-capable triggers (`pull_request`, `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`), because a structurally forked base repository is a legitimate topology for those triggers and rejecting it produces a false positive (see the risk matrix below). If the `workflow_dispatch` event payload does not carry `repository` data, the implementation MUST fail closed (reject checkout) rather than treat unverifiable fork status as trusted.
-   - **Permission floor** (ALL PR checkout paths): the actor MUST hold write-or-higher repository permission, or be a verified bot/app actor identified by the platform-set `sender.type == "Bot"` signal (not by any actor-supplied claim).
+   - **Permission floor** (ALL PR checkout paths): the actor MUST hold write-or-higher repository permission. Bot/app actors MAY use the platform-set `sender.type == "Bot"` signal only as an identity signal; it MUST NOT bypass the repository permission check. If a bot/app actor's repository permission cannot be verified, checkout MUST fail closed.
 3. **Parse resilience**: Malformed `aw_context` JSON MUST be caught; the implementation MUST emit a warning and skip checkout rather than propagating the parse error.
 4. **Ref isolation**: The PR head MUST be fetched exclusively via `refs/pull/N/head` from the current repository's origin, using array-based execution (no shell interpolation).
 

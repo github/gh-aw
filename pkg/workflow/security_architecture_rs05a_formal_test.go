@@ -132,14 +132,32 @@ func TestFormalRS05a_ActorTrustVerifiedBotAllowed(t *testing.T) {
 	})
 	scenario.Actor = "copilot-swe-agent[bot]"
 	scenario.SenderType = "Bot"
-	scenario.Permission = "none"
+	scenario.Permission = "write"
 
 	result := runRS05aBridge(t, scenario)
 
 	assertRS05aCheckoutSucceeded(t, result)
 	assertRS05aFetchedPullHeadRef(t, result, 123)
-	assert.Empty(t, result.PermissionCalls, "RS-05a verified bot/app actor must not require collaborator permission lookup")
-	assert.Contains(t, result.Info, "Runtime safety check passed for bot/app actor 'copilot-swe-agent[bot]' (sender type: Bot)")
+	assert.Len(t, result.PermissionCalls, 1, "RS-05a verified bot/app actor must satisfy the repository permission floor")
+	assert.Contains(t, result.Info, "Runtime safety check passed for actor 'copilot-swe-agent[bot]' with 'write' permission")
+}
+
+func TestFormalRS05a_ActorTrustBotWithoutWritePermissionRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"item_type":   "pull_request",
+		"item_number": 123,
+		"repo":        "test-owner/test-repo",
+	})
+	scenario.Actor = "third-party-bot[bot]"
+	scenario.SenderType = "Bot"
+	scenario.Permission = "read"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Len(t, result.PermissionCalls, 1, "RS-05a must query repository permission even for bot/app actors")
+	assertRS05aFailedContains(t, result, "requires write or higher")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
 func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {

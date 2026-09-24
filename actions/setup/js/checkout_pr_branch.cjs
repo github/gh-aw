@@ -239,16 +239,11 @@ async function assertTrustedCheckoutRuntime() {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");
   }
 
-  // Bot and app actors (e.g. Copilot, dependabot[bot]) are not regular GitHub
-  // users and cannot be resolved via the collaborators API (returns 404).
-  // Trust them based on the event payload's own identity signal, independently
-  // of the workflow_dispatch-only fork check above: GitHub sets `sender.type`,
-  // so a "Bot" sender identifies an app installation acting on this repository.
+  // Bot and app actors (e.g. Copilot, dependabot[bot]) use GitHub-provided
+  // event identity (`sender.type === "Bot"`), but that signal only proves the
+  // account type. They still must satisfy the same repository permission floor
+  // below; the workflow_dispatch-only fork check above is independent.
   const senderType = context.payload.sender?.type;
-  if (senderType === "Bot") {
-    core.info(`Runtime safety check passed for bot/app actor '${actor}' (sender type: ${senderType})`);
-    return;
-  }
 
   try {
     const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -266,8 +261,9 @@ async function assertTrustedCheckoutRuntime() {
     core.info(`Runtime safety check passed for actor '${actor}' with '${permission}' permission`);
   } catch (err) {
     // A 404 here is ambiguous: it can indicate either a non-user app/bot actor
-    // or a real user that is not a collaborator. Disambiguate via users API.
-    // Real users resolve via users.getByUsername; app/bot actors return 404.
+    // or a real user that is not a collaborator. Disambiguate via users API so
+    // user denials stay clear, but fail closed for app/bot actors whose
+    // repository permission cannot be verified.
     const errAny = /** @type {any} */ err;
     if (errAny.status === 404) {
       try {
@@ -276,8 +272,7 @@ async function assertTrustedCheckoutRuntime() {
       } catch (userErr) {
         const userErrAny = /** @type {any} */ userErr;
         if (userErrAny.status === 404) {
-          core.info(`Runtime safety check passed for app actor '${actor}' (not a regular user)`);
-          return;
+          throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: bot/app actor '${actor}' repository permission could not be verified (sender type: ${senderType || "unknown"})`);
         }
         throw userErr;
       }

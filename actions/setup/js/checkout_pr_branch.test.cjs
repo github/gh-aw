@@ -296,22 +296,22 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
 
-      it("should allow checkout for Bot actor without calling the collaborator API", async () => {
+      it("should allow checkout for Bot actor only after repository permission verification", async () => {
         mockContext.actor = "Copilot";
         mockContext.payload.sender = { login: "Copilot", type: "Bot" };
 
         await runScript();
 
-        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
-        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for bot/app actor 'Copilot' (sender type: Bot)");
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "Copilot" }));
+        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for actor 'Copilot' with 'write' permission");
         expect(mockCore.setFailed).not.toHaveBeenCalled();
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
       });
 
-      it("should allow checkout when collaborator API returns 404 (app actor without sender type)", async () => {
+      it("should fail closed when bot/app actor repository permission cannot be verified", async () => {
         mockContext.actor = "Copilot";
-        // No sender.type set — simulates an event payload without type info
+        mockContext.payload.sender = { login: "Copilot", type: "Bot" };
         const notAUserError = Object.assign(new Error("Copilot is not a user"), { status: 404 });
         mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notAUserError);
         mockGithub.rest.users.getByUsername.mockRejectedValue(notAUserError);
@@ -320,10 +320,10 @@ If the pull request is still open, verify that:
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
         expect(mockGithub.rest.users.getByUsername).toHaveBeenCalledWith({ username: "Copilot" });
-        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for app actor 'Copilot' (not a regular user)");
-        expect(mockCore.setFailed).not.toHaveBeenCalled();
-        expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
-        expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("bot/app actor 'Copilot' repository permission could not be verified"));
       });
 
       it("should fail when collaborator API returns 404 for a regular non-collaborator user", async () => {
@@ -354,6 +354,34 @@ If the pull request is still open, verify that:
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Internal Server Error"));
+      });
+
+      it.each(["workflow_dispatch", "issue_comment", "pull_request_review_comment"])("should reject bot actor without write-or-higher permission for %s events", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "third-party-bot[bot]";
+        mockContext.payload.sender = { login: "third-party-bot[bot]", type: "Bot" };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: {
+            permission: "read",
+          },
+        });
+        if (eventName === "workflow_dispatch") {
+          mockContext.payload = {
+            repository: { fork: false },
+            sender: { login: "third-party-bot[bot]", type: "Bot" },
+            inputs: {
+              aw_context: JSON.stringify({ item_type: "pull_request", item_number: 123 }),
+            },
+          };
+        }
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "third-party-bot[bot]" }));
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
     });
 
