@@ -665,7 +665,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Maximum 10 add_labels call(s) can be made.",
+                "add_labels": " CONSTRAINTS: Maximum 10 add_labels call(s) can be made. Maximum 10 label(s) can be added per call.",
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[Auto-Triage] \". Discussions will be created in category \"audits\"."
               },
               "repo_params": {},

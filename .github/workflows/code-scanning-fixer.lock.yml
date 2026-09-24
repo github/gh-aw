@@ -641,7 +641,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"agentic-campaign\" \"z_campaign_security-alert-burndown\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"agentic-campaign\" \"z_campaign_security-alert-burndown\"].",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[code-scanning-fixer-diagnostic] \". Labels [\"security\" \"automated-fix\" \"agentic-campaign\" \"z_campaign_security-alert-burndown\"] will be automatically added.",
                 "create_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[code-scanning-fix] \". Labels [\"security\" \"automated-fix\" \"agentic-campaign\" \"z_campaign_security-alert-burndown\"] will be automatically added. Reviewers [\"copilot\"] will be assigned."
               },

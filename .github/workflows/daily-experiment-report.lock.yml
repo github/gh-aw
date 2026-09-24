@@ -634,7 +634,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 10 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Maximum 10 add_labels call(s) can be made.",
+                "add_labels": " CONSTRAINTS: Maximum 10 add_labels call(s) can be made. Maximum 10 label(s) can be added per call.",
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[experiments] \". Discussions will be created in category \"audits\".",
                 "upload_asset": " CONSTRAINTS: Maximum 10 asset(s) can be uploaded. Maximum file size: 10240KB. Allowed file extensions: [.png .jpg .jpeg .svg]."
               },

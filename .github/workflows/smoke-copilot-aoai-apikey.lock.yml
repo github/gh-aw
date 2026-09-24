@@ -864,7 +864,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 2 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"smoke-copilot-aoai-apikey\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"smoke-copilot-aoai-apikey\"].",
                 "create_check_run": " CONSTRAINTS: Maximum 1 check run(s) can be created. Check run name: \"Smoke Copilot - AOAI (apikey)\".",
                 "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Discussions will be created in category \"announcements\".",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added.",

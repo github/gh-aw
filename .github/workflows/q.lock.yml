@@ -747,7 +747,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 1 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"spam\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"spam\"].",
                 "create_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[q] \". Labels [\"automation\" \"workflow-optimization\"] will be automatically added. Reviewers [\"copilot\"] will be assigned."
               },
               "repo_params": {},

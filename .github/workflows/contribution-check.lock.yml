@@ -682,7 +682,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 10 comment(s) can be added. Target: *. Comments will be added in repository \"${GH_AW_VARS_TARGET_REPOSITORY}\". Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Maximum 4 label(s) can be added per call. Maximum 4 add_labels call(s) can be made. Only these labels are allowed: [\"spam\" \"needs-work\" \"outdated\" \"lgtm\"]. Target: *.",
+                "add_labels": " CONSTRAINTS: Maximum 4 add_labels call(s) can be made. Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"spam\" \"needs-work\" \"outdated\" \"lgtm\"]. Target: *.",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[Contribution Check Report]\". Labels [\"contribution-report\"] will be automatically added."
               },
               "repo_params": {},

@@ -788,7 +788,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 2 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"smoke-claude\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"smoke-claude\"].",
                 "add_reviewer": " CONSTRAINTS: Maximum 2 reviewer(s) can be added.",
                 "close_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be closed.",
                 "create_check_run": " CONSTRAINTS: Maximum 1 check run(s) can be created. Check run name: \"Smoke Claude: Agent Status\".",

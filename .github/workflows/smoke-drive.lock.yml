@@ -697,7 +697,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 2 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"smoke-drive\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"smoke-drive\"].",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"automation\" \"testing\"] will be automatically added."
               },
               "repo_params": {},

@@ -714,7 +714,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 2 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"smoke-project\"].",
+                "add_labels": " CONSTRAINTS: Maximum 10 label(s) can be added per call. Only these labels are allowed: [\"smoke-project\"].",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Labels [\"ai-generated\" \"automation\" \"testing\"] will be automatically added.",
                 "create_project_status_update": " CONSTRAINTS: Maximum 1 status update(s) can be created. Default project URL: \"https://github.com/orgs/github/projects/24068\".",
                 "create_pull_request": " CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[smoke-project] \". Labels [\"ai-generated\"] will be automatically added.",

@@ -616,7 +616,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 50 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Maximum 100 label(s) can be added per call. Maximum 100 add_labels call(s) can be made.",
+                "add_labels": " CONSTRAINTS: Maximum 100 add_labels call(s) can be made. Maximum 10 label(s) can be added per call.",
                 "create_check_run": " CONSTRAINTS: Maximum 1 check run(s) can be created.",
                 "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[PR Triage Report] \". Labels [\"automation\" \"pr-triage-report\"] will be automatically added.",
                 "create_pull_request_review_comment": " CONSTRAINTS: Maximum 10 review comment(s) can be created. Comments will be on the RIGHT side of the diff.",
