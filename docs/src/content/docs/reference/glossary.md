@@ -378,7 +378,7 @@ See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#hide-older-comments)
 
 ### Add Labels (`add-labels:`)
 
-A safe output capability for adding labels to issues or pull requests. Supports an `allowed` list to restrict which labels can be applied, and a `blocked` list using glob patterns to reject specific labels regardless of the allow list — providing protection against prompt injection via label manipulation. The `max` limit (default: 10) controls both the number of calls and labels per call, capped at 100 labels per call. Also accepts `target` (`"triggering"`, `"*"`, or a specific number) and cross-repository configuration via `target-repo`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#add-labels-add-labels).
+A safe output capability for adding labels to issues or pull requests. Supports an `allowed` list to restrict which labels can be applied, and a `blocked` list using glob patterns to reject specific labels regardless of the allow list — providing protection against prompt injection via label manipulation. The `max` limit (default: 10) controls both the number of calls and labels kept per call; calls with more than GitHub's hard 100-label per-call cap are rejected. Also accepts `target` (`"triggering"`, `"*"`, or a specific number) and cross-repository configuration via `target-repo`. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#add-labels-add-labels).
 
 ### Remove Labels (`remove-labels:`)
 

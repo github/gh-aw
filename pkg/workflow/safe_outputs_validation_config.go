@@ -241,7 +241,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		},
 	},
 	"add_labels": {
-		DefaultMax: 5,
+		DefaultMax: 10,
 		Fields: map[string]FieldValidation{
 			"labels":      {Required: true, Type: "array"}, // Item-level validation/sanitization handled by JS issue-intent label normalization.
 			"item_number": {IssueNumberOrTemporaryID: true},

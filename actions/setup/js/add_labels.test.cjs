@@ -1354,10 +1354,14 @@ describe("add_labels", () => {
       expect(addLabelsCalls[0].repo).toBe("gh-aw");
     });
 
-    it("should enforce max limit on labels per operation", async () => {
+    it("should trim labels to the configured max per operation", async () => {
       const handler = await main({ max: 10 });
+      const addLabelsCalls = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        addLabelsCalls.push(params);
+        return {};
+      };
 
-      // Try to add more than MAX_LABELS (10)
       const result = await handler(
         {
           item_number: 100,
@@ -1378,10 +1382,9 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("E003");
-      expect(result.error).toContain("Cannot add more than 10 labels");
-      expect(result.error).toContain("received 11");
+      expect(result.success).toBe(true);
+      expect(addLabelsCalls).toHaveLength(1);
+      expect(addLabelsCalls[0].labels).toEqual(["label1", "label2", "label3", "label4", "label5", "label6", "label7", "label8", "label9", "label10"]);
     });
 
     it("should allow the configured maximum labels per operation", async () => {
@@ -1410,6 +1413,40 @@ describe("add_labels", () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain("Cannot add more than 100 labels");
       expect(result.error).toContain("received 101");
+    });
+
+    it("should allow exactly GitHub's 100-label limit", async () => {
+      const labels = Array.from({ length: 100 }, (_, index) => `label${index + 1}`);
+      mockGithub._repoLabels = labels;
+      const handler = await main({ max: 101 });
+      const addLabelsCalls = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        addLabelsCalls.push(params);
+        return {};
+      };
+
+      const result = await handler({ item_number: 100, labels }, {});
+
+      expect(result.success).toBe(true);
+      expect(addLabelsCalls).toHaveLength(1);
+      expect(addLabelsCalls[0].labels).toEqual(labels);
+    });
+
+    it("should treat max -1 as unlimited calls with GitHub's per-call label limit", async () => {
+      const labels = Array.from({ length: 12 }, (_, index) => `label${index + 1}`);
+      mockGithub._repoLabels = labels;
+      const handler = await main({ max: -1 });
+      const addLabelsCalls = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        addLabelsCalls.push(params);
+        return {};
+      };
+
+      const result = await handler({ item_number: 100, labels }, {});
+
+      expect(result.success).toBe(true);
+      expect(addLabelsCalls).toHaveLength(1);
+      expect(addLabelsCalls[0].labels).toEqual(labels);
     });
 
     it("should resolve temporary ID in item_number to real issue number", async () => {

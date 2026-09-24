@@ -57,7 +57,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 |--------|-----|-------------|
 | [Add Comment](#comment-creation-add-comment) | `add-comment` | Post comments on issues, PRs, or discussions (max: 1) |
 | [Hide Comment](#hide-comment-hide-comment) | `hide-comment` | Hide comments on issues, PRs, or discussions (max: 5) |
-| [Add Labels](#add-labels-add-labels) | `add-labels` | Add labels to issues or PRs (max: 10 calls and labels per call; per-call cap: 100) |
+| [Add Labels](#add-labels-add-labels) | `add-labels` | Add labels to issues or PRs (max: 10 calls and labels kept per call; hard per-call cap: 100) |
 | [Remove Labels](#remove-labels-remove-labels) | `remove-labels` | Remove labels from issues or PRs (max: 3) |
 | [Assign Milestone](#assign-milestone-assign-milestone) | `assign-milestone` | Assign issues to milestones (max: 1) |
 | [Assign to Agent](#assign-to-agent-assign-to-agent) | `assign-to-agent` | Assign Copilot coding agent to issues or PRs (max: 1) |
@@ -488,7 +488,7 @@ safe-outputs:
   add-labels:
     allowed: [bug, team-*, area/*] # restrict to specific labels or glob patterns
     blocked: ["~*", "*[bot]"]   # deny labels matching these glob patterns
-    max: 3                       # max add_labels calls and labels per call (default: 10; per-call cap: 100)
+    max: 3                       # max add_labels calls and labels kept per call (default: 10; hard per-call cap: 100)
     target: "*"                  # "triggering" (default), "*", or number
     target-repo: "owner/repo"    # cross-repository
     allowed-repos: ["org/repo1", "org/repo2"]  # additional allowed repositories

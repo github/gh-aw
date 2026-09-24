@@ -145,6 +145,23 @@ describe("handler_scaffold", () => {
       expect(handleItem).toHaveBeenCalledTimes(2);
     });
 
+    it("should not enforce the call count when max is -1", async () => {
+      const handleItem = vi.fn().mockResolvedValue({ success: true });
+
+      const factory = createCountGatedHandler({
+        handlerType: "test_handler",
+        setup: async () => handleItem,
+      });
+
+      const handler = await factory({ max: -1 });
+      await handler({}, {});
+      await handler({}, {});
+      const result = await handler({}, {});
+
+      expect(result.success).toBe(true);
+      expect(handleItem).toHaveBeenCalledTimes(3);
+    });
+
     it("should log warning when max count is reached", async () => {
       const factory = createCountGatedHandler({
         handlerType: "my_handler",

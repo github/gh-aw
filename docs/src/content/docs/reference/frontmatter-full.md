@@ -13102,7 +13102,7 @@ safe-outputs:
     blocked: []
       # Array of strings
 
-    # Optional maximum number of add_labels calls and labels per call (default: 10; per-call cap: 100) Supports integer or GitHub
+    # Optional maximum number of add_labels calls and labels kept per call (default: 10; hard per-call cap: 100) Supports integer or GitHub
     # Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
     # Accepted formats:

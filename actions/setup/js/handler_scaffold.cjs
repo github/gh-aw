@@ -41,7 +41,7 @@ function createCountGatedHandler({ handlerType, setup }) {
 
     /** @type {MessageHandlerFunction} */
     return async function handler(message, resolvedTemporaryIds) {
-      if (processedCount >= maxCount) {
+      if (maxCount !== -1 && processedCount >= maxCount) {
         core.warning(`Skipping ${handlerType}: max count of ${maxCount} reached`);
         return {
           success: false,

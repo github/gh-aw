@@ -10,6 +10,9 @@ import (
 
 var toolDescriptionEnhancerLog = logger.New("workflow:tool_description_enhancer")
 
+// Keep this in sync with MAX_LABELS_PER_ADD_LABELS_CALL in actions/setup/js/add_labels.cjs.
+const maxLabelsPerAddLabelsCall = 100
+
 type toolConstraintBuilder func(*SafeOutputsConfig) []string
 
 var toolConstraintBuilders = map[string]toolConstraintBuilder{
@@ -122,9 +125,9 @@ func formatStringList(items []string) string {
 	if len(items) == 0 {
 		return "[]"
 	}
-	quoted := make([]string, len(items))
-	for i, item := range items {
-		quoted[i] = fmt.Sprintf("%q", item)
+	quoted := make([]string, 0, len(items))
+	for _, item := range items {
+		quoted = append(quoted, fmt.Sprintf("%q", item))
 	}
 	return "[" + strings.Join(quoted, " ") + "]"
 }
@@ -415,9 +418,10 @@ func createCheckRunConstraints(config *CreateCheckRunConfig) []string {
 func addLabelsConstraints(config *AddLabelsConfig) []string {
 	return buildConstraints(config, func(config *AddLabelsConfig, constraints *[]string) {
 		if max := templatableIntValue(config.Max); max > 0 {
-			const maxLabelsPerCall = 100
-			*constraints = append(*constraints, fmt.Sprintf("Maximum %d label(s) can be added per call.", min(max, maxLabelsPerCall)))
+			*constraints = append(*constraints, fmt.Sprintf("Maximum %d label(s) can be added per call.", min(max, maxLabelsPerAddLabelsCall)))
 			*constraints = append(*constraints, fmt.Sprintf("Maximum %d add_labels call(s) can be made.", max))
+		} else if config.Max != nil && isExpression(*config.Max) {
+			*constraints = append(*constraints, fmt.Sprintf("The runtime max expression controls both labels added per call and add_labels calls; labels per call are capped at %d.", maxLabelsPerAddLabelsCall))
 		}
 		if len(config.Allowed) > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Only these labels are allowed: %s.", formatStringList(config.Allowed)))
@@ -440,9 +444,9 @@ func replaceLabelConstraints(config *ReplaceLabelConfig) []string {
 	return buildConstraints(config, func(config *ReplaceLabelConfig, constraints *[]string) {
 		appendMaxConstraint(constraints, config.Max, "Maximum %d label replacement(s) allowed.")
 		if len(config.AllowedTransitions) > 0 {
-			pairs := make([]string, len(config.AllowedTransitions))
-			for i, transition := range config.AllowedTransitions {
-				pairs[i] = fmt.Sprintf("%q → %q", transition.From, transition.To)
+			pairs := make([]string, 0, len(config.AllowedTransitions))
+			for _, transition := range config.AllowedTransitions {
+				pairs = append(pairs, fmt.Sprintf("%q → %q", transition.From, transition.To))
 			}
 			*constraints = append(*constraints, fmt.Sprintf("Only these label transitions are allowed: %s.", formatStringList(pairs)))
 		}

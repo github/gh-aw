@@ -242,7 +242,7 @@ async function applyIssueIntentLabels({ githubClient, core, repoParts, itemNumbe
 const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
-    const maxLabelsPerCall = Math.min(maxCount, MAX_LABELS_PER_ADD_LABELS_CALL);
+    const configuredLabelsPerCall = maxCount === -1 ? MAX_LABELS_PER_ADD_LABELS_CALL : Math.min(maxCount, MAX_LABELS_PER_ADD_LABELS_CALL);
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
     const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
@@ -410,15 +410,15 @@ const main = createCountGatedHandler({
         };
       }
 
-      // Enforce max limits on labels before validation
-      const limitResult = tryEnforceArrayLimit(requestedLabelNames, maxLabelsPerCall, "labels");
+      // Enforce GitHub's per-call API limit before validation trims configured limits.
+      const limitResult = tryEnforceArrayLimit(requestedLabelNames, MAX_LABELS_PER_ADD_LABELS_CALL, "labels");
       if (!limitResult.success) {
         core.warning(`Label limit exceeded: ${limitResult.error}`);
         return { success: false, error: limitResult.error };
       }
 
       // Use validation helper to sanitize and validate labels
-      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxLabelsPerCall, blockedPatterns);
+      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, configuredLabelsPerCall, blockedPatterns);
 
       if (!labelsResult.valid) {
         // If no valid labels, log info and return gracefully
