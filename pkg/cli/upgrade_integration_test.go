@@ -87,7 +87,7 @@ Say hello.
 	assert.Contains(t, string(lockContent), noImplicitExpiry)
 
 	_, err = os.Stat(filepath.Join(setup.tempDir, ".github", "workflows", "agentics-maintenance.yml"))
-	require.True(t, os.IsNotExist(err), "implicit expiry alone must not generate maintenance")
+	require.True(t, os.IsNotExist(err), "expected maintenance workflow to not be generated for implicit expiry")
 }
 
 func TestUpgradeNoFixSkipsCompilation(t *testing.T) {
