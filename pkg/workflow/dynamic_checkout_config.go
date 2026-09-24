@@ -23,6 +23,11 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	if !ok {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout requires allowed-repos")
 	}
+	for key := range raw {
+		if key != "dynamic" && key != "allowed-repos" {
+			return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
+		}
+	}
 	if len(raw) != 2 {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
 	}

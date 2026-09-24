@@ -87,6 +87,7 @@ function normalizeCheckout(entry, workspace) {
     sparseCheckout: String(entry["sparse-checkout"] || ""),
     submodules: entry.submodules,
     lfs: entry.lfs === true,
+    wiki: entry.wiki === true,
   };
 }
 
@@ -248,7 +249,8 @@ async function main(options = {}) {
   const normalized = checkouts.map(entry => normalizeCheckout(entry, workspace));
   const allowedRepos = parseAllowedRepos(options.allowedRepos);
   for (const checkout of normalized) {
-    if (!allowedRepos.has(checkout.repository.toLowerCase())) {
+    const allowedRepository = checkout.wiki ? checkout.repository.slice(0, -".wiki".length) : checkout.repository;
+    if (!allowedRepos.has(allowedRepository.toLowerCase())) {
       throw new Error(`dynamic checkout repository '${checkout.repository}' is not in allowed-repos`);
     }
   }

@@ -80,6 +80,7 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 }
 
 func (c *Compiler) validateDynamicCheckoutExpressions(workflowData *WorkflowData) error {
+	// Validate deferred parsing, secret serialization, and cross-job expression contexts.
 	if len(workflowData.DynamicCheckoutErrors) > 0 {
 		return errors.Join(workflowData.DynamicCheckoutErrors...)
 	}
