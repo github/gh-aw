@@ -5,12 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
 )
+
+// updateCompileVersionGlobalsMu serializes tests in this file that mutate the
+// process-wide compiler version and release-build globals (via SetVersionInfo /
+// workflow.SetIsRelease). These tests intentionally avoid t.Parallel(), but the
+// lock guards against future refactors introducing parallelism that could race
+// on the shared state or observe a partially-restored value.
+var updateCompileVersionGlobalsMu sync.Mutex
 
 func TestNewUpdateCompileConfigMatchesCompileCommandDefaults(t *testing.T) {
 	t.Parallel()
@@ -96,6 +104,12 @@ Say hello.
 }
 
 func TestUpdateCompilation_RegeneratesGeneratedWorkflowsWithCurrentVersion(t *testing.T) {
+	// Deliberately not t.Parallel(): this test mutates process-wide compiler
+	// version/release globals. The mutex below isolates that mutation so this
+	// test cannot race with a future parallel pkg/cli test that reads them.
+	updateCompileVersionGlobalsMu.Lock()
+	defer updateCompileVersionGlobalsMu.Unlock()
+
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
 	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
