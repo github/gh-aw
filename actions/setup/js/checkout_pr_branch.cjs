@@ -241,9 +241,9 @@ async function assertTrustedCheckoutRuntime(awContext) {
   let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
   const senderType = context.payload.sender?.type;
   // GitHub attributes direct dispatches to their initiating user/app, while
-  // the repository's centralized router runs as github-actions[bot].
-  // command_name and trigger_label are the router's command/label markers;
-  // arbitrary bot/app dispatchers must be validated as themselves.
+  // repository workflows using GITHUB_TOKEN run as github-actions[bot].
+  // Only trusted workflows may hold actions:write; command_name and
+  // trigger_label distinguish the generated router's dispatch shape.
   if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR && senderType === "Bot") {
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";

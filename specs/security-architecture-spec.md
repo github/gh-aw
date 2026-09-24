@@ -979,6 +979,8 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 
 The implementation MUST NOT perform checkout when `aw_context.item_number` is absent or falsy.
 
+Centralized actor propagation relies on the repository's `actions: write` trust boundary. `github-actions[bot]` is the shared `GITHUB_TOKEN` identity for repository workflows, not a router-unique provenance signal, and the target `workflow_dispatch` event does not expose an immutable caller-workflow identity. Therefore, workflows that can dispatch other workflows MUST be trusted not to forge `aw_context`; untrusted code MUST NOT receive `actions: write`.
+
 **RS-05a Risk Matrix**: A conforming implementation's fork-runtime rejection MUST produce the following outcomes across the full trigger × topology combination space:
 
 | PR-capable trigger | Runtime repository is a fork | Result |
