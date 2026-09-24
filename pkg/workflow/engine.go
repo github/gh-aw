@@ -176,6 +176,7 @@ type NetworkPermissions struct {
 	Blocked           []string         `yaml:"blocked,omitempty"` // List of blocked domains (takes precedence over allowed)
 	HostedWeb         *HostedWebPolicy `yaml:"hosted-web,omitempty" json:"hosted-web,omitempty"`
 	InvalidHostedWeb  bool             `yaml:"-" json:"-"`         // Internal flag: true if hosted-web had an unsupported raw shape
+	HostedWebRawValue string           `yaml:"-" json:"-"`         // Internal diagnostic for unsupported hosted-web values
 	Firewall          *FirewallConfig  `yaml:"firewall,omitempty"` // AWF firewall configuration (see firewall.go)
 	ExplicitlyDefined bool             `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
 }

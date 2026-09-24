@@ -387,35 +387,6 @@ func buildHostedWebConfig(engineName, engineRuntimeID string, workflowData *Work
 	}
 }
 
-func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
-	if engineRuntimeID != "" {
-		return strings.ToLower(engineRuntimeID)
-	}
-	engineName = strings.ToLower(engineName)
-	if hasHostedWebRuntimeAlias(engineName, "claude") {
-		return "claude"
-	}
-	if hasHostedWebRuntimeAlias(engineName, "codex") {
-		return "codex"
-	}
-	return engineName
-}
-
-// hasHostedWebRuntimeAlias treats engineName as an alias of runtimeID only when it
-// is exactly runtimeID or uses the legacy runtime-prefixed form runtimeID-* or
-// runtimeID_*. This preserves supported aliases such as codex-experimental without
-// classifying unrelated names like codexbridge as Codex-backed engines.
-func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
-	if engineName == runtimeID {
-		return true
-	}
-	if !strings.HasPrefix(engineName, runtimeID) {
-		return false
-	}
-	suffix := strings.TrimPrefix(engineName, runtimeID)
-	return strings.HasPrefix(suffix, "-") || strings.HasPrefix(suffix, "_")
-}
-
 func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {
 	return &AWFCloudHypervisorConfig{
 		PreviewEnabled: true,

@@ -76,6 +76,22 @@ func applyHostedWebPolicy(permissions *NetworkPermissions, hostedWeb any) {
 		permissions.HostedWeb = policy
 	} else {
 		permissions.InvalidHostedWeb = true
+		permissions.HostedWebRawValue = describeHostedWebValue(hostedWeb)
+	}
+}
+
+func describeHostedWebValue(hostedWeb any) string {
+	switch value := hostedWeb.(type) {
+	case bool:
+		return fmt.Sprintf("boolean %t", value)
+	case string:
+		return fmt.Sprintf("string %q", value)
+	case []any:
+		return "array"
+	case nil:
+		return "null"
+	default:
+		return fmt.Sprintf("%T", hostedWeb)
 	}
 }
 

@@ -137,7 +137,7 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 		return nil
 	}
 	if workflowData.NetworkPermissions.InvalidHostedWeb {
-		return errors.New("network.hosted-web must be false or an object policy")
+		return fmt.Errorf("network.hosted-web must be false or an object policy; got %s", workflowData.NetworkPermissions.HostedWebRawValue)
 	}
 
 	policy := workflowData.NetworkPermissions.HostedWeb
@@ -217,6 +217,35 @@ func guardResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registe
 	// EngineCatalog.Resolve has a broad historical prefix fallback; avoid treating
 	// unrelated unregistered names (for example "codexbridge") as hosted-web-capable.
 	return strings.ToLower(engineID)
+}
+
+func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
+	if engineRuntimeID != "" {
+		return strings.ToLower(engineRuntimeID)
+	}
+	engineName = strings.ToLower(engineName)
+	if hasHostedWebRuntimeAlias(engineName, "claude") {
+		return "claude"
+	}
+	if hasHostedWebRuntimeAlias(engineName, "codex") {
+		return "codex"
+	}
+	return engineName
+}
+
+// hasHostedWebRuntimeAlias treats engineName as an alias of runtimeID only when it
+// is exactly runtimeID or uses the legacy runtime-prefixed form runtimeID-* or
+// runtimeID_*. This preserves supported aliases such as codex-experimental without
+// classifying unrelated names like codexbridge as Codex-backed engines.
+func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
+	if engineName == runtimeID {
+		return true
+	}
+	if !strings.HasPrefix(engineName, runtimeID) {
+		return false
+	}
+	suffix := strings.TrimPrefix(engineName, runtimeID)
+	return strings.HasPrefix(suffix, "-") || strings.HasPrefix(suffix, "_")
 }
 
 func validateHostedWebDomains(field string, domains []string) error {

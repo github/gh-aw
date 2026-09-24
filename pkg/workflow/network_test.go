@@ -200,7 +200,7 @@ strict: false
 			EngineConfig:       &EngineConfig{ID: "claude"},
 			NetworkPermissions: networkPermissions,
 		})
-		if err == nil || !strings.Contains(err.Error(), "false or an object policy") {
+		if err == nil || !strings.Contains(err.Error(), "false or an object policy; got array") {
 			t.Fatalf("Expected invalid hosted web policy validation error, got %v", err)
 		}
 	})
