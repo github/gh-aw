@@ -103,6 +103,10 @@ A built-in tool that provides vector similarity search over documentation files.
 
 Capabilities that an AI agent can use during workflow execution. Tools are configured in the frontmatter and include GitHub operations ([`github:`](/gh-aw/reference/github-tools/)), file editing (`edit:`), web access (`web-fetch:`, `web-search:`), shell commands (`bash:`), browser automation ([`playwright:`](/gh-aw/reference/playwright/), CLI-only — see [Playwright CLI Mode](#playwright-cli-mode-toolsplaywrightmode-cli)), and custom MCP servers.
 
+### Native Web Search (`tools.web-search`)
+
+Engine-provided web search that runs without a third-party MCP server. The Copilot CLI engine exposes its built-in `web_search` tool when `tools: web-search:` is declared, working even in workflows that do not use GitHub repository tools. For the Codex, Claude, and Copilot engines, `web-search:` is disabled unless explicitly declared: Codex otherwise runs with `-c web_search="disabled"`, Claude omits the `WebSearch` tool, and Copilot CLI is not granted `--allow-tool web_search`. See [Using Web Search](/gh-aw/reference/web-search/) and [engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+
 ### GitHub Access Mode (`tools.github.mode`)
 
 A `tools.github` field that controls how the agent accesses GitHub APIs. Three values are supported: `gh-proxy` (recommended — provides pre-authenticated `gh` CLI prompt guidance without mounting a GitHub MCP server, replacing the deprecated `features.cli-proxy: true`), `local` (Docker-based GitHub MCP server, the legacy default), and `remote` (hosted GitHub MCP server at `api.githubcopilot.com`). Use `gh-proxy` for better performance; use `local` or `remote` when MCP-based GitHub toolsets are required. See [GitHub Tools Reference](/gh-aw/reference/github-tools/).
@@ -415,6 +419,10 @@ A type-specific `github-app:` field that lets an individual safe output handler 
 ### Custom Safe Outputs
 
 An extension mechanism for safe outputs that enables integration with third-party services beyond built-in GitHub operations. Defined under `safe-outputs.jobs:`, custom safe outputs separate read and write operations: agents use read-only MCP tools for queries, while custom jobs execute write operations with secret access after agent completion. Supports services like Slack, Notion, Jira, or any external API. See [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/).
+
+### Custom Safe-Output Job Artifacts (`safe-outputs.jobs.<job>.artifacts`)
+
+An `artifacts:` array on a custom safe-outputs job that declares agent-job filesystem paths the job depends on. The agent job's unified artifact upload only includes a fixed set of compiler-managed paths (logs, patches, `agent_output.json`, and similar); any other path the agent wrote during the run — such as a directory under `/tmp/gh-aw/agent/` populated by prompt instructions — is silently dropped unless declared here. Entries must be literal paths or globs rooted under `/tmp/gh-aw/` using an extension covered by secret redaction (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, `.patch`); directory paths must end with `/` and expand to recursive globs. Path traversal segments, hidden-file entries, and paths outside `/tmp/gh-aw/` are rejected at compile time. See [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/#depending-on-agent-job-files).
 
 ### Dispatch Repository (`dispatch-repository`)
 
@@ -1290,6 +1298,14 @@ A CLI command that downloads workflow run artifacts and logs, analyzes MCP tool 
 ### Audit Diff (multi-run mode)
 
 Passing two or more run IDs to `gh aw audit` activates diff mode: the first ID is the base and the rest are compared against it. Reports domain additions and removals, allowed/denied status changes, request volume drift, and anomaly flags across firewall, MCP tool usage, and run metrics dimensions. Useful for detecting regressions and behavioral drift between runs. See [Audit Commands](/gh-aw/reference/audit/).
+
+### Grouped Audit Findings (`gh aw audit --group`)
+
+An aggregation mode for multi-run `gh aw audit` that replaces per-run diffing with a single table where each `[run, code]` pair appears once alongside an occurrence count and a representative entry. Combine with `--json` for machine-readable grouped output. Useful for spotting recurring findings across many runs without scrolling through a per-run diff. See [Audit Commands](/gh-aw/reference/audit/).
+
+### Gateway Steering Events
+
+Audit report entries (`token_steering`, `timeout_steering`) that record when the AWF proxy actively steers a run's requests because it is approaching its AI Credits or time budget. `gh aw audit` renders them in a dedicated Gateway Steering Events section, with JSON output including each event's type, message, and timestamp when available. See [Audit Commands](/gh-aw/reference/audit/) and [Token Steering](#token-steering-sandboxagenttoken-steering).
 
 ### `usage` Artifact
 
