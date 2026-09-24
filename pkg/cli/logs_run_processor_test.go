@@ -166,6 +166,56 @@ func TestApplyKnownWorkflowPathOverridesCachedPath(t *testing.T) {
 	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
 }
 
+func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
+	t.Run("agentic current path is retained", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   10,
+			WorkflowPath: ".github/workflows/agentic.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{WorkflowPath: ".github/workflows/agentic.lock.yml"}, false, false)
+
+		assert.False(t, result.Skipped)
+		assert.Equal(t, ".github/workflows/agentic.lock.yml", result.Run.WorkflowPath)
+	})
+
+	t.Run("regular current path is skipped", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   11,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{WorkflowPath: ".github/workflows/ci.yml"}, true, false)
+
+		assert.True(t, result.Skipped)
+		assert.Empty(t, result.Run.WorkflowPath)
+	})
+
+	t.Run("unverified empty current path clears stale cached path", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   12,
+			WorkflowPath: ".github/workflows/stale.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{}, false, false)
+
+		assert.True(t, result.Skipped)
+		assert.Empty(t, result.Run.WorkflowPath)
+	})
+
+	t.Run("verified empty current path preserves metadata path", func(t *testing.T) {
+		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
+			DatabaseID:   13,
+			WorkflowPath: ".github/workflows/agentic.lock.yml",
+		}}}
+
+		applyCachedRunWorkflowPathGate(result, WorkflowRun{}, true, false)
+
+		assert.False(t, result.Skipped)
+		assert.Equal(t, ".github/workflows/agentic.lock.yml", result.Run.WorkflowPath)
+	})
+}
+
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -399,7 +449,49 @@ func TestTryLoadCachedRunResultRejectsStaleRegularWorkflowPath(t *testing.T) {
 	require.NotNil(t, result)
 	assert.True(t, result.Cached)
 	assert.True(t, result.Skipped)
-	assert.Equal(t, ".github/workflows/ci.yml", result.Run.WorkflowPath)
+	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/stale.lock.yml", reloaded.Run.WorkflowPath)
+}
+
+func TestTryLoadCachedRunResultDoesNotPersistRejectedCurrentPathAfterMetadataRefresh(t *testing.T) {
+	t.Parallel()
+	runOutputDir := t.TempDir()
+	summary := &RunSummary{
+		CLIVersion:  GetVersion(),
+		RunID:       132,
+		ProcessedAt: time.Now(),
+		RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{
+				DatabaseID:   132,
+				WorkflowPath: ".github/workflows/stale.lock.yml",
+			},
+		},
+	}
+	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runOutputDir, runAPIResponseFileName),
+		[]byte(`{"id":132,"status":"completed","conclusion":"success","name":"Refreshed Agentic","path":".github/workflows/refreshed.lock.yml"}`),
+		0o600,
+	))
+
+	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{
+		DatabaseID:   132,
+		WorkflowPath: ".github/workflows/ci.yml",
+	}, runOutputDir, concurrentRunDownloadParams{})
+
+	require.True(t, ok)
+	require.NotNil(t, result)
+	assert.True(t, result.Skipped)
+	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/refreshed.lock.yml", reloaded.Run.WorkflowPath)
+	assert.NotEqual(t, ".github/workflows/ci.yml", reloaded.Run.WorkflowPath)
 }
 
 func TestTryLoadCachedRunResultClearsStalePathWhenMetadataOmitsPath(t *testing.T) {
@@ -429,7 +521,12 @@ func TestTryLoadCachedRunResultClearsStalePathWhenMetadataOmitsPath(t *testing.T
 	require.True(t, ok)
 	require.NotNil(t, result)
 	assert.True(t, result.Cached)
+	assert.True(t, result.Skipped)
 	assert.Empty(t, result.Run.WorkflowPath)
+
+	reloaded, ok := loadRunSummary(runOutputDir, false)
+	require.True(t, ok)
+	assert.Equal(t, ".github/workflows/stale.lock.yml", reloaded.Run.WorkflowPath)
 }
 
 func TestNewRunSummaryCarriesGatewaySteeringEvents(t *testing.T) {

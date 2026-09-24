@@ -612,8 +612,7 @@ func tryLoadCachedRunResult(
 		LogsPath:    runOutputDir,
 		Cached:      true,
 	}
-	metadataResolved, metadataApplied := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
-	applyKnownWorkflowPath(&result, run)
+	metadataRefresh := refreshCachedRunMetadata(ctx, &result.Run, runOutputDir, run, params)
 	// Re-apply the usage activity backfill to heal stale cache entries.
 	// Capture the SafeItemsCount before backfill to detect whether the field was healed.
 	safeItemsBefore := result.Run.SafeItemsCount
@@ -623,7 +622,7 @@ func tryLoadCachedRunResult(
 	// persist the healed value back to run_summary.json so downstream readers (e.g.
 	// the api-consumption-report) see the correct count without having to fall back to
 	// usage/activity/summary.json.
-	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || metadataApplied {
+	if result.Run.SafeItemsCount != safeItemsBefore || activitySummaryApplied || steeringBackfillApplied || metadataRefresh.Applied {
 		healed := *summary
 		healed.Run = result.Run
 		healed.Metrics = result.Metrics
@@ -635,43 +634,54 @@ func tryLoadCachedRunResult(
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
 	}
-	applyCachedRunWorkflowPathGate(&result, run, metadataResolved, params.verbose)
+	applyCachedRunWorkflowPathGate(&result, run, metadataRefresh.WorkflowPathVerified, params.verbose)
 	return &result, true
 }
 
-func applyCachedRunWorkflowPathGate(result *DownloadResult, run WorkflowRun, metadataResolved bool, verbose bool) {
+// applyCachedRunWorkflowPathGate enforces current workflow-path trust for cache hits.
+// An explicit current non-agentic path skips the cached result. When no current path
+// is available and metadata did not verify one, the stale cached path is cleared only
+// in memory so the result fails closed without rewriting the persisted summary.
+func applyCachedRunWorkflowPathGate(result *DownloadResult, run WorkflowRun, workflowPathVerified bool, verbose bool) {
 	if run.WorkflowPath != "" {
+		result.Run.WorkflowPath = run.WorkflowPath
 		if !isAgenticWorkflowPath(run.WorkflowPath) {
 			skipNonAgenticWorkflowRun(result, verbose)
+			result.Run.WorkflowPath = ""
 		}
 		return
 	}
-	if !metadataResolved {
+	if !workflowPathVerified {
 		result.Run.WorkflowPath = ""
 		skipUnverifiedWorkflowRun(result, verbose)
 	}
 }
 
-func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) (bool, bool) {
+type cachedRunMetadataRefresh struct {
+	// Applied reports whether non-empty current metadata changed the cached run summary.
+	Applied bool
+	// WorkflowPathVerified reports whether current metadata contained an authoritative workflow path.
+	WorkflowPathVerified bool
+}
+
+func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) cachedRunMetadataRefresh {
 	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo)
 	if err == nil && needsRefresh {
 		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	}
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false, false
+		return cachedRunMetadataRefresh{}
 	}
 	metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, params.dlOwner, params.dlRepo, params.dlHost, params.verbose)
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to refresh cached workflow run metadata for run %d: %v", run.DatabaseID, err)
-		return false, false
+		return cachedRunMetadataRefresh{}
 	}
-	metadataApplied := applyWorkflowRunMetadata(cachedRun, metadata)
-	if cachedRun.WorkflowPath != metadata.WorkflowPath {
-		cachedRun.WorkflowPath = metadata.WorkflowPath
-		metadataApplied = true
+	return cachedRunMetadataRefresh{
+		Applied:              applyWorkflowRunMetadata(cachedRun, metadata),
+		WorkflowPathVerified: metadata.WorkflowPath != "",
 	}
-	return true, metadataApplied
 }
 
 // analyzeRunArtifacts populates a DownloadResult with all analysis data derived from
