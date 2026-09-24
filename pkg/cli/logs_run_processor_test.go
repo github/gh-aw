@@ -76,6 +76,21 @@ func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestInferMissingWorkflowPathFromAwInfo(t *testing.T) {
+	runDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "aw_info.json"),
+		[]byte(`{"workflow_name":"Weekly Research"}`),
+		0o600,
+	))
+	result := &DownloadResult{}
+
+	inferMissingWorkflowPath(result, runDir)
+
+	assert.Equal(t, ".github/workflows/weekly-research.lock.yml", result.Run.WorkflowPath)
+	assert.True(t, isAgenticWorkflowPath(result.Run.WorkflowPath))
+}
+
 func TestBuildConcurrentDownloadParams_RepoOverride(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

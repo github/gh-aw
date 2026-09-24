@@ -376,12 +376,15 @@ func processSingleRunDownload(
 	result, ok, err := prepareRunDownload(ctx, run, runOutputDir, perRunParams, params.storageLimit)
 	if err != nil {
 		handleArtifactDownloadError(result, err, params.verbose)
-	} else if ok && !isAgenticWorkflowPath(result.Run.WorkflowPath) {
-		skipNonAgenticWorkflowRun(result, params.verbose)
-	} else if !ok {
-		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
+	} else if ok {
+		inferMissingWorkflowPath(result, runOutputDir)
+		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+			skipNonAgenticWorkflowRun(result, params.verbose)
+		} else {
+			logsOrchestratorLog.Printf("Cache hit for run %d, using cached summary", run.DatabaseID)
+		}
 	} else {
-		logsOrchestratorLog.Printf("Cache hit for run %d, using cached summary", run.DatabaseID)
+		downloadAndTimeRunArtifacts(ctx, run, runOutputDir, perRunParams, params, result)
 	}
 
 	completed := completedCount.Add(1)
@@ -427,13 +430,7 @@ func downloadAndTimeRunArtifacts(
 			logsOrchestratorLog.Printf("failed to compute pre-download size for run %d: %v", run.DatabaseID, sizeErr)
 		}
 		downloadStart = time.Now()
-		if metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, perRunParams.dlOwner, perRunParams.dlRepo, perRunParams.dlHost, params.verbose); err != nil {
-			logsOrchestratorLog.Printf("Failed to fetch workflow run metadata for run %d: %v", run.DatabaseID, err)
-		} else {
-			applyWorkflowRunMetadata(&result.Run, metadata)
-		}
-		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
-			skipNonAgenticWorkflowRun(result, params.verbose)
+		if !shouldDownloadAgenticWorkflowRun(ctx, run, runOutputDir, perRunParams, params.verbose, result) {
 			return nil
 		}
 		if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: run.DatabaseID, outputDir: runOutputDir, verbose: params.verbose, owner: perRunParams.dlOwner, repo: perRunParams.dlRepo, hostname: perRunParams.dlHost, artifactFilter: params.artifactFilter}); err != nil {
@@ -455,6 +452,9 @@ func downloadAndTimeRunArtifacts(
 			logsOrchestratorLog.Printf("failed to compute download size for run %d: %v", run.DatabaseID, sizeErr)
 		}
 		analyzeRunArtifacts(ctx, result, runOutputDir, params.verbose, params.artifactFilter)
+		if !isAgenticWorkflowPath(result.Run.WorkflowPath) {
+			skipNonAgenticWorkflowRun(result, params.verbose)
+		}
 		return nil
 	})
 
@@ -462,6 +462,27 @@ func downloadAndTimeRunArtifacts(
 		handleArtifactDownloadError(result, err, params.verbose)
 		return
 	}
+}
+
+func shouldDownloadAgenticWorkflowRun(
+	ctx context.Context,
+	run WorkflowRun,
+	runOutputDir string,
+	perRunParams concurrentRunDownloadParams,
+	verbose bool,
+	result *DownloadResult,
+) bool {
+	metadata, err := fetchAndCacheWorkflowRunMetadata(ctx, run, runOutputDir, perRunParams.dlOwner, perRunParams.dlRepo, perRunParams.dlHost, verbose)
+	if err != nil {
+		logsOrchestratorLog.Printf("Failed to fetch workflow run metadata for run %d: %v", run.DatabaseID, err)
+	} else {
+		applyWorkflowRunMetadata(&result.Run, metadata)
+	}
+	if result.Run.WorkflowPath == "" || isAgenticWorkflowPath(result.Run.WorkflowPath) {
+		return true
+	}
+	skipNonAgenticWorkflowRun(result, verbose)
+	return false
 }
 
 func isAgenticWorkflowPath(workflowPath string) bool {
@@ -664,15 +685,7 @@ func extractRunMetricsAndMetadata(result *DownloadResult, runOutputDir string, v
 	result.Run.AvgTimeBetweenTurns = metrics.AvgTimeBetweenTurns
 	result.Run.LogsPath = runOutputDir
 
-	// If the GitHub API returned an empty workflow path (e.g. for scheduled or agentic
-	// workflow runs), infer it from aw_info.json so the cached RunSummary and downstream
-	// consumers have a usable identifier.
-	if result.Run.WorkflowPath == "" {
-		awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
-		if info, err := parseAwInfo(awInfoPath, false); err == nil && info != nil && info.WorkflowName != "" {
-			result.Run.WorkflowPath = inferWorkflowPathFromDisplayName(info.WorkflowName)
-		}
-	}
+	inferMissingWorkflowPath(result, runOutputDir)
 
 	// Calculate duration and billable minutes from GitHub API timestamps.
 	// This mirrors the identical computation in audit.go for consistency.
@@ -681,6 +694,16 @@ func extractRunMetricsAndMetadata(result *DownloadResult, runOutputDir string, v
 		result.Run.ActionMinutes = math.Ceil(result.Run.Duration.Minutes())
 	}
 	return metrics
+}
+
+func inferMissingWorkflowPath(result *DownloadResult, runOutputDir string) {
+	if result.Run.WorkflowPath != "" {
+		return
+	}
+	awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
+	if info, err := parseAwInfo(awInfoPath, false); err == nil && info != nil && info.WorkflowName != "" {
+		result.Run.WorkflowPath = inferWorkflowPathFromDisplayName(info.WorkflowName)
+	}
 }
 
 // applyRunSecurityAnalysis runs access-log, firewall, and redacted-domain analyses and
