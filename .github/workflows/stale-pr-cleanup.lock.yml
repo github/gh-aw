@@ -569,7 +569,7 @@ jobs:
             {
               "description_suffixes": {
                 "add_comment": " CONSTRAINTS: Maximum 30 comment(s) can be added. Supports reply_to_id for discussion threading.",
-                "add_labels": " CONSTRAINTS: Maximum 30 label(s) can be added.",
+                "add_labels": " CONSTRAINTS: Maximum 30 label(s) can be added per call. Maximum 30 add_labels call(s) can be made.",
                 "close_pull_request": " CONSTRAINTS: Maximum 20 pull request(s) can be closed. Target: *."
               },
               "repo_params": {},
