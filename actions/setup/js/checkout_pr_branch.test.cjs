@@ -604,6 +604,22 @@ If the pull request is still open, verify that:
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
+
+    it("should skip checkout for the native 'fork' webhook event without reaching assertTrustedCheckoutRuntime, regardless of repository.fork", async () => {
+      // The GitHub-native `fork` event (on: repository forked / on: {fork: null}) fires
+      // in the base/upstream repository when someone forks it. It carries no PR context
+      // (no `pull_request` payload, and it is not `workflow_dispatch`), so RS-05a's
+      // fork-runtime rejection in assertTrustedCheckoutRuntime() is never reached for it.
+      // This holds independent of `payload.repository.fork`, which is unrelated to this event.
+      mockContext.eventName = "fork";
+      mockContext.payload = { repository: { fork: true }, forkee: { full_name: "some-user/test-repo" } };
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
   });
 
   describe("workflow_dispatch events with aw_context", () => {

@@ -439,8 +439,9 @@ async function assertTrustedCheckoutRuntime() {
 | `workflow_dispatch` PR replay rejected when runtime repository is a fork | fork-runtime rejection |
 | `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
+| native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |
 
-**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection and its fail-closed behavior for missing `repository` data.
+**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection and its fail-closed behavior for missing `repository` data. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
 
 ---
 

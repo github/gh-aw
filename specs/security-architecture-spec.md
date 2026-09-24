@@ -991,6 +991,8 @@ The implementation MUST NOT perform checkout when `aw_context.item_number` is ab
 
 Only the fork-runtime rejection row is scope-limited to `workflow_dispatch`; the permission floor and ref-isolation properties apply uniformly across every row.
 
+**RS-05a and the `on.fork` frontmatter field**: The `fork` GitHub Actions event (`on: {fork: null}`, exposed as `on: repository forked` in the DSL) is unrelated to RS-05a and does not interact with it. That event fires in the base/upstream repository when someone forks it, carries no `pull_request` payload, and is not `workflow_dispatch`, so `pullRequest` is never resolved in `checkout_pr_branch.cjs` and `assertTrustedCheckoutRuntime()` is never invoked for it — checkout is skipped before the fork-runtime check is reached (last row of the risk matrix above), regardless of `payload.repository.fork`. This is also distinct from the `pull_request`/`pull_request_target` `forks:` allowlist field (RS-04-adjacent), which gates workflow *activation* for inbound PRs from a forked head repository and is evaluated in the compiled `if:` condition, not in `assertTrustedCheckoutRuntime()`.
+
 ### 11.4 Role Validation
 
 **RS-06**: The implementation MUST validate user roles at workflow start.
