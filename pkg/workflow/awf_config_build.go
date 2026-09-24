@@ -401,6 +401,10 @@ func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
 	return engineName
 }
 
+// hasHostedWebRuntimeAlias treats engineName as an alias of runtimeID only when it
+// is exactly runtimeID or uses the legacy runtime-prefixed form runtimeID-* or
+// runtimeID_*. This preserves supported aliases such as codex-experimental without
+// classifying unrelated names like codexbridge as Codex-backed engines.
 func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
 	if engineName == runtimeID {
 		return true
