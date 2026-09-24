@@ -219,7 +219,7 @@ function logCheckoutStrategy(eventName, strategy, reason) {
  * Ensure checkout step only runs in trusted runtime contexts.
  * - workflow_dispatch PR replay must not run in a forked repository
  * - triggering actor must have write-or-higher repository permission
- * @param {Record<string, any> | undefined} awContext Parsed workflow_dispatch context
+ * @param {Record<string, any> | undefined} awContext Parsed workflow_dispatch context, consulted only for github-actions bot dispatches
  */
 async function assertTrustedCheckoutRuntime(awContext) {
   if (context.eventName === "workflow_dispatch") {
@@ -242,8 +242,8 @@ async function assertTrustedCheckoutRuntime(awContext) {
   const senderType = context.payload.sender?.type;
   // GitHub attributes direct dispatches to their initiating user/app, while
   // repository workflows using GITHUB_TOKEN run as github-actions[bot].
-  // Only trusted workflows may hold actions:write; command_name and
-  // trigger_label distinguish the generated router's dispatch shape.
+  // Only trusted workflows may hold actions:write. command_name and
+  // trigger_label are shape checks, not additional proof of provenance.
   if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR && senderType === "Bot") {
     const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
     const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
