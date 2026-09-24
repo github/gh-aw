@@ -73,6 +73,10 @@ function parseFirewallLogLine(line) {
 function isRequestBlocked(decision, status) {
   // Check status code first
   const statusCode = parseInt(status, 10);
+  if (statusCode === 200 || statusCode === 206 || statusCode === 304) {
+    return false;
+  }
+
   if (statusCode === 403 || statusCode === 407) {
     return true;
   }
@@ -80,11 +84,6 @@ function isRequestBlocked(decision, status) {
   // Check decision field
   if (decision.includes("NONE_NONE") || decision.includes("TCP_DENIED")) {
     return true;
-  }
-
-  // Check for allowed indicators
-  if (statusCode === 200 || statusCode === 206 || statusCode === 304) {
-    return false;
   }
 
   if (decision.includes("TCP_TUNNEL") || decision.includes("TCP_HIT") || decision.includes("TCP_MISS")) {

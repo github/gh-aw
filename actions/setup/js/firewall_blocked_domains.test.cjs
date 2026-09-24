@@ -102,6 +102,12 @@ describe("firewall_blocked_domains.cjs", () => {
       expect(isRequestBlocked("TCP_TUNNEL:HIER_DIRECT", "200")).toBe(false);
     });
 
+    it("should identify successful NONE_NONE requests as allowed", () => {
+      expect(isRequestBlocked("NONE_NONE:HIER_NONE", "200")).toBe(false);
+      expect(isRequestBlocked("NONE_NONE:HIER_NONE", "206")).toBe(false);
+      expect(isRequestBlocked("NONE_NONE:HIER_NONE", "304")).toBe(false);
+    });
+
     it("should identify allowed request with TCP_TUNNEL decision", () => {
       expect(isRequestBlocked("TCP_TUNNEL:HIER_DIRECT", "200")).toBe(false);
     });
@@ -289,6 +295,20 @@ describe("firewall_blocked_domains.cjs", () => {
       expect(result).not.toContain("-:-");
       // Allowed domains should not appear
       expect(result).not.toContain("api.anthropic.com");
+    });
+
+    it("should not report successful SNI guard records as blocked", () => {
+      const logsDir = path.join(testDir, "logs-sni-guard");
+      fs.mkdirSync(logsDir, { recursive: true });
+
+      const logContent = [
+        '1773003475.166 172.30.0.30:50232 api.anthropic.com:443 18.64.224.91:443 1.1 CONNECT 200 NONE_NONE:HIER_NONE api.anthropic.com:443 "-"',
+        '1773003475.167 172.30.0.30:50232 api.anthropic.com:443 18.64.224.91:443 1.1 CONNECT 200 TCP_TUNNEL:HIER_DIRECT api.anthropic.com:443 "-"',
+      ].join("\n");
+
+      fs.writeFileSync(path.join(logsDir, "access.log"), logContent);
+
+      expect(getBlockedDomains(logsDir)).toEqual([]);
     });
 
     it("should handle invalid log lines gracefully", () => {
