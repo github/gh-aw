@@ -315,11 +315,7 @@ jobs:
           echo "GOCACHE=$HOME/.cache/go-build" >> "$GITHUB_ENV"
 ```
 
-Security guidance:
-
-- Keep keys specific to OS and dependency lock state (`go.sum`) to reduce accidental cross-context restores.
-- Do not share writeable cache keys across trust boundaries (for example, untrusted fork PR runs and protected branch runs).
-- Never place secrets in `GOMODCACHE`/`GOCACHE`; these directories should contain only modules and build outputs.
+Keep cache keys specific to the OS and `go.sum`, do not share writable keys across trust boundaries such as untrusted forks and protected branches, and never place secrets in `GOMODCACHE` or `GOCACHE`.
 
 ## Guardrails
 
@@ -449,10 +445,7 @@ on:
 
 ### What is a workflow lock file?
 
-The `.lock.yml` file is the compiled GitHub Actions workflow generated from your `.md` by `gh aw compile`. It contains SHA-pinned actions, resolved imports, permissions, and all guardrail hardening — inspect it to see exactly what will run. Commit both files:
-
-- **`.md`**: source; edit the prompt body freely without recompiling
-- **`.lock.yml`**: what GitHub Actions runs; regenerate after any frontmatter change
+The `.lock.yml` file is the compiled GitHub Actions workflow generated from your `.md` by `gh aw compile`. It contains SHA-pinned actions, resolved imports, permissions, and all guardrail hardening, so inspect it to see exactly what will run. Commit both files: the `.md` is the editable source, while the `.lock.yml` is what GitHub Actions runs and must be regenerated after any frontmatter change.
 
 ### What is the actions-lock.json file?
 
@@ -550,13 +543,7 @@ safe-outputs:
 
 ### Why is my create-pull-request workflow failing with "GitHub Actions is not permitted to create or approve pull requests"?
 
-Some organizations block PR creation by GitHub Actions (**Settings → Actions → General → Workflow permissions**). If you can't enable it:
-
-- **Automatic issue fallback (default)**: `fallback-as-issue: true` creates an issue with the branch link when PR creation is blocked. Requires `contents: write`, `pull-requests: write`, `issues: write`.
-- **Assign to Copilot**: create an issue assigned to `copilot` for automated implementation (`assignees: [copilot]` under `create-issue`).
-- **Disable fallback**: set `fallback-as-issue: false` to fail when PR creation is blocked (requires only `contents: write` and `pull-requests: write`).
-
-See [Pull Request Creation](/gh-aw/reference/safe-outputs/#pull-request-creation-create-pull-request).
+Some organizations block PR creation by GitHub Actions (**Settings → Actions → General → Workflow permissions**). If you can't enable it, keep the default `fallback-as-issue: true` to open an issue with the branch link instead, assign that issue to `copilot` if you want automated follow-up (`assignees: [copilot]` under `create-issue`), or set `fallback-as-issue: false` to fail outright. See [Pull Request Creation](/gh-aw/reference/safe-outputs/#pull-request-creation-create-pull-request).
 
 ### Why don't pull requests created by agentic workflows trigger my CI checks?
 
@@ -630,16 +617,15 @@ One workflow is simpler to maintain; multiple workflows give better separation o
 
 ### Should I create agentic workflows by hand editing or using AI?
 
-Both work. AI-assisted authoring gives interactive guidance and best practices; manual editing gives full control for advanced customization.
+Both work: AI-assisted authoring gives interactive guidance and best practices, while manual editing gives full control for advanced customization.
 
-- **GitHub Copilot users**: after running `gh aw init`, use `agentic-workflows create` in Copilot Chat on github.com or the GitHub mobile app.
-- **Claude Code and other CLI agent users**: run `gh aw init --engine claude` to initialize (skips Copilot-specific files), then use the `create.md` prompt directly — no Copilot subscription required:
+GitHub Copilot users can run `gh aw init` and then use `agentic-workflows create` in Copilot Chat on github.com or the GitHub mobile app. Claude Code and other CLI agent users can run `gh aw init --engine claude` to skip Copilot-specific files, then use the `create.md` prompt directly:
 
-  ```text wrap
-  Create a workflow for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/create.md
+```text wrap
+Create a workflow for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/create.md
 
-  The purpose of the workflow is <your goal here>.
-  ```
+The purpose of the workflow is <your goal here>.
+```
 
 See [Creating Workflows](/gh-aw/setup/creating-workflows/) or [Frontmatter Reference](/gh-aw/reference/frontmatter/).
 
@@ -709,13 +695,7 @@ jobs:
 
 ### Who pays for the use of AI?
 
-Depends on the engine:
-
-- **GitHub Copilot CLI** (default): organization billing through `copilot-requests: write`, or the account supplying [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token).
-- **Claude Code**: the Anthropic account tied to [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key), or the account configured for Anthropic WIF.
-- **OpenAI Codex**: the OpenAI account tied to `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key).
-- **Google Gemini**: the Google account tied to [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key), or the Google Cloud account configured for WIF.
-- **Pi**: the account for the provider selected in the `provider/model` value.
+It depends on the engine: GitHub Copilot CLI bills the organization through `copilot-requests: write` or the account supplying [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token); Claude Code bills the Anthropic account tied to [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) or Anthropic WIF; OpenAI Codex bills the OpenAI account tied to `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key); Google Gemini bills the Google account tied to [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) or Google WIF; and Pi bills the provider selected in the `provider/model` value.
 
 ### Does gh-aw add any cost beyond what the AI engine charges?
 
@@ -731,10 +711,7 @@ Yes — every run consumes Actions minutes (free for public repos, metered for p
 
 ### How do retries and agent loops affect costs?
 
-gh-aw has no automatic retries — each trigger produces exactly one run. Control reasoning depth and continuation to bound tokens and wall-clock time:
-
-- `max-turns` (Claude) — limits AI chat iterations per run
-- `max-continuations` (Copilot) — autopilot mode with consecutive triggered runs
+gh-aw has no automatic retries, so each trigger produces one run. Bound tokens and wall-clock time with `max-turns` for Claude or `max-continuations` for Copilot:
 
 ```yaml
 engine:
@@ -742,17 +719,11 @@ engine:
 max-turns: 5
 ```
 
-For scheduled workflows, run frequency is the primary cost lever — an hourly schedule adds up quickly.
+For scheduled workflows, run frequency is usually the biggest cost lever.
 
 ### How do I control spend and set budgets?
 
-Spend controls live at the provider level:
-
-- **Actions minutes**: org spending limit in GitHub Billing.
-- **Claude / Codex / Gemini**: API key or project-level limits in Anthropic Console / OpenAI platform.
-- **Copilot**: quota-based — the plan's monthly request quota is the natural cap.
-
-For per-repository tracking, use a dedicated API key per repository. Use `gh aw audit <run-id>` for per-run detail and `gh aw logs` for aggregate metrics.
+Spend controls live at the provider level: use GitHub Billing for Actions minutes, provider-side API key or project limits for Claude, Codex, and Gemini, and Copilot plan quota limits for Copilot. For per-repository tracking, use a dedicated API key per repository, `gh aw audit <run-id>` for per-run detail, and `gh aw logs` for aggregate metrics.
 
 ### Can I change the model being used, e.g., use a cheaper or more advanced one?
 

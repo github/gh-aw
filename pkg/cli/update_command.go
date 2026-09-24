@@ -288,9 +288,6 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 // This is used after container pin updates to embed digest-pinned image references
 // in the generated lock files.
 func recompileAllWorkflows(ctx context.Context, workflowsDir, engineOverride string, verbose bool, approve bool) error {
-	if workflowsDir == "" {
-		workflowsDir = getWorkflowsDir()
-	}
 	return compileWorkflowsForUpdate(ctx, nil, workflowsDir, engineOverride, verbose, approve)
 }
 
