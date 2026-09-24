@@ -81,13 +81,14 @@ const ALLOWED_FILES_ERROR_RE = /^(?<summary>.*outside the allowed-files list) \(
  * available, e.g. `No such agent: foo:bar, available: `.
  */
 const COPILOT_AGENT_NOT_FOUND_RE = /No such agent:\s*([^\n,]+),\s*available:\s*([^\n]*)/i;
+const COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH = 200;
+const PLUGIN_DIAGNOSTICS_MAX_LENGTH = 8000;
 /**
  * Fallback path for plugin installation diagnostics when GH_AW_AGENT_OUTPUT is unset
  * (mirrors pluginDiagnosticsLogPath = logsFolder + "plugin-diagnostics.log" in
  * pkg/workflow/plugin_installation.go / copilot_engine.go). readPluginDiagnosticsLog()
- * prefers deriving the path from GH_AW_AGENT_OUTPUT — the same directory agent-stdio.log
- * lives in — so this literal is only a last-resort fallback and does not need to track
- * every change to logsFolder for normal production runs.
+ * uses this declared path for production runs because GH_AW_AGENT_OUTPUT points to
+ * /tmp/gh-aw/agent_output.json in downstream failure jobs, not the Copilot logs directory.
  */
 const PLUGIN_DIAGNOSTICS_LOG_PATH = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
 
@@ -383,7 +384,10 @@ function buildFailureIssueTitle(options) {
   if (options.hasStaleLockFileFailed) return `[aw] ${workflowName} has stale lock file`;
   if (options.shellExpansionGuardRejected) return `[aw] ${workflowName} hit shell expansion guard rejection`;
   if (options.copilotOrgBillingError) return `[aw] ${workflowName} hit Copilot organization billing error`;
-  if (options.copilotAgentNotFound) return `[aw] ${workflowName} could not find configured Copilot agent "${options.copilotAgentNotFound}"`;
+  if (options.copilotAgentNotFound) {
+    const agentName = sanitizeContent(options.copilotAgentNotFound, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH).replace(/\s+/g, " ").trim();
+    return `[aw] ${workflowName} could not find configured Copilot agent "${agentName}"`;
+  }
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -1805,18 +1809,50 @@ function buildCopilotAgentNotFoundContext(detection) {
     return "";
   }
 
-  const availableAgents = detection.availableAgents.length > 0 ? detection.availableAgents.map(agent => `\`${agent}\``).join(", ") : "_(none — Copilot CLI discovered no loadable agents)_";
+  const requestedAgent = sanitizeContent(detection.requestedAgent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH);
+  const availableAgents =
+    detection.availableAgents.length > 0
+      ? detection.availableAgents.map(agent => renderSafeInlineCodeSpan(sanitizeContent(agent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH))).join(", ")
+      : "_(none — Copilot CLI discovered no loadable agents)_";
   const diagnosticsLog = readPluginDiagnosticsLog();
-  const pluginDiagnostics = diagnosticsLog ? `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n\`\`\`\n${diagnosticsLog}\n\`\`\`\n\n</details>\n` : "";
+  const pluginDiagnostics = diagnosticsLog ? renderPluginDiagnosticsDetails(diagnosticsLog) : "";
 
   return (
     "\n" +
     renderPromptTemplate("copilot_agent_not_found.md", {
-      requested_agent: detection.requestedAgent,
+      requested_agent: renderSafeInlineCodeSpan(requestedAgent),
       available_agents: availableAgents,
       plugin_diagnostics: pluginDiagnostics,
     })
   );
+}
+
+/**
+ * Render a value as an inline Markdown code span using a delimiter longer than any backtick run
+ * present in the value.
+ * @param {string} value
+ * @returns {string}
+ */
+function renderSafeInlineCodeSpan(value) {
+  const text = value.replace(/\s+/g, " ").trim();
+  let longestBacktickRun = 0;
+  for (const run of text.match(/`+/g) || []) {
+    longestBacktickRun = Math.max(longestBacktickRun, run.length);
+  }
+  const fence = "`".repeat(longestBacktickRun + 1);
+  const padding = text.startsWith("`") || text.endsWith("`") ? " " : "";
+  return `${fence}${padding}${text}${padding}${fence}`;
+}
+
+/**
+ * Render sanitized plugin diagnostics inside a code fence that cannot be closed by the log.
+ * @param {string} diagnosticsLog
+ * @returns {string}
+ */
+function renderPluginDiagnosticsDetails(diagnosticsLog) {
+  const sanitizedDiagnostics = sanitizeContent(diagnosticsLog, { maxLength: PLUGIN_DIAGNOSTICS_MAX_LENGTH });
+  const fence = safeMarkdownCodeFence([sanitizedDiagnostics]);
+  return `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n${fence}\n${sanitizedDiagnostics}\n${fence}\n\n</details>\n`;
 }
 
 /**
@@ -2854,16 +2890,11 @@ function detectCopilotAgentNotFoundFromLog(stdioLogPathOverride) {
 /**
  * Read the filesystem diagnostics recorded during plugin installation
  * (see pluginDiagnosticsLogPath in pkg/workflow/plugin_installation.go), if present.
- * The diagnostics file is written to the same logs directory as agent-stdio.log
- * (both under logsFolder in pkg/workflow/copilot_engine.go), so its path is derived
- * from GH_AW_AGENT_OUTPUT the same way agent-stdio.log's path is, rather than being
- * hardcoded separately — keeping the two languages from drifting out of sync.
  * GH_AW_PLUGIN_DIAGNOSTICS_FILE is an explicit override used by tests.
  * @returns {string} Diagnostics log content, or "" when unavailable
  */
 function readPluginDiagnosticsLog() {
-  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
-  const diagnosticsPath = process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "plugin-diagnostics.log") : PLUGIN_DIAGNOSTICS_LOG_PATH);
+  const diagnosticsPath = process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE || PLUGIN_DIAGNOSTICS_LOG_PATH;
   try {
     return fs.readFileSync(diagnosticsPath, "utf8").trim();
   } catch {

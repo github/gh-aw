@@ -1,5 +1,5 @@
 > [!WARNING]
-> **Configured Copilot agent not found**: The Copilot CLI could not load agent `{requested_agent}` at startup.
+> **Configured Copilot agent not found**: The Copilot CLI could not load agent {requested_agent} at startup.
 
 This is a **configuration issue** — the workflow's `engine.agent` value does not match any agent the Copilot CLI discovered when it started.
 

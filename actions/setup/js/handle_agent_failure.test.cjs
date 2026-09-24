@@ -236,6 +236,10 @@ describe("handle_agent_failure", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, missingModelPricingError: true, missingModelPricingModelName: "" })).toBe("[aw] Test Workflow has no AI credits pricing for model");
     });
 
+    it("sanitizes Copilot agent-not-found title content", () => {
+      expect(buildFailureIssueTitle({ ...baseOptions, copilotAgentNotFound: "agent` @octo\npayload" })).toBe('[aw] Test Workflow could not find configured Copilot agent "agent` ``@octo`` payload"');
+    });
+
     it("prefers missingModelPricingError over unknownModelAICredits when both are true", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, missingModelPricingError: true, missingModelPricingModelName: "claude-opus-5", unknownModelAICredits: true })).toBe(
         "[aw] Test Workflow has no AI credits pricing for model (claude-opus-5)"
@@ -3783,6 +3787,8 @@ describe("handle_agent_failure", () => {
       delete process.env.RUNNER_TEMP;
       delete process.env.GH_AW_ENGINE_ID;
       delete process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE;
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      fs.rmSync("/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log", { force: true });
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -3833,6 +3839,14 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("`baz`");
     });
 
+    it("sanitizes agent identifiers before rendering them", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo` @octo\npayload", availableAgents: ["baz` @team"] });
+      expect(result).toContain("``foo` ``@octo`` payload``");
+      expect(result).toContain("``` baz` ``@team`` ```");
+      expect(result).not.toContain("` @octo");
+      expect(result).not.toContain("` @team");
+    });
+
     it("renders a fallback message when no agents were reported as available", () => {
       const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
       expect(result).toContain("none — Copilot CLI discovered no loadable agents");
@@ -3845,6 +3859,27 @@ describe("handle_agent_failure", () => {
       const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
       expect(result).toContain("Plugin installation diagnostics");
       expect(result).toContain("Markdown files found: 0");
+    });
+
+    it("reads the declared plugin diagnostics path when agent output is elsewhere", () => {
+      const diagnosticsPath = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
+      fs.mkdirSync(path.dirname(diagnosticsPath), { recursive: true });
+      fs.writeFileSync(diagnosticsPath, "Markdown files found: 0");
+      process.env.GH_AW_AGENT_OUTPUT = "/tmp/gh-aw/agent_output.json";
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("Plugin installation diagnostics");
+      expect(result).toContain("Markdown files found: 0");
+    });
+
+    it("sanitizes and bounds plugin diagnostics with a safe code fence", () => {
+      const diagnosticsPath = path.join(tmpDir, "plugin-diagnostics.log");
+      fs.writeFileSync(diagnosticsPath, `file-\`\`\`\n@octo\n${"x".repeat(9000)}`);
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("````\nfile-```");
+      expect(result).toContain("`@octo`");
+      expect(result).toContain("[Content truncated due to length]");
+      expect(result).not.toContain("x".repeat(8500));
     });
   });
 

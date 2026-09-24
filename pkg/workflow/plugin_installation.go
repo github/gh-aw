@@ -139,7 +139,13 @@ func pluginTokenExpression(workflowData *WorkflowData, index int) string {
 	if workflowData == nil || index < 0 || index >= len(workflowData.PluginReferences) {
 		return ""
 	}
-	ref := workflowData.PluginReferences[index]
+	var ref PluginReference
+	for i, candidate := range workflowData.PluginReferences {
+		if i == index {
+			ref = candidate
+			break
+		}
+	}
 	if ref.GitHubApp != nil {
 		token := fmt.Sprintf("${{ steps.%s.outputs.token }}", pluginAppTokenStepID(index))
 		if ref.GitHubApp.shouldIgnoreMissingKey() {
@@ -166,15 +172,20 @@ func (c *Compiler) generatePluginAuthTokenSteps(workflowData *WorkflowData) []Gi
 		if ref.GitHubApp == nil {
 			continue
 		}
-		repoParts := strings.Split(parseSkillRefSpec(ref.Plugin).repoPath, "/")
-		if len(repoParts) < 2 {
+		owner, repoRest, ok := strings.Cut(parseSkillRefSpec(ref.Plugin).repoPath, "/")
+		if !ok || owner == "" || repoRest == "" {
 			continue
 		}
+		repoName, _, _ := strings.Cut(repoRest, "/")
+		if repoName == "" {
+			continue
+		}
+		repository := path.Join(owner, repoName)
 		lines := c.buildGitHubAppTokenMintStepWithMeta(
 			ref.GitHubApp,
 			nil,
-			repoParts[1],
-			strings.Join(repoParts[:2], "/"),
+			repoName,
+			repository,
 			fmt.Sprintf("Generate GitHub App token for agent plugin %d", i+1),
 			pluginAppTokenStepID(i),
 		)
@@ -274,8 +285,8 @@ const pluginDiagnosticsMaxDepth = 6
 func newPluginDiagnosticsStep(parsed parsedSkillRefSpec, installPath string) GitHubActionStep {
 	quotedInstallPath := fmt.Sprintf("%q", "./"+installPath)
 	pluginLabel := parsed.repoPath + "@" + parsed.ref
-	headerEcho := fmt.Sprintf("echo %s", shellEscapeArg("=== Agent plugin diagnostics: "+pluginLabel+" ==="))
-	warningEcho := fmt.Sprintf("echo %s", shellEscapeArg(fmt.Sprintf("::warning::Agent plugin %s has no markdown files after installation; it may not expose any loadable Copilot agents. Verify the plugin ref points to the branch that publishes materialized agent/skill files (for example a 'marketplace' branch) rather than a source-only manifest branch.", pluginLabel)))
+	headerEcho := "echo " + shellEscapeArg("=== Agent plugin diagnostics: "+pluginLabel+" ===")
+	warningEcho := "echo " + shellEscapeArg(fmt.Sprintf("::warning::Agent plugin %s has no markdown files after installation; it may not expose any loadable Copilot agents. Verify the plugin ref points to the branch that publishes materialized agent/skill files (for example a 'marketplace' branch) rather than a source-only manifest branch.", pluginLabel))
 	diagnosticsCommand := strings.Join([]string{
 		fmt.Sprintf("mkdir -p %q", path.Dir(pluginDiagnosticsLogPath)),
 		"{",
@@ -283,11 +294,11 @@ func newPluginDiagnosticsStep(parsed parsedSkillRefSpec, installPath string) Git
 		fmt.Sprintf("  find %s -maxdepth %d -type f | sort", quotedInstallPath, pluginDiagnosticsMaxDepth),
 		fmt.Sprintf("  md_count=$(find %s -maxdepth %d -type f -name '*.md' | wc -l)", quotedInstallPath, pluginDiagnosticsMaxDepth),
 		"  echo \"Markdown files found: ${md_count}\"",
-		"  if [ \"${md_count}\" -eq 0 ]; then",
-		"    " + warningEcho,
-		"  fi",
 		"  echo",
 		fmt.Sprintf("} >> %q", pluginDiagnosticsLogPath),
+		"if [ \"${md_count}\" -eq 0 ]; then",
+		"  " + warningEcho,
+		"fi",
 	}, "\n")
 	diagnosticsStep := []string{"      - name: Diagnose agent plugin " + parsed.repoPath}
 	return FormatStepWithCommandAndEnv(diagnosticsStep, diagnosticsCommand, nil)
