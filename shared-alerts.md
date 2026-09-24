@@ -190,3 +190,19 @@
 - No dashboard issue created this run (material delta below the threshold for a full dashboard
   refresh — only new issue is the mempalace root-cause finding; #62310/#62311 remain correctly
   closed as resolved; #62731 correctly left open).
+## NEW — 2026-09-24T04:37Z (Workflow Health Manager)
+- **Filed 3 concretely root-caused failures in one consolidated maintenance issue** (see
+  workflow-health-latest.md for full detail): (1) avenger.md `/usr/local/bin/npm` symlink
+  bind-mount crash — 4 consecutive fresh failures, two prior fix PRs (#57946, #58722) closed
+  unmerged 2026-09-05, diff still valid; (2) metrics-collector.md missing `model-provider: github`
+  under `engine:` — root cause of the `model_not_supported_error` recurring since 2026-09-17,
+  distinct from the already-fixed silent-success masking (#62670/#62731); (3) gpclean.md hardcoded
+  retired model `openai/gpt-5-codex` (should be `gpt-5.3-codex`), same defect class as #46412 but
+  missed for this file.
+- **Correction for downstream consumers:** #62670/#62731 (Metrics Collector "success-but-empty"
+  gate) is unrelated to today's Metrics Collector failures — those are a config bug
+  (`model-provider` missing), not the codex early-termination behavior #62731 tracks. Do not
+  conflate the two when triaging future Metrics Collector runs.
+- `metrics/latest.json` still stale at 2026-09-01 (23 days) — expected to self-resolve once the
+  `model-provider` fix lands and a scheduled run succeeds through the #62670 content gate.
+- No dashboard issue created this run — captured via the consolidated maintenance issue instead.
