@@ -34,7 +34,7 @@ type UpgradeConfig struct {
 
 // NewUpgradeCommand creates the upgrade command
 //
-//nolint:largefunc // Cobra command setup keeps related flags and validation together.
+//nolint:largefunc // Cobra requires the command's complete discoverable flag surface to be registered together.
 func NewUpgradeCommand(validateEngine func(string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
@@ -79,7 +79,7 @@ This command always upgrades all Markdown files in .github/workflows.`,
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --audit --json              # Output audit results in JSON format
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --pre-releases              # Include pre-release versions when upgrading the extension (stable releases are the default)`,
 		Args: cobra.NoArgs,
-		//nolint:largefunc // Upgrade flag validation is kept with command dispatch.
+		//nolint:largefunc // Interdependent flag validation must run before dispatch so no caller bypasses it.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			dir, _ := cmd.Flags().GetString("dir")
@@ -236,7 +236,7 @@ type upgradeOptions struct {
 
 // runUpgradeCommand executes the upgrade process
 //
-//nolint:largefunc // Upgrade steps run in a deliberate, user-visible sequence.
+//nolint:largefunc // Upgrade side effects require ordered progress reporting and independent failure handling.
 func runUpgradeCommand(opts upgradeOptions) error {
 	upgradeLog.Printf("Running upgrade command: verbose=%v, workflowDir=%s, noFix=%v, noCompile=%v, noActions=%v, disabledCodemodIDs=%v, skipExtensionUpgrade=%v",
 		opts.verbose, opts.workflowDir, opts.noFix, opts.noCompile, opts.noActions, opts.disabledCodemodIDs, opts.skipExtensionUpgrade)
