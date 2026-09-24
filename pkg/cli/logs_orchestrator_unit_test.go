@@ -633,9 +633,17 @@ func TestCollectProcessedWorkflowRunsIterationLimitSurfacesContinuation(t *testi
 		return processedRuns, len(batch.runs), true, false, false
 	}
 
+	// An explicit rate-limit ceiling equal to the mocked API limit keeps
+	// checkAndWaitForRateLimitMode on its "configuredMax != 0" fast path,
+	// avoiding the unconditional 500ms legacy cooldown it otherwise sleeps
+	// between iterations. Without this, MaxIterations=20 iterations (times
+	// two sub-tests below) cost ~20s of real wall-clock sleep per run for a
+	// path that isn't under test here.
+	const noSleepMaxRateLimit = 5000
+
 	runs, timeoutReached, countLimitReached, _, _, err := collectProcessedWorkflowRuns(
 		logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
-		LogsDownloadOptions{Count: 1000, StartDate: "-90d"},
+		LogsDownloadOptions{Count: 1000, StartDate: "-90d", MaxGitHubAPIRateLimit: noSleepMaxRateLimit},
 	)
 	require.NoError(t, err)
 	assert.False(t, timeoutReached)
@@ -646,7 +654,7 @@ func TestCollectProcessedWorkflowRunsIterationLimitSurfacesContinuation(t *testi
 		nextID = 0
 		runs, _, countLimitReached, _, _, err := collectProcessedWorkflowRuns(
 			logsDownloadRuntime{activeCtx: context.Background(), fetchAllInRange: true},
-			LogsDownloadOptions{Count: MaxIterations, StartDate: "-90d"},
+			LogsDownloadOptions{Count: MaxIterations, StartDate: "-90d", MaxGitHubAPIRateLimit: noSleepMaxRateLimit},
 		)
 		require.NoError(t, err)
 		assert.True(t, countLimitReached)
