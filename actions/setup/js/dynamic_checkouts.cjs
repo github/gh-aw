@@ -115,6 +115,17 @@ function credentialArgs(serverURL, token, maskSecret = value => core.setSecret(v
   return ["-c", `http.${serverURL}/.extraheader=AUTHORIZATION: basic ${encoded}`];
 }
 
+function lstatIfExists(target) {
+  try {
+    return fs.lstatSync(target);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function checkoutRepository(checkout, options = {}) {
   const workspace = options.workspace || process.env.GITHUB_WORKSPACE || "";
   const serverURL = (options.serverURL || process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
@@ -127,16 +138,12 @@ async function checkoutRepository(checkout, options = {}) {
   try {
     workspaceReal = fs.realpathSync(workspace);
     checkoutTarget = path.join(workspaceReal, checkout.path);
-    try {
-      const targetStats = fs.lstatSync(checkoutTarget);
+    const targetStats = lstatIfExists(checkoutTarget);
+    if (targetStats) {
       if (targetStats.isSymbolicLink()) {
         throw new Error(`dynamic checkout path is a symbolic link: ${checkout.path}`);
       }
       throw new Error(`dynamic checkout path already exists: ${checkout.path}`);
-    } catch (error) {
-      if (!error || error.code !== "ENOENT") {
-        throw error;
-      }
     }
 
     let parent = workspaceReal;
