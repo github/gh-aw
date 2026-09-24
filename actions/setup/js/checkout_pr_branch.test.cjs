@@ -646,6 +646,17 @@ If the pull request is still open, verify that:
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout in forked repository runtime context"));
     });
 
+    it("should refuse PR replay when the workflow_dispatch payload has no repository data", async () => {
+      delete mockContext.payload.repository;
+
+      await runScript();
+
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine repository fork status for workflow_dispatch"));
+    });
+
     it("should skip checkout when aw_context item_type is not pull_request", async () => {
       mockContext.payload.inputs.aw_context = JSON.stringify({ item_type: "issue", item_number: 42 });
 
@@ -788,6 +799,35 @@ If the pull request is still open, verify that:
       // pull_request_review_comment uses git fetch refs/pull + checkout
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head", "--depth=2"]);
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "origin/pr-head"]);
+    });
+  });
+
+  describe("risk matrix: forked runtime repository scope (RS-05a)", () => {
+    // Formal coverage for the risk matrix from PR #63011: the repository.fork
+    // guard in assertTrustedCheckoutRuntime() MUST be scoped to workflow_dispatch
+    // PR replays only. Every other PR-capable trigger MUST remain unaffected by
+    // a structurally forked runtime repository.
+    it.each(["pull_request_target", "pull_request_review", "pull_request_review_comment", "issue_comment"])("should allow checkout for %s events even when the runtime repository is a fork", async eventName => {
+      mockContext.eventName = eventName;
+      mockContext.payload.repository = { fork: true };
+
+      await runScript();
+
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head", "--depth=2"]);
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "origin/pr-head"]);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should skip checkout without evaluating the fork guard when workflow_dispatch has no PR context", async () => {
+      mockContext.eventName = "workflow_dispatch";
+      mockContext.payload = { repository: { fork: true }, inputs: {} };
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
   });
 

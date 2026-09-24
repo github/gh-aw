@@ -218,9 +218,18 @@ function logCheckoutStrategy(eventName, strategy, reason) {
  * - triggering actor must have write-or-higher repository permission
  */
 async function assertTrustedCheckoutRuntime() {
-  const repository = context.payload.repository;
-  if (context.eventName === "workflow_dispatch" && repository?.fork === true) {
-    throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
+  if (context.eventName === "workflow_dispatch") {
+    const repository = context.payload.repository;
+    // Fork status can only be verified when the payload carries repository
+    // data. Fail closed rather than silently trusting an unverifiable
+    // runtime: RS-05a requires proving "not a fork", not merely failing to
+    // prove "is a fork".
+    if (!repository) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine repository fork status for workflow_dispatch");
+    }
+    if (repository.fork === true) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
+    }
   }
 
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR

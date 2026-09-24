@@ -406,7 +406,21 @@ if (!pullRequest && eventName === "workflow_dispatch") {
 }
 ```
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call (lines 247–248) and the `exec.exec("git", [...])` array invocation (lines 305–310) that apply to all PR checkout paths.
+Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call (lines 247–248) and the `exec.exec("git", [...])` array invocation (lines 305–310) that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent:
+
+```js
+async function assertTrustedCheckoutRuntime() {
+  if (context.eventName === "workflow_dispatch") {
+    const repository = context.payload.repository;
+    if (!repository) {
+      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: unable to determine repository fork status for workflow_dispatch`);
+    }
+    if (repository.fork === true) {
+      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout in forked repository runtime context`);
+    }
+  }
+  // ... permission-floor check below applies to all PR checkout paths
+```
 
 **Unit test coverage** (`actions/setup/js/checkout_pr_branch.test.cjs`):
 
@@ -421,8 +435,12 @@ Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutR
 | `aw_context.repo` matches current repo → checkout | repository scope |
 | `aw_context.repo` mismatches → warn + skip | repository scope |
 | successful checkout → output `true` | ref isolation |
+| same-repo PR checkout allowed when runtime repository is itself a fork (`pull_request`) | fork-runtime rejection scope |
+| `workflow_dispatch` PR replay rejected when runtime repository is a fork | fork-runtime rejection |
+| `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
+| forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 
-**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests.
+**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection and its fail-closed behavior for missing `repository` data.
 
 ---
 
