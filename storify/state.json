@@ -1,17 +1,1 @@
-{
-  "last_window": {
-    "start": "2026-09-12T08:00:00Z",
-    "end": "2026-09-13T08:00:00Z"
-  },
-  "themes": [
-    "stabilization via scheduled probes",
-    "read-only posture persistence",
-    "cost-rightsizing signals in maintenance workflows"
-  ],
-  "carry_forward_questions": [
-    "Will reduced-friction smoke-call behavior persist tomorrow?",
-    "Will maintenance model-rightsizing be adopted and lower AIC/token usage?",
-    "Can clear human intervention links be established in next window from richer GitHub event traces?"
-  ],
-  "last_updated": "2026-09-13T08:00:00Z"
-}
+{"last_window":{"start":"2026-09-23T08:07:00Z","end":"2026-09-24T08:07:00Z"},"last_run_at":"2026-09-24T08:07:00Z","key_themes":["safe-output compliance failures","agent job partial-failure resilience","rapid remediation via merged infra PRs"],"carry_forward_questions":["Will safe-output incident count decline after recent merges?","Do agent-job failures remain concentrated in a few workflows?","Can high-token workflows sustain reliability without timeout spillover?"]}

@@ -6,3 +6,6 @@
 {"date":"2026-09-12","loop_name":"Observability-to-Reliability","evidence_runs":[34657470495,34659052909],"direction":"stable-to-improving","reinforcer":"reporting workflows completed with full downstream stages"}
 {"date":"2026-09-12","loop_name":"Governance-Pulse-Loop","evidence_runs":[34674344416,34676638964],"direction":"stable","reinforcer":"repeated decision/reviewer workflow executions throughout the window"}
 {"date": "2026-09-13", "loop_name": "Scheduled probes to tighter execution shape", "direction": "improving", "evidence_runs": [34726913882, 34726917192, 34733467133], "notes": "Blocked request reductions and lower turn counts vs baselines in sampled runs.", "confidence": "medium"}
+{"ts":"2026-09-24T08:07:00Z","date":"2026-09-24","loop":"Safe-output compliance loop","direction":"stable_to_improving_detection_degrading_execution","evidence":["35959597858","35960383617","63118","63109","63103"]}
+{"ts":"2026-09-24T08:07:00Z","date":"2026-09-24","loop":"Failure-to-fix platform loop","direction":"improving","evidence":["63048","63043","63032","35966237309","35967540862"]}
+{"ts":"2026-09-24T08:07:00Z","date":"2026-09-24","loop":"Cost/complexity pressure loop","direction":"uncertain","evidence":["35959597858"]}
