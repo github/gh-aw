@@ -236,6 +236,10 @@ describe("handle_agent_failure", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, missingModelPricingError: true, missingModelPricingModelName: "" })).toBe("[aw] Test Workflow has no AI credits pricing for model");
     });
 
+    it("sanitizes Copilot agent-not-found title content", () => {
+      expect(buildFailureIssueTitle({ ...baseOptions, copilotAgentNotFound: "agent` @octo\npayload" })).toBe('[aw] Test Workflow could not find configured Copilot agent "agent` ``@octo`` payload"');
+    });
+
     it("prefers missingModelPricingError over unknownModelAICredits when both are true", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, missingModelPricingError: true, missingModelPricingModelName: "claude-opus-5", unknownModelAICredits: true })).toBe(
         "[aw] Test Workflow has no AI credits pricing for model (claude-opus-5)"
@@ -3758,6 +3762,124 @@ describe("handle_agent_failure", () => {
       const logPath = path.join(tmpDir, "agent-stdio.log");
       fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\n${errorOutput}`);
       expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
+    });
+  });
+
+  describe("buildCopilotAgentNotFoundContext", () => {
+    let buildCopilotAgentNotFoundContext;
+    let detectCopilotAgentNotFoundFromLog;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    let tmpDir;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-copilot-agent-not-found-"));
+      const promptsDir = path.join(tmpDir, "gh-aw", "prompts");
+      fs.mkdirSync(promptsDir, { recursive: true });
+      fs.copyFileSync(path.join(runtimePromptsDir, "copilot_agent_not_found.md"), path.join(promptsDir, "copilot_agent_not_found.md"));
+      process.env.RUNNER_TEMP = tmpDir;
+      ({ buildCopilotAgentNotFoundContext, detectCopilotAgentNotFoundFromLog } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.RUNNER_TEMP;
+      delete process.env.GH_AW_ENGINE_ID;
+      delete process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE;
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      fs.rmSync("/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log", { force: true });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("detects a 'No such agent' failure with an available agents list", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: csharp-dotnet-development:expert-dotnet-software-engineer, available: foo, bar");
+      const detection = detectCopilotAgentNotFoundFromLog(logPath);
+      expect(detection).toEqual({
+        requestedAgent: "csharp-dotnet-development:expert-dotnet-software-engineer",
+        availableAgents: ["foo", "bar"],
+      });
+    });
+
+    it("detects a 'No such agent' failure with an empty available agents list", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: csharp-dotnet-development:expert-dotnet-software-engineer, available: ");
+      const detection = detectCopilotAgentNotFoundFromLog(logPath);
+      expect(detection).toEqual({
+        requestedAgent: "csharp-dotnet-development:expert-dotnet-software-engineer",
+        availableAgents: [],
+      });
+    });
+
+    it("returns null when the log does not contain the failure", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "everything is fine");
+      expect(detectCopilotAgentNotFoundFromLog(logPath)).toBeNull();
+    });
+
+    it("returns null for non-copilot engines even with a matching log line", () => {
+      process.env.GH_AW_ENGINE_ID = "claude";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "No such agent: foo, available: ");
+      expect(detectCopilotAgentNotFoundFromLog(logPath)).toBeNull();
+    });
+
+    it("returns no guidance when no failure was detected", () => {
+      expect(buildCopilotAgentNotFoundContext(null)).toBe("");
+    });
+
+    it("renders the requested agent and available agents list", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: ["baz"] });
+      expect(result).toContain("Configured Copilot agent not found");
+      expect(result).toContain("`foo:bar`");
+      expect(result).toContain("`baz`");
+    });
+
+    it("sanitizes agent identifiers before rendering them", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo` @octo\npayload", availableAgents: ["baz` @team"] });
+      expect(result).toContain("``foo` ``@octo`` payload``");
+      expect(result).toContain("``` baz` ``@team`` ```");
+      expect(result).not.toContain("` @octo");
+      expect(result).not.toContain("` @team");
+    });
+
+    it("renders a fallback message when no agents were reported as available", () => {
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("none — Copilot CLI discovered no loadable agents");
+    });
+
+    it("includes plugin installation diagnostics when present", () => {
+      const diagnosticsPath = path.join(tmpDir, "plugin-diagnostics.log");
+      fs.writeFileSync(diagnosticsPath, "=== Agent plugin diagnostics: octo-org/plugin@sha ===\nMarkdown files found: 0");
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("Plugin installation diagnostics");
+      expect(result).toContain("Markdown files found: 0");
+    });
+
+    it("reads the declared plugin diagnostics path when agent output is elsewhere", () => {
+      const diagnosticsPath = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
+      fs.mkdirSync(path.dirname(diagnosticsPath), { recursive: true });
+      fs.writeFileSync(diagnosticsPath, "Markdown files found: 0");
+      process.env.GH_AW_AGENT_OUTPUT = "/tmp/gh-aw/agent_output.json";
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("Plugin installation diagnostics");
+      expect(result).toContain("Markdown files found: 0");
+    });
+
+    it("sanitizes and bounds plugin diagnostics with a safe code fence", () => {
+      const diagnosticsPath = path.join(tmpDir, "plugin-diagnostics.log");
+      fs.writeFileSync(diagnosticsPath, `file-\`\`\`\n@octo\n${"x".repeat(9000)}`);
+      process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE = diagnosticsPath;
+      const result = buildCopilotAgentNotFoundContext({ requestedAgent: "foo:bar", availableAgents: [] });
+      expect(result).toContain("````\nfile-```");
+      expect(result).toContain("`@octo`");
+      expect(result).toContain("[Content truncated due to length]");
+      expect(result).not.toContain("x".repeat(8500));
     });
   });
 

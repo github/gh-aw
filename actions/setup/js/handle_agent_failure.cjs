@@ -73,6 +73,24 @@ const COPILOT_ORG_BILLING_ERROR_RE = new RegExp(
   "i"
 );
 const ALLOWED_FILES_ERROR_RE = /^(?<summary>.*outside the allowed-files list) \((?<files>.+?)\)\. (?<remediation>Add the files to the allowed-files configuration field or remove them from the (?:patch|bundle)\.)$/;
+/**
+ * Copilot CLI error emitted at engine startup when `engine.agent` (the `--agent` flag) does
+ * not match any agent the CLI discovered, for example when a `plugins:` entry is pinned to a
+ * source-only ref that never materializes loadable agent files. Captures the requested agent
+ * identifier and the (possibly empty) comma-separated list of agents Copilot reports as
+ * available, e.g. `No such agent: foo:bar, available: `.
+ */
+const COPILOT_AGENT_NOT_FOUND_RE = /No such agent:\s*([^\n,]+),\s*available:\s*([^\n]*)/i;
+const COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH = 200;
+const PLUGIN_DIAGNOSTICS_MAX_LENGTH = 8000;
+/**
+ * Fallback path for plugin installation diagnostics when GH_AW_AGENT_OUTPUT is unset
+ * (mirrors pluginDiagnosticsLogPath = logsFolder + "plugin-diagnostics.log" in
+ * pkg/workflow/plugin_installation.go / copilot_engine.go). readPluginDiagnosticsLog()
+ * uses this declared path for production runs because GH_AW_AGENT_OUTPUT points to
+ * /tmp/gh-aw/agent_output.json in downstream failure jobs, not the Copilot logs directory.
+ */
+const PLUGIN_DIAGNOSTICS_LOG_PATH = "/tmp/gh-aw/sandbox/agent/logs/plugin-diagnostics.log";
 
 /**
  * Parse action failure issue expiration from environment.
@@ -282,6 +300,7 @@ function buildFailureMatchCategories(options) {
   if (options.secretVerificationFailed) categories.push("secret_verification_failed");
   if (options.inferenceAccessError) categories.push("inference_access_error");
   if (options.copilotOrgBillingError) categories.push("copilot_org_billing_error");
+  if (options.copilotAgentNotFound) categories.push("copilot_agent_not_found");
   if (options.mcpPolicyError) categories.push("mcp_policy_error");
   if (options.modelNotSupportedError) categories.push("model_not_supported_error");
   if (options.http400ResponseError) categories.push("http_400_response_error");
@@ -334,6 +353,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.http400ResponseError
  * @param {boolean} options.unknownModelAICredits
  * @param {boolean} [options.copilotOrgBillingError]
+ * @param {string} [options.copilotAgentNotFound] - Requested agent identifier if a "No such agent" failure was detected
  * @param {boolean} [options.missingModelPricingError]
  * @param {string} [options.missingModelPricingModelName]
  * @param {boolean} [options.shellExpansionGuardRejected]
@@ -364,6 +384,10 @@ function buildFailureIssueTitle(options) {
   if (options.hasStaleLockFileFailed) return `[aw] ${workflowName} has stale lock file`;
   if (options.shellExpansionGuardRejected) return `[aw] ${workflowName} hit shell expansion guard rejection`;
   if (options.copilotOrgBillingError) return `[aw] ${workflowName} hit Copilot organization billing error`;
+  if (options.copilotAgentNotFound) {
+    const agentName = sanitizeContent(options.copilotAgentNotFound, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH).replace(/\s+/g, " ").trim();
+    return `[aw] ${workflowName} could not find configured Copilot agent "${agentName}"`;
+  }
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -1774,6 +1798,64 @@ function buildCopilotOrgBillingErrorContext(hasCopilotOrgBillingError) {
 }
 
 /**
+ * Build remediation for a Copilot CLI "No such agent" startup failure, including a rendering
+ * of the agent identifier that was requested, the agents Copilot reported as available, and
+ * the filesystem diagnostics recorded at plugin-install time (if any).
+ * @param {CopilotAgentNotFoundDetection|null} detection
+ * @returns {string}
+ */
+function buildCopilotAgentNotFoundContext(detection) {
+  if (!detection) {
+    return "";
+  }
+
+  const requestedAgent = sanitizeContent(detection.requestedAgent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH);
+  const availableAgents =
+    detection.availableAgents.length > 0
+      ? detection.availableAgents.map(agent => renderSafeInlineCodeSpan(sanitizeContent(agent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH))).join(", ")
+      : "_(none — Copilot CLI discovered no loadable agents)_";
+  const diagnosticsLog = readPluginDiagnosticsLog();
+  const pluginDiagnostics = diagnosticsLog ? renderPluginDiagnosticsDetails(diagnosticsLog) : "";
+
+  return (
+    "\n" +
+    renderPromptTemplate("copilot_agent_not_found.md", {
+      requested_agent: renderSafeInlineCodeSpan(requestedAgent),
+      available_agents: availableAgents,
+      plugin_diagnostics: pluginDiagnostics,
+    })
+  );
+}
+
+/**
+ * Render a value as an inline Markdown code span using a delimiter longer than any backtick run
+ * present in the value.
+ * @param {string} value
+ * @returns {string}
+ */
+function renderSafeInlineCodeSpan(value) {
+  const text = value.replace(/\s+/g, " ").trim();
+  let longestBacktickRun = 0;
+  for (const run of text.match(/`+/g) || []) {
+    longestBacktickRun = Math.max(longestBacktickRun, run.length);
+  }
+  const fence = "`".repeat(longestBacktickRun + 1);
+  const padding = text.startsWith("`") || text.endsWith("`") ? " " : "";
+  return `${fence}${padding}${text}${padding}${fence}`;
+}
+
+/**
+ * Render sanitized plugin diagnostics inside a code fence that cannot be closed by the log.
+ * @param {string} diagnosticsLog
+ * @returns {string}
+ */
+function renderPluginDiagnosticsDetails(diagnosticsLog) {
+  const sanitizedDiagnostics = sanitizeContent(diagnosticsLog, { maxLength: PLUGIN_DIAGNOSTICS_MAX_LENGTH });
+  const fence = safeMarkdownCodeFence([sanitizedDiagnostics]);
+  return `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n${fence}\n${sanitizedDiagnostics}\n${fence}\n\n</details>\n`;
+}
+
+/**
  * Build a context string when MCP servers were blocked by enterprise/organization policy.
  * This is a persistent configuration error — retrying will not help.
  * @param {boolean} hasMCPPolicyError - Whether an MCP policy error was detected
@@ -2768,6 +2850,59 @@ function detectCopilotOrgBillingErrorFromLog(stdioLogPathOverride) {
 }
 
 /**
+ * @typedef {Object} CopilotAgentNotFoundDetection
+ * @property {string} requestedAgent - The agent identifier passed via `engine.agent`/`--agent`
+ * @property {string[]} availableAgents - Agents the Copilot CLI reported as available (may be empty)
+ */
+
+/**
+ * Detect the Copilot CLI's "No such agent" startup failure, which occurs when `engine.agent`
+ * does not match any agent the CLI discovered (for example when a `plugins:` entry is pinned
+ * to a ref that does not materialize loadable agent files).
+ * @param {string} [stdioLogPathOverride] - Explicit agent-stdio.log path; only used by tests, production callers rely on GH_AW_AGENT_OUTPUT
+ * @returns {CopilotAgentNotFoundDetection|null}
+ */
+function detectCopilotAgentNotFoundFromLog(stdioLogPathOverride) {
+  if (process.env.GH_AW_ENGINE_ID !== "copilot") {
+    return null;
+  }
+
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const stdioLogPath = stdioLogPathOverride || (agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log");
+  try {
+    const logContent = fs.readFileSync(stdioLogPath, "utf8");
+    const match = logContent.match(COPILOT_AGENT_NOT_FOUND_RE);
+    if (!match) {
+      return null;
+    }
+    const requestedAgent = match[1].trim();
+    const availableRaw = match[2].trim();
+    const availableAgents = availableRaw
+      .split(",")
+      .map(agent => agent.trim())
+      .filter(Boolean);
+    return { requestedAgent, availableAgents };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the filesystem diagnostics recorded during plugin installation
+ * (see pluginDiagnosticsLogPath in pkg/workflow/plugin_installation.go), if present.
+ * GH_AW_PLUGIN_DIAGNOSTICS_FILE is an explicit override used by tests.
+ * @returns {string} Diagnostics log content, or "" when unavailable
+ */
+function readPluginDiagnosticsLog() {
+  const diagnosticsPath = process.env.GH_AW_PLUGIN_DIAGNOSTICS_FILE || PLUGIN_DIAGNOSTICS_LOG_PATH;
+  try {
+    return fs.readFileSync(diagnosticsPath, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Detect AWF firewall startup failure signals from log content.
  * Uses specific failure patterns to avoid false positives on successful runs
  * where container lifecycle lines (e.g., " Container awf-cli-proxy  Started")
@@ -3586,6 +3721,7 @@ async function main() {
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
     const copilotOrgBillingError = detectCopilotOrgBillingErrorFromLog();
+    const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
     const agenticEngineTimeout = process.env.GH_AW_AGENTIC_ENGINE_TIMEOUT === "true";
     const modelNotSupportedError = process.env.GH_AW_MODEL_NOT_SUPPORTED_ERROR === "true";
@@ -4034,6 +4170,7 @@ async function main() {
       missingModelPricingError,
       missingModelPricingModelName,
       copilotOrgBillingError,
+      copilotAgentNotFound: copilotAgentNotFound?.requestedAgent,
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
@@ -4054,6 +4191,7 @@ async function main() {
       secretVerificationFailed: hasSecretVerificationFailed,
       inferenceAccessError,
       copilotOrgBillingError,
+      copilotAgentNotFound: Boolean(copilotAgentNotFound),
       mcpPolicyError,
       modelNotSupportedError,
       http400ResponseError,
@@ -4246,6 +4384,7 @@ async function main() {
 
         // Build inference access error context
         const copilotOrgBillingErrorContext = buildCopilotOrgBillingErrorContext(copilotOrgBillingError);
+        const copilotAgentNotFoundContext = buildCopilotAgentNotFoundContext(copilotAgentNotFound);
         const inferenceAccessErrorContext = copilotOrgBillingErrorContext ? "" : buildInferenceAccessErrorContext(inferenceAccessError);
 
         // Build MCP policy error context
@@ -4291,6 +4430,7 @@ async function main() {
           secret_verification_context: buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage),
           credential_auth_error_context: credentialAuthErrorContext,
           copilot_org_billing_error_context: copilotOrgBillingErrorContext,
+          copilot_agent_not_found_context: copilotAgentNotFoundContext,
           assignment_errors_context: assignmentErrorsContext,
           assign_copilot_failure_context: assignCopilotFailureContext,
           skill_install_failure_context: skillInstallFailureContext,
@@ -4479,6 +4619,7 @@ async function main() {
 
         // Build inference access error context
         const copilotOrgBillingErrorContext = buildCopilotOrgBillingErrorContext(copilotOrgBillingError);
+        const copilotAgentNotFoundContext = buildCopilotAgentNotFoundContext(copilotAgentNotFound);
         const inferenceAccessErrorContext = copilotOrgBillingErrorContext ? "" : buildInferenceAccessErrorContext(inferenceAccessError);
 
         // Build MCP policy error context
@@ -4528,6 +4669,7 @@ async function main() {
           secret_verification_context: buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage),
           credential_auth_error_context: credentialAuthErrorContext,
           copilot_org_billing_error_context: copilotOrgBillingErrorContext,
+          copilot_agent_not_found_context: copilotAgentNotFoundContext,
           assignment_errors_context: assignmentErrorsContext,
           assign_copilot_failure_context: assignCopilotFailureContext,
           skill_install_failure_context: skillInstallFailureContext,
@@ -4675,6 +4817,8 @@ module.exports = {
   buildMCPPolicyErrorContext,
   buildCopilotOrgBillingErrorContext,
   detectCopilotOrgBillingErrorFromLog,
+  buildCopilotAgentNotFoundContext,
+  detectCopilotAgentNotFoundFromLog,
   buildModelNotSupportedErrorContext,
   buildHTTP400ResponseErrorContext,
   buildMissingDataContext,
