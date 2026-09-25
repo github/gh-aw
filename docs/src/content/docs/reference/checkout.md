@@ -5,11 +5,32 @@ sidebar:
   order: 852
 ---
 
-The `checkout:` frontmatter field controls how `actions/checkout` is invoked in the agent job. Configure custom checkout settings, check out multiple repositories, or disable checkout entirely.
+The `checkout:` frontmatter field controls how repositories are checked out for the agent job. Use the static syntax when every repository is known from the workflow file, and use the dynamic syntax only when the checkout set must be selected at runtime.
 
 By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR head ref. For `pull_request_target` events, checkout of the PR head branch is **disabled by default** — the head branch may be deleted (merged/closed PRs) or inaccessible (fork PRs), causing the step to hard-fail. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
 
-Use `checkout:` when you need to check out additional branches, check out multiple repositories, or to disable checkout entirely for workflows that don't need to access code or can access code dynamically through the GitHub Tools.
+Use `checkout:` when you need to check out additional branches, check out multiple repositories, select repositories dynamically, or disable checkout entirely for workflows that don't need a local workspace.
+
+## Static and Dynamic Syntax
+
+Static checkout syntax is the existing object or array form. The compiler sees the repository list while compiling the workflow and emits `actions/checkout` steps. Static entries support the complete checkout field set, including GitHub App authentication, `current`, and additional `fetch` patterns.
+
+```yaml wrap
+checkout:
+  - repository: owner/known-repo
+    path: known-repo
+```
+
+Dynamic checkout syntax uses a wrapper object with `repos` and `allowed-repos`. The `repos` value is a GitHub Actions expression that resolves at runtime to one checkout object or an array of checkout objects. The `allowed-repos` value is the trusted allowlist that constrains those runtime results.
+
+```yaml wrap
+checkout:
+  repos: ${{ fromJSON(inputs.checkouts) }}
+  allowed-repos:
+    - owner/allowed-repo
+```
+
+Do not use a top-level expression such as `checkout: ${{ fromJSON(...) }}` for dynamic checkout. Do not use the old `checkout.dynamic` field. Use `checkout.repos` so the compiler can distinguish the dynamic runtime expression from statically declared checkout entries.
 
 ## Custom Checkout Settings
 
@@ -34,9 +55,10 @@ checkout:
 ### Dynamic Checkout Sets
 
 Use a dynamic checkout declaration when repositories are only known at runtime. The
-expression must resolve to one checkout object or an array of checkout objects. To
-prevent untrusted input from selecting arbitrary repositories, `allowed-repos` is
-required and may itself be a GitHub Actions expression resolving to an array:
+`checkout.repos` expression must resolve to one checkout object or an array of
+checkout objects. To prevent untrusted input from selecting arbitrary repositories,
+`allowed-repos` is required and may itself be a GitHub Actions expression resolving
+to an array:
 
 ```yaml wrap
 checkout:
@@ -53,7 +75,9 @@ support `repository`, `ref`, `path`, `github-token` (or `token`), `fetch-depth`,
 The runtime validates repository names, prevents paths from escaping the workspace,
 enforces unique paths, and removes checkout credentials before the agent starts. GitHub
 App authentication, `current`, and additional `fetch` patterns remain available only in
-statically declared checkout entries.
+statically declared checkout entries. Agents should treat static checkouts as known from
+the workflow source and dynamic checkouts as runtime-selected repositories discovered
+from the workspace and checkout manifest.
 
 The resolved expression is serialized once into a single runtime JSON payload
 (`GH_AW_DYNAMIC_CHECKOUTS`), so it must not reference `secrets.*` directly — doing so

@@ -18,7 +18,7 @@ sidebar:
 
 ## Abstract
 
-This specification defines normative checkout behavior in GitHub Agentic Workflows for activation, agent, and `safe_outputs` jobs. It specifies credential and token precedence, `github-token` and `github-app` resolution, trial mode behavior, side-repo targeting, sparse/shallow/fetch semantics, symlink handling during sparse activation checkout, submodule cleanup semantics, expression-valued dynamic checkout sets, and checkout-manifest behavior used by safe output handlers.
+This specification defines normative checkout behavior in GitHub Agentic Workflows for activation, agent, and `safe_outputs` jobs. It specifies credential and token precedence, `github-token` and `github-app` resolution, trial mode behavior, side-repo targeting, sparse/shallow/fetch semantics, symlink handling during sparse activation checkout, submodule cleanup semantics, object-form dynamic checkout sets, and checkout-manifest behavior used by safe output handlers.
 
 ## Status of This Document
 
@@ -134,7 +134,7 @@ See also Threat T7 and requirements RCR1–RCR7 in the [Safe Outputs MCP Gateway
 
 ### 3.6 Dynamic Checkout Sets
 
-A `checkout:` entry MAY be expression-valued instead of a static object or array, using a `repos`/`allowed-repos` object form:
+A `checkout:` declaration MAY select repositories dynamically at runtime using a `repos`/`allowed-repos` object form. Static checkout declarations remain the direct object or array form; a top-level `checkout: ${{ ... }}` expression is not a valid dynamic checkout declaration.
 
 ```yaml
 checkout:
@@ -142,7 +142,7 @@ checkout:
   allowed-repos: ${{ fromJSON(vars.ALLOWED_DYNAMIC_CHECKOUT_REPOS) }}
 ```
 
-`repos` MUST be a GitHub Actions expression (`${{ ... }}`) that resolves at runtime to one checkout object or an array of checkout objects. `allowed-repos` is REQUIRED and MUST be either a non-empty static array of `owner/repo` strings or an expression resolving to such an array. The object form MUST NOT contain any field other than `repos` and `allowed-repos`.
+`repos` MUST be a GitHub Actions expression (`${{ ... }}`) that resolves at runtime to one checkout object or an array of checkout objects. `allowed-repos` is REQUIRED and MUST be either a non-empty static array of `owner/repo` strings or an expression resolving to such an array. The object form MUST NOT contain any field other than `repos` and `allowed-repos`, so agents and validators can distinguish runtime-selected repositories from statically declared checkout entries.
 
 **Compile-time requirements:**
 
@@ -150,6 +150,7 @@ checkout:
 - The compiler MUST reject a dynamic checkout expression that references `steps.*`, because the same expression is re-evaluated independently in both the agent job and the `safe_outputs` job (see §3.3); an agent-job-local step output would resolve differently — or not at all — in `safe_outputs`.
 - The compiler MUST reject (strict mode) or warn (non-strict mode) when a dynamic checkout expression references `secrets.*` directly (dot or bracket notation), because the resolved expression is serialized once into the single `GH_AW_DYNAMIC_CHECKOUTS` runtime JSON payload rather than a statically declared environment variable, hiding the secret from static analysis. Secrets needed by the expression MUST instead be declared in the workflow's top-level `env:` section and referenced via `env.NAME`.
 - GitHub App authentication, `current`, and additional `fetch` patterns are NOT supported on dynamic checkout entries; those remain available only on statically declared `checkout:` entries.
+- Static checkout entries are compile-time repository declarations. Dynamic checkout entries are runtime data produced by `checkout.repos`; agents MUST use the workspace and checkout manifest to discover the repositories that were selected at runtime.
 
 **Runtime requirements** (`actions/setup/js/dynamic_checkouts.cjs`):
 
