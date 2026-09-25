@@ -173,6 +173,17 @@ function generateWorkflowCallIdMarker(callerWorkflowId) {
 }
 
 /**
+ * Generates a non-rendered Markdown reference definition carrying a workflow-call ID.
+ * Unlike HTML comments, GitHub preserves this form in pull request review bodies.
+ *
+ * @param {string} callerWorkflowId - Calling workflow identifier
+ * @returns {string} Markdown reference definition for review provenance
+ */
+function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
+  return `[gh-aw-workflow-call-id]: # "${encodeURIComponent(callerWorkflowId)}"`;
+}
+
+/**
  * Normalizes a user-supplied close-older-key to identifier style.
  * Converts to lowercase, replaces runs of non-alphanumeric/dash/underscore characters
  * with a single dash, then trims leading and trailing dashes and underscores.
@@ -294,6 +305,7 @@ module.exports = {
   generateXMLMarker,
   generateWorkflowIdMarker,
   generateWorkflowCallIdMarker,
+  generateWorkflowCallIdReviewMarker,
   getWorkflowIdMarkerContent,
   matchesWorkflowId,
   isValidWorkflowId,
