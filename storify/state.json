@@ -1,1 +1,19 @@
-{"last_window":{"start":"2026-09-23T08:07:00Z","end":"2026-09-24T08:07:00Z"},"last_run_at":"2026-09-24T08:07:00Z","key_themes":["safe-output compliance failures","agent job partial-failure resilience","rapid remediation via merged infra PRs"],"carry_forward_questions":["Will safe-output incident count decline after recent merges?","Do agent-job failures remain concentrated in a few workflows?","Can high-token workflows sustain reliability without timeout spillover?"]}
+{
+  "date": "2026-09-25",
+  "window_start": "2026-09-24T08:09:16Z",
+  "window_end": "2026-09-25T08:09:16Z",
+  "themes": [
+    "safe_outputs_endpoint_fragility",
+    "activation_gating_fail_fast",
+    "stable_daily_baseline"
+  ],
+  "carry_forward_questions": [
+    "Does PR Sous Chef recover safe_outputs in next schedule?",
+    "Does Failure Investigator clear activation in next cycle?"
+  ],
+  "representative_runs": [
+    36109332777,
+    36108622668,
+    36109264070
+  ]
+}
