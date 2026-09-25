@@ -229,3 +229,18 @@
   output quality, and flag this signature to AWF firewall maintainers if it recurs elsewhere.
 - `metrics/latest.json` still stale at 2026-09-01 (24 days) — root cause (missing
   `model-provider: github` in metrics-collector.md) remains unfixed, per item 1 above.
+
+## NEW — 2026-09-25T12:58Z (Agent Performance Analyzer)
+- **Diagnosed a new systemic gap: root-caused fixes are never converted into PRs before their
+  tracking issues self-expire.** Independently re-verified (direct file reads) that all 3 fixes
+  in #63098 (avenger npm-symlink mount, metrics-collector missing `model-provider: github`,
+  gpclean retired `gpt-5-codex`) are still unmerged. #63098 self-expired `not_planned` at
+  2026-09-25T06:56:34Z (2nd expiry cycle for the metrics-collector/gpt-5.3-codex family going back
+  to #60563/#61030) — a fresh tracker #63348 was filed the same day by Workflow Health Manager
+  restating the same findings. **Recommendation:** either extend `expires` for `priority-p1`
+  issues that already contain an applicable diff until a linked PR exists, or route such findings
+  to `workflow-generator.md` (which has Copilot-assignment tooling) with the specific diff text
+  rather than relying on generic issue-level Copilot assignment (attempted once on #63098,
+  2026-09-24, without producing a PR).
+- `metrics/latest.json` still stale at 2026-09-01 (24 days, 14th consecutive affected run).
+- Created the weekly Agent Performance Report discussion for 2026-09-25.

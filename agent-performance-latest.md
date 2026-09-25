@@ -1,3 +1,46 @@
+# Agent Performance Analyzer — Latest Run (2026-09-25T12:58Z)
+
+## Summary
+
+Full agent quality/effectiveness ranking deferred a **14th consecutive run** —
+`metrics/latest.json` remains dated 2026-09-01 (24 days stale). Independently re-verified (direct
+file reads, not just shared-memory notes) that all 3 root causes from #63098 are still unfixed:
+`avenger.md` line 42 still mounts the rejected `/usr/local/bin/npm` symlink, `metrics-collector.md`
+still lacks `model-provider: github` under `engine:` (confirmed against two correctly-configured
+siblings, `daily-go-test-parallelizer.md` and `api-consumption-report.md`), and `gpclean.md` line
+61 still hardcodes retired `openai/gpt-5-codex`. Confirmed via `issue_read` that tracker #63098
+self-expired (`state_reason: not_planned`, closed 2026-09-25T06:56:34Z) without a fix landing, and
+that Workflow Health Manager filed a fresh consolidated tracker #63348 the same day restating the
+same 3 items plus 2 new findings. Searched `search_pull_requests` for any merged fix touching these
+3 files — found none. **New finding this run:** the real blocker is a
+**diagnose-but-never-convert-to-PR gap** — Workflow Health Manager has correctly root-caused these
+3 fixes with exact diffs across at least 4 separate runs since 2026-09-22, but no downstream agent
+or maintainer has opened a PR before each tracker's `expires: 1d` self-closes. This is now the 2nd
+observed self-expiry cycle for the same findings. Created the weekly Agent Performance Report
+discussion for 2026-09-25 documenting this gap and recommending either a maintainer apply the 3
+single-line diffs directly, or `workflow-generator.md` be pointed at #63098/#63348's diff text
+specifically (generic Copilot-assignment on the tracker alone, attempted 2026-09-24, did not
+produce a PR).
+
+## Actions Taken This Run
+
+- Directly re-read `metrics-collector.md`, `avenger.md`, `gpclean.md` and diffed against 2 working
+  sibling workflows to independently confirm all 3 root causes remain unfixed (not just trusting
+  shared-memory notes).
+- Confirmed via `issue_read` that #63098 closed `not_planned` (auto-expiry, not a fix) and that
+  #63348 is the current open consolidated tracker.
+- Searched for a merged fix PR across all 3 files; found none.
+- Diagnosed and reported a new systemic finding: the fix-conversion gap causing repeated
+  tracker self-expiry without resolution (2nd cycle for these findings).
+- Created the weekly Agent Performance Report discussion (2026-09-25), including a root-cause
+  verification table and prioritized recommendations to break the self-expiry loop.
+- Full agent quality/effectiveness ranking remains blocked pending a fresh (non-stale) metrics
+  snapshot, itself blocked on the metrics-collector `model-provider` fix.
+
+> Last updated: 2026-09-25T12:58Z
+
+---
+
 # Agent Performance Analyzer — Latest Run (2026-09-24T12:56Z)
 
 ## Summary
