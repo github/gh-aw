@@ -34,8 +34,15 @@ In single-run mode, a job URL without a step anchor extracts the first failing s
 | `--verbose` | off | Print detailed progress information |
 | `--format <fmt>` | `pretty` | Diff output format: `pretty` or `markdown` (multi-run only) |
 | `--group` | off | Group audit findings so each `[run, code]` pair appears once with an occurrence count and representative entry |
+| `--no-baseline` | off | Skip baseline lookup and comparison for single-run audits; the Comparison section reports no baseline found |
 
 Top-level fields in `--json` output are stable; nested sub-fields may be extended but are not removed without deprecation. Add `--parse` to populate `behavior_fingerprint` and `agentic_assessments`.
+
+By default a single-run audit looks up an earlier run of the same workflow and renders a Comparison section against it. Use `--no-baseline` to audit a run on its own — for example when the baseline run is unrepresentative, or to avoid the extra downloads the lookup performs. A `--no-baseline` result is never written to the audit cache, so it cannot suppress the Comparison section of a later default audit of the same run.
+
+```bash
+gh aw audit 1234567890 --no-baseline
+```
 
 **Single-run examples:**
 
