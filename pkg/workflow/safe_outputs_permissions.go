@@ -121,7 +121,13 @@ func safeOutputsGlobalAppTokenMinted(safeOutputs *SafeOutputsConfig) bool {
 	if safeOutputs == nil || safeOutputs.GitHubApp == nil {
 		return false
 	}
-	appPermissions := computePermissionsForSafeOutputs(safeOutputs, true)
+	return globalAppTokenNeededForPermissions(computePermissionsForSafeOutputs(safeOutputs, true))
+}
+
+// globalAppTokenNeededForPermissions reports whether the permission set computed for the
+// global GitHub App requires minting an installation token. An explicitly empty permission
+// set means no enabled handler consumes the global app, so no token is minted.
+func globalAppTokenNeededForPermissions(appPermissions *Permissions) bool {
 	return appPermissions == nil || len(appPermissions.permissions) > 0
 }
 

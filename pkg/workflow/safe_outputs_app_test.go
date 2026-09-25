@@ -1267,6 +1267,11 @@ Test workflow.
 	lockContent, _, _, err := compiler.generateYAML(workflowData, testFile)
 	require.NoError(t, err)
 
+	// The safe_outputs job's Process Safe Outputs step must still receive a usable token.
+	assert.Contains(t, lockContent,
+		"github-token: ${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
+		"Process Safe Outputs must fall back to a regular token when the app token step is skipped")
+
 	for line := range strings.SplitSeq(lockContent, "\n") {
 		if strings.Contains(line, "steps.safe-outputs-app-token.outputs.token") {
 			assert.Contains(t, line, "||",
