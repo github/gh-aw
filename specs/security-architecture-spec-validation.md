@@ -486,7 +486,22 @@ async function assertTrustedCheckoutRuntime() {
 | forked runtime repository allowed for `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` | fork-runtime rejection scope (risk matrix) |
 | native `fork` webhook event skips checkout before `assertTrustedCheckoutRuntime()` regardless of `repository.fork` | RS-05a / `on.fork` non-interaction |
 
-**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection, fail-closed behavior for missing `repository` data, originating-actor validation for centralized dispatches, and the invariant that bot/app identity does not bypass the write-or-higher repository permission floor. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
+**Z3 proof coverage** (`specs/rs05a-checkout-validator-safety.smt2`, checked by `actions/setup/js/checkout_pr_branch_z3.test.cjs`):
+
+| Z3 query | Expected result | RS-05a property |
+|----------|-----------------|-----------------|
+| `workflow_dispatch_requires_verified_non_fork` | `unsat` | no workflow_dispatch PR checkout exists unless `repository.fork` is verified boolean `false` |
+| `checkout_requires_write_or_higher_permission` | `unsat` | no PR checkout exists without a verifiable write-or-higher effective actor |
+| `centralized_dispatch_requires_platform_bot_identity` | `unsat` | centralized dispatch cannot proceed without GitHub-provided bot identity |
+| `centralized_dispatch_requires_command_or_label_marker` | `unsat` | centralized dispatch cannot proceed without command/label provenance marker |
+| `centralized_dispatch_requires_originating_actor` | `unsat` | centralized dispatch cannot proceed without an originating actor |
+| `centralized_dispatch_rejects_router_self_propagation` | `unsat` | centralized dispatch cannot identify `github-actions[bot]` as the originating actor |
+| `workflow_dispatch_rejects_cross_repository_aw_context` | `unsat` | cross-repository workflow_dispatch PR replay cannot reach checkout |
+| `workflow_dispatch_rejects_noncanonical_pr_number` | `unsat` | non-canonical PR numbers cannot reach checkout |
+| `workflow_dispatch_uses_refs_pull_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without `refs/pull/N/head` isolation |
+| `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
+
+**Status**: ✅ **VERIFIED** — all four RS-05a properties (repository scope, actor trust, parse resilience, ref isolation) are implemented and covered by unit tests, including the `workflow_dispatch`-only scope of the fork-runtime rejection, fail-closed behavior for missing `repository` data, originating-actor validation for centralized dispatches, and the invariant that bot/app identity does not bypass the write-or-higher repository permission floor. The Z3 model proves the validator has no satisfying assignment for the unsafe checkout states above while preserving the intended non-dispatch forked-runtime topology. The native `fork` GitHub Actions event (`on.fork` frontmatter field) and the `pull_request`/`pull_request_target` `forks:` allowlist field are both confirmed distinct from, and non-interacting with, this guard (see Section 11.3).
 
 ---
 
