@@ -683,7 +683,7 @@ func TestMergeNetworkPermissionsPreservesImportedRestrictions(t *testing.T) {
 	t.Run("empty network object", func(t *testing.T) {
 		permissions, err := compiler.MergeNetworkPermissions(
 			&workflow.NetworkPermissions{Allowed: []string{"defaults"}},
-			"{}",
+			"{}\n{\"allowed\":[\"example.com\"]}",
 		)
 
 		if err != nil {

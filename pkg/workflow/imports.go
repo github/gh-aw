@@ -132,6 +132,7 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 	// Split by newlines to handle multiple JSON objects from different imports
 	lines := strings.Split(importedNetworkJSON, "\n")
 	importsLog.Printf("Processing %d network permission lines", len(lines))
+	importedDenyAll := false
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -139,9 +140,9 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 			continue
 		}
 		if line == "{}" {
-			if !result.ExplicitlyDefined {
-				result.Allowed = nil
-			}
+			// An imported empty network object denies all network access. It takes
+			// precedence over all imported and top-level allow lists.
+			importedDenyAll = true
 			result.ExplicitlyDefined = true
 			continue
 		}
@@ -153,6 +154,9 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 		}
 
 		mergeImportedNetworkPermissions(result, importedNetwork, domainSet)
+	}
+	if importedDenyAll {
+		result.Allowed = nil
 	}
 
 	// Sort the final domain list for consistent output

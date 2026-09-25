@@ -112,7 +112,11 @@ func (c *Compiler) reportUnfirewalledComponent(field, value, reason, suggestion 
 		return NewValidationError(field, value, "strict mode: "+reason, suggestion)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(reason+". "+suggestion))
+	message := reason + "."
+	if suggestion != "" {
+		message += " " + suggestion
+	}
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	c.IncrementWarningCount()
 	return nil
 }
