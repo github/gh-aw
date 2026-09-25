@@ -22,6 +22,7 @@ func TestNewPiEngine(t *testing.T) {
 	assert.True(t, capabilities.ToolsAllowlist, "Pi should support tools allowlist (needed for gh-proxy/cli-proxy settings)")
 	assert.False(t, capabilities.MCP, "Pi should not support MCP directly")
 	assert.True(t, capabilities.MaxTurns, "Pi should support max turns")
+	assert.True(t, capabilities.ContextWindow, "Pi should support context-window")
 }
 
 func TestPiEngine_GetModelEnvVarName(t *testing.T) {

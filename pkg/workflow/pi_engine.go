@@ -46,6 +46,7 @@ func NewPiEngine() *PiEngine {
 				ToolsAllowlist:   true,
 				MCP:              false,
 				MaxTurns:         true,
+				ContextWindow:    true,
 				MaxContinuations: false,
 				WebSearch:        false,
 				NativeAgentFile:  false,

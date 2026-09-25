@@ -14325,7 +14325,7 @@
             "context-window": {
               "type": "integer",
               "minimum": 1,
-              "description": "Optional model context window metadata for engines that need to register explicit model catalog entries. Currently used by the Pi engine when generating its AWF gateway models.json."
+              "description": "Optional model context window metadata for engines that need to register explicit model catalog entries. Supported by the Pi engine when generating its AWF gateway models.json; other engines ignore it and emit a warning."
             },
             "model-provider": {
               "type": "string",

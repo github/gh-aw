@@ -2586,8 +2586,8 @@ engine:
   model: "example-value"
 
   # Optional model context window metadata for engines that need to register
-  # explicit model catalog entries. Currently used by the Pi engine when generating
-  # its AWF gateway models.json.
+  # explicit model catalog entries. Supported by the Pi engine when generating its
+  # AWF gateway models.json; other engines ignore it and emit a warning.
   # (optional)
   context-window: 1
 
@@ -20920,8 +20920,8 @@ safe-outputs:
       model: "example-value"
 
       # Optional model context window metadata for engines that need to register
-      # explicit model catalog entries. Currently used by the Pi engine when generating
-      # its AWF gateway models.json.
+      # explicit model catalog entries. Supported by the Pi engine when generating its
+      # AWF gateway models.json; other engines ignore it and emit a warning.
       # (optional)
       context-window: 1
 

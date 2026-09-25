@@ -133,6 +133,7 @@ type ModelSelection struct {
 type EngineCapabilitiesDefinition struct {
 	ToolsAllowlist       bool `yaml:"tools-allowlist,omitempty"`
 	MaxTurns             bool `yaml:"max-turns,omitempty"`
+	ContextWindow        bool `yaml:"context-window,omitempty"`
 	WebSearch            bool `yaml:"web-search,omitempty"`
 	MaxContinuations     bool `yaml:"max-continuations,omitempty"`
 	NativeAgentFile      bool `yaml:"native-agent-file,omitempty"`
@@ -147,6 +148,7 @@ func (d EngineCapabilitiesDefinition) ToRuntimeCapabilities() EngineCapabilities
 	return EngineCapabilities{
 		ToolsAllowlist:       d.ToolsAllowlist,
 		MaxTurns:             d.MaxTurns,
+		ContextWindow:        d.ContextWindow,
 		WebSearch:            d.WebSearch,
 		MaxContinuations:     d.MaxContinuations,
 		NativeAgentFile:      d.NativeAgentFile,
@@ -515,12 +517,16 @@ func knownEngineImportWithCompilerRef(ctx context.Context, importPath string) st
 func knownEngineImportDefaultBranch(ctx context.Context, importPath string) string {
 	const fallback = "main"
 
-	parts := strings.SplitN(importPath, "/", 3)
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+	owner, remainder, ok := strings.Cut(importPath, "/")
+	if !ok || owner == "" {
+		return fallback
+	}
+	repo, _, ok := strings.Cut(remainder, "/")
+	if !ok || repo == "" {
 		return fallback
 	}
 
-	requestURL, err := url.JoinPath(knownEngineImportsAPIBaseURL, "repos", parts[0], parts[1])
+	requestURL, err := url.JoinPath(knownEngineImportsAPIBaseURL, "repos", owner, repo)
 	if err != nil {
 		return fallback
 	}

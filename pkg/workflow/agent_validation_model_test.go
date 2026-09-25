@@ -119,3 +119,30 @@ func TestValidatePiEngineRequirements(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestValidateContextWindowSupport(t *testing.T) {
+	frontmatter := map[string]any{
+		"engine": map[string]any{
+			"context-window": 1000000,
+		},
+	}
+
+	t.Run("Pi supports context-window", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.validateContextWindowSupport(frontmatter, NewPiEngine())
+		assert.Zero(t, compiler.GetWarningCount())
+	})
+
+	for _, engine := range []CodingAgentEngine{
+		NewClaudeEngine(),
+		NewCodexEngine(),
+		NewCopilotEngine(),
+		NewGeminiEngine(),
+	} {
+		t.Run(engine.GetID()+" warns when context-window is unsupported", func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.validateContextWindowSupport(frontmatter, engine)
+			assert.Equal(t, 1, compiler.GetWarningCount())
+		})
+	}
+}
