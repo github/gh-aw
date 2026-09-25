@@ -500,6 +500,7 @@ test-scripts: build
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
 	bash scripts/update-threat-detect-pins_test.sh
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
+	bash actions/setup/sh/create_gh_aw_tmp_dir_test.sh
 	@echo "✓ All Bash script tests passed"
 
 # Test all code (Go, JavaScript, wasm golden, and shell scripts)

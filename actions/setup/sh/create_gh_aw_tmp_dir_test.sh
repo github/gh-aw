@@ -96,6 +96,7 @@ set +e
 OUTPUT="$(bash "${SCRIPT}" 2>&1)"
 EXIT_CODE=$?
 set -e
+assert "validation marker dir is writable after reclaim" "[ -w /tmp/gh-aw/memory-validation ]"
 chmod u+rwx /tmp/gh-aw/memory-validation 2>/dev/null || true
 assert "exits 0 when validation marker dir is reclaimed" "[ '${EXIT_CODE}' -eq 0 ]"
 assert "prints Pre-flight reclaim message when validation marker dir is non-writable" "printf '%s' \"${OUTPUT}\" | grep -q '/tmp/gh-aw/memory-validation'"
