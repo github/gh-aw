@@ -191,15 +191,17 @@ func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy
 
 // appendUniqueDomains returns a fresh domain list with additions appended once.
 func appendUniqueDomains(domains, additions []string) []string {
-	result := append([]string(nil), domains...)
-	seen := make(map[string]struct{}, len(domains)+len(additions))
-	for _, domain := range domains {
-		seen[domain] = struct{}{}
+	if len(domains) == 0 && len(additions) == 0 {
+		return nil
 	}
-	for _, domain := range additions {
-		if _, exists := seen[domain]; !exists {
-			result = append(result, domain)
-			seen[domain] = struct{}{}
+	result := make([]string, 0, len(domains)+len(additions))
+	seen := make(map[string]struct{}, len(domains)+len(additions))
+	for _, candidates := range [][]string{domains, additions} {
+		for _, domain := range candidates {
+			if _, exists := seen[domain]; !exists {
+				result = append(result, domain)
+				seen[domain] = struct{}{}
+			}
 		}
 	}
 	return result

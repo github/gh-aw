@@ -31,10 +31,10 @@ func TestMergeHostedWebPolicy(t *testing.T) {
 			want:     &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org"}},
 		},
 		{
-			name:     "merges unique allowed domains",
-			top:      &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org"}},
-			imported: &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org", "microsoft.com"}},
-			want:     &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org", "microsoft.com"}},
+			name:     "merges unique allowed domains while retaining top-level max uses",
+			top:      &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org"}, MaxUses: 1},
+			imported: &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org", "microsoft.com"}, MaxUses: 5},
+			want:     &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org", "microsoft.com"}, MaxUses: 1},
 		},
 		{
 			name:     "merges unique blocked domains",
