@@ -23,6 +23,11 @@ func hasNetworkRestrictions(networkPermissions *NetworkPermissions) bool {
 		return false
 	}
 
+	// Blocked domains always restrict access, including when allowed is defaults.
+	if len(networkPermissions.Blocked) > 0 {
+		return true
+	}
+
 	// If allowed domains are specified and it's not just the defaults ecosystem, we have restrictions
 	if len(networkPermissions.Allowed) > 0 {
 		// Check if it's ONLY "defaults" (which means use default ecosystem, not a restriction)
@@ -34,11 +39,6 @@ func hasNetworkRestrictions(networkPermissions *NetworkPermissions) bool {
 
 	// Empty allowed list [] means deny-all, which is a restriction
 	if networkPermissions.ExplicitlyDefined && len(networkPermissions.Allowed) == 0 {
-		return true
-	}
-
-	// If blocked domains are specified, we have restrictions
-	if len(networkPermissions.Blocked) > 0 {
 		return true
 	}
 
@@ -112,7 +112,7 @@ func (c *Compiler) reportUnfirewalledComponent(field, value, reason, suggestion 
 		return NewValidationError(field, value, "strict mode: "+reason, suggestion)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(reason+"."))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(reason+". "+suggestion))
 	c.IncrementWarningCount()
 	return nil
 }

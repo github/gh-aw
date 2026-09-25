@@ -107,7 +107,7 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 	importsLog.Print("Merging network permissions from imports")
 
 	// If no imported network config, return top-level network as-is
-	if importedNetworkJSON == "" || importedNetworkJSON == "{}" {
+	if importedNetworkJSON == "" {
 		importsLog.Print("No imported network permissions to merge")
 		return topNetwork, nil
 	}
@@ -135,7 +135,14 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || line == "{}" {
+		if line == "" {
+			continue
+		}
+		if line == "{}" {
+			if !result.ExplicitlyDefined {
+				result.Allowed = nil
+			}
+			result.ExplicitlyDefined = true
 			continue
 		}
 
@@ -167,6 +174,8 @@ func mergeImportedNetworkPermissions(result *NetworkPermissions, imported Networ
 		}
 	}
 
+	result.Blocked = appendUniqueDomains(result.Blocked, imported.Blocked)
+	result.ExplicitlyDefined = true
 	mergeHostedWebPolicy(result, imported.HostedWeb)
 }
 

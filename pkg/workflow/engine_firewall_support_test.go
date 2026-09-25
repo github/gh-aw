@@ -28,6 +28,16 @@ func TestHasNetworkRestrictions(t *testing.T) {
 		}
 	})
 
+	t.Run("blocked domains restrict defaults mode", func(t *testing.T) {
+		perms := &NetworkPermissions{
+			Allowed: []string{"defaults"},
+			Blocked: []string{"tracker.example.com"},
+		}
+		if !hasNetworkRestrictions(perms) {
+			t.Error("blocked domains should restrict defaults mode")
+		}
+	})
+
 	t.Run("allowed domains define restrictions", func(t *testing.T) {
 		perms := &NetworkPermissions{
 			Allowed: []string{"example.com", "api.github.com"},
@@ -214,6 +224,14 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			tools:        map[string]any{"web-fetch": true, "web-search": true},
 			network:      restrictedNetwork,
 			wantWarnings: 2,
+		},
+		{
+			name:        "defaults with blocked domains rejects enabled tools",
+			tools:       map[string]any{"web-fetch": true},
+			network:     &NetworkPermissions{Allowed: []string{"defaults"}, Blocked: []string{"tracker.example.com"}},
+			strictMode:  true,
+			wantErr:     true,
+			errContains: []string{"tools.web-fetch", "not bound by firewall policies"},
 		},
 		{
 			name:       "strict enabled tools produce errors",
