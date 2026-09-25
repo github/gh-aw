@@ -272,9 +272,11 @@ validate_explicit_version_minimum() {
   fi
 
   if version_is_greater "$feature_min" "$requested"; then
-    echo "ERROR: Explicit Copilot CLI version ${1:-} is below required minimum ${feature_min} from GH_AW_COPILOT_MIN_VERSION." >&2
+    echo "ERROR: Explicit Copilot CLI version ${1:-} is below required minimum ${2:-} from GH_AW_COPILOT_MIN_VERSION." >&2
     return 1
   fi
+
+  return 0
 }
 
 # Download compatibility matrix with bundled fallback.
