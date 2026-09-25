@@ -372,6 +372,32 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider(t *testing.T) {
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
 }
 
+func TestPiEngine_GetExecutionSteps_FirewallContextWindow(t *testing.T) {
+	engine := NewPiEngine()
+	toolsRaw := map[string]any{
+		"github":    map[string]any{"mode": "gh-proxy"},
+		"cli-proxy": true,
+	}
+	workflowData := &WorkflowData{
+		Name:  "test-workflow",
+		Model: "copilot/custom-model",
+		EngineConfig: &EngineConfig{
+			ID:            "pi",
+			ContextWindow: 256000,
+		},
+		Tools:       toolsRaw,
+		ParsedTools: NewTools(toolsRaw),
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+	}
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1, "Should produce exactly one execution step")
+
+	stepText := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepText, "GH_AW_PI_CONTEXT_WINDOW=256000", "Should export configured context window for pi_models_json.cjs")
+}
+
 func TestPiEngine_GetExecutionSteps_FirewallAnthropicProvider(t *testing.T) {
 	engine := NewPiEngine()
 	toolsRaw := map[string]any{

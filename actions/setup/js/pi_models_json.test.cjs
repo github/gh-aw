@@ -134,6 +134,17 @@ describe("pi_models_json.cjs", () => {
       expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
     });
 
+    it("uses a configured context window for any routed model", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10001",
+        apiKeyEnvVar: "ANTHROPIC_API_KEY",
+        modelId: "custom-claude",
+        provider: "anthropic",
+        contextWindow: "256000",
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "custom-claude", contextWindow: 256000 }]);
+    });
+
     it.each([
       ["github", "custom-model"],
       ["anthropic", "claude-sonnet-5"],
@@ -243,6 +254,22 @@ describe("pi_models_json.cjs", () => {
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+    });
+
+    it("writes configured context window to models.json", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "custom-model";
+      process.env.GH_AW_PI_CONTEXT_WINDOW = "256000";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.AWF_REFLECT_ENABLED;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+
+      await piModelsJson.main();
+
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].models).toEqual([{ id: "custom-model", contextWindow: 256000 }]);
     });
 
     it("exits with an error when required env vars are missing", async () => {

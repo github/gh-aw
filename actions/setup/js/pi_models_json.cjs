@@ -18,6 +18,7 @@
  *
  * Environment variables:
  *   GH_AW_PI_MODEL_ID              — Pi model ID (without provider prefix)
+ *   GH_AW_PI_CONTEXT_WINDOW        — optional model context window to write into models.json
  *   GH_AW_PI_GATEWAY_SECRET_ENV    — name of the env var holding the provider API key
  *   GH_AW_PI_GATEWAY_FALLBACK_PORT — compile-time api-proxy port, used when /reflect
  *                                    is unavailable or has no matching configured endpoint
@@ -79,13 +80,13 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, contextWindow?: number|string }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
   const { baseUrl, apiKeyEnvVar, modelId, api, provider } = options;
   // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
-  const contextWindow = provider === "github" && modelId === "claude-sonnet-5" ? 1000000 : undefined;
+  const contextWindow = resolveContextWindow(options.contextWindow) || (provider === "github" && modelId === "claude-sonnet-5" ? 1000000 : undefined);
   return JSON.stringify({
     providers: {
       "aw-gateway": {
@@ -96,6 +97,21 @@ function buildModelsJSON(options) {
       },
     },
   });
+}
+
+/**
+ * @param {number|string|undefined} value
+ * @returns {number|undefined}
+ */
+function resolveContextWindow(value) {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
 }
 
 /**
@@ -128,6 +144,7 @@ async function main() {
   const logger = DEFAULT_LOGGER;
   const modelId = process.env.GH_AW_PI_MODEL_ID || "";
   const apiKeyEnvVar = process.env.GH_AW_PI_GATEWAY_SECRET_ENV || "";
+  const contextWindow = process.env.GH_AW_PI_CONTEXT_WINDOW || "";
   const fallbackPort = Number.parseInt(process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT || "", 10);
   const provider = process.env.GH_AW_LLM_PROVIDER || "github";
   const agentDir = process.env.PI_CODING_AGENT_DIR || DEFAULT_PI_CODING_AGENT_DIR;
@@ -158,7 +175,7 @@ async function main() {
   const api = resolvePiApiForProvider(provider);
   logger(`resolved gateway api=${api} (provider=${provider})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider });
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, "utf8");
   logger(`wrote ${outputPath}`);

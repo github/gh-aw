@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -134,8 +135,8 @@ func piReflectProviderName(backend UniversalLLMBackend) string {
 }
 
 func resolvePiGatewaySecretEnvVar(profile universalLLMBackendProfile, backend UniversalLLMBackend) string {
-	if len(profile.coreSecretNames) > 0 {
-		return profile.coreSecretNames[0]
+	for _, secretName := range profile.coreSecretNames {
+		return secretName
 	}
 
 	switch backend {
@@ -335,9 +336,14 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 		// /reflect endpoint at runtime (when AWF_REFLECT_ENABLED=1) to resolve the live
 		// api-proxy port for reflectProvider, since AWF's actual port assignment is the
 		// source of truth and can drift from the compiled-in value.
+		contextWindowAssignment := ""
+		if workflowData.EngineConfig != nil && workflowData.EngineConfig.ContextWindow > 0 {
+			contextWindowAssignment = " GH_AW_PI_CONTEXT_WINDOW=" + shellEscapeArg(strconv.Itoa(workflowData.EngineConfig.ContextWindow))
+		}
 		setup := fmt.Sprintf(
-			`export GH_AW_PI_MODEL_ID=%s GH_AW_PI_GATEWAY_SECRET_ENV=%s GH_AW_PI_GATEWAY_FALLBACK_PORT=%d GH_AW_LLM_PROVIDER=%s && ( %s "%s/pi_models_json.cjs" ) && `,
+			`export GH_AW_PI_MODEL_ID=%s GH_AW_PI_GATEWAY_SECRET_ENV=%s GH_AW_PI_GATEWAY_FALLBACK_PORT=%d GH_AW_LLM_PROVIDER=%s%s && ( %s "%s/pi_models_json.cjs" ) && `,
 			shellEscapeArg(modelID), shellEscapeArg(gatewaySecretEnvVar), profile.gatewayPort, shellEscapeArg(reflectProvider),
+			contextWindowAssignment,
 			nodeRuntimeResolutionCommand, SetupActionDestinationShell,
 		)
 		if !driverConfigured {
