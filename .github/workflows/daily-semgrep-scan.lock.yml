@@ -2495,7 +2495,9 @@ jobs:
           if-no-files-found: ignore
 
   upload_code_scanning_sarif:
-    needs: safe_outputs
+    needs:
+      - activation
+      - safe_outputs
     if: needs.safe_outputs.outputs.sarif_file != ''
     runs-on: ubuntu-slim
     permissions:
