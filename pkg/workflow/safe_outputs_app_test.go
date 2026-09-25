@@ -1272,11 +1272,17 @@ Test workflow.
 		"github-token: ${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
 		"Process Safe Outputs must fall back to a regular token when the app token step is skipped")
 
+	// Consumers of the app token (step inputs and token env vars) must carry a fallback.
+	// Job/step output mappings are excluded: they legitimately reference the step directly.
 	for line := range strings.SplitSeq(lockContent, "\n") {
-		if strings.Contains(line, "steps.safe-outputs-app-token.outputs.token") {
-			assert.Contains(t, line, "||",
-				"App token references must include a fallback when the minting step is skipped: %s", line)
+		if !strings.Contains(line, "steps.safe-outputs-app-token.outputs.token") {
+			continue
 		}
+		if !strings.Contains(line, "github-token:") && !strings.Contains(line, "GITHUB_TOKEN:") {
+			continue
+		}
+		assert.Contains(t, line, "||",
+			"App token references must include a fallback when the minting step is skipped: %s", line)
 	}
 }
 
