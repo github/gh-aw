@@ -37,6 +37,7 @@ describe("generate_footer.cjs", () => {
   let generateXMLMarker;
   let generateWorkflowIdMarker;
   let generateWorkflowCallIdMarker;
+  let generateWorkflowCallIdReviewMarker;
   let getWorkflowIdMarkerContent;
   let normalizeCloseOlderKey;
 
@@ -58,6 +59,7 @@ describe("generate_footer.cjs", () => {
     generateXMLMarker = module.generateXMLMarker;
     generateWorkflowIdMarker = module.generateWorkflowIdMarker;
     generateWorkflowCallIdMarker = module.generateWorkflowCallIdMarker;
+    generateWorkflowCallIdReviewMarker = module.generateWorkflowCallIdReviewMarker;
     getWorkflowIdMarkerContent = module.getWorkflowIdMarkerContent;
     normalizeCloseOlderKey = module.normalizeCloseOlderKey;
   });
@@ -213,6 +215,14 @@ describe("generate_footer.cjs", () => {
       const result = generateWorkflowCallIdMarker("owner/repo/CallerWorkflow");
 
       expect(result).toBe("<!-- gh-aw-workflow-call-id: owner/repo/CallerWorkflow -->");
+    });
+
+    describe("generateWorkflowCallIdReviewMarker", () => {
+      it("should generate an encoded non-rendered marker", () => {
+        const result = generateWorkflowCallIdReviewMarker('owner/repo/Workflow "with" spaces');
+
+        expect(result).toBe('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FWorkflow%20%22with%22%20spaces"');
+      });
     });
 
     it("should handle caller IDs with slashes (repo/workflow format)", () => {
