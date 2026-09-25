@@ -531,7 +531,6 @@ function createReviewBuffer() {
         core.warning("supersede-older-reviews is enabled but neither GH_AW_WORKFLOW_ID nor GH_AW_CALLER_WORKFLOW_ID is set. Skipping stale review dismissal.");
         return;
       }
-      const workflowCallMarker = workflowCallId ? generateWorkflowCallIdMarker(workflowCallId) : "";
       try {
         /** @type {any[]} */
         const reviews = [];
@@ -563,7 +562,7 @@ function createReviewBuffer() {
           if (!review || review.id === currentReviewId) return false;
           if (review.state !== "CHANGES_REQUESTED") return false;
           if (review.user?.type !== "Bot") return false;
-          if (workflowCallMarker) {
+          if (workflowCallId) {
             return matchesWorkflowCallId(review.body, workflowCallId);
           }
           return matchesWorkflowId(review.body, workflowId);
