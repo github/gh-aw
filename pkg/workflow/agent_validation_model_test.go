@@ -121,6 +121,14 @@ func TestValidatePiEngineRequirements(t *testing.T) {
 }
 
 func TestValidateContextWindowSupport(t *testing.T) {
+	t.Run("missing context-window does not warn", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.validateContextWindowSupport(map[string]any{
+			"engine": map[string]any{},
+		}, NewCodexEngine())
+		assert.Zero(t, compiler.GetWarningCount())
+	})
+
 	frontmatter := map[string]any{
 		"engine": map[string]any{
 			"context-window": 1000000,
