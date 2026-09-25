@@ -145,6 +145,20 @@ describe("pi_models_json.cjs", () => {
       expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "custom-claude", contextWindow: 256000 }]);
     });
 
+    it("warns and falls back when configured context window is invalid", () => {
+      const warnings = [];
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "claude-sonnet-5",
+        provider: "github",
+        contextWindow: "not-a-number",
+        logger: message => warnings.push(message),
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+      expect(warnings).toEqual(["warning: ignoring invalid contextWindow; expected a positive integer"]);
+    });
+
     it.each([
       ["github", "custom-model"],
       ["anthropic", "claude-sonnet-5"],

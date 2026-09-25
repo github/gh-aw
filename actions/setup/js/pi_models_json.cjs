@@ -81,14 +81,14 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, contextWindow?: number|string }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, contextWindow?: number|string, logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow } = options;
+  const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow, logger = () => {} } = options;
   // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
   const fallbackContextWindow = provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined;
-  const resolvedContextWindow = resolveContextWindow(configuredContextWindow);
+  const resolvedContextWindow = resolveContextWindow(configuredContextWindow, logger);
   const contextWindow = resolvedContextWindow === undefined ? fallbackContextWindow : resolvedContextWindow;
   return JSON.stringify({
     providers: {
@@ -103,15 +103,19 @@ function buildModelsJSON(options) {
 }
 
 /**
+ * Resolve a configured context window, returning undefined for empty or invalid values so callers can apply a fallback.
+ *
  * @param {number|string|undefined} value
+ * @param {(msg: string) => void} logger
  * @returns {number|undefined}
  */
-function resolveContextWindow(value) {
+function resolveContextWindow(value, logger) {
   if (value === undefined || value === "") {
     return undefined;
   }
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    logger("warning: ignoring invalid contextWindow; expected a positive integer");
     return undefined;
   }
   return parsed;
@@ -178,7 +182,7 @@ async function main() {
   const api = resolvePiApiForProvider(provider);
   logger(`resolved gateway api=${api} (provider=${provider})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow });
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow, logger });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, "utf8");
   logger(`wrote ${outputPath}`);
