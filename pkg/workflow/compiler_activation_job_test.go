@@ -24,6 +24,11 @@ const workflowCallRepo = "${{ steps.resolve-host-repo.outputs.target_repo }}"
 // Uses target_checkout_ref (job.workflow_sha) for immutable pinning to the exact executing revision.
 const workflowCallRef = "${{ steps.resolve-host-repo.outputs.target_checkout_ref }}"
 
+// pullRequestActivationRef pins activation-time runtime imports and skills to base
+// branch content for pull_request events, while preserving existing checkout refs
+// for non-PR events in mixed-trigger workflows.
+const pullRequestActivationRef = "${{ github.event_name == 'pull_request' && github.event.pull_request != null && github.event.pull_request.base.sha || github.sha }}"
+
 // sameRepoCondition is the if: condition injected into the .github checkout step when
 // no custom activation token is configured. It restricts the checkout to same-repo
 // workflow_call invocations to prevent failures when GITHUB_TOKEN cannot read a private
@@ -138,6 +143,19 @@ func TestGenerateCheckoutGitHubFolderForActivation_WorkflowCall(t *testing.T) {
 			wantSameRepoCondition: true, // no custom token → restrict to same-repo only
 		},
 		{
+			name: "workflow_call mixed with pull_request pins pull_request activation checkout to base sha",
+			onSection: `"on":
+  pull_request:
+    types: [opened]
+  workflow_call:`,
+			wantRepository:        workflowCallRepo,
+			wantRef:               "${{ github.event_name == 'pull_request' && github.event.pull_request != null && github.event.pull_request.base.sha || steps.resolve-host-repo.outputs.target_checkout_ref }}",
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: true,
+		},
+		{
 			name: "workflow_call with inlined-imports - standard checkout without cross-repo expression",
 			onSection: `"on":
   workflow_call:`,
@@ -160,6 +178,44 @@ func TestGenerateCheckoutGitHubFolderForActivation_WorkflowCall(t *testing.T) {
 			wantPersistFalse:      true,
 			wantFetchDepth1:       true,
 			wantSameRepoCondition: false, // non-workflow_call trigger → no same-repo condition
+		},
+		{
+			name: "pull_request trigger pins activation checkout to base sha",
+			onSection: `"on":
+  pull_request:
+    types: [opened, ready_for_review, labeled]`,
+			wantRepository:        "",
+			wantRef:               pullRequestActivationRef,
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: false,
+		},
+		{
+			name: "pull_request mixed with issue trigger pins only pull_request events to base sha",
+			onSection: `"on":
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]`,
+			wantRepository:        "",
+			wantRef:               pullRequestActivationRef,
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: false,
+		},
+		{
+			name: "pull_request_target does not match pull_request base checkout pin",
+			onSection: `"on":
+  pull_request_target:
+    types: [opened]`,
+			wantRepository:        "",
+			wantRef:               "",
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: false,
 		},
 		{
 			name: "issue_comment only - no repository field",
