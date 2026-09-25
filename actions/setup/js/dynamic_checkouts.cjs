@@ -1,6 +1,11 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+// Runtime support for expression-valued checkout declarations. The compiler
+// passes resolved checkout JSON and an allowed-repos list through environment
+// variables; this module validates them, performs the extra git checkouts, and
+// updates the checkout manifest consumed by agent and safe-output jobs.
+
 require("./shim.cjs");
 
 const fs = require("fs");

@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// Dynamic checkout compilation bridges expression-valued checkout declarations
+// to runtime git operations and records metadata for agent guidance and safe
+// output jobs through the checkout manifest.
+
 // generateDynamicCheckoutSteps emits one runtime checkout step per expression-valued
 // checkout declaration. GitHub Actions cannot expand an expression into a variable
 // number of steps, so the bundled script performs the additional checkouts with git.
