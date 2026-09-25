@@ -101,7 +101,7 @@ fi
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
-echo "Installing awf with checksum verification (version: ${AWF_VERSION}, os: ${OS}, arch: ${ARCH})"
+echo "Installing awf with checksum verification (configured version, os: ${OS}, arch: ${ARCH})"
 
 # Rootless mode preflight: create and verify write access to install directories
 if [ "$ROOTLESS" = "true" ]; then
@@ -163,7 +163,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Download checksums
 AWF_INSTALL_STAGE="download_checksums"
-echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
+echo "Downloading AWF release checksums..."
 download_awf_asset "download_checksums" "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
 
 verify_checksum() {
@@ -215,7 +215,7 @@ install_bundle() {
   node_bin=$(command -v node)
 
   echo "Node.js >= 20 detected ($(node --version)), using lightweight bundle..."
-  echo "Downloading bundle from ${bundle_url@Q}..."
+  echo "Downloading AWF bundle asset..."
   if ! download_awf_asset "download_bundle" "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
     echo "⚠ Bundle download failed (asset may not exist for this version)"
     return 1
@@ -254,7 +254,7 @@ install_linux_binary() {
   esac
 
   local binary_url="${BASE_URL}/${awf_binary}"
-  echo "Downloading binary from ${binary_url@Q}..."
+  echo "Downloading AWF platform binary asset..."
   download_awf_asset "download_binary" "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum
@@ -279,7 +279,7 @@ install_darwin_binary() {
   echo ""
 
   local binary_url="${BASE_URL}/${awf_binary}"
-  echo "Downloading binary from ${binary_url@Q}..."
+  echo "Downloading AWF platform binary asset..."
   download_awf_asset "download_binary" "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum

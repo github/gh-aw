@@ -245,7 +245,9 @@ test_download_failure_diagnostics() {
   local failing_stage="$1"
   local expected_stage="$2"
   local test_dir
+  local installer_log
   test_dir=$(mktemp -d)
+  installer_log="${test_dir}/installer.log"
   rm -f /tmp/gh-aw/awf-install-diagnostics.json
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
@@ -307,7 +309,7 @@ EOF
   fi
 
   if FAIL_STAGE="${failing_stage}" NODE_MAJOR="${node_major}" TEST_ARCH="${test_arch}" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
-    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null 2>&1; then
+    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest-private-value --rootless >"${installer_log}" 2>&1; then
     TEST_FAILURE_REASON="installer unexpectedly succeeded"
     rm -rf "${test_dir}"
     rm -f /tmp/gh-aw/awf-install-diagnostics.json
@@ -315,6 +317,12 @@ EOF
   fi
   if ! grep -q "\"stage\":\"${expected_stage}\"" /tmp/gh-aw/awf-install-diagnostics.json 2>/dev/null; then
     TEST_FAILURE_REASON="$(cat /tmp/gh-aw/awf-install-diagnostics.json 2>/dev/null || echo '<missing diagnostics file>')"
+    rm -rf "${test_dir}"
+    rm -f /tmp/gh-aw/awf-install-diagnostics.json
+    return 1
+  fi
+  if grep -Eq 'vtest-private-value|https://github\.com|checksums\.txt|awf-bundle\.js|awf-linux-x64' /tmp/gh-aw/awf-install-diagnostics.json "${installer_log}" 2>/dev/null; then
+    TEST_FAILURE_REASON="diagnostics or installer log included release URL, asset name, or configured version: $(cat /tmp/gh-aw/awf-install-diagnostics.json 2>/dev/null || true) $(cat "${installer_log}" 2>/dev/null || true)"
     rm -rf "${test_dir}"
     rm -f /tmp/gh-aw/awf-install-diagnostics.json
     return 1

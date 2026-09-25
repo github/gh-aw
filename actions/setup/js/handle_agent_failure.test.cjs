@@ -89,6 +89,29 @@ describe("handle_agent_failure", () => {
       expect(context).toContain("Re-run the workflow");
     });
 
+    it("does not surface extra diagnostic fields in the failure context", () => {
+      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+      fs.writeFileSync(
+        diagnosticsPath,
+        JSON.stringify({
+          kind: "awf_install_failure",
+          stage: "download_bundle",
+          exit_code: 22,
+          url: "https://github.com/example/private/releases/download/vtest-private-value/awf-bundle.js",
+          output: "curl failed with token TOKEN_PLACEHOLDER_SHOULD_NOT_SURFACE",
+        })
+      );
+
+      expect(readAWFDownloadFailure()).toEqual({ stage: "download_bundle" });
+      const context = buildAWFDownloadFailureContext(readAWFDownloadFailure());
+      expect(context).toContain("AWF Download Failure");
+      expect(context).toContain("bundle");
+      expect(context).not.toContain("vtest-private-value");
+      expect(context).not.toContain("TOKEN_PLACEHOLDER_SHOULD_NOT_SURFACE");
+      expect(context).not.toContain("github.com");
+      expect(context).not.toContain("awf-bundle.js");
+    });
+
     it("ignores non-download installer failures", () => {
       fs.mkdirSync("/tmp/gh-aw", { recursive: true });
       fs.writeFileSync(diagnosticsPath, JSON.stringify({ kind: "awf_install_failure", stage: "verify_installation", exit_code: 1 }));
