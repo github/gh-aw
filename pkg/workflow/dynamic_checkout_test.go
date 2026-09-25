@@ -96,10 +96,11 @@ func TestParseFrontmatterConfigDynamicCheckoutRejectsUnsupportedField(t *testing
 			"repos":         "${{ fromJSON(inputs.checkouts) }}",
 			"allowed-repos": []any{"owner/repo"},
 			"fetch-depth":   1,
+			"path":          "repo",
 		},
 	})
 
-	require.ErrorContains(t, err, `field "fetch-depth" is not supported`)
+	require.ErrorContains(t, err, `field(s) "fetch-depth, path" are not supported`)
 }
 
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {

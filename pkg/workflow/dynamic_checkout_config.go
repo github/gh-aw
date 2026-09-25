@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -33,10 +34,15 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	if !ok {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout requires allowed-repos")
 	}
+	var unsupportedFields []string
 	for key := range raw {
 		if key != "repos" && key != "allowed-repos" {
-			return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field %q is not supported; only repos and allowed-repos are allowed", key)
+			unsupportedFields = append(unsupportedFields, key)
 		}
+	}
+	if len(unsupportedFields) > 0 {
+		sort.Strings(unsupportedFields)
+		return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field(s) %q are not supported; only repos and allowed-repos are allowed", strings.Join(unsupportedFields, ", "))
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
 	if err != nil || len(allowedRepos) == 0 {
