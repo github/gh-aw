@@ -50,6 +50,11 @@ const FAILURE_ISSUE_CATEGORY_DAILY_CAP = 50;
 const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
 const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
 const AWF_INSTALL_DIAGNOSTICS_PATH = "/tmp/gh-aw/awf-install-diagnostics.json";
+const AWF_DOWNLOAD_STAGE_ASSETS = new Map([
+  ["download_checksums", "release checksums"],
+  ["download_bundle", "the Node.js bundle"],
+  ["download_binary", "the platform binary"],
+]);
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
 const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
 const GITHUB_API_VERSION = "2022-11-28";
@@ -2955,7 +2960,7 @@ function detectAWFFirewallStartupFailureFromLog() {
 function readAWFDownloadFailure() {
   try {
     const diagnostic = JSON.parse(fs.readFileSync(AWF_INSTALL_DIAGNOSTICS_PATH, "utf8"));
-    if (diagnostic?.kind !== "awf_install_failure" || typeof diagnostic.stage !== "string" || !["download_checksums", "download_bundle", "download_binary"].includes(diagnostic.stage)) {
+    if (diagnostic?.kind !== "awf_install_failure" || typeof diagnostic.stage !== "string" || !AWF_DOWNLOAD_STAGE_ASSETS.has(diagnostic.stage)) {
       return null;
     }
     return { stage: diagnostic.stage };
@@ -2971,7 +2976,7 @@ function readAWFDownloadFailure() {
  */
 function buildAWFDownloadFailureContext(failure) {
   if (!failure) return "";
-  const asset = failure.stage === "download_checksums" ? "release checksums" : failure.stage === "download_bundle" ? "the Node.js bundle" : "the platform binary";
+  const asset = AWF_DOWNLOAD_STAGE_ASSETS.get(failure.stage) || "an AWF release asset";
   return (
     buildWarningAlertLine("AWF Download Failure", `The workflow could not download ${asset} from the AWF release. The agent was not started.`) +
     "\nThis is usually transient GitHub release or network infrastructure failure. Re-run the workflow; if it persists, check the configured AWF version and GitHub Actions network access.\n\n"

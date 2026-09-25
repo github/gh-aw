@@ -37,6 +37,10 @@ AWF_INSTALL_STAGE="initialization"
 
 record_install_failure() {
   local exit_code="$1"
+  case "$AWF_INSTALL_STAGE" in
+    download_checksums|download_bundle|download_binary) ;;
+    *) return ;;
+  esac
   mkdir -p "$(dirname "$AWF_DIAGNOSTICS_FILE")" 2>/dev/null || true
   printf '{"kind":"awf_install_failure","stage":"%s","exit_code":%s}\n' "$AWF_INSTALL_STAGE" "$exit_code" > "$AWF_DIAGNOSTICS_FILE" 2>/dev/null || true
 }
