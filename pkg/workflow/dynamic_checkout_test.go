@@ -100,7 +100,7 @@ func TestParseFrontmatterConfigDynamicCheckoutRejectsUnsupportedField(t *testing
 		},
 	})
 
-	require.ErrorContains(t, err, `field(s) "fetch-depth, path" are not supported`)
+	require.ErrorContains(t, err, `field(s) "fetch-depth", "path" are not supported`)
 }
 
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {

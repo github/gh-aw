@@ -42,7 +42,11 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	}
 	if len(unsupportedFields) > 0 {
 		sort.Strings(unsupportedFields)
-		return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field(s) %q are not supported; only repos and allowed-repos are allowed", strings.Join(unsupportedFields, ", "))
+		quotedFields := make([]string, 0, len(unsupportedFields))
+		for _, field := range unsupportedFields {
+			quotedFields = append(quotedFields, fmt.Sprintf("%q", field))
+		}
+		return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field(s) %s are not supported; only repos and allowed-repos are allowed", strings.Join(quotedFields, ", "))
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
 	if err != nil || len(allowedRepos) == 0 {
