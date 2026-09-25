@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-06",
-    "workflow_name": "Code Simplifier",
-    "workflow_file": "code-simplifier",
-    "total_aic_analyzed": 864.23,
-    "runs_audited": 10,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 700
-  },
-  {
     "date": "2026-06-10",
     "workflow_name": "Claude Code User Documentation Review",
     "workflow_file": "claude-code-user-docs-review",
@@ -283,5 +274,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 85
+  },
+  {
+    "date": "2026-09-25",
+    "workflow_name": "PR Sous Chef",
+    "workflow_file": "pr-sous-chef",
+    "total_aic_analyzed": 324.41305,
+    "runs_audited": 11,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 5
   }
 ]
