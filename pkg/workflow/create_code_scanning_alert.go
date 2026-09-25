@@ -106,7 +106,10 @@ func (c *Compiler) buildCodeScanningUploadJob(data *WorkflowData) (*Job, error) 
 		restoreToken = resolveStaticCheckoutToken(data.SafeOutputs, checkoutMgr)
 	}
 
-	steps := append(tokenMintSteps, c.buildCodeScanningUploadSteps(data, restoreToken)...)
+	uploadSteps := c.buildCodeScanningUploadSteps(data, restoreToken)
+	steps := make([]string, 0, len(tokenMintSteps)+len(uploadSteps))
+	steps = append(steps, tokenMintSteps...)
+	steps = append(steps, uploadSteps...)
 
 	// The job only runs when the safe_outputs job exported a non-empty SARIF file path.
 	jobCondition := fmt.Sprintf("needs.%s.outputs.sarif_file != ''", constants.SafeOutputsJobName)
@@ -130,6 +133,8 @@ func (c *Compiler) buildCodeScanningUploadJob(data *WorkflowData) (*Job, error) 
 	return job, nil
 }
 
+// buildCodeScanningUploadSteps restores the triggering commit because upload-sarif requires HEAD
+// to match the scanned commit, then downloads the SARIF artifact because this job has a fresh workspace.
 func (c *Compiler) buildCodeScanningUploadSteps(data *WorkflowData, restoreToken string) []string {
 	steps := []string{
 		"      - name: Restore checkout to triggering commit\n",
