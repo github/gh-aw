@@ -192,9 +192,19 @@ function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
  * @returns {boolean} Whether the review belongs to the calling workflow
  */
 function matchesWorkflowCallId(body, callerWorkflowId) {
-  if (!body) return false;
-  const markers = new Set([generateWorkflowCallIdMarker(callerWorkflowId), generateWorkflowCallIdReviewMarker(callerWorkflowId)]);
-  return body.split(/\r?\n/).some(line => markers.has(line.trim()));
+  if (!body || !callerWorkflowId) return false;
+  const legacyMarker = generateWorkflowCallIdMarker(callerWorkflowId);
+  return body.split(/\r?\n/).some(line => {
+    const trimmedLine = line.trim();
+    if (trimmedLine === legacyMarker) return true;
+    const durableMatch = trimmedLine.match(/^\[gh-aw-workflow-call-id\]: # "([^"]+)"$/);
+    if (!durableMatch) return false;
+    try {
+      return decodeURIComponent(durableMatch[1]) === callerWorkflowId;
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**

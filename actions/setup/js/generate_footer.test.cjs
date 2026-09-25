@@ -264,8 +264,10 @@ describe("generate_footer.cjs", () => {
 
       expect(matchesWorkflowCallId("Review\n<!-- gh-aw-workflow-call-id: owner/repo/Caller -->", callerWorkflowId)).toBe(true);
       expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCaller"\nReview', callerWorkflowId)).toBe(true);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2frepo%2fCaller"', callerWorkflowId)).toBe(true);
       expect(matchesWorkflowCallId('Quoted [gh-aw-workflow-call-id]: # "owner%2Frepo%2FCaller"', callerWorkflowId)).toBe(false);
       expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerB"', callerWorkflowId)).toBe(false);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # ""', "")).toBe(false);
     });
   });
 
