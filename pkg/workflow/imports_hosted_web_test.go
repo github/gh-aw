@@ -71,6 +71,7 @@ func TestAppendUniqueDomains(t *testing.T) {
 		want      []string
 	}{
 		{name: "nil lists", want: nil},
+		{name: "appends new additions", domains: []string{"archive.org"}, additions: []string{"web.archive.org"}, want: []string{"archive.org", "web.archive.org"}},
 		{name: "duplicate additions", domains: []string{"archive.org"}, additions: []string{"archive.org"}, want: []string{"archive.org"}},
 		{name: "deduplicates existing domains", domains: []string{"archive.org", "archive.org"}, want: []string{"archive.org"}},
 	}
