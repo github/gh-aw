@@ -47,8 +47,6 @@ network:
     allowed:
       - microsoft.com
       - learn.microsoft.com
-      - archive.org
-      - web.archive.org
 tools:
   cli-proxy: true
   cache-memory: true
