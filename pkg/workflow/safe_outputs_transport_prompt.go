@@ -38,10 +38,9 @@ func engineSupportsMCPToolCalls(catalog *EngineCatalog, data *WorkflowData) bool
 	engineID := strings.ToLower(data.EngineConfig.ID)
 	if catalog != nil {
 		resolved, err := catalog.Resolve(engineID, data.EngineConfig)
-		if err != nil || resolved == nil || resolved.Runtime == nil {
-			return true
+		if err == nil && resolved != nil && resolved.Runtime != nil {
+			return resolved.Runtime.GetCapabilities().MCP
 		}
-		return resolved.Runtime.GetCapabilities().MCP
 	}
 
 	engine, err := GetGlobalEngineRegistry().GetEngine(engineID)
