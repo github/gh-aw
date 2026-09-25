@@ -1120,7 +1120,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Check if file exists
   if (!fs.existsSync(normalizedPath)) {
     if (optional) {
-      core.warning(`Optional runtime import file not found: ${normalizedPath}`);
+      core.info(`Optional runtime import file not found: ${normalizedPath}`);
       return "";
     }
     throw new Error(`${ERR_SYSTEM}: Runtime import file not found: ${normalizedPath}`);
