@@ -136,9 +136,7 @@ func piReflectProviderName(backend UniversalLLMBackend) string {
 
 func resolvePiGatewaySecretEnvVar(profile universalLLMBackendProfile, backend UniversalLLMBackend) string {
 	if len(profile.coreSecretNames) > 0 {
-		for _, secretName := range profile.coreSecretNames {
-			return secretName
-		}
+		return profile.coreSecretNames[0] //nolint:uncheckedsliceindex // len(profile.coreSecretNames) is checked above.
 	}
 
 	switch backend {

@@ -87,7 +87,9 @@ function resolveGatewayBaseUrl(options) {
 function buildModelsJSON(options) {
   const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow } = options;
   // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
-  const contextWindow = resolveContextWindow(configuredContextWindow) || (provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined);
+  const fallbackContextWindow = provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined;
+  const resolvedContextWindow = resolveContextWindow(configuredContextWindow);
+  const contextWindow = resolvedContextWindow === undefined ? fallbackContextWindow : resolvedContextWindow;
   return JSON.stringify({
     providers: {
       "aw-gateway": {
