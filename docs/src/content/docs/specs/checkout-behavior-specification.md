@@ -399,6 +399,7 @@ The following MUST-level norms govern credential and token safety during checkou
 ### Version 1.3.0 (Working Draft)
 
 - Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
+- Renamed the dynamic checkout expression field from `checkout.dynamic` to `checkout.repos`; `checkout.dynamic` is rejected with a migration error.
 - Added T-CHK-017 through T-CHK-021 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
 - Added the dynamic checkout implementation files to the §8 Normative References.
 
