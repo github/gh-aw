@@ -79,18 +79,20 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId, api } = options;
+  const { baseUrl, apiKeyEnvVar, modelId, api, provider } = options;
+  // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
+  const contextWindow = provider === "github" && modelId === "claude-sonnet-5" ? 1000000 : undefined;
   return JSON.stringify({
     providers: {
       "aw-gateway": {
         baseUrl,
         api: api || "openai-completions",
         apiKey: apiKeyEnvVar,
-        models: [{ id: modelId }],
+        models: [{ id: modelId, ...(contextWindow ? { contextWindow } : {}) }],
       },
     },
   });
@@ -156,7 +158,7 @@ async function main() {
   const api = resolvePiApiForProvider(provider);
   logger(`resolved gateway api=${api} (provider=${provider})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api });
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, "utf8");
   logger(`wrote ${outputPath}`);
