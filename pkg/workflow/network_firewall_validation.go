@@ -13,7 +13,9 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"sort"
 	"strings"
@@ -58,7 +60,7 @@ func validateNetworkFirewallConfig(networkPermissions *NetworkPermissions) error
 }
 
 // validateNetworkAllowedDomains validates the allowed domains in network configuration
-func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) error {
+func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) error { //nolint:largefunc // Domain validation preserves detailed diagnostics.
 	if network == nil || len(network.Allowed) == 0 {
 		return nil
 	}
@@ -130,6 +132,148 @@ func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) er
 	return nil
 }
 
+func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.NetworkPermissions == nil || (workflowData.NetworkPermissions.HostedWeb == nil && !workflowData.NetworkPermissions.ExplicitlyDefined) {
+		return nil
+	}
+	if workflowData.NetworkPermissions.InvalidHostedWeb {
+		return fmt.Errorf("network.hosted-web must be false or an object policy; got %s", workflowData.NetworkPermissions.HostedWebRawValue)
+	}
+
+	policy := workflowData.NetworkPermissions.HostedWeb
+	runtimeID, err := c.resolveHostedWebRuntimeID(workflowData)
+	if err != nil {
+		return fmt.Errorf("network.hosted-web: failed to resolve engine runtime: %w", err)
+	}
+	if runtimeID != "claude" && runtimeID != "codex" {
+		if policy == nil {
+			return nil
+		}
+		return errors.New("network.hosted-web is only supported by the claude and codex engines")
+	}
+	firewallConfig := getFirewallConfig(workflowData)
+	if !awfSupportsHostedWeb(firewallConfig) {
+		awfTag := getAWFImageTag(firewallConfig)
+		networkFirewallValidationLog.Printf("Rejecting network.hosted-web: AWF tag %q predates %s", awfTag, constants.AWFHostedWebMinVersion)
+		return NewValidationError(
+			"network.hosted-web",
+			awfTag,
+			fmt.Sprintf("requires AWF %s or newer; pinned version %q rejects apiProxy.hostedWeb", constants.AWFHostedWebMinVersion, awfTag),
+			fmt.Sprintf("Set network.firewall.version or sandbox.agent.version to %s or newer:\n\nnetwork:\n  firewall:\n    version: %s", constants.AWFHostedWebMinVersion, constants.AWFHostedWebMinVersion),
+		)
+	}
+	if policy == nil {
+		return nil
+	}
+	if !policy.Enabled {
+		if len(policy.Allowed) > 0 || len(policy.Blocked) > 0 || policy.MaxUses != 0 {
+			return errors.New("network.hosted-web: false cannot be combined with allowed, blocked, or max-uses")
+		}
+		return nil
+	}
+	if len(policy.Allowed) == 0 && len(policy.Blocked) == 0 {
+		return errors.New("network.hosted-web requires exactly one non-empty allowed or blocked list")
+	}
+	if len(policy.Allowed) > 0 && len(policy.Blocked) > 0 {
+		return errors.New("network.hosted-web: allowed and blocked cannot both be set")
+	}
+	if policy.MaxUses < 0 {
+		return errors.New("network.hosted-web.max-uses must be a positive integer")
+	}
+	if err := validateHostedWebDomains("allowed", policy.Allowed); err != nil {
+		return err
+	}
+	if err := validateHostedWebDomains("blocked", policy.Blocked); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string, error) {
+	if workflowData == nil || workflowData.EngineConfig == nil {
+		return "", nil
+	}
+	engineID := workflowData.EngineConfig.ID
+	if workflowData.EngineConfig.IsInlineDefinition {
+		return hostedWebRuntimeID(engineID, ""), nil
+	}
+	if c != nil && c.engineCatalog != nil {
+		resolved, err := c.engineCatalog.Resolve(engineID, workflowData.EngineConfig)
+		if err != nil {
+			return "", err
+		}
+		if resolved != nil && resolved.Runtime != nil {
+			return guardResolvedHostedWebRuntimeID(engineID, resolved.Runtime.GetID(), c.engineCatalog.Get(engineID) != nil), nil
+		}
+	}
+	return hostedWebRuntimeID(engineID, ""), nil
+}
+
+func guardResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {
+	runtimeID := strings.ToLower(resolvedRuntimeID)
+	if registeredEngine || hostedWebRuntimeID(engineID, "") == runtimeID {
+		return runtimeID
+	}
+	// EngineCatalog.Resolve has a broad historical prefix fallback; avoid treating
+	// unrelated unregistered names (for example "codexbridge") as hosted-web-capable.
+	return strings.ToLower(engineID)
+}
+
+func hostedWebRuntimeID(engineName, engineRuntimeID string) string {
+	if engineRuntimeID != "" {
+		return strings.ToLower(engineRuntimeID)
+	}
+	engineName = strings.ToLower(engineName)
+	if hasHostedWebRuntimeAlias(engineName, "claude") {
+		return "claude"
+	}
+	if hasHostedWebRuntimeAlias(engineName, "codex") {
+		return "codex"
+	}
+	return engineName
+}
+
+// hasHostedWebRuntimeAlias treats engineName as an alias of runtimeID only when it
+// is exactly runtimeID or uses the legacy runtime-prefixed form runtimeID-* or
+// runtimeID_*. This preserves supported aliases such as codex-experimental without
+// classifying unrelated names like codexbridge as Codex-backed engines.
+func hasHostedWebRuntimeAlias(engineName, runtimeID string) bool {
+	if engineName == runtimeID {
+		return true
+	}
+	if !strings.HasPrefix(engineName, runtimeID) {
+		return false
+	}
+	suffix := strings.TrimPrefix(engineName, runtimeID)
+	return strings.HasPrefix(suffix, "-") || strings.HasPrefix(suffix, "_")
+}
+
+func validateHostedWebDomains(field string, domains []string) error {
+	seen := map[string]struct{}{}
+	for _, domain := range domains {
+		if _, ok := seen[domain]; ok {
+			return fmt.Errorf("network.hosted-web.%s contains duplicate domain %q", field, domain)
+		}
+		seen[domain] = struct{}{}
+		if err := validateHostedWebDomain(domain); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var hostedWebDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
+
+func validateHostedWebDomain(domain string) error {
+	if len(domain) > 253 {
+		return fmt.Errorf("network.hosted-web domain %q must be 253 characters or fewer", domain)
+	}
+	if !hostedWebDomainPattern.MatchString(domain) || net.ParseIP(domain) != nil || domain == "localhost" {
+		return fmt.Errorf("network.hosted-web domain %q must be a lowercase DNS hostname with at least two labels", domain)
+	}
+	return nil
+}
+
 // isEcosystemIdentifierPattern matches valid ecosystem identifiers like "defaults", "node", "dev-tools"
 var isEcosystemIdentifierPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
@@ -179,7 +323,7 @@ func getValidEcosystemIdentifiers() []string {
 var domainPattern = regexp.MustCompile(`^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 
 // validateDomainPattern validates a single domain pattern
-func validateDomainPattern(domain string) error {
+func validateDomainPattern(domain string) error { //nolint:largefunc // Domain validation preserves detailed diagnostics.
 	// Check for empty domain
 	if domain == "" {
 		return NewValidationError(

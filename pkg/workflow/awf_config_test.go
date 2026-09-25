@@ -57,6 +57,134 @@ func TestResolveAWFContainerAgentTimeoutMinutes(t *testing.T) {
 	})
 }
 
+func TestBuildAWFConfigJSON_HostedWebPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		engine     string
+		runtime    string
+		network    *NetworkPermissions
+		wantPolicy map[string]any
+	}{
+		{
+			name:   "Claude allowlist",
+			engine: "claude",
+			network: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{
+					Enabled: true,
+					Allowed: []string{"docs.github.com"},
+					MaxUses: 5,
+				},
+			},
+			wantPolicy: map[string]any{
+				"claude": map[string]any{
+					"enabled":        true,
+					"allowedDomains": []any{"docs.github.com"},
+					"maxUses":        float64(5),
+				},
+			},
+		},
+		{
+			name:   "Codex blocklist",
+			engine: "codex",
+			network: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{
+					Enabled: true,
+					Blocked: []string{"example.com"},
+				},
+			},
+			wantPolicy: map[string]any{
+				"codex": map[string]any{
+					"enabled":        true,
+					"blockedDomains": []any{"example.com"},
+				},
+			},
+		},
+		{
+			name:   "Network policy defaults to deny",
+			engine: "claude",
+			network: &NetworkPermissions{
+				ExplicitlyDefined: true,
+			},
+			wantPolicy: map[string]any{
+				"claude": map[string]any{
+					"enabled": false,
+				},
+			},
+		},
+		{
+			name:    "Custom engine uses resolved Codex runtime",
+			engine:  "my-codex-wrapper",
+			runtime: "codex",
+			network: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{
+					Enabled: true,
+					Allowed: []string{"docs.github.com"},
+				},
+			},
+			wantPolicy: map[string]any{
+				"codex": map[string]any{
+					"enabled":        true,
+					"allowedDomains": []any{"docs.github.com"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsonStr, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName:      tt.engine,
+				EngineRuntimeID: tt.runtime,
+				WorkflowData: &WorkflowData{
+					EngineConfig:       &EngineConfig{ID: tt.engine},
+					NetworkPermissions: tt.network,
+				},
+			})
+			require.NoError(t, err)
+
+			var config map[string]any
+			require.NoError(t, json.Unmarshal([]byte(jsonStr), &config))
+			assert.Equal(t, tt.wantPolicy, config["apiProxy"].(map[string]any)["hostedWeb"])
+			require.NoError(t, validateAWFConfigJSON(jsonStr))
+		})
+	}
+}
+
+func TestBuildAWFConfigJSON_HostedWebSkippedForOlderAWF(t *testing.T) {
+	jsonStr, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName: "claude",
+		WorkflowData: &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "claude"},
+			NetworkPermissions: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+				Firewall:  &FirewallConfig{Version: "v0.28.24"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &config))
+	assert.NotContains(t, config["apiProxy"].(map[string]any), "hostedWeb")
+}
+
+func TestBuildAWFConfigJSON_HostedWebDoesNotInferUnrelatedPrefix(t *testing.T) {
+	jsonStr, err := BuildAWFConfigJSON(AWFCommandConfig{
+		EngineName: "codexbridge",
+		WorkflowData: &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "codexbridge"},
+			NetworkPermissions: &NetworkPermissions{
+				HostedWeb: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var config map[string]any
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &config))
+	assert.NotContains(t, config["apiProxy"].(map[string]any), "hostedWeb")
+}
+
 // TestBuildAWFConfigJSON verifies that BuildAWFConfigJSON produces a valid JSON config
 // that contains the expected network, apiProxy, and container fields.
 func TestBuildAWFConfigJSON(t *testing.T) {

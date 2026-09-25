@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,6 +71,137 @@ This is a test workflow with network permissions.`
 			if workflowData.NetworkPermissions.Allowed[i] != expected {
 				t.Errorf("Expected domain %d to be '%s', got '%s'", i, expected, workflowData.NetworkPermissions.Allowed[i])
 			}
+		}
+	})
+
+	t.Run("Extract hosted web policy", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: claude
+network:
+  hosted-web:
+    allowed:
+      - docs.github.com
+    max-uses: 5
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		workflowData, err := compiler.ParseWorkflowFile(filePath)
+		if err != nil {
+			t.Fatalf("Failed to parse workflow: %v", err)
+		}
+
+		policy := workflowData.NetworkPermissions.HostedWeb
+		if policy == nil || !policy.Enabled {
+			t.Fatal("Expected hosted web policy to be enabled")
+		}
+		if len(policy.Allowed) != 1 || policy.Allowed[0] != "docs.github.com" || policy.MaxUses != 5 {
+			t.Errorf("Unexpected hosted web policy: %#v", policy)
+		}
+	})
+
+	t.Run("Extract disabled hosted web policy", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: codex
+network:
+  hosted-web: false
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		workflowData, err := compiler.ParseWorkflowFile(filePath)
+		if err != nil {
+			t.Fatalf("Failed to parse workflow: %v", err)
+		}
+
+		policy := workflowData.NetworkPermissions.HostedWeb
+		if policy == nil || policy.Enabled {
+			t.Fatalf("Expected hosted web policy to be disabled, got %#v", policy)
+		}
+	})
+
+	t.Run("Round trip disabled hosted web policy", func(t *testing.T) {
+		config, err := ParseFrontmatterConfig(map[string]any{
+			"network": map[string]any{"hosted-web": false},
+		})
+		if err != nil {
+			t.Fatalf("Failed to parse frontmatter config: %v", err)
+		}
+
+		network := config.ToMap()["network"].(map[string]any)
+		if hostedWeb, ok := network["hosted-web"].(bool); !ok || hostedWeb {
+			t.Fatalf("Expected disabled hosted web policy to serialize as false, got %#v", hostedWeb)
+		}
+	})
+
+	t.Run("Hosted web policy JSON unmarshal", func(t *testing.T) {
+		var disabled HostedWebPolicy
+		if err := json.Unmarshal([]byte(`false`), &disabled); err != nil {
+			t.Fatalf("Failed to unmarshal disabled hosted web policy: %v", err)
+		}
+		if disabled.Enabled {
+			t.Fatalf("Expected disabled hosted web policy, got %#v", disabled)
+		}
+
+		var enabled HostedWebPolicy
+		if err := json.Unmarshal([]byte(`{"allowed":["docs.github.com"]}`), &enabled); err != nil {
+			t.Fatalf("Failed to unmarshal enabled hosted web policy: %v", err)
+		}
+		if !enabled.Enabled || len(enabled.Allowed) != 1 || enabled.Allowed[0] != "docs.github.com" {
+			t.Fatalf("Unexpected enabled hosted web policy: %#v", enabled)
+		}
+
+		var malformed HostedWebPolicy
+		if err := json.Unmarshal([]byte(`"oops"`), &malformed); err == nil {
+			t.Fatal("Expected malformed hosted web policy JSON to fail")
+		}
+	})
+
+	t.Run("Reject malformed hosted web scalar", func(t *testing.T) {
+		yamlContent := `---
+on: push
+engine: claude
+network:
+  hosted-web: "true"
+strict: false
+---
+
+# Test Workflow`
+
+		filePath, cleanup := createTempWorkflowFile(yamlContent)
+		defer cleanup()
+
+		_, err := compiler.ParseWorkflowFile(filePath)
+		if err == nil || !strings.Contains(err.Error(), "hosted-web") {
+			t.Fatalf("Expected malformed hosted web policy to fail validation, got %v", err)
+		}
+	})
+
+	t.Run("Raw extraction marks malformed hosted web values invalid", func(t *testing.T) {
+		networkPermissions := compiler.extractNetworkPermissions(map[string]any{
+			"network": map[string]any{
+				"hosted-web": []any{"docs.github.com"},
+			},
+		})
+		if networkPermissions == nil || !networkPermissions.InvalidHostedWeb {
+			t.Fatalf("Expected malformed hosted web policy to be marked invalid, got %#v", networkPermissions)
+		}
+		err := compiler.validateHostedWebPolicy(&WorkflowData{
+			EngineConfig:       &EngineConfig{ID: "claude"},
+			NetworkPermissions: networkPermissions,
+		})
+		if err == nil || !strings.Contains(err.Error(), "false or an object policy; got array") {
+			t.Fatalf("Expected invalid hosted web policy validation error, got %v", err)
 		}
 	})
 

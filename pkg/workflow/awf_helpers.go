@@ -62,8 +62,12 @@ const (
 // AWFCommandConfig contains configuration for building AWF commands.
 // This struct centralizes all the parameters needed to construct an AWF-wrapped command.
 type AWFCommandConfig struct {
-	// EngineName is the engine ID (e.g., "copilot", "claude", "codex")
+	// EngineName is the configured engine ID (e.g., "copilot", "claude", "codex")
 	EngineName string
+
+	// EngineRuntimeID is the resolved runtime engine ID when EngineName is an alias
+	// or behavior-defined engine. When empty, EngineName is used.
+	EngineRuntimeID string
 
 	// EngineCommand is the command to execute inside AWF
 	EngineCommand string

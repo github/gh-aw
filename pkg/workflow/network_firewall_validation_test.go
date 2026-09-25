@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -257,4 +258,132 @@ func TestValidateNetworkFirewallConfig_Integration(t *testing.T) {
 
 		assert.NoError(t, err, "Compiler should accept workflow with allow-urls and ssl-bump enabled")
 	})
+}
+
+func TestValidateHostedWebPolicy(t *testing.T) {
+	tests := []struct {
+		name            string
+		engine          string
+		runtime         string
+		inline          bool
+		policy          *HostedWebPolicy
+		explicitNetwork bool
+		firewallVersion string
+		wantErr         string
+	}{
+		{
+			name:   "allows a lowercase allowlist",
+			engine: "claude",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+		},
+		{
+			name:    "requires a policy list",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true},
+			wantErr: "requires exactly one",
+		},
+		{
+			name:    "rejects simultaneous lists",
+			engine:  "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, Blocked: []string{"example.com"}},
+			wantErr: "cannot both be set",
+		},
+		{
+			name:    "rejects uppercase domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"Docs.GitHub.com"}},
+			wantErr: "lowercase DNS hostname",
+		},
+		{
+			name:    "rejects IP addresses",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"192.0.2.1"}},
+			wantErr: "lowercase DNS hostname",
+		},
+		{
+			name:    "rejects duplicate domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com", "docs.github.com"}},
+			wantErr: "duplicate domain",
+		},
+		{
+			name:    "rejects overlong domains",
+			engine:  "claude",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 61) + ".com"}},
+			wantErr: "253 characters or fewer",
+		},
+		{
+			name:   "accepts Codex runtime alias",
+			engine: "codex-experimental",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:   "accepts Claude runtime underscore alias",
+			engine: "claude_custom",
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:    "rejects unrelated Codex prefix",
+			engine:  "codexbridge",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			wantErr: "only supported",
+		},
+		{
+			name:    "accepts custom engine backed by Codex runtime",
+			engine:  "my-codex-wrapper",
+			runtime: "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:   "accepts inline Claude runtime prefix",
+			engine: "claude-custom",
+			inline: true,
+			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+		},
+		{
+			name:            "rejects explicit policy with older AWF",
+			engine:          "claude",
+			policy:          &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			firewallVersion: "v0.28.24",
+			wantErr:         "requires AWF",
+		},
+		{
+			name:            "rejects implicit deny with older AWF",
+			engine:          "claude",
+			explicitNetwork: true,
+			firewallVersion: "v0.28.24",
+			wantErr:         "requires AWF",
+		},
+		{
+			name:    "rejects unsupported engine",
+			engine:  "copilot",
+			policy:  &HostedWebPolicy{Enabled: false},
+			wantErr: "only supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			network := &NetworkPermissions{
+				HostedWeb:         tt.policy,
+				ExplicitlyDefined: tt.explicitNetwork,
+			}
+			if tt.firewallVersion != "" {
+				network.Firewall = &FirewallConfig{Version: tt.firewallVersion}
+			}
+			compiler := NewCompiler()
+			if tt.runtime != "" {
+				compiler.engineCatalog.Register(&EngineDefinition{ID: tt.engine, RuntimeID: tt.runtime})
+			}
+			err := compiler.validateHostedWebPolicy(&WorkflowData{
+				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline},
+				NetworkPermissions: network,
+			})
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
 }

@@ -25,10 +25,17 @@ network:
   allowed:
     - defaults
     - github
+  hosted-web:
+    allowed:
+      - microsoft.com
+      - learn.microsoft.com
+      - archive.org
+      - web.archive.org
 
 tools:
   cli-proxy: true
   cache-memory: true
+  web-search:
   github:
     mode: gh-proxy
     toolsets: [default, discussions]

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
+	"gopkg.in/yaml.v3"
 )
 
 var engineLog = logger.New("workflow:engine")
@@ -169,11 +171,91 @@ type EngineAuthConfig struct {
 // Ecosystem identifiers in the Allowed list are expanded to their corresponding domain lists.
 // See GetAllowedDomains() for the list of supported ecosystem identifiers.
 type NetworkPermissions struct {
-	Allowed           []string        `yaml:"allowed,omitempty"` // List of allowed domains or ecosystem identifiers (e.g., "defaults", "github", "python")
-	AllowedInput      bool            `yaml:"allowed-input,omitempty"`
-	Blocked           []string        `yaml:"blocked,omitempty"`  // List of blocked domains (takes precedence over allowed)
-	Firewall          *FirewallConfig `yaml:"firewall,omitempty"` // AWF firewall configuration (see firewall.go)
-	ExplicitlyDefined bool            `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
+	Allowed           []string         `yaml:"allowed,omitempty"` // List of allowed domains or ecosystem identifiers (e.g., "defaults", "github", "python")
+	AllowedInput      bool             `yaml:"allowed-input,omitempty"`
+	Blocked           []string         `yaml:"blocked,omitempty"` // List of blocked domains (takes precedence over allowed)
+	HostedWeb         *HostedWebPolicy `yaml:"hosted-web,omitempty" json:"hosted-web,omitempty"`
+	InvalidHostedWeb  bool             `yaml:"-" json:"-"`         // Internal flag: true if hosted-web had an unsupported raw shape
+	HostedWebRawValue string           `yaml:"-" json:"-"`         // Internal diagnostic for unsupported hosted-web values
+	Firewall          *FirewallConfig  `yaml:"firewall,omitempty"` // AWF firewall configuration (see firewall.go)
+	ExplicitlyDefined bool             `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
+}
+
+// clone returns a deep-enough copy of n so callers can safely mutate the
+// returned value's slices (e.g. Allowed) without affecting the original.
+func (n *NetworkPermissions) clone() *NetworkPermissions {
+	if n == nil {
+		return &NetworkPermissions{}
+	}
+	result := *n
+	if n.Allowed != nil {
+		result.Allowed = append([]string(nil), n.Allowed...)
+	}
+	if n.Blocked != nil {
+		result.Blocked = append([]string(nil), n.Blocked...)
+	}
+	if n.HostedWeb != nil {
+		hostedWeb := *n.HostedWeb
+		hostedWeb.Allowed = append([]string(nil), n.HostedWeb.Allowed...)
+		hostedWeb.Blocked = append([]string(nil), n.HostedWeb.Blocked...)
+		result.HostedWeb = &hostedWeb
+	}
+	return &result
+}
+
+// HostedWebPolicy controls provider-hosted web search and fetch tools.
+// Its domain lists are deliberately independent from network.allowed because hosted
+// retrieval executes outside the AWF network boundary.
+type HostedWebPolicy struct {
+	Enabled bool     `yaml:"-" json:"-"`
+	Allowed []string `yaml:"allowed,omitempty" json:"allowed,omitempty"`
+	Blocked []string `yaml:"blocked,omitempty" json:"blocked,omitempty"`
+	MaxUses int      `yaml:"max-uses,omitempty" json:"max-uses,omitempty"`
+}
+
+// UnmarshalYAML accepts hosted-web: false to disable provider-hosted web tools.
+// An object policy enables them.
+func (p *HostedWebPolicy) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		if node.Tag == "!!bool" && node.Value == "false" {
+			*p = HostedWebPolicy{}
+			return nil
+		}
+		return errors.New("network.hosted-web must be false or an object policy")
+	}
+	if node.Kind != yaml.MappingNode {
+		return errors.New("network.hosted-web must be false or an object policy")
+	}
+
+	type hostedWebPolicy HostedWebPolicy
+	var policy hostedWebPolicy
+	if err := node.Decode(&policy); err != nil {
+		return err
+	}
+	*p = HostedWebPolicy(policy)
+	p.Enabled = true
+	return nil
+}
+
+// UnmarshalJSON accepts hosted-web: false to disable provider-hosted web tools.
+// An object policy enables them.
+func (p *HostedWebPolicy) UnmarshalJSON(data []byte) error {
+	if string(data) == "false" {
+		*p = HostedWebPolicy{}
+		return nil
+	}
+	if !bytes.HasPrefix(bytes.TrimSpace(data), []byte("{")) {
+		return errors.New("network.hosted-web must be false or an object policy")
+	}
+
+	type hostedWebPolicy HostedWebPolicy
+	var policy hostedWebPolicy
+	if err := json.Unmarshal(data, &policy); err != nil {
+		return err
+	}
+	*p = HostedWebPolicy(policy)
+	p.Enabled = true
+	return nil
 }
 
 // EngineNetworkConfig combines engine configuration with top-level network permissions
@@ -245,7 +327,9 @@ func parseTopLevelEngineConfig(frontmatter map[string]any) engineTopLevelConfig 
 	if topLevel.maxRuns == 0 {
 		topLevel.maxRuns = parseMaxRunsValue(frontmatter["max-runs"])
 	}
-	topLevel.model, _ = frontmatter["model"].(string)
+	if model, ok := frontmatter["model"].(string); ok {
+		topLevel.model = model
+	}
 	return topLevel
 }
 
@@ -296,7 +380,10 @@ func extractInlineProviderConfig(config *EngineConfig, provider any) string {
 		if id, ok := providerTyped["id"].(string); ok {
 			config.InlineProviderID = id
 		}
-		model, _ := providerTyped["model"].(string)
+		var model string
+		if parsedModel, ok := providerTyped["model"].(string); ok {
+			model = parsedModel
+		}
 		if authObj, ok := providerTyped["auth"].(map[string]any); ok {
 			if authDef := parseNonEmptyAuthDefinition(authObj); authDef != nil {
 				config.InlineProviderAuth = authDef
@@ -491,8 +578,11 @@ func applyEngineDriverField(config *EngineConfig, engineObj map[string]any) {
 	}
 
 	// Pick the first match. Validation will reject the map when len > 1.
-	runtime := matched[0]
-	source, _ := driverMap[runtime].(string)
+	runtime := matched[0] //nolint:uncheckedsliceindex // The empty case returns above.
+	source, ok := driverMap[runtime].(string)
+	if !ok {
+		return
+	}
 	// Preserve runtime even for empty source so validateInlineEngineDriver
 	// can reject it with a clear error rather than silently bypassing checks.
 	config.InlineDriver = &InlineEngineDriver{

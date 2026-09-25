@@ -263,7 +263,7 @@ The following frontmatter fields in imported files are merged into the importing
 - `pre-agent-steps:` - Steps appended in import order
 - `post-steps:` - Steps appended in import order
 - `jobs.<job-id>.setup-steps`, `jobs.<job-id>.pre-steps`, and `jobs.activation.steps` - Merged per job with imported steps first, then main workflow steps. Execution order is `setup-steps` before `pre-steps`; `jobs.activation.steps` run later in the activation job before the activation artifact is staged.
-- `runtimes:`, `network:`, `permissions:`, `services:`, `cache:`, `features:`, `mcp-servers:`
+- `runtimes:`, `network:`, `permissions:`, `services:`, `cache:`, `features:`, `mcp-servers:`. Network allowlists and enabled `hosted-web` domain lists are combined; top-level hosted-web scalar configuration (such as `max-uses` or an explicit disablement) takes precedence.
 - `plugins:` - Union by plugin path; identical refs dedupe, compatible semantic versions select the highest, incompatible majors/non-semver conflicts fail compilation
 
 Example import file:
