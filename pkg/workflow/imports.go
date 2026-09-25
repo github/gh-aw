@@ -164,6 +164,8 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 	return result, nil
 }
 
+// mergeHostedWebPolicy combines enabled imported domain lists with the top-level
+// policy. An explicit top-level disablement and its scalar settings take precedence.
 func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy) {
 	if imported == nil {
 		return
@@ -175,6 +177,8 @@ func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy
 		network.HostedWeb = &policy
 		return
 	}
+	// An explicit disablement must not be re-enabled by an import, and an imported
+	// disablement does not override an enabled top-level policy.
 	if !network.HostedWeb.Enabled || !imported.Enabled {
 		return
 	}
@@ -183,18 +187,20 @@ func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy
 	network.HostedWeb.Blocked = appendUniqueDomains(network.HostedWeb.Blocked, imported.Blocked)
 }
 
+// appendUniqueDomains returns a fresh domain list with additions appended once.
 func appendUniqueDomains(domains, additions []string) []string {
+	result := append([]string(nil), domains...)
 	seen := make(map[string]struct{}, len(domains)+len(additions))
 	for _, domain := range domains {
 		seen[domain] = struct{}{}
 	}
 	for _, domain := range additions {
-		if !setutil.Contains(seen, domain) {
-			domains = append(domains, domain)
+		if _, exists := seen[domain]; !exists {
+			result = append(result, domain)
 			seen[domain] = struct{}{}
 		}
 	}
-	return domains
+	return result
 }
 
 // getSafeOutputTypeKeys returns the list of safe output type keys from the embedded schema.
