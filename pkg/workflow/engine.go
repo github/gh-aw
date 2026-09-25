@@ -181,6 +181,28 @@ type NetworkPermissions struct {
 	ExplicitlyDefined bool             `yaml:"-"`                  // Internal flag: true if network field was explicitly set in frontmatter
 }
 
+// clone returns a deep-enough copy of n so callers can safely mutate the
+// returned value's slices (e.g. Allowed) without affecting the original.
+func (n *NetworkPermissions) clone() *NetworkPermissions {
+	if n == nil {
+		return &NetworkPermissions{}
+	}
+	result := *n
+	if n.Allowed != nil {
+		result.Allowed = append([]string(nil), n.Allowed...)
+	}
+	if n.Blocked != nil {
+		result.Blocked = append([]string(nil), n.Blocked...)
+	}
+	if n.HostedWeb != nil {
+		hostedWeb := *n.HostedWeb
+		hostedWeb.Allowed = append([]string(nil), n.HostedWeb.Allowed...)
+		hostedWeb.Blocked = append([]string(nil), n.HostedWeb.Blocked...)
+		result.HostedWeb = &hostedWeb
+	}
+	return &result
+}
+
 // HostedWebPolicy controls provider-hosted web search and fetch tools.
 // Its domain lists are deliberately independent from network.allowed because hosted
 // retrieval executes outside the AWF network boundary.

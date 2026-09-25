@@ -111,11 +111,12 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 		return topNetwork, nil
 	}
 
-	// Start with top-level network or create a new one
+	// Start with top-level network or create a new one. Copy the struct first so
+	// fields other than Allowed (Blocked, HostedWeb, Firewall, ExplicitlyDefined,
+	// etc.) survive the merge instead of silently reverting to zero values.
 	result := &NetworkPermissions{}
 	if topNetwork != nil {
-		result.Allowed = make([]string, len(topNetwork.Allowed))
-		copy(result.Allowed, topNetwork.Allowed)
+		result = topNetwork.clone()
 		importsLog.Printf("Starting with %d top-level allowed domains", len(topNetwork.Allowed))
 	}
 

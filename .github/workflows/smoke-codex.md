@@ -43,10 +43,17 @@ network:
     - defaults
     - github
     - playwright
+  hosted-web:
+    allowed:
+      - microsoft.com
+      - learn.microsoft.com
+      - archive.org
+      - web.archive.org
 tools:
   cli-proxy: true
   cache-memory: true
   comment-memory: true
+  web-search:
   github:
     mode: gh-proxy
   playwright:

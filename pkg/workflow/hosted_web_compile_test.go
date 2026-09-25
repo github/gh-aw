@@ -199,6 +199,68 @@ Test workflow.`,
 	}
 }
 
+// TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge verifies that a
+// hosted-web policy is preserved when an imported shared file also declares
+// network.allowed. MergeNetworkPermissions previously rebuilt the merged
+// NetworkPermissions from scratch and only copied Allowed, silently dropping
+// HostedWeb (and Blocked/Firewall) whenever any import contributed network
+// permissions.
+func TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "hosted-web-import-merge-test")
+
+	sharedFile := filepath.Join(tmpDir, "shared-network.md")
+	sharedContent := `---
+network:
+  allowed:
+    - "*.sentry.io"
+---
+`
+	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
+		t.Fatalf("Failed to write shared workflow file: %v", err)
+	}
+
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	frontmatter := `---
+on: workflow_dispatch
+engine: claude
+imports:
+  - shared-network.md
+network:
+  allowed:
+    - defaults
+  hosted-web:
+    allowed:
+      - docs.github.com
+---
+
+# Test
+Test workflow.`
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatalf("Failed to write workflow file: %v", err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Failed to compile workflow: %v", err)
+	}
+
+	lockFile := stringutil.MarkdownToLockFile(testFile)
+	yamlBytes, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+	yamlStr := string(yamlBytes)
+
+	for _, want := range []string{
+		`\"hostedWeb\"`,
+		`\"claude\":{\"enabled\":true,\"allowedDomains\":[\"docs.github.com\"]}`,
+	} {
+		if !strings.Contains(yamlStr, want) {
+			t.Errorf("Expected lock file to contain %q after merging imported network permissions, but it did not.\n%s", want, yamlStr)
+		}
+	}
+}
+
 // TestCompileWorkflow_HostedWebRejectsUnsupportedEngine verifies that declaring
 // network.hosted-web for an engine other than Claude/Codex fails compilation
 // instead of silently dropping the restriction.
