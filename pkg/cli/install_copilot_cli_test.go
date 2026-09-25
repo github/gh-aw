@@ -368,6 +368,38 @@ exit 97
 	assert.Contains(t, string(wrapperOutput), "copilot "+cachedMinVersion)
 }
 
+func TestInstallCopilotCLIScriptRejectsExplicitVersionBelowCopilotMinVersion(t *testing.T) {
+	t.Parallel()
+
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+
+	installScript := filepath.Join(wd, "..", "..", "actions", "setup", "sh", "install_copilot_cli.sh")
+
+	tempDir := t.TempDir()
+	fakeBinDir := filepath.Join(tempDir, "fake-bin")
+	require.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(fakeBinDir, "sudo"), []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = "chown" ]; then
+  exit 0
+fi
+exec "$@"
+`), 0o755))
+
+	cmd := exec.Command("bash", installScript, "1.0.85")
+	cmd.Env = append(os.Environ(),
+		"GH_AW_COPILOT_MIN_VERSION=1.0.87",
+		"COPILOT_INSTALL_DIR="+filepath.Join(tempDir, "install-bin"),
+		"GITHUB_PATH="+filepath.Join(tempDir, "github-path"),
+		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
+	)
+
+	output, err := cmd.CombinedOutput()
+	require.Error(t, err, "install_copilot_cli.sh should reject an explicit version below GH_AW_COPILOT_MIN_VERSION")
+	assert.Contains(t, string(output), "ERROR: Explicit Copilot CLI version 1.0.85 is below required minimum 1.0.87 from GH_AW_COPILOT_MIN_VERSION.")
+	assert.NotContains(t, string(output), "Downloading binary", "script should fail before attempting a release download")
+}
+
 func TestInstallCopilotCLIScriptUsesBoundedRetriesForReleaseDownloads(t *testing.T) {
 	t.Parallel()
 	wd, err := os.Getwd()

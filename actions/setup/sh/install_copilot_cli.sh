@@ -250,6 +250,33 @@ select_effective_min_version() {
   printf '%s\n' "$compat_min"
 }
 
+validate_explicit_version_minimum() {
+  local requested
+  local feature_min
+
+  requested="$(normalize_version "${1:-}")"
+  feature_min="$(normalize_version "${2:-}")"
+
+  if [ -z "$feature_min" ]; then
+    return 0
+  fi
+
+  if ! version_is_numeric "$feature_min"; then
+    echo "WARNING: Ignoring invalid GH_AW_COPILOT_MIN_VERSION '${2:-}'" >&2
+    return 0
+  fi
+
+  if ! version_is_numeric "$requested"; then
+    echo "WARNING: Could not validate explicit Copilot CLI version '${1:-}' against GH_AW_COPILOT_MIN_VERSION '${2:-}' because it is not numeric." >&2
+    return 0
+  fi
+
+  if version_is_greater "$feature_min" "$requested"; then
+    echo "ERROR: Explicit Copilot CLI version ${requested} is below required minimum ${feature_min} from GH_AW_COPILOT_MIN_VERSION." >&2
+    return 1
+  fi
+}
+
 # Download compatibility matrix with bundled fallback.
 download_compat_json() {
   local compat_file="$1"
@@ -588,6 +615,7 @@ if [ -z "$VERSION" ]; then
     REQUESTED_VERSION="$DEFAULT_COPILOT_VERSION"
   fi
 else
+  validate_explicit_version_minimum "$VERSION" "$COPILOT_MIN_VERSION_OVERRIDE"
   echo "Explicit Copilot CLI version argument provided (${VERSION}); skipping compat matrix resolution."
 fi
 
