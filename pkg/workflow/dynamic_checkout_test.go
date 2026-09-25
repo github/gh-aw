@@ -88,6 +88,20 @@ func TestParseFrontmatterConfigDynamicCheckoutRequiresReposString(t *testing.T) 
 	require.ErrorContains(t, err, "repos must be a string containing a GitHub Actions expression")
 }
 
+func TestParseFrontmatterConfigDynamicCheckoutRejectsUnsupportedField(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"repos":         "${{ fromJSON(inputs.checkouts) }}",
+			"allowed-repos": []any{"owner/repo"},
+			"fetch-depth":   1,
+		},
+	})
+
+	require.ErrorContains(t, err, `field "fetch-depth" is not supported`)
+}
+
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 	compiler := NewCompiler()
 	steps := compiler.generateDynamicCheckoutSteps(

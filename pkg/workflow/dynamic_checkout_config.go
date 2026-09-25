@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -34,7 +35,7 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	}
 	for key := range raw {
 		if key != "repos" && key != "allowed-repos" {
-			return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports repos and allowed-repos fields")
+			return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field %q is not supported; only repos and allowed-repos are allowed", key)
 		}
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
