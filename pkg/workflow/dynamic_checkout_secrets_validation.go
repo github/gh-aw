@@ -3,9 +3,9 @@
 //
 // # Dynamic Checkout Secrets Validation
 //
-// A dynamic checkout expression (e.g. checkout: ${{ fromJSON(inputs.checkouts) }})
-// is serialized once and passed to the runtime checkout script as a single JSON
-// payload (GH_AW_DYNAMIC_CHECKOUTS). If the expression itself references
+// A dynamic checkout expression (checkout.repos) is serialized once and passed
+// to the runtime checkout script as a single JSON payload
+// (GH_AW_DYNAMIC_CHECKOUTS). If the expression itself references
 // secrets.* (for example to embed a per-repository github-token value), the
 // resolved secret value is written into that JSON payload rather than being
 // assigned to its own statically declared environment variable. This makes the

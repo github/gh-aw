@@ -40,7 +40,7 @@ required and may itself be a GitHub Actions expression resolving to an array:
 
 ```yaml wrap
 checkout:
-  dynamic: ${{ fromJSON(inputs.checkouts) }}
+  repos: ${{ fromJSON(inputs.checkouts) }}
   # Use trusted configuration for this allowlist, not caller-controlled input.
   allowed-repos: ${{ fromJSON(vars.ALLOWED_DYNAMIC_CHECKOUT_REPOS) }}
 ```
@@ -66,7 +66,7 @@ reference it through `env.NAME` instead:
 env:
   CHECKOUT_TOKEN: ${{ secrets.MY_TOKEN }}
 checkout:
-  dynamic: ${{ fromJSON(inputs.checkouts) }}
+  repos: ${{ fromJSON(inputs.checkouts) }}
   allowed-repos:
     - owner/repository
 ```

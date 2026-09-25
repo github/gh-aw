@@ -13282,9 +13282,9 @@
         },
         {
           "type": "object",
-          "required": ["dynamic", "allowed-repos"],
+          "required": ["repos", "allowed-repos"],
           "properties": {
-            "dynamic": {
+            "repos": {
               "type": "string",
               "pattern": "^\\s*\\$\\{\\{[\\s\\S]+\\}\\}\\s*$",
               "description": "GitHub Actions expression resolving to one checkout object or an array of checkout objects."

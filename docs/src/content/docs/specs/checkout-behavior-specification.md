@@ -134,15 +134,15 @@ See also Threat T7 and requirements RCR1–RCR7 in the [Safe Outputs MCP Gateway
 
 ### 3.6 Dynamic Checkout Sets
 
-A `checkout:` entry MAY be expression-valued instead of a static object or array, using a `dynamic`/`allowed-repos` object form:
+A `checkout:` entry MAY be expression-valued instead of a static object or array, using a `repos`/`allowed-repos` object form:
 
 ```yaml
 checkout:
-  dynamic: ${{ fromJSON(inputs.checkouts) }}
+  repos: ${{ fromJSON(inputs.checkouts) }}
   allowed-repos: ${{ fromJSON(vars.ALLOWED_DYNAMIC_CHECKOUT_REPOS) }}
 ```
 
-`dynamic` MUST be a GitHub Actions expression (`${{ ... }}`) that resolves at runtime to one checkout object or an array of checkout objects. `allowed-repos` is REQUIRED and MUST be either a non-empty static array of `owner/repo` strings or an expression resolving to such an array. The object form MUST NOT contain any field other than `dynamic` and `allowed-repos`.
+`repos` MUST be a GitHub Actions expression (`${{ ... }}`) that resolves at runtime to one checkout object or an array of checkout objects. `allowed-repos` is REQUIRED and MUST be either a non-empty static array of `owner/repo` strings or an expression resolving to such an array. The object form MUST NOT contain any field other than `repos` and `allowed-repos`.
 
 **Compile-time requirements:**
 
@@ -398,7 +398,7 @@ The following MUST-level norms govern credential and token safety during checkou
 
 ### Version 1.3.0 (Working Draft)
 
-- Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.dynamic` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
+- Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
 - Added T-CHK-017 through T-CHK-021 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
 - Added the dynamic checkout implementation files to the §8 Normative References.
 

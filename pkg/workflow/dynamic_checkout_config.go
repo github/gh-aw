@@ -15,21 +15,30 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	if !ok {
 		return DynamicCheckoutConfig{}, false, nil
 	}
-	expression, hasExpression := raw["dynamic"].(string)
-	if !hasExpression || !isExpression(expression) {
+	if _, hasLegacyDynamic := raw["dynamic"]; hasLegacyDynamic {
+		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout uses checkout.repos; checkout.dynamic is not supported")
+	}
+	expression, hasExpression := raw["repos"].(string)
+	if !hasExpression {
+		if _, hasRepos := raw["repos"]; hasRepos {
+			return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout repos must be a GitHub Actions expression")
+		}
 		return DynamicCheckoutConfig{}, false, nil
+	}
+	if !isExpression(expression) {
+		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout repos must be a GitHub Actions expression")
 	}
 	allowed, ok := raw["allowed-repos"]
 	if !ok {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout requires allowed-repos")
 	}
 	for key := range raw {
-		if key != "dynamic" && key != "allowed-repos" {
-			return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
+		if key != "repos" && key != "allowed-repos" {
+			return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports repos and allowed-repos fields")
 		}
 	}
 	if len(raw) != 2 {
-		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports dynamic and allowed-repos fields")
+		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout only supports repos and allowed-repos fields")
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
 	if err != nil || len(allowedRepos) == 0 {

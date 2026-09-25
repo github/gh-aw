@@ -12,7 +12,7 @@ func TestParseFrontmatterConfigDynamicCheckout(t *testing.T) {
 		"name":   "dynamic-checkout",
 		"engine": "copilot",
 		"checkout": map[string]any{
-			"dynamic":       "${{ fromJSON(inputs.checkouts) }}",
+			"repos":         "${{ fromJSON(inputs.checkouts) }}",
 			"allowed-repos": []any{"owner/repo"},
 		},
 	})
@@ -28,7 +28,7 @@ func TestParseFrontmatterConfigDynamicCheckoutTrimsExpression(t *testing.T) {
 		"name":   "dynamic-checkout",
 		"engine": "copilot",
 		"checkout": map[string]any{
-			"dynamic":       "  ${{ fromJSON(inputs.checkouts) }}  ",
+			"repos":         "  ${{ fromJSON(inputs.checkouts) }}  ",
 			"allowed-repos": "${{ fromJSON(inputs.allowed_repos) }}",
 		},
 	})
@@ -42,11 +42,37 @@ func TestParseFrontmatterConfigDynamicCheckoutRequiresAllowedRepos(t *testing.T)
 		"name":   "dynamic-checkout",
 		"engine": "copilot",
 		"checkout": map[string]any{
-			"dynamic": "${{ fromJSON(inputs.checkouts) }}",
+			"repos": "${{ fromJSON(inputs.checkouts) }}",
 		},
 	})
 
 	require.ErrorContains(t, err, "requires allowed-repos")
+}
+
+func TestParseFrontmatterConfigDynamicCheckoutRejectsLegacyDynamicField(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"dynamic":       "${{ fromJSON(inputs.checkouts) }}",
+			"allowed-repos": []any{"owner/repo"},
+		},
+	})
+
+	require.ErrorContains(t, err, "checkout.repos")
+}
+
+func TestParseFrontmatterConfigDynamicCheckoutRequiresReposExpression(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"repos":         "owner/repo",
+			"allowed-repos": []any{"owner/repo"},
+		},
+	})
+
+	require.ErrorContains(t, err, "repos must be a GitHub Actions expression")
 }
 
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
