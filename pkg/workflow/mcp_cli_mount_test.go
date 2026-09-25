@@ -208,7 +208,7 @@ func TestBuildMCPCLIPromptSection_PromptFileUsesNonHeadingLabels(t *testing.T) {
 		},
 	}
 
-	section := buildMCPCLIPromptSection(data, nil)
+	section := buildMCPCLIPromptSection(data)
 	require.NotNil(t, section)
 	assert.Equal(t, mcpCLIToolsWithSafeOutputsPromptFile, section.Content)
 	// GH_AW_MCP_CLI_SERVERS_LIST must be a compile-time static value, NOT a step output
@@ -219,7 +219,6 @@ func TestBuildMCPCLIPromptSection_PromptFileUsesNonHeadingLabels(t *testing.T) {
 	assert.NotContains(t, serversList, "${{", "server list must not use a GitHub Actions expression (step output reference is out of scope in activation job)")
 	assert.Contains(t, serversList, "safeoutputs", "server list must mention the safeoutputs server")
 	assert.Contains(t, serversList, "--help", "server list must guide agents to use --help for tool signatures")
-
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 	content, err := os.ReadFile(filepath.Clean(filepath.Join(wd, "../../actions/setup/md", section.Content)))
@@ -240,7 +239,7 @@ func TestBuildMCPCLIPromptSection_UsesBaseTemplateWithoutSafeOutputs(t *testing.
 		},
 	}
 
-	section := buildMCPCLIPromptSection(data, nil)
+	section := buildMCPCLIPromptSection(data)
 	require.NotNil(t, section)
 	assert.Equal(t, mcpCLIToolsPromptFile, section.Content)
 }
@@ -251,7 +250,7 @@ func TestBuildMCPCLIPromptSection_StaticEnclaveBudgetGuidance(t *testing.T) {
 	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
 	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/private-service", Sensitivity: "confidential"}}
 
-	section := buildMCPCLIPromptSection(data, nil)
+	section := buildMCPCLIPromptSection(data)
 	require.NotNil(t, section)
 
 	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
@@ -268,7 +267,7 @@ func TestBuildMCPCLIPromptSection_SealedRepoGuidance(t *testing.T) {
 	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
 	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/sealed-service", Sensitivity: "sealed"}}
 
-	section := buildMCPCLIPromptSection(data, nil)
+	section := buildMCPCLIPromptSection(data)
 	require.NotNil(t, section)
 
 	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
@@ -367,5 +366,5 @@ func TestBuildMCPCLIPromptSection_OmittedWhenBashDisabled(t *testing.T) {
 	}
 
 	require.NotEmpty(t, getMCPCLIServerNames(data), "safeoutputs is still CLI-mounted")
-	assert.Nil(t, buildMCPCLIPromptSection(data, nil), "CLI-only instructions must be omitted when the agent has no shell")
+	assert.Nil(t, buildMCPCLIPromptSection(data), "CLI-only instructions must be omitted when the agent has no shell")
 }

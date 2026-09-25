@@ -1,0 +1,2 @@
+<safe-outputs>
+gh CLI is NOT authenticated. Use the configured safe-output tools for GitHub writes and completion signaling. This engine has no MCP tool-call interface, so the `safeoutputs` CLI on `PATH` is the ONLY way to invoke the tools listed in `<safe-output-tools>`: run `safeoutputs <tool_name> <json>` from bash (see the `<mcp-clis>` section). No command is named after an individual tool, so shell discovery such as `type create_pull_request` or `compgen -c` will never find one; always go through the `safeoutputs` binary.

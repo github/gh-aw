@@ -45,12 +45,10 @@ Fix the bug and open a pull request.
 		"pi workflows must not describe the safeoutputs CLI as an optional transport")
 	assert.NotContains(t, compiled, "you may use that CLI form instead",
 		"pi workflows must not describe the safeoutputs CLI as an alternative form")
-	assert.Contains(t, compiled, safeOutputsTransportEnvVar,
-		"compiled workflow should substitute the safe-output transport wording")
-	assert.Contains(t, compiled, "is the ONLY way to invoke the tools listed in",
-		"pi workflows must state the safeoutputs CLI is the only transport")
-	assert.Contains(t, compiled, "the CLI commands above are the ONLY transport",
-		"pi workflows must state the safeoutputs CLI commands are the only transport")
+	assert.Contains(t, compiled, safeOutputsCLIOnlyTransportPromptFile,
+		"pi workflows must load the CLI-only safe-output transport prompt")
+	assert.NotContains(t, compiled, safeOutputsMCPTransportPromptFile,
+		"pi workflows must not load the MCP-safe-output transport prompt")
 }
 
 // TestCopilotSafeOutputsPromptKeepsOptionalCLITransportIntegration verifies that engines
@@ -80,8 +78,8 @@ Fix the bug and open a pull request.
 	require.NoError(t, err)
 	compiled := string(compiledBytes)
 
-	assert.Contains(t, compiled, "optional equivalent transport",
-		"MCP-capable engines should keep the optional CLI transport wording")
-	assert.NotContains(t, compiled, "the CLI commands above are the ONLY transport",
-		"MCP-capable engines must not be told the CLI is the only transport")
+	assert.Contains(t, compiled, safeOutputsMCPTransportPromptFile,
+		"MCP-capable workflows should load the MCP-safe-output transport prompt")
+	assert.NotContains(t, compiled, safeOutputsCLIOnlyTransportPromptFile,
+		"MCP-capable workflows must not load the CLI-only safe-output transport prompt")
 }

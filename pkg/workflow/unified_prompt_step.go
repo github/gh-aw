@@ -141,24 +141,29 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	// 8. Safe outputs instructions (if enabled)
 	if HasSafeOutputsEnabled(data.SafeOutputs) || data.CommentMemoryConfig != nil {
 		unifiedPromptLog.Print("Adding safe outputs section")
-		// Static intro from file (gh CLI warning, temporary ID rules, noop note)
+		cliOnlySafeOutputs := !engineSupportsMCPToolCalls(c.engineCatalog, data)
+		transportPromptFile := safeOutputsMCPTransportPromptFile
+		if cliOnlySafeOutputs {
+			transportPromptFile = safeOutputsCLIOnlyTransportPromptFile
+		}
+		sections = append(sections, PromptSection{
+			Content: transportPromptFile,
+			IsFile:  true,
+		})
+		// Static body from file (temporary ID rules, noop note).
 		sections = append(sections, PromptSection{
 			Content: safeOutputsPromptFile,
 			IsFile:  true,
-			EnvVars: map[string]string{
-				safeOutputsTransportEnvVar: safeOutputsTransportText(c.engineCatalog, data),
-			},
 		})
 		// Per-tool sections: opening tag + tools list (inline), tool instruction files, closing tag
 		sections = append(sections, buildSafeOutputsSections(data.SafeOutputs, data.CommentMemoryConfig)...)
 	}
 
 	// 8a. MCP CLI tools instructions (if any MCP servers are mounted as CLIs)
-	if section := buildMCPCLIPromptSection(data, c.engineCatalog); section != nil {
+	if section := buildMCPCLIPromptSection(data); section != nil {
 		unifiedPromptLog.Printf("Adding MCP CLI tools section: servers=%v", getMCPCLIServerNames(data))
 		sections = append(sections, *section)
 	}
-
 	// 9. GitHub context (if GitHub tool is enabled)
 	if hasGitHubTool(data.ParsedTools) {
 		unifiedPromptLog.Print("Adding GitHub context section")
