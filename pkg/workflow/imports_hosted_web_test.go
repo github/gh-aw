@@ -57,3 +57,22 @@ func TestMergeHostedWebPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestAppendUniqueDomains(t *testing.T) {
+	tests := []struct {
+		name      string
+		domains   []string
+		additions []string
+		want      []string
+	}{
+		{name: "nil lists", want: nil},
+		{name: "duplicate additions", domains: []string{"archive.org"}, additions: []string{"archive.org"}, want: []string{"archive.org"}},
+		{name: "deduplicates existing domains", domains: []string{"archive.org", "archive.org"}, want: []string{"archive.org"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, appendUniqueDomains(tt.domains, tt.additions))
+		})
+	}
+}

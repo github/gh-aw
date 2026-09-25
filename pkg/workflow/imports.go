@@ -145,23 +145,29 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 			continue // Skip invalid lines
 		}
 
-		// Merge allowed domains from imported network
-		for _, domain := range importedNetwork.Allowed {
-			if !setutil.Contains(domainSet, domain) {
-				result.Allowed = append(result.Allowed, domain)
-				domainSet[domain] = struct {
-				}{}
-			}
-		}
-
-		mergeHostedWebPolicy(result, importedNetwork.HostedWeb)
+		mergeImportedNetworkPermissions(result, importedNetwork, domainSet)
 	}
 
 	// Sort the final domain list for consistent output
 	sort.Strings(result.Allowed)
+	if result.HostedWeb != nil {
+		sort.Strings(result.HostedWeb.Allowed)
+		sort.Strings(result.HostedWeb.Blocked)
+	}
 
 	importsLog.Printf("Successfully merged network permissions with %d allowed domains", len(result.Allowed))
 	return result, nil
+}
+
+func mergeImportedNetworkPermissions(result *NetworkPermissions, imported NetworkPermissions, domainSet map[string]struct{}) {
+	for _, domain := range imported.Allowed {
+		if !setutil.Contains(domainSet, domain) {
+			result.Allowed = append(result.Allowed, domain)
+			domainSet[domain] = struct{}{}
+		}
+	}
+
+	mergeHostedWebPolicy(result, imported.HostedWeb)
 }
 
 // mergeHostedWebPolicy combines enabled imported domain lists with the top-level
