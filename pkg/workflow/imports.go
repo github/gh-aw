@@ -177,6 +177,9 @@ func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy
 		return
 	}
 	if network.HostedWeb == nil {
+		if !imported.Enabled {
+			return
+		}
 		policy := *imported
 		policy.Allowed = append([]string(nil), imported.Allowed...)
 		policy.Blocked = append([]string(nil), imported.Blocked...)

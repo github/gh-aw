@@ -31,6 +31,11 @@ func TestMergeHostedWebPolicy(t *testing.T) {
 			want:     &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org"}},
 		},
 		{
+			name:     "ignores disabled import when top-level policy is absent",
+			imported: &HostedWebPolicy{},
+			want:     nil,
+		},
+		{
 			name:     "merges unique allowed domains while retaining top-level max uses",
 			top:      &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org"}, MaxUses: 1},
 			imported: &HostedWebPolicy{Enabled: true, Allowed: []string{"archive.org", "microsoft.com"}, MaxUses: 5},
