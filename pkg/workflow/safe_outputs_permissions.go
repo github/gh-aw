@@ -109,7 +109,29 @@ func ComputePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig) *Permissio
 	return computePermissionsForSafeOutputs(safeOutputs, false)
 }
 
-func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePerHandlerApps bool) *Permissions {
+// safeOutputsGlobalAppTokenMinted reports whether the consolidated safe_outputs job
+// mints the global "safe-outputs-app-token" step. The step is skipped when no enabled
+// handler consumes GitHub permissions from the global app (for example when every
+// handler is staged, or in a Linear-only configuration), so token expressions that
+// reference the step must fall back to a regular token in that case.
+//
+// This must stay in sync with buildPreambleTokenSteps, which uses the same condition
+// to decide whether to emit the minting step.
+func safeOutputsGlobalAppTokenMinted(safeOutputs *SafeOutputsConfig) bool {
+	if safeOutputs == nil || safeOutputs.GitHubApp == nil {
+		return false
+	}
+	return globalAppTokenNeededForPermissions(computePermissionsForSafeOutputs(safeOutputs, true))
+}
+
+// globalAppTokenNeededForPermissions reports whether the permission set computed for the
+// global GitHub App requires minting an installation token. An explicitly empty permission
+// set means no enabled handler consumes the global app, so no token is minted.
+func globalAppTokenNeededForPermissions(appPermissions *Permissions) bool {
+	return appPermissions == nil || len(appPermissions.permissions) > 0
+}
+
+func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePerHandlerApps bool) *Permissions { //nolint:largefunc // Permission aggregation is clearer as one sequential pass.
 	if safeOutputs == nil {
 		safeOutputsPermissionsLog.Print("No safe outputs configured, returning empty permissions")
 		return NewPermissions()

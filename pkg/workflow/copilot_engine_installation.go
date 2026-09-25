@@ -148,7 +148,13 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	// the rootless location to ${RUNNER_TEMP}/gh-aw/bin/copilot where AWF expects it.
 	rootless := isArcDindTopology(workflowData)
 	compiledVersion := workflowData.CompiledVersion
-	npmSteps := GenerateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion)
+	copilotMinVersion := ""
+	if isCopilotToolValueEnabled(workflowData.Tools, "web-search") &&
+		copilotSupportsWebSearch(workflowData.EngineConfig) &&
+		(copilotVersion == "" || containsExpression(copilotVersion)) {
+		copilotMinVersion = string(constants.CopilotWebSearchMinVersion)
+	}
+	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, copilotMinVersion)
 	if len(inlineDriverWriteStep) > 0 {
 		npmSteps = append(npmSteps, inlineDriverWriteStep)
 	}
@@ -373,7 +379,11 @@ func firstCommandToken(command string) string {
 	if len(fields) == 0 {
 		return ""
 	}
-	token := normalizeCommandToken(fields[0])
+	token := ""
+	for _, field := range fields {
+		token = normalizeCommandToken(field)
+		break
+	}
 	if token != "env" {
 		return token
 	}

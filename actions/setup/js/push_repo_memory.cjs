@@ -172,7 +172,7 @@ async function pushRepoMemoryChangesWithRetry({
         // pushSignedCommits while still preserving concurrent JSONL rows via the
         // checkout-local merge=union policy.
         try {
-          const { stdout: lsOut } = await execGetExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir });
+          const { stdout: lsOut } = await execGetExecOutput("git", ["ls-remote", repoUrlWithToken, `refs/heads/${branchName}`], { cwd: workspaceDir, silent: true });
           const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
           if (remoteHead && remoteHead !== currentBaseRef) {
             const previousBaseRef = currentBaseRef;
