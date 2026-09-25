@@ -16,7 +16,7 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 		return DynamicCheckoutConfig{}, false, nil
 	}
 	if _, hasLegacyDynamic := raw["dynamic"]; hasLegacyDynamic {
-		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout uses checkout.repos; checkout.dynamic is not supported")
+		return DynamicCheckoutConfig{}, true, errors.New("checkout.dynamic is no longer supported; rename it to checkout.repos")
 	}
 	expression, hasExpression := raw["repos"].(string)
 	if !hasExpression {
