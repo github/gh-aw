@@ -1712,6 +1712,29 @@ func TestCreateCodeScanningAlertUploadJob(t *testing.T) {
 	}
 }
 
+func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+
+	workflowData := &WorkflowData{
+		Name: "Test Workflow",
+		On: `"on":
+  workflow_call:`,
+		SafeOutputs: &SafeOutputsConfig{
+			CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{},
+		},
+	}
+
+	uploadJob, err := compiler.buildCodeScanningUploadJob(workflowData)
+	require.NoError(t, err)
+	require.NotNil(t, uploadJob)
+	assert.Equal(t, []string{
+		string(constants.ActivationJobName),
+		string(constants.SafeOutputsJobName),
+	}, uploadJob.Needs)
+	assert.Contains(t, strings.Join(uploadJob.Steps, ""), "${{ needs.activation.outputs.artifact_prefix }}")
+}
+
 // TestBuildSafeOutputItemsManifestUploadStep verifies that the upload step includes
 // the manifest and temporary ID map but excludes process stdout/stderr logs.
 func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
