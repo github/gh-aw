@@ -17,7 +17,7 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 	if !ok {
 		return DynamicCheckoutConfig{}, false, nil
 	}
-	if _, hasLegacyDynamic := raw["dynamic"]; hasLegacyDynamic {
+	if legacyDynamic, hasLegacyDynamic := raw["dynamic"]; hasLegacyDynamic && legacyDynamicLooksLikeCheckout(legacyDynamic, raw) {
 		return DynamicCheckoutConfig{}, true, errors.New("checkout.dynamic is no longer supported; rename it to checkout.repos")
 	}
 	expression, hasExpression := raw["repos"].(string)
@@ -46,13 +46,25 @@ func parseDynamicCheckoutConfig(value any) (DynamicCheckoutConfig, bool, error) 
 		for _, field := range unsupportedFields {
 			quotedFields = append(quotedFields, fmt.Sprintf("%q", field))
 		}
-		return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field(s) %s are not supported; only repos and allowed-repos are allowed", strings.Join(quotedFields, ", "))
+		if len(quotedFields) == 1 {
+			return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout field %s is not supported; only repos and allowed-repos are allowed", quotedFields[0])
+		}
+		return DynamicCheckoutConfig{}, true, fmt.Errorf("dynamic checkout fields %s are not supported; only repos and allowed-repos are allowed", strings.Join(quotedFields, ", "))
 	}
 	allowedRepos, err := parseStringArrayOrExpression(allowed)
 	if err != nil || len(allowedRepos) == 0 {
 		return DynamicCheckoutConfig{}, true, errors.New("dynamic checkout allowed-repos must be a non-empty array or GitHub Actions expression")
 	}
+
 	return DynamicCheckoutConfig{Expression: strings.TrimSpace(expression), AllowedRepos: allowedRepos}, true, nil
+}
+
+func legacyDynamicLooksLikeCheckout(value any, raw map[string]any) bool {
+	if _, hasAllowedRepos := raw["allowed-repos"]; hasAllowedRepos {
+		return true
+	}
+	expression, ok := value.(string)
+	return ok && isExpression(expression)
 }
 
 func parseStringArrayOrExpression(value any) ([]string, error) {

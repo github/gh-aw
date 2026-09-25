@@ -62,6 +62,34 @@ func TestParseFrontmatterConfigDynamicCheckoutRejectsLegacyDynamicField(t *testi
 	require.ErrorContains(t, err, "checkout.repos")
 }
 
+func TestParseFrontmatterConfigDynamicCheckoutRejectsLegacyDynamicExpression(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"dynamic": "${{ fromJSON(inputs.checkouts) }}",
+		},
+	})
+
+	require.ErrorContains(t, err, "checkout.dynamic is no longer supported")
+}
+
+func TestParseFrontmatterConfigDynamicCheckoutIgnoresStaticDynamicKey(t *testing.T) {
+	config, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "static-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"repository": "owner/repo",
+			"dynamic":    false,
+		},
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, config.DynamicCheckouts)
+	require.Len(t, config.CheckoutConfigs, 1)
+	assert.Equal(t, "owner/repo", config.CheckoutConfigs[0].Repository)
+}
+
 func TestParseFrontmatterConfigDynamicCheckoutRequiresReposExpression(t *testing.T) {
 	_, err := ParseFrontmatterConfig(map[string]any{
 		"name":   "dynamic-checkout",
@@ -100,7 +128,7 @@ func TestParseFrontmatterConfigDynamicCheckoutRejectsUnsupportedField(t *testing
 		},
 	})
 
-	require.ErrorContains(t, err, `field(s) "fetch-depth", "path" are not supported`)
+	require.ErrorContains(t, err, `fields "fetch-depth", "path" are not supported`)
 }
 
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
