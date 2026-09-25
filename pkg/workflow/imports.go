@@ -177,8 +177,10 @@ func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy
 		network.HostedWeb = &policy
 		return
 	}
-	// An explicit disablement must not be re-enabled by an import, and an imported
-	// disablement does not override an enabled top-level policy.
+	// Object policies are normalized to Enabled during parsing; only
+	// hosted-web: false is disabled. An explicit top-level disablement must not be
+	// re-enabled by an import, and an imported disablement does not override an
+	// enabled top-level policy.
 	if !network.HostedWeb.Enabled || !imported.Enabled {
 		return
 	}
