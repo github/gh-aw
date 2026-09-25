@@ -614,7 +614,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 	var preambleTokenSteps []string
 	if data.SafeOutputs.GitHubApp != nil {
 		appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
-		if appPermissions != nil && len(appPermissions.permissions) == 0 {
+		if !safeOutputsGlobalAppTokenMinted(data.SafeOutputs) {
 			// No enabled handler (e.g. a Linear-only configuration) consumes GitHub
 			// permissions from this global app, so skip minting an unrelated
 			// installation token purely because a top-level github-app was
