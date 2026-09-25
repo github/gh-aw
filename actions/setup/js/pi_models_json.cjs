@@ -115,7 +115,7 @@ function resolveContextWindow(value, logger) {
   }
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    logger("warning: ignoring invalid contextWindow; expected a positive integer");
+    logger(`warning: ignoring invalid contextWindow=${JSON.stringify(value)}; expected a positive integer`);
     return undefined;
   }
   return parsed;

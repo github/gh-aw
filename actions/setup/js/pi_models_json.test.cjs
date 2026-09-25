@@ -156,7 +156,7 @@ describe("pi_models_json.cjs", () => {
         logger: message => warnings.push(message),
       });
       expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
-      expect(warnings).toEqual(["warning: ignoring invalid contextWindow; expected a positive integer"]);
+      expect(warnings).toEqual(['warning: ignoring invalid contextWindow="not-a-number"; expected a positive integer']);
     });
 
     it.each([
