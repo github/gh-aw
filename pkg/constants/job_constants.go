@@ -132,6 +132,9 @@ const SafeOutputsFilename Filename = "safeoutputs.jsonl"
 // consume structured token data without parsing the step summary or GITHUB_OUTPUT.
 const TokenUsageFilename Filename = "agent_usage.json"
 
+// AWFInstallDiagnosticsFilename is the filename of the AWF install failure marker written to /tmp/gh-aw/.
+const AWFInstallDiagnosticsFilename Filename = "awf-install-diagnostics.json"
+
 // GradersDirName is the directory name holding grader manifest and results files. The agent
 // job writes them under /tmp/gh-aw/agent/graders/ and the conclusion job mirrors them into
 // the graders/ subdirectory of the usage artifact.

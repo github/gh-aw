@@ -2979,7 +2979,7 @@ function buildAWFDownloadFailureContext(failure) {
   const asset = AWF_DOWNLOAD_STAGE_ASSETS.get(failure.stage) || "an AWF release asset";
   return (
     buildWarningAlertLine("AWF Download Failure", `The workflow could not download ${asset} from the AWF release. The agent was not started.`) +
-    "\nThis is usually transient GitHub release or network infrastructure failure. Re-run the workflow; if it persists, check the configured AWF version and GitHub Actions network access.\n\n"
+    "\nThis is usually a transient GitHub release or network infrastructure failure. Re-run the workflow; if it persists, check the configured AWF version and GitHub Actions network access.\n\n"
   );
 }
 

@@ -157,7 +157,7 @@ EOF
 #!/usr/bin/env bash
 case "$1" in
   -s) echo Linux ;;
-  -m) echo x86_64 ;;
+    -m) echo "${TEST_ARCH:-x86_64}" ;;
 esac
 EOF
   chmod +x "${test_dir}/bin/"*
@@ -238,6 +238,97 @@ if echo "$warning_output" | grep -q "WARNING"; then
 else
   fail "No WARNING when GITHUB_PATH is unset" "$warning_output"
 fi
+
+# Test 8: download failures write the AWF install diagnostics marker for the current stage
+echo "Test 8: download failures write stage-specific diagnostics..."
+test_download_failure_diagnostics() {
+  local failing_stage="$1"
+  local expected_stage="$2"
+  local test_dir
+  test_dir=$(mktemp -d)
+  rm -f /tmp/gh-aw/awf-install-diagnostics.json
+  mkdir -p "${test_dir}/bin" "${test_dir}/home"
+  cat > "${test_dir}/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "--help" ]; then
+  exit 0
+fi
+output=""
+url="${@: -1}"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    output="$2"
+    break
+  fi
+  shift
+done
+case "${FAIL_STAGE}:${output}" in
+  download_checksums:*checksums.txt|download_bundle:*awf-bundle.js|download_binary:*awf-linux-x64)
+    exit 22
+    ;;
+esac
+if [ "${FAIL_STAGE}" = "download_bundle" ] && [[ "${url}" == *awf-bundle.js ]]; then
+  exit 22
+fi
+if [[ "${url}" == *checksums.txt ]]; then
+  printf 'checksum awf-bundle.js\nchecksum awf-linux-x64\n' > "${output}"
+else
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
+fi
+EOF
+  cat > "${test_dir}/bin/node" <<'EOF'
+#!/usr/bin/env bash
+if [ "${NODE_MAJOR}" = "20" ]; then
+  echo v20.0.0
+else
+  echo v18.0.0
+fi
+EOF
+  cat > "${test_dir}/bin/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+printf 'checksum %s\n' "$1"
+EOF
+  cat > "${test_dir}/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  -s) echo Linux ;;
+  -m) echo "${TEST_ARCH:-x86_64}" ;;
+esac
+EOF
+  chmod +x "${test_dir}/bin/"*
+
+  local node_major=18
+  if [ "${failing_stage}" = "download_bundle" ]; then
+    node_major=20
+  fi
+  local test_arch=x86_64
+  if [ "${failing_stage}" = "download_bundle" ]; then
+    test_arch=unsupported
+  fi
+
+  if FAIL_STAGE="${failing_stage}" NODE_MAJOR="${node_major}" TEST_ARCH="${test_arch}" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
+    PATH="${test_dir}/bin:/usr/bin:/bin" bash "${SCRIPT_DIR}/install_awf_binary.sh" vtest --rootless >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="installer unexpectedly succeeded"
+    rm -rf "${test_dir}"
+    rm -f /tmp/gh-aw/awf-install-diagnostics.json
+    return 1
+  fi
+  if ! grep -q "\"stage\":\"${expected_stage}\"" /tmp/gh-aw/awf-install-diagnostics.json 2>/dev/null; then
+    TEST_FAILURE_REASON="$(cat /tmp/gh-aw/awf-install-diagnostics.json 2>/dev/null || echo '<missing diagnostics file>')"
+    rm -rf "${test_dir}"
+    rm -f /tmp/gh-aw/awf-install-diagnostics.json
+    return 1
+  fi
+  rm -rf "${test_dir}"
+  rm -f /tmp/gh-aw/awf-install-diagnostics.json
+}
+for stage in download_checksums download_bundle download_binary; do
+  if test_download_failure_diagnostics "${stage}" "${stage}"; then
+    pass "${stage} failure writes diagnostics"
+  else
+    fail "${stage} failure did not write diagnostics" "${TEST_FAILURE_REASON}"
+  fi
+done
 
 echo
 echo "Tests passed: $TESTS_PASSED"

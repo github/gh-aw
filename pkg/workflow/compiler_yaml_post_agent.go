@@ -42,7 +42,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 
 	// Collect agent stdio logs path for unified upload
 	paths = append(paths, logFileFull)
-	paths = append(paths, constants.TmpGhAwDirSlash+"awf-install-diagnostics.json")
+	paths = append(paths, constants.TmpGhAwDirSlash+constants.AWFInstallDiagnosticsFilename.String())
 
 	// Include the pre-agent audit file (file listing of agent-related directories captured
 	// before agent execution) so it is available in the agent artifact for post-run inspection.

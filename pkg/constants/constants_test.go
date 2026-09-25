@@ -148,6 +148,7 @@ func TestConstantValues(t *testing.T) {
 		{"AgentOutputArtifactName", string(AgentOutputArtifactName), "agent-output"},
 		{"InfoArtifactName", string(InfoArtifactName), "info"},
 		{"SafeOutputItemsArtifactName", string(SafeOutputItemsArtifactName), "safe-outputs-items"},
+		{"AWFInstallDiagnosticsFilename", string(AWFInstallDiagnosticsFilename), "awf-install-diagnostics.json"},
 		{"TemporaryIdMapFilename", string(TemporaryIdMapFilename), "temporary-id-map.json"},
 		{"SafeOutputsMCPServerID", string(SafeOutputsMCPServerID), "safeoutputs"},
 		{"CheckMembershipStepID", string(CheckMembershipStepID), "check_membership"},

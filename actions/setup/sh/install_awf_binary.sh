@@ -34,6 +34,7 @@ AWF_INSTALL_NAME="awf"
 AWF_LIB_DIR="/usr/local/lib/awf"
 AWF_DIAGNOSTICS_FILE="/tmp/gh-aw/awf-install-diagnostics.json"
 AWF_INSTALL_STAGE="initialization"
+rm -f "$AWF_DIAGNOSTICS_FILE" 2>/dev/null || true
 
 record_install_failure() {
   local exit_code="$1"
@@ -45,7 +46,22 @@ record_install_failure() {
   printf '{"kind":"awf_install_failure","stage":"%s","exit_code":%s}\n' "$AWF_INSTALL_STAGE" "$exit_code" > "$AWF_DIAGNOSTICS_FILE" 2>/dev/null || true
 }
 
-trap 'exit_code=$?; record_install_failure "$exit_code"; exit "$exit_code"' ERR
+download_awf_asset() {
+  local stage="$1"
+  local output="$2"
+  local url="$3"
+
+  AWF_INSTALL_STAGE="$stage"
+  if curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "$output" "$url"; then
+    AWF_INSTALL_STAGE="${stage}_complete"
+    return 0
+  else
+    local exit_code=$?
+    record_install_failure "$exit_code"
+    AWF_INSTALL_STAGE="${stage}_failed"
+    return "$exit_code"
+  fi
+}
 
 # Parse flags from remaining arguments
 ROOTLESS=false
@@ -148,7 +164,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # Download checksums
 AWF_INSTALL_STAGE="download_checksums"
 echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
-curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
+download_awf_asset "download_checksums" "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
 
 verify_checksum() {
   local file="$1"
@@ -199,9 +215,8 @@ install_bundle() {
   node_bin=$(command -v node)
 
   echo "Node.js >= 20 detected ($(node --version)), using lightweight bundle..."
-  AWF_INSTALL_STAGE="download_bundle"
   echo "Downloading bundle from ${bundle_url@Q}..."
-  if ! curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
+  if ! download_awf_asset "download_bundle" "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
     echo "⚠ Bundle download failed (asset may not exist for this version)"
     return 1
   fi
@@ -239,9 +254,8 @@ install_linux_binary() {
   esac
 
   local binary_url="${BASE_URL}/${awf_binary}"
-  AWF_INSTALL_STAGE="download_binary"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  download_awf_asset "download_binary" "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"
@@ -265,9 +279,8 @@ install_darwin_binary() {
   echo ""
 
   local binary_url="${BASE_URL}/${awf_binary}"
-  AWF_INSTALL_STAGE="download_binary"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  download_awf_asset "download_binary" "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"
@@ -329,5 +342,6 @@ fi
 AWF_INSTALL_STAGE="verify_installation"
 maybe_sudo env -u GITHUB_API_URL -u GITHUB_GRAPHQL_URL -u GH_HOST \
     "${AWF_INSTALL_DIR}/${AWF_INSTALL_NAME}" --version
+rm -f "$AWF_DIAGNOSTICS_FILE" 2>/dev/null || true
 
 echo "✓ AWF installation complete"

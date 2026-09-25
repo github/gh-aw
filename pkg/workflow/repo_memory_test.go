@@ -1444,9 +1444,9 @@ func TestPushRepoMemoryJobConditions(t *testing.T) {
 		require.NotNil(t, pushJob, "Should produce a push job")
 
 		assert.Equal(t,
-			"always() && (!cancelled())",
+			"always() && (!cancelled()) && needs.agent.result != 'skipped'",
 			pushJob.If,
-			"Condition should run unless the workflow is cancelled",
+			"Condition should run unless the workflow is cancelled or the agent was skipped",
 		)
 	})
 

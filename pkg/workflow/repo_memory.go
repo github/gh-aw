@@ -741,8 +741,7 @@ func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) 
 		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), buildDetectionPassedCondition()), agentCompleted))
 		jobNeeds = append(jobNeeds, string(constants.DetectionJobName))
 	} else {
-		// Without a detection job, only cancellation prevents this cleanup job from running.
-		jobCondition = RenderCondition(BuildAnd(BuildFunctionCall("always"), notCancelled))
+		jobCondition = RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), notCancelled), agentCompleted))
 	}
 	return jobCondition, jobNeeds
 }
