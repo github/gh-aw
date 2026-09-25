@@ -594,7 +594,7 @@ cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--json/-j`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--stdin`, `--variant`
+**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--stdin`, `--variant`
 
 The `--repo` flag accepts `owner/repo` format and is required when passing a bare numeric run ID without a full URL, allowing the command to locate the correct repository.
 
