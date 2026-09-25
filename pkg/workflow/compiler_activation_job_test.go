@@ -1121,6 +1121,13 @@ func TestCheckoutSameRepoGuardWithCustomToken(t *testing.T) {
 			wantSameRepoCondition: true,
 		},
 		{
+			name:            "explicit GITHUB_TOKEN with workflow_call - same-repo guard present",
+			activationToken: "${{ secrets.GITHUB_TOKEN }}",
+			onSection: `"on":
+  workflow_call:`,
+			wantSameRepoCondition: true,
+		},
+		{
 			name: "GitHub App with ignore-if-missing and workflow_call - same-repo guard present",
 			activationApp: &GitHubAppConfig{
 				AppID:           "${{ vars.APP_ID }}",

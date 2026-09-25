@@ -540,13 +540,16 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 		if normalized == "" {
 			continue
 		}
-		topLevel, _, _ := strings.Cut(normalized, "/")
 		parts := strings.Split(normalized, "/")
 		invalid := false
-		for _, part := range parts {
+		topLevel := ""
+		for i, part := range parts {
 			if part == "" || part == "." || part == ".." {
 				invalid = true
 				break
+			}
+			if i == 0 {
+				topLevel = part
 			}
 		}
 		if invalid {
@@ -584,7 +587,7 @@ func activationTokenMayUseGitHubToken(data *WorkflowData) bool {
 	if data.ActivationGitHubApp != nil {
 		return data.ActivationGitHubApp.shouldIgnoreMissingKey()
 	}
-	return data.ActivationGitHubToken == ""
+	return data.ActivationGitHubToken == "" || data.ActivationGitHubToken == "${{ secrets.GITHUB_TOKEN }}"
 }
 
 // injectIfConditionAfterName inserts an "if:" field immediately after the "- name:"
