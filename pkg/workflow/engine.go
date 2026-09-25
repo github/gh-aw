@@ -411,6 +411,7 @@ func parseNonEmptyAuthDefinition(authObj map[string]any) *AuthDefinition {
 func applyInlineEngineFields(config *EngineConfig, engineObj map[string]any, topLevel engineTopLevelConfig) {
 	applyEngineBareField(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
+	applyEngineContextWindowField(config, engineObj)
 	config.MaxTurns = topLevel.maxTurns
 	config.MaxToolDenials = topLevel.maxToolDenials
 	config.MaxRuns = topLevel.maxRuns

@@ -170,6 +170,26 @@ func TestEngineContextWindowFieldExtraction(t *testing.T) {
 		}
 	})
 
+	t.Run("extracts inline engine context-window", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"engine": map[string]any{
+				"runtime":        map[string]any{"id": "pi"},
+				"context-window": 1000000,
+			},
+		}
+
+		_, config, _ := compiler.ExtractEngineConfig(frontmatter)
+		if config == nil {
+			t.Fatal("Expected config to be non-nil")
+		}
+		if !config.IsInlineDefinition {
+			t.Fatal("Expected inline engine definition")
+		}
+		if config.ContextWindow != 1000000 {
+			t.Errorf("Expected context window 1000000, got %d", config.ContextWindow)
+		}
+	})
+
 	t.Run("context-window omitted keeps zero default", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"engine": map[string]any{

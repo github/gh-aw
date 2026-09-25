@@ -140,9 +140,21 @@ func (c *Compiler) validateMaxTurnsSupport(frontmatter map[string]any, engine Co
 	return validateCapabilitySupport("max-turns", hasMaxTurns, engine.GetCapabilities().MaxTurns, engine.GetID())
 }
 
+// emitContextWindowSupportWarning warns when the resolved engine configuration,
+// including imported engine settings, sets context-window for an unsupported engine.
+func (c *Compiler) emitContextWindowSupportWarning(workflowData *WorkflowData) {
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.ContextWindow == 0 {
+		return
+	}
+	engine, err := c.getAgenticEngine(workflowData.AI)
+	if err != nil {
+		return
+	}
+	c.validateContextWindowSupport(workflowData.EngineConfig, engine)
+}
+
 // validateContextWindowSupport warns when context-window is used with an engine that cannot consume it.
-func (c *Compiler) validateContextWindowSupport(frontmatter map[string]any, engine CodingAgentEngine) {
-	_, engineConfig, _ := c.ExtractEngineConfig(frontmatter)
+func (c *Compiler) validateContextWindowSupport(engineConfig *EngineConfig, engine CodingAgentEngine) {
 	if engineConfig == nil || engineConfig.ContextWindow == 0 || engine.GetCapabilities().ContextWindow {
 		return
 	}
