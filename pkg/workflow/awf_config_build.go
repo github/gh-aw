@@ -137,6 +137,10 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		MaxAICredits:        maxAICredits,
 		EnableTokenSteering: tokenSteeringEnabled,
 	}
+	if hostedWeb := buildHostedWebConfig(config.EngineName, config.EngineRuntimeID, config.WorkflowData, firewallConfig); hostedWeb != nil {
+		apiProxy.HostedWeb = hostedWeb
+		awfConfigLog.Printf("API proxy: hosted web policy configured for %s", config.EngineName)
+	}
 
 	if !enableTokenSteering {
 		awfConfigLog.Print("Disabling apiProxy.enableTokenSteering")
@@ -344,6 +348,43 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 
 	return jsonStr, nil
+}
+
+func buildHostedWebConfig(engineName, engineRuntimeID string, workflowData *WorkflowData, firewallConfig *FirewallConfig) *AWFHostedWebConfig {
+	if workflowData == nil || workflowData.NetworkPermissions == nil {
+		return nil
+	}
+	runtimeID := hostedWebRuntimeID(engineName, engineRuntimeID)
+	if runtimeID != "claude" && runtimeID != "codex" {
+		return nil
+	}
+	if !awfSupportsHostedWeb(firewallConfig) {
+		awfConfigLog.Printf("Skipping apiProxy.hostedWeb: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFHostedWebMinVersion)
+		return nil
+	}
+
+	policy := workflowData.NetworkPermissions.HostedWeb
+	if policy == nil {
+		if !workflowData.NetworkPermissions.ExplicitlyDefined {
+			return nil
+		}
+		policy = &HostedWebPolicy{}
+	}
+
+	awfPolicy := &AWFHostedWebPolicy{
+		Enabled:        policy.Enabled,
+		AllowedDomains: policy.Allowed,
+		BlockedDomains: policy.Blocked,
+		MaxUses:        policy.MaxUses,
+	}
+	switch runtimeID {
+	case "claude":
+		return &AWFHostedWebConfig{Claude: awfPolicy}
+	case "codex":
+		return &AWFHostedWebConfig{Codex: awfPolicy}
+	default:
+		return nil
+	}
 }
 
 func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {

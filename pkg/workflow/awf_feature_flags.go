@@ -102,6 +102,12 @@ func awfSupportsAPIProxyCACert(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFAPIProxyCACertMinVersion)
 }
 
+// awfSupportsHostedWeb returns true when the effective AWF version supports
+// apiProxy.hostedWeb in awf-config.json.
+func awfSupportsHostedWeb(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFHostedWebMinVersion)
+}
+
 // awfSupportsHTTPAPITargets returns true when the effective AWF version supports
 // explicit http:// schemes in apiProxy target hosts.
 func awfSupportsHTTPAPITargets(firewallConfig *FirewallConfig) bool {

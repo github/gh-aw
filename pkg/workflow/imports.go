@@ -100,8 +100,9 @@ func (c *Compiler) MergeMCPServers(topMCPServers map[string]any, importedMCPServ
 	return result, nil
 }
 
-// MergeNetworkPermissions merges network permissions from imports with top-level network permissions
-// Combines allowed domains from both sources into a single list
+// MergeNetworkPermissions merges network permissions from imports with top-level network permissions.
+// Allowed and hosted-web domains are combined while top-level scalar configuration
+// takes precedence.
 func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, importedNetworkJSON string) (*NetworkPermissions, error) {
 	importsLog.Print("Merging network permissions from imports")
 
@@ -111,11 +112,12 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 		return topNetwork, nil
 	}
 
-	// Start with top-level network or create a new one
+	// Start with top-level network or create a new one. Copy the struct first so
+	// fields other than Allowed (Blocked, HostedWeb, Firewall, ExplicitlyDefined,
+	// etc.) survive the merge instead of silently reverting to zero values.
 	result := &NetworkPermissions{}
 	if topNetwork != nil {
-		result.Allowed = make([]string, len(topNetwork.Allowed))
-		copy(result.Allowed, topNetwork.Allowed)
+		result = topNetwork.clone()
 		importsLog.Printf("Starting with %d top-level allowed domains", len(topNetwork.Allowed))
 	}
 
@@ -143,21 +145,75 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 			continue // Skip invalid lines
 		}
 
-		// Merge allowed domains from imported network
-		for _, domain := range importedNetwork.Allowed {
-			if !setutil.Contains(domainSet, domain) {
-				result.Allowed = append(result.Allowed, domain)
-				domainSet[domain] = struct {
-				}{}
-			}
-		}
+		mergeImportedNetworkPermissions(result, importedNetwork, domainSet)
 	}
 
 	// Sort the final domain list for consistent output
 	sort.Strings(result.Allowed)
+	if result.HostedWeb != nil {
+		sort.Strings(result.HostedWeb.Allowed)
+		sort.Strings(result.HostedWeb.Blocked)
+	}
 
 	importsLog.Printf("Successfully merged network permissions with %d allowed domains", len(result.Allowed))
 	return result, nil
+}
+
+func mergeImportedNetworkPermissions(result *NetworkPermissions, imported NetworkPermissions, domainSet map[string]struct{}) {
+	for _, domain := range imported.Allowed {
+		if !setutil.Contains(domainSet, domain) {
+			result.Allowed = append(result.Allowed, domain)
+			domainSet[domain] = struct{}{}
+		}
+	}
+
+	mergeHostedWebPolicy(result, imported.HostedWeb)
+}
+
+// mergeHostedWebPolicy combines enabled imported domain lists with the top-level
+// policy. An explicit top-level disablement and its scalar settings take precedence.
+func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy) {
+	if imported == nil {
+		return
+	}
+	if network.HostedWeb == nil {
+		if !imported.Enabled {
+			return
+		}
+		policy := *imported
+		policy.Allowed = append([]string(nil), imported.Allowed...)
+		policy.Blocked = append([]string(nil), imported.Blocked...)
+		network.HostedWeb = &policy
+		return
+	}
+	// Object policies are normalized to Enabled during parsing; only
+	// hosted-web: false is disabled. An explicit top-level disablement must not be
+	// re-enabled by an import, and an imported disablement does not override an
+	// enabled top-level policy.
+	if !network.HostedWeb.Enabled || !imported.Enabled {
+		return
+	}
+
+	network.HostedWeb.Allowed = appendUniqueDomains(network.HostedWeb.Allowed, imported.Allowed)
+	network.HostedWeb.Blocked = appendUniqueDomains(network.HostedWeb.Blocked, imported.Blocked)
+}
+
+// appendUniqueDomains returns a fresh domain list with additions appended once.
+func appendUniqueDomains(domains, additions []string) []string {
+	if len(domains) == 0 && len(additions) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(domains)+len(additions))
+	seen := make(map[string]struct{}, len(domains)+len(additions))
+	for _, candidates := range [][]string{domains, additions} {
+		for _, domain := range candidates {
+			if _, exists := seen[domain]; !exists {
+				result = append(result, domain)
+				seen[domain] = struct{}{}
+			}
+		}
+	}
+	return result
 }
 
 // getSafeOutputTypeKeys returns the list of safe output type keys from the embedded schema.

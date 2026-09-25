@@ -160,6 +160,9 @@ type AWFAPIProxyConfig struct {
 	// EnableTokenSteering enables budget-warning system message injection near AIC budget exhaustion.
 	EnableTokenSteering *bool `json:"enableTokenSteering,omitempty"`
 
+	// HostedWeb configures policy for provider-hosted web search and fetch tools.
+	HostedWeb *AWFHostedWebConfig `json:"hostedWeb,omitempty"`
+
 	// MaxRuns is the maximum number of LLM invocations allowed for a run.
 	MaxRuns int `json:"maxRuns,omitempty"`
 
@@ -210,6 +213,20 @@ type AWFAPIProxyConfig struct {
 	// Only emitted for AWF v0.28.10+ (see AWFAPIProxyCACertMinVersion); older
 	// AWF strict config validation rejects the unknown property.
 	CACert string `json:"caCert,omitempty"`
+}
+
+// AWFHostedWebConfig is the "apiProxy.hostedWeb" section of the AWF config file.
+type AWFHostedWebConfig struct {
+	Claude *AWFHostedWebPolicy `json:"claude,omitempty"`
+	Codex  *AWFHostedWebPolicy `json:"codex,omitempty"`
+}
+
+// AWFHostedWebPolicy constrains hosted retrieval for a single provider.
+type AWFHostedWebPolicy struct {
+	Enabled        bool     `json:"enabled"`
+	AllowedDomains []string `json:"allowedDomains,omitempty"`
+	BlockedDomains []string `json:"blockedDomains,omitempty"`
+	MaxUses        int      `json:"maxUses,omitempty"`
 }
 
 // AWFModelFallbackConfig is the "apiProxy.modelFallback" section of the AWF config file.

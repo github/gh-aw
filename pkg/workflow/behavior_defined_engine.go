@@ -641,8 +641,8 @@ func (e *BehaviorDefinedEngine) applyBehaviorDefinedModelEnv(exec *EngineExecuti
 	}
 	modelVal := workflowData.Model
 	if exec.ModelEnvProviderPrefix != "" {
-		if parts := strings.SplitN(modelVal, "/", 2); len(parts) == 2 {
-			modelVal = path.Join(exec.ModelEnvProviderPrefix, parts[1])
+		if _, model, ok := strings.Cut(modelVal, "/"); ok {
+			modelVal = path.Join(exec.ModelEnvProviderPrefix, model)
 		}
 	}
 	env[exec.ModelEnvVarName] = modelVal
@@ -706,6 +706,7 @@ func (e *BehaviorDefinedEngine) buildFirewallCommand(exec *EngineExecutionDefini
 
 	return BuildAWFCommand(AWFCommandConfig{
 		EngineName:         e.GetID(),
+		EngineRuntimeID:    e.definition.RuntimeID,
 		EngineCommand:      engineCommandWithPath,
 		LogFile:            logFile,
 		WorkflowData:       workflowData,
@@ -887,9 +888,9 @@ func deepCopyAny(v any) any {
 		}
 		return cp
 	case []any:
-		cp := make([]any, len(val))
-		for i, elem := range val {
-			cp[i] = deepCopyAny(elem)
+		cp := make([]any, 0, len(val))
+		for _, elem := range val {
+			cp = append(cp, deepCopyAny(elem))
 		}
 		return cp
 	default:
