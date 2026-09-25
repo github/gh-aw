@@ -32,6 +32,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
+	"github.com/github/gh-aw/pkg/linters/loopindexaddresstaken"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
 	"github.com/github/gh-aw/pkg/linters/lenstringzero"
 	"github.com/github/gh-aw/pkg/linters/logfatallibrary"
@@ -116,6 +117,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ioutildeprecated.Analyzer,
 	httpstatuscode.Analyzer,
 	largefunc.Analyzer,
+	loopindexaddresstaken.Analyzer,
 	logfatallibrary.Analyzer,
 	manualmutexunlock.Analyzer,
 	manualpathconcat.Analyzer,
