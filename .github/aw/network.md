@@ -141,6 +141,27 @@ These look like ecosystem identifiers but are **not recognised** — using them 
 - **No protocol prefix**: `https://api.example.com` is invalid — write `api.example.com`.
 - **Subdomains must be explicit**: `github.com` does not cover `api.github.com`; use `*.github.com` or both.
 
+## Hosted Web Policy (`network.hosted-web`)
+
+Claude and Codex expose provider-hosted web search/fetch tools that run on provider infrastructure, outside the AWF sandbox — `network.allowed` does not constrain their destinations. Configure a separate policy to control them:
+
+```yaml
+network:
+  allowed:
+    - defaults
+  hosted-web:
+    allowed:
+      - docs.github.com
+    max-uses: 5
+```
+
+- `allowed` and `blocked` are mutually exclusive; each is a non-empty list of lowercase DNS hostnames (no wildcards).
+- `max-uses` optionally caps the number of hosted web tool invocations.
+- `hosted-web: false` disables hosted web tools for that workflow.
+- **Deny-by-default**: if a Claude or Codex workflow sets `network` explicitly without a `hosted-web` policy, hosted web tools compile to disabled for that engine.
+- Setting `hosted-web` on any engine other than Claude or Codex is a compile error.
+- On import merge, allowed/blocked lists from imported files combine with the main workflow's, but only when both policies are enabled; the main workflow's scalar settings (such as `max-uses`) and an explicit `hosted-web: false` on either side win — see [syntax-tools-imports.md](syntax-tools-imports.md).
+
 ## Inferring Ecosystem From Repository Files
 
 For workflows that build, test, or install packages, add the matching ecosystem alongside `defaults`:

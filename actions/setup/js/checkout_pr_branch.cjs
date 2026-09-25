@@ -35,6 +35,9 @@ const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs")
 const { detectForkPR } = require("./pr_helpers.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
 const TRUSTED_CHECKOUT_PERMISSIONS = ["write", "maintain", "admin"];
+// Centralized command/label routing uses the repository GITHUB_TOKEN, whose
+// GitHub-authenticated actor is fixed to this platform identity.
+const CENTRALIZED_ROUTER_ACTOR = "github-actions[bot]";
 const PR_HEAD_BASE_REF = "refs/remotes/origin/pr-head";
 
 /**
@@ -213,33 +216,81 @@ function logCheckoutStrategy(eventName, strategy, reason) {
 }
 
 /**
- * Ensure checkout step only runs in trusted runtime contexts.
- * - repository must not be a fork
- * - triggering actor must have write-or-higher repository permission
+ * Parse a canonical positive decimal pull request number without coercing
+ * booleans, exponent notation, hexadecimal, whitespace, or fractional values.
+ * @param {unknown} value
+ * @returns {number | null}
  */
-async function assertTrustedCheckoutRuntime() {
-  const repository = context.payload.repository;
-  if (repository?.fork === true) {
-    throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
+function parsePullRequestNumber(value) {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+/**
+ * Ensure checkout step only runs in trusted runtime contexts.
+ * - workflow_dispatch PR replay must not run in a forked repository
+ * - triggering actor must have write-or-higher repository permission
+ * @param {Record<string, any> | undefined} awContext Parsed workflow_dispatch context, consulted only for github-actions bot dispatches
+ */
+async function assertTrustedCheckoutRuntime(awContext) {
+  if (context.eventName === "workflow_dispatch") {
+    const repository = context.payload.repository;
+    // Fork status can only be verified when the payload carries repository
+    // data. Fail closed rather than silently trusting an unverifiable
+    // runtime: RS-05a requires proving "not a fork", not merely failing to
+    // prove "is a fork".
+    if (!repository) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine repository fork status for workflow_dispatch");
+    }
+    if (repository.fork === true) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout in forked repository runtime context");
+    }
+    if (repository.fork !== false) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to verify repository is not a fork for workflow_dispatch");
+    }
   }
 
   // context.actor is preferred when available; sender.login and GITHUB_ACTOR
   // are retained as event/runtime-compatible fallbacks.
-  const actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  let actor = context.actor || context.payload.sender?.login || process.env.GITHUB_ACTOR;
+  const senderType = context.payload.sender?.type;
+  // GitHub attributes direct dispatches to their initiating user/app, while
+  // repository workflows using GITHUB_TOKEN run as github-actions[bot].
+  // Only trusted workflows may hold actions:write. command_name and
+  // trigger_label are shape checks, not additional proof of provenance.
+  if (context.eventName === "workflow_dispatch" && actor === CENTRALIZED_ROUTER_ACTOR) {
+    if (senderType !== "Bot") {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to verify centralized workflow_dispatch identity");
+    }
+    const commandName = typeof awContext?.command_name === "string" ? awContext.command_name.trim() : "";
+    const triggerLabel = typeof awContext?.trigger_label === "string" ? awContext.trigger_label.trim() : "";
+    if (!commandName && !triggerLabel) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to identify centralized workflow_dispatch");
+    }
+    const propagatedActor = typeof awContext?.actor === "string" ? awContext.actor.trim() : "";
+    if (!propagatedActor) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine originating actor for centralized workflow_dispatch");
+    }
+    if (propagatedActor === CENTRALIZED_ROUTER_ACTOR) {
+      throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: centralized workflow_dispatch must identify an originating actor");
+    }
+    actor = propagatedActor;
+    core.info(`Validating centralized workflow_dispatch against originating actor '${actor}'`);
+  }
   if (!actor) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");
   }
 
-  // Bot and app actors (e.g. Copilot, dependabot[bot]) are not regular GitHub
-  // users and cannot be resolved via the collaborators API (returns 404).
-  // Trust them implicitly: the non-fork repository check above already ensures
-  // the workflow is running in a controlled context.
-  const senderType = context.payload.sender?.type;
-  if (senderType === "Bot") {
-    core.info(`Runtime safety check passed for bot/app actor '${actor}' (sender type: ${senderType})`);
-    return;
-  }
-
+  // Bot and app actors (e.g. Copilot, dependabot[bot]) use GitHub-provided
+  // event identity (`sender.type === "Bot"`), but that signal only proves the
+  // account type. They still must satisfy the same repository permission floor
+  // below; the workflow_dispatch-only fork check above is independent.
   try {
     const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
       owner: context.repo.owner,
@@ -256,8 +307,9 @@ async function assertTrustedCheckoutRuntime() {
     core.info(`Runtime safety check passed for actor '${actor}' with '${permission}' permission`);
   } catch (err) {
     // A 404 here is ambiguous: it can indicate either a non-user app/bot actor
-    // or a real user that is not a collaborator. Disambiguate via users API.
-    // Real users resolve via users.getByUsername; app/bot actors return 404.
+    // or a real user that is not a collaborator. Disambiguate via users API so
+    // user denials stay clear, but fail closed for app/bot actors whose
+    // repository permission cannot be verified.
     const errAny = /** @type {any} */ err;
     if (errAny.status === 404) {
       try {
@@ -266,8 +318,7 @@ async function assertTrustedCheckoutRuntime() {
       } catch (userErr) {
         const userErrAny = /** @type {any} */ userErr;
         if (userErrAny.status === 404) {
-          core.info(`Runtime safety check passed for app actor '${actor}' (not a regular user)`);
-          return;
+          throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: bot/app actor '${actor}' repository permission could not be verified (sender type: ${senderType || "unknown"})`);
         }
         throw userErr;
       }
@@ -282,6 +333,8 @@ async function main() {
   // For issue_comment events on PRs, context.payload.pull_request is not set;
   // instead context.payload.issue.pull_request indicates the issue is a PR.
   let pullRequest = context.payload.pull_request;
+  /** @type {Record<string, any> | undefined} */
+  let workflowDispatchAwContext;
 
   // Handle issue_comment (and similar) events triggered on a PR
   if (!pullRequest && context.payload.issue?.pull_request) {
@@ -298,8 +351,9 @@ async function main() {
     if (awContextStr) {
       try {
         const awContext = JSON.parse(awContextStr);
-        const prNumber = Number(awContext.item_number);
-        if (awContext.item_type === "pull_request" && Number.isInteger(prNumber) && prNumber > 0) {
+        workflowDispatchAwContext = awContext;
+        const prNumber = parsePullRequestNumber(awContext.item_number);
+        if (awContext.item_type === "pull_request" && prNumber !== null) {
           if (awContext.repo) {
             const currentRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (awContext.repo !== currentRepo) {
@@ -341,7 +395,7 @@ async function main() {
   }
 
   try {
-    await assertTrustedCheckoutRuntime();
+    await assertTrustedCheckoutRuntime(workflowDispatchAwContext);
 
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);

@@ -350,10 +350,14 @@ func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string 
 	return events
 }
 
+func rolesAreAll(roles []string) bool {
+	return slices.Equal(roles, []string{"all"})
+}
+
 // needsRoleCheck determines if the workflow needs permission checks with full context
 func (c *Compiler) needsRoleCheck(data *WorkflowData, frontmatter map[string]any) bool {
 	// If user explicitly specified "roles: all", no permission checks needed
-	if len(data.Roles) == 1 && data.Roles[0] == "all" {
+	if rolesAreAll(data.Roles) {
 		roleLog.Print("Role check not needed: roles set to 'all'")
 		return false
 	}
@@ -378,7 +382,7 @@ func (c *Compiler) needsRoleCheck(data *WorkflowData, frontmatter map[string]any
 // hasSafeEventsOnly checks if the workflow uses only safe events that don't require permission checks
 func (c *Compiler) hasSafeEventsOnly(data *WorkflowData, frontmatter map[string]any) bool {
 	// If user explicitly specified "roles: all", skip permission checks
-	if len(data.Roles) == 1 && data.Roles[0] == "all" {
+	if rolesAreAll(data.Roles) {
 		return true
 	}
 
@@ -459,14 +463,27 @@ func (c *Compiler) hasWorkflowRunTrigger(frontmatter map[string]any) bool {
 	return false
 }
 
-// buildWorkflowRunRepoSafetyCondition generates the if condition to ensure workflow_run is from same repo and not a fork
-// The condition uses: (event_name != 'workflow_run') OR (repository IDs match AND not from fork)
-// This allows all non-workflow_run events, but requires repository match and fork check for workflow_run events
+// buildWorkflowRunRepoSafetyCondition generates the if condition to ensure workflow_run is from same repo and not a fork.
+// The condition uses:
+// (event_name != 'workflow_run') OR (workflow_run payload exists AND repository payload exists AND repository IDs match AND not from fork).
+// This allows all non-workflow_run events, but requires fail-closed repository checks for workflow_run events.
 func (c *Compiler) buildWorkflowRunRepoSafetyCondition() string {
 	// Check that event is NOT workflow_run
 	eventNotWorkflowRun := BuildNotEquals(
 		BuildPropertyAccess("github.event_name"),
 		BuildStringLiteral("workflow_run"),
+	)
+
+	// Guard nested workflow_run fields explicitly so mixed-trigger workflows
+	// short-circuit safely and workflow_run events fail closed if GitHub omits
+	// repository metadata unexpectedly.
+	workflowRunPayloadPresent := BuildNotEquals(
+		BuildPropertyAccess("github.event.workflow_run"),
+		BuildNullLiteral(),
+	)
+	workflowRunRepositoryPresent := BuildNotEquals(
+		BuildPropertyAccess("github.event.workflow_run.repository"),
+		BuildNullLiteral(),
 	)
 
 	// Check that repository IDs match
@@ -480,8 +497,14 @@ func (c *Compiler) buildWorkflowRunRepoSafetyCondition() string {
 		Child: BuildPropertyAccess("github.event.workflow_run.repository.fork"),
 	}
 
-	// Combine repository ID check AND not-from-fork check
-	repoSafetyCheck := BuildAnd(repoIDCheck, notFromForkCheck)
+	// Combine existence, repository ID, and fork checks.
+	repoSafetyCheck := BuildAnd(
+		workflowRunPayloadPresent,
+		BuildAnd(
+			workflowRunRepositoryPresent,
+			BuildAnd(repoIDCheck, notFromForkCheck),
+		),
+	)
 
 	// Combine with OR: allow if NOT workflow_run OR (repository matches AND not fork)
 	combinedCheck := BuildOr(eventNotWorkflowRun, repoSafetyCheck)

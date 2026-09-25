@@ -97,8 +97,8 @@ jobs:
     if: >
       (needs.pre_activation.outputs.activated == 'true' && (github.event.workflow_run.event == 'workflow_dispatch' &&
       contains(fromJSON('["pelikhan","cmuto09","dsyme","mnkiefer","davidslater","zarenner","lpcox","salmanmkc","gh-aw-bot"]'), github.event.workflow_run.actor.login))) &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.repository.id == github.repository_id &&
-      (!(github.event.workflow_run.repository.fork)))
+      (github.event_name != 'workflow_run' || github.event.workflow_run != null && github.event.workflow_run.repository != null &&
+      github.event.workflow_run.repository.id == github.repository_id && (!(github.event.workflow_run.repository.fork)))
     runs-on: ubuntu-slim
     permissions:
       actions: read

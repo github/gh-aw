@@ -19,7 +19,7 @@ import (
 type rs05aBridgeScenario struct {
 	AwContextProvided bool   `json:"awContextProvided"`
 	AwContextRaw      string `json:"awContextRaw"`
-	RepositoryFork    bool   `json:"repositoryFork"`
+	RepositoryFork    any    `json:"repositoryFork"`
 	Actor             string `json:"actor"`
 	SenderType        string `json:"senderType"`
 	Permission        string `json:"permission"`
@@ -108,6 +108,26 @@ func TestFormalRS05a_ActorTrustForkRejected(t *testing.T) {
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
+func TestFormalRS05a_UnverifiableForkStatusRejected(t *testing.T) {
+	for _, forkStatus := range []any{nil, "false", 0} {
+		t.Run(fmt.Sprintf("fork=%v", forkStatus), func(t *testing.T) {
+			scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+				"item_type":   "pull_request",
+				"item_number": 123,
+				"repo":        "test-owner/test-repo",
+			})
+			scenario.RepositoryFork = forkStatus
+
+			result := runRS05aBridge(t, scenario)
+
+			assertRS05aNoFetch(t, result)
+			assert.Empty(t, result.PermissionCalls, "unverifiable fork status must block before permission lookup")
+			assertRS05aFailedContains(t, result, "unable to verify repository is not a fork")
+			assertRS05aOutput(t, result, "checkout_pr_success", "false")
+		})
+	}
+}
+
 func TestFormalRS05a_ActorTrustInsufficientPermissionRejected(t *testing.T) {
 	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
 		"item_type":   "pull_request",
@@ -132,14 +152,127 @@ func TestFormalRS05a_ActorTrustVerifiedBotAllowed(t *testing.T) {
 	})
 	scenario.Actor = "copilot-swe-agent[bot]"
 	scenario.SenderType = "Bot"
-	scenario.Permission = "none"
+	scenario.Permission = "write"
 
 	result := runRS05aBridge(t, scenario)
 
 	assertRS05aCheckoutSucceeded(t, result)
 	assertRS05aFetchedPullHeadRef(t, result, 123)
-	assert.Empty(t, result.PermissionCalls, "RS-05a verified bot/app actor must not require collaborator permission lookup")
-	assert.Contains(t, result.Info, "Runtime safety check passed for bot/app actor 'copilot-swe-agent[bot]' (sender type: Bot)")
+	assert.Len(t, result.PermissionCalls, 1, "RS-05a verified bot/app actor must satisfy the repository permission floor")
+	assert.Contains(t, result.Info, "Runtime safety check passed for actor 'copilot-swe-agent[bot]' with 'write' permission")
+}
+
+func TestFormalRS05a_ActorTrustBotWithoutWritePermissionRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"item_type":   "pull_request",
+		"item_number": 123,
+		"repo":        "test-owner/test-repo",
+	})
+	scenario.Actor = "third-party-bot[bot]"
+	scenario.SenderType = "Bot"
+	scenario.Permission = "read"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Len(t, result.PermissionCalls, 1, "RS-05a must query repository permission even for bot/app actors")
+	assertRS05aFailedContains(t, result, "requires write or higher")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_CentralizedDispatchValidatesOriginatingActor(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "trusted-maintainer",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aCheckoutSucceeded(t, result)
+	assertRS05aFetchedPullHeadRef(t, result, 123)
+	require.Len(t, result.PermissionCalls, 1)
+	assert.Equal(t, "trusted-maintainer", result.PermissionCalls[0]["username"], "centralized dispatch must validate the originating actor, not the dispatcher bot")
+	assert.Contains(t, result.Info, "Validating centralized workflow_dispatch against originating actor 'trusted-maintainer'")
+}
+
+func TestFormalRS05a_CentralizedDispatchWithoutOriginatingActorRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "missing originating actor must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to determine originating actor")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_CentralizedDispatchRequiresBotSenderSignal(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "trusted-maintainer",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "User"
+	scenario.Permission = "read"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "missing Bot sender signal must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to verify centralized workflow_dispatch identity")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_CentralizedDispatchRejectsRouterAsOriginatingActor(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"command_name": "triage",
+		"actor":        "github-actions[bot]",
+		"item_type":    "pull_request",
+		"item_number":  123,
+		"repo":         "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "router cannot authorize itself as the originating actor")
+	assertRS05aFailedContains(t, result, "must identify an originating actor")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+}
+
+func TestFormalRS05a_CentralizedDispatchWithoutRouterMarkersRejected(t *testing.T) {
+	scenario := rs05aDefaultBridgeScenario(t, map[string]any{
+		"actor":       "trusted-maintainer",
+		"item_type":   "pull_request",
+		"item_number": 123,
+		"repo":        "test-owner/test-repo",
+	})
+	scenario.Actor = "github-actions[bot]"
+	scenario.SenderType = "Bot"
+
+	result := runRS05aBridge(t, scenario)
+
+	assertRS05aNoFetch(t, result)
+	assert.Empty(t, result.PermissionCalls, "missing centralized router markers must fail before permission lookup")
+	assertRS05aFailedContains(t, result, "unable to identify centralized workflow_dispatch")
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
 func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {
@@ -204,6 +337,22 @@ func TestFormalRS05a_ZeroItemNumberTreatedAsFalsy(t *testing.T) {
 
 			assertRS05aCheckoutSkipped(t, result)
 			assert.Empty(t, result.PermissionCalls, "RS-05a falsy item_number must block before actor trust")
+		})
+	}
+}
+
+func TestFormalRS05a_AdversarialItemNumbersBlockedBeforeTrustGate(t *testing.T) {
+	for _, itemNumber := range []any{true, false, " 123", "123 ", "1e3", "0x7b", "123.0", "-1", -1, 1.5, float64(9007199254740992), map[string]any{}, []any{123}} {
+		t.Run(fmt.Sprintf("item_number=%v", itemNumber), func(t *testing.T) {
+			result := runRS05aBridge(t, rs05aDefaultBridgeScenario(t, map[string]any{
+				"item_type":   "pull_request",
+				"item_number": itemNumber,
+				"repo":        "test-owner/test-repo",
+			}))
+
+			assertRS05aCheckoutSkipped(t, result)
+			assert.Empty(t, result.PermissionCalls, "non-canonical item_number must block before actor trust")
+			assert.Empty(t, result.PullCalls, "non-canonical item_number must block before pull request API access")
 		})
 	}
 }
@@ -324,7 +473,7 @@ global.context = {
   sha: "abc123",
   repo: { owner: "test-owner", repo: "test-repo" },
   payload: {
-    repository: { fork: Boolean(scenario.repositoryFork) },
+    repository: { fork: scenario.repositoryFork },
     sender: {
       login: scenario.actor || "trusted-maintainer",
       type: scenario.senderType || "User",

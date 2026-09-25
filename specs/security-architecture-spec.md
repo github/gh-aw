@@ -963,17 +963,39 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 ```
 
 **RS-05**: For `workflow_run` triggers, the implementation MUST validate:
+- Trigger scoping: non-`workflow_run` triggers in the same workflow MUST short-circuit before any `github.event.workflow_run.*` field access.
+- Payload presence: `github.event.workflow_run` and `github.event.workflow_run.repository` MUST be present before repository fields are evaluated; a missing payload MUST fail closed for `workflow_run`.
 - Repository ID match: `github.event.workflow_run.repository.id == github.repository_id`
 - Not from fork: `!github.event.workflow_run.repository.fork`
 
 **RS-05a**: For `workflow_dispatch` triggers where the `aw_context` input encodes a pull request context (`item_type == "pull_request"`), the implementation MUST enforce all of the following before executing a PR checkout:
 
 1. **Repository scope**: If `aw_context.repo` is present, the implementation MUST compare it against the current repository identity (`context.repo.owner/context.repo.repo`). A mismatch MUST cause checkout to be skipped with a warning; cross-repository PR checkout is NOT supported.
-2. **Actor trust**: The triggering actor MUST satisfy `assertTrustedCheckoutRuntime()` — the runtime repository MUST NOT be a fork, and the actor MUST hold write-or-higher repository permission (or be a verified bot/app actor).
+2. **Actor trust**: The triggering actor MUST satisfy `assertTrustedCheckoutRuntime()`, which enforces two properties with different scopes:
+   - **Fork-runtime rejection** (`workflow_dispatch` PR replay ONLY): the runtime repository MUST NOT be a fork. This check MUST NOT be evaluated for other PR-capable triggers (`pull_request`, `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`), because a structurally forked base repository is a legitimate topology for those triggers and rejecting it produces a false positive (see the risk matrix below). The payload MUST contain `repository.fork` as the boolean `false`; missing or malformed fork metadata MUST fail closed rather than be treated as trusted.
+   - **Permission floor** (ALL PR checkout paths): the actor MUST hold write-or-higher repository permission. For centralized command or label dispatches where the runtime actor is `github-actions[bot]`, the platform-set `sender.type` MUST be `Bot`, a command/label marker MUST be present, and the originating `aw_context.actor` MUST be a different identity with write-or-higher permission. Missing or inconsistent identity metadata MUST fail closed before permission lookup. Bot/app actors MAY use `sender.type == "Bot"` only as an identity signal; it MUST NOT bypass the repository permission check. If a bot/app actor's repository permission cannot be verified, checkout MUST fail closed.
 3. **Parse resilience**: Malformed `aw_context` JSON MUST be caught; the implementation MUST emit a warning and skip checkout rather than propagating the parse error.
 4. **Ref isolation**: The PR head MUST be fetched exclusively via `refs/pull/N/head` from the current repository's origin, using array-based execution (no shell interpolation).
 
-The implementation MUST NOT perform checkout when `aw_context.item_number` is absent or falsy.
+The implementation MUST NOT perform checkout unless `aw_context.item_number` is a positive safe integer or its canonical decimal string representation. Values requiring JavaScript coercion (including booleans, whitespace, exponent notation, hexadecimal notation, fractional values, objects, and arrays) MUST be rejected before actor, API, or git operations.
+
+Centralized actor propagation relies on the repository's `actions: write` trust boundary. `github-actions[bot]` is the shared `GITHUB_TOKEN` identity for repository workflows, not a router-unique provenance signal, and the target `workflow_dispatch` event does not expose an immutable caller-workflow identity. Therefore, workflows that can dispatch other workflows MUST be trusted not to forge `aw_context`; untrusted code MUST NOT receive `actions: write`.
+
+**RS-05a Risk Matrix**: A conforming implementation's fork-runtime rejection MUST produce the following outcomes across the full trigger × topology combination space:
+
+| PR-capable trigger | Runtime repository is a fork | Result |
+| --- | --- | --- |
+| `pull_request` (same-repo head) | yes/no | Allowed after actor trust check; direct branch fetch. |
+| `pull_request` (fork head) | yes/no | Allowed after actor trust check; fetches `refs/pull/N/head`. |
+| `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` on a PR | yes/no | Allowed after actor trust check; fetches `refs/pull/N/head` from the base context. |
+| `workflow_dispatch` with valid PR `aw_context` | no | Allowed after actor trust check; fetches `refs/pull/N/head`. |
+| `workflow_dispatch` with valid PR `aw_context` | yes | Rejected before actor/API/git operations. |
+| `workflow_dispatch` with valid PR `aw_context` and no `repository` payload | unverifiable | Rejected (fail closed); the implementation MUST NOT infer non-fork status from absent data. |
+| Any trigger without PR context, or a malformed/non-PR/cross-repository `aw_context` | any | Checkout is skipped before the fork-runtime check is reached. |
+
+Only the fork-runtime rejection row is scope-limited to `workflow_dispatch`; the permission floor and ref-isolation properties apply uniformly across every row.
+
+**RS-05a and the `on.fork` frontmatter field**: The `fork` GitHub Actions event (`on: {fork: null}`, exposed as `on: repository forked` in the DSL) is unrelated to RS-05a and does not interact with it. That event fires in the base/upstream repository when someone forks it, carries no `pull_request` payload, and is not `workflow_dispatch`, so `pullRequest` is never resolved in `checkout_pr_branch.cjs` and `assertTrustedCheckoutRuntime()` is never invoked for it — checkout is skipped before the fork-runtime check is reached (last row of the risk matrix above), regardless of `payload.repository.fork`. This is also distinct from the `pull_request`/`pull_request_target` `forks:` allowlist field (RS-04-adjacent), which gates workflow *activation* for inbound PRs from a forked head repository and is evaluated in the compiled `if:` condition, not in `assertTrustedCheckoutRuntime()`.
 
 ### 11.4 Role Validation
 
@@ -2027,6 +2049,25 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.0.1 (Editorial Update, addendum: September 24, 2026)
+
+**Scoped RS-05a fork-runtime rejection to `workflow_dispatch` PR replays**:
+- The fork-runtime rejection in `assertTrustedCheckoutRuntime()` now applies only
+  to `workflow_dispatch` PR replays; `pull_request`, `pull_request_target`,
+  `pull_request_review`, `pull_request_review_comment`, and `issue_comment`
+  events are unaffected by a structurally forked base repository. The
+  permission-floor and ref-isolation properties remain unchanged for all paths.
+- Adds the RS-05a Risk Matrix documenting expected outcomes across the full
+  trigger × fork-topology combination space, based on the systematic risk
+  analysis in https://github.com/github/gh-aw/pull/63011#issuecomment-5804282930.
+- Closes a fail-open gap: `workflow_dispatch` PR checkout is now rejected when
+  the event payload carries no `repository` data, since fork status cannot be
+  verified in that case.
+- Backed by additional unit test coverage in
+  `actions/setup/js/checkout_pr_branch.test.cjs` for the missing-`repository`
+  case and for forked-runtime checkout across every non-`workflow_dispatch`
+  PR-capable trigger.
 
 ### Version 1.0.1 (Editorial Update)
 

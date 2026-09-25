@@ -270,15 +270,15 @@ If the pull request is still open, verify that:
     });
 
     describe("runtime checkout safety assertions", () => {
-      it("should fail when runtime repository context is a fork", async () => {
+      it("should allow a same-repository PR when the runtime repository is itself a fork", async () => {
         mockContext.payload.repository.fork = true;
 
         await runScript();
 
-        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
-        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
-        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
-        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout in forked repository runtime context"));
+        expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
+        expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
       });
 
       it("should fail when actor does not have write-or-higher permission", async () => {
@@ -296,22 +296,22 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
 
-      it("should allow checkout for Bot actor without calling the collaborator API", async () => {
+      it("should allow checkout for Bot actor only after repository permission verification", async () => {
         mockContext.actor = "Copilot";
         mockContext.payload.sender = { login: "Copilot", type: "Bot" };
 
         await runScript();
 
-        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
-        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for bot/app actor 'Copilot' (sender type: Bot)");
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "Copilot" }));
+        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for actor 'Copilot' with 'write' permission");
         expect(mockCore.setFailed).not.toHaveBeenCalled();
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
       });
 
-      it("should allow checkout when collaborator API returns 404 (app actor without sender type)", async () => {
+      it("should fail closed when bot/app actor repository permission cannot be verified", async () => {
         mockContext.actor = "Copilot";
-        // No sender.type set — simulates an event payload without type info
+        mockContext.payload.sender = { login: "Copilot", type: "Bot" };
         const notAUserError = Object.assign(new Error("Copilot is not a user"), { status: 404 });
         mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notAUserError);
         mockGithub.rest.users.getByUsername.mockRejectedValue(notAUserError);
@@ -320,10 +320,10 @@ If the pull request is still open, verify that:
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
         expect(mockGithub.rest.users.getByUsername).toHaveBeenCalledWith({ username: "Copilot" });
-        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for app actor 'Copilot' (not a regular user)");
-        expect(mockCore.setFailed).not.toHaveBeenCalled();
-        expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
-        expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch", "--depth=2"]);
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("bot/app actor 'Copilot' repository permission could not be verified"));
       });
 
       it("should fail when collaborator API returns 404 for a regular non-collaborator user", async () => {
@@ -354,6 +354,206 @@ If the pull request is still open, verify that:
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Internal Server Error"));
+      });
+
+      it.each(["workflow_dispatch", "issue_comment", "pull_request_review_comment"])("should reject bot actor without write-or-higher permission for %s events", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "third-party-bot[bot]";
+        mockContext.payload.sender = { login: "third-party-bot[bot]", type: "Bot" };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: {
+            permission: "read",
+          },
+        });
+        if (eventName === "workflow_dispatch") {
+          mockContext.payload = {
+            repository: { fork: false },
+            sender: { login: "third-party-bot[bot]", type: "Bot" },
+            inputs: {
+              aw_context: JSON.stringify({ item_type: "pull_request", item_number: 123 }),
+            },
+          };
+        }
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "third-party-bot[bot]" }));
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
+      });
+
+      it("should validate centralized workflow_dispatch using the originating aw_context actor", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockCore.info).toHaveBeenCalledWith("Validating centralized workflow_dispatch against originating actor 'trusted-maintainer'");
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "github-actions[bot]" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      });
+
+      it("should reject centralized workflow_dispatch without an originating aw_context actor", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine originating actor"));
+      });
+
+      it("should reject github-actions bot PR dispatch without centralized router markers", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to identify centralized workflow_dispatch"));
+      });
+
+      it("should not trust a propagated actor from a third-party bot dispatcher", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "third-party-bot[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "third-party-bot[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+          data: { permission: "read" },
+        });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "third-party-bot[bot]" }));
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
+      });
+
+      it("should not trust a propagated actor without GitHub's Bot sender signal", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "User" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "trusted-maintainer",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "write" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalledWith(expect.objectContaining({ username: "trusted-maintainer" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to verify centralized workflow_dispatch identity"));
+      });
+
+      it("should reject centralized dispatch when the propagated actor is the router itself", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "github-actions[bot]",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("must identify an originating actor"));
+      });
+
+      it("should reject a propagated originating actor who is not a collaborator", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.actor = "github-actions[bot]";
+        mockContext.payload = {
+          repository: { fork: false },
+          sender: { login: "github-actions[bot]", type: "Bot" },
+          inputs: {
+            aw_context: JSON.stringify({
+              command_name: "triage",
+              actor: "external-user",
+              item_type: "pull_request",
+              item_number: 123,
+            }),
+          },
+        };
+        const notFound = Object.assign(new Error("Not Found"), { status: 404 });
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notFound);
+        mockGithub.rest.users.getByUsername.mockResolvedValue({ data: { login: "external-user" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "external-user" }));
+        expect(mockGithub.rest.users.getByUsername).toHaveBeenCalledWith({ username: "external-user" });
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is not a collaborator"));
       });
     });
 
@@ -604,6 +804,22 @@ If the pull request is still open, verify that:
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
     });
+
+    it("should skip checkout for the native 'fork' webhook event without reaching assertTrustedCheckoutRuntime, regardless of repository.fork", async () => {
+      // The GitHub-native `fork` event (on: repository forked / on: {fork: null}) fires
+      // in the base/upstream repository when someone forks it. It carries no PR context
+      // (no `pull_request` payload, and it is not `workflow_dispatch`), so RS-05a's
+      // fork-runtime rejection in assertTrustedCheckoutRuntime() is never reached for it.
+      // This holds independent of `payload.repository.fork`, which is unrelated to this event.
+      mockContext.eventName = "fork";
+      mockContext.payload = { repository: { fork: true }, forkee: { full_name: "some-user/test-repo" } };
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
   });
 
   describe("workflow_dispatch events with aw_context", () => {
@@ -632,6 +848,51 @@ If the pull request is still open, verify that:
       expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
 
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should refuse PR replay when the runtime repository is a fork", async () => {
+      mockContext.payload.repository.fork = true;
+
+      await runScript();
+
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout in forked repository runtime context"));
+    });
+
+    it("should refuse PR replay when the workflow_dispatch payload has no repository data", async () => {
+      delete mockContext.payload.repository;
+
+      await runScript();
+
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to determine repository fork status for workflow_dispatch"));
+    });
+
+    it.each([{ fork: undefined }, { fork: null }, { fork: "false" }, { fork: 0 }])("should refuse PR replay when repository fork status is unverifiable: %j", async repository => {
+      mockContext.payload.repository = repository;
+
+      await runScript();
+
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unable to verify repository is not a fork"));
+    });
+
+    it.each([true, false, " 123", "123 ", "1e3", "0x7b", "123.0", "-1", -1, 1.5, Number.MAX_SAFE_INTEGER + 1, {}, []])("should skip adversarial non-canonical PR number %j before trust or API operations", async itemNumber => {
+      mockContext.payload.inputs.aw_context = JSON.stringify({ item_type: "pull_request", item_number: itemNumber });
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
@@ -777,6 +1038,35 @@ If the pull request is still open, verify that:
       // pull_request_review_comment uses git fetch refs/pull + checkout
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head", "--depth=2"]);
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "origin/pr-head"]);
+    });
+  });
+
+  describe("risk matrix: forked runtime repository scope (RS-05a)", () => {
+    // Formal coverage for the risk matrix from PR #63011: the repository.fork
+    // guard in assertTrustedCheckoutRuntime() MUST be scoped to workflow_dispatch
+    // PR replays only. Every other PR-capable trigger MUST remain unaffected by
+    // a structurally forked runtime repository.
+    it.each(["pull_request_target", "pull_request_review", "pull_request_review_comment", "issue_comment"])("should allow checkout for %s events even when the runtime repository is a fork", async eventName => {
+      mockContext.eventName = eventName;
+      mockContext.payload.repository = { fork: true };
+
+      await runScript();
+
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head", "--depth=2"]);
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "origin/pr-head"]);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should skip checkout without evaluating the fork guard when workflow_dispatch has no PR context", async () => {
+      mockContext.eventName = "workflow_dispatch";
+      mockContext.payload = { repository: { fork: true }, inputs: {} };
+
+      await runScript();
+
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
   });
 
