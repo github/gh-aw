@@ -44,7 +44,7 @@ async function checkBotAllowlistAuthorization(actorToValidate, allowedBots, owne
   } else if (botStatus.isBot && !botStatus.isActive) {
     // Only bypass when the lookup conclusively reported "not a collaborator" (no error field).
     // Transient failures (5xx, rate limiting) set `error` and must not grant authorization.
-    if (options.installationCheckOptional && !botStatus.error) {
+    if (options.installationCheckOptional && botStatus.error === undefined) {
       core.info(`✅ Bot '${actorToValidate}' is allowlisted and is not listed as a collaborator; authorizing because this event already requires write access to the repository`);
       core.setOutput("is_team_member", "true");
       core.setOutput("result", "authorized_bot");

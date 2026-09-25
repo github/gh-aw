@@ -1107,5 +1107,17 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
     });
+
+    it("should not authorize an allowlisted App when the lookup fails with an empty error message", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const emptyMessageError = { status: 500, message: "" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(emptyMessageError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+    });
   });
 });
