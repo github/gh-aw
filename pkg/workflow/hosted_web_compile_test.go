@@ -199,12 +199,9 @@ Test workflow.`,
 	}
 }
 
-// TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge verifies that a
-// hosted-web policy is preserved when an imported shared file also declares
-// network.allowed. MergeNetworkPermissions previously rebuilt the merged
-// NetworkPermissions from scratch and only copied Allowed, silently dropping
-// HostedWeb (and Blocked/Firewall) whenever any import contributed network
-// permissions.
+// TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge verifies that
+// hosted-web domains from imported shared workflows are merged with the
+// importing workflow's policy.
 func TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "hosted-web-import-merge-test")
 
@@ -213,6 +210,9 @@ func TestCompileWorkflow_HostedWebSurvivesNetworkImportMerge(t *testing.T) {
 network:
   allowed:
     - "*.sentry.io"
+  hosted-web:
+    allowed:
+      - microsoft.com
 ---
 `
 	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
@@ -230,7 +230,7 @@ network:
     - defaults
   hosted-web:
     allowed:
-      - docs.github.com
+      - archive.org
 ---
 
 # Test
@@ -253,7 +253,7 @@ Test workflow.`
 
 	for _, want := range []string{
 		`\"hostedWeb\"`,
-		`\"claude\":{\"enabled\":true,\"allowedDomains\":[\"docs.github.com\"]}`,
+		`\"claude\":{\"enabled\":true,\"allowedDomains\":[\"archive.org\",\"microsoft.com\"]}`,
 	} {
 		if !strings.Contains(yamlStr, want) {
 			t.Errorf("Expected lock file to contain %q after merging imported network permissions, but it did not.\n%s", want, yamlStr)

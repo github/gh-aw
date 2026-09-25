@@ -100,8 +100,9 @@ func (c *Compiler) MergeMCPServers(topMCPServers map[string]any, importedMCPServ
 	return result, nil
 }
 
-// MergeNetworkPermissions merges network permissions from imports with top-level network permissions
-// Combines allowed domains from both sources into a single list
+// MergeNetworkPermissions merges network permissions from imports with top-level network permissions.
+// Allowed and hosted-web domains are combined while top-level scalar configuration
+// takes precedence.
 func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, importedNetworkJSON string) (*NetworkPermissions, error) {
 	importsLog.Print("Merging network permissions from imports")
 
@@ -152,6 +153,8 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 				}{}
 			}
 		}
+
+		mergeHostedWebPolicy(result, importedNetwork.HostedWeb)
 	}
 
 	// Sort the final domain list for consistent output
@@ -159,6 +162,39 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 
 	importsLog.Printf("Successfully merged network permissions with %d allowed domains", len(result.Allowed))
 	return result, nil
+}
+
+func mergeHostedWebPolicy(network *NetworkPermissions, imported *HostedWebPolicy) {
+	if imported == nil {
+		return
+	}
+	if network.HostedWeb == nil {
+		policy := *imported
+		policy.Allowed = append([]string(nil), imported.Allowed...)
+		policy.Blocked = append([]string(nil), imported.Blocked...)
+		network.HostedWeb = &policy
+		return
+	}
+	if !network.HostedWeb.Enabled || !imported.Enabled {
+		return
+	}
+
+	network.HostedWeb.Allowed = appendUniqueDomains(network.HostedWeb.Allowed, imported.Allowed)
+	network.HostedWeb.Blocked = appendUniqueDomains(network.HostedWeb.Blocked, imported.Blocked)
+}
+
+func appendUniqueDomains(domains, additions []string) []string {
+	seen := make(map[string]struct{}, len(domains)+len(additions))
+	for _, domain := range domains {
+		seen[domain] = struct{}{}
+	}
+	for _, domain := range additions {
+		if !setutil.Contains(seen, domain) {
+			domains = append(domains, domain)
+			seen[domain] = struct{}{}
+		}
+	}
+	return domains
 }
 
 // getSafeOutputTypeKeys returns the list of safe output type keys from the embedded schema.
