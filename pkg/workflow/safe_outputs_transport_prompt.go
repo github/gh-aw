@@ -30,11 +30,21 @@ const (
 // engineSupportsMCPToolCalls reports whether the workflow engine can call MCP tools
 // directly. Unknown or unset engines are treated as MCP-capable, matching the default
 // engine behaviour.
-func engineSupportsMCPToolCalls(data *WorkflowData) bool {
+func engineSupportsMCPToolCalls(catalog *EngineCatalog, data *WorkflowData) bool {
 	if data == nil || data.EngineConfig == nil || data.EngineConfig.ID == "" {
 		return true
 	}
-	engine, err := GetGlobalEngineRegistry().GetEngine(strings.ToLower(data.EngineConfig.ID))
+
+	engineID := strings.ToLower(data.EngineConfig.ID)
+	if catalog != nil {
+		resolved, err := catalog.Resolve(engineID, data.EngineConfig)
+		if err != nil || resolved == nil || resolved.Runtime == nil {
+			return true
+		}
+		return resolved.Runtime.GetCapabilities().MCP
+	}
+
+	engine, err := GetGlobalEngineRegistry().GetEngine(engineID)
 	if err != nil || engine == nil {
 		return true
 	}
@@ -42,16 +52,16 @@ func engineSupportsMCPToolCalls(data *WorkflowData) bool {
 }
 
 // safeOutputsTransportText returns the wording for safe_outputs_prompt.md.
-func safeOutputsTransportText(data *WorkflowData) string {
-	if engineSupportsMCPToolCalls(data) {
+func safeOutputsTransportText(catalog *EngineCatalog, data *WorkflowData) string {
+	if engineSupportsMCPToolCalls(catalog, data) {
 		return safeOutputsTransportMCPText
 	}
 	return safeOutputsTransportCLIOnlyText
 }
 
 // safeOutputsCLITransportText returns the wording for mcp_cli_tools_with_safeoutputs_prompt.md.
-func safeOutputsCLITransportText(data *WorkflowData) string {
-	if engineSupportsMCPToolCalls(data) {
+func safeOutputsCLITransportText(catalog *EngineCatalog, data *WorkflowData) string {
+	if engineSupportsMCPToolCalls(catalog, data) {
 		return safeOutputsCLITransportMCPText
 	}
 	return safeOutputsCLITransportCLIOnlyText

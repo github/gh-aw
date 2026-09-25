@@ -208,7 +208,7 @@ func TestBuildMCPCLIPromptSection_PromptFileUsesNonHeadingLabels(t *testing.T) {
 		},
 	}
 
-	section := buildMCPCLIPromptSection(data)
+	section := buildMCPCLIPromptSection(data, nil)
 	require.NotNil(t, section)
 	assert.Equal(t, mcpCLIToolsWithSafeOutputsPromptFile, section.Content)
 	// GH_AW_MCP_CLI_SERVERS_LIST must be a compile-time static value, NOT a step output
@@ -240,7 +240,7 @@ func TestBuildMCPCLIPromptSection_UsesBaseTemplateWithoutSafeOutputs(t *testing.
 		},
 	}
 
-	section := buildMCPCLIPromptSection(data)
+	section := buildMCPCLIPromptSection(data, nil)
 	require.NotNil(t, section)
 	assert.Equal(t, mcpCLIToolsPromptFile, section.Content)
 }
@@ -251,7 +251,7 @@ func TestBuildMCPCLIPromptSection_StaticEnclaveBudgetGuidance(t *testing.T) {
 	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
 	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/private-service", Sensitivity: "confidential"}}
 
-	section := buildMCPCLIPromptSection(data)
+	section := buildMCPCLIPromptSection(data, nil)
 	require.NotNil(t, section)
 
 	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
@@ -268,7 +268,7 @@ func TestBuildMCPCLIPromptSection_SealedRepoGuidance(t *testing.T) {
 	data.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
 	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "octo-org/sealed-service", Sensitivity: "sealed"}}
 
-	section := buildMCPCLIPromptSection(data)
+	section := buildMCPCLIPromptSection(data, nil)
 	require.NotNil(t, section)
 
 	serversList := section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"]
@@ -367,5 +367,5 @@ func TestBuildMCPCLIPromptSection_OmittedWhenBashDisabled(t *testing.T) {
 	}
 
 	require.NotEmpty(t, getMCPCLIServerNames(data), "safeoutputs is still CLI-mounted")
-	assert.Nil(t, buildMCPCLIPromptSection(data), "CLI-only instructions must be omitted when the agent has no shell")
+	assert.Nil(t, buildMCPCLIPromptSection(data, nil), "CLI-only instructions must be omitted when the agent has no shell")
 }

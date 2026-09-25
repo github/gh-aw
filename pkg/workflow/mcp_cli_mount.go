@@ -359,7 +359,7 @@ func GetMCPCLIPathSetup(data *WorkflowData) string {
 // tools.bash: []): the agent has no way to invoke the CLI wrappers, so advertising them
 // would steer the model towards an unusable tool path (for example telling it to call the
 // safeoutputs CLI from bash when only the safeoutputs MCP tools are reachable).
-func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
+func buildMCPCLIPromptSection(data *WorkflowData, catalog *EngineCatalog) *PromptSection {
 	if data != nil && data.BashDisabled {
 		mcpCLIMountLog.Print("Skipping MCP CLI tools prompt section: bash is fully disabled")
 		return nil
@@ -389,7 +389,7 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	}
 	if slices.Contains(servers, constants.SafeOutputsMCPServerID.String()) {
 		promptFile = mcpCLIToolsWithSafeOutputsPromptFile
-		envVars[safeOutputsCLITransportEnvVar] = safeOutputsCLITransportText(data)
+		envVars[safeOutputsCLITransportEnvVar] = safeOutputsCLITransportText(catalog, data)
 	}
 
 	return &PromptSection{

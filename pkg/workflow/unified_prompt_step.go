@@ -146,7 +146,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 			Content: safeOutputsPromptFile,
 			IsFile:  true,
 			EnvVars: map[string]string{
-				safeOutputsTransportEnvVar: safeOutputsTransportText(data),
+				safeOutputsTransportEnvVar: safeOutputsTransportText(c.engineCatalog, data),
 			},
 		})
 		// Per-tool sections: opening tag + tools list (inline), tool instruction files, closing tag
@@ -154,7 +154,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	}
 
 	// 8a. MCP CLI tools instructions (if any MCP servers are mounted as CLIs)
-	if section := buildMCPCLIPromptSection(data); section != nil {
+	if section := buildMCPCLIPromptSection(data, c.engineCatalog); section != nil {
 		unifiedPromptLog.Printf("Adding MCP CLI tools section: servers=%v", getMCPCLIServerNames(data))
 		sections = append(sections, *section)
 	}
