@@ -14,7 +14,6 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 	frontmatterExtractionSecurityLog.Print("Extracting network permissions from frontmatter")
 
 	if network, exists := frontmatter["network"]; exists {
-		// Handle string format: "defaults"
 		if networkStr, ok := network.(string); ok {
 			frontmatterExtractionSecurityLog.Printf("Network permissions string format: %s", networkStr)
 			if networkStr == "defaults" {
@@ -23,19 +22,16 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 					ExplicitlyDefined: true,
 				}
 			}
-			// Unknown string format, return nil
 			frontmatterExtractionSecurityLog.Printf("Unknown network string format: %s", networkStr)
 			return nil
 		}
 
-		// Handle object format: { allowed: [...], blocked: [...] } or {}
 		if networkObj, ok := network.(map[string]any); ok {
 			frontmatterExtractionSecurityLog.Printf("Network permissions object format with %d fields", len(networkObj))
 			permissions := &NetworkPermissions{
 				ExplicitlyDefined: true,
 			}
 
-			// Extract allowed domains if present
 			if allowed, hasAllowed := networkObj["allowed"]; hasAllowed {
 				if allowedSlice, ok := allowed.([]any); ok {
 					for _, domain := range allowedSlice {
@@ -53,7 +49,6 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 				}
 			}
 
-			// Extract blocked domains if present
 			if blocked, hasBlocked := networkObj["blocked"]; hasBlocked {
 				if blockedSlice, ok := blocked.([]any); ok {
 					for _, domain := range blockedSlice {
@@ -65,12 +60,79 @@ func (c *Compiler) extractNetworkPermissions(frontmatter map[string]any) *Networ
 				}
 			}
 
-			// Empty object {} means no network access (empty allowed list)
+			if hostedWeb, hasHostedWeb := networkObj["hosted-web"]; hasHostedWeb {
+				applyHostedWebPolicy(permissions, hostedWeb)
+			}
+
 			return permissions
 		}
 	}
 	frontmatterExtractionSecurityLog.Print("No network permissions found in frontmatter")
 	return nil
+}
+
+func applyHostedWebPolicy(permissions *NetworkPermissions, hostedWeb any) {
+	if policy, ok := extractHostedWebPolicy(hostedWeb); ok {
+		permissions.HostedWeb = policy
+	} else {
+		permissions.InvalidHostedWeb = true
+		permissions.HostedWebRawValue = describeHostedWebValue(hostedWeb)
+	}
+}
+
+func describeHostedWebValue(hostedWeb any) string {
+	switch value := hostedWeb.(type) {
+	case bool:
+		return fmt.Sprintf("boolean %t", value)
+	case string:
+		return fmt.Sprintf("string %q", value)
+	case []any:
+		return "array"
+	case nil:
+		return "null"
+	default:
+		return fmt.Sprintf("%T", hostedWeb)
+	}
+}
+
+// extractHostedWebPolicy accepts hosted-web: false for explicit disablement;
+// enablement is represented by the object form, not by hosted-web: true.
+func extractHostedWebPolicy(hostedWeb any) (*HostedWebPolicy, bool) {
+	switch hostedWeb := hostedWeb.(type) {
+	case bool:
+		if !hostedWeb {
+			return &HostedWebPolicy{}, true
+		}
+		return nil, false
+	case map[string]any:
+		policy := &HostedWebPolicy{Enabled: true}
+		policy.Allowed = extractStringSlice(hostedWeb["allowed"])
+		policy.Blocked = extractStringSlice(hostedWeb["blocked"])
+		switch maxUses := hostedWeb["max-uses"].(type) {
+		case int:
+			policy.MaxUses = maxUses
+		case uint64:
+			policy.MaxUses = int(maxUses)
+		case float64:
+			policy.MaxUses = int(maxUses)
+		}
+		return policy, true
+	}
+	return nil, false
+}
+
+func extractStringSlice(value any) []string {
+	values, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value, ok := value.(string); ok {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 // extractSandboxConfig extracts sandbox configuration from front matter
