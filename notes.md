@@ -1,5 +1,16 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-25 snapshot
+- 50 sessions (mostly CI/gate re-fires on 3 branches, not 50 distinct tasks); **20.0% completion** (10 success/38 action_required/2 in_progress), -24pts vs 09-24 (44%), below ~32% mean.
+- **true_agentic 2/2=100%**, 5th consecutive full-recovery day (09-22 7/7, 09-23 5/5, 09-24 5/5), +1 in_progress.
+- **provenance mid-band**: 80.0% bot-driven (8/10), inside 72-86% range.
+- **branch_level_stuck_gate, no exceptions**: CGO/CWI/CJS 0/10 each, Doc Build-Deploy 0/8 vs Code scanning 8/8 + Addressing comment 2/2 (100%) — same bimodal split as 09-22.
+- **NEW RECORD concentration**: dynamic-checkouts-github-action 44/50=88% (beats 86%), 18.2% succ on-branch.
+- **burst_vs_isolated NEW RECORD**: isolated 66.7% (8/12) vs burst 5.3% (2/38), 12.7x gap (prior ~8x).
+- PR #63241: 9 blocked gate cycles in ~40min (~5min apart) + passing Code scanning each time — dense but standing pattern. No merge/close cascade today.
+- Other branches: add-diagnostic-message-for-failure 5/50=20%succ, fix-assert-trusted-checkout-runtime 1/50=100%succ.
+- Duration proxy: mean 1.44m/median 0m. Orphans 0/18 → 0% NORMAL, 33rd healthy day. Conv logs empty 33rd+ day. roll=92 standard.
+
 ## 2026-09-24 snapshot
 - 50 sessions; **44.0% completion** (22 success/8 failure/20 action_required), +20pts vs 09-23 (24%), above ~31% mean.
 - **true_agentic 5/5=100%**, 4th consecutive full-recovery day (09-19 3/3, 09-22 7/7, 09-23 5/5).
@@ -121,3 +132,5 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - 09-19 update: true_agentic_100pct_streak RESTORED on a small sample (3/3) after the 09-16 break; provenance_inversion back to 78.6% bot-driven (in-band); burst_vs_isolated_success_gap reverted to the historical isolated>burst norm (09-18's inversion looks like noise, not a 2nd confirming instance); merge_invalidation_cascade's smallest-ever instance (1 run); genuine (non-cascade, non-merge) CGO/CWI failure-then-recovery pair verified. Conv logs empty 28th+ day — now flagged as the single largest unresolved tooling gap.
 - 09-22 update (per cache-memory; no 09-20/09-21 repo-memory entries): true_agentic_100pct_streak held at 100% (7/7); provenance_inversion snapped back to 86.0% bot-driven (upper edge of band) after 09-20's record-low 53.3%; branch-level split perfectly bimodal (every CI-gate workflow 0% success, every true-agentic/code-scanning workflow 100% success); no cascade artifacts; conv logs empty 30th+ day.
 - 09-23 update: **new pr_terminal_event_cascade pattern** — first confirmed cascade triggered by a PR **close** (not merge): PR #62815 closed unmerged at 04:01:42Z invalidated 8 in-flight runs across 5 workflows 1s later, the largest cascade yet (prior peak 6, 09-13). Refines merge_invalidation_cascade to "any PR terminal event." provenance_inversion hit a new LOW (58.3% bot-driven, below the 72-86% band) even as true_agentic_100pct_streak extended to a 3rd consecutive full-recovery day (5/5). New workflow name observed: `Stale Lock Files`. Conv logs empty 31st+ day.
+- 09-24 update: pr_terminal_event_cascade NEW RECORD (9 runs, beats 8); provenance reverted to 77.3% bot-driven (in-band); true_agentic 4th 100% day (5/5); CGO/CWI posted first-ever partial passes (1/5) on a merged branch. Conv logs empty 32nd+ day.
+- 09-25 update: true_agentic 5th 100% day (2/2, +1 in_progress); provenance mid-band (80.0%); branch_level_stuck_gate back to clean 09-22-style bimodal split; NEW RECORDS single-branch concentration (88%) and burst_vs_isolated gap (12.7x); no cascade today. Conv logs empty 33rd+ day.

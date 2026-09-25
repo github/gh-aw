@@ -98,8 +98,19 @@
    "orphan_rate_pct": 0.0,
    "data_quality": "metadata-only (conv-logs empty 32nd+ day)",
    "notes": "See notes.md 09-24 snapshot for full detail. Headline: 44.0% completion +20pts vs 09-23; true_agentic 5/5=100% 4th day; NEW RECORD pr_terminal_event_cascade 9 runs (PR#63069 closed); orphan 0/18 32nd healthy day; roll=53 standard run."
+  },
+  {
+   "date": "2026-09-25",
+   "sessions": 50,
+   "completion_pct": 20.0,
+   "avg_dur_min": 1.443,
+   "median_dur_min": 0.0,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 33rd+ day)",
+   "notes": "See notes.md 09-25 snapshot for full detail. Headline: 20.0% completion -24pts vs 09-24; true_agentic 2/2=100% 5th day (+1 in_progress); provenance 80.0% bot-driven mid-band; branch_level_stuck_gate perfectly bimodal (0% all 4 core gates, 100% true-agentic/code-scanning); NEW RECORDS single-branch concentration 88% and burst_vs_isolated gap 12.7x; orphan 0/18 33rd healthy day; roll=92 standard run."
   }
  ],
- "last_updated": "2026-09-24",
+ "last_updated": "2026-09-25",
  "version": "1.9"
 }
