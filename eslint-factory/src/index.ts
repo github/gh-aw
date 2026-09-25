@@ -54,6 +54,7 @@ import { requireLastIndexResetBeforeGlobalExecLoopRule } from "./rules/require-l
 import { requirePageCounterIncrementInWhileTrueLoopRule } from "./rules/require-page-counter-increment-in-while-true-loop";
 import { noMathMinMaxArraySpreadRule } from "./rules/no-math-minmax-array-spread";
 import { requireErrorCodeForGithubApiThrowRule } from "./rules/require-error-code-for-github-api-throw";
+import { requireErrorCodeForFetchThrowRule } from "./rules/require-error-code-for-fetch-throw";
 import { requireHttpResponseErrorListenerRule } from "./rules/require-http-response-error-listener";
 import { noStringFallbackForNonStringMessageRule } from "./rules/no-string-fallback-for-non-string-message";
 import { requireGetExecOutputExitCodeCheckRule } from "./rules/require-getexecoutput-exitcode-check";
@@ -123,6 +124,7 @@ const plugin = {
     "require-page-counter-increment-in-while-true-loop": requirePageCounterIncrementInWhileTrueLoopRule,
     "no-math-minmax-array-spread": noMathMinMaxArraySpreadRule,
     "require-error-code-for-github-api-throw": requireErrorCodeForGithubApiThrowRule,
+    "require-error-code-for-fetch-throw": requireErrorCodeForFetchThrowRule,
     "require-http-response-error-listener": requireHttpResponseErrorListenerRule,
     "no-string-fallback-for-non-string-message": noStringFallbackForNonStringMessageRule,
     "require-getexecoutput-exitcode-check": requireGetExecOutputExitCodeCheckRule,

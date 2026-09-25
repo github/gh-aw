@@ -42,6 +42,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-error-cause-in-rethrow`](#require-error-cause-in-rethrow) | Require `{ cause: err }` when rethrowing inside a `catch` block |
 | [`require-error-code-in-thrown-error`](#require-error-code-in-thrown-error) | Require standardized error codes in thrown errors when `error_codes.cjs` is imported |
 | [`require-error-code-for-github-api-throw`](#require-error-code-for-github-api-throw) | Require standardized error codes for `throw new Error(...)` after GitHub API calls |
+| [`require-error-code-for-fetch-throw`](#require-error-code-for-fetch-throw) | Require standardized error codes for `throw new Error(...)` after a bare `fetch(...)` call |
 | [`require-fetch-response-body-try-catch`](#require-fetch-response-body-try-catch) | Require try/catch around `.json()` or `.text()` on Responses from `fetch(...)` |
 | [`require-fetch-timeout`](#require-fetch-timeout) | Require `fetch(...)` calls to include a non-nullish abort `signal` option |
 | [`require-fetch-try-catch`](#require-fetch-try-catch) | Require try/catch around awaited `fetch(...)` calls, including chained promise forms without rejection handlers |
@@ -1014,6 +1015,31 @@ throw new Error("failed to fetch pull request");
 const { ERR_API } = require("./error_codes.cjs");
 await githubClient.rest.pulls.get({ owner, repo, pull_number });
 throw new Error(`${ERR_API}: failed to fetch pull request`);
+```
+
+### `require-error-code-for-fetch-throw`
+
+Require `throw new Error(...)` messages to include a standardized code when an earlier bare `fetch(...)` call happens in the same function — regardless of whether the file already imports `./error_codes.cjs`. This generalizes `require-error-code-for-github-api-throw` to direct external HTTP calls (Azure DevOps, Google OTLP, artifact-upload endpoints, and similar integrations), which previously fell outside both existing error-code rules because they never imported `error_codes.cjs` in the first place.
+
+**Flagged form:**
+```js
+async function adoRequest(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Azure DevOps request failed with HTTP ${response.status}`);
+  }
+}
+```
+
+**Safe alternative:**
+```js
+const { ERR_API } = require("./error_codes.cjs");
+async function adoRequest(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${ERR_API}: Azure DevOps request failed with HTTP ${response.status}`);
+  }
+}
 ```
 
 ### `require-invalid-date-check-before-compare`
