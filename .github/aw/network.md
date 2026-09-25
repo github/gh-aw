@@ -157,10 +157,10 @@ network:
 
 - `allowed` and `blocked` are mutually exclusive; each is a non-empty list of lowercase DNS hostnames (no wildcards).
 - `max-uses` optionally caps the number of hosted web tool invocations.
-- `hosted-web: false` rejects all hosted web tool calls for that workflow.
-- **Deny-by-default**: if `network` restricts domains for Claude or Codex without an explicit `hosted-web` policy, hosted web tools compile to disabled for that engine.
-- Ignored for engines other than Claude and Codex.
-- On import merge, allow/blocked lists from imported files combine with the main workflow's; a top-level scalar (`max-uses` or `hosted-web: false`) in either file takes precedence — see [syntax-tools-imports.md](syntax-tools-imports.md).
+- `hosted-web: false` disables hosted web tools for that workflow.
+- **Deny-by-default**: if a Claude or Codex workflow sets `network` explicitly without a `hosted-web` policy, hosted web tools compile to disabled for that engine.
+- Setting `hosted-web` on any engine other than Claude or Codex is a compile error.
+- On import merge, allowed/blocked lists from imported files combine with the main workflow's, but only when both policies are enabled; the main workflow's scalar settings (such as `max-uses`) and an explicit `hosted-web: false` on either side win — see [syntax-tools-imports.md](syntax-tools-imports.md).
 
 ## Inferring Ecosystem From Repository Files
 
