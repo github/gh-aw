@@ -22,7 +22,7 @@
 const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { generateWorkflowCallIdMarker, generateWorkflowCallIdReviewMarker, matchesWorkflowId } = require("./generate_footer.cjs");
+const { generateWorkflowCallIdMarker, generateWorkflowCallIdReviewMarker, matchesWorkflowCallId, matchesWorkflowId } = require("./generate_footer.cjs");
 const { attachExecutionState, fetchPullRequestReviewState } = require("./safe_output_execution_metadata.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isTransientError, sleep } = require("./error_recovery.cjs");
 const { ERR_API } = require("./error_codes.cjs");
@@ -532,7 +532,6 @@ function createReviewBuffer() {
         return;
       }
       const workflowCallMarker = workflowCallId ? generateWorkflowCallIdMarker(workflowCallId) : "";
-      const workflowCallReviewMarker = workflowCallId ? generateWorkflowCallIdReviewMarker(workflowCallId) : "";
       try {
         /** @type {any[]} */
         const reviews = [];
@@ -565,7 +564,7 @@ function createReviewBuffer() {
           if (review.state !== "CHANGES_REQUESTED") return false;
           if (review.user?.type !== "Bot") return false;
           if (workflowCallMarker) {
-            return review.body?.includes(workflowCallMarker) || review.body?.includes(workflowCallReviewMarker) || false;
+            return matchesWorkflowCallId(review.body, workflowCallId);
           }
           return matchesWorkflowId(review.body, workflowId);
         });

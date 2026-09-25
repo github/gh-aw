@@ -184,6 +184,20 @@ function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
 }
 
 /**
+ * Check whether a review body has an exact workflow-call ID marker line.
+ * Supports the legacy HTML comment and the durable Markdown reference marker.
+ *
+ * @param {string|null|undefined} body - Review body
+ * @param {string} callerWorkflowId - Calling workflow identifier
+ * @returns {boolean} Whether the review belongs to the calling workflow
+ */
+function matchesWorkflowCallId(body, callerWorkflowId) {
+  if (!body) return false;
+  const markers = new Set([generateWorkflowCallIdMarker(callerWorkflowId), generateWorkflowCallIdReviewMarker(callerWorkflowId)]);
+  return body.split(/\r?\n/).some(line => markers.has(line.trim()));
+}
+
+/**
  * Normalizes a user-supplied close-older-key to identifier style.
  * Converts to lowercase, replaces runs of non-alphanumeric/dash/underscore characters
  * with a single dash, then trims leading and trailing dashes and underscores.
@@ -306,6 +320,7 @@ module.exports = {
   generateWorkflowIdMarker,
   generateWorkflowCallIdMarker,
   generateWorkflowCallIdReviewMarker,
+  matchesWorkflowCallId,
   getWorkflowIdMarkerContent,
   matchesWorkflowId,
   isValidWorkflowId,
