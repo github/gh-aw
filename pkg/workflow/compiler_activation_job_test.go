@@ -1102,6 +1102,7 @@ func TestCheckoutSameRepoGuardWithCustomToken(t *testing.T) {
 	tests := []struct {
 		name                  string
 		activationToken       string
+		activationApp         *GitHubAppConfig
 		onSection             string
 		wantSameRepoCondition bool
 	}{
@@ -1118,6 +1119,27 @@ func TestCheckoutSameRepoGuardWithCustomToken(t *testing.T) {
 			onSection: `"on":
   workflow_call:`,
 			wantSameRepoCondition: true,
+		},
+		{
+			name: "GitHub App with ignore-if-missing and workflow_call - same-repo guard present",
+			activationApp: &GitHubAppConfig{
+				AppID:           "${{ vars.APP_ID }}",
+				PrivateKey:      "${{ secrets.APP_KEY }}",
+				IgnoreIfMissing: true,
+			},
+			onSection: `"on":
+  workflow_call:`,
+			wantSameRepoCondition: true,
+		},
+		{
+			name: "required GitHub App with workflow_call - no same-repo guard",
+			activationApp: &GitHubAppConfig{
+				AppID:      "${{ vars.APP_ID }}",
+				PrivateKey: "${{ secrets.APP_KEY }}",
+			},
+			onSection: `"on":
+  workflow_call:`,
+			wantSameRepoCondition: false,
 		},
 		{
 			name:            "default GITHUB_TOKEN without workflow_call - no same-repo guard",
@@ -1137,6 +1159,7 @@ func TestCheckoutSameRepoGuardWithCustomToken(t *testing.T) {
 			data := &WorkflowData{
 				On:                    tt.onSection,
 				ActivationGitHubToken: tt.activationToken,
+				ActivationGitHubApp:   tt.activationApp,
 			}
 
 			result := c.generateCheckoutGitHubFolderForActivation(data)

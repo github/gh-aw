@@ -423,8 +423,8 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 		// checkout is only attempted for same-repo invocations where GITHUB_TOKEN works.
 		// For cross-repo scenarios, users can enable the checkout by configuring
 		// activation-github-token or activation-github-app in the workflow frontmatter.
-		if activationToken == "${{ secrets.GITHUB_TOKEN }}" {
-			compilerActivationJobLog.Print("No custom activation token — restricting cross-repo checkout to same-repo invocations")
+		if activationTokenMayUseGitHubToken(data) {
+			compilerActivationJobLog.Print("Activation token may use GITHUB_TOKEN — restricting cross-repo checkout to same-repo invocations")
 			checkoutSteps = addSameRepoIfConditionToSteps(checkoutSteps)
 		}
 		return checkoutSteps
@@ -497,6 +497,8 @@ func activationCheckoutRef(data *WorkflowData, fallbackExpression string) string
 }
 
 // onSectionHasTrigger reports whether a rendered on: YAML section contains trigger.
+// Structured parsing provides exact key matching for security-sensitive triggers,
+// unlike the legacy substring check used by hasWorkflowCallTrigger.
 func onSectionHasTrigger(onSection, trigger string) bool {
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(onSection), &parsed); err != nil {
@@ -538,10 +540,8 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 		if normalized == "" {
 			continue
 		}
+		topLevel, _, _ := strings.Cut(normalized, "/")
 		parts := strings.Split(normalized, "/")
-		if len(parts) == 0 {
-			continue
-		}
 		invalid := false
 		for _, part := range parts {
 			if part == "" || part == "." || part == ".." {
@@ -553,7 +553,6 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 			continue
 		}
 
-		topLevel := firstString(parts)
 		if topLevel == "" {
 			continue
 		}
@@ -567,13 +566,6 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 	return result
 }
 
-func firstString(values []string) string {
-	for _, value := range values {
-		return value
-	}
-	return ""
-}
-
 // addSameRepoIfConditionToSteps injects an if: condition into each step that restricts
 // execution to same-repo workflow_call invocations. This prevents checkout steps from
 // failing when GITHUB_TOKEN cannot read a private callee repository in cross-repo scenarios.
@@ -584,6 +576,15 @@ func addSameRepoIfConditionToSteps(steps []string) []string {
 		result = append(result, injectIfConditionAfterName(step, sameRepoCondition))
 	}
 	return result
+}
+
+// activationTokenMayUseGitHubToken reports whether activation authentication can
+// resolve to the repository-scoped GITHUB_TOKEN at runtime.
+func activationTokenMayUseGitHubToken(data *WorkflowData) bool {
+	if data.ActivationGitHubApp != nil {
+		return data.ActivationGitHubApp.shouldIgnoreMissingKey()
+	}
+	return data.ActivationGitHubToken == ""
 }
 
 // injectIfConditionAfterName inserts an "if:" field immediately after the "- name:"
