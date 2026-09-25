@@ -36,6 +36,7 @@ const { fetchAWFReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES,
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
+const COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW = 1000000;
 
 // prettier-ignore
 const DEFAULT_LOGGER = /** @type {(msg: string) => void} */ (msg => process.stderr.write(`[gh-aw/pi-models-json] ${new Date().toISOString()} ${msg}\n`));
@@ -84,9 +85,9 @@ function resolveGatewayBaseUrl(options) {
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId, api, provider } = options;
+  const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow } = options;
   // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
-  const contextWindow = resolveContextWindow(options.contextWindow) || (provider === "github" && modelId === "claude-sonnet-5" ? 1000000 : undefined);
+  const contextWindow = resolveContextWindow(configuredContextWindow) || (provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined);
   return JSON.stringify({
     providers: {
       "aw-gateway": {

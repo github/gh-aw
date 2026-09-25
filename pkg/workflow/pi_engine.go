@@ -135,8 +135,10 @@ func piReflectProviderName(backend UniversalLLMBackend) string {
 }
 
 func resolvePiGatewaySecretEnvVar(profile universalLLMBackendProfile, backend UniversalLLMBackend) string {
-	for _, secretName := range profile.coreSecretNames {
-		return secretName
+	if len(profile.coreSecretNames) > 0 {
+		for _, secretName := range profile.coreSecretNames {
+			return secretName
+		}
 	}
 
 	switch backend {
