@@ -1482,10 +1482,16 @@ This appendix is generated from the current non-test Go source files in this pac
 | `permissions_factory.go` | `NewPermissionsActionsWrite` | `func NewPermissionsActionsWrite() *Permissions` | NewPermissionsActionsWrite creates permissions with actions: write This is required for dispatching workflows via workflow_dispatch |
 | `permissions_factory.go` | `NewPermissionsAllRead` | `func NewPermissionsAllRead() *Permissions` | NewPermissionsAllRead creates a Permissions with all: read |
 | `permissions_factory.go` | `NewPermissionsContentsRead` | `func NewPermissionsContentsRead() *Permissions` | NewPermissionsContentsRead creates permissions with contents: read |
+| `permissions_factory.go` | `NewPermissionsContentsReadCodeQualityWritePRRead` | `func NewPermissionsContentsReadCodeQualityWritePRRead() *Permissions` | NewPermissionsContentsReadCodeQualityWritePRRead creates permissions with contents: read, code-quality: write, pull-requests: read (required by actions/upload-code-coverage) |
+| `permissions_factory.go` | `NewPermissionsContentsReadDiscussionsWrite` | `func NewPermissionsContentsReadDiscussionsWrite() *Permissions` | NewPermissionsContentsReadDiscussionsWrite creates permissions with contents: read and discussions: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadIssuesWrite` | `func NewPermissionsContentsReadIssuesWrite() *Permissions` | NewPermissionsContentsReadIssuesWrite creates permissions with contents: read and issues: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadIssuesWritePRWrite` | `func NewPermissionsContentsReadIssuesWritePRWrite() *Permissions` | NewPermissionsContentsReadIssuesWritePRWrite creates permissions with contents: read, issues: write, pull-requests: write |
+| `permissions_factory.go` | `NewPermissionsContentsReadPRWrite` | `func NewPermissionsContentsReadPRWrite() *Permissions` | NewPermissionsContentsReadPRWrite creates permissions with contents: read and pull-requests: write |
+| `permissions_factory.go` | `NewPermissionsContentsReadSecurityEventsWrite` | `func NewPermissionsContentsReadSecurityEventsWrite() *Permissions` | NewPermissionsContentsReadSecurityEventsWrite creates permissions with contents: read and security-events: write |
 | `permissions_factory.go` | `NewPermissionsContentsReadSecurityEventsWriteActionsRead` | `func NewPermissionsContentsReadSecurityEventsWriteActionsRead() *Permissions` | NewPermissionsContentsReadSecurityEventsWriteActionsRead creates permissions with contents: read, security-events: write, actions: read |
 | `permissions_factory.go` | `NewPermissionsContentsWrite` | `func NewPermissionsContentsWrite() *Permissions` | NewPermissionsContentsWrite creates permissions with contents: write |
+| `permissions_factory.go` | `NewPermissionsContentsWriteIssuesWritePRWrite` | `func NewPermissionsContentsWriteIssuesWritePRWrite() *Permissions` | NewPermissionsContentsWriteIssuesWritePRWrite creates permissions with contents: write, issues: write, pull-requests: write |
+| `permissions_factory.go` | `NewPermissionsContentsWritePRWrite` | `func NewPermissionsContentsWritePRWrite() *Permissions` | NewPermissionsContentsWritePRWrite creates permissions with contents: write, pull-requests: write (used when create-pull-request has fallback-as-issue: false) |
 | `permissions_factory.go` | `NewPermissionsEmpty` | `func NewPermissionsEmpty() *Permissions` | NewPermissionsEmpty creates a Permissions that explicitly renders as "permissions: {}" |
 | `permissions_factory.go` | `NewPermissionsFromMap` | `func NewPermissionsFromMap(perms map[PermissionScope]PermissionLevel) *Permissions` | NewPermissionsFromMap creates a Permissions from a map of scopes to levels |
 | `permissions_factory.go` | `NewPermissionsNone` | `func NewPermissionsNone() *Permissions` | NewPermissionsNone creates a Permissions with none shorthand |
@@ -1607,6 +1613,8 @@ This appendix is generated from the current non-test Go source files in this pac
 ## Source Synchronization
 
 Reviewed against recent source updates on 2026-09-20: added 14 previously-undocumented exported package-level functions (GitHub App manifest permission helpers, engine default domain sets, GitHub CLI proxy-mode detection, operational-value evaluator path helpers, grader/experiment reference rewriting, and secret/shell-env substitution) to the appendix table below. No other public-contract deltas were identified beyond the sections above.
+
+Reviewed against recent source updates on 2026-09-25: added 6 previously-undocumented `NewPermissionsContents*` factory functions from `permissions_factory.go` (`NewPermissionsContentsReadCodeQualityWritePRRead`, `NewPermissionsContentsReadDiscussionsWrite`, `NewPermissionsContentsReadPRWrite`, `NewPermissionsContentsReadSecurityEventsWrite`, `NewPermissionsContentsWriteIssuesWritePRWrite`, `NewPermissionsContentsWritePRWrite`) to the appendix table below. All other public-contract entries (types, engine architecture, `compilerenv` helpers, `CompilerOption` functions) were cross-checked against source and found accurate; no other changes were needed.
 
 ---
 
