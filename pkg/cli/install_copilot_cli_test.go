@@ -261,6 +261,113 @@ exit 97
 	assert.Equal(t, 1, compatFetches, "compat.json should be fetched exactly once (no double fallback)")
 }
 
+func TestInstallCopilotCLIScriptAppliesCopilotMinVersionOverrideToToolcache(t *testing.T) {
+	t.Parallel()
+	const compatVersion = "1.0.87"
+	const cachedTooOldVersion = "1.0.85"
+	const cachedMinVersion = "1.0.87"
+
+	wd, err := os.Getwd()
+	require.NoError(t, err, "Failed to get working directory")
+
+	projectRoot := filepath.Join(wd, "..", "..")
+	installScript := filepath.Join(projectRoot, "actions", "setup", "sh", "install_copilot_cli.sh")
+
+	tempDir := t.TempDir()
+	tooOldToolcacheBin := filepath.Join(tempDir, "toolcache", "copilot-cli", cachedTooOldVersion, "x64", "bin")
+	minToolcacheBin := filepath.Join(tempDir, "toolcache", "copilot-cli", cachedMinVersion, "x64", "bin")
+	require.NoError(t, os.MkdirAll(tooOldToolcacheBin, 0o755))
+	require.NoError(t, os.MkdirAll(minToolcacheBin, 0o755))
+
+	tooOldCachedCopilot := filepath.Join(tooOldToolcacheBin, "copilot")
+	minCachedCopilot := filepath.Join(minToolcacheBin, "copilot")
+	require.NoError(t, os.WriteFile(tooOldCachedCopilot, []byte("#!/usr/bin/env bash\necho 'copilot "+cachedTooOldVersion+"'\n"), 0o755))
+	require.NoError(t, os.WriteFile(minCachedCopilot, []byte("#!/usr/bin/env bash\necho 'copilot "+cachedMinVersion+"'\n"), 0o755))
+
+	fakeBinDir := filepath.Join(tempDir, "fake-bin")
+	require.NoError(t, os.MkdirAll(fakeBinDir, 0o755))
+
+	curlLog := filepath.Join(tempDir, "curl.log")
+	sudoScript := filepath.Join(fakeBinDir, "sudo")
+	curlScript := filepath.Join(fakeBinDir, "curl")
+
+	require.NoError(t, os.WriteFile(sudoScript, []byte(`#!/usr/bin/env bash
+if [ "${1:-}" = "chown" ]; then
+  exit 0
+fi
+exec "$@"
+`), 0o755))
+	require.NoError(t, os.WriteFile(curlScript, []byte(`#!/usr/bin/env bash
+set -euo pipefail
+output_file=""
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o)
+      output_file="$2"
+      shift 2
+      ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+echo "$url" >> "`+curlLog+`"
+if [[ "$url" == *"/compat.json" ]]; then
+  cat > "$output_file" <<'JSON'
+{
+  "agent-compat-v1": {
+    "copilot": [
+      {
+        "min-gh-aw": "0.72.0",
+        "max-gh-aw": "*",
+        "min-agent": "1.0.21",
+        "max-agent": "`+compatVersion+`",
+        "open": true
+      }
+    ]
+  }
+}
+JSON
+  exit 0
+fi
+echo "unexpected URL: $url" >&2
+exit 97
+`), 0o755))
+
+	githubPath := filepath.Join(tempDir, "github-path")
+	installDir := filepath.Join(tempDir, "install-bin")
+	require.NoError(t, os.MkdirAll(installDir, 0o755))
+	cmd := exec.Command("bash", installScript)
+	cmd.Env = append(os.Environ(),
+		"RUNNER_TOOL_CACHE="+filepath.Join(tempDir, "toolcache"),
+		"GITHUB_PATH="+githubPath,
+		"GH_AW_COMPILED_VERSION=dev",
+		"GH_AW_COPILOT_MIN_VERSION="+cachedMinVersion,
+		"COPILOT_INSTALL_DIR="+installDir,
+		"PATH="+fakeBinDir+":"+os.Getenv("PATH"),
+	)
+
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "install_copilot_cli.sh should apply GH_AW_COPILOT_MIN_VERSION to toolcache lookup: %s", output)
+
+	outputString := string(output)
+	assert.Contains(t, outputString, "Raising Copilot CLI minimum version from 1.0.21 to "+cachedMinVersion+" due to GH_AW_COPILOT_MIN_VERSION.")
+	assert.Contains(t, outputString, "Using compat-resolved Copilot CLI window: "+cachedMinVersion+".."+compatVersion)
+	assert.Contains(t, outputString, "Skipping candidate (below compat minimum: "+cachedTooOldVersion+" < "+cachedMinVersion+")")
+	assert.Contains(t, outputString, "Using cached GitHub Copilot CLI")
+
+	installedCopilot := filepath.Join(installDir, "copilot")
+	require.FileExists(t, installedCopilot, "toolcache hit must still create the canonical copilot path")
+	wrapper, err := os.ReadFile(installedCopilot)
+	require.NoError(t, err)
+	assert.Contains(t, string(wrapper), minCachedCopilot, "wrapper should exec the cached Copilot CLI at the feature minimum")
+	wrapperOutput, err := exec.Command(installedCopilot, "--version").CombinedOutput()
+	require.NoError(t, err, "feature-minimum toolcache wrapper should be executable: %s", wrapperOutput)
+	assert.Contains(t, string(wrapperOutput), "copilot "+cachedMinVersion)
+}
+
 func TestInstallCopilotCLIScriptUsesBoundedRetriesForReleaseDownloads(t *testing.T) {
 	t.Parallel()
 	wd, err := os.Getwd()

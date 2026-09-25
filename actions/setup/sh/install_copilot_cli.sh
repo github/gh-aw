@@ -39,6 +39,7 @@ COPILOT_TOOLCACHE_MAX_DEPTH=4
 DEFAULT_COPILOT_VERSION="1.0.87"
 COMPAT_URL="${COPILOT_COMPAT_URL:-https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json}"
 COMPILED_GH_AW_VERSION="${GH_AW_COMPILED_VERSION:-}"
+COPILOT_MIN_VERSION_OVERRIDE="${GH_AW_COPILOT_MIN_VERSION:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 COMPAT_BUNDLED_PATH="${COPILOT_COMPAT_BUNDLED_PATH:-${REPO_ROOT}/.github/aw/compat.json}"
@@ -215,6 +216,38 @@ version_is_greater() {
   done
 
   return 1
+}
+
+# Return the higher of the compat minimum and a feature-derived minimum version.
+select_effective_min_version() {
+  local compat_min
+  local feature_min
+
+  compat_min="$(normalize_version "${1:-}")"
+  feature_min="$(normalize_version "${2:-}")"
+
+  if [ -z "$feature_min" ]; then
+    printf '%s\n' "$compat_min"
+    return 0
+  fi
+
+  if ! version_is_numeric "$feature_min"; then
+    echo "WARNING: Ignoring invalid GH_AW_COPILOT_MIN_VERSION '${2:-}'" >&2
+    printf '%s\n' "$compat_min"
+    return 0
+  fi
+
+  if [ -z "$compat_min" ] || version_is_greater "$feature_min" "$compat_min"; then
+    if [ -n "$compat_min" ]; then
+      echo "Raising Copilot CLI minimum version from ${compat_min} to ${feature_min} due to GH_AW_COPILOT_MIN_VERSION." >&2
+    else
+      echo "Using Copilot CLI minimum version from GH_AW_COPILOT_MIN_VERSION: ${feature_min}" >&2
+    fi
+    printf '%s\n' "$feature_min"
+    return 0
+  fi
+
+  printf '%s\n' "$compat_min"
 }
 
 # Download compatibility matrix with bundled fallback.
@@ -546,6 +579,7 @@ if [ -z "$VERSION" ]; then
     IFS='|' read -r RESOLVED_COMPAT_VERSION COMPAT_MATCHED_MIN_AGENT COMPAT_MATCHED_MAX_AGENT COMPAT_CACHE_TTL_DAYS <<< "$RESOLVED_COMPAT_INFO"
     VERSION="$RESOLVED_COMPAT_VERSION"
     REQUESTED_VERSION="latest"
+    COMPAT_MATCHED_MIN_AGENT="$(select_effective_min_version "${COMPAT_MATCHED_MIN_AGENT}" "${COPILOT_MIN_VERSION_OVERRIDE}")"
     echo "Using compat-resolved Copilot CLI window: ${COMPAT_MATCHED_MIN_AGENT}..${COMPAT_MATCHED_MAX_AGENT}"
     echo "Will install compat max-agent ${VERSION} if no cached version satisfies the window."
   else
