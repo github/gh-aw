@@ -336,6 +336,8 @@ jobs:
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INPUTS_DEVICES: ${{ inputs.devices }}
           GH_AW_MCP_CLI_SERVERS_LIST: '- `safeoutputs` — run `safeoutputs --help` to see available tools'
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, the CLI commands above are the ONLY transport: this engine has no MCP tool-call interface, so every tool listed in `<safe-output-tools>` must be invoked as `safeoutputs <tool_name> <json>` from bash. No command is named after an individual tool, so never conclude a safe-output tool is unavailable because shell discovery cannot find it.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'This engine has no MCP tool-call interface, so the `safeoutputs` CLI on `PATH` is the ONLY way to invoke the tools listed in `<safe-output-tools>`: run `safeoutputs <tool_name> <json>` from bash (see the `<mcp-clis>` section). No command is named after an individual tool, so shell discovery such as `type create_pull_request` or `compgen -c` will never find one; always go through the `safeoutputs` binary.'
         with:
           script: |
             const path = require('path');
@@ -358,7 +360,9 @@ jobs:
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
                 GH_AW_INPUTS_DEVICES: process.env.GH_AW_INPUTS_DEVICES,
-                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
+                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT
               }
             });
       - name: Validate prompt placeholders

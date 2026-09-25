@@ -392,6 +392,8 @@ jobs:
           GH_AW_MEMORY_DESCRIPTION: ' Historical news digest data'
           GH_AW_MEMORY_DIR: '/tmp/gh-aw/repo-memory/default/'
           GH_AW_MEMORY_TARGET_REPO: ' of the current repository'
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, the CLI commands above are the ONLY transport: this engine has no MCP tool-call interface, so every tool listed in `<safe-output-tools>` must be invoked as `safeoutputs <tool_name> <json>` from bash. No command is named after an individual tool, so never conclude a safe-output tool is unavailable because shell discovery cannot find it.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'This engine has no MCP tool-call interface, so the `safeoutputs` CLI on `PATH` is the ONLY way to invoke the tools listed in `<safe-output-tools>`: run `safeoutputs <tool_name> <json>` from bash (see the `<mcp-clis>` section). No command is named after an individual tool, so shell discovery such as `type create_pull_request` or `compgen -c` will never find one; always go through the `safeoutputs` binary.'
           GH_AW_WIKI_NOTE: ''
         with:
           script: |
@@ -424,6 +426,8 @@ jobs:
                 GH_AW_MEMORY_DESCRIPTION: process.env.GH_AW_MEMORY_DESCRIPTION,
                 GH_AW_MEMORY_DIR: process.env.GH_AW_MEMORY_DIR,
                 GH_AW_MEMORY_TARGET_REPO: process.env.GH_AW_MEMORY_TARGET_REPO,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT,
                 GH_AW_WIKI_NOTE: process.env.GH_AW_WIKI_NOTE
               }
             });

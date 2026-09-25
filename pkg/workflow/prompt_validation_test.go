@@ -114,9 +114,16 @@ func TestSafeOutputsPromptDoesNotRequireCLI(t *testing.T) {
 
 	content := string(data)
 
-	assert.Contains(t, content, "Call the tool names listed in `<safe-output-tools>` directly",
+	require.Contains(t, content, "__"+safeOutputsTransportEnvVar+"__",
+		"safe-output prompt should carry the engine-aware transport placeholder")
+
+	mcpContent := strings.ReplaceAll(content, "__"+safeOutputsTransportEnvVar+"__", safeOutputsTransportText(&WorkflowData{
+		EngineConfig: &EngineConfig{ID: "copilot"},
+	}))
+
+	assert.Contains(t, mcpContent, "Call the tool names listed in `<safe-output-tools>` directly",
 		"safe-output prompt should instruct agents to call configured safe-output tools")
-	assert.Contains(t, content, "if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead",
+	assert.Contains(t, mcpContent, "if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead",
 		"safe-output prompt should describe CLI usage as optional because CLI mounting is optional")
 }
 
@@ -162,6 +169,54 @@ func TestComposedPromptSafeOutputsGuidanceStaysTransportNeutral(t *testing.T) {
 		"final composed prompt should not require safeoutputs CLI usage unconditionally")
 	assert.Contains(t, finalPrompt, "For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.",
 		"final composed prompt should keep safeoutputs CLI guidance optional when safe-output tools are available")
+}
+
+// TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport verifies that engines
+// without native MCP tool-calling (EngineCapabilities.MCP == false, e.g. `pi`) are
+// told the safeoutputs CLI is the only transport, instead of being told the CLI is
+// an optional alternative to a direct tool call that does not exist for them.
+func TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport(t *testing.T) {
+	compiler := &Compiler{}
+	data := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "pi"},
+		SafeOutputs: &SafeOutputsConfig{
+			NoOp: &NoOpConfig{},
+		},
+	}
+
+	sections := compiler.collectPromptSections(data)
+	require.NotEmpty(t, sections, "should collect prompt sections")
+
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	promptDir := filepath.Clean(filepath.Join(wd, "..", "..", "actions", "setup", "md"))
+
+	var composed strings.Builder
+	for _, section := range sections {
+		content := section.Content
+		if section.IsFile {
+			fileBytes, readErr := os.ReadFile(filepath.Clean(filepath.Join(promptDir, section.Content)))
+			require.NoError(t, readErr, "should read prompt fragment %s", section.Content)
+			content = string(fileBytes)
+		}
+
+		for key, value := range section.EnvVars {
+			content = strings.ReplaceAll(content, "__"+key+"__", value)
+		}
+
+		composed.WriteString(content)
+		composed.WriteString("\n")
+	}
+
+	finalPrompt := composed.String()
+	assert.NotContains(t, finalPrompt, "optional equivalent transport",
+		"engines without MCP must not be told the safeoutputs CLI is optional")
+	assert.NotContains(t, finalPrompt, "you may use that CLI form instead",
+		"engines without MCP must not be told the safeoutputs CLI is an alternative")
+	assert.Contains(t, finalPrompt, "the `safeoutputs` CLI on `PATH` is the ONLY way to invoke the tools listed in `<safe-output-tools>`",
+		"engines without MCP must be told the safeoutputs CLI is the only transport")
+	assert.Contains(t, finalPrompt, "For `safeoutputs`, the CLI commands above are the ONLY transport",
+		"the MCP CLI section must state the CLI is the only transport for non-MCP engines")
 }
 
 // TestGitHubMCPToolsPromptIncludedForCodeSecurityToolset verifies that when a

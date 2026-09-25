@@ -395,6 +395,8 @@ jobs:
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_REQUEST_TEXT: ${{ needs.pre_activation.outputs.request_text }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_NAME: ${{ needs.pre_activation.outputs.skill_name }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_PATH: ${{ needs.pre_activation.outputs.skill_path }}
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'Call the tool names listed in `<safe-output-tools>` directly; if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead.'
           GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: ${{ steps.sanitized.outputs.text }}
         with:
           script: |
@@ -425,6 +427,8 @@ jobs:
                 GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_REQUEST_TEXT: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_REQUEST_TEXT,
                 GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_NAME: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_NAME,
                 GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_PATH: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_SKILL_PATH,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT,
                 GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT: process.env.GH_AW_STEPS_SANITIZED_OUTPUTS_TEXT
               }
             });

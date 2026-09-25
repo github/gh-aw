@@ -347,6 +347,8 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `agenticworkflows` — run `agenticworkflows --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools"
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'Call the tool names listed in `<safe-output-tools>` directly; if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead.'
         with:
           script: |
             const path = require('path');
@@ -371,7 +373,9 @@ jobs:
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
+                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT
               }
             });
       - name: Validate prompt placeholders

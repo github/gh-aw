@@ -362,6 +362,8 @@ jobs:
           GH_AW_MEMORY_DESCRIPTION: ' Historical code quality and health metrics'
           GH_AW_MEMORY_DIR: '/tmp/gh-aw/repo-memory/default/'
           GH_AW_MEMORY_TARGET_REPO: ' of the current repository'
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'Call the tool names listed in `<safe-output-tools>` directly; if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead.'
           GH_AW_WIKI_NOTE: ''
         with:
           script: |
@@ -394,6 +396,8 @@ jobs:
                 GH_AW_MEMORY_DESCRIPTION: process.env.GH_AW_MEMORY_DESCRIPTION,
                 GH_AW_MEMORY_DIR: process.env.GH_AW_MEMORY_DIR,
                 GH_AW_MEMORY_TARGET_REPO: process.env.GH_AW_MEMORY_TARGET_REPO,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT,
                 GH_AW_WIKI_NOTE: process.env.GH_AW_WIKI_NOTE
               }
             });

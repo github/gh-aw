@@ -145,6 +145,9 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 		sections = append(sections, PromptSection{
 			Content: safeOutputsPromptFile,
 			IsFile:  true,
+			EnvVars: map[string]string{
+				safeOutputsTransportEnvVar: safeOutputsTransportText(data),
+			},
 		})
 		// Per-tool sections: opening tag + tools list (inline), tool instruction files, closing tag
 		sections = append(sections, buildSafeOutputsSections(data.SafeOutputs, data.CommentMemoryConfig)...)

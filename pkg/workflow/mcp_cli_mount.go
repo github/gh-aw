@@ -384,16 +384,18 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	}
 
 	promptFile := mcpCLIToolsPromptFile
+	envVars := map[string]string{
+		"GH_AW_MCP_CLI_SERVERS_LIST": strings.Join(lines, "\n"),
+	}
 	if slices.Contains(servers, constants.SafeOutputsMCPServerID.String()) {
 		promptFile = mcpCLIToolsWithSafeOutputsPromptFile
+		envVars[safeOutputsCLITransportEnvVar] = safeOutputsCLITransportText(data)
 	}
 
 	return &PromptSection{
 		Content: promptFile,
 		IsFile:  true,
-		EnvVars: map[string]string{
-			"GH_AW_MCP_CLI_SERVERS_LIST": strings.Join(lines, "\n"),
-		},
+		EnvVars: envVars,
 	}
 }
 

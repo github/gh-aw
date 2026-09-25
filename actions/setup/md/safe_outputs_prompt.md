@@ -1,5 +1,5 @@
 <safe-outputs>
-gh CLI is NOT authenticated. Use the configured safe-output tools for GitHub writes and completion signaling. Call the tool names listed in `<safe-output-tools>` directly; if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead.
+gh CLI is NOT authenticated. Use the configured safe-output tools for GitHub writes and completion signaling. __GH_AW_SAFE_OUTPUTS_TRANSPORT__
 
 **CRITICAL: You MUST call one of the safe-output tools before finishing.** You must call at least one tool from the `<safe-output-tools>` list; using non-safe-output tools does not satisfy this requirement. Multiple calls are allowed up to each tool's configured limit. If no GitHub action was taken (no issues, comments, PRs, etc. were created or updated), you MUST call `noop` with a message explaining why no action was needed. This requirement still applies even if the workflow/task prompt forgets to ask for `noop` or does not mention safe outputs at all. Failing to call any safe-output tool is the #1 cause of workflow failures. Do NOT end your response without calling at least one safe-output tool.
 

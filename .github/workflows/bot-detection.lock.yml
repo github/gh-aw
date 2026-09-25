@@ -345,6 +345,8 @@ jobs:
           GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_BODY: ${{ needs.precompute.outputs.issue_body }}
           GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_NUMBER: ${{ needs.precompute.outputs.issue_number }}
           GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_TITLE: ${{ needs.precompute.outputs.issue_title }}
+          GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: 'For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.'
+          GH_AW_SAFE_OUTPUTS_TRANSPORT: 'Call the tool names listed in `<safe-output-tools>` directly; if a separate `<mcp-clis>` section says `safeoutputs` is available on `PATH`, you may use that CLI form instead.'
         with:
           script: |
             const path = require('path');
@@ -370,7 +372,9 @@ jobs:
                 GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ACTION: process.env.GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ACTION,
                 GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_BODY: process.env.GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_BODY,
                 GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_NUMBER: process.env.GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_NUMBER,
-                GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_TITLE: process.env.GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_TITLE
+                GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_TITLE: process.env.GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ISSUE_TITLE,
+                GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_CLI_TRANSPORT,
+                GH_AW_SAFE_OUTPUTS_TRANSPORT: process.env.GH_AW_SAFE_OUTPUTS_TRANSPORT
               }
             });
       - name: Validate prompt placeholders
