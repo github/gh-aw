@@ -26,7 +26,7 @@ permissions:
   contents: read
   pull-requests: read
 engine: copilot
-strict: true
+strict: false
 network:
   allowed:
     - defaults

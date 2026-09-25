@@ -42,6 +42,7 @@ func TestSetupEngineAndImports_ValidSetup(t *testing.T) {
 	testContent := `---
 on: push
 engine: copilot
+strict: false
 network:
   allowed:
     - python
@@ -831,6 +832,7 @@ network:
 	testContent := `---
 on: push
 engine: copilot
+strict: false
 imports:
   - imported.md
 network:
@@ -971,6 +973,7 @@ func TestSetupEngineAndImports_FirewallEnablement(t *testing.T) {
 	testContent := `---
 on: push
 engine: copilot
+strict: false
 network:
   allowed:
     - python
