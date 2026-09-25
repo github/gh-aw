@@ -75,6 +75,19 @@ func TestParseFrontmatterConfigDynamicCheckoutRequiresReposExpression(t *testing
 	require.ErrorContains(t, err, "repos must be a GitHub Actions expression")
 }
 
+func TestParseFrontmatterConfigDynamicCheckoutRequiresReposString(t *testing.T) {
+	_, err := ParseFrontmatterConfig(map[string]any{
+		"name":   "dynamic-checkout",
+		"engine": "copilot",
+		"checkout": map[string]any{
+			"repos":         []any{"owner/repo"},
+			"allowed-repos": []any{"owner/repo"},
+		},
+	})
+
+	require.ErrorContains(t, err, "repos must be a string containing a GitHub Actions expression")
+}
+
 func TestGenerateDynamicCheckoutSteps(t *testing.T) {
 	compiler := NewCompiler()
 	steps := compiler.generateDynamicCheckoutSteps(
