@@ -49,6 +49,7 @@ const FAILURE_ISSUE_DEDUP_WINDOW_HOURS = 24;
 const FAILURE_ISSUE_CATEGORY_DAILY_CAP = 50;
 const FAILURE_ISSUE_WINDOW_MS = FAILURE_ISSUE_DEDUP_WINDOW_HOURS * 60 * 60 * 1000;
 const DEFAULT_OTEL_JSONL_PATH = "/tmp/gh-aw/otel.jsonl";
+const AWF_INSTALL_DIAGNOSTICS_PATH = "/tmp/gh-aw/awf-install-diagnostics.json";
 /** Path to the failure categories file written by handle_agent_failure and read by the OTLP conclusion span. */
 const FAILURE_CATEGORIES_PATH = "/tmp/gh-aw/failure_categories.json";
 const GITHUB_API_VERSION = "2022-11-28";
@@ -282,6 +283,7 @@ function parseHTMLCommentMetadata(body, markerKey) {
  */
 function buildFailureMatchCategories(options) {
   const categories = [];
+  if (options.awfDownloadFailure) categories.push("awf_download_failure");
 
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
@@ -352,6 +354,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.hasAssignmentErrors
  * @param {boolean} options.http400ResponseError
  * @param {boolean} options.unknownModelAICredits
+ * @param {boolean} [options.awfDownloadFailure]
  * @param {boolean} [options.copilotOrgBillingError]
  * @param {string} [options.copilotAgentNotFound] - Requested agent identifier if a "No such agent" failure was detected
  * @param {boolean} [options.missingModelPricingError]
@@ -361,6 +364,7 @@ function buildFailureMatchCategories(options) {
  */
 function buildFailureIssueTitle(options) {
   const { workflowName } = options;
+  if (options.awfDownloadFailure) return `[aw] ${workflowName} failed to download AWF`;
   if (options.hasDailyAICExceeded) return `[aw] ${workflowName} exceeded daily AI credits budget`;
   if (options.hasDailyAICGuardrailError) return `[aw] ${workflowName} could not verify daily AI credits`;
   if (options.maxAICreditsExceeded) return `[aw] ${workflowName} exceeded max AI credits`;
@@ -2943,6 +2947,38 @@ function detectAWFFirewallStartupFailureFromLog() {
 }
 
 /**
+ * Read the structured failure marker written by the AWF installer. The marker
+ * deliberately contains only a fixed stage name and exit code, never command
+ * output, so it can safely be included in failure reports.
+ * @returns {{stage: string}|null}
+ */
+function readAWFDownloadFailure() {
+  try {
+    const diagnostic = JSON.parse(fs.readFileSync(AWF_INSTALL_DIAGNOSTICS_PATH, "utf8"));
+    if (diagnostic?.kind !== "awf_install_failure" || typeof diagnostic.stage !== "string" || !["download_checksums", "download_bundle", "download_binary"].includes(diagnostic.stage)) {
+      return null;
+    }
+    return { stage: diagnostic.stage };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a dedicated diagnostic for an AWF release-download failure.
+ * @param {{stage: string}|null} failure
+ * @returns {string}
+ */
+function buildAWFDownloadFailureContext(failure) {
+  if (!failure) return "";
+  const asset = failure.stage === "download_checksums" ? "release checksums" : failure.stage === "download_bundle" ? "the Node.js bundle" : "the platform binary";
+  return (
+    buildWarningAlertLine("AWF Download Failure", `The workflow could not download ${asset} from the AWF release. The agent was not started.`) +
+    "\nThis is usually transient GitHub release or network infrastructure failure. Re-run the workflow; if it persists, check the configured AWF version and GitHub Actions network access.\n\n"
+  );
+}
+
+/**
  * Detect whether the agent failure was caused by engine HTTP 429/rate limiting.
  * Checks agent-stdio.log first, then falls back to OTLP mirror payloads.
  * @returns {boolean}
@@ -2989,6 +3025,11 @@ function buildEngineFailureContext(options = {}) {
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineLabel = engineId ? ` \`${engineId}\`` : " AI";
   const hasStructuredMaxCacheMissesSignal = maxCacheMissesExceededFromDetection || parseMaxCacheMissesExceededFromEventLog();
+  const awfDownloadFailure = readAWFDownloadFailure();
+  if (awfDownloadFailure) {
+    core.info(`Detected AWF download failure at stage: ${awfDownloadFailure.stage}`);
+    return buildAWFDownloadFailureContext(awfDownloadFailure);
+  }
 
   try {
     if (!fs.existsSync(stdioLogPath)) {
@@ -3733,6 +3774,7 @@ async function main() {
     const missingModelPricingError = process.env.GH_AW_MISSING_MODEL_PRICING_ERROR === "true" && agentConclusion === "failure";
     const missingModelPricingModelName = process.env.GH_AW_MISSING_MODEL_PRICING_MODEL_NAME || "";
     const shellExpansionGuardRejected = process.env.GH_AW_SHELL_EXPANSION_GUARD_REJECTED === "true" && agentConclusion === "failure";
+    const awfDownloadFailure = readAWFDownloadFailure();
     const pushRepoMemoryResult = process.env.GH_AW_PUSH_REPO_MEMORY_RESULT || "";
     const reportFailureAsIssue = parseBoolTemplatable(process.env.GH_AW_FAILURE_REPORT_AS_ISSUE, true);
     // Parse included categories filter for report-failure-as-issue (optional JSON array of category strings)
@@ -4171,6 +4213,7 @@ async function main() {
       missingModelPricingModelName,
       copilotOrgBillingError,
       copilotAgentNotFound: copilotAgentNotFound?.requestedAgent,
+      awfDownloadFailure: Boolean(awfDownloadFailure),
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
@@ -4207,6 +4250,7 @@ async function main() {
       hasDailyAICExceeded,
       hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       isAWFFirewallStartupFailed: detectAWFFirewallStartupFailureFromLog(),
+      awfDownloadFailure: Boolean(awfDownloadFailure),
     });
 
     // Persist failure categories so the OTLP conclusion span can record them
@@ -4813,6 +4857,8 @@ module.exports = {
   buildSafeOutputsCliInvocationContext,
   isDroppedPipeSafeOutputsCommand,
   detectAWFFirewallStartupFailureFromLog,
+  readAWFDownloadFailure,
+  buildAWFDownloadFailureContext,
   buildReportIncompleteContext,
   buildMCPPolicyErrorContext,
   buildCopilotOrgBillingErrorContext,

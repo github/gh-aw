@@ -19,6 +19,8 @@ describe("handle_agent_failure", () => {
   let buildSecretVerificationContext;
   let buildAssignmentErrorsContext;
   let buildAssignCopilotFailureContext;
+  let buildAWFDownloadFailureContext;
+  let readAWFDownloadFailure;
   let setFailureIssueOutputs;
   let getActionFailureIssueExpiresHours;
   const ENGINE_RATE_LIMIT_TEMPLATE = "> [!WARNING]\n> **Engine Rate Limited (HTTP 429)**\n> OTLP telemetry\n> {engine_label}\n";
@@ -52,6 +54,8 @@ describe("handle_agent_failure", () => {
       buildSecretVerificationContext,
       buildAssignmentErrorsContext,
       buildAssignCopilotFailureContext,
+      buildAWFDownloadFailureContext,
+      readAWFDownloadFailure,
       setFailureIssueOutputs,
       getActionFailureIssueExpiresHours,
     } = require("./handle_agent_failure.cjs"));
@@ -64,6 +68,33 @@ describe("handle_agent_failure", () => {
     delete process.env.GITHUB_SHA;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_GROUP_REPORTS;
+  });
+
+  describe("AWF download diagnostics", () => {
+    const fs = require("fs");
+    const diagnosticsPath = "/tmp/gh-aw/awf-install-diagnostics.json";
+
+    afterEach(() => {
+      fs.rmSync(diagnosticsPath, { force: true });
+    });
+
+    it("reports a dedicated, actionable context for a failed binary download", () => {
+      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+      fs.writeFileSync(diagnosticsPath, JSON.stringify({ kind: "awf_install_failure", stage: "download_binary", exit_code: 22 }));
+
+      expect(readAWFDownloadFailure()).toEqual({ stage: "download_binary" });
+      const context = buildAWFDownloadFailureContext(readAWFDownloadFailure());
+      expect(context).toContain("AWF Download Failure");
+      expect(context).toContain("platform binary");
+      expect(context).toContain("Re-run the workflow");
+    });
+
+    it("ignores non-download installer failures", () => {
+      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+      fs.writeFileSync(diagnosticsPath, JSON.stringify({ kind: "awf_install_failure", stage: "verify_installation", exit_code: 1 }));
+
+      expect(readAWFDownloadFailure()).toBeNull();
+    });
   });
 
   describe("getActionFailureIssueExpiresHours", () => {
@@ -187,10 +218,12 @@ describe("handle_agent_failure", () => {
       missingModelPricingError: false,
       missingModelPricingModelName: "",
       shellExpansionGuardRejected: false,
+      awfDownloadFailure: false,
     };
 
     const cases = [
       { flag: "hasDailyAICExceeded", expected: "[aw] Test Workflow exceeded daily AI credits budget" },
+      { flag: "awfDownloadFailure", expected: "[aw] Test Workflow failed to download AWF" },
       { flag: "hasDailyAICGuardrailError", expected: "[aw] Test Workflow could not verify daily AI credits" },
       { flag: "maxAICreditsExceeded", expected: "[aw] Test Workflow exceeded max AI credits" },
       { flag: "aiCreditsRateLimitError", expected: "[aw] Test Workflow hit AI credits rate limit" },

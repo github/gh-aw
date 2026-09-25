@@ -91,6 +91,7 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		agentExecutionEvidencePath,
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
+		constants.TmpGhAwDirSlash + "awf-install-diagnostics.json",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
 		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
 		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),

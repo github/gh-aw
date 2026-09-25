@@ -32,6 +32,16 @@ AWF_REPO="github/gh-aw-firewall"
 AWF_INSTALL_DIR="/usr/local/bin"
 AWF_INSTALL_NAME="awf"
 AWF_LIB_DIR="/usr/local/lib/awf"
+AWF_DIAGNOSTICS_FILE="/tmp/gh-aw/awf-install-diagnostics.json"
+AWF_INSTALL_STAGE="initialization"
+
+record_install_failure() {
+  local exit_code="$1"
+  mkdir -p "$(dirname "$AWF_DIAGNOSTICS_FILE")" 2>/dev/null || true
+  printf '{"kind":"awf_install_failure","stage":"%s","exit_code":%s}\n' "$AWF_INSTALL_STAGE" "$exit_code" > "$AWF_DIAGNOSTICS_FILE" 2>/dev/null || true
+}
+
+trap 'exit_code=$?; record_install_failure "$exit_code"; exit "$exit_code"' ERR
 
 # Parse flags from remaining arguments
 ROOTLESS=false
@@ -132,6 +142,7 @@ TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Download checksums
+AWF_INSTALL_STAGE="download_checksums"
 echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
 curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
 
@@ -184,6 +195,7 @@ install_bundle() {
   node_bin=$(command -v node)
 
   echo "Node.js >= 20 detected ($(node --version)), using lightweight bundle..."
+  AWF_INSTALL_STAGE="download_bundle"
   echo "Downloading bundle from ${bundle_url@Q}..."
   if ! curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
     echo "⚠ Bundle download failed (asset may not exist for this version)"
@@ -223,6 +235,7 @@ install_linux_binary() {
   esac
 
   local binary_url="${BASE_URL}/${awf_binary}"
+  AWF_INSTALL_STAGE="download_binary"
   echo "Downloading binary from ${binary_url@Q}..."
   curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
@@ -248,6 +261,7 @@ install_darwin_binary() {
   echo ""
 
   local binary_url="${BASE_URL}/${awf_binary}"
+  AWF_INSTALL_STAGE="download_binary"
   echo "Downloading binary from ${binary_url@Q}..."
   curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
 
@@ -308,6 +322,7 @@ fi
 # and GITHUB_GRAPHQL_URL point to localhost:18443 and GH_HOST is overridden.
 # The AWF bundle may try to reach these endpoints on startup, causing the
 # version check to fail with a connection error if the proxy rejects the request.
+AWF_INSTALL_STAGE="verify_installation"
 maybe_sudo env -u GITHUB_API_URL -u GITHUB_GRAPHQL_URL -u GH_HOST \
     "${AWF_INSTALL_DIR}/${AWF_INSTALL_NAME}" --version
 
