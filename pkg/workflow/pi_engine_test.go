@@ -370,6 +370,7 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider(t *testing.T) {
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=COPILOT_GITHUB_TOKEN", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CopilotLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_CONTEXT_WINDOW", "Should not export context window when engine.context-window is not configured")
 }
 
 func TestPiEngine_GetExecutionSteps_FirewallContextWindow(t *testing.T) {
