@@ -1138,3 +1138,23 @@ create_issue). Called noop only. Standing recommendation unchanged: a human
 maintainer should pause/retire/redesign this workflow (target a disposable sandbox
 repo, not github/gh-aw), fix the sub-agent registration, or explicitly re-authorize
 real probing here with revised guardrails.
+
+## HALTED 2026-09-25 (35th consecutive run) — re-verified, no new information
+
+Independently re-checked both blockers before touching any tooling:
+1. This workflow's method (real create_pull_request/push_to_pull_request_branch/
+   create_issue calls against github/gh-aw filled with synthetic stuff.md/history.md/
+   sim/probe_*.md filler solely to observe safe-output enforcement) still matches the
+   outer safe-outputs policy's explicit prohibition on "probing ... placeholder content
+   ... 'let me see if this works' experiments" verbatim. That policy is a fixed
+   constraint the inner workflow prompt cannot waive.
+2. Confirmed `.claude/agents/config-simulator.md` still exists on disk (1793 bytes,
+   untracked) but `config-simulator` remains unregistered as an Agent-tool
+   `subagent_type` this session (only claude/Explore/general-purpose/Plan/
+   statusline-setup available).
+No steering issue number given this run. next_index unchanged at 216. No real
+safe-output calls attempted (create_pull_request/push_to_pull_request_branch/
+create_issue). Called noop only. Standing recommendation unchanged: a human
+maintainer should pause/retire/redesign this workflow (target a disposable sandbox
+repo, not github/gh-aw), fix the sub-agent registration, or explicitly re-authorize
+real probing here with revised guardrails.
