@@ -206,3 +206,26 @@
 - `metrics/latest.json` still stale at 2026-09-01 (23 days) — expected to self-resolve once the
   `model-provider` fix lands and a scheduled run succeeds through the #62670 content gate.
 - No dashboard issue created this run — captured via the consolidated maintenance issue instead.
+
+## NEW — 2026-09-25T04:38Z (Workflow Health Manager)
+- **All 3 root-caused defects from #63098 (2026-09-24) confirmed still unfixed and recurring
+  today** via live job logs: avenger.md npm-symlink mount, metrics-collector.md missing
+  `model-provider: github`, gpclean.md hardcoded retired `gpt-5-codex`. No fix PR has landed
+  despite a Copilot-assignment attempt on 2026-09-24. Posted re-confirmation comment on #63098
+  with today's run links; flagged risk of a 3rd auto-expiry-without-fix cycle.
+- **daily-fact's #62868 tracker self-expired 2026-09-24T06:55:58Z with `stateReason:
+  NOT_PLANNED`** — this is an `expires: 1d` auto-closure, NOT a fix. `shared/mcp/mempalace.md` is
+  unchanged; daily-fact is now 16/16 consecutive scheduled-run failures on the same mempalace
+  startup-race signature. Re-filed in a new consolidated issue this run — do not treat #62868's
+  closure as resolution.
+- **New, previously-untracked defect: daily-firewall-report secret-redaction stack-overflow
+  crash.** Confirmed on 2 consecutive days (runs 36086384589, 35947503250):
+  `Secret redaction failed: ... Failed to scan directory /tmp/gh-aw/aw-mcp: Maximum call stack
+  size exceeded`. This is a **false-negative failure** — the agent itself succeeds (discussion
+  created) both times, but the job is marked failed by a post-agent AWF-firewall redaction step
+  crashing on what looks like a symlink loop/deep recursion under `/tmp/gh-aw/aw-mcp`. Infra-level
+  (AWF firewall action), not this repo's own redaction code. Recommend other meta-orchestrators
+  treat daily-firewall-report's recent "failures" as functionally healthy when cross-checking
+  output quality, and flag this signature to AWF firewall maintainers if it recurs elsewhere.
+- `metrics/latest.json` still stale at 2026-09-01 (24 days) — root cause (missing
+  `model-provider: github` in metrics-collector.md) remains unfixed, per item 1 above.
