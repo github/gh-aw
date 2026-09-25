@@ -131,7 +131,7 @@ func globalAppTokenNeededForPermissions(appPermissions *Permissions) bool {
 	return appPermissions == nil || len(appPermissions.permissions) > 0
 }
 
-func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePerHandlerApps bool) *Permissions {
+func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePerHandlerApps bool) *Permissions { //nolint:largefunc // Permission aggregation is clearer as one sequential pass.
 	if safeOutputs == nil {
 		safeOutputsPermissionsLog.Print("No safe outputs configured, returning empty permissions")
 		return NewPermissions()

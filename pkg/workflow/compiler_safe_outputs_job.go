@@ -63,8 +63,8 @@ func headRepoNameFromSlug(slug string) string {
 		return ""
 	}
 	parts := strings.SplitN(slug, "/", 2)
-	if len(parts) == 2 && !strings.Contains(parts[1], "${{") {
-		return parts[1]
+	if len(parts) == 2 && !strings.Contains(parts[1], "${{") { //nolint:uncheckedsliceindex // The length check guards the indexed access.
+		return parts[1] //nolint:uncheckedsliceindex // The length check above guards the indexed access.
 	}
 	return ""
 }
@@ -655,7 +655,7 @@ func (c *Compiler) insertPreambleTokenStepsIntoSteps(steps []string, preambleTok
 
 	// The insertion index is line-oriented; if it lands in the middle of a
 	// multi-line run/with block, move it to the next step boundary.
-	for insertIndex < len(steps) && !strings.HasPrefix(steps[insertIndex], stepNameLinePrefix) {
+	for insertIndex < len(steps) && !strings.HasPrefix(steps[insertIndex], stepNameLinePrefix) { //nolint:uncheckedsliceindex // The loop condition guards the indexed access.
 		insertIndex++
 	}
 	if insertIndex == len(steps) {
