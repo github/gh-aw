@@ -21,7 +21,7 @@ const (
 	activationSymlinkPromptDir = constants.GithubDir + "prompts"
 )
 
-const pullRequestBaseSHAExpression = "github.event_name == 'pull_request' && github.event.pull_request != null && github.event.pull_request.base.sha"
+const pullRequestBaseSHAExpression = "(github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') && github.event.pull_request != null && github.event.pull_request.base.sha"
 
 var activationMetadataTriggerFields = map[string]struct{}{
 	"reaction":       {},
@@ -487,27 +487,38 @@ func (c *Compiler) activationSparseCheckoutExtraPaths(data *WorkflowData) []stri
 }
 
 // activationCheckoutRef returns the ref expression for activation sparse checkout.
-// It returns an empty string when the ref should be omitted. fallbackExpression must
-// be a raw GitHub Actions expression without a ${{ }} wrapper.
+// It returns an empty string when the workflow has no pull-request event whose payload
+// includes a pull request. fallbackExpression must be a raw GitHub Actions expression
+// without a ${{ }} wrapper.
 func activationCheckoutRef(data *WorkflowData, fallbackExpression string) string {
-	if data == nil || !onSectionHasTrigger(data.On, "pull_request") {
+	if data == nil || !onSectionHasAnyTrigger(data.On, "pull_request", "pull_request_review", "pull_request_review_comment") {
 		return ""
 	}
 	return fmt.Sprintf("${{ %s || %s }}", pullRequestBaseSHAExpression, fallbackExpression)
 }
 
-// onSectionHasTrigger reports whether a rendered on: YAML section contains trigger.
+// onSectionHasAnyTrigger reports whether a rendered on: YAML section contains a trigger.
 // Structured parsing provides exact key matching for security-sensitive triggers,
 // unlike the legacy substring check used by hasWorkflowCallTrigger.
-func onSectionHasTrigger(onSection, trigger string) bool {
+func onSectionHasAnyTrigger(onSection string, triggers ...string) bool {
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(onSection), &parsed); err != nil {
 		return false
 	}
 	if onValue, ok := parsed["on"]; ok {
-		return frontmatterHasTrigger(onValue, trigger)
+		for _, trigger := range triggers {
+			if frontmatterHasTrigger(onValue, trigger) {
+				return true
+			}
+		}
+		return false
 	}
-	return frontmatterHasTrigger(parsed, trigger)
+	for _, trigger := range triggers {
+		if frontmatterHasTrigger(parsed, trigger) {
+			return true
+		}
+	}
+	return false
 }
 
 func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {

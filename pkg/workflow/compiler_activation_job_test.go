@@ -25,9 +25,9 @@ const workflowCallRepo = "${{ steps.resolve-host-repo.outputs.target_repo }}"
 const workflowCallRef = "${{ steps.resolve-host-repo.outputs.target_checkout_ref }}"
 
 // pullRequestActivationRef pins activation-time runtime imports and skills to base
-// branch content for pull_request events, while preserving existing checkout refs
+// branch content for pull request events, while preserving existing checkout refs
 // for non-PR events in mixed-trigger workflows.
-const pullRequestActivationRef = "${{ github.event_name == 'pull_request' && github.event.pull_request != null && github.event.pull_request.base.sha || github.sha }}"
+const pullRequestActivationRef = "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') && github.event.pull_request != null && github.event.pull_request.base.sha || github.sha }}"
 
 // sameRepoCondition is the if: condition injected into the .github checkout step when
 // no custom activation token is configured. It restricts the checkout to same-repo
@@ -149,7 +149,7 @@ func TestGenerateCheckoutGitHubFolderForActivation_WorkflowCall(t *testing.T) {
     types: [opened]
   workflow_call:`,
 			wantRepository:        workflowCallRepo,
-			wantRef:               "${{ github.event_name == 'pull_request' && github.event.pull_request != null && github.event.pull_request.base.sha || steps.resolve-host-repo.outputs.target_checkout_ref }}",
+			wantRef:               "${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') && github.event.pull_request != null && github.event.pull_request.base.sha || steps.resolve-host-repo.outputs.target_checkout_ref }}",
 			wantGitHubSparse:      true,
 			wantPersistFalse:      true,
 			wantFetchDepth1:       true,
@@ -198,6 +198,30 @@ func TestGenerateCheckoutGitHubFolderForActivation_WorkflowCall(t *testing.T) {
     types: [opened]
   pull_request:
     types: [opened]`,
+			wantRepository:        "",
+			wantRef:               pullRequestActivationRef,
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: false,
+		},
+		{
+			name: "pull_request_review trigger pins activation checkout to base sha",
+			onSection: `"on":
+  pull_request_review:
+    types: [submitted]`,
+			wantRepository:        "",
+			wantRef:               pullRequestActivationRef,
+			wantGitHubSparse:      true,
+			wantPersistFalse:      true,
+			wantFetchDepth1:       true,
+			wantSameRepoCondition: false,
+		},
+		{
+			name: "pull_request_review_comment trigger pins activation checkout to base sha",
+			onSection: `"on":
+  pull_request_review_comment:
+    types: [created]`,
 			wantRepository:        "",
 			wantRef:               pullRequestActivationRef,
 			wantGitHubSparse:      true,

@@ -8,11 +8,11 @@
 
 ### Context
 
-For `pull_request`-triggered workflows, the activation job checks out repository content that is then used to build runtime imports and install skills before later review steps run. The PR description states that this activation checkout could previously read PR-head content before base-branch restoration, which let same-repo PR authors influence the instructions used to review their own PR. The diff shows compiler-driven workflow output changes that pin activation sparse checkouts to `github.event.pull_request.base.sha` on `pull_request` events while preserving existing fallback refs for mixed-trigger workflows and `workflow_call`. The decision is how gh-aw should select the activation checkout ref when a workflow can execute against untrusted pull request content.
+For pull-request-related workflows, the activation job checks out repository content that is then used to build runtime imports and install skills before later review steps run. The PR description states that this activation checkout could previously read PR-head content before base-branch restoration, which let same-repo PR authors influence the instructions used to review their own PR. The diff shows compiler-driven workflow output changes that pin activation sparse checkouts to `github.event.pull_request.base.sha` on `pull_request`, `pull_request_review`, and `pull_request_review_comment` events while preserving existing fallback refs for mixed-trigger workflows and `workflow_call`. The decision is how gh-aw should select the activation checkout ref when a workflow can execute against untrusted pull request content.
 
 ### Decision
 
-We will pin activation-job sparse checkouts to the pull request base SHA when the active event is `pull_request`. For other trigger types, including mixed-trigger workflows outside an active pull request and `workflow_call`, the compiler will preserve the existing fallback refs instead of forcing the base SHA behavior universally. Reusable workflows will also retain the same-repository checkout guard whenever activation authentication can fall back to the repository-scoped `GITHUB_TOKEN`. We chose this because activation-time instructions and imported content are security-sensitive, and the PR evidence shows that using PR-head content at that stage can let contributors influence the system that evaluates their own changes.
+We will pin activation-job sparse checkouts to the pull request base SHA when the active event is `pull_request`, `pull_request_review`, or `pull_request_review_comment`. For other trigger types, including mixed-trigger workflows outside an active pull request and `workflow_call`, the compiler will preserve the existing fallback refs instead of forcing the base SHA behavior universally. Reusable workflows will also retain the same-repository checkout guard whenever activation authentication can fall back to the repository-scoped `GITHUB_TOKEN`. We chose this because activation-time instructions and imported content are security-sensitive, and the PR evidence shows that using PR-head content at that stage can let contributors influence the system that evaluates their own changes.
 
 ### Alternatives Considered
 
@@ -27,7 +27,7 @@ This was considered because it would maximize consistency and reduce branching l
 ### Consequences
 
 #### Positive
-- Activation-time imports and skills for `pull_request` workflows are derived from trusted base-branch content rather than mutable PR-head content.
+- Activation-time imports and skills for pull-request-related workflows are derived from trusted base-branch content rather than mutable PR-head content.
 - Same-repo pull request authors lose a path to influence the instructions used to review their own PR during activation.
 - Mixed-trigger workflows and `workflow_call` retain their current ref-selection behavior, limiting compatibility risk outside the vulnerable case.
 - Cross-repository reusable workflows continue to skip activation checkout when optional GitHub App credentials are unavailable and authentication falls back to `GITHUB_TOKEN`.
