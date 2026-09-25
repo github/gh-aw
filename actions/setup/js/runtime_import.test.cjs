@@ -533,7 +533,7 @@ describe("runtime_import", () => {
         it("should return empty string for missing optional file", async () => {
           const expectedPath = path.normalize(path.join(tempDir, ".github", "workflows", "missing.md"));
           const result = await processRuntimeImport("missing.md", !0, tempDir);
-          (expect(result).toBe(""), expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: " + expectedPath));
+          (expect(result).toBe(""), expect(core.info).toHaveBeenCalledWith("Optional runtime import file not found: " + expectedPath));
         }),
         it("should remove front matter and log debug message", async () => {
           const filepath = "with-frontmatter.md";
@@ -806,7 +806,7 @@ describe("runtime_import", () => {
         }),
         it("should handle optional import of missing file", async () => {
           const result = await processRuntimeImports("Before\n{{#runtime-import? missing.md}}\nAfter", tempDir);
-          (expect(result).toBe("Before\n\nAfter"), expect(core.warning).toHaveBeenCalled());
+          (expect(result).toBe("Before\n\nAfter"), expect(core.info).toHaveBeenCalled());
         }),
         it("should throw error for required import of missing file", async () => {
           await expect(processRuntimeImports("Before\n{{#runtime-import missing.md}}\nAfter", tempDir)).rejects.toThrow();
@@ -1621,7 +1621,7 @@ describe("runtime_import", () => {
           const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
           expect(result).toBe("Main\nExists before\n\nExists after");
           const expectedPath = path.normalize(path.join(tempDir, ".github", "workflows", "optional-missing.md"));
-          expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: " + expectedPath);
+          expect(core.info).toHaveBeenCalledWith("Optional runtime import file not found: " + expectedPath);
         });
 
         it("should process expressions in recursively imported files", async () => {
