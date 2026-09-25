@@ -272,7 +272,7 @@ validate_explicit_version_minimum() {
   fi
 
   if version_is_greater "$feature_min" "$requested"; then
-    echo "ERROR: Explicit Copilot CLI version ${requested} is below required minimum ${feature_min} from GH_AW_COPILOT_MIN_VERSION." >&2
+    echo "ERROR: Explicit Copilot CLI version ${1:-} is below required minimum ${feature_min} from GH_AW_COPILOT_MIN_VERSION." >&2
     return 1
   fi
 }
@@ -615,7 +615,9 @@ if [ -z "$VERSION" ]; then
     REQUESTED_VERSION="$DEFAULT_COPILOT_VERSION"
   fi
 else
-  validate_explicit_version_minimum "$VERSION" "$COPILOT_MIN_VERSION_OVERRIDE"
+  if ! validate_explicit_version_minimum "$VERSION" "$COPILOT_MIN_VERSION_OVERRIDE"; then
+    exit 1
+  fi
   echo "Explicit Copilot CLI version argument provided (${VERSION}); skipping compat matrix resolution."
 fi
 
