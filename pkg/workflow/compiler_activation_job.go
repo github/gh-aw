@@ -437,6 +437,8 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 	return cm.GenerateGitHubFolderCheckoutStep("", activationCheckoutRef(data, "github.sha"), activationToken, c.getActionPin, extraPaths...)
 }
 
+// activationCheckoutDisabledByActionTag reports whether action-tag supplies setup
+// assets outside the workspace, making the activation sparse checkout unnecessary.
 func activationCheckoutDisabledByActionTag(data *WorkflowData) bool {
 	if data == nil || data.Features == nil {
 		return false
@@ -446,6 +448,8 @@ func activationCheckoutDisabledByActionTag(data *WorkflowData) bool {
 	return exists && ok && actionTagStr != ""
 }
 
+// activationSparseCheckoutExtraPaths returns additional activation-job sparse checkout
+// paths beyond the default .github and .agents directories.
 func (c *Compiler) activationSparseCheckoutExtraPaths(data *WorkflowData) []string {
 	var extraPaths []string
 	if c.actionMode.IsDev() {
@@ -482,6 +486,9 @@ func (c *Compiler) activationSparseCheckoutExtraPaths(data *WorkflowData) []stri
 	return resolveSymlinkExtraPaths(repoRoot, extraPaths)
 }
 
+// activationCheckoutRef returns the ref expression for activation sparse checkout.
+// It returns an empty string when the ref should be omitted. fallbackExpression must
+// be a raw GitHub Actions expression without a ${{ }} wrapper.
 func activationCheckoutRef(data *WorkflowData, fallbackExpression string) string {
 	if data == nil || !onSectionHasTrigger(data.On, "pull_request") {
 		return ""
@@ -489,6 +496,7 @@ func activationCheckoutRef(data *WorkflowData, fallbackExpression string) string
 	return fmt.Sprintf("${{ %s || %s }}", pullRequestBaseSHAExpression, fallbackExpression)
 }
 
+// onSectionHasTrigger reports whether a rendered on: YAML section contains trigger.
 func onSectionHasTrigger(onSection, trigger string) bool {
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(onSection), &parsed); err != nil {
@@ -545,11 +553,7 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 			continue
 		}
 
-		topLevel := ""
-		for _, part := range parts {
-			topLevel = part
-			break
-		}
+		topLevel := firstString(parts)
 		if topLevel == "" {
 			continue
 		}
@@ -561,6 +565,13 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 	}
 
 	return result
+}
+
+func firstString(values []string) string {
+	for _, value := range values {
+		return value
+	}
+	return ""
 }
 
 // addSameRepoIfConditionToSteps injects an if: condition into each step that restricts
