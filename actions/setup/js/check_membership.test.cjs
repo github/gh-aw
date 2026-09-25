@@ -1095,5 +1095,17 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
     });
+
+    it("should not authorize an allowlisted App when the installation lookup fails transiently", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const serverError = { status: 500, message: "Internal Server Error" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(serverError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+    });
   });
 });
