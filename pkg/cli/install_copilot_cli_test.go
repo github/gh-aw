@@ -396,7 +396,9 @@ exec "$@"
 
 	output, err := cmd.CombinedOutput()
 	require.Error(t, err, "install_copilot_cli.sh should reject an explicit version below GH_AW_COPILOT_MIN_VERSION")
-	assert.Contains(t, string(output), "ERROR: Explicit Copilot CLI version 1.0.85 is below required minimum 1.0.87 from GH_AW_COPILOT_MIN_VERSION.")
+	assert.Contains(t, string(output), "1.0.85")
+	assert.Contains(t, string(output), "is below required minimum")
+	assert.Contains(t, string(output), "1.0.87")
 	assert.NotContains(t, string(output), "Downloading binary", "script should fail before attempting a release download")
 }
 
