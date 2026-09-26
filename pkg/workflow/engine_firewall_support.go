@@ -90,7 +90,7 @@ func (c *Compiler) checkToolsNetworkSupport(engine CodingAgentEngine, engineConf
 			"tools."+tool,
 			tool,
 			fmt.Sprintf("Copilot's '%s' tool does not follow the configured network restrictions", tool),
-			fmt.Sprintf("To enforce network restrictions, use Codex or Claude. Example:\n\nengine: codex\n\nAlternatively, disable this tool:\n\ntools:\n  %s: false", tool),
+			fmt.Sprintf("To enforce network restrictions, use Codex or Claude and configure network.hosted-web separately for hosted tools (network.allowed does not cover them). Example:\n\nengine: codex\nnetwork:\n  hosted-web:\n    allowed:\n      - example.com\n\nAlternatively, disable this tool:\n\ntools:\n  %s: false", tool),
 		); err != nil {
 			if returnErr := collector.Add(err); returnErr != nil {
 				return returnErr

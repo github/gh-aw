@@ -198,7 +198,7 @@ func TestCheckNetworkSupport_StrictMode(t *testing.T) {
 
 func TestCheckToolsNetworkSupport(t *testing.T) {
 	restrictedNetwork := &NetworkPermissions{Allowed: []string{"example.com"}}
-	tests := []struct {
+	type testCase struct {
 		name         string
 		engine       CodingAgentEngine
 		engineConfig *EngineConfig
@@ -208,7 +208,8 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 		wantErr      bool
 		wantWarnings int
 		errContains  []string
-	}{
+	}
+	tests := []testCase{
 		{
 			name:         "non-strict web-fetch emits warning",
 			engine:       NewCopilotEngine(),
@@ -251,6 +252,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 				"tools.web-search",
 				"does not follow the configured network restrictions",
 				"To enforce network restrictions, use Codex or Claude",
+				"configure network.hosted-web separately",
 				"engine: codex",
 			},
 		},
@@ -283,27 +285,16 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			network:    &NetworkPermissions{Allowed: []string{"defaults"}},
 			strictMode: true,
 		},
-		{
-			name:       "web tools with Codex are allowed",
-			engine:     NewCodexEngine(),
+	}
+
+	for _, engine := range []CodingAgentEngine{NewCodexEngine(), NewPiEngine(), NewClaudeEngine()} {
+		tests = append(tests, testCase{
+			name:       "web tools with " + engine.GetID() + " are allowed",
+			engine:     engine,
 			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
 			network:    restrictedNetwork,
 			strictMode: true,
-		},
-		{
-			name:       "web tools with Pi are allowed",
-			engine:     NewPiEngine(),
-			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    restrictedNetwork,
-			strictMode: true,
-		},
-		{
-			name:       "web tools with Claude are allowed",
-			engine:     NewClaudeEngine(),
-			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    restrictedNetwork,
-			strictMode: true,
-		},
+		})
 	}
 
 	for _, tt := range tests {
