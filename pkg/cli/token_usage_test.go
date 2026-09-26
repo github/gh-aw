@@ -518,6 +518,16 @@ func TestFindAPIProxyEventsFile(t *testing.T) {
 
 		assert.Equal(t, eventsFile, findAPIProxyEventsFile(tmpDir))
 	})
+
+	t.Run("retains first existing log when none contain steering", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-no-steering")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "event-logs.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"request"}`+"\n"), 0o644))
+
+		assert.Equal(t, eventsFile, findAPIProxyEventsFile(tmpDir))
+	})
 }
 
 func TestAnalyzeTokenUsageAICOnly(t *testing.T) {

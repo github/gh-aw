@@ -146,7 +146,7 @@ func (e proxyEventsEntry) eventName() string {
 			Event string `json:"event"`
 			Type  string `json:"type"`
 		}
-		if json.Unmarshal(e.Payload, &payload) != nil {
+		if err := json.Unmarshal(e.Payload, &payload); err != nil {
 			return ""
 		}
 		for _, v := range []string{payload.Event, payload.Type} {
