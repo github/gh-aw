@@ -73,6 +73,7 @@ pre-agent-steps:
         set -e
         if [ "$DIFF_EXIT" -ne 0 ]; then
           echo "::error::gh pr diff failed for PR #${PR_NUMBER} (exit ${DIFF_EXIT}): $(cat /tmp/gh-aw/agent/pr-diff.err)" >&2
+          rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err
           exit 1
         fi
         head -n "${PR_DIFF_MAX_LINES}" /tmp/gh-aw/agent/pr-diff.full > /tmp/gh-aw/agent/pr-diff.patch

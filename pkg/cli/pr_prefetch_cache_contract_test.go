@@ -63,6 +63,8 @@ func TestPRDataPrefetchRejectsDiffFailuresBeforeSavingCacheData(t *testing.T) {
 		assert.NotContains(t, text, "|| true; } | head", "%s should not suppress gh pr diff failures", workflow)
 		assertSubstringsInOrder(t, text, []string{
 			`if [ "$DIFF_EXIT" -ne 0 ]; then`,
+			"rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err",
+			"exit 1",
 			"pr-data-head-sha.txt",
 		}, "%s should validate the diff before writing a valid cache head marker", workflow)
 	}
