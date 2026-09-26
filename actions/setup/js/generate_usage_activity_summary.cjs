@@ -335,11 +335,11 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
   };
   const skills = new Map();
   const pendingSkills = new Map();
-  const pendingSkillsWithoutIDs = [];
 
   for (const logDir of sessionLogDirs) {
     for (const eventsPath of findFiles(logDir, entry => entry.name === "events.jsonl", 1)) {
       try {
+        const pendingSkillsWithoutIDs = [];
         const content = fs.readFileSync(eventsPath, "utf-8");
         const lines = content.split("\n");
 

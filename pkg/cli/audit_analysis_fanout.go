@@ -42,12 +42,7 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 		results.workingSet = usageSummary.WorkingSet
 		results.friction = usageSummary.Friction
 		applyUsageActivitySteeringSummary(usageSummary.Steering, &results.tokenUsageSummary)
-		usageResult := DownloadResult{RunAnalysis: RunAnalysis{
-			Run:              run,
-			SkillActivations: results.skillActivations,
-		}}
-		applyUsageActivitySkills(usageSummary.Skills, &usageResult)
-		results.skillActivations = usageResult.SkillActivations
+		results.skillActivations = mergeUsageActivitySkills(usageSummary.Skills, run, results.skillActivations)
 	}
 	// Historical runs predate precomputed friction: derive the observable subset
 	// from raw logs so audit output stays useful without rewriting history.

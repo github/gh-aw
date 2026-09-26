@@ -229,8 +229,15 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 }
 
 func applyUsageActivitySkills(skills *usageActivitySkills, result *DownloadResult) {
-	if skills == nil || len(skills.Items) == 0 {
+	if result == nil {
 		return
+	}
+	result.SkillActivations = mergeUsageActivitySkills(skills, result.Run, result.SkillActivations)
+}
+
+func mergeUsageActivitySkills(skills *usageActivitySkills, run WorkflowRun, activations []SkillActivation) []SkillActivation {
+	if skills == nil || len(skills.Items) == 0 {
+		return activations
 	}
 	aggregates := make(map[string]usageActivitySkillItem, len(skills.Items))
 	for _, skill := range skills.Items {
@@ -238,8 +245,8 @@ func applyUsageActivitySkills(skills *usageActivitySkills, result *DownloadResul
 			aggregates[skill.Name] = skill
 		}
 	}
-	enriched := make([]SkillActivation, 0, len(result.SkillActivations)+len(aggregates))
-	for _, activation := range result.SkillActivations {
+	enriched := make([]SkillActivation, 0, len(activations)+len(aggregates))
+	for _, activation := range activations {
 		if skill, ok := aggregates[activation.Name]; ok {
 			activation.InvocationCount = skill.InvocationCount
 			activation.FailedCount = skill.FailedCount
@@ -258,7 +265,7 @@ func applyUsageActivitySkills(skills *usageActivitySkills, result *DownloadResul
 			InvocationCount: skill.InvocationCount,
 			FailedCount:     skill.FailedCount,
 			ReportProvenance: buildReportProvenance(
-				result.Run,
+				run,
 				skill.FirstTimestamp,
 				"",
 				"",
@@ -266,7 +273,7 @@ func applyUsageActivitySkills(skills *usageActivitySkills, result *DownloadResul
 		})
 		delete(aggregates, skill.Name)
 	}
-	result.SkillActivations = enriched
+	return enriched
 }
 
 func applyUsageActivitySteeringSummary(steering *usageActivitySteering, tokenUsage **TokenUsageSummary) {
