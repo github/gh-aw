@@ -1,5 +1,16 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-26 snapshot
+- 50 sessions (8 branches, mostly CI/gate re-fires); **36.0% completion** (18 success/31 action_required/1 cancelled/0 failure), +16pts vs 09-25 (20%), slightly above ~31.5% mean.
+- **true_agentic streak BROKEN**: 7/8=87.5% (5-day 100% streak 09-22..09-25 ends), but the 1 exception was a merge-triggered cancellation (PR #63474 merged 05:39:46Z, own run cancelled ~39s later), not a genuine failure.
+- **provenance LOW again**: 61.1% bot-driven (11/18), 2nd-lowest of 30+ days after 09-23's 58.3% (called a one-off then) — 2 low readings in 4 days, may not be noise.
+- **NEW RECORD merge_invalidation_cascade multiplicity**: 4 merges each disturbed an in-flight run within 6-39s (beats 09-14's record of 2/day). 3 of 4 share an identical new sub-signature (merge -> Squad Implement Worker action_required 6-7s later, PRs #63492/#63494/#63493) — previously only seen as isolated "smallest instance" events (09-19, 09-24), now recurring 3x in one 8min window.
+- **branch_level_stuck_gate**, near-total: CJS/CWI/Doc Build-Deploy/Squad/Agentic Commands/Squad Implement Worker all 0% (25/25), CGO 1/7 (14.3%, single pass) vs Code scanning 10/10 + Addressing comment 7/8 (87.5%) — same bimodal split as prior weeks.
+- Branches: fix-cache-memory-validation-failure 15/50=30% (33.3%succ), preserve-review-provenance-marker 14/50=28% (35.7%succ). Yesterday's record branch dynamic-checkouts-github-action (88%) dropped to 6/50=12% as PR #63241 stabilized.
+- burst_vs_isolated: isolated 55.6% (5/9) vs burst 31.7% (13/41), 1.75x gap (narrower than usual 3-8x, same direction).
+- Duration proxy: raw mean 3.06m/median 0m (18 nonzero: mean 8.32m/median 4.58m). 1 CGO success showed 437.7min resync artifact (same pattern as 09-16/18/20/23), excluded.
+- Orphans 0/18 → 0% NORMAL, 34th healthy day. Conv logs empty 34th+ day — flagged in report as top system-improvement priority. Standard run (roll=74).
+
 ## 2026-09-25 snapshot
 - 50 sessions (mostly CI/gate re-fires on 3 branches, not 50 distinct tasks); **20.0% completion** (10 success/38 action_required/2 in_progress), -24pts vs 09-24 (44%), below ~32% mean.
 - **true_agentic 2/2=100%**, 5th consecutive full-recovery day (09-22 7/7, 09-23 5/5, 09-24 5/5), +1 in_progress.
