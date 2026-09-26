@@ -198,7 +198,7 @@ func TestCheckNetworkSupport_StrictMode(t *testing.T) {
 
 func TestCheckToolsNetworkSupport(t *testing.T) {
 	restrictedNetwork := &NetworkPermissions{Allowed: []string{"example.com"}}
-	tests := []struct {
+	type testCase struct {
 		name         string
 		engine       CodingAgentEngine
 		engineConfig *EngineConfig
@@ -208,7 +208,8 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 		wantErr      bool
 		wantWarnings int
 		errContains  []string
-	}{
+	}
+	tests := []testCase{
 		{
 			name:         "non-strict web-fetch emits warning",
 			engine:       NewCopilotEngine(),
@@ -285,17 +286,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 		},
 	}
 	for _, engine := range []CodingAgentEngine{NewCodexEngine(), NewPiEngine(), NewClaudeEngine()} {
-		tests = append(tests, struct {
-			name         string
-			engine       CodingAgentEngine
-			engineConfig *EngineConfig
-			tools        map[string]any
-			network      *NetworkPermissions
-			strictMode   bool
-			wantErr      bool
-			wantWarnings int
-			errContains  []string
-		}{
+		tests = append(tests, testCase{
 			name:       "web tools with " + engine.GetID() + " are allowed",
 			engine:     engine,
 			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
