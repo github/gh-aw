@@ -18,6 +18,7 @@
  *
  * Environment variables:
  *   GH_AW_PI_MODEL_ID              — Pi model ID (without provider prefix)
+ *   GH_AW_PI_CONTEXT_WINDOW        — optional model context window to write into models.json
  *   GH_AW_PI_GATEWAY_SECRET_ENV    — name of the env var holding the provider API key
  *   GH_AW_PI_GATEWAY_FALLBACK_PORT — compile-time api-proxy port, used when /reflect
  *                                    is unavailable or has no matching configured endpoint
@@ -35,6 +36,7 @@ const { fetchAWFReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES,
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
+const COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW = 1000000;
 
 // prettier-ignore
 const DEFAULT_LOGGER = /** @type {(msg: string) => void} */ (msg => process.stderr.write(`[gh-aw/pi-models-json] ${new Date().toISOString()} ${msg}\n`));
@@ -79,21 +81,44 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, contextWindow?: number|string, logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId, api } = options;
+  const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow, logger = () => {} } = options;
+  // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
+  const fallbackContextWindow = provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined;
+  const resolvedContextWindow = resolveContextWindow(configuredContextWindow, logger);
+  const contextWindow = resolvedContextWindow === undefined ? fallbackContextWindow : resolvedContextWindow;
   return JSON.stringify({
     providers: {
       "aw-gateway": {
         baseUrl,
         api: api || "openai-completions",
         apiKey: apiKeyEnvVar,
-        models: [{ id: modelId }],
+        models: [{ id: modelId, ...(contextWindow ? { contextWindow } : {}) }],
       },
     },
   });
+}
+
+/**
+ * Resolve a configured context window, returning undefined for empty or invalid values so callers can apply a fallback.
+ *
+ * @param {number|string|undefined} value
+ * @param {(msg: string) => void} logger
+ * @returns {number|undefined}
+ */
+function resolveContextWindow(value, logger) {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    logger(`warning: ignoring invalid contextWindow=${JSON.stringify(value)}; expected a positive integer`);
+    return undefined;
+  }
+  return parsed;
 }
 
 /**
@@ -126,6 +151,7 @@ async function main() {
   const logger = DEFAULT_LOGGER;
   const modelId = process.env.GH_AW_PI_MODEL_ID || "";
   const apiKeyEnvVar = process.env.GH_AW_PI_GATEWAY_SECRET_ENV || "";
+  const contextWindow = process.env.GH_AW_PI_CONTEXT_WINDOW || "";
   const fallbackPort = Number.parseInt(process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT || "", 10);
   const provider = process.env.GH_AW_LLM_PROVIDER || "github";
   const agentDir = process.env.PI_CODING_AGENT_DIR || DEFAULT_PI_CODING_AGENT_DIR;
@@ -156,7 +182,7 @@ async function main() {
   const api = resolvePiApiForProvider(provider);
   logger(`resolved gateway api=${api} (provider=${provider})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api });
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow, logger });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, "utf8");
   logger(`wrote ${outputPath}`);

@@ -219,7 +219,6 @@ func TestBuildMCPCLIPromptSection_PromptFileUsesNonHeadingLabels(t *testing.T) {
 	assert.NotContains(t, serversList, "${{", "server list must not use a GitHub Actions expression (step output reference is out of scope in activation job)")
 	assert.Contains(t, serversList, "safeoutputs", "server list must mention the safeoutputs server")
 	assert.Contains(t, serversList, "--help", "server list must guide agents to use --help for tool signatures")
-
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 	content, err := os.ReadFile(filepath.Clean(filepath.Join(wd, "../../actions/setup/md", section.Content)))

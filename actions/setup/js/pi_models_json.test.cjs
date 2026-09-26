@@ -123,6 +123,54 @@ describe("pi_models_json.cjs", () => {
       const parsed = JSON.parse(json);
       expect(parsed.providers["aw-gateway"].api).toBe("openai-responses");
     });
+
+    it("uses the native Copilot context window for claude-sonnet-5", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "claude-sonnet-5",
+        provider: "github",
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+    });
+
+    it("uses a configured context window for any routed model", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10001",
+        apiKeyEnvVar: "ANTHROPIC_API_KEY",
+        modelId: "custom-claude",
+        provider: "anthropic",
+        contextWindow: "256000",
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "custom-claude", contextWindow: 256000 }]);
+    });
+
+    it("warns and falls back when configured context window is invalid", () => {
+      const warnings = [];
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "claude-sonnet-5",
+        provider: "github",
+        contextWindow: "not-a-number",
+        logger: message => warnings.push(message),
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+      expect(warnings).toEqual(['warning: ignoring invalid contextWindow="not-a-number"; expected a positive integer']);
+    });
+
+    it.each([
+      ["github", "custom-model"],
+      ["anthropic", "claude-sonnet-5"],
+    ])("does not invent a context window for %s/%s", (provider, modelId) => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId,
+        provider,
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: modelId }]);
+    });
   });
 
   describe("resolvePiApiForProvider", () => {
@@ -205,6 +253,37 @@ describe("pi_models_json.cjs", () => {
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10002");
+    });
+
+    it("writes the Copilot context window to models.json", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "claude-sonnet-5";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.AWF_REFLECT_ENABLED;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+
+      await piModelsJson.main();
+
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+    });
+
+    it("writes configured context window to models.json", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "custom-model";
+      process.env.GH_AW_PI_CONTEXT_WINDOW = "256000";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.AWF_REFLECT_ENABLED;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+
+      await piModelsJson.main();
+
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].models).toEqual([{ id: "custom-model", contextWindow: 256000 }]);
     });
 
     it("exits with an error when required env vars are missing", async () => {

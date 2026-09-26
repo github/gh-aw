@@ -19,7 +19,11 @@ var copilotInstallerLog = logger.New("workflow:copilot_installer")
 // compiledVersion should be the gh-aw compiler version string (e.g. "v0.72.5"). Pass "" when
 // the compiler version is unavailable (the script falls back to priority 3 in that case).
 func GenerateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion string) []GitHubActionStep {
-	copilotInstallerLog.Printf("Generating Copilot installer steps using install_copilot_cli.sh: version=%q, rootless=%v, compiledVersion=%q", version, rootless, compiledVersion)
+	return generateCopilotInstallerSteps(version, stepName, rootless, compiledVersion, "")
+}
+
+func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion string) []GitHubActionStep {
+	copilotInstallerLog.Printf("Generating Copilot installer steps using install_copilot_cli.sh: version=%q, rootless=%v, compiledVersion=%q, copilotMinVersion=%q", version, rootless, compiledVersion, copilotMinVersion)
 
 	rootlessFlag := ""
 	if rootless {
@@ -46,9 +50,7 @@ func GenerateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 			"          GH_HOST: github.com",
 			"          ENGINE_VERSION: " + version,
 		}
-		if compiledVersion != "" {
-			stepLines = append(stepLines, "          GH_AW_COMPILED_VERSION: "+compiledVersion)
-		}
+		stepLines = appendCopilotInstallerVersionEnv(stepLines, compiledVersion, copilotMinVersion)
 		return []GitHubActionStep{GitHubActionStep(stepLines)}
 	}
 
@@ -63,9 +65,7 @@ func GenerateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 			"        env:",
 			"          GH_HOST: github.com",
 		}
-		if compiledVersion != "" {
-			stepLines = append(stepLines, "          GH_AW_COMPILED_VERSION: "+compiledVersion)
-		}
+		stepLines = appendCopilotInstallerVersionEnv(stepLines, compiledVersion, copilotMinVersion)
 		return []GitHubActionStep{GitHubActionStep(stepLines)}
 	}
 
@@ -77,4 +77,14 @@ func GenerateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 	}
 
 	return []GitHubActionStep{GitHubActionStep(stepLines)}
+}
+
+func appendCopilotInstallerVersionEnv(stepLines []string, compiledVersion, copilotMinVersion string) []string {
+	if compiledVersion != "" {
+		stepLines = append(stepLines, "          GH_AW_COMPILED_VERSION: "+compiledVersion)
+	}
+	if copilotMinVersion != "" {
+		stepLines = append(stepLines, "          GH_AW_COPILOT_MIN_VERSION: "+copilotMinVersion)
+	}
+	return stepLines
 }

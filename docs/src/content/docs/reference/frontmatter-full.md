@@ -2585,6 +2585,12 @@ engine:
   # (optional)
   model: "example-value"
 
+  # Optional model context window metadata for engines that need to register
+  # explicit model catalog entries. Supported by the Pi engine when generating its
+  # AWF gateway models.json; other engines ignore it and emit a warning.
+  # (optional)
+  context-window: 1
+
   # Optional inference provider override for this engine. Defaults to the engine's
   # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).
   # (optional)
@@ -20912,6 +20918,12 @@ safe-outputs:
       # main agent engine.
       # (optional)
       model: "example-value"
+
+      # Optional model context window metadata for engines that need to register
+      # explicit model catalog entries. Supported by the Pi engine when generating its
+      # AWF gateway models.json; other engines ignore it and emit a warning.
+      # (optional)
+      context-window: 1
 
       # Optional inference provider override for this engine. Defaults to the engine's
       # native provider (copilot: github, claude: anthropic, codex: openai, pi: github).

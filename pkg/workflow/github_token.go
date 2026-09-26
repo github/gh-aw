@@ -163,7 +163,10 @@ func resolvePRCheckoutToken(safeOutputs *SafeOutputsConfig, checkoutMgr *Checkou
 
 	// GitHub App token takes precedence over the safe-outputs level PAT
 	if safeOutputs.GitHubApp != nil {
-		if safeOutputs.GitHubApp.shouldIgnoreMissingKey() {
+		// When the global app-token minting step may be absent (ignore-if-missing, or no
+		// enabled handler consuming the global app), keep a fallback so the expression
+		// still resolves to a usable token instead of an empty string.
+		if safeOutputs.GitHubApp.shouldIgnoreMissingKey() || !safeOutputsGlobalAppTokenMinted(safeOutputs) {
 			return combineTokenExpressions(
 				"${{ steps.safe-outputs-app-token.outputs.token }}",
 				resolveSafeOutputGitHubToken(safeOutputs.GitHubToken),

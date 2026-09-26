@@ -1902,6 +1902,41 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       expect(scriptContent).toContain("BASE_DELAY_MS * Math.pow(2, attempt)");
     });
 
+    it("refreshes retry base with the authenticated repository URL instead of origin", async () => {
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-auth-ls-remote-"));
+      const baseRef = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const retryRepoUrl = "authenticated-retry-url";
+      const pushSignedCommitsFn = vi.fn().mockRejectedValueOnce(new Error("ERR_API: stale head")).mockResolvedValueOnce(undefined);
+      const execGetExecOutput = vi.fn().mockResolvedValue({ stdout: `${baseRef}\trefs/heads/memory/test\n` });
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
+
+      try {
+        execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
+        await pushRepoMemoryChangesWithRetry({
+          githubClient: {},
+          targetOwner: "owner",
+          targetRepoName: "repo",
+          targetRepo: "owner/repo",
+          branchName: "memory/test",
+          baseRef,
+          workspaceDir: repoDir,
+          ghToken: "token",
+          serverHost: "github.com",
+          pushSignedCommitsFn,
+          repoUrlWithTokenForRetry: retryRepoUrl,
+          execGetExecOutput,
+          sleepFn: vi.fn(),
+        });
+
+        expect(execGetExecOutput).toHaveBeenCalledWith("git", ["ls-remote", retryRepoUrl, "refs/heads/memory/test"], { cwd: repoDir, silent: true });
+        expect(pushSignedCommitsFn).toHaveBeenCalledTimes(2);
+        expect(global.core.setFailed).not.toHaveBeenCalled();
+      } finally {
+        delete global.core;
+        fs.rmSync(repoDir, { recursive: true, force: true });
+      }
+    });
+
     it("should fail deterministic validation errors without retrying", async () => {
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-validation-"));
       const setFailed = vi.fn();

@@ -662,3 +662,35 @@ This workflow imports a shared file that declares a model preference.
 		t.Fatalf("CompileWorkflow failed when imported shared workflow has engine.model without engine.id: %v", err)
 	}
 }
+
+func TestMergeNetworkPermissionsPreservesImportedRestrictions(t *testing.T) {
+	compiler := workflow.NewCompiler()
+
+	t.Run("blocked domains", func(t *testing.T) {
+		permissions, err := compiler.MergeNetworkPermissions(
+			&workflow.NetworkPermissions{Allowed: []string{"defaults"}},
+			`{"blocked":["tracker.example.com"]}`,
+		)
+
+		if err != nil {
+			t.Fatalf("MergeNetworkPermissions returned an error: %v", err)
+		}
+		if len(permissions.Blocked) != 1 || permissions.Blocked[0] != "tracker.example.com" {
+			t.Errorf("expected imported blocked domain to be preserved, got %v", permissions.Blocked)
+		}
+	})
+
+	t.Run("empty network object", func(t *testing.T) {
+		permissions, err := compiler.MergeNetworkPermissions(
+			&workflow.NetworkPermissions{Allowed: []string{"defaults"}},
+			"{}\n{\"allowed\":[\"example.com\"]}",
+		)
+
+		if err != nil {
+			t.Fatalf("MergeNetworkPermissions returned an error: %v", err)
+		}
+		if len(permissions.Allowed) != 0 || !permissions.ExplicitlyDefined {
+			t.Errorf("expected imported empty network object to preserve deny-all semantics, got %+v", permissions)
+		}
+	})
+}

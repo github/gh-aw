@@ -225,7 +225,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-engine: copilot
+engine: claude
 network:
   allowed:
     - github.com
@@ -244,7 +244,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-engine: copilot
+engine: claude
 network:
   allowed:
     - github.com
