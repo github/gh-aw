@@ -47,6 +47,7 @@ type EngineConfig struct {
 	ID                 string
 	Version            string
 	LLMProvider        LLMProvider // Inference provider override for this engine (engine.provider / engine.model-provider)
+	ContextWindow      int         // Model context window metadata for engines that need explicit model catalog entries
 	PermissionMode     string
 	MaxTurns           string
 	MaxToolDenials     string // Maximum repeated tool denials before stopping inference (copilot SDK mode only)
@@ -410,6 +411,7 @@ func parseNonEmptyAuthDefinition(authObj map[string]any) *AuthDefinition {
 func applyInlineEngineFields(config *EngineConfig, engineObj map[string]any, topLevel engineTopLevelConfig) {
 	applyEngineBareField(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
+	applyEngineContextWindowField(config, engineObj)
 	config.MaxTurns = topLevel.maxTurns
 	config.MaxToolDenials = topLevel.maxToolDenials
 	config.MaxRuns = topLevel.maxRuns
@@ -434,6 +436,7 @@ func extractReferencedEngineConfig(engineObj map[string]any, topLevel engineTopL
 func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any, topLevel engineTopLevelConfig) {
 	applyEngineProviderFields(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
+	applyEngineContextWindowField(config, engineObj)
 	applyEngineTurnFields(config, engineObj, topLevel)
 	applyEngineConcurrencyField(config, engineObj)
 	applyEngineStringFields(config, engineObj)
@@ -476,6 +479,12 @@ func normalizeEngineProvider(provider string) LLMProvider {
 func applyEnginePermissionMode(config *EngineConfig, engineObj map[string]any) {
 	if permissionMode, ok := engineObj["permission-mode"].(string); ok {
 		config.PermissionMode = permissionMode
+	}
+}
+
+func applyEngineContextWindowField(config *EngineConfig, engineObj map[string]any) {
+	if contextWindow, ok := engineObj["context-window"]; ok {
+		config.ContextWindow = parsePositiveIntValue(contextWindow, "context-window")
 	}
 }
 

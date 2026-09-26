@@ -1501,6 +1501,26 @@ func TestSupportsBareMode(t *testing.T) {
 	}
 }
 
+func TestSupportsContextWindow(t *testing.T) {
+	tests := []struct {
+		name     string
+		engine   CodingAgentEngine
+		expected bool
+	}{
+		{name: "Claude does not support context-window", engine: NewClaudeEngine()},
+		{name: "Codex does not support context-window", engine: NewCodexEngine()},
+		{name: "Copilot does not support context-window", engine: NewCopilotEngine()},
+		{name: "Gemini does not support context-window", engine: NewGeminiEngine()},
+		{name: "Pi supports context-window", engine: NewPiEngine(), expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.engine.GetCapabilities().ContextWindow)
+		})
+	}
+}
+
 // TestBareMode_UnsupportedEngineNoFlag verifies that engines not supporting bare mode
 // do not inject any bare-mode flags in their execution steps.
 func TestBareMode_UnsupportedEngineNoFlag(t *testing.T) {

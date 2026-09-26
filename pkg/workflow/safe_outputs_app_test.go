@@ -1227,3 +1227,94 @@ func TestResolveHandlerGitHubTokenUsesDedicatedMintStepForSupportedHandlers(t *t
 		resolveHandlerGitHubToken(app, "close-issue", "${{ secrets.FALLBACK_TOKEN }}"),
 	)
 }
+
+// TestStagedSafeOutputsWithGitHubAppDoesNotEmitDanglingAppTokenReference verifies that a
+// staged safe-outputs configuration combined with a global github-app never emits a
+// github-token expression that only references the "safe-outputs-app-token" step: that
+// minting step is skipped when no enabled handler consumes the global app, so the
+// expression must carry a fallback token.
+func TestStagedSafeOutputsWithGitHubAppDoesNotEmitDanglingAppTokenReference(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "staged-app.md")
+	content := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: claude
+safe-outputs:
+  staged: true
+  github-app:
+    client-id: ${{ vars.APP_CLIENT_ID }}
+    private-key: ${{ secrets.APP_PRIVATE_KEY }}
+  create-pull-request:
+---
+
+Test workflow.
+`
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0600))
+
+	workflowData, err := compiler.ParseWorkflowFile(testFile)
+	require.NoError(t, err)
+	require.NotNil(t, workflowData.SafeOutputs)
+	require.NotNil(t, workflowData.SafeOutputs.GitHubApp)
+
+	assert.False(t, safeOutputsGlobalAppTokenMinted(workflowData.SafeOutputs),
+		"Staged handlers must not trigger global GitHub App token minting")
+	assert.Empty(t, compiler.buildPreambleTokenSteps(workflowData, map[string]string{}),
+		"No preamble token steps should be built when all handlers are staged")
+
+	lockContent, _, _, err := compiler.generateYAML(workflowData, testFile)
+	require.NoError(t, err)
+
+	// The safe_outputs job's Process Safe Outputs step must still receive a usable token.
+	assert.Contains(t, lockContent,
+		"github-token: ${{ steps.safe-outputs-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
+		"Process Safe Outputs must fall back to a regular token when the app token step is skipped")
+
+	// Consumers of the app token (step inputs and token env vars) must carry a fallback.
+	// Job/step output mappings are excluded: they legitimately reference the step directly.
+	for line := range strings.SplitSeq(lockContent, "\n") {
+		if !strings.Contains(line, "steps.safe-outputs-app-token.outputs.token") {
+			continue
+		}
+		if !strings.Contains(line, "github-token:") && !strings.Contains(line, "GITHUB_TOKEN:") {
+			continue
+		}
+		assert.Contains(t, line, "||",
+			"App token references must include a fallback when the minting step is skipped: %s", line)
+	}
+}
+
+// TestNonStagedSafeOutputsWithGitHubAppUsesAppTokenDirectly is the control case: when a
+// GitHub-backed handler is enabled, the minting step is emitted and the token expression
+// must reference it without a fallback.
+func TestNonStagedSafeOutputsWithGitHubAppUsesAppTokenDirectly(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "app.md")
+	content := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: claude
+safe-outputs:
+  github-app:
+    client-id: ${{ vars.APP_CLIENT_ID }}
+    private-key: ${{ secrets.APP_PRIVATE_KEY }}
+  create-pull-request:
+---
+
+Test workflow.
+`
+	require.NoError(t, os.WriteFile(testFile, []byte(content), 0600))
+
+	workflowData, err := compiler.ParseWorkflowFile(testFile)
+	require.NoError(t, err)
+
+	assert.True(t, safeOutputsGlobalAppTokenMinted(workflowData.SafeOutputs))
+
+	lockContent, _, _, err := compiler.generateYAML(workflowData, testFile)
+	require.NoError(t, err)
+	assert.Contains(t, lockContent, "github-token: ${{ steps.safe-outputs-app-token.outputs.token }}")
+}

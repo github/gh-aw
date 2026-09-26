@@ -140,6 +140,32 @@ func (c *Compiler) validateMaxTurnsSupport(frontmatter map[string]any, engine Co
 	return validateCapabilitySupport("max-turns", hasMaxTurns, engine.GetCapabilities().MaxTurns, engine.GetID())
 }
 
+// emitContextWindowSupportWarning warns when the resolved engine configuration,
+// including imported engine settings, sets context-window for an unsupported engine.
+func (c *Compiler) emitContextWindowSupportWarning(workflowData *WorkflowData) {
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.ContextWindow == 0 {
+		return
+	}
+	engine, err := c.getAgenticEngine(workflowData.AI)
+	if err != nil {
+		return
+	}
+	c.validateContextWindowSupport(workflowData.EngineConfig, engine)
+}
+
+// validateContextWindowSupport warns when context-window is used with an engine that cannot consume it.
+func (c *Compiler) validateContextWindowSupport(engineConfig *EngineConfig, engine CodingAgentEngine) {
+	if engineConfig == nil || engineConfig.ContextWindow == 0 || engine.GetCapabilities().ContextWindow {
+		return
+	}
+
+	agentValidationLog.Printf("Engine %s does not support context-window, emitting warning", engine.GetID())
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+		"Engine '%s' does not support context-window (engine.context-window). The setting will be ignored.",
+		engine.GetID())))
+	c.IncrementWarningCount()
+}
+
 // validateMaxContinuationsSupport validates that max-continuations is only used with engines that support this feature
 func (c *Compiler) validateMaxContinuationsSupport(frontmatter map[string]any, engine CodingAgentEngine) error {
 	// Check if max-continuations is specified in the engine config

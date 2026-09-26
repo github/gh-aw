@@ -4,7 +4,6 @@ The following servers are available as CLI executables on `PATH`. Invoke them fr
 __GH_AW_MCP_CLI_SERVERS_LIST__
 
 For `mcpscripts`, always use the CLI commands above.
-For `safeoutputs`, call the tool names listed in `<safe-output-tools>` directly; the `safeoutputs` CLI commands above are an optional equivalent transport.
 
 For `safeoutputs`, every successful call is a real write-intent declaration - do not use it for probing, auth checks, or placeholder payloads. Use `noop` or `report_incomplete` if not ready to emit the final action.
 

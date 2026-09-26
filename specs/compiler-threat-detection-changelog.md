@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.39 | Added CTR-029 for fail-closed authorization of allowlisted GitHub Apps that send `repository_dispatch`; a conclusive absent collaborator lookup is accepted only for the allowlisted App on that trigger. |
 | 1.0.38 | Audit-only review of the safe-outputs workspace checkout discovery path; the agent-writable workspace trust boundary is a runtime control recorded in the safe-outputs (Threat T7, RCR1–RCR7) and checkout-behavior (§3.5, T-CHK-016) specifications, and is not a new compiler threat class. |
 | 1.0.37 | Added CTR-028 for base-branch agent configuration restore provenance on pull-request triggers; the restore is emitted after the PR checkout and before any step that installs agent content, for every engine. |
 | 1.0.36 | Audit-only review; Opengrep build-reproducibility alerts (`github-actions-npm-install-non-deterministic`, `actions-uv-pip-install-non-deterministic`, `actions-pip-install-inline-no-hash-check`, `github-actions-setup-node-missing-version`, `dockerfile-non-sha-pinned-image`) are external-scanner findings outside conformance scope; no new CTR rule required. |

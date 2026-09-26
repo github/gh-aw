@@ -515,12 +515,16 @@ func knownEngineImportWithCompilerRef(ctx context.Context, importPath string) st
 func knownEngineImportDefaultBranch(ctx context.Context, importPath string) string {
 	const fallback = "main"
 
-	parts := strings.SplitN(importPath, "/", 3)
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+	owner, remainder, ok := strings.Cut(importPath, "/")
+	if !ok || owner == "" {
+		return fallback
+	}
+	repo, _, ok := strings.Cut(remainder, "/")
+	if !ok || repo == "" {
 		return fallback
 	}
 
-	requestURL, err := url.JoinPath(knownEngineImportsAPIBaseURL, "repos", parts[0], parts[1])
+	requestURL, err := url.JoinPath(knownEngineImportsAPIBaseURL, "repos", owner, repo)
 	if err != nil {
 		return fallback
 	}

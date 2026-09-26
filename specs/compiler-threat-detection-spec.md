@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.38
+**Version**: 1.0.39
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -94,6 +94,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-026 Generated Job Timeout Expression Injection**: Reject non-positive or expression job timeout values.
 - **CTR-027 Allowlisted Bot Synchronization Provenance**: Deny bot-driven PR synchronization when the actor differs from the PR author unless the bot is explicitly allowlisted and active, the PR is from the base repository, the PR author satisfies the configured roles, and the actor is not Dependabot.
 - **CTR-028 Agent Configuration Restore Provenance**: For pull-request triggers, emit the base-branch restore of every engine's agent configuration folders and root instruction files after the PR checkout and before any generated step that installs agent content or executes the agent.
+- **CTR-029 Repository Dispatch App Authorization**: On `repository_dispatch`, authorize a GitHub App that is explicitly listed in `on.bots` when the collaborator lookup conclusively reports it absent; deny non-allowlisted actors, lookup failures, and App actors on every other trigger.
 
 ### 5.2 Compiler Response Requirements
 
@@ -163,6 +164,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
 | CTR-027 Allowlisted Bot Synchronization Provenance | `actions/setup/js/check_membership.cjs`, `actions/setup/js/check_permissions_utils.cjs` | `actions/setup/js/check_membership.test.cjs`, `actions/setup/js/check_permissions_utils.test.cjs` |
 | CTR-028 Agent Configuration Restore Provenance | `pkg/workflow/pr.go`, `actions/setup/sh/save_base_github_folders.sh`, `actions/setup/sh/restore_base_github_folders.sh` | `pkg/workflow/compiler_pre_agent_steps_test.go`, `actions/setup/sh/restore_base_github_folders_test.sh` |
+| CTR-029 Repository Dispatch App Authorization | `actions/setup/js/check_membership.cjs`, `actions/setup/js/check_permissions_utils.cjs` | `actions/setup/js/check_membership.test.cjs` |
 
 ### 7.2 Mapping Audit History
 
@@ -203,6 +205,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-041** | CTR-026 Generated Job Timeout Expression Injection | Reject non-positive or expression job timeout values | Reject non-positive or expression job timeout values. | `CTR-026` |
 | **T-CTR-042** | CTR-027 Allowlisted Bot Synchronization Provenance | An allowlisted bot synchronizes a PR authored by another actor | Authorize only when the bot, repository provenance, and PR author satisfy all trust requirements; otherwise deny with `confused_deputy` or `bot_not_active`. | `CTR-027` |
 | **T-CTR-043** | CTR-028 Agent Configuration Restore Provenance | A pull-request-triggered workflow generates an agent job that installs agent content through `steps:` or `pre-agent-steps:` | Emit the base-branch restore of the engine's agent configuration folders and root instruction files after the PR checkout and before any agent-content install step and the agent execution step. | `CTR-028` |
+| **T-CTR-044** | CTR-029 Repository Dispatch App Authorization | An allowlisted GitHub App sends `repository_dispatch` and the collaborator lookup reports it absent | Authorize only the allowlisted App on `repository_dispatch`; deny non-allowlisted actors, lookup failures, and all other triggers. | `CTR-029` |
 
 The core tests exercise their catalog trigger and assert the expected rejection, warning, rewrite, or runtime-safe output.
 

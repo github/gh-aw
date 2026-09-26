@@ -790,6 +790,24 @@
           "type": "array",
           "desc": "List of blocked domains or ecosystem identifiers (e.g., 'python', 'node', 'tracker.example.com').",
           "array": true
+        },
+        "hosted-web": {
+          "type": "object",
+          "desc": "Policy for Claude and Codex provider-hosted web search and fetch tools.",
+          "children": {
+            "allowed": {
+              "type": "array",
+              "array": true
+            },
+            "blocked": {
+              "type": "array",
+              "array": true
+            },
+            "max-uses": {
+              "type": "integer",
+              "leaf": true
+            }
+          }
         }
       }
     },
@@ -1128,6 +1146,11 @@
           "desc": "Model for this engine, overriding the top-level model.",
           "leaf": true
         },
+        "context-window": {
+          "type": "integer",
+          "desc": "Optional model context window metadata for engines that need to register explicit model catalog entries.",
+          "leaf": true
+        },
         "model-provider": {
           "type": "string",
           "desc": "Optional inference provider override for this engine.",
@@ -1413,7 +1436,7 @@
     },
     "max-daily-ai-credits": {
       "type": "integer|string|object",
-      "desc": "24-hour AI Credits guardrail for runs triggered by the same user.",
+      "desc": "24-hour AI Credits guardrail for all runs of this workflow.",
       "children": {
         "value": {
           "type": "integer|string",
@@ -1653,6 +1676,12 @@
           "type": "boolean",
           "desc": "When true, an unknown daily AI Credits total produces a warning and allows the workflow to continue.",
           "enum": [true, false],
+          "leaf": true
+        },
+        "backend": {
+          "type": "string",
+          "desc": "Optional storage backend for the daily AI Credits rolling ledger.",
+          "enum": ["repo-memory"],
           "leaf": true
         }
       }

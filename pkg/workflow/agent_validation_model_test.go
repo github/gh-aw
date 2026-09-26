@@ -3,8 +3,11 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,4 +121,64 @@ func TestValidatePiEngineRequirements(t *testing.T) {
 		}), NewPiEngine())
 		assert.NoError(t, err)
 	})
+}
+
+func TestValidateContextWindowSupport(t *testing.T) {
+	t.Run("missing context-window does not warn", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.validateContextWindowSupport(&EngineConfig{}, NewCodexEngine())
+		assert.Zero(t, compiler.GetWarningCount())
+	})
+
+	t.Run("nil engine config does not warn", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.validateContextWindowSupport(nil, NewCodexEngine())
+		assert.Zero(t, compiler.GetWarningCount())
+	})
+
+	engineConfig := &EngineConfig{ContextWindow: 1000000}
+
+	t.Run("Pi supports context-window", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.validateContextWindowSupport(engineConfig, NewPiEngine())
+		assert.Zero(t, compiler.GetWarningCount())
+	})
+
+	for _, engine := range []CodingAgentEngine{
+		NewClaudeEngine(),
+		NewCodexEngine(),
+		NewCopilotEngine(),
+		NewGeminiEngine(),
+	} {
+		t.Run(engine.GetID()+" warns when context-window is unsupported", func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.validateContextWindowSupport(engineConfig, engine)
+			assert.Equal(t, 1, compiler.GetWarningCount())
+		})
+	}
+}
+
+func TestCompileWorkflowWarnsForImportedUnsupportedContextWindow(t *testing.T) {
+	compileWithSharedEngine := func(t *testing.T, sharedEngine string) int {
+		t.Helper()
+		tmpDir := testutil.TempDir(t, "imported-context-window")
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "shared.md"), []byte("---\nengine:\n"+sharedEngine+"---\n\nShared engine configuration.\n"), 0o644))
+		workflowPath := filepath.Join(tmpDir, "workflow.md")
+		require.NoError(t, os.WriteFile(workflowPath, []byte(`---
+on: workflow_dispatch
+imports:
+  - shared.md
+---
+
+Run the workflow.
+`), 0o644))
+
+		compiler := NewCompiler(WithVersion("dev"))
+		require.NoError(t, compiler.CompileWorkflow(workflowPath))
+		return compiler.GetWarningCount()
+	}
+
+	baseline := compileWithSharedEngine(t, "  id: codex\n")
+	withContextWindow := compileWithSharedEngine(t, "  id: codex\n  context-window: 1000000\n")
+	assert.Equal(t, baseline+1, withContextWindow, "Imported context-window on an unsupported engine should warn")
 }
