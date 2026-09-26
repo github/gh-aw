@@ -24,11 +24,11 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
-	// Check for secrets serialization expressions FIRST — before the general allowlist —
-	// to provide a specific, actionable error/warning message.
-	// In strict mode this returns an error that stops further validation.
-	// In non-strict mode it emits a warning and continues.
 	if err := c.validateSecretsSerializationExpressions(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
+	if err := c.validateDynamicCheckoutExpressions(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
@@ -41,6 +41,7 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
 			markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
 		}
+
 		if err := validateExpressionSafety(markdownForAllowlist); err != nil {
 			return formatCompilerError(markdownPath, "error", err.Error(), err)
 		}
@@ -76,6 +77,17 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	}
 
 	return nil
+}
+
+func (c *Compiler) validateDynamicCheckoutExpressions(workflowData *WorkflowData) error {
+	// Validate deferred parsing, secret serialization, and cross-job expression contexts.
+	if len(workflowData.DynamicCheckoutErrors) > 0 {
+		return errors.Join(workflowData.DynamicCheckoutErrors...)
+	}
+	if err := c.validateDynamicCheckoutSecretsUsage(workflowData); err != nil {
+		return err
+	}
+	return c.validateDynamicCheckoutContexts(workflowData)
 }
 
 func runtimeImportValidationMarkdown(workflowData *WorkflowData) string {

@@ -93,6 +93,7 @@ func containsExpression(s string) bool {
 
 // isExpression reports whether the entire string s is a GitHub Actions expression.
 func isExpression(s string) bool {
+	s = strings.TrimSpace(s)
 	result := strings.HasPrefix(s, "${{") && strings.HasSuffix(s, "}}")
 	if result {
 		expressionPatternsLog.Printf("isExpression: entire value is an expression (length %d)", len(s))

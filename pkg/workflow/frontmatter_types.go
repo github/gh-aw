@@ -462,11 +462,12 @@ type FrontmatterConfig struct {
 	// Controls how actions/checkout is invoked.
 	// Can be a single CheckoutConfig object or an array of CheckoutConfig objects.
 	// Set to false to disable the default checkout step entirely.
-	Checkout                   any               `json:"checkout,omitempty"` // Raw value (object, array, or false)
-	CheckoutConfigs            []*CheckoutConfig `json:"-"`                  // Parsed checkout configs (not in JSON)
-	CheckoutDisabled           bool              `json:"-"`                  // true when checkout: false is set in frontmatter
-	CheckoutExplicitlyDisabled bool              `json:"-"`                  // true only when checkout: false is explicitly written by the user in frontmatter
-	CheckoutSkipDefault        bool              `json:"-"`                  // true when permissions.contents: none skips only the default workflow-repository checkout
+	Checkout                   any                     `json:"checkout,omitempty"` // Raw value (object, array, or false)
+	CheckoutConfigs            []*CheckoutConfig       `json:"-"`                  // Parsed checkout configs (not in JSON)
+	DynamicCheckouts           []DynamicCheckoutConfig `json:"-"`                  // Runtime checkout expressions and their repository allowlists
+	CheckoutDisabled           bool                    `json:"-"`                  // true when checkout: false is set in frontmatter
+	CheckoutExplicitlyDisabled bool                    `json:"-"`                  // true only when checkout: false is explicitly written by the user in frontmatter
+	CheckoutSkipDefault        bool                    `json:"-"`                  // true when permissions.contents: none skips only the default workflow-repository checkout
 
 	// Model is the top-level LLM model default. An engine.model value overrides it
 	// for that engine instance.

@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-09-23<br>
+**Publication Date**: 2026-09-25<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -18,7 +18,7 @@ sidebar:
 
 ## Abstract
 
-This specification defines normative checkout behavior in GitHub Agentic Workflows for activation, agent, and `safe_outputs` jobs. It specifies credential and token precedence, `github-token` and `github-app` resolution, trial mode behavior, side-repo targeting, sparse/shallow/fetch semantics, symlink handling during sparse activation checkout, submodule cleanup semantics, and checkout-manifest behavior used by safe output handlers.
+This specification defines normative checkout behavior in GitHub Agentic Workflows for activation, agent, and `safe_outputs` jobs. It specifies credential and token precedence, `github-token` and `github-app` resolution, trial mode behavior, side-repo targeting, sparse/shallow/fetch semantics, symlink handling during sparse activation checkout, submodule cleanup semantics, object-form dynamic checkout sets, and checkout-manifest behavior used by safe output handlers.
 
 ## Status of This Document
 
@@ -131,6 +131,41 @@ The fallback is an agent-influenced trust boundary: the agent can write anywhere
 - **Non-disclosing failure**: the not-found error MUST name the requested slug and the supported remediation (`checkout:` entry or workspace clone) without returning scanned filesystem paths to the agent.
 
 See also Threat T7 and requirements RCR1–RCR7 in the [Safe Outputs MCP Gateway Specification](/gh-aw/specs/safe-outputs-specification/).
+
+### 3.6 Dynamic Checkout Sets
+
+A `checkout:` declaration MAY select repositories dynamically at runtime using a `repos`/`allowed-repos` object form. Static checkout declarations remain the direct object or array form; a top-level `checkout: ${{ ... }}` expression is not a valid dynamic checkout declaration.
+
+```yaml
+checkout:
+  repos: ${{ fromJSON(inputs.checkouts) }}
+  allowed-repos: ${{ fromJSON(vars.ALLOWED_DYNAMIC_CHECKOUT_REPOS) }}
+```
+
+`repos` MUST be a GitHub Actions expression (`${{ ... }}`) that resolves at runtime to one checkout object or an array of checkout objects. `allowed-repos` is REQUIRED and MUST be either a non-empty static array of `owner/repo` strings or an expression resolving to such an array. The object form MUST NOT contain any field other than `repos` and `allowed-repos`, so agents and validators can distinguish runtime-selected repositories from statically declared checkout entries.
+
+**Compile-time requirements:**
+
+- The compiler MUST reject a dynamic checkout declaration missing `allowed-repos`.
+- The compiler MUST reject a dynamic checkout expression that references `steps.*`, because the same expression is re-evaluated independently in both the agent job and the `safe_outputs` job (see §3.3); an agent-job-local step output would resolve differently — or not at all — in `safe_outputs`.
+- The compiler MUST reject (strict mode) or warn (non-strict mode) when a dynamic checkout expression references `secrets.*` directly (dot or bracket notation), because the resolved expression is serialized once into the single `GH_AW_DYNAMIC_CHECKOUTS` runtime JSON payload rather than a statically declared environment variable, hiding the secret from static analysis. Secrets needed by the expression MUST instead be declared in the workflow's top-level `env:` section and referenced via `env.NAME`.
+- GitHub App authentication, `current`, and additional `fetch` patterns are NOT supported on dynamic checkout entries; those remain available only on statically declared `checkout:` entries.
+- Static checkout entries are compile-time repository declarations. Dynamic checkout entries are runtime data produced by `checkout.repos`; agents MUST use the workspace and checkout manifest to discover the repositories that were selected at runtime.
+
+**Runtime requirements** (`actions/setup/js/dynamic_checkouts.cjs`):
+
+- The runtime MUST parse the resolved `GH_AW_DYNAMIC_CHECKOUTS` payload as a single checkout object or an array of checkout objects, rejecting any other JSON shape.
+- Each entry MUST be validated against a fixed field allowlist (`repository`, `ref`, `path`, `github-token`/`token`, `fetch-depth`, `sparse-checkout`, `submodules`, `lfs`, `wiki`); an unsupported field MUST fail the step.
+- `repository` MUST match `owner/repo` syntax; `path` MUST be a non-empty relative path that does not escape the workspace (no absolute paths, no `..` segments).
+- Every checkout's effective repository (its `.wiki` suffix stripped for the comparison when `wiki: true`) MUST be present in the resolved `allowed-repos` set (case-insensitive); a repository outside that set MUST fail the step before any checkout is attempted.
+- Checkout paths across all dynamic entries in a single declaration MUST be unique (case-insensitive); duplicates MUST fail the step.
+- Before cloning, the runtime MUST reject a checkout path whose final component is an existing file, directory, or symbolic link (including a dangling symlink), and MUST reject a path whose parent segments traverse a symbolic link or resolve outside the workspace root.
+- `ref` values and `sparse-checkout` patterns MUST be passed to `git` after an option-terminator (`--`) so that a value beginning with `-` cannot be parsed as a git option.
+- Clone, checkout, sparse-checkout, and submodule operations MUST run with `GIT_LFS_SKIP_SMUDGE=1`; LFS objects MUST be fetched only when `lfs: true`, via an explicit `git lfs pull` step.
+- Agent-job dynamic checkouts MUST use ephemeral, command-level credentials (`persist-credentials: false`-equivalent behavior): the runtime MUST NOT leave a git credential configured after checkout completes unless the caller explicitly requests credential retention (used only for the `safe_outputs` job's PR/push checkout path).
+- Each successfully checked-out dynamic entry MUST be merged into the same checkout-manifest file used by static cross-repo checkouts (see §3.4), recording at least `repository`, `path`, and resolved `default_branch`.
+
+**Agent guidance**: when a workflow declares any dynamic checkout, the agent's system prompt MUST include guidance stating that additional repositories were selected and checked out at runtime, and that the agent should inspect the checkout manifest and workspace directories to locate them.
 
 ---
 
@@ -284,6 +319,11 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-014**: Checkout-manifest path resolution MUST reject paths that are absolute (e.g., `/etc/passwd`) or escape the workspace root (e.g., `../../sensitive`); rejected paths MUST produce an error and MUST NOT be used for checkout or file lookup
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
 - **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
+- **T-CHK-017**: Dynamic checkout compilation requires `allowed-repos`, rejects expressions referencing `steps.*`, and rejects/warns on expressions referencing `secrets.*` directly (strict vs. non-strict mode)
+- **T-CHK-018**: Dynamic checkout runtime rejects repositories not present in the resolved `allowed-repos` set, rejects duplicate checkout paths, and rejects unsupported entry fields
+- **T-CHK-019**: Dynamic checkout runtime rejects checkout paths that are absolute, escape the workspace, or resolve through a symbolic link (including the checkout target itself, whether pre-existing or a dangling symlink)
+- **T-CHK-020**: Dynamic checkout runtime passes `ref` and sparse-checkout patterns to `git` after an option-terminator (`--`), and disables Git LFS smudging except in the explicit `lfs: true` pull step
+- **T-CHK-021**: Dynamic checkout entries are merged into the same checkout-manifest file as static cross-repo checkouts, and agent-job dynamic checkouts leave no persisted git credential after checkout completes
 
 ### 7.2 Compliance Checklist
 
@@ -300,6 +340,11 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout-manifest path-escape rejection | T-CHK-014 | C2 | Required |
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
 | Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
+| Dynamic checkout compile-time validation (`allowed-repos`, `steps.*`, `secrets.*`) | T-CHK-017 | C1 | Required |
+| Dynamic checkout runtime allowlist, duplicate-path, and field validation | T-CHK-018 | C2 | Required |
+| Dynamic checkout path/symlink workspace-escape rejection | T-CHK-019 | C2 | Required |
+| Dynamic checkout git argument hardening and LFS smudge suppression | T-CHK-020 | C2 | Required |
+| Dynamic checkout manifest merge and credential lifecycle | T-CHK-021 | C1/C2 | Required |
 
 ### 7.3 Safeguards
 
@@ -312,6 +357,10 @@ The following MUST-level norms govern credential and token safety during checkou
 3. **Credential cleanup**: When `force-clean-git-credentials: true` is active and `keep-credentials-for-push` is not, all credential-bearing git config sections MUST be removed from `.git/config` and `.git/modules/**/config` before the agent step completes.
 
 4. **Scan trust scoping**: The workspace git-scan fallback MUST NOT grant process-wide git ownership trust to scanned directories, and MUST NOT bind a scanned directory to an `owner/repo` slug when its remote host is neither the host of `GITHUB_SERVER_URL` nor `github.com` (see §3.5 and T-CHK-016).
+
+5. **Dynamic checkout allowlist enforcement**: A dynamic checkout entry MUST NOT be cloned unless its repository is present in the resolved `allowed-repos` set. The check MUST occur before any git operation runs for that entry (see §3.6 and T-CHK-018).
+
+6. **Dynamic checkout path safety**: A dynamic checkout path that is absolute, escapes the workspace root, or resolves through a symbolic link (pre-existing target or traversed parent, including dangling symlinks) MUST be rejected before cloning (see §3.6 and T-CHK-019).
 
 ---
 
@@ -332,6 +381,11 @@ The following MUST-level norms govern credential and token safety during checkou
 - `actions/setup/js/find_repo_checkout.cjs`
 - `actions/setup/sh/configure_git_credentials.sh`
 - `actions/setup/sh/clean_git_credentials.sh`
+- `pkg/workflow/dynamic_checkout.go`
+- `pkg/workflow/dynamic_checkout_config.go`
+- `pkg/workflow/dynamic_checkout_context_validation.go`
+- `pkg/workflow/dynamic_checkout_secrets_validation.go`
+- `actions/setup/js/dynamic_checkouts.cjs`
 
 ### Informative References
 
@@ -342,6 +396,13 @@ The following MUST-level norms govern credential and token safety during checkou
 ---
 
 ## 9. Change Log
+
+### Version 1.3.0 (Working Draft)
+
+- Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
+- Renamed the dynamic checkout expression field from `checkout.dynamic` to `checkout.repos`; `checkout.dynamic` is rejected with a migration error.
+- Added T-CHK-017 through T-CHK-021 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
+- Added the dynamic checkout implementation files to the §8 Normative References.
 
 ### Version 1.2.0 (Working Draft)
 
