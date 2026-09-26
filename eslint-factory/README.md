@@ -50,6 +50,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
 | [`require-json-parse-try-catch`](#require-json-parse-try-catch) | Require try/catch around `JSON.parse(...)` calls |
+| [`require-lstatsync-try-catch`](#require-lstatsync-try-catch) | Require try/catch around `fs.lstatSync` and `fs.readlinkSync` |
 | [`require-mkdirsync-try-catch`](#require-mkdirsync-try-catch) | Require try/catch around `fs.mkdirSync` calls |
 | [`require-mkdtempsync-try-catch`](#require-mkdtempsync-try-catch) | Require try/catch around `fs.mkdtempSync` calls |
 | [`require-realpathsync-try-catch`](#require-realpathsync-try-catch) | Require try/catch around `fs.realpathSync` calls |
@@ -450,6 +451,32 @@ Why: malformed JSON should produce a controlled failure path in runtime scripts 
 
 Out of scope:
 - aliased or destructured `JSON.parse` references such as `const parse = JSON.parse`
+
+### `require-lstatsync-try-catch`
+
+Require `fs.lstatSync` and `fs.readlinkSync` calls to be wrapped in `try/catch`.
+
+Why: these two symlink-inspection primitives throw on missing paths, permission errors, and broken symlinks. They concentrate in symlink-containment guards and audit-log cleanup code, where an unguarded throw skips the security check outright instead of failing with an actionable, call-site-specific `{ cause }` message.
+
+**Detected forms:**
+- `fs.lstatSync(path)` / `fs.readlinkSync(path)` — direct call on a known `require("fs")` result.
+- `fs["lstatSync"](path)` — computed string-literal property access.
+- `const { lstatSync } = require("fs")` / `require("node:fs")` — destructured bindings.
+- ESM namespace and named imports of either method.
+- Bare unbound identifiers: `lstatSync(path)` when `lstatSync` is not a locally bound variable.
+
+**Out of scope:**
+- Objects whose `require` source is not the Node `fs` / `node:fs` module.
+- Other `fs` methods — use `require-fs-io-try-catch` for `statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync`; use `require-realpathsync-try-catch` for `realpathSync`.
+
+**Safe alternative:**
+```js
+try {
+  const stat = fs.lstatSync(filePath);
+} catch (err) {
+  throw new Error("fs.lstatSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
+}
+```
 
 ### `require-parseInt-radix`
 
