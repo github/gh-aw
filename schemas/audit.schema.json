@@ -1145,12 +1145,10 @@
                 "type": "string"
               },
               "invocation_count": {
-                "type": "integer",
-                "minimum": 0
+                "type": "integer"
               },
               "failed_count": {
-                "type": "integer",
-                "minimum": 0
+                "type": "integer"
               },
               "timestamp": {
                 "type": "string"
