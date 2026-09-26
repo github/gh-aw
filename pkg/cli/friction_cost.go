@@ -370,9 +370,11 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	return summary
 }
 
+// deriveFrictionFallback returns a historical summary only when it attributes
+// at least one counted friction occurrence.
 func deriveFrictionFallback(mcpUsage *MCPToolUsageData, session *usageActivitySession) *FrictionCostSummary {
 	summary := deriveFrictionFromLogs(mcpUsage, session)
-	if summary == nil || summary.TotalOccurrences == 0 {
+	if summary == nil || summary.CountedOccurrences == 0 {
 		return nil
 	}
 	return summary
