@@ -249,6 +249,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		TokenUsage:              summary.TokenUsage,
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,
+		Friction:                summary.Friction,
 		GitHubRateLimitUsage:    summary.GitHubRateLimitUsage,
 		JobDetails:              summary.JobDetails,
 	}

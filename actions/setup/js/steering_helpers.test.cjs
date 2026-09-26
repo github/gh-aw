@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getApiProxyEventName, countSteeringEventsInApiProxyJsonl } from "./steering_helpers.cjs";
+import { getApiProxyEventName, countSteeringEventsByTypeInApiProxyJsonl, countSteeringEventsInApiProxyJsonl } from "./steering_helpers.cjs";
 
 describe("steering_helpers", () => {
   describe("getApiProxyEventName", () => {
@@ -19,6 +19,11 @@ describe("steering_helpers", () => {
       expect(getApiProxyEventName({ type: "model_steering", request_id: "r2" })).toBe("model_steering");
     });
 
+    it("returns snake-case and camel-case event name fields", () => {
+      expect(getApiProxyEventName({ event_name: "timeout_steering" })).toBe("timeout_steering");
+      expect(getApiProxyEventName({ eventName: "model_steering" })).toBe("model_steering");
+    });
+
     it("returns payload.event when top-level fields are absent", () => {
       expect(getApiProxyEventName({ payload: { event: "steering" }, request_id: "r3" })).toBe("steering");
     });
@@ -35,6 +40,17 @@ describe("steering_helpers", () => {
 
     it("returns empty string when no recognized field is present", () => {
       expect(getApiProxyEventName({ request_id: "r5", status: "ok" })).toBe("");
+    });
+  });
+
+  describe("countSteeringEventsByTypeInApiProxyJsonl", () => {
+    it("aggregates counters for each normalized steering event", () => {
+      const content = ['{"event":"TOKEN_STEERING"}', '{"type":"token_steering"}', '{"event_name":"timeout_steering"}', '{"eventName":"model_steering"}'].join("\n");
+      expect(countSteeringEventsByTypeInApiProxyJsonl(content)).toEqual({
+        model_steering: 1,
+        timeout_steering: 1,
+        token_steering: 2,
+      });
     });
   });
 

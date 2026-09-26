@@ -30,7 +30,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 		// empty placeholder token_usage.jsonl), fall through to the agent_usage.json
 		// fallback rather than returning nil immediately.
 		if summary != nil {
-			summary.TotalSteeringEvents = countAPIProxySteeringEvents(runDir)
+			applyGatewaySteeringSummary(summary, runDir)
 			augmentSubagentModelAttribution(runDir, summary)
 			return summary, nil
 		}
@@ -49,7 +49,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 	if err != nil || summary == nil {
 		return summary, err
 	}
-	summary.TotalSteeringEvents = countAPIProxySteeringEvents(runDir)
+	applyGatewaySteeringSummary(summary, runDir)
 	augmentSubagentModelAttribution(runDir, summary)
 	return summary, nil
 }

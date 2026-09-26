@@ -1,3 +1,3 @@
 "gh-aw": minor
 
-Report AI-credit and timeout gateway steering events in audit output
+Report gateway steering events and per-event counters in audit and compact usage output

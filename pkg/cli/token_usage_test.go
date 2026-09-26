@@ -457,7 +457,26 @@ func TestFindTokenUsageFile(t *testing.T) {
 	})
 }
 
-func TestFindAPIProxyEventsFile(t *testing.T) {
+func TestFindAPIProxyEventsLog(t *testing.T) {
+	t.Run("recovers from invalid cached value", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-invalid-cache")
+		cacheKey := filepath.Clean(tmpDir)
+		apiProxySteeringLogCache.Store(cacheKey, "invalid")
+		t.Cleanup(func() {
+			apiProxySteeringLogCache.Delete(cacheKey)
+		})
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path)
+	})
+
 	t.Run("finds in sandbox/firewall/audit path", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "find-api-proxy-events")
 		auditDir := filepath.Join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs")
@@ -465,8 +484,23 @@ func TestFindAPIProxyEventsFile(t *testing.T) {
 		eventsFile := filepath.Join(auditDir, "events.jsonl")
 		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
 
-		result := findAPIProxyEventsFile(tmpDir)
-		assert.Equal(t, eventsFile, result, "should find file in AWF audit path")
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path, "should find file in AWF audit path")
+	})
+
+	t.Run("finds event-logs filename", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-event-logs")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "event-logs.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"model_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path)
 	})
 
 	t.Run("prefers sandbox/firewall/logs over sandbox/firewall/audit when both exist", func(t *testing.T) {
@@ -480,8 +514,66 @@ func TestFindAPIProxyEventsFile(t *testing.T) {
 		require.NoError(t, os.WriteFile(logsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
 		require.NoError(t, os.WriteFile(auditFile, []byte(`{"event":"timeout_steering"}`+"\n"), 0o644))
 
-		result := findAPIProxyEventsFile(tmpDir)
-		assert.Equal(t, logsFile, result, "should prefer primary logs path over AWF audit path")
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, logsFile, result.path, "should prefer primary logs path over AWF audit path")
+	})
+
+	t.Run("skips empty and steering-free event logs across layouts", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-events-fallback")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		auditDir := filepath.Join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		require.NoError(t, os.MkdirAll(auditDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(logsDir, "event-logs.jsonl"), nil, 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(logsDir, "events.jsonl"), []byte(`{"event":"request"}`+"\n"), 0o644))
+		auditFile := filepath.Join(auditDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(auditFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, auditFile, result.path)
+	})
+
+	t.Run("skips empty legacy event logs", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-legacy-fallback")
+		legacyDir := filepath.Join(tmpDir, "firewall-audit-logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(legacyDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(legacyDir, "event-logs.jsonl"), nil, 0o644))
+		eventsFile := filepath.Join(legacyDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"timeout_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path)
+	})
+
+	t.Run("finds legacy event logs nested under sandbox", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-nested-legacy")
+		legacyDir := filepath.Join(tmpDir, "sandbox", "firewall-audit-logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(legacyDir, 0o755))
+		eventsFile := filepath.Join(legacyDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path)
+	})
+
+	t.Run("returns no log when no candidates contain steering", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-no-steering")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "event-logs.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"request"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+		require.NoError(t, err)
+		assert.Nil(t, result)
 	})
 }
 
@@ -794,8 +886,10 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		eventsContent := strings.Join([]string{
 			`{"event":"token_steering","message":"[AWF TOKEN WARNING] You have used 80% of your AI Credits budget. Begin planning to wrap up your current work."}`,
 			`{"type":"token_steering","message":"[AWF TOKEN WARNING] You have used 90% of your AI Credits budget. Complete your current task and prepare final output."}`,
+			`{"event":"token_steering","payload":"opaque","message":"[AWF TOKEN WARNING] Still steering."}`,
 			`{"event_name":"timeout_steering","message":"[AWF TIME WARNING] You have used 80% of your allotted run time. Begin planning to wrap up your current work."}`,
 			`{"eventName":"timeout_steering","message":"[AWF TIME WARNING] You have used 90% of your allotted run time. Complete your current task and prepare final output."}`,
+			`{"payload":{"type":"model_steering"}}`,
 			`{"event":"request.forwarded"}`,
 			`{"event":"token_steering","message":"warn 95%"}`,
 			`{"event":"budget_steering","message":"[AWF TOKEN WARNING] non-spec event name"}`,
@@ -805,7 +899,13 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		assert.Equal(t, 4, summary.TotalSteeringEvents, "should count spec-compliant steering events from api-proxy events.jsonl")
+		assert.Equal(t, 8, summary.TotalSteeringEvents, "should count all steering events from api-proxy events.jsonl")
+		assert.Equal(t, map[string]int{
+			"budget_steering":        1,
+			"model_steering":         1,
+			tokenSteeringEventName:   4,
+			timeoutSteeringEventName: 2,
+		}, summary.SteeringEventCounts, "should aggregate steering events by type")
 	})
 
 	t.Run("counts steering events from legacy firewall-audit-logs events file", func(t *testing.T) {
@@ -832,6 +932,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		eventsContent := strings.Join([]string{
 			`{"timestamp":"2026-09-23T12:00:00Z","event":"token_steering","message":"[AWF TOKEN WARNING] You are running out of AI Credits."}`,
 			`{"timestamp":"2026-09-23T12:01:00Z","event_name":"timeout_steering","message":"[AWF TIME WARNING] You are running out of time."}`,
+			`{"event":"token_steering","payload":["opaque"],"message":"[AWF TOKEN WARNING] Still steering."}`,
 			`{"event":"token_steering","message":"wrong prefix"}`,
 		}, "\n")
 		require.NoError(t, os.WriteFile(filepath.Join(logsDir, "events.jsonl"), []byte(eventsContent+"\n"), 0o644))
@@ -839,7 +940,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		events, err := extractGatewaySteeringEvents(tmpDir)
 
 		require.NoError(t, err)
-		require.Len(t, events, 2)
+		require.Len(t, events, 3)
 		assert.Equal(t, GatewaySteeringEvent{
 			Type:      tokenSteeringEventName,
 			Message:   "[AWF TOKEN WARNING] You are running out of AI Credits.",
@@ -847,6 +948,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		}, events[0])
 		assert.Equal(t, timeoutSteeringEventName, events[1].Type)
 		assert.Contains(t, events[1].Message, "running out of time")
+		assert.Equal(t, tokenSteeringEventName, events[2].Type)
 	})
 
 	t.Run("returns nil when no events file exists", func(t *testing.T) {

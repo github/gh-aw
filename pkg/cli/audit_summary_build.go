@@ -37,6 +37,7 @@ func buildProcessedAuditRun(run WorkflowRun, results auditAnalysisResults) Proce
 		GatewaySteeringEvents:   results.gatewaySteeringEvents,
 		TokenUsage:              results.tokenUsageSummary,
 		WorkingSet:              results.workingSet,
+		Friction:                results.friction,
 		GitHubRateLimitUsage:    results.rateLimitUsage,
 		JobDetails:              results.jobDetails,
 	}
@@ -80,6 +81,7 @@ func buildAuditRunSummary(run WorkflowRun, processedRun ProcessedRun, results au
 			TokenUsage:              results.tokenUsageSummary,
 			GatewaySteeringEvents:   results.gatewaySteeringEvents,
 			WorkingSet:              results.workingSet,
+			Friction:                results.friction,
 			GitHubRateLimitUsage:    results.rateLimitUsage,
 			JobDetails:              results.jobDetails,
 		},

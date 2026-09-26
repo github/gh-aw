@@ -566,33 +566,25 @@ func steeringEntryToTimelineEvent(entry proxyEventsEntry) (UnifiedTimelineEvent,
 // returns a slice of TimelineKindSteering timeline events, one per recognised steering
 // record.  Returns nil (not an error) when no proxy events file is found.
 func collectSteeringTimelineEvents(logDir string, verbose bool) ([]UnifiedTimelineEvent, error) {
-	eventsPath := findAPIProxyEventsFile(logDir)
-	if eventsPath == "" {
+	log, err := findAPIProxyEventsLog(logDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse proxy events in %s: %w", logDir, err)
+	}
+	if log == nil {
 		gatewayLogsLog.Printf("No api-proxy events.jsonl found in %s; skipping steering timeline collection", logDir)
 		return nil, nil
 	}
 
-	gatewayLogsLog.Printf("Collecting steering timeline events from: %s", eventsPath)
+	gatewayLogsLog.Printf("Collecting steering timeline events from: %s", log.path)
 
-	f, err := os.Open(filepath.Clean(eventsPath))
-	if err != nil {
-		return nil, fmt.Errorf("failed to open proxy events file: %w", err)
-	}
-	defer f.Close()
-
-	entries, err := scanSteeringEntries(f)
-	if err != nil {
-		return nil, fmt.Errorf("scanner error reading proxy events: %w", err)
-	}
-
-	events := make([]UnifiedTimelineEvent, 0, len(entries))
-	for _, entry := range entries {
+	events := make([]UnifiedTimelineEvent, 0, len(log.entries))
+	for _, entry := range log.entries {
 		if evt, ok := steeringEntryToTimelineEvent(entry); ok {
 			events = append(events, evt)
 		}
 	}
 
-	gatewayLogsLog.Printf("Collected %d steering timeline events from %s", len(events), filepath.Base(eventsPath))
+	gatewayLogsLog.Printf("Collected %d steering timeline events from %s", len(events), filepath.Base(log.path))
 	return events, nil
 }
 
