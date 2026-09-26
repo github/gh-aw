@@ -431,6 +431,8 @@ AI credits (`aic`) are the canonical unit. Every other dimension — token class
 
 `measurement_state` at the top of the section is the state of the canonical `aic` dimension and equals the weakest state contributing to it. A run with friction sources but no friction reports `measured` with a zero cost; a run with no usable source reports `unavailable`.
 
+Consequently, a counted event with unavailable AIC makes the run-level state `unavailable` even when other events have measured or estimated costs. The numeric cost remains the sum of attributed portions and does not imply that the unattributed portion is zero; `unattributed_occurrences` records occurrences whose AIC could not be attributed.
+
 #### Driver matrix
 
 | Driver | Class | Source | AIC | Tokens | Turns | Tool calls | Latency |
