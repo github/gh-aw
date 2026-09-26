@@ -4,8 +4,6 @@ description: Tests network firewall functionality and validates security rules f
 on:
   workflow_dispatch:
 
-strict: false
-
 permissions:
   contents: read
   issues: read
@@ -28,7 +26,6 @@ imports:
   - shared/otlp.md
 tools:
   cli-proxy: true
-  web-fetch:
 
 timeout-minutes: 5
 

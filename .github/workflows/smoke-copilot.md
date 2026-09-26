@@ -23,7 +23,6 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot
-strict: false
 engine:
   id: copilot
   max-continuations: 2
@@ -57,7 +56,6 @@ tools:
     trusted-users:
       - pelikhan
   playwright:
-  web-fetch:
   cli-proxy: true
 lsp:
   typescript:

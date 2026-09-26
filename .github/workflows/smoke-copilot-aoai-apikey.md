@@ -22,7 +22,6 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot - AOAI (apikey)
-strict: false
 model: o4-mini-aw
 engine:
   id: copilot
@@ -63,7 +62,6 @@ tools:
     trusted-users:
       - pelikhan
   playwright:
-  web-fetch:
   cli-proxy: true
 runtimes:
   go:

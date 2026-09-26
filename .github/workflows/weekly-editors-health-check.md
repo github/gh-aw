@@ -10,7 +10,6 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-strict: false
 tracker-id: weekly-editors-health-check
 engine: copilot
 timeout-minutes: 30
@@ -29,7 +28,6 @@ imports:
 tools:
   cli-proxy: true
   playwright:
-  web-fetch:
   bash:
     - "curl*"
     - "cat*"

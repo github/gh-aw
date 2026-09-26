@@ -23,7 +23,6 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot - AOAI (Entra)
-strict: false
 environment: aoai-model
 model: o4-mini-aw
 engine:
@@ -73,7 +72,6 @@ tools:
     trusted-users:
       - pelikhan
   playwright:
-  web-fetch:
   cli-proxy: true
 runtimes:
   go:

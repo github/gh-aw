@@ -283,27 +283,25 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			network:    &NetworkPermissions{Allowed: []string{"defaults"}},
 			strictMode: true,
 		},
-		{
-			name:       "web tools with Codex are allowed",
-			engine:     NewCodexEngine(),
+	}
+	for _, engine := range []CodingAgentEngine{NewCodexEngine(), NewPiEngine(), NewClaudeEngine()} {
+		tests = append(tests, struct {
+			name         string
+			engine       CodingAgentEngine
+			engineConfig *EngineConfig
+			tools        map[string]any
+			network      *NetworkPermissions
+			strictMode   bool
+			wantErr      bool
+			wantWarnings int
+			errContains  []string
+		}{
+			name:       "web tools with " + engine.GetID() + " are allowed",
+			engine:     engine,
 			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
 			network:    restrictedNetwork,
 			strictMode: true,
-		},
-		{
-			name:       "web tools with Pi are allowed",
-			engine:     NewPiEngine(),
-			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    restrictedNetwork,
-			strictMode: true,
-		},
-		{
-			name:       "web tools with Claude are allowed",
-			engine:     NewClaudeEngine(),
-			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    restrictedNetwork,
-			strictMode: true,
-		},
+		})
 	}
 
 	for _, tt := range tests {
