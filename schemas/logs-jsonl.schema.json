@@ -3388,6 +3388,12 @@
                           "total_output_size": {
                             "type": "integer"
                           },
+                          "avg_input_size": {
+                            "type": "integer"
+                          },
+                          "avg_output_size": {
+                            "type": "integer"
+                          },
                           "max_input_size": {
                             "type": "integer"
                           },
@@ -3410,6 +3416,8 @@
                           "call_count",
                           "total_input_size",
                           "total_output_size",
+                          "avg_input_size",
+                          "avg_output_size",
                           "max_input_size",
                           "max_output_size"
                         ],
@@ -3492,6 +3500,18 @@
                           "total_output_size": {
                             "type": "integer"
                           },
+                          "avg_input_size": {
+                            "type": "integer"
+                          },
+                          "avg_output_size": {
+                            "type": "integer"
+                          },
+                          "max_input_size": {
+                            "type": "integer"
+                          },
+                          "max_output_size": {
+                            "type": "integer"
+                          },
                           "avg_duration": {
                             "type": "string"
                           }
@@ -3501,7 +3521,11 @@
                           "tool_call_count",
                           "request_count",
                           "total_input_size",
-                          "total_output_size"
+                          "total_output_size",
+                          "avg_input_size",
+                          "avg_output_size",
+                          "max_input_size",
+                          "max_output_size"
                         ],
                         "additionalProperties": false
                       }
