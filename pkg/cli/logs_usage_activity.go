@@ -23,6 +23,7 @@ type usageActivitySummary struct {
 	Session     *usageActivitySession     `json:"session,omitempty"`
 	Gateway     *usageActivityGateway     `json:"gateway,omitempty"`
 	Integrity   *IntegrityFilterSummary   `json:"integrity,omitempty"`
+	Steering    *usageActivitySteering    `json:"steering,omitempty"`
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
@@ -68,6 +69,11 @@ type usageActivitySession struct {
 	ToolExecutionStarts    int `json:"tool_execution_starts"`
 	ToolExecutionCompletes int `json:"tool_execution_completes"`
 	FailedToolExecutions   int `json:"failed_tool_executions"`
+}
+
+type usageActivitySteering struct {
+	TotalEvents int            `json:"total_events"`
+	EventCounts map[string]int `json:"event_counts,omitempty"`
 }
 
 type usageActivityGateway struct {
@@ -176,6 +182,7 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	applyUsageActivityFirewallSummary(summary.Firewall, result)
 	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
+	applyUsageActivitySteeringSummary(summary.Steering, &result.TokenUsage)
 
 	// Backfill safe output item count from usage summary when the safe-outputs-items
 	// artifact was not downloaded separately. The count is 0-safe: only backfill when
@@ -186,6 +193,21 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	}
 	if summary.SafeOutputs != nil && len(result.SafeOutputs) == 0 && len(summary.SafeOutputs.Items) > 0 {
 		result.SafeOutputs = summary.SafeOutputs.Items
+	}
+}
+
+func applyUsageActivitySteeringSummary(steering *usageActivitySteering, tokenUsage **TokenUsageSummary) {
+	if steering == nil || steering.TotalEvents <= 0 {
+		return
+	}
+	if *tokenUsage == nil {
+		*tokenUsage = &TokenUsageSummary{ByModel: make(map[string]*ModelTokenUsage)}
+	}
+	if (*tokenUsage).TotalSteeringEvents == 0 {
+		(*tokenUsage).TotalSteeringEvents = steering.TotalEvents
+		if len(steering.EventCounts) > 0 {
+			(*tokenUsage).SteeringEventCounts = maps.Clone(steering.EventCounts)
+		}
 	}
 }
 
@@ -270,20 +292,19 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 		for _, tool := range gateway.Tools {
 			activityTools[tool.ServerName+":"+tool.ToolName] = tool
 		}
-		for index := range usage.Summary {
-			tool := &usage.Summary[index]
+		usage.Summary = sliceutil.Map(usage.Summary, func(tool MCPToolSummary) MCPToolSummary {
 			tool.syncFieldsFromBase()
 			if activity, ok := activityTools[tool.ServerName+":"+tool.ToolName]; ok {
-				backfillUsageActivityToolMetrics(tool, activity)
+				backfillUsageActivityToolMetrics(&tool, activity)
 			}
-		}
+			return tool
+		})
 
 		activityServers := make(map[string]usageActivityGatewayServer, len(gateway.Servers))
 		for _, server := range gateway.Servers {
 			activityServers[server.ServerName] = server
 		}
-		for index := range usage.Servers {
-			server := &usage.Servers[index]
+		usage.Servers = sliceutil.Map(usage.Servers, func(server MCPServerStats) MCPServerStats {
 			if activity, ok := activityServers[server.ServerName]; ok {
 				if server.TotalInputSize == 0 {
 					server.TotalInputSize = activity.TotalInputSize
@@ -295,7 +316,8 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 					server.AvgDuration = formatActivityDuration(activity.AvgDurationMS)
 				}
 			}
-		}
+			return server
+		})
 	}
 	if usage.Integrity == nil && len(usage.FilteredEvents) == 0 && integritySummary != nil {
 		usage.Integrity = cloneIntegrityFilterSummary(integritySummary)

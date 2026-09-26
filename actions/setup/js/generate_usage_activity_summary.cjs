@@ -7,6 +7,7 @@
 //   session: aggregate Copilot session event counters
 //   gateway: tool-call counts, sizes, durations, and per-server/tool breakdowns
 //   integrity: aggregate DIFC filtering counts from gateway/RPC logs
+//   steering: aggregate AWF steering-event counts by event type
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
@@ -14,6 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
+const { countSteeringEventsByTypeInApiProxyJsonl } = require("./steering_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
 require("./shim.cjs");
@@ -29,6 +31,14 @@ const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
+const API_PROXY_EVENT_LOG_PATHS = [
+  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl",
+  "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/events.jsonl",
+  "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl",
+  "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/events.jsonl",
+  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/event-logs.jsonl",
+  "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/events.jsonl",
+];
 
 function findFiles(rootDir, shouldIncludeFile, maxDepth = Number.POSITIVE_INFINITY, currentDepth = 0) {
   if (!fs.existsSync(rootDir)) {
@@ -333,6 +343,29 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
   }
 
   return session.total_events > 0 ? session : null;
+}
+
+/**
+ * Parse the first available AWF API proxy event log and aggregate steering events.
+ *
+ * @param {string[]} eventLogPaths
+ * @returns {{ total_events: number, event_counts: Record<string, number> } | null}
+ */
+function parseSteeringEvents(eventLogPaths = API_PROXY_EVENT_LOG_PATHS) {
+  for (const eventLogPath of eventLogPaths) {
+    try {
+      const stat = fs.statSync(eventLogPath);
+      if (!stat || stat.size <= 0) {
+        continue;
+      }
+      const eventCounts = countSteeringEventsByTypeInApiProxyJsonl(fs.readFileSync(eventLogPath, "utf-8"));
+      const totalEvents = Object.values(eventCounts).reduce((total, count) => total + count, 0);
+      return totalEvents > 0 ? { total_events: totalEvents, event_counts: eventCounts } : null;
+    } catch {
+      // Ignore missing or unreadable candidate files and try the next layout.
+    }
+  }
+  return null;
 }
 
 /**
@@ -809,6 +842,11 @@ function main() {
     summary.integrity = gatewayActivity.integrity;
   }
 
+  const steering = parseSteeringEvents();
+  if (steering) {
+    summary.steering = steering;
+  }
+
   // Parse safe outputs manifest.
   // parseSafeOutputsManifest() has three distinct outcomes that drive the three
   // states downstream consumers need to distinguish:
@@ -870,6 +908,7 @@ if (require.main === module) {
 module.exports = {
   parseFirewallLogs,
   parseSessionLogs,
+  parseSteeringEvents,
   parseGatewayLogs,
   parseGatewayActivity,
   parseSafeOutputsManifest,

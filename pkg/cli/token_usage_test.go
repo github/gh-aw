@@ -469,6 +469,16 @@ func TestFindAPIProxyEventsFile(t *testing.T) {
 		assert.Equal(t, eventsFile, result, "should find file in AWF audit path")
 	})
 
+	t.Run("finds event-logs filename", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-event-logs")
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "event-logs.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"model_steering"}`+"\n"), 0o644))
+
+		assert.Equal(t, eventsFile, findAPIProxyEventsFile(tmpDir))
+	})
+
 	t.Run("prefers sandbox/firewall/logs over sandbox/firewall/audit when both exist", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "find-api-proxy-events")
 		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
@@ -805,7 +815,12 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		assert.Equal(t, 4, summary.TotalSteeringEvents, "should count spec-compliant steering events from api-proxy events.jsonl")
+		assert.Equal(t, 6, summary.TotalSteeringEvents, "should count all steering events from api-proxy events.jsonl")
+		assert.Equal(t, map[string]int{
+			"budget_steering":        1,
+			tokenSteeringEventName:   3,
+			timeoutSteeringEventName: 2,
+		}, summary.SteeringEventCounts, "should aggregate steering events by type")
 	})
 
 	t.Run("counts steering events from legacy firewall-audit-logs events file", func(t *testing.T) {

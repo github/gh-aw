@@ -9,13 +9,52 @@ import (
 	"strings"
 )
 
-func countAPIProxySteeringEvents(runDir string) int {
-	events, err := extractGatewaySteeringEvents(runDir)
+func applyGatewaySteeringSummary(summary *TokenUsageSummary, runDir string) {
+	if summary == nil {
+		return
+	}
+	eventsPath := findAPIProxyEventsFile(runDir)
+	if eventsPath == "" {
+		return
+	}
+	eventCounts, err := parseAPIProxySteeringEventCounts(eventsPath)
 	if err != nil {
 		tokenUsageLog.Printf("Failed to parse API proxy steering events in %s: %v", runDir, err)
-		return 0
+		return
 	}
-	return len(events)
+	summary.SteeringEventCounts = eventCounts
+	summary.TotalSteeringEvents = 0
+	for _, count := range eventCounts {
+		summary.TotalSteeringEvents += count
+	}
+}
+
+func parseAPIProxySteeringEventCounts(filePath string) (map[string]int, error) {
+	file, err := os.Open(filepath.Clean(filePath))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	counts := make(map[string]int)
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, maxScannerBufferSize)
+	scanner.Buffer(buf, maxScannerBufferSize)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || !containsSteeringKeyword(line) {
+			continue
+		}
+		var entry proxyEventsEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		eventName := entry.eventName()
+		if eventName == "steering" || strings.HasSuffix(eventName, "_steering") {
+			counts[eventName]++
+		}
+	}
+	return counts, scanner.Err()
 }
 
 // scanSteeringEntries reads all valid steering proxyEventsEntry records from r.
@@ -100,6 +139,13 @@ func (e proxyEventsEntry) eventName() string {
 	for _, v := range []string{e.Event, e.Type, e.EventNameSnake, e.EventNameCamel} {
 		if v = strings.TrimSpace(v); v != "" {
 			return strings.ToLower(v)
+		}
+	}
+	if e.Payload != nil {
+		for _, v := range []string{e.Payload.Event, e.Payload.Type} {
+			if v = strings.TrimSpace(v); v != "" {
+				return strings.ToLower(v)
+			}
 		}
 	}
 	return ""

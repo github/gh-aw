@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const req = createRequire(import.meta.url);
-const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, MANIFEST_FILE_PATH } = req("./generate_usage_activity_summary.cjs");
+const { parseFirewallLogs, parseSessionLogs, parseSteeringEvents, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, MANIFEST_FILE_PATH } =
+  req("./generate_usage_activity_summary.cjs");
 
 describe("generate_usage_activity_summary.cjs", () => {
   /** Unique directory for each test to avoid cross-test interference */
@@ -112,6 +113,28 @@ describe("generate_usage_activity_summary.cjs", () => {
         });
       } finally {
         fs.rmSync(sessionRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("parseSteeringEvents", () => {
+    it("aggregates steering counters from the first available AWF event log", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "steering-events-test-"));
+      const missingPath = path.join(root, "missing.jsonl");
+      const eventsPath = path.join(root, "events.jsonl");
+      fs.writeFileSync(eventsPath, ['{"event":"token_steering"}', '{"type":"TOKEN_STEERING"}', '{"event_name":"timeout_steering"}', '{"eventName":"model_steering"}', '{"event":"request"}'].join("\n"));
+
+      try {
+        expect(parseSteeringEvents([missingPath, eventsPath])).toEqual({
+          total_events: 4,
+          event_counts: {
+            model_steering: 1,
+            timeout_steering: 1,
+            token_steering: 2,
+          },
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
       }
     });
   });

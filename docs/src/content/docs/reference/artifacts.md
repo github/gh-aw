@@ -259,6 +259,13 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "filtered_tool_counts": { "issue_read": 2 },
     "filtered_reason_counts": { "integrity": 2 }
   },
+  "steering": {
+    "total_events": 3,
+    "event_counts": {
+      "token_steering": 2,
+      "timeout_steering": 1
+    }
+  },
   "working_set": {
     "measurement_state": "measured",
     "rebuild_factor": 3.9017857142857144,
@@ -324,6 +331,8 @@ without querying those services. Label records include the associated issue or p
 label name, and GitHub database or node ID when returned by the API.
 
 The conclusion job derives `gateway` and `integrity` from MCP gateway logs, falling back to `rpc-messages.jsonl` when `gateway.jsonl` is unavailable. These compact aggregates let `gh aw logs --artifacts usage` report MCP call, payload-size, duration, failure, and integrity-filter metrics without downloading raw logs. Cross-run reports include `runs_with_filtered_events`; the existing logs report summary remains the source for the total number of runs.
+
+The `steering` section aggregates AWF API proxy events by normalized event name. `gh aw audit --artifacts usage` exposes these counters in `firewall_token_usage.steering_event_counts`, so steering behavior can be inspected without downloading raw firewall logs.
 
 `rebuild_factor` is `cumulative_input_tokens / peak_input_tokens`, where each invocation contributes the canonical `input_tokens` value from the agent `token_usage.jsonl` record. Cache-read and cache-write fields are not added because provider normalization has already produced that logical input count. The factor is omitted when `measurement_state` is `unavailable`; `partial` means usable records were measured but malformed or unsupported records were ignored.
 

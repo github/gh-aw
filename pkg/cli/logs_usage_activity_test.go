@@ -35,6 +35,10 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 			"total_calls":5,
 			"failed_calls":1,
 			"tool_calls":[{"tool_call_id":"call-1","timestamp":"2026-09-09T00:00:00Z","server_name":"github","tool_name":"issue_read","request_size":100,"response_size":200,"duration_ms":25,"outcome":"success"}]
+		},
+		"steering":{
+			"total_events":3,
+			"event_counts":{"token_steering":2,"timeout_steering":1}
 		}
 	}`), 0o644), "should write usage activity summary")
 
@@ -57,6 +61,9 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 	applyUsageActivitySummaryToResult(summary, &result, true)
 	require.NotNil(t, result.MCPToolUsage, "loaded gateway summary should populate MCP usage")
 	require.Len(t, result.MCPToolUsage.ToolCalls, 1, "loaded gateway summary should populate MCP call records")
+	require.NotNil(t, result.TokenUsage, "loaded steering summary should populate token usage")
+	assert.Equal(t, 3, result.TokenUsage.TotalSteeringEvents)
+	assert.Equal(t, map[string]int{"token_steering": 2, "timeout_steering": 1}, result.TokenUsage.SteeringEventCounts)
 	assert.Equal(t, MCPToolCall{
 		ToolCallID: "call-1",
 		Timestamp:  "2026-09-09T00:00:00Z",
@@ -110,6 +117,10 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 			FilteredToolCounts:   map[string]int{"issue_read": 2},
 			FilteredReasonCounts: map[string]int{"integrity": 2},
 		},
+		Steering: &usageActivitySteering{
+			TotalEvents: 4,
+			EventCounts: map[string]int{"token_steering": 3, "timeout_steering": 1},
+		},
 	}
 
 	applyUsageActivitySummaryToResult(summary, &result, true)
@@ -148,6 +159,25 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 	require.NotNil(t, result.MCPToolUsage.Integrity, "integrity summary should be backfilled")
 	assert.Equal(t, 2, result.MCPToolUsage.Integrity.TotalFiltered, "integrity filtered counts should be preserved")
 	assert.Equal(t, map[string]int{"issue_read": 2}, result.MCPToolUsage.Integrity.FilteredToolCounts, "integrity tool counts should be preserved")
+	require.NotNil(t, result.TokenUsage, "steering summary should create token usage data")
+	assert.Equal(t, 4, result.TokenUsage.TotalSteeringEvents)
+	assert.Equal(t, map[string]int{"token_steering": 3, "timeout_steering": 1}, result.TokenUsage.SteeringEventCounts)
+}
+
+func TestApplyUsageActivitySteeringSummaryPreservesDetailedAnalysis(t *testing.T) {
+	t.Parallel()
+
+	tokenUsage := &TokenUsageSummary{
+		TotalSteeringEvents: 2,
+		SteeringEventCounts: map[string]int{"token_steering": 2},
+	}
+	applyUsageActivitySteeringSummary(&usageActivitySteering{
+		TotalEvents: 3,
+		EventCounts: map[string]int{"timeout_steering": 3},
+	}, &tokenUsage)
+
+	assert.Equal(t, 2, tokenUsage.TotalSteeringEvents)
+	assert.Equal(t, map[string]int{"token_steering": 2}, tokenUsage.SteeringEventCounts)
 }
 
 func TestApplyUsageActivitySummaryBackfillsIntegrityWithoutGateway(t *testing.T) {

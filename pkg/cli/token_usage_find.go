@@ -149,17 +149,25 @@ func findLegacyAPIProxyLogFile(runDir, relativePath string) string {
 }
 
 func findAPIProxyEventsFile(runDir string) string {
-	primary := filepath.Join(runDir, "sandbox", "firewall", "logs", proxyEventsJSONLPath)
-	if fileutil.FileExists(primary) {
-		return primary
+	relativePaths := []string{proxyEventLogsJSONLPath, proxyEventsJSONLPath}
+	for _, root := range []string{
+		filepath.Join(runDir, "sandbox", "firewall", "logs"),
+		filepath.Join(runDir, "sandbox", "firewall", "audit"),
+	} {
+		for _, relativePath := range relativePaths {
+			candidate := filepath.Join(root, relativePath)
+			if fileutil.FileExists(candidate) {
+				return candidate
+			}
+		}
 	}
 
-	awfAuditPath := filepath.Join(runDir, "sandbox", "firewall", "audit", proxyEventsJSONLPath)
-	if fileutil.FileExists(awfAuditPath) {
-		return awfAuditPath
+	for _, relativePath := range relativePaths {
+		if legacy := findLegacyAPIProxyLogFile(runDir, relativePath); legacy != "" {
+			return legacy
+		}
 	}
-
-	return findLegacyAPIProxyLogFile(runDir, proxyEventsJSONLPath)
+	return ""
 }
 
 func findAgentStdioFile(runDir string) string {

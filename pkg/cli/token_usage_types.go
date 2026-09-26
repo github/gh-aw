@@ -52,6 +52,7 @@ type TokenUsageSummary struct {
 	TotalCacheWriteTokens int                         `json:"total_cache_write_tokens" console:"header:Cache Write,format:number"`
 	TotalRequests         int                         `json:"total_requests" console:"header:Requests"`
 	TotalSteeringEvents   int                         `json:"total_steering_events,omitempty" console:"header:Steering Events,format:number,omitempty"`
+	SteeringEventCounts   map[string]int              `json:"steering_event_counts,omitempty" console:"-"`
 	TotalDurationMs       int                         `json:"total_duration_ms"`
 	TotalResponseBytes    int                         `json:"total_response_bytes"`
 	CacheEfficiency       float64                     `json:"cache_efficiency"`
@@ -133,6 +134,10 @@ type proxyEventsEntry struct {
 	Type           string `json:"type"`
 	EventNameSnake string `json:"event_name"`
 	EventNameCamel string `json:"eventName"`
+	Payload        *struct {
+		Event string `json:"event"`
+		Type  string `json:"type"`
+	} `json:"payload,omitempty"`
 	// Message text (present on steering events).
 	Message string `json:"message"`
 	// Optional RFC3339/RFC3339Nano timestamp (not always present).
@@ -142,6 +147,7 @@ type proxyEventsEntry struct {
 // tokenUsageJSONLPath is the relative path within the firewall logs directory
 const tokenUsageJSONLPath = "api-proxy-logs/token-usage.jsonl"
 const proxyEventsJSONLPath = "api-proxy-logs/events.jsonl"
+const proxyEventLogsJSONLPath = "api-proxy-logs/event-logs.jsonl"
 const agentUsageJSONPath = "agent_usage.json"
 const modelMismatchReasonTokenUsageMissing = "TOKEN_USAGE_MISSING"
 const modelMismatchReasonModelNotObserved = "REQUESTED_MODEL_NOT_OBSERVED"

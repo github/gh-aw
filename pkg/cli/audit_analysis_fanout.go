@@ -40,6 +40,7 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 	}
 	if usageSummary != nil {
 		results.workingSet = usageSummary.WorkingSet
+		applyUsageActivitySteeringSummary(usageSummary.Steering, &results.tokenUsageSummary)
 	}
 	return results, nil
 }
