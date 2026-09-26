@@ -37,6 +37,8 @@ describe("generate_footer.cjs", () => {
   let generateXMLMarker;
   let generateWorkflowIdMarker;
   let generateWorkflowCallIdMarker;
+  let generateWorkflowCallIdReviewMarker;
+  let matchesWorkflowCallId;
   let getWorkflowIdMarkerContent;
   let normalizeCloseOlderKey;
 
@@ -58,6 +60,8 @@ describe("generate_footer.cjs", () => {
     generateXMLMarker = module.generateXMLMarker;
     generateWorkflowIdMarker = module.generateWorkflowIdMarker;
     generateWorkflowCallIdMarker = module.generateWorkflowCallIdMarker;
+    generateWorkflowCallIdReviewMarker = module.generateWorkflowCallIdReviewMarker;
+    matchesWorkflowCallId = module.matchesWorkflowCallId;
     getWorkflowIdMarkerContent = module.getWorkflowIdMarkerContent;
     normalizeCloseOlderKey = module.normalizeCloseOlderKey;
   });
@@ -243,6 +247,27 @@ describe("generate_footer.cjs", () => {
 
       expect(result).toMatch(/^<!-- gh-aw-workflow-call-id: .+ -->$/);
       expect(result).toContain(callerId);
+    });
+  });
+
+  describe("generateWorkflowCallIdReviewMarker", () => {
+    it("should generate an encoded non-rendered marker", () => {
+      const result = generateWorkflowCallIdReviewMarker('owner/repo/Workflow "with" spaces');
+
+      expect(result).toBe('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FWorkflow%20%22with%22%20spaces"');
+    });
+  });
+
+  describe("matchesWorkflowCallId", () => {
+    it("matches exact legacy and durable marker lines only", () => {
+      const callerWorkflowId = "owner/repo/Caller";
+
+      expect(matchesWorkflowCallId("Review\n<!-- gh-aw-workflow-call-id: owner/repo/Caller -->", callerWorkflowId)).toBe(true);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCaller"\nReview', callerWorkflowId)).toBe(true);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2frepo%2fCaller"', callerWorkflowId)).toBe(true);
+      expect(matchesWorkflowCallId('Quoted [gh-aw-workflow-call-id]: # "owner%2Frepo%2FCaller"', callerWorkflowId)).toBe(false);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerB"', callerWorkflowId)).toBe(false);
+      expect(matchesWorkflowCallId('[gh-aw-workflow-call-id]: # ""', "")).toBe(false);
     });
   });
 

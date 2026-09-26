@@ -173,6 +173,63 @@ function generateWorkflowCallIdMarker(callerWorkflowId) {
 }
 
 /**
+ * Generates a non-rendered Markdown reference definition carrying a workflow-call ID.
+ * Unlike HTML comments, GitHub preserves this form in pull request review bodies.
+ *
+ * @param {string} callerWorkflowId - Calling workflow identifier
+ * @returns {string} Markdown reference definition for review provenance
+ */
+function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
+  return `[gh-aw-workflow-call-id]: # "${encodeURIComponent(callerWorkflowId)}"`;
+}
+
+/**
+ * Check whether any trimmed line of a body satisfies a marker predicate.
+ *
+ * @param {string|null|undefined} body - Body to scan
+ * @param {(line: string) => boolean} predicate - Predicate applied to each trimmed line
+ * @returns {boolean} Whether any line matches
+ */
+function someMarkerLine(body, predicate) {
+  if (!body) return false;
+  return body.split(/\r?\n/).some(line => predicate(line.trim()));
+}
+
+/**
+ * Check whether a body contains a line that exactly equals the given marker.
+ *
+ * @param {string|null|undefined} body - Body to scan
+ * @param {string} marker - Complete marker line
+ * @returns {boolean} Whether an exact marker line is present
+ */
+function matchesExactMarkerLine(body, marker) {
+  if (!marker) return false;
+  return someMarkerLine(body, line => line === marker);
+}
+
+/**
+ * Check whether a review body has an exact workflow-call ID marker line.
+ * Supports the legacy HTML comment and the durable Markdown reference marker.
+ *
+ * @param {string|null|undefined} body - Review body
+ * @param {string} callerWorkflowId - Calling workflow identifier
+ * @returns {boolean} Whether the review belongs to the calling workflow
+ */
+function matchesWorkflowCallId(body, callerWorkflowId) {
+  if (!body || !callerWorkflowId) return false;
+  if (matchesExactMarkerLine(body, generateWorkflowCallIdMarker(callerWorkflowId))) return true;
+  return someMarkerLine(body, trimmedLine => {
+    const durableMatch = trimmedLine.match(/^\[gh-aw-workflow-call-id\]: # "([^"]+)"$/);
+    if (!durableMatch) return false;
+    try {
+      return decodeURIComponent(durableMatch[1]) === callerWorkflowId;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
  * Normalizes a user-supplied close-older-key to identifier style.
  * Converts to lowercase, replaces runs of non-alphanumeric/dash/underscore characters
  * with a single dash, then trims leading and trailing dashes and underscores.
@@ -294,6 +351,8 @@ module.exports = {
   generateXMLMarker,
   generateWorkflowIdMarker,
   generateWorkflowCallIdMarker,
+  generateWorkflowCallIdReviewMarker,
+  matchesWorkflowCallId,
   getWorkflowIdMarkerContent,
   matchesWorkflowId,
   isValidWorkflowId,

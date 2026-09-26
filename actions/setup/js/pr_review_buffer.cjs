@@ -22,7 +22,7 @@
 const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { generateWorkflowCallIdMarker, matchesWorkflowId } = require("./generate_footer.cjs");
+const { generateWorkflowCallIdMarker, generateWorkflowCallIdReviewMarker, matchesWorkflowCallId, matchesWorkflowId } = require("./generate_footer.cjs");
 const { attachExecutionState, fetchPullRequestReviewState } = require("./safe_output_execution_metadata.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isTransientError, sleep } = require("./error_recovery.cjs");
 const { ERR_API } = require("./error_codes.cjs");
@@ -365,17 +365,23 @@ function createReviewBuffer() {
           undefined,
           { skipDetectionCaution: true }
         );
-
-      const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
-      if (callerWorkflowId) {
-        body += "\n" + generateWorkflowCallIdMarker(callerWorkflowId);
-      }
     }
     if (footerContext) {
       const bodyFooter = getBodyFooterMessage(footerContext.bodyFooter, footerContext);
       if (bodyFooter) {
         body = body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
+    }
+
+    // Always embed caller provenance, even when the visible footer is disabled, so
+    // supersede-older-reviews can identify this review in later runs. The legacy HTML
+    // marker is kept for consistency with other safe outputs and existing readers;
+    // the Markdown reference marker is the durable form because GitHub strips HTML
+    // comments from submitted review bodies.
+    const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
+    if (callerWorkflowId) {
+      const provenance = generateWorkflowCallIdMarker(callerWorkflowId) + "\n" + generateWorkflowCallIdReviewMarker(callerWorkflowId);
+      body = body.trim() ? body.trimEnd() + "\n\n" + provenance : provenance;
     }
 
     // Build comments array for the API
@@ -531,7 +537,6 @@ function createReviewBuffer() {
         core.warning("supersede-older-reviews is enabled but neither GH_AW_WORKFLOW_ID nor GH_AW_CALLER_WORKFLOW_ID is set. Skipping stale review dismissal.");
         return;
       }
-      const workflowCallMarker = workflowCallId ? generateWorkflowCallIdMarker(workflowCallId) : "";
       try {
         /** @type {any[]} */
         const reviews = [];
@@ -563,8 +568,8 @@ function createReviewBuffer() {
           if (!review || review.id === currentReviewId) return false;
           if (review.state !== "CHANGES_REQUESTED") return false;
           if (review.user?.type !== "Bot") return false;
-          if (workflowCallMarker) {
-            return review.body?.includes(workflowCallMarker) || false;
+          if (workflowCallId) {
+            return matchesWorkflowCallId(review.body, workflowCallId);
           }
           return matchesWorkflowId(review.body, workflowId);
         });
