@@ -29,6 +29,9 @@ const frictionSummaryJSON = `{
       "tool_calls": 3,
       "latency_ms": 550
     },
+    "total_run_aic": 2.5,
+    "total_run_aic_partial": true,
+    "friction_ratio": 0.5,
     "dimension_states": {"aic": "statistical", "tokens": "statistical", "turns": "measured", "tool_calls": "measured", "latency_ms": "measured"},
     "uncertainty": {
       "aic": {"state": "statistical", "method": "mean_invocation_apportionment", "confidence": "low", "relative_error": 0.3, "sample_size": 2, "basis": "mean healthy-invocation cost"},
@@ -89,6 +92,9 @@ func TestLoadUsageActivitySummaryDecodesFriction(t *testing.T) {
 	if f.CountedOccurrences != 3 || f.SuppressedOccurrences != 1 {
 		t.Errorf("occurrence accounting = counted %d suppressed %d", f.CountedOccurrences, f.SuppressedOccurrences)
 	}
+	if f.TotalRunAIC == nil || *f.TotalRunAIC != 2.5 || !f.TotalRunAICPartial || f.FrictionRatio == nil || *f.FrictionRatio != 0.5 {
+		t.Errorf("run AIC coverage = total %v partial %v ratio %v", f.TotalRunAIC, f.TotalRunAICPartial, f.FrictionRatio)
+	}
 	aic, ok := f.Uncertainty["aic"]
 	if !ok || aic.RelativeError == nil || *aic.RelativeError != 0.3 || aic.Method != "mean_invocation_apportionment" || aic.SampleSize != 2 {
 		t.Errorf("aic uncertainty = %+v", aic)
@@ -140,6 +146,7 @@ func TestHistoricalRunsWithoutFrictionRemainCompatible(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadUsageActivitySummary: %v", err)
 	}
+
 	if summary.Friction != nil {
 		t.Fatal("legacy summary must not synthesize a friction section")
 	}
@@ -159,6 +166,33 @@ func TestHistoricalRunsWithoutFrictionRemainCompatible(t *testing.T) {
 		t.Errorf("frictionRelativeError(nil) = %q", got)
 	}
 	renderConsoleFriction(nil)
+}
+
+func TestHistoricalFrictionFallbackUsesAvailableUsageAndLogs(t *testing.T) {
+	summaryJSON := `{"schema":"usage-activity-summary/v1","session":{"failed_tool_executions":1}}`
+	summary, err := loadUsageActivitySummary(writeUsageSummary(t, summaryJSON))
+	if err != nil {
+		t.Fatalf("loadUsageActivitySummary: %v", err)
+	}
+	result := &DownloadResult{
+		RunAnalysis: RunAnalysis{
+			MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c1", ServerName: "github", ToolName: "issue_read", Status: "error"}}},
+		},
+	}
+	applyUsageActivitySummaryToResult(summary, result, true)
+	if result.Friction == nil || !result.Friction.Derived {
+		t.Fatalf("expected historical fallback, got %+v", result.Friction)
+	}
+	if result.Friction.TotalOccurrences != 2 || result.Friction.CountedOccurrences != 1 {
+		t.Errorf("fallback occurrences = %d counted = %d", result.Friction.TotalOccurrences, result.Friction.CountedOccurrences)
+	}
+
+	result = &DownloadResult{RunAnalysis: RunAnalysis{
+		MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c2", Status: "failed"}}},
+	}}
+	if !backfillCacheHitIfNeeded(result, t.TempDir(), false) || result.Friction == nil || !result.Friction.Derived {
+		t.Fatalf("expected no-summary cache fallback, got %+v", result.Friction)
+	}
 }
 
 func TestDeriveFrictionFromLogsDeduplicatesSessionFailures(t *testing.T) {

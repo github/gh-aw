@@ -311,14 +311,14 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
         "counted_occurrences": 1,
         "suppressed_occurrences": 0,
         "state": "causal",
-        "cost": { "aic": 0.5, "tokens": { "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
+        "cost": { "aic": 0.5, "tokens": { "input": 100, "output": 28, "cache_read": 0, "cache_write": 0, "reasoning": 0, "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
       }
     ],
     "groups": [
       {
         "group_id": "tool_failure",
         "primary_source": "mcp_gateway",
-        "event_ids": ["mcp_tool_error:call-1", "session_tool_failure:aggregate"],
+        "event_ids": ["mcp_tool_error:call-1"],
         "total_occurrences": 4,
         "counted_occurrences": 3,
         "suppressed_occurrences": 1,
@@ -344,7 +344,7 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
           "tool_calls": "measured",
           "latency_ms": "measured"
         },
-        "cost": { "aic": 0.5, "tokens": { "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
+        "cost": { "aic": 0.5, "tokens": { "input": 100, "output": 28, "cache_read": 0, "cache_write": 0, "reasoning": 0, "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
       }
     ],
     "unmeasured_drivers": [{ "driver": "firewall_block", "reason": "no_occurrences" }]
@@ -438,10 +438,12 @@ AI credits (`aic`) are the canonical unit. Every other dimension — token class
 | `mcp_tool_error` | `tool_failure` | `mcp_gateway` | derived | derived | unsupported | measured | measured |
 | `session_tool_failure` | `tool_failure` | `agent_session` | derived | derived | unsupported | measured | unsupported |
 | `integrity_filter` | `integrity_filter` | `mcp_gateway` | derived | derived | unsupported | measured | unsupported |
-| `firewall_block` | `network_block` | `firewall` | unsupported | unsupported | unsupported | unsupported | unsupported |
+| `firewall_block` | `network_block` | `firewall` | derived | derived | unsupported | unsupported | unsupported |
 | `agent_api_error` | `model_error` | `agent_token_usage` | measured | measured | measured | unsupported | measured |
 
-`measured` means the dimension is read from the friction record itself. `derived` means the dimension is attributed causally when a follow-up invocation can be linked, and statistically otherwise. `unsupported` means no data source expresses that dimension for the driver: firewall blocks are counted as occurrences, but their cost is never estimated, because a blocked request leaves no invocation-level trace to attribute. Drivers whose source is absent, or that produced no occurrences, are listed in `unmeasured_drivers` with a `no_occurrences` or `source_unavailable:<source>` reason.
+`measured` means the dimension is read from the friction record itself. `derived` means the dimension is attributed causally when a follow-up invocation can be linked, and statistically otherwise. `unsupported` means no data source expresses that dimension for the driver. Firewall-block costs have no invocation-level causal link, but AIC and tokens are statistically estimated from healthy invocations when that baseline is available; otherwise those dimensions are unavailable. Drivers whose source is absent, or that produced no occurrences, are listed in `unmeasured_drivers` with a `no_occurrences` or `source_unavailable:<source>` reason.
+
+When `total_run_aic_partial` is `true`, `total_run_aic` and `friction_ratio` use only invocations that include AIC data. Malformed token-usage records make the run total unavailable instead of publishing a misleading partial denominator.
 
 #### Causal grouping and double counting
 

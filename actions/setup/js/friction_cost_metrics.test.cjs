@@ -291,6 +291,49 @@ describe("unavailable friction", () => {
     expect(friction.events[0]).toMatchObject({ driver: "agent_api_error", label: "http_500" });
   });
 
+  it("rounds fractional token estimates and latency to the integer artifact contract", () => {
+    const { friction } = computeFrictionCost({
+      gateway: { tool_calls: [failedCall("call-1", "2026-01-01T00:00:09Z", { duration_ms: 12.5 })] },
+      tokenUsageContent: jsonl([invocation("2026-01-01T00:00:01Z", 0.4, { input_tokens: 100 }), invocation("2026-01-01T00:00:02Z", 0.6, { input_tokens: 101 })]),
+    });
+    expect(friction.cost.latency_ms).toBe(13);
+    expect(parseInvocationsFromJSONL(jsonl([invocation("2026-01-01T00:00:01Z", 0.2, { duration_ms: 12.5 })])).invocations[0].durationMs).toBe(13);
+    for (const tokenClass of ["input", "output", "cache_read", "cache_write", "reasoning", "total"]) {
+      expect(Number.isInteger(friction.cost.tokens[tokenClass])).toBe(true);
+    }
+    expect(friction.cost.tokens.total).toBe(["input", "output", "cache_read", "cache_write", "reasoning"].reduce((sum, key) => sum + friction.cost.tokens[key], 0));
+  });
+
+  it("includes unavailable counted events in aggregate measurement states", () => {
+    const { friction } = computeFrictionCost({
+      firewall: { requests_by_domain: { "blocked.example": { blocked: 3 } } },
+      tokenUsageContent: jsonl([invocation("2026-01-01T00:00:01Z", 1, { status_code: 500 })]),
+    });
+    expect(friction.measurement_state).toBe("unavailable");
+    expect(friction.dimension_states.aic).toBe("unavailable");
+    expect(friction.drivers.find(driver => driver.driver === "firewall_block").state).toBe("unavailable");
+  });
+
+  it("bounds group event IDs to the emitted event list", () => {
+    const requestsByDomain = {};
+    for (let index = 0; index < MAX_FRICTION_EVENTS + 5; index += 1) {
+      requestsByDomain[`domain-${String(index).padStart(4, "0")}.example`] = { blocked: 1 };
+    }
+    const { friction } = computeFrictionCost({ firewall: { requests_by_domain: requestsByDomain } });
+    const emittedIDs = new Set(friction.events.map(event => event.id));
+    expect(friction.groups.flatMap(group => group.event_ids).every(id => emittedIDs.has(id))).toBe(true);
+    expect(friction.groups.reduce((sum, group) => sum + group.event_ids.length, 0)).toBe(MAX_FRICTION_EVENTS);
+  });
+
+  it("marks run totals partial when valid invocations omit AIC", () => {
+    const { friction } = computeFrictionCost({
+      tokenUsageContent: jsonl([invocation("2026-01-01T00:00:01Z", 0.2, { status_code: 500 }), invocation("2026-01-01T00:00:02Z", undefined)]),
+    });
+    expect(friction.total_run_aic).toBe(0.2);
+    expect(friction.total_run_aic_partial).toBe(true);
+    expect(friction.friction_ratio).toBe(1);
+  });
+
   it("lists drivers that could not be measured with a reason", () => {
     const { friction } = computeFrictionCost({ firewall: { requests_by_domain: { "blocked.example": { allowed: 0, blocked: 1 } } } });
     const reasons = Object.fromEntries(friction.unmeasured_drivers.map(entry => [entry.driver, entry.reason]));
@@ -412,6 +455,8 @@ describe("robustness", () => {
     expect(warnings[0]).toContain("ignored 1 malformed");
     expect(friction.ignored_token_records).toBe(1);
     expect(friction.cost.aic).toBe(0.4);
+    expect(friction).not.toHaveProperty("total_run_aic");
+    expect(friction).not.toHaveProperty("friction_ratio");
   });
 
   it("tolerates missing and malformed activity sections", () => {

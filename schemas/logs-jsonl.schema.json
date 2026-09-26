@@ -224,6 +224,9 @@
                     "number"
                   ]
                 },
+                "total_run_aic_partial": {
+                  "type": "boolean"
+                },
                 "friction_ratio": {
                   "type": [
                     "null",
@@ -4236,6 +4239,9 @@
                         "null",
                         "number"
                       ]
+                    },
+                    "total_run_aic_partial": {
+                      "type": "boolean"
                     },
                     "friction_ratio": {
                       "type": [

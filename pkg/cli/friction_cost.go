@@ -43,6 +43,7 @@ type FrictionCostSummary struct {
 	UnattributedOccurrences int                          `json:"unattributed_occurrences,omitempty"`
 	Cost                    FrictionCost                 `json:"cost"`
 	TotalRunAIC             *float64                     `json:"total_run_aic,omitempty"`
+	TotalRunAICPartial      bool                         `json:"total_run_aic_partial,omitempty"`
 	FrictionRatio           *float64                     `json:"friction_ratio,omitempty"`
 	DimensionStates         map[string]string            `json:"dimension_states,omitempty"`
 	Uncertainty             map[string]FrictionUncertain `json:"uncertainty,omitempty"`

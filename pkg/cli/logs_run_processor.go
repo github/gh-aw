@@ -948,6 +948,10 @@ func backfillCacheHitIfNeeded(result *DownloadResult, runOutputDir string, verbo
 		logsOrchestratorLog.Printf("Warning: failed to load usage activity summary for cache-hit backfill (run %d): %v", result.Run.DatabaseID, err)
 	}
 	if usageActivitySummary == nil {
+		if result.Friction == nil {
+			result.Friction = deriveFrictionFromLogs(result.MCPToolUsage, nil)
+			return result.Friction != nil
+		}
 		return false
 	}
 	applyUsageActivitySummaryToResult(usageActivitySummary, result, true)

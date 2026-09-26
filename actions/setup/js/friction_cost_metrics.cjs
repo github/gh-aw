@@ -128,6 +128,14 @@ function nonNegativeNumber(value) {
 
 /**
  * @param {unknown} value
+ * @returns {number}
+ */
+function nonNegativeInteger(value) {
+  return Math.round(nonNegativeNumber(value));
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 function optionalNonNegativeNumber(value) {
@@ -228,11 +236,11 @@ function parseInvocationsFromJSONL(content) {
     }
 
     const tokens = emptyTokens();
-    tokens.input = nonNegativeNumber(entry.input_tokens);
-    tokens.output = nonNegativeNumber(entry.output_tokens);
-    tokens.cache_read = nonNegativeNumber(entry.cache_read_tokens);
-    tokens.cache_write = nonNegativeNumber(entry.cache_write_tokens);
-    tokens.reasoning = nonNegativeNumber(entry.reasoning_tokens);
+    tokens.input = nonNegativeInteger(entry.input_tokens);
+    tokens.output = nonNegativeInteger(entry.output_tokens);
+    tokens.cache_read = nonNegativeInteger(entry.cache_read_tokens);
+    tokens.cache_write = nonNegativeInteger(entry.cache_write_tokens);
+    tokens.reasoning = nonNegativeInteger(entry.reasoning_tokens);
     tokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + tokens[tokenClass], 0);
 
     invocations.push({
@@ -240,7 +248,7 @@ function parseInvocationsFromJSONL(content) {
       timestampMs: parseTimestampMs(entry.timestamp),
       aic: optionalNonNegativeNumber(entry.ai_credits_this_response ?? entry.ai_credits ?? entry.aic),
       tokens,
-      durationMs: nonNegativeNumber(entry.duration_ms),
+      durationMs: nonNegativeInteger(entry.duration_ms),
       frictionReason: classifyInvocationFriction(entry),
       consumed: false,
     });
@@ -289,9 +297,9 @@ function computeBaselineStats(invocations) {
   const meanTokens = emptyTokens();
   if (healthy.length > 0) {
     for (const tokenClass of TOKEN_CLASSES) {
-      meanTokens[tokenClass] = healthy.reduce((sum, invocation) => sum + invocation.tokens[tokenClass], 0) / healthy.length;
+      meanTokens[tokenClass] = Math.round(healthy.reduce((sum, invocation) => sum + invocation.tokens[tokenClass], 0) / healthy.length);
     }
-    meanTokens.total = healthy.reduce((sum, invocation) => sum + invocation.tokens.total, 0) / healthy.length;
+    meanTokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + meanTokens[tokenClass], 0);
   }
   return {
     healthyCount: healthy.length,
@@ -351,7 +359,7 @@ function buildFrictionEvents({ gateway, integrity, session, firewall, invocation
       occurrences: 1,
       counted_occurrences: 1,
       suppressed_occurrences: 0,
-      latencyMs: nonNegativeNumber(call.duration_ms),
+      latencyMs: nonNegativeInteger(call.duration_ms),
     });
   }
 
@@ -776,7 +784,7 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
 
     for (const dimension of COST_DIMENSIONS) {
       const state = dimensionStates[dimension];
-      if (state !== DIMENSION_UNSUPPORTED && state !== STATE_UNAVAILABLE) {
+      if (event.counted_occurrences > 0 && state !== DIMENSION_UNSUPPORTED) {
         dimensionStateSets[dimension].push(state);
       }
     }
@@ -805,7 +813,9 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     driver.cost.turns += cost.turns;
     driver.cost.tool_calls += cost.tool_calls;
     driver.cost.latency_ms += cost.latency_ms;
-    driver.states.push(dimensionStates.aic);
+    if (event.counted_occurrences > 0) {
+      driver.states.push(dimensionStates.aic);
+    }
 
     const eventState = dimensionStates.aic === DIMENSION_UNSUPPORTED ? STATE_UNAVAILABLE : dimensionStates.aic;
     /** @type {Record<string, any>} */
@@ -888,7 +898,10 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
   const totalOccurrences = events.reduce((sum, event) => sum + event.occurrences, 0);
   const countedOccurrences = events.reduce((sum, event) => sum + event.counted_occurrences, 0);
   const runAICValues = invocations.map(invocation => invocation.aic).filter(value => value !== null);
-  const totalRunAIC = runAICValues.length === invocations.length && invocations.length > 0 ? runAICValues.reduce((sum, value) => sum + Number(value), 0) : null;
+  const totalRunAIC = ignoredRecords === 0 && runAICValues.length > 0 ? runAICValues.reduce((sum, value) => sum + Number(value), 0) : null;
+  const totalRunAICPartial = totalRunAIC !== null && runAICValues.length < invocations.length;
+  const emittedEvents = eventRecords.slice(0, MAX_FRICTION_EVENTS);
+  const emittedEventIDs = new Set(emittedEvents.map(event => event.id));
 
   const friction = {
     measurement_state: sources.length === 0 ? STATE_UNAVAILABLE : aggregateStates.aic,
@@ -901,7 +914,7 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     linked_invocations: linkedInvocationTotal,
     unattributed_occurrences: unattributedOccurrenceTotal,
     cost: totalCost,
-    ...(totalRunAIC !== null ? { total_run_aic: totalRunAIC, friction_ratio: totalRunAIC > 0 ? totalCost.aic / totalRunAIC : 0 } : {}),
+    ...(totalRunAIC !== null ? { total_run_aic: totalRunAIC, ...(totalRunAICPartial ? { total_run_aic_partial: true } : {}), friction_ratio: totalRunAIC > 0 ? totalCost.aic / totalRunAIC : 0 } : {}),
     dimension_states: aggregateStates,
     uncertainty,
     drivers: Array.from(driverTotals.values())
@@ -917,8 +930,8 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
         state: driver.states.length === 0 ? STATE_UNAVAILABLE : driver.states.map(state => (state === DIMENSION_UNSUPPORTED ? STATE_UNAVAILABLE : state)).reduce(weakerState),
         cost: driver.cost,
       })),
-    groups,
-    events: eventRecords.slice(0, MAX_FRICTION_EVENTS),
+    groups: groups.map(group => ({ ...group, event_ids: group.event_ids.filter(id => emittedEventIDs.has(id)) })),
+    events: emittedEvents,
     ...(eventRecords.length > MAX_FRICTION_EVENTS ? { events_truncated: true } : {}),
     ...(unmeasuredDrivers.length > 0 ? { unmeasured_drivers: unmeasuredDrivers } : {}),
     ...(ignoredRecords > 0 ? { ignored_token_records: ignoredRecords } : {}),

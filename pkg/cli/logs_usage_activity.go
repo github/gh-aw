@@ -161,7 +161,13 @@ func loadUsageActivitySummary(runDir string) (*usageActivitySummary, error) {
 }
 
 func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *DownloadResult, allowTurnBackfill bool) {
-	if summary == nil || result == nil {
+	if result == nil {
+		return
+	}
+	if summary == nil {
+		if result.Friction == nil {
+			result.Friction = deriveFrictionFromLogs(result.MCPToolUsage, nil)
+		}
 		return
 	}
 
@@ -183,6 +189,9 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	applyUsageActivityFirewallSummary(summary.Firewall, result)
 	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
+	if result.Friction == nil {
+		result.Friction = deriveFrictionFromLogs(result.MCPToolUsage, summary.Session)
+	}
 
 	// Backfill safe output item count from usage summary when the safe-outputs-items
 	// artifact was not downloaded separately. The count is 0-safe: only backfill when
