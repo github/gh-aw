@@ -44,6 +44,31 @@ func TestBuildProcessedAuditRun(t *testing.T) {
 	assert.Equal(t, results.jobDetails, processedRun.JobDetails)
 }
 
+func TestProcessedRunFromSummaryPreservesSkillActivations(t *testing.T) {
+	t.Parallel()
+
+	skills := []SkillActivation{{Name: "documentation", Status: "invoked", InvocationCount: 2}}
+	processed := processedRunFromSummary(&RunSummary{
+		RunAnalysis: RunAnalysis{
+			Run:              WorkflowRun{DatabaseID: 12},
+			SkillActivations: skills,
+		},
+	}, t.TempDir())
+
+	assert.Equal(t, skills, processed.SkillActivations)
+}
+
+func TestBuildAuditToolUsageIncludesNamedSkills(t *testing.T) {
+	t.Parallel()
+
+	usage := buildAuditToolUsage(LogMetrics{}, nil, []SkillActivation{
+		{Name: "documentation", InvocationCount: 2},
+		{Name: "documentation"},
+	})
+
+	assert.Equal(t, []ToolUsageInfo{{Name: "skill:documentation", CallCount: 3}}, usage)
+}
+
 func TestBuildAuditRunSummary(t *testing.T) {
 	t.Parallel()
 	run := WorkflowRun{DatabaseID: 22}

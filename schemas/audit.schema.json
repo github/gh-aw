@@ -1144,6 +1144,14 @@
               "source": {
                 "type": "string"
               },
+              "invocation_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed_count": {
+                "type": "integer",
+                "minimum": 0
+              },
               "timestamp": {
                 "type": "string"
               },

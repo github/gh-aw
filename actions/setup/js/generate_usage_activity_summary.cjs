@@ -333,6 +333,8 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
     tool_execution_completes: 0,
     failed_tool_executions: 0,
   };
+  const skills = new Map();
+  const pendingSkills = new Map();
 
   for (const logDir of sessionLogDirs) {
     for (const eventsPath of findFiles(logDir, entry => entry.name === "events.jsonl", 1)) {
@@ -373,12 +375,43 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
             session.reasoning_events += 1;
           } else if (eventType === "tool.execution_start") {
             session.tool_execution_starts += 1;
+            const data = entry.data && typeof entry.data === "object" ? entry.data : {};
+            if (
+              String(data.toolName || "")
+                .trim()
+                .toLowerCase() === "skill"
+            ) {
+              const input = data.input && typeof data.input === "object" ? data.input : data.arguments && typeof data.arguments === "object" ? data.arguments : {};
+              const skillName = String(input.skill || "").trim();
+              if (skillName) {
+                const aggregate = skills.get(skillName) || {
+                  name: skillName,
+                  invocation_count: 0,
+                  failed_count: 0,
+                  first_timestamp: String(entry.timestamp || ""),
+                  last_timestamp: String(entry.timestamp || ""),
+                };
+                aggregate.invocation_count += 1;
+                aggregate.last_timestamp = String(entry.timestamp || aggregate.last_timestamp);
+                skills.set(skillName, aggregate);
+                if (data.toolCallId) {
+                  pendingSkills.set(String(data.toolCallId), skillName);
+                }
+              }
+            }
           } else if (eventType === "tool.execution_complete") {
             session.tool_execution_completes += 1;
             const data = entry.data || {};
             const success = typeof data === "object" ? data.success !== false : true;
             if (!success) {
               session.failed_tool_executions += 1;
+              const skillName = pendingSkills.get(String(data.toolCallId || ""));
+              if (skillName && skills.has(skillName)) {
+                skills.get(skillName).failed_count += 1;
+              }
+            }
+            if (typeof data === "object" && data.toolCallId) {
+              pendingSkills.delete(String(data.toolCallId));
             }
           }
         }
@@ -389,6 +422,13 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
     }
   }
 
+  if (skills.size > 0) {
+    session.skills = {
+      total_invocations: Array.from(skills.values()).reduce((total, skill) => total + skill.invocation_count, 0),
+      unique_skills: skills.size,
+      items: Array.from(skills.values()).sort((left, right) => left.name.localeCompare(right.name)),
+    };
+  }
   return session.total_events > 0 ? session : null;
 }
 
@@ -879,6 +919,10 @@ function main() {
   // Parse session logs
   const session = parseSessionLogs();
   if (session) {
+    if (session.skills) {
+      summary.skills = session.skills;
+      delete session.skills;
+    }
     summary.session = session;
   }
 
