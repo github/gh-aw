@@ -159,7 +159,9 @@ type RunData struct {
 	AIC                        float64                `json:"aic"`
 	AmbientContext             *AmbientContextMetrics `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
-	WSRF                       string                 `json:"-" console:"header:WSRF,omitempty"` // Working-Set Rebuild Factor, pre-formatted for table display
+	Friction                   *FrictionCostSummary   `json:"friction,omitempty" console:"-"`
+	WSRF                       string                 `json:"-" console:"header:WSRF,omitempty"`         // Working-Set Rebuild Factor, pre-formatted for table display
+	FrictionAIC                string                 `json:"-" console:"header:Friction AIC,omitempty"` // Precomputed friction cost in AI credits, pre-formatted for table display
 	Turns                      int                    `json:"turns,omitempty" console:"header:Turns,omitempty"`
 	ErrorCount                 int                    `json:"error_count,omitempty" console:"header:Errors"`
 	WarningCount               int                    `json:"warning_count,omitempty" console:"header:Warnings"`
@@ -559,6 +561,8 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		AmbientContext:             ambientContext,
 		WorkingSet:                 pr.WorkingSet,
 		WSRF:                       wsrfDisplayValue(pr.WorkingSet),
+		Friction:                   pr.Friction,
+		FrictionAIC:                frictionDisplayValue(pr.Friction),
 		ActionMinutes:              run.ActionMinutes,
 		Turns:                      run.Turns,
 		ErrorCount:                 run.ErrorCount,

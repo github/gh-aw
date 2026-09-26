@@ -69,6 +69,7 @@ type AuditData struct {
 	OutcomeSummary          *OutcomeSummary          `json:"outcome_summary,omitempty"`
 	Experiments             *ExperimentData          `json:"experiments,omitempty"`
 	Graders                 *GradersData             `json:"graders,omitempty"`
+	Friction                *FrictionCostSummary     `json:"friction,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
@@ -121,6 +122,7 @@ type MetricsData struct {
 	AIC            float64                `json:"aic,omitempty"`
 	AmbientContext *AmbientContextMetrics `json:"ambient_context,omitempty" console:"title:Ambient Context,omitempty"`
 	WorkingSet     *WorkingSetMetrics     `json:"working_set,omitempty" console:"-"`
+	Friction       *FrictionCostSummary   `json:"-" console:"-"`
 	ActionMinutes  float64                `json:"action_minutes,omitempty" console:"header:Action Minutes,omitempty"`
 	Turns          int                    `json:"turns,omitempty" console:"header:Turns,omitempty"`
 	ErrorCount     int                    `json:"error_count" console:"header:Errors"`
@@ -382,6 +384,7 @@ func buildAuditMetrics(processedRun ProcessedRun, metrics LogMetrics) (MetricsDa
 	applyFallbackMetrics(&metricsData, processedRun, metrics, fallbackMetrics)
 	populateAuditMetricContext(&metricsData, processedRun.TokenUsage)
 	metricsData.WorkingSet = processedRun.WorkingSet
+	metricsData.Friction = processedRun.Friction
 	return metricsData, inferredEngineID
 }
 
@@ -522,6 +525,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		BehaviorFingerprint:     inputs.behaviorFingerprint,
 		AgenticAssessments:      inputs.agenticAssessments,
 		Metrics:                 metricsData,
+		Friction:                inputs.processedRun.Friction,
 		KeyFindings:             inputs.findings,
 		Recommendations:         inputs.recommendations,
 		ObservabilityInsights:   inputs.observabilityInsights,

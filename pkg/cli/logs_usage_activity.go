@@ -23,9 +23,11 @@ type usageActivitySummary struct {
 	Session     *usageActivitySession     `json:"session,omitempty"`
 	Gateway     *usageActivityGateway     `json:"gateway,omitempty"`
 	Integrity   *IntegrityFilterSummary   `json:"integrity,omitempty"`
+	Steering    *usageActivitySteering    `json:"steering,omitempty"`
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
+	Friction    *FrictionCostSummary      `json:"friction,omitempty"`
 }
 
 // WorkingSetMetrics describes cumulative model-input traffic relative to the
@@ -68,6 +70,11 @@ type usageActivitySession struct {
 	ToolExecutionStarts    int `json:"tool_execution_starts"`
 	ToolExecutionCompletes int `json:"tool_execution_completes"`
 	FailedToolExecutions   int `json:"failed_tool_executions"`
+}
+
+type usageActivitySteering struct {
+	TotalEvents int            `json:"total_events"`
+	EventCounts map[string]int `json:"event_counts,omitempty"`
 }
 
 type usageActivityGateway struct {
@@ -160,12 +167,24 @@ func loadUsageActivitySummary(runDir string) (*usageActivitySummary, error) {
 }
 
 func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *DownloadResult, allowTurnBackfill bool) {
-	if summary == nil || result == nil {
+	if result == nil {
+		return
+	}
+	if summary == nil {
+		if result.Friction == nil {
+			result.Friction = deriveFrictionFallback(result.MCPToolUsage, nil)
+		}
 		return
 	}
 
 	if summary.WorkingSet != nil {
 		result.WorkingSet = summary.WorkingSet
+	}
+
+	// Friction is precomputed in the conclusion job: prefer it verbatim and never
+	// recompute it from raw logs when the section is present.
+	if summary.Friction != nil {
+		result.Friction = summary.Friction
 	}
 
 	// Preserve previously parsed turn counts (from full session artifacts/events.jsonl)
@@ -176,6 +195,10 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	applyUsageActivityFirewallSummary(summary.Firewall, result)
 	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
+	if result.Friction == nil {
+		result.Friction = deriveFrictionFallback(result.MCPToolUsage, summary.Session)
+	}
+	applyUsageActivitySteeringSummary(summary.Steering, &result.TokenUsage)
 
 	// Backfill safe output item count from usage summary when the safe-outputs-items
 	// artifact was not downloaded separately. The count is 0-safe: only backfill when
@@ -186,6 +209,21 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	}
 	if summary.SafeOutputs != nil && len(result.SafeOutputs) == 0 && len(summary.SafeOutputs.Items) > 0 {
 		result.SafeOutputs = summary.SafeOutputs.Items
+	}
+}
+
+func applyUsageActivitySteeringSummary(steering *usageActivitySteering, tokenUsage **TokenUsageSummary) {
+	if steering == nil || steering.TotalEvents <= 0 {
+		return
+	}
+	if *tokenUsage == nil {
+		*tokenUsage = &TokenUsageSummary{ByModel: make(map[string]*ModelTokenUsage)}
+	}
+	if (*tokenUsage).TotalSteeringEvents == 0 {
+		(*tokenUsage).TotalSteeringEvents = steering.TotalEvents
+	}
+	if len((*tokenUsage).SteeringEventCounts) == 0 && len(steering.EventCounts) > 0 {
+		(*tokenUsage).SteeringEventCounts = maps.Clone(steering.EventCounts)
 	}
 }
 
