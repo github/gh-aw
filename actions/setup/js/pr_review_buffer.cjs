@@ -365,17 +365,23 @@ function createReviewBuffer() {
           undefined,
           { skipDetectionCaution: true }
         );
-
-      const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
-      if (callerWorkflowId) {
-        body += "\n" + generateWorkflowCallIdMarker(callerWorkflowId) + "\n" + generateWorkflowCallIdReviewMarker(callerWorkflowId);
-      }
     }
     if (footerContext) {
       const bodyFooter = getBodyFooterMessage(footerContext.bodyFooter, footerContext);
       if (bodyFooter) {
         body = body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
+    }
+
+    // Always embed caller provenance, even when the visible footer is disabled, so
+    // supersede-older-reviews can identify this review in later runs. The legacy HTML
+    // marker is kept for consistency with other safe outputs and existing readers;
+    // the Markdown reference marker is the durable form because GitHub strips HTML
+    // comments from submitted review bodies.
+    const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
+    if (callerWorkflowId) {
+      const provenance = generateWorkflowCallIdMarker(callerWorkflowId) + "\n" + generateWorkflowCallIdReviewMarker(callerWorkflowId);
+      body = body.trim() ? body.trimEnd() + "\n\n" + provenance : provenance;
     }
 
     // Build comments array for the API

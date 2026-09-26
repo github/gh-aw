@@ -841,6 +841,48 @@ describe("pr_review_buffer (factory pattern)", () => {
       }
     });
 
+    it("should append workflow-call-id provenance even when footer is disabled", async () => {
+      const previousCallerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID;
+      process.env.GH_AW_CALLER_WORKFLOW_ID = "owner/repo/CallerA";
+      try {
+        buffer.addComment({ path: "test.js", line: 1, body: "comment" });
+        buffer.setReviewMetadata("", "REQUEST_CHANGES");
+        buffer.setReviewContext({
+          repo: "owner/repo",
+          repoParts: { owner: "owner", repo: "repo" },
+          pullRequestNumber: 42,
+          pullRequest: { head: { sha: "abc123" } },
+        });
+        buffer.setFooterContext({
+          workflowName: "test-workflow",
+          runUrl: "https://github.com/owner/repo/actions/runs/123",
+          workflowSource: "owner/repo/workflows/test.md@v1",
+          workflowSourceURL: "https://github.com/owner/repo/blob/main/test.md",
+        });
+        buffer.setFooterMode("none");
+
+        mockGithub.rest.pulls.createReview.mockResolvedValue({
+          data: {
+            id: 406,
+            html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-406",
+          },
+        });
+
+        const result = await buffer.submitReview();
+        expect(result.success).toBe(true);
+
+        const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
+        expect(callArgs.body).not.toContain("test-workflow");
+        expect(callArgs.body).toBe('<!-- gh-aw-workflow-call-id: owner/repo/CallerA -->\n[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerA"');
+      } finally {
+        if (previousCallerWorkflowId === undefined) {
+          delete process.env.GH_AW_CALLER_WORKFLOW_ID;
+        } else {
+          process.env.GH_AW_CALLER_WORKFLOW_ID = previousCallerWorkflowId;
+        }
+      }
+    });
+
     it("should skip footer when setIncludeFooter('none') is called", async () => {
       buffer.addComment({ path: "test.js", line: 1, body: "comment" });
       buffer.setReviewMetadata("Review body", "COMMENT");

@@ -184,6 +184,30 @@ function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
 }
 
 /**
+ * Check whether any trimmed line of a body satisfies a marker predicate.
+ *
+ * @param {string|null|undefined} body - Body to scan
+ * @param {(line: string) => boolean} predicate - Predicate applied to each trimmed line
+ * @returns {boolean} Whether any line matches
+ */
+function someMarkerLine(body, predicate) {
+  if (!body) return false;
+  return body.split(/\r?\n/).some(line => predicate(line.trim()));
+}
+
+/**
+ * Check whether a body contains a line that exactly equals the given marker.
+ *
+ * @param {string|null|undefined} body - Body to scan
+ * @param {string} marker - Complete marker line
+ * @returns {boolean} Whether an exact marker line is present
+ */
+function matchesExactMarkerLine(body, marker) {
+  if (!marker) return false;
+  return someMarkerLine(body, line => line === marker);
+}
+
+/**
  * Check whether a review body has an exact workflow-call ID marker line.
  * Supports the legacy HTML comment and the durable Markdown reference marker.
  *
@@ -193,10 +217,8 @@ function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
  */
 function matchesWorkflowCallId(body, callerWorkflowId) {
   if (!body || !callerWorkflowId) return false;
-  const legacyMarker = generateWorkflowCallIdMarker(callerWorkflowId);
-  return body.split(/\r?\n/).some(line => {
-    const trimmedLine = line.trim();
-    if (trimmedLine === legacyMarker) return true;
+  if (matchesExactMarkerLine(body, generateWorkflowCallIdMarker(callerWorkflowId))) return true;
+  return someMarkerLine(body, trimmedLine => {
     const durableMatch = trimmedLine.match(/^\[gh-aw-workflow-call-id\]: # "([^"]+)"$/);
     if (!durableMatch) return false;
     try {
