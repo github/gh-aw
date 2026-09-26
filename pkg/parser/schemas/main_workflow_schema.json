@@ -14322,6 +14322,11 @@
               "type": "string",
               "description": "Model for this engine, overriding the top-level model. Has sensible defaults and can typically be omitted. Supports full model IDs (e.g., 'claude-3-5-sonnet-20241022', 'gpt-4'), which is useful when a nested engine (e.g. safe-outputs.threat-detection.engine) needs a different model than the main agent engine."
             },
+            "context-window": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional model context window metadata for engines that need to register explicit model catalog entries. Supported by the Pi engine when generating its AWF gateway models.json; other engines ignore it and emit a warning."
+            },
             "model-provider": {
               "type": "string",
               "enum": ["github", "anthropic", "openai"],

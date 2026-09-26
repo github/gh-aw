@@ -127,6 +127,16 @@ func TestFormal_ActiveRuleCoverageComplete(t *testing.T) {
 	}
 }
 
+func TestFormal_RepositoryDispatchAppAuthorizationRule(t *testing.T) {
+	rules := formalActiveRules(t)
+	mapping := formalComplianceMap(t)
+	tests := formalCatalogTests(t)
+
+	require.Contains(t, rules, "CTR-029")
+	require.Equal(t, "T-CTR-044", mapping["CTR-029"])
+	require.Equal(t, "CTR-029", tests["T-CTR-044"])
+}
+
 func TestFormal_EdgeCase_DuplicateTestIDViolatesBijection(t *testing.T) {
 	mapping := map[string]string{"CTR-001": "T-CTR-001", "CTR-002": "T-CTR-001"}
 	require.False(t, formalHasUniqueTestIDs(mapping))

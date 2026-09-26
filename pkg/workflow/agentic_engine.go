@@ -120,6 +120,9 @@ type EngineCapabilities struct {
 	// MaxTurns reports whether the engine supports the max-turns feature.
 	MaxTurns bool
 
+	// ContextWindow reports whether the engine supports the context-window feature.
+	ContextWindow bool
+
 	// WebSearch reports whether the engine has built-in support for the web-search tool.
 	WebSearch bool
 
@@ -762,8 +765,9 @@ func (r *EngineRegistry) GetEngineByPrefix(prefix string) (CodingAgentEngine, er
 			return 0
 		}
 	})
-	agenticEngineLog.Printf("Found %d engine candidate(s) for prefix %s, using: %s", len(candidates), prefix, candidates[0].id)
-	return candidates[0].engine, nil
+	candidate := candidates[0] //nolint:uncheckedsliceindex // The empty case returns above.
+	agenticEngineLog.Printf("Found %d engine candidate(s) for prefix %s, using: %s", len(candidates), prefix, candidate.id)
+	return candidate.engine, nil
 }
 
 // resolveStepTimeoutValue returns the timeout value string to emit on an

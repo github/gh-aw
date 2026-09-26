@@ -21,6 +21,8 @@ const (
 	repoMemoryPromptFile                    = "repo_memory_prompt.md"
 	repoMemoryPromptMultiFile               = "repo_memory_prompt_multi.md"
 	safeOutputsPromptFile                   = "safe_outputs_prompt.md"
+	safeOutputsMCPTransportPromptFile       = "safe_outputs_mcp_transport_prompt.md"
+	safeOutputsCLIOnlyTransportPromptFile   = "safe_outputs_cli_only_transport_prompt.md"
 	safeOutputsCreatePRFile                 = "safe_outputs_create_pull_request.md"
 	safeOutputsSteeringIssueFile            = "safe_outputs_steering_issue.md"
 	safeOutputsPushToBranchFile             = "safe_outputs_push_to_pr_branch.md"
