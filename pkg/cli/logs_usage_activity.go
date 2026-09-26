@@ -82,6 +82,8 @@ type usageActivityGateway struct {
 	FailedCalls     int                          `json:"failed_calls"`
 	TotalInputSize  int                          `json:"total_input_size"`
 	TotalOutputSize int                          `json:"total_output_size"`
+	AvgInputSize    int                          `json:"avg_input_size"`
+	AvgOutputSize   int                          `json:"avg_output_size"`
 	MaxInputSize    int                          `json:"max_input_size"`
 	MaxOutputSize   int                          `json:"max_output_size"`
 	Servers         []usageActivityGatewayServer `json:"servers,omitempty"`
@@ -107,6 +109,10 @@ type usageActivityGatewayServer struct {
 	FailedCalls     int     `json:"failed_calls"`
 	TotalInputSize  int     `json:"total_input_size"`
 	TotalOutputSize int     `json:"total_output_size"`
+	AvgInputSize    int     `json:"avg_input_size"`
+	AvgOutputSize   int     `json:"avg_output_size"`
+	MaxInputSize    int     `json:"max_input_size"`
+	MaxOutputSize   int     `json:"max_output_size"`
 	AvgDurationMS   float64 `json:"avg_duration_ms"`
 }
 
@@ -117,6 +123,8 @@ type usageActivityGatewayTool struct {
 	FailedCalls     int     `json:"failed_calls"`
 	TotalInputSize  int     `json:"total_input_size"`
 	TotalOutputSize int     `json:"total_output_size"`
+	AvgInputSize    int     `json:"avg_input_size"`
+	AvgOutputSize   int     `json:"avg_output_size"`
 	MaxInputSize    int     `json:"max_input_size"`
 	MaxOutputSize   int     `json:"max_output_size"`
 	AvgDurationMS   float64 `json:"avg_duration_ms"`
@@ -308,20 +316,24 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 		for _, tool := range gateway.Tools {
 			activityTools[tool.ServerName+":"+tool.ToolName] = tool
 		}
-		for index := range usage.Summary {
-			tool := &usage.Summary[index]
+		summaries := make([]MCPToolSummary, 0, len(usage.Summary))
+		for _, summary := range usage.Summary {
+			tool := &summary
 			tool.syncFieldsFromBase()
 			if activity, ok := activityTools[tool.ServerName+":"+tool.ToolName]; ok {
 				backfillUsageActivityToolMetrics(tool, activity)
 			}
+			summaries = append(summaries, *tool)
 		}
+		usage.Summary = summaries
 
 		activityServers := make(map[string]usageActivityGatewayServer, len(gateway.Servers))
 		for _, server := range gateway.Servers {
 			activityServers[server.ServerName] = server
 		}
-		for index := range usage.Servers {
-			server := &usage.Servers[index]
+		servers := make([]MCPServerStats, 0, len(usage.Servers))
+		for _, serverStats := range usage.Servers {
+			server := &serverStats
 			if activity, ok := activityServers[server.ServerName]; ok {
 				if server.TotalInputSize == 0 {
 					server.TotalInputSize = activity.TotalInputSize
@@ -329,11 +341,25 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 				if server.TotalOutputSize == 0 {
 					server.TotalOutputSize = activity.TotalOutputSize
 				}
+				if server.AvgInputSize == 0 {
+					server.AvgInputSize = activity.AvgInputSize
+				}
+				if server.AvgOutputSize == 0 {
+					server.AvgOutputSize = activity.AvgOutputSize
+				}
+				if server.MaxInputSize == 0 {
+					server.MaxInputSize = activity.MaxInputSize
+				}
+				if server.MaxOutputSize == 0 {
+					server.MaxOutputSize = activity.MaxOutputSize
+				}
 				if server.AvgDuration == "" {
 					server.AvgDuration = formatActivityDuration(activity.AvgDurationMS)
 				}
 			}
+			servers = append(servers, *server)
 		}
+		usage.Servers = servers
 	}
 	if usage.Integrity == nil && len(usage.FilteredEvents) == 0 && integritySummary != nil {
 		usage.Integrity = cloneIntegrityFilterSummary(integritySummary)
@@ -367,6 +393,12 @@ func backfillUsageActivityToolMetrics(tool *MCPToolSummary, activity usageActivi
 	if tool.TotalOutputSize == 0 {
 		tool.TotalOutputSize = activity.TotalOutputSize
 	}
+	if tool.AvgInputSize == 0 {
+		tool.AvgInputSize = activity.AvgInputSize
+	}
+	if tool.AvgOutputSize == 0 {
+		tool.AvgOutputSize = activity.AvgOutputSize
+	}
 	if tool.MaxInputSize == 0 {
 		tool.MaxInputSize = activity.MaxInputSize
 	}
@@ -397,12 +429,24 @@ func cloneIntegrityFilterSummary(summary *IntegrityFilterSummary) *IntegrityFilt
 func buildUsageActivityTools(activityTools []usageActivityGatewayTool) []MCPToolSummary {
 	tools := make([]MCPToolSummary, 0, len(activityTools))
 	for _, tool := range activityTools {
+		avgInputSize := tool.AvgInputSize
+		avgOutputSize := tool.AvgOutputSize
+		if tool.CallCount > 0 {
+			if avgInputSize == 0 {
+				avgInputSize = tool.TotalInputSize / tool.CallCount
+			}
+			if avgOutputSize == 0 {
+				avgOutputSize = tool.TotalOutputSize / tool.CallCount
+			}
+		}
 		toolSummary := MCPToolSummary{
 			ServerName:      tool.ServerName,
 			ToolName:        tool.ToolName,
 			CallCount:       tool.CallCount,
 			TotalInputSize:  tool.TotalInputSize,
 			TotalOutputSize: tool.TotalOutputSize,
+			AvgInputSize:    avgInputSize,
+			AvgOutputSize:   avgOutputSize,
 			MaxInputSize:    tool.MaxInputSize,
 			MaxOutputSize:   tool.MaxOutputSize,
 			AvgDuration:     formatActivityDuration(tool.AvgDurationMS),
@@ -422,6 +466,16 @@ func buildUsageActivityServers(activityServers []usageActivityGatewayServer) []M
 		if requestCount == 0 {
 			requestCount = server.ToolCallCount
 		}
+		avgInputSize := server.AvgInputSize
+		avgOutputSize := server.AvgOutputSize
+		if server.ToolCallCount > 0 {
+			if avgInputSize == 0 {
+				avgInputSize = server.TotalInputSize / server.ToolCallCount
+			}
+			if avgOutputSize == 0 {
+				avgOutputSize = server.TotalOutputSize / server.ToolCallCount
+			}
+		}
 		servers = append(servers, MCPServerStats{
 			MCPServerStatsBase: MCPServerStatsBase{
 				ServerName:    server.ServerName,
@@ -431,6 +485,10 @@ func buildUsageActivityServers(activityServers []usageActivityGatewayServer) []M
 			RequestCount:    requestCount,
 			TotalInputSize:  server.TotalInputSize,
 			TotalOutputSize: server.TotalOutputSize,
+			AvgInputSize:    avgInputSize,
+			AvgOutputSize:   avgOutputSize,
+			MaxInputSize:    server.MaxInputSize,
+			MaxOutputSize:   server.MaxOutputSize,
 			AvgDuration:     formatActivityDuration(server.AvgDurationMS),
 		})
 	}

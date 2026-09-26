@@ -39,9 +39,7 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to load usage activity summary for run %d: %v", run.DatabaseID, usageErr)))
 	}
 	if usageSummary != nil {
-		results.workingSet = usageSummary.WorkingSet
-		results.friction = usageSummary.Friction
-		applyUsageActivitySteeringSummary(usageSummary.Steering, &results.tokenUsageSummary)
+		applyUsageSummaryToAuditResults(usageSummary, &results)
 	}
 	// Historical runs predate precomputed friction: derive the observable subset
 	// from raw logs so audit output stays useful without rewriting history.
@@ -53,6 +51,15 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 		results.friction = deriveFrictionFromLogs(results.mcpToolUsage, session)
 	}
 	return results, nil
+}
+
+func applyUsageSummaryToAuditResults(summary *usageActivitySummary, results *auditAnalysisResults) {
+	results.workingSet = summary.WorkingSet
+	results.friction = summary.Friction
+	applyUsageActivitySteeringSummary(summary.Steering, &results.tokenUsageSummary)
+	usageResult := &DownloadResult{RunAnalysis: RunAnalysis{MCPToolUsage: results.mcpToolUsage}}
+	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, usageResult)
+	results.mcpToolUsage = usageResult.MCPToolUsage
 }
 
 // launchCoreAuditAnalyses exclusively writes missingTools, missingData, noops, mcpFailures, and accessAnalysis.
