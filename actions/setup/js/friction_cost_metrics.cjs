@@ -893,6 +893,8 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     eventRecords.push(eventRecord);
   }
 
+  // Every token contribution to the totals is also represented by an event record,
+  // including suppressed events; this list is complete even when output events truncate.
   roundAttributedTokens(eventRecords, totalCost, driverTotals);
 
   /** @type {Record<string, string>} */

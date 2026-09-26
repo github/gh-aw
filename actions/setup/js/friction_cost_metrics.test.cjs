@@ -451,11 +451,16 @@ describe("event listing limits", () => {
     for (let index = 0; index < MAX_FRICTION_EVENTS + 5; index += 1) {
       requestsByDomain[`domain-${String(index).padStart(4, "0")}.example`] = { allowed: 0, blocked: 1 };
     }
-    const { friction } = computeFrictionCost({ firewall: { requests_by_domain: requestsByDomain } });
+    const { friction } = computeFrictionCost({
+      firewall: { requests_by_domain: requestsByDomain },
+      tokenUsageContent: jsonl([invocation("2026-01-01T00:00:01Z", 0.5)]),
+    });
     expect(friction.total_events).toBe(MAX_FRICTION_EVENTS + 5);
     expect(friction.events).toHaveLength(MAX_FRICTION_EVENTS);
     expect(friction.events_truncated).toBe(true);
     expect(friction.total_occurrences).toBe(MAX_FRICTION_EVENTS + 5);
+    expect(friction.cost.tokens.input).toBe((MAX_FRICTION_EVENTS + 5) * 100);
+    expect(friction.events.reduce((sum, event) => sum + event.cost.tokens.input, 0)).toBe(MAX_FRICTION_EVENTS * 100);
   });
 });
 
