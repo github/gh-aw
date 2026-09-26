@@ -37,6 +37,7 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 	return usage
 }
 
+// roundPayloadAverage matches the JavaScript usage artifact producer's Math.round semantics.
 func roundPayloadAverage(total, count int) int {
 	if count <= 0 {
 		return 0
