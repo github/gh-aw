@@ -419,6 +419,8 @@ The `friction` section contains the precomputed friction cost for tool calls tha
 
 AI credits (`aic`) are the canonical unit. Every other dimension — token classes, turns, tool calls, and latency — is reported only for drivers that support it, and `unsupported` is stated explicitly rather than reported as zero.
 
+Statistical token estimates retain fractional precision across attributed occurrences, then emit integer token counts with deterministic remainder distribution across event records.
+
 #### Attribution states
 
 | State | Meaning |

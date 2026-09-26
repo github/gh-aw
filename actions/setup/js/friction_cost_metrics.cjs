@@ -119,6 +119,39 @@ function addTokens(target, addition) {
 }
 
 /**
+ * Round fractional statistical token estimates after attribution, distributing
+ * remainder tokens deterministically so event and aggregate totals stay aligned.
+ *
+ * @param {Array<Record<string, any>>} eventRecords
+ * @param {Record<string, any>} totalCost
+ * @param {Map<string, Record<string, any>>} driverTotals
+ */
+function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
+  for (const tokenClass of TOKEN_CLASSES) {
+    const exactValues = eventRecords.map(event => event.cost.tokens[tokenClass]);
+    const roundedValues = exactValues.map(Math.floor);
+    let remainder = Math.round(exactValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
+    const fractions = exactValues.map((value, index) => ({ index, fraction: value - roundedValues[index] })).sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+    for (let index = 0; index < remainder; index += 1) {
+      roundedValues[fractions[index].index] += 1;
+    }
+    eventRecords.forEach((event, index) => {
+      event.cost.tokens[tokenClass] = roundedValues[index];
+    });
+  }
+
+  totalCost.tokens = emptyTokens();
+  for (const driver of driverTotals.values()) {
+    driver.cost.tokens = emptyTokens();
+  }
+  for (const event of eventRecords) {
+    event.cost.tokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + event.cost.tokens[tokenClass], 0);
+    addTokens(totalCost.tokens, event.cost.tokens);
+    addTokens(driverTotals.get(event.driver).cost.tokens, event.cost.tokens);
+  }
+}
+
+/**
  * @param {unknown} value
  * @returns {number}
  */
@@ -297,7 +330,7 @@ function computeBaselineStats(invocations) {
   const meanTokens = emptyTokens();
   if (healthy.length > 0) {
     for (const tokenClass of TOKEN_CLASSES) {
-      meanTokens[tokenClass] = Math.round(healthy.reduce((sum, invocation) => sum + invocation.tokens[tokenClass], 0) / healthy.length);
+      meanTokens[tokenClass] = healthy.reduce((sum, invocation) => sum + invocation.tokens[tokenClass], 0) / healthy.length;
     }
     meanTokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + meanTokens[tokenClass], 0);
   }
@@ -854,6 +887,8 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     }
     eventRecords.push(eventRecord);
   }
+
+  roundAttributedTokens(eventRecords, totalCost, driverTotals);
 
   /** @type {Record<string, string>} */
   const aggregateStates = {};

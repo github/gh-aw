@@ -304,6 +304,25 @@ describe("unavailable friction", () => {
     expect(friction.cost.tokens.total).toBe(["input", "output", "cache_read", "cache_write", "reasoning"].reduce((sum, key) => sum + friction.cost.tokens[key], 0));
   });
 
+  it("preserves fractional token estimates across many statistically attributed events", () => {
+    const requestsByDomain = {};
+    for (let index = 0; index < 100; index += 1) {
+      requestsByDomain[`domain-${String(index).padStart(3, "0")}.example`] = { blocked: 1 };
+    }
+    const healthyInvocations = [
+      invocation("2026-01-01T00:00:01Z", 0.1, { input_tokens: 0 }),
+      invocation("2026-01-01T00:00:02Z", 0.1, { input_tokens: 0 }),
+      invocation("2026-01-01T00:00:03Z", 0.1, { input_tokens: 0 }),
+      invocation("2026-01-01T00:00:04Z", 0.1, { input_tokens: 0 }),
+      invocation("2026-01-01T00:00:05Z", 0.1, { input_tokens: 2 }),
+    ];
+    const { friction } = computeFrictionCost({ firewall: { requests_by_domain: requestsByDomain }, tokenUsageContent: jsonl(healthyInvocations) });
+    const eventInputTotal = friction.events.reduce((sum, event) => sum + event.cost.tokens.input, 0);
+    expect(friction.cost.tokens.input).toBe(40);
+    expect(eventInputTotal).toBe(40);
+    expect(friction.drivers[0].cost.tokens.input).toBe(40);
+  });
+
   it("includes unavailable counted events in aggregate measurement states", () => {
     const { friction } = computeFrictionCost({
       firewall: { requests_by_domain: { "blocked.example": { blocked: 3 } } },
