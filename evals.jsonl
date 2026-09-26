@@ -112,3 +112,6 @@
 {"id":"assignment-made","question":"Did the agent assign one or more unassigned issues to a user, or correctly call noop when no unassigned issues were found?","answer":"YES","model":"evals","timestamp":"2026-09-25T06:02:01.208Z","runid":"36100356278"}
 {"id":"contributor-selected","question":"Does the agent output show that a relevant contributor was selected from recent merged PRs?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-25T06:02:01.208Z","runid":"36100356278"}
 {"id":"comment-posted","question":"Did the agent post a comment explaining the assignment decision?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-25T06:02:01.208Z","runid":"36100356278"}
+{"id":"assignment-made","question":"Did the agent assign one or more unassigned issues to a user, or correctly call noop when no unassigned issues were found?","answer":"YES","model":"evals","timestamp":"2026-09-26T06:00:07.954Z","runid":"36221997638"}
+{"id":"contributor-selected","question":"Does the agent output show that a relevant contributor was selected from recent merged PRs?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-26T06:00:07.954Z","runid":"36221997638"}
+{"id":"comment-posted","question":"Did the agent post a comment explaining the assignment decision?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-26T06:00:07.954Z","runid":"36221997638"}
