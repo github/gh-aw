@@ -129,13 +129,15 @@ function addTokens(target, addition) {
 function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
   for (const tokenClass of TOKEN_CLASSES) {
     const exactValues = eventRecords.map(event => event.cost.tokens[tokenClass]);
-    const roundedValues = exactValues.map(Math.floor);
-    const remainder = Math.round(exactValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
-    const fractions = exactValues
-      .map((value, index) => ({ index, fraction: value - roundedValues[index] }))
-      .filter(entry => entry.fraction > Number.EPSILON)
-      .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
-    for (let index = 0; index < Math.min(remainder, fractions.length); index += 1) {
+    const normalizedValues = exactValues.map(value => {
+      const nearestInteger = Math.round(value);
+      const tolerance = Number.EPSILON * Math.max(1, Math.abs(value)) * 4;
+      return Math.abs(value - nearestInteger) <= tolerance ? nearestInteger : value;
+    });
+    const roundedValues = normalizedValues.map(Math.floor);
+    const remainder = Math.round(normalizedValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
+    const fractions = normalizedValues.map((value, index) => ({ index, fraction: value - roundedValues[index] })).sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+    for (let index = 0; index < remainder; index += 1) {
       roundedValues[fractions[index].index] += 1;
     }
     eventRecords.forEach((event, index) => {
