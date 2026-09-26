@@ -29,7 +29,6 @@ imports:
 tools:
   cli-proxy: true
   playwright:
-  web-fetch:
   bash:
     - "curl*"
     - "cat*"
@@ -80,7 +79,7 @@ Proceed with the full list of editors discovered in this step.
 
 For each editor discovered in Step 0, verify that its URL is reachable:
 
-1. Use `web_fetch` (or `curl -sS -o /dev/null -w "%{http_code}" <url>`) to perform an HTTP GET request.
+1. Use `curl -sS -o /dev/null -w "%{http_code}" <url>` to perform an HTTP GET request.
 2. Record the HTTP status code for each URL.
 3. A status code of **200** means the editor is available.
 4. Any other status code (or a connection error) means the editor is unavailable.

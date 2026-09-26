@@ -68,15 +68,16 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	hasUnrestrictedBash := false
 
 	// Check if bash has wildcard - if so, use --allow-all-tools in CLI mode.
-	// SDK mode must keep shell permission scoped because its explicit session
-	// catalog can contain non-shell tools that wildcard bash must not authorize.
+	// SDK mode and restricted-network workflows must keep shell permission scoped
+	// because --allow-all-tools would also authorize hosted web tools.
 	if bashConfig, hasBash := tools["bash"]; hasBash {
 		if bashCommands, ok := bashConfig.([]any); ok {
 			// Check for :* or * wildcard - if present, allow all tools
 			for _, cmd := range bashCommands {
 				if cmdStr, ok := cmd.(string); ok {
 					if cmdStr == ":*" || cmdStr == "*" {
-						if copilotNeedsBuiltinMCPs(workflowData) || isCopilotSDKMode(workflowData) {
+						if copilotNeedsBuiltinMCPs(workflowData) || isCopilotSDKMode(workflowData) ||
+							(workflowData != nil && hasNetworkRestrictions(workflowData.NetworkPermissions)) {
 							hasUnrestrictedBash = true
 							break
 						}
