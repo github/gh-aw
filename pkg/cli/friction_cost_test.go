@@ -193,6 +193,11 @@ func TestHistoricalFrictionFallbackUsesAvailableUsageAndLogs(t *testing.T) {
 	if !backfillCacheHitIfNeeded(result, t.TempDir(), false) || result.Friction == nil || !result.Friction.Derived {
 		t.Fatalf("expected no-summary cache fallback, got %+v", result.Friction)
 	}
+
+	result = &DownloadResult{RunAnalysis: RunAnalysis{MCPToolUsage: &MCPToolUsageData{}}}
+	if backfillCacheHitIfNeeded(result, t.TempDir(), false) || result.Friction != nil {
+		t.Fatalf("empty cache activity should not create friction or trigger backfill: %+v", result.Friction)
+	}
 }
 
 func TestDeriveFrictionFromLogsDeduplicatesSessionFailures(t *testing.T) {

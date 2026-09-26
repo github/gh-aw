@@ -370,6 +370,14 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	return summary
 }
 
+func deriveFrictionFallback(mcpUsage *MCPToolUsageData, session *usageActivitySession) *FrictionCostSummary {
+	summary := deriveFrictionFromLogs(mcpUsage, session)
+	if summary == nil || summary.TotalOccurrences == 0 {
+		return nil
+	}
+	return summary
+}
+
 // isFrictionToolCallStatus reports whether an MCP tool call status indicates a
 // failed call.
 func isFrictionToolCallStatus(status string) bool {

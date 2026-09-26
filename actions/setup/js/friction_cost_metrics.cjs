@@ -137,7 +137,7 @@ function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
     const roundedValues = normalizedValues.map(Math.floor);
     const remainder = Math.round(normalizedValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
     const fractions = normalizedValues.map((value, index) => ({ index, fraction: value - roundedValues[index] })).sort((left, right) => right.fraction - left.fraction || left.index - right.index);
-    for (let index = 0; index < remainder; index += 1) {
+    for (let index = 0; index < Math.min(remainder, fractions.length); index += 1) {
       roundedValues[fractions[index].index] += 1;
     }
     eventRecords.forEach((event, index) => {
@@ -152,7 +152,11 @@ function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
   for (const event of eventRecords) {
     event.cost.tokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + event.cost.tokens[tokenClass], 0);
     addTokens(totalCost.tokens, event.cost.tokens);
-    addTokens(driverTotals.get(event.driver).cost.tokens, event.cost.tokens);
+    const driver = driverTotals.get(event.driver);
+    if (!driver) {
+      throw new Error(`missing friction driver total for ${event.driver}`);
+    }
+    addTokens(driver.cost.tokens, event.cost.tokens);
   }
 }
 

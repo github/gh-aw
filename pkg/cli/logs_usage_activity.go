@@ -166,7 +166,7 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	}
 	if summary == nil {
 		if result.Friction == nil {
-			result.Friction = deriveFrictionFromLogs(result.MCPToolUsage, nil)
+			result.Friction = deriveFrictionFallback(result.MCPToolUsage, nil)
 		}
 		return
 	}
@@ -190,7 +190,7 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	applyUsageActivityFirewallSummary(summary.Firewall, result)
 	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
 	if result.Friction == nil {
-		result.Friction = deriveFrictionFromLogs(result.MCPToolUsage, summary.Session)
+		result.Friction = deriveFrictionFallback(result.MCPToolUsage, summary.Session)
 	}
 
 	// Backfill safe output item count from usage summary when the safe-outputs-items
