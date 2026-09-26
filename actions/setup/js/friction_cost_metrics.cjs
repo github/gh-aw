@@ -130,9 +130,12 @@ function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
   for (const tokenClass of TOKEN_CLASSES) {
     const exactValues = eventRecords.map(event => event.cost.tokens[tokenClass]);
     const roundedValues = exactValues.map(Math.floor);
-    let remainder = Math.round(exactValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
-    const fractions = exactValues.map((value, index) => ({ index, fraction: value - roundedValues[index] })).sort((left, right) => right.fraction - left.fraction || left.index - right.index);
-    for (let index = 0; index < remainder; index += 1) {
+    const remainder = Math.round(exactValues.reduce((sum, value) => sum + value, 0)) - roundedValues.reduce((sum, value) => sum + value, 0);
+    const fractions = exactValues
+      .map((value, index) => ({ index, fraction: value - roundedValues[index] }))
+      .filter(entry => entry.fraction > Number.EPSILON)
+      .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+    for (let index = 0; index < Math.min(remainder, fractions.length); index += 1) {
       roundedValues[fractions[index].index] += 1;
     }
     eventRecords.forEach((event, index) => {
