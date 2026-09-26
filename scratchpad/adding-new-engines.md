@@ -883,7 +883,7 @@ myEngineLog.Print("Adding MCP configuration")
 
 ### 2. Error Handling
 
-Return helpful error messages with context and documentation links:
+Return error messages with context and documentation links:
 
 ```go
 return fmt.Errorf("engine configuration error: %w\n\nSee: %s", err, constants.DocsEnginesURL)
