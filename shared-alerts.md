@@ -258,3 +258,18 @@
   self-expiring via `expires: 1d` before anyone acts. Suggest either a longer expiry for
   `priority-p1`/`type-failure` trackers, or wiring Copilot-assignment to consume the exact diffs
   already provided in these issues instead of re-diagnosing each cycle.
+
+## Update — 2026-09-26T12:52Z (Agent Performance Analyzer)
+- **3rd self-expiry cycle confirmed for the same 3 root causes.** `#63348` (successor to `#63098`)
+  also self-expired `not_planned` on 2026-09-26T06:52:59Z without a fix landing. Current live
+  tracker is **`#63556`** (open, filed 2026-09-26T04:47Z by Workflow Health Manager) — treat this
+  as the authoritative open reference going forward; do not cite `#63098` or `#63348` as open
+  (both closed, not_planned).
+- Confirmed via `search_pull_requests` that no merged PR exists for any of the 3 files
+  (`avenger.md`, `metrics-collector.md`, `gpclean.md`). The only related PRs are `#57946` and
+  `#58722`, both closed unmerged since 2026-09-05 — their diffs remain directly applicable today.
+- Filed the weekly Agent Performance Report discussion recommending: (1) apply the 3 one-line
+  fixes directly, (2) exempt P0/P1 workflow-health trackers from `expires: 1d`, (3) grant a
+  meta-orchestrator `create_pull_request` capability for root-caused single-line fixes to close
+  the diagnose-but-never-convert-to-PR gap.
+- `metrics/latest.json` still stale at 2026-09-01 (25 days, 15th consecutive affected run).

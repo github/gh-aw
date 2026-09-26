@@ -320,3 +320,39 @@ flakiness. See shared-alerts.md for full correction.
   existing convention — consolidated into the new tracking issue instead).
 
 > Last updated: 2026-09-12T12:48Z
+
+---
+
+# Agent Performance Analyzer — Latest Run (2026-09-26T12:52Z)
+
+## Summary
+
+Full agent quality/effectiveness ranking deferred a **15th consecutive run** — `metrics/latest.json`
+remains dated 2026-09-01 (25 days stale). Independently re-verified (direct file reads) that all 3
+root causes are still unfixed: `avenger.md:42` still mounts `/usr/local/bin/npm` as a bind-mount
+symlink, `metrics-collector.md`'s `engine:` block still lacks `model-provider: github` (confirmed
+against working siblings `daily-go-test-parallelizer.md` and `api-consumption-report.md`), and
+`gpclean.md:61` still hardcodes retired `openai/gpt-5-codex`. Confirmed via `issue_read` that
+`#63348` (successor to `#63098`) also self-expired `not_planned` on 2026-09-26T06:52:59Z — this is
+now a **3rd self-expiry cycle** for the identical findings. The current live tracker is `#63556`
+(open, filed 2026-09-26T04:47Z). Searched `search_pull_requests` for any PR touching the 3 files;
+found only 2 closed-unmerged PRs from 2026-09-05 (`#57946`, `#58722`) whose diffs remain applicable
+but were never merged — confirming the diagnose-but-never-convert-to-PR gap first flagged last run
+is systemic, not a one-off. Created the weekly Agent Performance Report discussion documenting the
+3-cycle timeline and recommending (1) applying the 3 one-line fixes directly, (2) exempting P0/P1
+workflow-health trackers from `expires: 1d`, and (3) giving a meta-orchestrator direct
+`create_pull_request` capability for root-caused single-line fixes.
+
+## Actions Taken This Run
+
+- Directly re-read `metrics-collector.md`, `avenger.md`, `gpclean.md` and diffed against 2 working
+  sibling workflows to independently confirm all 3 root causes remain unfixed.
+- Confirmed via `issue_read` that `#63098` and `#63348` both closed `not_planned` (auto-expiry, not
+  fixes), and identified `#63556` as the current open successor tracker.
+- Searched for merged/closed PRs touching the 3 files; found 2 unmerged closed PRs (`#57946`,
+  `#58722`) from 2026-09-05 whose diffs remain applicable but were never merged.
+- Created the weekly Agent Performance Report discussion (2026-09-26) with a root-cause
+  verification table, a 3-cycle self-expiry timeline, and prioritized recommendations.
+- Full agent quality/effectiveness ranking remains blocked pending the Metrics Collector fix.
+
+> Last updated: 2026-09-26T12:52Z
