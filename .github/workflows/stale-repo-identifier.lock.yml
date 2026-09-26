@@ -74,7 +74,7 @@
 name: "Stale Repository Identifier"
 on:
   schedule:
-    - cron: "15 9 1 * *"  # Friendly format: weekly (scattered)
+    - cron: "15 9 1 * *"
   workflow_dispatch:
     inputs:
       aw_context:

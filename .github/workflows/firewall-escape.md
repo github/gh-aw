@@ -63,7 +63,6 @@ tools:
     max-file-size: 524288  # 512KB
     max-file-count: 50
   bash: [":*"]
-  web-fetch:
 
 jobs:
   post-issue:
