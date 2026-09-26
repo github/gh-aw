@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -137,11 +138,11 @@ engine: copilot
 	require.NoError(t, err, "failed to read generated lock file")
 
 	activationJobSection := extractJobSection(string(lockContent), string(constants.ActivationJobName))
-	assert.Contains(t, activationJobSection, "Add eyes reaction for immediate feedback", "activation job should include reaction step")
-	assert.Contains(t, activationJobSection, "github.event_name == 'issues'", "reaction condition should still include issues when reaction.issues is enabled")
-	assert.Contains(t, activationJobSection, "github.event_name == 'discussion'", "reaction condition should still include discussions when reaction.discussions is enabled")
-	assert.NotContains(t, activationJobSection, "github.event_name == 'pull_request'", "reaction condition should exclude pull_request when reaction.pull-requests is false")
-	assert.NotContains(t, activationJobSection, "github.event_name == 'pull_request_review_comment'", "reaction condition should exclude pull_request_review_comment when reaction.pull-requests is false")
+	reactionStep := extractWorkflowStepByName(t, activationJobSection, "Add eyes reaction for immediate feedback")
+	assert.Contains(t, reactionStep, "github.event_name == 'issues'", "reaction condition should still include issues when reaction.issues is enabled")
+	assert.Contains(t, reactionStep, "github.event_name == 'discussion'", "reaction condition should still include discussions when reaction.discussions is enabled")
+	assert.NotContains(t, reactionStep, "github.event_name == 'pull_request'", "reaction condition should exclude pull_request when reaction.pull-requests is false")
+	assert.NotContains(t, reactionStep, "github.event_name == 'pull_request_review_comment'", "reaction condition should exclude pull_request_review_comment when reaction.pull-requests is false")
 	assert.NotContains(t, activationJobSection, "issues: write", "activation job should not include issues: write when pull request reactions are disabled")
 	assert.NotContains(t, activationJobSection, "pull-requests: write", "activation job should not include pull-requests: write when pull request reactions are disabled")
 	assert.NotContains(t, activationJobSection, "discussions: write", "activation job should not include discussions: write when no discussion triggers are configured")
@@ -362,9 +363,23 @@ engine: copilot
 	activationJobSection := extractJobSection(string(lockContent), string(constants.ActivationJobName))
 	assert.Contains(t, activationJobSection, "issues: write", "activation job should include issues: write for issue status comments")
 	assert.NotContains(t, activationJobSection, "pull-requests: write", "activation job should not include pull-requests: write when reactions are disabled")
-	assert.Contains(t, activationJobSection, "github.event_name == 'issues'", "status comment condition should include issue events")
-	assert.Contains(t, activationJobSection, "github.event_name == 'issue_comment'", "status comment condition should include issue_comment events")
-	assert.NotContains(t, activationJobSection, "github.event_name == 'pull_request_review_comment'", "status comment condition should not include pull_request_review_comment when status-comment.pull-requests is false")
+	statusCommentStep := extractActivationStepByName(t, activationJobSection, "Add comment with workflow run link")
+	assert.Contains(t, statusCommentStep, "github.event_name == 'issues'", "status comment condition should include issue events")
+	assert.Contains(t, statusCommentStep, "github.event_name == 'issue_comment'", "status comment condition should include issue_comment events")
+	assert.NotContains(t, statusCommentStep, "github.event_name == 'pull_request_review_comment'", "status comment condition should not include pull_request_review_comment when status-comment.pull-requests is false")
+}
+
+func extractActivationStepByName(t *testing.T, activationJobSection, stepName string) string {
+	t.Helper()
+
+	start := strings.Index(activationJobSection, "- name: "+stepName)
+	require.NotEqualf(t, -1, start, "activation job should include step %q", stepName)
+
+	step := activationJobSection[start:]
+	if next := strings.Index(step[len("- name: "+stepName):], "\n      - name: "); next != -1 {
+		step = step[:len("- name: "+stepName)+next]
+	}
+	return step
 }
 
 func TestAddActivationInteractionPermissionsMapFallbackRespectsStatusCommentPullRequestsToggle(t *testing.T) {

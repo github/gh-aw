@@ -291,7 +291,7 @@ The design supports future MCP servers (Jira, WorkIQ) through:
 
 ## Error Messages
 
-The implementation provides clear, actionable error messages:
+The implementation returns error messages that identify the invalid field, the invalid value, and the expected format:
 
 ```
 invalid guard policy: repository pattern 'Owner/Repo' must be lowercase
@@ -401,7 +401,7 @@ tools:
 2. **Compliance**: Enforce minimum min-integrity requirements
 3. **Flexibility**: Support diverse repository patterns and wildcards
 4. **Extensibility**: Supports adding policies for Jira, WorkIQ, etc.
-5. **Clarity**: Clear error messages and validation
+5. **Error reporting**: Error messages identify the invalid field and value
 6. **Documentation**: Self-documenting through type system
 
 ## Resolved Decisions
@@ -411,7 +411,7 @@ tools:
 1. **Should we support negative patterns (e.g., exclude certain repos)?**
 
    **Decision**: No, negative patterns (e.g., `!owner/repo`) are **not supported** in the initial implementation.
-   *Rationale*: Negative patterns introduce ordering complexity and ambiguity when combined with wildcard rules (e.g., `"owner/*"` and `"!owner/private-repo"` create a subtraction model that is hard to reason about safely). The preferred approach is to use an explicit allowlist — specify only what is permitted rather than excluding items from a broader grant. If a workflow requires fine-grained exclusions, it SHOULD use a narrower `allowed-repos` pattern. Negative patterns may be revisited in a future version if a clear security use-case emerges.
+   *Rationale*: Negative patterns introduce ordering complexity and ambiguity when combined with wildcard rules (e.g., `"owner/*"` and `"!owner/private-repo"` create a subtraction model that is hard to reason about safely). The preferred approach is to use an explicit allowlist — specify only what is permitted rather than excluding items from a broader grant. If a workflow requires fine-grained exclusions, it SHOULD use a narrower `allowed-repos` pattern. Negative patterns may be revisited in a future version if a documented security requirement emerges.
 
 2. **Should we support combining multiple policies (AND/OR logic)?**
 
@@ -434,7 +434,7 @@ This implementation covers guard policies in the MCP gateway. The design is:
 - **Type-safe**: Strongly-typed structs with validation
 - **Extensible**: New servers and policy types can be added without structural changes
 - **Consistent syntax**: Follows existing frontmatter conventions
-- **Well-validated**: Validation with clear error messages
+- **Validation**: Enforces field-level checks and returns error messages naming the invalid field and value
 - **Forward-compatible**: Supports future enhancements
 
 The implementation follows established patterns in the codebase and integrates with the existing compilation and validation infrastructure.
