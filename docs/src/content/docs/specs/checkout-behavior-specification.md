@@ -9,11 +9,7 @@ sidebar:
 
 **Version**: 1.3.0<br>
 **Status**: Working Draft  
-<<<<<<< HEAD
-**Publication Date**: 2026-09-25<br>
-=======
 **Publication Date**: 2026-09-26<br>
->>>>>>> origin/main
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -327,15 +323,12 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-014**: Checkout-manifest path resolution MUST reject paths that are absolute (e.g., `/etc/passwd`) or escape the workspace root (e.g., `../../sensitive`); rejected paths MUST produce an error and MUST NOT be used for checkout or file lookup
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
 - **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
-<<<<<<< HEAD
-- **T-CHK-017**: Dynamic checkout compilation requires `allowed-repos`, rejects expressions referencing `steps.*`, and rejects/warns on expressions referencing `secrets.*` directly (strict vs. non-strict mode)
-- **T-CHK-018**: Dynamic checkout runtime rejects repositories not present in the resolved `allowed-repos` set, rejects duplicate checkout paths, and rejects unsupported entry fields
-- **T-CHK-019**: Dynamic checkout runtime rejects checkout paths that are absolute, escape the workspace, or resolve through a symbolic link (including the checkout target itself, whether pre-existing or a dangling symlink)
-- **T-CHK-020**: Dynamic checkout runtime passes `ref` and sparse-checkout patterns to `git` after an option-terminator (`--`), and disables Git LFS smudging except in the explicit `lfs: true` pull step
-- **T-CHK-021**: Dynamic checkout entries are merged into the same checkout-manifest file as static cross-repo checkouts, and agent-job dynamic checkouts leave no persisted git credential after checkout completes
-=======
 - **T-CHK-017**: Activation sparse checkout pins supported pull-request events to the base SHA, retains non-PR and `workflow_call` fallback refs, excludes `pull_request_target`, and preserves the same-repo guard for optional App token fallback
->>>>>>> origin/main
+- **T-CHK-018**: Dynamic checkout compilation requires `allowed-repos`, rejects expressions referencing `steps.*`, and rejects/warns on expressions referencing `secrets.*` directly (strict vs. non-strict mode)
+- **T-CHK-019**: Dynamic checkout runtime rejects repositories not present in the resolved `allowed-repos` set, rejects duplicate checkout paths, and rejects unsupported entry fields
+- **T-CHK-020**: Dynamic checkout runtime rejects checkout paths that are absolute, escape the workspace, or resolve through a symbolic link (including the checkout target itself, whether pre-existing or a dangling symlink)
+- **T-CHK-021**: Dynamic checkout runtime passes `ref` and sparse-checkout patterns to `git` after an option-terminator (`--`), and disables Git LFS smudging except in the explicit `lfs: true` pull step
+- **T-CHK-022**: Dynamic checkout entries are merged into the same checkout-manifest file as static cross-repo checkouts, and agent-job dynamic checkouts leave no persisted git credential after checkout completes
 
 ### 7.2 Compliance Checklist
 
@@ -352,15 +345,12 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout-manifest path-escape rejection | T-CHK-014 | C2 | Required |
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
 | Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
-<<<<<<< HEAD
-| Dynamic checkout compile-time validation (`allowed-repos`, `steps.*`, `secrets.*`) | T-CHK-017 | C1 | Required |
-| Dynamic checkout runtime allowlist, duplicate-path, and field validation | T-CHK-018 | C2 | Required |
-| Dynamic checkout path/symlink workspace-escape rejection | T-CHK-019 | C2 | Required |
-| Dynamic checkout git argument hardening and LFS smudge suppression | T-CHK-020 | C2 | Required |
-| Dynamic checkout manifest merge and credential lifecycle | T-CHK-021 | C1/C2 | Required |
-=======
 | Activation checkout ref and fallback provenance | T-CHK-017 | C1 | Required |
->>>>>>> origin/main
+| Dynamic checkout compile-time validation (`allowed-repos`, `steps.*`, `secrets.*`) | T-CHK-018 | C1 | Required |
+| Dynamic checkout runtime allowlist, duplicate-path, and field validation | T-CHK-019 | C2 | Required |
+| Dynamic checkout path/symlink workspace-escape rejection | T-CHK-020 | C2 | Required |
+| Dynamic checkout git argument hardening and LFS smudge suppression | T-CHK-021 | C2 | Required |
+| Dynamic checkout manifest merge and credential lifecycle | T-CHK-022 | C1/C2 | Required |
 
 ### 7.3 Safeguards
 
@@ -415,14 +405,11 @@ The following MUST-level norms govern credential and token safety during checkou
 
 ### Version 1.3.0 (Working Draft)
 
-<<<<<<< HEAD
+- Specified activation checkout base-SHA pinning, event and payload guards, and same-repository token fallback; added T-CHK-017.
 - Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
 - Renamed the dynamic checkout expression field from `checkout.dynamic` to `checkout.repos`; `checkout.dynamic` is rejected with a migration error.
-- Added T-CHK-017 through T-CHK-021 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
+- Added T-CHK-018 through T-CHK-022 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
 - Added the dynamic checkout implementation files to the §8 Normative References.
-=======
-- Specified activation checkout base-SHA pinning, event and payload guards, and same-repository token fallback; added T-CHK-017.
->>>>>>> origin/main
 
 ### Version 1.2.0 (Working Draft)
 
