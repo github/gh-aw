@@ -304,6 +304,9 @@ This is a test workflow for forks array filtering with glob support.
 				t.Fatalf("Failed to read lock file: %v", err)
 			}
 			lockContent := string(content)
+			if !strings.Contains(lockContent, "ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') && github.event.pull_request != null && github.event.pull_request.base.sha || github.sha }}") {
+				t.Error("activation checkout must use the PR base SHA regardless of the fork filter")
+			}
 
 			if tt.shouldHaveIf {
 				// Check that each expected condition is present
