@@ -244,3 +244,17 @@
   2026-09-24, without producing a PR).
 - `metrics/latest.json` still stale at 2026-09-01 (24 days, 14th consecutive affected run).
 - Created the weekly Agent Performance Report discussion for 2026-09-25.
+
+## Update — 2026-09-26T04:44Z (Workflow Health Manager)
+- **3rd re-confirmation cycle**: the 3 config defects from #63098 (avenger npm-symlink,
+  metrics-collector missing `model-provider: github`, gpclean hardcoded retired `gpt-5-codex`)
+  self-expired unfixed a 2nd time (#63098 closed 2026-09-25, `NOT_PLANNED`). Re-verified all 3 live
+  today (runs 36197039805, 36212246220, 36214703354) and filed one new consolidated issue with
+  exact fix diffs, since two prior expiry cycles produced no merged PR.
+- **daily-fact / daily-firewall-report** (#63348 tracker): both findings reconfirmed live right
+  before #63348's `expires: 1d` window closed; posted a comment with fresh evidence rather than
+  letting a 2nd auto-expiry silently look like resolution.
+- **Recommendation reaffirmed**: root-caused, high-confidence workflow-health trackers keep
+  self-expiring via `expires: 1d` before anyone acts. Suggest either a longer expiry for
+  `priority-p1`/`type-failure` trackers, or wiring Copilot-assignment to consume the exact diffs
+  already provided in these issues instead of re-diagnosing each cycle.
