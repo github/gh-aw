@@ -42,6 +42,7 @@ network:
 	workflowContent := `---
 on: issues
 engine: copilot
+strict: false
 imports:
   - shared-playwright.md
 permissions:
@@ -211,6 +212,7 @@ network:
 	workflowContent := `---
 on: issues
 engine: copilot
+strict: false
 imports:
   - shared-all.md
 permissions:

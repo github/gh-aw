@@ -274,7 +274,7 @@ network:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			frontmatter := "---\non: push\nengine: copilot"
+			frontmatter := "---\non: push\nengine: copilot\nstrict: false"
 			if tt.includeNetwork {
 				frontmatter += "\n" + tt.networkConfig
 			}
