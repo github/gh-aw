@@ -349,6 +349,8 @@ on:
 
 Omit `types:` to fire on any `event_type`.
 
+Unless `on.roles: all` is set (which disables the check entirely), the dispatch sender goes through the [role check](#filtering-by-repository-access-roles-onroles-onskip-roles). A PAT-based sender is checked against `on.roles:`; a GitHub App sender is never a repository collaborator and must be allowlisted with [`on.bots:`](#filtering-by-bot-onbots-onskip-bots).
+
 #### Sending the Dispatch Request
 
 Call the GitHub dispatch API with a `repo`-scoped PAT (classic) or a token with `contents: write` permission:
@@ -497,6 +499,8 @@ on:
 ```
 
 The `[bot]` suffix is optional — `github-actions` matches `github-actions[bot]` automatically.
+
+Allowlisted bots must be installed on the repository, which is verified through the repository collaborator API. GitHub App identities are not collaborators, so that lookup finds nothing for them. On `repository_dispatch` the check is therefore relaxed: the lookup is still performed, and an allowlisted App is authorized when it conclusively reports that the actor is not a collaborator, because sending the event already requires `contents: write` access to the repository. A lookup that fails (for example during an API outage or when rate limited) is still denied. This is how an App-triggered `repository_dispatch` is admitted — `on.roles:` is matched against repository collaborator roles and never matches an App sender.
 
 ### Filtering by Author Associations (`on.skip-author-associations`)
 

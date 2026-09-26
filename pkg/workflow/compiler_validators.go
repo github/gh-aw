@@ -469,6 +469,7 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 	}
 	c.emitSandboxRuntimeWarnings(workflowData, markdownPath)
 	c.emitPiThreatDetectionAuthWarning(workflowData, markdownPath)
+	c.emitContextWindowSupportWarning(workflowData)
 	c.emitCustomEngineThreatDetectionWarning(workflowData, markdownPath)
 	c.emitPlaywrightBrowserInstallWarning(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.AssignToAgent != nil &&

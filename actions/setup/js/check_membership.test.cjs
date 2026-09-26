@@ -1049,4 +1049,75 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
     });
   });
+
+  describe("repository_dispatch GitHub App actors", () => {
+    beforeEach(() => {
+      process.env.GH_AW_REQUIRED_ROLES = "admin,maintainer,write";
+      mockContext.eventName = "repository_dispatch";
+      mockContext.actor = "my-app[bot]";
+    });
+
+    it("should authorize an allowlisted App even when it is not listed as a collaborator", async () => {
+      // GitHub Apps are never repository collaborators, so both lookups return 404. Posting a
+      // repository_dispatch already requires contents: write, so the allowlisted App is trusted.
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const notFoundError = { status: 404, message: "Not Found" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notFoundError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("user_permission", "bot");
+    });
+
+    it("should still deny an App that is not in the allowlist", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "some-other-app";
+
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "insufficient_permissions");
+    });
+
+    it("should keep requiring installation for allowlisted bots on other events", async () => {
+      mockContext.eventName = "issues";
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const notFoundError = { status: 404, message: "Not Found" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notFoundError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+    });
+
+    it("should not authorize an allowlisted App when the installation lookup fails transiently", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const serverError = { status: 500, message: "Internal Server Error" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(serverError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+    });
+
+    it("should not authorize an allowlisted App when the lookup fails with an empty error message", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "my-app";
+
+      const emptyMessageError = { status: 500, message: "" };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(emptyMessageError);
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+    });
+  });
 });

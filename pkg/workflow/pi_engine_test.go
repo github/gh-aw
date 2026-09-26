@@ -22,6 +22,7 @@ func TestNewPiEngine(t *testing.T) {
 	assert.True(t, capabilities.ToolsAllowlist, "Pi should support tools allowlist (needed for gh-proxy/cli-proxy settings)")
 	assert.False(t, capabilities.MCP, "Pi should not support MCP directly")
 	assert.True(t, capabilities.MaxTurns, "Pi should support max turns")
+	assert.True(t, capabilities.ContextWindow, "Pi should support context-window")
 }
 
 func TestPiEngine_GetModelEnvVarName(t *testing.T) {
@@ -370,6 +371,33 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider(t *testing.T) {
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=COPILOT_GITHUB_TOKEN", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CopilotLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
+	assert.NotContains(t, stepText, "GH_AW_PI_CONTEXT_WINDOW", "Should not export context window when engine.context-window is not configured")
+}
+
+func TestPiEngine_GetExecutionSteps_FirewallContextWindow(t *testing.T) {
+	engine := NewPiEngine()
+	toolsRaw := map[string]any{
+		"github":    map[string]any{"mode": "gh-proxy"},
+		"cli-proxy": true,
+	}
+	workflowData := &WorkflowData{
+		Name:  "test-workflow",
+		Model: "copilot/custom-model",
+		EngineConfig: &EngineConfig{
+			ID:            "pi",
+			ContextWindow: 256000,
+		},
+		Tools:       toolsRaw,
+		ParsedTools: NewTools(toolsRaw),
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+	}
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1, "Should produce exactly one execution step")
+
+	stepText := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepText, "GH_AW_PI_CONTEXT_WINDOW=256000", "Should export configured context window for pi_models_json.cjs")
 }
 
 func TestPiEngine_GetExecutionSteps_FirewallAnthropicProvider(t *testing.T) {

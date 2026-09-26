@@ -269,7 +269,10 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 	}
 
 	if allowGitHubApp && githubApp != nil {
-		if githubApp.shouldIgnoreMissingKey() {
+		// The global app-token minting step is not always emitted (ignore-if-missing, or
+		// no enabled handler consuming the global app, e.g. staged safe outputs). Emit a
+		// fallback in that case so github-token never resolves to an empty value.
+		if githubApp.shouldIgnoreMissingKey() || !safeOutputsGlobalAppTokenMinted(data.SafeOutputs) {
 			fallbackToken := resolver(resolvedCustomToken)
 			*steps = append(*steps, fmt.Sprintf("          github-token: %s\n", combineTokenExpressions("${{ steps.safe-outputs-app-token.outputs.token }}", fallbackToken)))
 			return
