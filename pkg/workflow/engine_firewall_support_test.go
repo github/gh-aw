@@ -89,7 +89,7 @@ func TestCheckNetworkSupport_NoRestrictions(t *testing.T) {
 }
 
 func TestCheckNetworkSupport_WithRestrictions(t *testing.T) {
-	t.Run("copilot engine with restrictions - warning", func(t *testing.T) {
+	t.Run("copilot engine with restrictions - no warning without web tools", func(t *testing.T) {
 		compiler := NewCompiler()
 		engine := NewCopilotEngine()
 		perms := &NetworkPermissions{
@@ -101,8 +101,8 @@ func TestCheckNetworkSupport_WithRestrictions(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 		}
-		if compiler.warningCount != initialWarnings+1 {
-			t.Error("Should emit warning for copilot engine with network restrictions")
+		if compiler.warningCount != initialWarnings {
+			t.Error("Should not emit warning for copilot engine without enabled web tools")
 		}
 	})
 
@@ -143,7 +143,7 @@ func TestCheckNetworkSupport_WithRestrictions(t *testing.T) {
 }
 
 func TestCheckNetworkSupport_StrictMode(t *testing.T) {
-	t.Run("strict mode: copilot engine with restrictions - error", func(t *testing.T) {
+	t.Run("strict mode: copilot engine with restrictions - no error without web tools", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 		engine := NewCopilotEngine()
@@ -152,7 +152,7 @@ func TestCheckNetworkSupport_StrictMode(t *testing.T) {
 		}
 
 		err := compiler.checkNetworkSupport(engine, perms)
-		require.ErrorContains(t, err, "engine 'copilot' is not bound by firewall policies")
+		require.NoError(t, err)
 	})
 
 	t.Run("strict mode: claude engine with restrictions - no error (claude supports firewall)", func(t *testing.T) {
@@ -200,6 +200,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 	restrictedNetwork := &NetworkPermissions{Allowed: []string{"example.com"}}
 	tests := []struct {
 		name         string
+		engine       CodingAgentEngine
 		tools        map[string]any
 		network      *NetworkPermissions
 		strictMode   bool
@@ -209,32 +210,37 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 	}{
 		{
 			name:         "non-strict web-fetch emits warning",
+			engine:       NewCopilotEngine(),
 			tools:        map[string]any{"web-fetch": nil},
 			network:      restrictedNetwork,
 			wantWarnings: 1,
 		},
 		{
 			name:         "non-strict web-search emits warning",
+			engine:       NewCopilotEngine(),
 			tools:        map[string]any{"web-search": map[string]any{}},
 			network:      restrictedNetwork,
 			wantWarnings: 1,
 		},
 		{
 			name:         "non-strict enabled tools emit separate warnings",
+			engine:       NewCopilotEngine(),
 			tools:        map[string]any{"web-fetch": true, "web-search": true},
 			network:      restrictedNetwork,
 			wantWarnings: 2,
 		},
 		{
 			name:        "defaults with blocked domains rejects enabled tools",
+			engine:      NewCopilotEngine(),
 			tools:       map[string]any{"web-fetch": true},
 			network:     &NetworkPermissions{Allowed: []string{"defaults"}, Blocked: []string{"tracker.example.com"}},
 			strictMode:  true,
 			wantErr:     true,
-			errContains: []string{"tools.web-fetch", "not bound by firewall policies"},
+			errContains: []string{"tools.web-fetch", "does not follow the configured network restrictions"},
 		},
 		{
 			name:       "strict enabled tools produce errors",
+			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"web-fetch": nil, "web-search": true},
 			network:    restrictedNetwork,
 			strictMode: true,
@@ -242,25 +248,51 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			errContains: []string{
 				"tools.web-fetch",
 				"tools.web-search",
-				"not bound by firewall policies",
+				"does not follow the configured network restrictions",
+				"To enforce network restrictions, use Codex or Pi",
+				"engine: codex",
 			},
 		},
 		{
 			name:       "disabled tools are allowed",
+			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"web-fetch": false, "web-search": false},
 			network:    restrictedNetwork,
 			strictMode: true,
 		},
 		{
 			name:       "unrelated tools are allowed",
+			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"github": nil, "bash": []any{"git"}},
 			network:    restrictedNetwork,
 			strictMode: true,
 		},
 		{
 			name:       "tools are allowed without network restrictions",
+			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
 			network:    &NetworkPermissions{Allowed: []string{"defaults"}},
+			strictMode: true,
+		},
+		{
+			name:       "web tools with Codex are allowed",
+			engine:     NewCodexEngine(),
+			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
+			network:    restrictedNetwork,
+			strictMode: true,
+		},
+		{
+			name:       "web tools with Pi are allowed",
+			engine:     NewPiEngine(),
+			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
+			network:    restrictedNetwork,
+			strictMode: true,
+		},
+		{
+			name:       "web tools with Claude are allowed",
+			engine:     NewClaudeEngine(),
+			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
+			network:    restrictedNetwork,
 			strictMode: true,
 		},
 	}
@@ -270,7 +302,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			compiler := NewCompiler(WithFailFast(false))
 			compiler.strictMode = tt.strictMode
 
-			err := compiler.checkToolsNetworkSupport(tt.tools, tt.network)
+			err := compiler.checkToolsNetworkSupport(tt.engine, tt.tools, tt.network)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -286,10 +318,10 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 }
 
 func TestToolsNetworkSupportCompilation(t *testing.T) {
-	workflow := func(strict bool) string {
+	workflow := func(engine string, strict bool) string {
 		return fmt.Sprintf(`---
 on: workflow_dispatch
-engine: claude
+engine: %s
 strict: %t
 network:
   allowed:
@@ -299,22 +331,30 @@ tools:
   web-search:
 ---
 Test firewall-bound tool validation.
-`, strict)
+`, engine, strict)
 	}
 
 	t.Run("non-strict mode warns and compiles", func(t *testing.T) {
 		compiler := NewCompiler()
-		_, err := compiler.ParseWorkflowString(workflow(false), "non-strict-tools.md")
+		_, err := compiler.ParseWorkflowString(workflow("copilot", false), "non-strict-tools.md")
 		require.NoError(t, err)
 		assert.Equal(t, 2, compiler.GetWarningCount())
 	})
 
-	t.Run("strict mode rejects tools", func(t *testing.T) {
+	t.Run("strict mode rejects Copilot web tools", func(t *testing.T) {
 		compiler := NewCompiler(WithFailFast(false))
-		_, err := compiler.ParseWorkflowString(workflow(true), "strict-tools.md")
+		_, err := compiler.ParseWorkflowString(workflow("copilot", true), "strict-copilot-tools.md")
 		require.Error(t, err)
 		require.ErrorContains(t, err, "tools.web-fetch")
 		require.ErrorContains(t, err, "tools.web-search")
+		require.ErrorContains(t, err, "To enforce network restrictions, use Codex or Pi")
+		require.NotContains(t, err.Error(), "engine: claude")
+	})
+
+	t.Run("strict mode allows web tools for Claude", func(t *testing.T) {
+		compiler := NewCompiler(WithFailFast(false))
+		_, err := compiler.ParseWorkflowString(workflow("claude", true), "strict-claude-tools.md")
+		require.NoError(t, err)
 	})
 }
 
@@ -332,17 +372,17 @@ Test Copilot firewall-bound engine validation.
 `, strict)
 	}
 
-	t.Run("non-strict mode warns and compiles", func(t *testing.T) {
+	t.Run("non-strict mode compiles without warning when web tools are disabled", func(t *testing.T) {
 		compiler := NewCompiler()
 		_, err := compiler.ParseWorkflowString(workflow(false), "non-strict-copilot.md")
 		require.NoError(t, err)
-		assert.Equal(t, 1, compiler.GetWarningCount())
+		assert.Equal(t, 0, compiler.GetWarningCount())
 	})
 
-	t.Run("strict mode rejects engine", func(t *testing.T) {
+	t.Run("strict mode accepts Copilot when web tools are disabled", func(t *testing.T) {
 		compiler := NewCompiler()
 		_, err := compiler.ParseWorkflowString(workflow(true), "strict-copilot.md")
-		require.ErrorContains(t, err, "engine 'copilot' is not bound by firewall policies")
+		require.NoError(t, err)
 	})
 }
 

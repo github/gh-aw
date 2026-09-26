@@ -251,7 +251,7 @@ func (c *Compiler) resolveToolsConfiguration(
 	if err != nil {
 		return nil, err
 	}
-	if err := c.validateToolsNetworkSupport(result.Frontmatter, importsResult, tools); err != nil {
+	if err := c.validateToolsNetworkSupport(result.Frontmatter, importsResult, agenticEngine, tools); err != nil {
 		return nil, err
 	}
 	if err := c.validateEngineToolRequirements(result.Frontmatter, agenticEngine, tools); err != nil {
@@ -267,7 +267,7 @@ func (c *Compiler) resolveToolsConfiguration(
 	}, nil
 }
 
-func (c *Compiler) validateToolsNetworkSupport(frontmatter map[string]any, importsResult *parser.ImportsResult, tools map[string]any) error {
+func (c *Compiler) validateToolsNetworkSupport(frontmatter map[string]any, importsResult *parser.ImportsResult, agenticEngine CodingAgentEngine, tools map[string]any) error {
 	networkPermissions := defaultNetworkPermissions(c.extractNetworkPermissions(frontmatter))
 	if importsResult.MergedNetwork != "" {
 		var err error
@@ -277,7 +277,7 @@ func (c *Compiler) validateToolsNetworkSupport(frontmatter map[string]any, impor
 		}
 	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
-		return c.checkToolsNetworkSupport(tools, networkPermissions)
+		return c.checkToolsNetworkSupport(agenticEngine, tools, networkPermissions)
 	})
 }
 
