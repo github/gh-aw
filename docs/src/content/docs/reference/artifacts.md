@@ -201,7 +201,7 @@ See [A/B Experiments](/gh-aw/experimental/experiments/) for how to declare exper
 
 The `usage` artifact is a compact conclusion-job artifact with workflow-run metadata and token-usage files for lightweight reporting and forecasting, so downstream tools can read aggregated usage data without downloading the full `agent` artifact.
 
-Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. The optional activity sections are additive; the `working_set` section is always written when the calculation step executes:
+Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. The optional activity sections are additive; the `working_set` and `friction` sections are always written when the calculation step executes. Runs produced before a section shipped simply omit it, and every consumer treats a missing section as unmeasured:
 
 ```json
 {
@@ -267,6 +267,89 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "rebuild_excess_tokens": 650000,
     "invocations": 5
   },
+  "friction": {
+    "schema": "friction-cost/v1",
+    "measurement_state": "statistical",
+    "canonical_unit": "aic",
+    "sources": ["agent_session", "agent_token_usage", "firewall", "mcp_gateway"],
+    "total_events": 2,
+    "total_occurrences": 4,
+    "counted_occurrences": 3,
+    "suppressed_occurrences": 1,
+    "linked_invocations": 1,
+    "unattributed_occurrences": 0,
+    "cost": {
+      "aic": 1.25,
+      "tokens": { "input": 200, "output": 40, "cache_read": 10, "cache_write": 2, "reasoning": 4, "total": 256 },
+      "turns": 1,
+      "tool_calls": 3,
+      "latency_ms": 550
+    },
+    "dimension_states": {
+      "aic": "statistical",
+      "tokens": "statistical",
+      "turns": "measured",
+      "tool_calls": "measured",
+      "latency_ms": "measured"
+    },
+    "uncertainty": {
+      "aic": {
+        "state": "statistical",
+        "method": "mean_invocation_apportionment",
+        "confidence": "low",
+        "relative_error": 0.3,
+        "sample_size": 2,
+        "basis": "AI credits of errored invocations (measured), of linked follow-up invocations (causal), or the mean healthy-invocation cost (statistical)"
+      }
+    },
+    "drivers": [
+      {
+        "driver": "mcp_tool_error",
+        "class": "tool_failure",
+        "source": "mcp_gateway",
+        "events": 1,
+        "occurrences": 1,
+        "counted_occurrences": 1,
+        "suppressed_occurrences": 0,
+        "state": "causal",
+        "cost": { "aic": 0.5, "tokens": { "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
+      }
+    ],
+    "groups": [
+      {
+        "group_id": "tool_failure",
+        "primary_source": "mcp_gateway",
+        "event_ids": ["mcp_tool_error:call-1", "session_tool_failure:aggregate"],
+        "total_occurrences": 4,
+        "counted_occurrences": 3,
+        "suppressed_occurrences": 1,
+        "rule": "highest-fidelity source owns overlapping occurrences; lower-fidelity sources contribute only their excess"
+      }
+    ],
+    "events": [
+      {
+        "id": "mcp_tool_error:call-1",
+        "driver": "mcp_tool_error",
+        "source": "mcp_gateway",
+        "group_id": "tool_failure",
+        "label": "github/issue_read",
+        "timestamp": "2026-09-09T00:00:01Z",
+        "occurrences": 1,
+        "counted_occurrences": 1,
+        "suppressed_occurrences": 0,
+        "state": "causal",
+        "dimension_states": {
+          "aic": "causal",
+          "tokens": "causal",
+          "turns": "unsupported",
+          "tool_calls": "measured",
+          "latency_ms": "measured"
+        },
+        "cost": { "aic": 0.5, "tokens": { "total": 128 }, "turns": 0, "tool_calls": 1, "latency_ms": 250 }
+      }
+    ],
+    "unmeasured_drivers": [{ "driver": "firewall_block", "reason": "no_occurrences" }]
+  },
   "safe_outputs": {
     "total_items": 2,
     "items_by_type": {
@@ -328,6 +411,49 @@ The conclusion job derives `gateway` and `integrity` from MCP gateway logs, fall
 `rebuild_factor` is `cumulative_input_tokens / peak_input_tokens`, where each invocation contributes the canonical `input_tokens` value from the agent `token_usage.jsonl` record. Cache-read and cache-write fields are not added because provider normalization has already produced that logical input count. The factor is omitted when `measurement_state` is `unavailable`; `partial` means usable records were measured but malformed or unsupported records were ignored.
 
 Working-Set Rebuild Factor measures cumulative context reconstruction relative to peak invocation context. It is an efficiency/trajectory metric, not a measurement of semantic coherence debt and not a predictor of task success. It cannot identify missing task facts or classify outcome quality. The metric is conceptually inspired by [“The Working Set of a Coding Agent: Coherence Debt in Repository-Scale Tasks”](https://arxiv.org/abs/2608.16630), while deliberately limiting the implementation to observable token traffic.
+
+### Friction cost
+
+> **Friction cost** is the estimated avoidable marginal cost attributable to an execution-friction event, relative to the counterfactual execution in which that event did not occur.
+
+The `friction` section contains the precomputed friction cost for tool calls that failed, responses that were filtered, requests that were blocked, and model invocations that errored or were retried. The conclusion job computes it once from the logs it already parses, so consumers that download only the `usage` artifact read the finished numbers instead of re-deriving them. `gh aw logs` and `gh aw audit` always prefer this precomputed section when it is present.
+
+AI credits (`aic`) are the canonical unit. Every other dimension — token classes, turns, tool calls, and latency — is reported only for drivers that support it, and `unsupported` is stated explicitly rather than reported as zero.
+
+#### Attribution states
+
+| State | Meaning |
+| --- | --- |
+| `measured` | The cost was read directly off the record describing the friction event. |
+| `causal` | The cost was taken from the model invocation the event demonstrably caused (the first unconsumed invocation after the event). |
+| `statistical` | The cost was apportioned from the mean healthy-invocation cost of the same run. |
+| `unavailable` | The driver was detected, but no cost could be attributed with the data available. |
+| `unsupported` | The driver cannot express this dimension at all. |
+
+`measurement_state` at the top of the section is the state of the canonical `aic` dimension and equals the weakest state contributing to it. A run with friction sources but no friction reports `measured` with a zero cost; a run with no usable source reports `unavailable`.
+
+#### Driver matrix
+
+| Driver | Class | Source | AIC | Tokens | Turns | Tool calls | Latency |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `mcp_tool_error` | `tool_failure` | `mcp_gateway` | derived | derived | unsupported | measured | measured |
+| `session_tool_failure` | `tool_failure` | `agent_session` | derived | derived | unsupported | measured | unsupported |
+| `integrity_filter` | `integrity_filter` | `mcp_gateway` | derived | derived | unsupported | measured | unsupported |
+| `firewall_block` | `network_block` | `firewall` | unsupported | unsupported | unsupported | unsupported | unsupported |
+| `agent_api_error` | `model_error` | `agent_token_usage` | measured | measured | measured | unsupported | measured |
+
+`measured` means the dimension is read from the friction record itself. `derived` means the dimension is attributed causally when a follow-up invocation can be linked, and statistically otherwise. `unsupported` means no data source expresses that dimension for the driver: firewall blocks are counted as occurrences, but their cost is never estimated, because a blocked request leaves no invocation-level trace to attribute. Drivers whose source is absent, or that produced no occurrences, are listed in `unmeasured_drivers` with a `no_occurrences` or `source_unavailable:<source>` reason.
+
+#### Causal grouping and double counting
+
+Events are grouped by causal class (`group_id`) so that the same underlying failure observed by several sources is counted once. Within a group, sources are ranked by fidelity — `agent_token_usage`, then `mcp_gateway`, then `agent_session`, then `firewall` — and the highest-fidelity source owns the overlapping occurrences. Lower-fidelity sources contribute only the occurrences they observed in excess, reported as `counted_occurrences` with the remainder in `suppressed_occurrences` and `suppressed_by`. A single model invocation is likewise linked to at most one friction event across the whole run, so causal attribution can never bill the same AI credits twice. Grouping depends only on the observed counts and a fixed fidelity order, so the same input always produces the same output.
+
+#### Uncertainty
+
+Each dimension carries an `uncertainty` entry with its `state`, the `method` used (`direct_record`, `next_invocation_linkage`, `mean_invocation_apportionment`, or `none`), a `confidence` bucket, the `sample_size` behind the estimate, and bounds where supported. Measured bounds equal the observed value. Causal estimates range from zero to the linked invocation cost because the exact counterfactual is not observable. Statistical estimates use a 95% interval based on the relative standard error of healthy invocations; bounds are omitted when fewer than two healthy invocations were available.
+
+Friction cost is an efficiency signal, not an attribution of blame, a claim that the underlying action was unnecessary, or a prediction of task success. Statistical attribution assumes the cost of recovering from friction resembles the average invocation of the same run, which is an approximation, not a measurement.
+
 
 ### Accessing usage data
 

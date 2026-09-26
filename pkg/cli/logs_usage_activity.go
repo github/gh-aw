@@ -26,6 +26,7 @@ type usageActivitySummary struct {
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
+	Friction    *FrictionCostSummary      `json:"friction,omitempty"`
 }
 
 // WorkingSetMetrics describes cumulative model-input traffic relative to the
@@ -166,6 +167,12 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	if summary.WorkingSet != nil {
 		result.WorkingSet = summary.WorkingSet
+	}
+
+	// Friction is precomputed in the conclusion job: prefer it verbatim and never
+	// recompute it from raw logs when the section is present.
+	if summary.Friction != nil {
+		result.Friction = summary.Friction
 	}
 
 	// Preserve previously parsed turn counts (from full session artifacts/events.jsonl)

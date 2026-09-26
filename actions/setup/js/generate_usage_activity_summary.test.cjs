@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const req = createRequire(import.meta.url);
-const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, MANIFEST_FILE_PATH } = req("./generate_usage_activity_summary.cjs");
+const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, buildFrictionSummary, readTokenUsageContent, MANIFEST_FILE_PATH } =
+  req("./generate_usage_activity_summary.cjs");
 
 describe("generate_usage_activity_summary.cjs", () => {
   /** Unique directory for each test to avoid cross-test interference */
@@ -447,6 +448,78 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(Number.isFinite(workingSet.rebuild_factor)).toBe(true);
       expect(workingSet.rebuild_factor).toBeGreaterThanOrEqual(1);
       expect(workingSet.cumulative_input_tokens).toBe(Number(BigInt(large) * 2n));
+    });
+  });
+
+  describe("friction-cost section", () => {
+    let frictionDir;
+
+    beforeEach(() => {
+      frictionDir = fs.mkdtempSync(path.join(__dirname, ".friction-test-"));
+    });
+
+    afterEach(() => {
+      fs.rmSync(frictionDir, { recursive: true, force: true });
+    });
+
+    const writeTokenUsage = lines => {
+      const target = path.join(frictionDir, "token_usage.jsonl");
+      fs.writeFileSync(target, lines.map(line => JSON.stringify(line)).join("\n"));
+      return target;
+    };
+
+    it("reports an unavailable section when no activity source exists", () => {
+      const friction = buildFrictionSummary({ gateway: null, integrity: null, session: null, firewall: null }, path.join(frictionDir, "missing.jsonl"));
+      expect(friction.schema).toBe("friction-cost/v1");
+      expect(friction.canonical_unit).toBe("aic");
+      expect(friction.measurement_state).toBe("unavailable");
+      expect(friction.cost.aic).toBe(0);
+    });
+
+    it("computes friction from parsed activity sections and the token-usage file", () => {
+      const tokenUsagePath = writeTokenUsage([
+        { timestamp: "2026-01-01T00:00:01Z", input_tokens: 100, output_tokens: 10, ai_credits_this_response: 0.5, duration_ms: 100 },
+        { timestamp: "2026-01-01T00:00:03Z", input_tokens: 100, output_tokens: 10, ai_credits_this_response: 0.25, duration_ms: 100 },
+      ]);
+      const friction = buildFrictionSummary(
+        {
+          gateway: { tool_calls: [{ tool_call_id: "call-1", timestamp: "2026-01-01T00:00:02Z", server_name: "github", tool_name: "issue_read", outcome: "failure", duration_ms: 42 }] },
+          integrity: null,
+          session: null,
+          firewall: null,
+        },
+        tokenUsagePath
+      );
+      expect(friction.measurement_state).toBe("causal");
+      expect(friction.cost.aic).toBe(0.25);
+      expect(friction.cost.tool_calls).toBe(1);
+      expect(friction.sources).toContain("mcp_gateway");
+      expect(friction.sources).toContain("agent_token_usage");
+    });
+
+    it("reads token usage content only when the file exists", () => {
+      expect(readTokenUsageContent(path.join(frictionDir, "missing.jsonl"))).toEqual({ content: "", available: false });
+      const tokenUsagePath = writeTokenUsage([{ timestamp: "2026-01-01T00:00:01Z", input_tokens: 1 }]);
+      const { content, available } = readTokenUsageContent(tokenUsagePath);
+      expect(available).toBe(true);
+      expect(content).toContain("input_tokens");
+    });
+
+    it("serializes to JSON without losing aggregate or event-level detail", () => {
+      const friction = buildFrictionSummary(
+        {
+          gateway: null,
+          integrity: null,
+          session: null,
+          firewall: { requests_by_domain: { "blocked.example": { allowed: 0, blocked: 2 } } },
+        },
+        path.join(frictionDir, "missing.jsonl")
+      );
+      const roundTripped = JSON.parse(JSON.stringify(friction));
+      expect(roundTripped.total_occurrences).toBe(2);
+      expect(roundTripped.events[0].driver).toBe("firewall_block");
+      expect(roundTripped.drivers[0].driver).toBe("firewall_block");
+      expect(roundTripped.groups[0].group_id).toBe("network_block");
     });
   });
 });

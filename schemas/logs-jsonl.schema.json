@@ -122,6 +122,512 @@
               ],
               "additionalProperties": false
             },
+            "friction": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "schema": {
+                  "type": "string"
+                },
+                "measurement_state": {
+                  "type": "string"
+                },
+                "canonical_unit": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "total_events": {
+                  "type": "integer"
+                },
+                "total_occurrences": {
+                  "type": "integer"
+                },
+                "counted_occurrences": {
+                  "type": "integer"
+                },
+                "suppressed_occurrences": {
+                  "type": "integer"
+                },
+                "linked_invocations": {
+                  "type": "integer"
+                },
+                "unattributed_occurrences": {
+                  "type": "integer"
+                },
+                "cost": {
+                  "type": "object",
+                  "properties": {
+                    "aic": {
+                      "type": "number"
+                    },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "input": {
+                          "type": "integer"
+                        },
+                        "output": {
+                          "type": "integer"
+                        },
+                        "cache_read": {
+                          "type": "integer"
+                        },
+                        "cache_write": {
+                          "type": "integer"
+                        },
+                        "reasoning": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "input",
+                        "output",
+                        "cache_read",
+                        "cache_write",
+                        "reasoning",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "turns": {
+                      "type": "integer"
+                    },
+                    "tool_calls": {
+                      "type": "integer"
+                    },
+                    "latency_ms": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "aic",
+                    "tokens",
+                    "turns",
+                    "tool_calls",
+                    "latency_ms"
+                  ],
+                  "additionalProperties": false
+                },
+                "estimated_usd": {
+                  "type": "number"
+                },
+                "total_run_aic": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "friction_ratio": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "dimension_states": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "uncertainty": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "method": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "string"
+                      },
+                      "relative_error": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "lower_bound": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "upper_bound": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "confidence_level": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "sample_size": {
+                        "type": "integer"
+                      },
+                      "basis": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "drivers": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "driver": {
+                        "type": "string"
+                      },
+                      "class": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "events": {
+                        "type": "integer"
+                      },
+                      "occurrences": {
+                        "type": "integer"
+                      },
+                      "counted_occurrences": {
+                        "type": "integer"
+                      },
+                      "suppressed_occurrences": {
+                        "type": "integer"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "cost": {
+                        "type": "object",
+                        "properties": {
+                          "aic": {
+                            "type": "number"
+                          },
+                          "tokens": {
+                            "type": "object",
+                            "properties": {
+                              "input": {
+                                "type": "integer"
+                              },
+                              "output": {
+                                "type": "integer"
+                              },
+                              "cache_read": {
+                                "type": "integer"
+                              },
+                              "cache_write": {
+                                "type": "integer"
+                              },
+                              "reasoning": {
+                                "type": "integer"
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "input",
+                              "output",
+                              "cache_read",
+                              "cache_write",
+                              "reasoning",
+                              "total"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "turns": {
+                            "type": "integer"
+                          },
+                          "tool_calls": {
+                            "type": "integer"
+                          },
+                          "latency_ms": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "aic",
+                          "tokens",
+                          "turns",
+                          "tool_calls",
+                          "latency_ms"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "driver",
+                      "events",
+                      "occurrences",
+                      "counted_occurrences",
+                      "suppressed_occurrences",
+                      "state",
+                      "cost"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "groups": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "group_id": {
+                        "type": "string"
+                      },
+                      "primary_source": {
+                        "type": "string"
+                      },
+                      "event_ids": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "total_occurrences": {
+                        "type": "integer"
+                      },
+                      "counted_occurrences": {
+                        "type": "integer"
+                      },
+                      "suppressed_occurrences": {
+                        "type": "integer"
+                      },
+                      "rule": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "group_id",
+                      "total_occurrences",
+                      "counted_occurrences",
+                      "suppressed_occurrences"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "events": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "driver": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "group_id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "occurrences": {
+                        "type": "integer"
+                      },
+                      "counted_occurrences": {
+                        "type": "integer"
+                      },
+                      "suppressed_occurrences": {
+                        "type": "integer"
+                      },
+                      "suppressed_by": {
+                        "type": "string"
+                      },
+                      "attribution_class": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "estimation_method": {
+                        "type": "string"
+                      },
+                      "estimated_usd": {
+                        "type": "number"
+                      },
+                      "lower_bound_aic": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "upper_bound_aic": {
+                        "type": [
+                          "null",
+                          "number"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "string"
+                      },
+                      "dimension_states": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      },
+                      "cost": {
+                        "type": "object",
+                        "properties": {
+                          "aic": {
+                            "type": "number"
+                          },
+                          "tokens": {
+                            "type": "object",
+                            "properties": {
+                              "input": {
+                                "type": "integer"
+                              },
+                              "output": {
+                                "type": "integer"
+                              },
+                              "cache_read": {
+                                "type": "integer"
+                              },
+                              "cache_write": {
+                                "type": "integer"
+                              },
+                              "reasoning": {
+                                "type": "integer"
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "input",
+                              "output",
+                              "cache_read",
+                              "cache_write",
+                              "reasoning",
+                              "total"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "turns": {
+                            "type": "integer"
+                          },
+                          "tool_calls": {
+                            "type": "integer"
+                          },
+                          "latency_ms": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "aic",
+                          "tokens",
+                          "turns",
+                          "tool_calls",
+                          "latency_ms"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "driver",
+                      "occurrences",
+                      "counted_occurrences",
+                      "suppressed_occurrences",
+                      "state",
+                      "estimated_usd",
+                      "cost"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "events_truncated": {
+                  "type": "boolean"
+                },
+                "unmeasured_drivers": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "driver": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "driver",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "ignored_token_records": {
+                  "type": "integer"
+                },
+                "derived": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "measurement_state",
+                "total_events",
+                "total_occurrences",
+                "counted_occurrences",
+                "suppressed_occurrences",
+                "cost",
+                "estimated_usd"
+              ],
+              "additionalProperties": false
+            },
             "turns": {
               "type": "integer"
             },
@@ -3637,6 +4143,512 @@
                     "failed",
                     "error_count",
                     "unavailable_count"
+                  ],
+                  "additionalProperties": false
+                },
+                "friction": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "measurement_state": {
+                      "type": "string"
+                    },
+                    "canonical_unit": {
+                      "type": "string"
+                    },
+                    "sources": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "total_events": {
+                      "type": "integer"
+                    },
+                    "total_occurrences": {
+                      "type": "integer"
+                    },
+                    "counted_occurrences": {
+                      "type": "integer"
+                    },
+                    "suppressed_occurrences": {
+                      "type": "integer"
+                    },
+                    "linked_invocations": {
+                      "type": "integer"
+                    },
+                    "unattributed_occurrences": {
+                      "type": "integer"
+                    },
+                    "cost": {
+                      "type": "object",
+                      "properties": {
+                        "aic": {
+                          "type": "number"
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "input": {
+                              "type": "integer"
+                            },
+                            "output": {
+                              "type": "integer"
+                            },
+                            "cache_read": {
+                              "type": "integer"
+                            },
+                            "cache_write": {
+                              "type": "integer"
+                            },
+                            "reasoning": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "input",
+                            "output",
+                            "cache_read",
+                            "cache_write",
+                            "reasoning",
+                            "total"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "turns": {
+                          "type": "integer"
+                        },
+                        "tool_calls": {
+                          "type": "integer"
+                        },
+                        "latency_ms": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "aic",
+                        "tokens",
+                        "turns",
+                        "tool_calls",
+                        "latency_ms"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "estimated_usd": {
+                      "type": "number"
+                    },
+                    "total_run_aic": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "friction_ratio": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "dimension_states": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "uncertainty": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string"
+                          },
+                          "relative_error": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "lower_bound": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "upper_bound": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "confidence_level": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "sample_size": {
+                            "type": "integer"
+                          },
+                          "basis": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "drivers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "driver": {
+                            "type": "string"
+                          },
+                          "class": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "events": {
+                            "type": "integer"
+                          },
+                          "occurrences": {
+                            "type": "integer"
+                          },
+                          "counted_occurrences": {
+                            "type": "integer"
+                          },
+                          "suppressed_occurrences": {
+                            "type": "integer"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "cost": {
+                            "type": "object",
+                            "properties": {
+                              "aic": {
+                                "type": "number"
+                              },
+                              "tokens": {
+                                "type": "object",
+                                "properties": {
+                                  "input": {
+                                    "type": "integer"
+                                  },
+                                  "output": {
+                                    "type": "integer"
+                                  },
+                                  "cache_read": {
+                                    "type": "integer"
+                                  },
+                                  "cache_write": {
+                                    "type": "integer"
+                                  },
+                                  "reasoning": {
+                                    "type": "integer"
+                                  },
+                                  "total": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "input",
+                                  "output",
+                                  "cache_read",
+                                  "cache_write",
+                                  "reasoning",
+                                  "total"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "turns": {
+                                "type": "integer"
+                              },
+                              "tool_calls": {
+                                "type": "integer"
+                              },
+                              "latency_ms": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "aic",
+                              "tokens",
+                              "turns",
+                              "tool_calls",
+                              "latency_ms"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "driver",
+                          "events",
+                          "occurrences",
+                          "counted_occurrences",
+                          "suppressed_occurrences",
+                          "state",
+                          "cost"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "groups": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group_id": {
+                            "type": "string"
+                          },
+                          "primary_source": {
+                            "type": "string"
+                          },
+                          "event_ids": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "total_occurrences": {
+                            "type": "integer"
+                          },
+                          "counted_occurrences": {
+                            "type": "integer"
+                          },
+                          "suppressed_occurrences": {
+                            "type": "integer"
+                          },
+                          "rule": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "group_id",
+                          "total_occurrences",
+                          "counted_occurrences",
+                          "suppressed_occurrences"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "events": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "driver": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "group_id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "occurrences": {
+                            "type": "integer"
+                          },
+                          "counted_occurrences": {
+                            "type": "integer"
+                          },
+                          "suppressed_occurrences": {
+                            "type": "integer"
+                          },
+                          "suppressed_by": {
+                            "type": "string"
+                          },
+                          "attribution_class": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "estimation_method": {
+                            "type": "string"
+                          },
+                          "estimated_usd": {
+                            "type": "number"
+                          },
+                          "lower_bound_aic": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "upper_bound_aic": {
+                            "type": [
+                              "null",
+                              "number"
+                            ]
+                          },
+                          "confidence": {
+                            "type": "string"
+                          },
+                          "dimension_states": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "cost": {
+                            "type": "object",
+                            "properties": {
+                              "aic": {
+                                "type": "number"
+                              },
+                              "tokens": {
+                                "type": "object",
+                                "properties": {
+                                  "input": {
+                                    "type": "integer"
+                                  },
+                                  "output": {
+                                    "type": "integer"
+                                  },
+                                  "cache_read": {
+                                    "type": "integer"
+                                  },
+                                  "cache_write": {
+                                    "type": "integer"
+                                  },
+                                  "reasoning": {
+                                    "type": "integer"
+                                  },
+                                  "total": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "input",
+                                  "output",
+                                  "cache_read",
+                                  "cache_write",
+                                  "reasoning",
+                                  "total"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "turns": {
+                                "type": "integer"
+                              },
+                              "tool_calls": {
+                                "type": "integer"
+                              },
+                              "latency_ms": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "aic",
+                              "tokens",
+                              "turns",
+                              "tool_calls",
+                              "latency_ms"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "driver",
+                          "occurrences",
+                          "counted_occurrences",
+                          "suppressed_occurrences",
+                          "state",
+                          "estimated_usd",
+                          "cost"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "events_truncated": {
+                      "type": "boolean"
+                    },
+                    "unmeasured_drivers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "driver": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "driver",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ignored_token_records": {
+                      "type": "integer"
+                    },
+                    "derived": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "measurement_state",
+                    "total_events",
+                    "total_occurrences",
+                    "counted_occurrences",
+                    "suppressed_occurrences",
+                    "cost",
+                    "estimated_usd"
                   ],
                   "additionalProperties": false
                 }

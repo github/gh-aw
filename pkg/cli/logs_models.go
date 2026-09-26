@@ -133,6 +133,7 @@ type ProcessedRun struct {
 	MCPToolUsage            *MCPToolUsageData
 	TokenUsage              *TokenUsageSummary
 	WorkingSet              *WorkingSetMetrics
+	Friction                *FrictionCostSummary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage
 	JobDetails              []JobInfoWithDuration
 	SafeOutputs             []CreatedItemReport
@@ -292,6 +293,7 @@ type RunAnalysis struct {
 	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
 	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
 	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
+	Friction                *FrictionCostSummary     `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
 	JobDetails              []JobInfoWithDuration    `json:"job_details"`                       // Job execution details
 	SafeOutputs             []CreatedItemReport      `json:"safe_outputs,omitempty"`            // Entities affected by safe-output handlers

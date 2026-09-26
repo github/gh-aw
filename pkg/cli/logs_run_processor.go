@@ -628,6 +628,7 @@ func tryLoadCachedRunResult(
 		healed.Metrics = result.Metrics
 		healed.MCPToolUsage = result.MCPToolUsage
 		healed.WorkingSet = result.WorkingSet
+		healed.Friction = result.Friction
 		healed.SafeOutputs = result.SafeOutputs
 		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
@@ -885,6 +886,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 		TokenUsage:              result.TokenUsage,
 		GatewaySteeringEvents:   result.GatewaySteeringEvents,
 		WorkingSet:              result.WorkingSet,
+		Friction:                result.Friction,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              jobDetails,
 		SafeOutputs:             result.SafeOutputs,
@@ -925,6 +927,7 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 			TokenUsage:              result.TokenUsage,
 			GatewaySteeringEvents:   result.GatewaySteeringEvents,
 			WorkingSet:              result.WorkingSet,
+			Friction:                result.Friction,
 			GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 			JobDetails:              jobDetails,
 			SafeOutputs:             result.SafeOutputs,

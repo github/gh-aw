@@ -128,6 +128,9 @@ func renderConsoleMetrics(metrics MetricsData) {
 		line += fmt.Sprintf(" action_min=%.0f", metrics.ActionMinutes)
 	}
 	fmt.Fprintln(os.Stderr, line)
+	if friction := frictionSummaryLine(metrics.Friction); friction != "" {
+		fmt.Fprintln(os.Stderr, "  friction: "+friction)
+	}
 }
 
 func renderConsoleSession(session *SessionAnalysis) {
@@ -320,8 +323,52 @@ func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleCreatedItems(data.CreatedItems)
 	renderConsoleToolUsage(data.ToolUsage)
 	renderConsoleMCPToolUsage(data.MCPToolUsage)
+	renderConsoleFriction(data.Friction)
 	if data.FirewallAnalysis != nil && data.FirewallAnalysis.TotalRequests > 0 {
 		renderCompactFirewall(data.FirewallAnalysis)
+	}
+}
+
+// renderConsoleFriction prints the per-driver breakdown and the individual
+// friction events behind the aggregate friction line.
+func renderConsoleFriction(friction *FrictionCostSummary) {
+	if friction == nil || len(friction.Drivers) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  friction_drivers:")
+	for _, driver := range friction.Drivers {
+		line := fmt.Sprintf("    %s (%s): occurrences=%d counted=%d state=%s", driver.Driver, driver.Source, driver.Occurrences, driver.CountedOccurrences, driver.State)
+		if driver.State != FrictionStateUnavailable {
+			line += " aic=" + formatAICValue(driver.Cost.AIC)
+		}
+		if driver.SuppressedOccurrences > 0 {
+			line += fmt.Sprintf(" deduped=%d", driver.SuppressedOccurrences)
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
+	if len(friction.Events) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  friction_events:")
+	for i, event := range friction.Events {
+		if i >= maxConsoleFrictionEvents {
+			fmt.Fprintf(os.Stderr, "    ... %d more events\n", len(friction.Events)-maxConsoleFrictionEvents)
+			break
+		}
+		line := fmt.Sprintf("    %s: %s x%d [%s]", event.Driver, event.Label, event.Occurrences, event.State)
+		if event.State != FrictionStateUnavailable {
+			line += " aic=" + formatAICValue(event.Cost.AIC)
+		}
+		if event.SuppressedBy != "" {
+			line += " suppressed-by=" + event.SuppressedBy
+		}
+		if event.Timestamp != "" {
+			line += " (" + event.Timestamp + ")"
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
+	if friction.EventsTruncated {
+		fmt.Fprintln(os.Stderr, "    (event list truncated during measurement)")
 	}
 }
 

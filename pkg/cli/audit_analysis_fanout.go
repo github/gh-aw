@@ -40,6 +40,16 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 	}
 	if usageSummary != nil {
 		results.workingSet = usageSummary.WorkingSet
+		results.friction = usageSummary.Friction
+	}
+	// Historical runs predate precomputed friction: derive the observable subset
+	// from raw logs so audit output stays useful without rewriting history.
+	if results.friction == nil {
+		var session *usageActivitySession
+		if usageSummary != nil {
+			session = usageSummary.Session
+		}
+		results.friction = deriveFrictionFromLogs(results.mcpToolUsage, session)
 	}
 	return results, nil
 }
