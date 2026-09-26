@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-**GitHub Actions** is GitHub's integrated automation platform for building, testing, and deploying code from your repository. It enables automated workflows triggered by repository events, schedules, or manual triggers — all defined in YAML files in your repository. Agentic workflows compile from markdown files into secure GitHub Actions YAML, inheriting these core concepts while adding AI-driven decision-making and enhanced security.
+**GitHub Actions** is GitHub's automation platform for building, testing, and deploying code from your repository. Workflows are defined as YAML files and can run on repository events, schedules, or manual triggers. Agentic workflows compile from markdown into GitHub Actions YAML, so they use the same foundation while adding AI-driven decisions and stronger guardrails.
 
 ## Core Concepts
 
@@ -34,7 +34,7 @@ jobs:
 
 ### Jobs
 
-A **job** is a set of steps that execute on the same runner (virtual machine). Jobs run in parallel by default but can depend on each other with `needs:`. Each job runs in a fresh VM, and results are shared between jobs using artifacts. Default timeout is 360 minutes for standard GitHub Actions jobs; the agent execution step in agentic workflows defaults to 20 minutes.
+A **job** is a set of steps that runs on the same runner. Jobs run in parallel by default, but `needs:` can create dependencies. Each job gets a fresh VM, and results are shared with artifacts. Standard GitHub Actions jobs default to a 360-minute timeout; the agent execution step in agentic workflows defaults to 20 minutes.
 
 ```yaml
 jobs:
@@ -54,7 +54,7 @@ jobs:
 
 ### Steps
 
-**Steps** are individual tasks within a job, running sequentially. They can execute shell commands or use pre-built actions from the GitHub Marketplace. Steps share the same filesystem and environment; a failed step stops the job by default.
+**Steps** are individual tasks within a job. They run sequentially, can execute shell commands or pre-built actions, and share the same filesystem and environment. A failed step stops the job by default.
 
 ```yaml
 steps:
@@ -75,7 +75,7 @@ steps:
 
 ### Workflow Storage and Execution
 
-Workflows must be stored in `.github/workflows/` on the **default branch** to be active and trusted. This ensures changes undergo code review, maintains an audit trail, prevents privilege escalation from feature branches, and treats the default branch as a trust boundary.
+Workflows must be stored in `.github/workflows/` on the **default branch** to be active and trusted. This gives workflow changes normal code review, preserves an audit trail, and keeps the default branch as the trust boundary.
 
 ```yaml
 # Workflows on main branch can access secrets
@@ -93,7 +93,7 @@ jobs:
 
 ### Permission Model
 
-GitHub Actions uses the **principle of least privilege** with explicit permission declarations. Fork pull requests are read-only by default; all required permissions should be explicitly declared.
+GitHub Actions follows the **principle of least privilege** with explicit permission declarations. Fork pull requests are read-only by default, and required permissions should be declared explicitly.
 
 ```yaml
 permissions:
@@ -108,11 +108,11 @@ jobs:
       - run: echo "Job has specified permissions only"
 ```
 
-With GItHub Agentic Workflows, **write permissions are not used explicitly**. Instead much more restricted capabilities to write to GitHub are declared through **safe outputs**, which validate, constrain and sanitize all GitHub API interactions.
+With GitHub Agentic Workflows, **write permissions are not used directly**. Instead, workflows declare **safe outputs**, which validate, constrain, and sanitize GitHub write operations.
 
 ### Secret Management
 
-**Secrets** are encrypted environment variables stored at the repository, organization, or environment level. They are never exposed in logs, only accessible to workflows on default/protected branches, and scoped by environment for additional protection.
+**Secrets** are encrypted environment variables stored at the repository, organization, or environment level. They are masked in logs, available only where GitHub permits them, and can be further scoped by environment.
 
 ```yaml
 jobs:
@@ -129,7 +129,7 @@ jobs:
 
 ### Testing from Branches with workflow_dispatch
 
-The **`workflow_dispatch`** trigger allows manual workflow execution from any branch, invaluable for development and testing:
+The **`workflow_dispatch`** trigger allows manual workflow execution from a selected branch, which is especially useful for development and testing:
 
 ```yaml
 name: Test Workflow
@@ -157,16 +157,16 @@ jobs:
       - run: echo "Debug mode: ${{ inputs.debug }}"
 ```
 
-To run: navigate to the **Actions** tab → select your workflow → click **Run workflow** → choose your branch and provide inputs.
+To run it, open the **Actions** tab, select the workflow, click **Run workflow**, then choose a branch and provide inputs.
 
 > [!TIP]
 > Enable debug logging by setting repository secrets `ACTIONS_STEP_DEBUG: true` and `ACTIONS_RUNNER_DEBUG: true`.
 
-**Note:** The workflow definition must be merged to the main branch before it can be executed. Only `workflow_dispatch` works on non-default branches — event triggers do not.
+**Note:** The workflow must already exist on the default branch before you can run it manually. On non-default branches, only `workflow_dispatch` is available; other event triggers do not activate from branch-only workflow changes.
 
 ### Debugging Workflow Runs
 
-View logs in the **Actions** tab by clicking a run, then a job, then individual steps. Use workflow commands for structured output:
+View logs in the **Actions** tab by opening a run, then a job, then individual steps. Use workflow commands for structured output:
 
 ```yaml
 steps:
@@ -186,7 +186,7 @@ steps:
 
 ## Agentic Workflows vs Traditional GitHub Actions
 
-While agentic workflows compile to GitHub Actions YAML and run on the same infrastructure, they introduce significant enhancements in security, simplicity, and AI-powered decision-making.
+Agentic workflows compile to GitHub Actions YAML and run on the same infrastructure, but they add stronger security controls, a simpler authoring model, and AI-driven decision-making.
 
 | Feature | Traditional GitHub Actions | Agentic Workflows |
 |---------|----------------------------|-------------------|
@@ -203,12 +203,6 @@ While agentic workflows compile to GitHub Actions YAML and run on the same infra
 
 ## Next Steps and Resources
 
-- **[Quick Start](/gh-aw/setup/quick-start/)** - Create your first agentic workflow
-- **[Security Best Practices](/gh-aw/introduction/architecture/)** - Deep dive into agentic security model
-- **[Safe Outputs](/gh-aw/reference/safe-outputs/)** - Learn about validated GitHub operations
-- **[Workflow Structure](/gh-aw/reference/workflow-structure/)** - Understand markdown workflow syntax
-- **[Design Patterns](/gh-aw/patterns/issue-ops/)** - Real-world agentic workflow patterns
-- **[Glossary](/gh-aw/reference/glossary/)** - Key terms and concepts
-- **[GitHub Actions Documentation](https://docs.github.com/en/actions)** - Official reference
-- **[Workflow Syntax](https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions)** - Complete YAML reference
-- **[Security Hardening](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions)** - Security best practices
+Start with the **[Quick Start](/gh-aw/setup/quick-start/)**, then review **[Workflow Structure](/gh-aw/reference/workflow-structure/)** and **[Safe Outputs](/gh-aw/reference/safe-outputs/)**. For deeper background, see **[Security Best Practices](/gh-aw/introduction/architecture/)**, **[Design Patterns](/gh-aw/patterns/issue-ops/)**, and the **[Glossary](/gh-aw/reference/glossary/)**.
+
+For GitHub-native details, refer to the official **[GitHub Actions Documentation](https://docs.github.com/en/actions)**, **[Workflow Syntax](https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions)**, and **[Security Hardening](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions)** guides.
