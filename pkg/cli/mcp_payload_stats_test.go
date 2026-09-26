@@ -85,5 +85,13 @@ func TestNormalizeMCPPayloadStatsLeavesZeroCountAveragesAtZero(t *testing.T) {
 	assert.Zero(t, normalized.Summary[0].AvgOutputSize)
 	assert.Zero(t, normalized.Servers[0].AvgInputSize)
 	assert.Zero(t, normalized.Servers[0].AvgOutputSize)
+}
+
+func TestRoundPayloadAverage(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 16, roundPayloadAverage(31, 2))
+	assert.Equal(t, 38, roundPayloadAverage(75, 2))
 	assert.Zero(t, roundPayloadAverage(31, 0))
+	assert.Zero(t, roundPayloadAverage(31, -1))
 }
