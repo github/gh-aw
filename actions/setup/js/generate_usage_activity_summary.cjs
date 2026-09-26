@@ -419,6 +419,7 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
                 .trim()
                 .toLowerCase() === "skill"
             ) {
+              // SDK events without IDs are paired in start order within this session file.
               skillName = pendingSkillsWithoutIDs.shift();
             }
             if (!success) {
