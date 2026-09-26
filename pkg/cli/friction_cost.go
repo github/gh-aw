@@ -111,6 +111,7 @@ type FrictionGroup struct {
 	GroupID               string   `json:"group_id"`
 	PrimarySource         string   `json:"primary_source,omitempty"`
 	EventIDs              []string `json:"event_ids,omitempty"`
+	EventIDsTruncated     bool     `json:"event_ids_truncated,omitempty"`
 	TotalOccurrences      int      `json:"total_occurrences"`
 	CountedOccurrences    int      `json:"counted_occurrences"`
 	SuppressedOccurrences int      `json:"suppressed_occurrences"`

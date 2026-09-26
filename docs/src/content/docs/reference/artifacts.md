@@ -449,6 +449,8 @@ When `total_run_aic_partial` is `true`, `total_run_aic` and `friction_ratio` use
 
 Events are grouped by causal class (`group_id`) so that the same underlying failure observed by several sources is counted once. Within a group, sources are ranked by fidelity — `agent_token_usage`, then `mcp_gateway`, then `agent_session`, then `firewall` — and the highest-fidelity source owns the overlapping occurrences. Lower-fidelity sources contribute only the occurrences they observed in excess, reported as `counted_occurrences` with the remainder in `suppressed_occurrences` and `suppressed_by`. A single model invocation is likewise linked to at most one friction event across the whole run, so causal attribution can never bill the same AI credits twice. Grouping depends only on the observed counts and a fixed fidelity order, so the same input always produces the same output.
 
+The `event_ids` list references only entries included in the capped `events` array. A group with omitted IDs sets `event_ids_truncated` to `true`; its occurrence and cost aggregates still include every event.
+
 #### Uncertainty
 
 Each dimension carries an `uncertainty` entry with its `state`, the `method` used (`direct_record`, `next_invocation_linkage`, `mean_invocation_apportionment`, or `none`), a `confidence` bucket, the `sample_size` behind the estimate, and bounds where supported. Measured bounds equal the observed value. Causal estimates range from zero to the linked invocation cost because the exact counterfactual is not observable. Statistical estimates use a 95% interval based on the relative standard error of healthy invocations; bounds are omitted when fewer than two healthy invocations were available.

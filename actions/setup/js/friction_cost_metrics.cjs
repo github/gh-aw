@@ -930,7 +930,14 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
         state: driver.states.length === 0 ? STATE_UNAVAILABLE : driver.states.map(state => (state === DIMENSION_UNSUPPORTED ? STATE_UNAVAILABLE : state)).reduce(weakerState),
         cost: driver.cost,
       })),
-    groups: groups.map(group => ({ ...group, event_ids: group.event_ids.filter(id => emittedEventIDs.has(id)) })),
+    groups: groups.map(group => {
+      const eventIDs = group.event_ids.filter(id => emittedEventIDs.has(id));
+      return {
+        ...group,
+        event_ids: eventIDs,
+        ...(eventIDs.length < group.event_ids.length ? { event_ids_truncated: true } : {}),
+      };
+    }),
     events: emittedEvents,
     ...(eventRecords.length > MAX_FRICTION_EVENTS ? { events_truncated: true } : {}),
     ...(unmeasuredDrivers.length > 0 ? { unmeasured_drivers: unmeasuredDrivers } : {}),

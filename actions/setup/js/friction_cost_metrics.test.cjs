@@ -323,6 +323,19 @@ describe("unavailable friction", () => {
     const emittedIDs = new Set(friction.events.map(event => event.id));
     expect(friction.groups.flatMap(group => group.event_ids).every(id => emittedIDs.has(id))).toBe(true);
     expect(friction.groups.reduce((sum, group) => sum + group.event_ids.length, 0)).toBe(MAX_FRICTION_EVENTS);
+    expect(friction.groups[0].event_ids_truncated).toBe(true);
+  });
+
+  it("marks groups whose events are entirely beyond the event listing limit", () => {
+    const failedInvocations = Array.from({ length: MAX_FRICTION_EVENTS }, (_, index) => invocation(`2026-01-01T00:00:${String(index).padStart(2, "0")}Z`, 0.2, { status_code: 500 }));
+    const { friction } = computeFrictionCost({
+      firewall: { requests_by_domain: { "blocked.example": { blocked: 1 } } },
+      tokenUsageContent: jsonl(failedInvocations),
+    });
+    const firewallGroup = friction.groups.find(group => group.group_id === "network_block");
+    expect(friction.events).toHaveLength(MAX_FRICTION_EVENTS);
+    expect(firewallGroup.event_ids).toEqual([]);
+    expect(firewallGroup.event_ids_truncated).toBe(true);
   });
 
   it("marks run totals partial when valid invocations omit AIC", () => {

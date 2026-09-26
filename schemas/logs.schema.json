@@ -534,6 +534,9 @@
                             "type": "string"
                           }
                         },
+                        "event_ids_truncated": {
+                          "type": "boolean"
+                        },
                         "total_occurrences": {
                           "type": "integer"
                         },
