@@ -26,7 +26,20 @@ if [ -d /tmp/gh-aw/sandbox/firewall ] && \
   fi
 fi
 
+# Reclaim stale root-owned validation markers before the agent starts. Agents can
+# run in containers as root while this post-agent validation runs as the runner
+# user, so pre-creating this directory prevents marker writes from failing.
+if [ -d /tmp/gh-aw/memory-validation ] && [ ! -w /tmp/gh-aw/memory-validation ]; then
+  echo "Pre-flight: /tmp/gh-aw/memory-validation is not writable (likely root-owned from prior AWF run); reclaiming with sudo"
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -n rm -rf /tmp/gh-aw/memory-validation 2>/dev/null || echo "::warning::sudo rm failed for /tmp/gh-aw/memory-validation; AWF may fail with EACCES"
+  else
+    echo "::warning::sudo unavailable; cannot reclaim /tmp/gh-aw/memory-validation; AWF may fail with EACCES"
+  fi
+fi
+
 mkdir -p /tmp/gh-aw/agent
+mkdir -p /tmp/gh-aw/memory-validation
 mkdir -p /tmp/gh-aw/sandbox/agent/logs
 # Pre-create the firewall sandbox dirs as the runner user (uid=1001) before AWF starts.
 # If the stale directory was successfully removed above, these create fresh dirs.
