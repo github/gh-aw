@@ -67,13 +67,16 @@ func (c *Compiler) checkNetworkSupport(engine CodingAgentEngine, networkPermissi
 }
 
 // checkToolsNetworkSupport validates that Copilot's enabled web tools are bound by firewall policies.
-func (c *Compiler) checkToolsNetworkSupport(engine CodingAgentEngine, tools map[string]any, networkPermissions *NetworkPermissions) error {
+func (c *Compiler) checkToolsNetworkSupport(engine CodingAgentEngine, engineConfig *EngineConfig, tools map[string]any, networkPermissions *NetworkPermissions) error {
 	if engine.GetID() != string(constants.CopilotEngine) || !hasNetworkRestrictions(networkPermissions) {
 		return nil
 	}
 
 	collector := NewErrorCollector(c.failFast)
 	for _, tool := range []string{"web-fetch", "web-search"} {
+		if tool == "web-search" && !copilotSupportsWebSearch(engineConfig) {
+			continue
+		}
 		value, exists := tools[tool]
 		if !exists {
 			continue
@@ -86,7 +89,7 @@ func (c *Compiler) checkToolsNetworkSupport(engine CodingAgentEngine, tools map[
 			"tools."+tool,
 			tool,
 			fmt.Sprintf("Copilot's '%s' tool does not follow the configured network restrictions", tool),
-			fmt.Sprintf("To enforce network restrictions, use Codex or Pi. Example:\n\nengine: codex\n\nAlternatively, disable this tool:\n\ntools:\n  %s: false", tool),
+			fmt.Sprintf("To enforce network restrictions, use Codex or Claude. Example:\n\nengine: codex\n\nAlternatively, disable this tool:\n\ntools:\n  %s: false", tool),
 		); err != nil {
 			if returnErr := collector.Add(err); returnErr != nil {
 				return returnErr

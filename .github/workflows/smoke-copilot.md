@@ -23,6 +23,7 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot
+strict: false
 engine:
   id: copilot
   max-continuations: 2

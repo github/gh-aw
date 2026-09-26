@@ -21,6 +21,7 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot ARM64
+strict: false
 engine: copilot
 runs-on: ubuntu-24.04-arm
 imports:

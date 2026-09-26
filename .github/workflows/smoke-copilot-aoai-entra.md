@@ -23,6 +23,7 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot - AOAI (Entra)
+strict: false
 environment: aoai-model
 model: o4-mini-aw
 engine:

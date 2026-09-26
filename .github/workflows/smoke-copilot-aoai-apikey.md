@@ -22,6 +22,7 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot - AOAI (apikey)
+strict: false
 model: o4-mini-aw
 engine:
   id: copilot

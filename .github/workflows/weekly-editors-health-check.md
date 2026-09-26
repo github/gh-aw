@@ -10,7 +10,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-strict: true
+strict: false
 tracker-id: weekly-editors-health-check
 engine: copilot
 timeout-minutes: 30

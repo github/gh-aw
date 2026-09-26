@@ -19,7 +19,7 @@ permissions:
   discussions: read
 
   copilot-requests: write
-strict: true
+strict: false
 
 engine:
   id: copilot

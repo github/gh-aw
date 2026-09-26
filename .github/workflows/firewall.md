@@ -4,6 +4,8 @@ description: Tests network firewall functionality and validates security rules f
 on:
   workflow_dispatch:
 
+strict: false
+
 permissions:
   contents: read
   issues: read

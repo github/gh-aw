@@ -201,6 +201,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 	tests := []struct {
 		name         string
 		engine       CodingAgentEngine
+		engineConfig *EngineConfig
 		tools        map[string]any
 		network      *NetworkPermissions
 		strictMode   bool
@@ -249,9 +250,17 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 				"tools.web-fetch",
 				"tools.web-search",
 				"does not follow the configured network restrictions",
-				"To enforce network restrictions, use Codex or Pi",
+				"To enforce network restrictions, use Codex or Claude",
 				"engine: codex",
 			},
+		},
+		{
+			name:         "unavailable web-search is allowed",
+			engine:       NewCopilotEngine(),
+			engineConfig: &EngineConfig{Version: "1.0.86"},
+			tools:        map[string]any{"web-search": true},
+			network:      restrictedNetwork,
+			strictMode:   true,
 		},
 		{
 			name:       "disabled tools are allowed",
@@ -302,7 +311,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			compiler := NewCompiler(WithFailFast(false))
 			compiler.strictMode = tt.strictMode
 
-			err := compiler.checkToolsNetworkSupport(tt.engine, tt.tools, tt.network)
+			err := compiler.checkToolsNetworkSupport(tt.engine, tt.engineConfig, tt.tools, tt.network)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -347,8 +356,27 @@ Test firewall-bound tool validation.
 		require.Error(t, err)
 		require.ErrorContains(t, err, "tools.web-fetch")
 		require.ErrorContains(t, err, "tools.web-search")
-		require.ErrorContains(t, err, "To enforce network restrictions, use Codex or Pi")
+		require.ErrorContains(t, err, "To enforce network restrictions, use Codex or Claude")
 		require.NotContains(t, err.Error(), "engine: claude")
+	})
+
+	t.Run("strict mode allows unavailable Copilot web-search", func(t *testing.T) {
+		compiler := NewCompiler()
+		_, err := compiler.ParseWorkflowString(`---
+on: workflow_dispatch
+engine:
+  id: copilot
+  version: "1.0.86"
+strict: true
+network:
+  allowed:
+    - example.com
+tools:
+  web-search:
+---
+Test unavailable web-search firewall validation.
+`, "strict-copilot-old-web-search.md")
+		require.NoError(t, err)
 	})
 
 	t.Run("strict mode allows web tools for Claude", func(t *testing.T) {
