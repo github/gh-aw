@@ -120,7 +120,7 @@ function addTokens(target, addition) {
 
 /**
  * Round fractional token estimates after attribution, distributing remainder
- * tokens deterministically while preserving independently accumulated aggregates.
+ * tokens deterministically and rebuilding aggregates from rounded event costs.
  *
  * @param {Array<Record<string, any>>} eventRecords
  * @param {Record<string, any>} totalCost
@@ -143,18 +143,14 @@ function roundAttributedTokens(eventRecords, totalCost, driverTotals) {
     });
   }
 
-  const roundTokenTotal = tokens => {
-    for (const tokenClass of TOKEN_CLASSES) {
-      tokens[tokenClass] = Math.round(tokens[tokenClass]);
-    }
-    tokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + tokens[tokenClass], 0);
-  };
-  roundTokenTotal(totalCost.tokens);
+  totalCost.tokens = emptyTokens();
   for (const driver of driverTotals.values()) {
-    roundTokenTotal(driver.cost.tokens);
+    driver.cost.tokens = emptyTokens();
   }
   for (const event of eventRecords) {
-    roundTokenTotal(event.cost.tokens);
+    event.cost.tokens.total = TOKEN_CLASSES.reduce((sum, tokenClass) => sum + event.cost.tokens[tokenClass], 0);
+    addTokens(totalCost.tokens, event.cost.tokens);
+    addTokens(driverTotals.get(event.driver).cost.tokens, event.cost.tokens);
   }
 }
 

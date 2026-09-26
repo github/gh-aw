@@ -321,6 +321,11 @@ describe("unavailable friction", () => {
     expect(friction.cost.tokens.input).toBe(40);
     expect(eventInputTotal).toBe(40);
     expect(friction.drivers[0].cost.tokens.input).toBe(40);
+    for (const tokenClass of ["input", "output", "cache_read", "cache_write", "reasoning"]) {
+      expect(friction.cost.tokens[tokenClass]).toBe(friction.events.reduce((sum, event) => sum + event.cost.tokens[tokenClass], 0));
+      expect(friction.cost.tokens[tokenClass]).toBe(friction.drivers[0].cost.tokens[tokenClass]);
+    }
+    expect(friction.cost.tokens.total).toBe(["input", "output", "cache_read", "cache_write", "reasoning"].reduce((sum, key) => sum + friction.cost.tokens[key], 0));
   });
 
   it("includes unavailable counted events in aggregate measurement states", () => {
