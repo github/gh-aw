@@ -5,7 +5,7 @@
 
 ## Overview
 
-This document provides a complete visual guide to the adaptive color palette and styling system used in GitHub Agentic Workflows. The system uses [lipgloss](https://github.com/charmbracelet/lipgloss) with adaptive colors that automatically adjust based on the user's terminal theme (light or dark).
+This document provides a visual guide to the adaptive color palette and styling system used in GitHub Agentic Workflows. The system uses [lipgloss](https://github.com/charmbracelet/lipgloss) with adaptive colors that automatically adjust based on the user's terminal theme (light or dark).
 
 **Implementation**: `pkg/styles/theme.go`
 
@@ -18,19 +18,19 @@ GitHub Agentic Workflows uses an adaptive color system that provides readability
 **Light Mode**:
 - Darker, more saturated colors for visibility on light backgrounds
 - High contrast ratios for accessibility
-- Muted tones to reduce visual fatigue during extended use
+- Muted tones for extended terminal sessions
 
 **Dark Mode**:
 - Inspired by the [Dracula color theme](https://draculatheme.com/)
-- Bright, vibrant colors optimized for dark backgrounds
-- Maintains consistency with popular dark terminal themes
+- Bright, saturated colors optimized for dark backgrounds
+- Maintains consistency with common dark terminal themes
 
 ### Automatic Adaptation
 
 The lipgloss library automatically detects the terminal's background and selects the appropriate color variant:
 - No configuration required by end users
 - Consistent experience across different terminal emulators
-- Graceful fallback for terminals with limited color support
+- Fallback for terminals with limited color support
 
 ## Color Palette
 
@@ -247,8 +247,8 @@ When adding new styles to the system:
 The color palette is designed with accessibility in mind:
 
 - **Light Mode**: All colors have been chosen to provide sufficient contrast (WCAG AA minimum) on light backgrounds
-- **Dark Mode**: Dracula theme colors are well-tested for readability on dark backgrounds
-- **Fallback**: The system gracefully degrades in terminals with limited color support
+- **Dark Mode**: Dracula theme colors are used for readability on dark backgrounds
+- **Fallback**: The system degrades in terminals with limited color support
 
 ### Testing Your Output
 
