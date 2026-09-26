@@ -246,13 +246,17 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 
 	summaries := sortedMCPToolSummaries(toolSummaryMap)
 	servers := sortedMCPServerStats(serverStatsMap)
+	payloadStats := normalizeMCPPayloadStats(&MCPToolUsageData{
+		Summary: summaries,
+		Servers: servers,
+	})
 
 	reportLog.Printf("Built MCP tool usage summary: %d tool summaries, %d servers, %d total tool calls, %d DIFC filtered events",
-		len(summaries), len(servers), len(allToolCalls), len(allFilteredEvents))
+		len(payloadStats.Summary), len(payloadStats.Servers), len(allToolCalls), len(allFilteredEvents))
 
 	return &MCPToolUsageSummary{
-		Summary:        summaries,
-		Servers:        servers,
+		Summary:        payloadStats.Summary,
+		Servers:        payloadStats.Servers,
 		ToolCalls:      allToolCalls,
 		FilteredEvents: allFilteredEvents,
 		Integrity:      integrity,

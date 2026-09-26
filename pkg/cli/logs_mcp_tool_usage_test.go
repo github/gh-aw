@@ -322,6 +322,8 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 	assert.Equal(t, 25000, server.TotalOutputSize, "Should sum output sizes: 15000+10000=25000")
 	assert.Equal(t, 1000, server.AvgInputSize, "Should compute weighted average input size")
 	assert.Equal(t, 5000, server.AvgOutputSize, "Should compute weighted average output size")
+	assert.Equal(t, 1500, server.MaxInputSize, "Should derive the server maximum from its tools")
+	assert.Equal(t, 8000, server.MaxOutputSize, "Should derive the server maximum from its tools")
 	assert.Equal(t, 1, server.ErrorCount, "Should sum error counts: 0+1=1")
 
 	// Check tool summary aggregation
