@@ -335,6 +335,7 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
   };
   const skills = new Map();
   const pendingSkills = new Map();
+  const pendingSkillsWithoutIDs = [];
 
   for (const logDir of sessionLogDirs) {
     for (const eventsPath of findFiles(logDir, entry => entry.name === "events.jsonl", 1)) {
@@ -392,10 +393,18 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
                   last_timestamp: String(entry.timestamp || ""),
                 };
                 aggregate.invocation_count += 1;
-                aggregate.last_timestamp = String(entry.timestamp || aggregate.last_timestamp);
+                const timestamp = String(entry.timestamp || "");
+                if (timestamp && (!aggregate.first_timestamp || timestamp < aggregate.first_timestamp)) {
+                  aggregate.first_timestamp = timestamp;
+                }
+                if (timestamp && (!aggregate.last_timestamp || timestamp > aggregate.last_timestamp)) {
+                  aggregate.last_timestamp = timestamp;
+                }
                 skills.set(skillName, aggregate);
                 if (data.toolCallId) {
                   pendingSkills.set(String(data.toolCallId), skillName);
+                } else {
+                  pendingSkillsWithoutIDs.push(skillName);
                 }
               }
             }
@@ -403,9 +412,17 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
             session.tool_execution_completes += 1;
             const data = entry.data || {};
             const success = typeof data === "object" ? data.success !== false : true;
+            let skillName = pendingSkills.get(String(data.toolCallId || ""));
+            if (
+              !skillName &&
+              String(data.toolName || "")
+                .trim()
+                .toLowerCase() === "skill"
+            ) {
+              skillName = pendingSkillsWithoutIDs.shift();
+            }
             if (!success) {
               session.failed_tool_executions += 1;
-              const skillName = pendingSkills.get(String(data.toolCallId || ""));
               if (skillName && skills.has(skillName)) {
                 skills.get(skillName).failed_count += 1;
               }

@@ -162,6 +162,44 @@ describe("generate_usage_activity_summary.cjs", () => {
         fs.rmSync(sessionRoot, { recursive: true, force: true });
       }
     });
+
+    it("correlates ID-less failures and orders skill timestamps chronologically", () => {
+      const sessionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "session-skills-order-test-"));
+      try {
+        for (const [name, events] of [
+          [
+            "a-newer",
+            [
+              { type: "tool.execution_start", timestamp: "2026-09-26T00:00:03Z", data: { toolName: "skill", input: { skill: "documentation" } } },
+              { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:04Z", data: { toolName: "skill", success: true } },
+            ],
+          ],
+          [
+            "z-older",
+            [
+              { type: "tool.execution_start", timestamp: "2026-09-26T00:00:01Z", data: { toolName: "skill", input: { skill: "documentation" } } },
+              { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:02Z", data: { toolName: "skill", success: false } },
+            ],
+          ],
+        ]) {
+          const sessionDir = path.join(sessionRoot, name);
+          fs.mkdirSync(sessionDir, { recursive: true });
+          fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map(JSON.stringify).join("\n"));
+        }
+
+        expect(parseSessionLogs([sessionRoot]).skills.items).toEqual([
+          {
+            name: "documentation",
+            invocation_count: 2,
+            failed_count: 1,
+            first_timestamp: "2026-09-26T00:00:01Z",
+            last_timestamp: "2026-09-26T00:00:03Z",
+          },
+        ]);
+      } finally {
+        fs.rmSync(sessionRoot, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("parseSteeringEvents", () => {
