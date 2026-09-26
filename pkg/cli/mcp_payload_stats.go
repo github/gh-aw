@@ -1,5 +1,7 @@
 package cli
 
+import "math"
+
 // normalizeMCPPayloadStats derives payload averages and server maxima from the
 // additive totals already present in historical and current MCP usage records.
 func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
@@ -12,8 +14,8 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 	summaries := make([]MCPToolSummary, 0, len(usage.Summary))
 	for _, summary := range usage.Summary {
 		if summary.CallCount > 0 {
-			summary.AvgInputSize = summary.TotalInputSize / summary.CallCount
-			summary.AvgOutputSize = summary.TotalOutputSize / summary.CallCount
+			summary.AvgInputSize = roundPayloadAverage(summary.TotalInputSize, summary.CallCount)
+			summary.AvgOutputSize = roundPayloadAverage(summary.TotalOutputSize, summary.CallCount)
 		}
 		serverMaxInput[summary.ServerName] = max(serverMaxInput[summary.ServerName], summary.MaxInputSize)
 		serverMaxOutput[summary.ServerName] = max(serverMaxOutput[summary.ServerName], summary.MaxOutputSize)
@@ -24,8 +26,8 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 	servers := make([]MCPServerStats, 0, len(usage.Servers))
 	for _, server := range usage.Servers {
 		if server.ToolCallCount > 0 {
-			server.AvgInputSize = server.TotalInputSize / server.ToolCallCount
-			server.AvgOutputSize = server.TotalOutputSize / server.ToolCallCount
+			server.AvgInputSize = roundPayloadAverage(server.TotalInputSize, server.ToolCallCount)
+			server.AvgOutputSize = roundPayloadAverage(server.TotalOutputSize, server.ToolCallCount)
 		}
 		server.MaxInputSize = max(server.MaxInputSize, serverMaxInput[server.ServerName])
 		server.MaxOutputSize = max(server.MaxOutputSize, serverMaxOutput[server.ServerName])
@@ -33,4 +35,11 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 	}
 	usage.Servers = servers
 	return usage
+}
+
+func roundPayloadAverage(total, count int) int {
+	if count <= 0 {
+		return 0
+	}
+	return int(math.Round(float64(total) / float64(count)))
 }

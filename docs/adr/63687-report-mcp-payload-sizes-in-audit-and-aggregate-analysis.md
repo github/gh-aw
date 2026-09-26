@@ -12,7 +12,7 @@ The PR adds MCP payload-size metrics to the usage activity summary generator, au
 
 ### Decision
 
-We will persist average and maximum MCP request and response sizes in compact usage activity summaries and normalize those payload statistics when building audit and aggregate analysis output. We will derive averages from additive totals and call counts, and derive server maxima from per-tool maxima so historical and legacy records can be reported consistently. We chose this because it preserves privacy-safe size metadata while making usage-only audits and aggregate analysis actionable even when raw gateway logs are unavailable.
+We will persist average and maximum MCP request and response sizes in compact usage activity summaries and normalize those payload statistics when building audit and aggregate analysis output. We will derive rounded averages from additive totals and call counts using the same semantics as the usage artifact producer, and derive server maxima from per-tool maxima so historical and legacy records can be reported consistently. We chose this because it preserves privacy-safe size metadata while making usage-only audits and aggregate analysis actionable even when raw gateway logs are unavailable.
 
 ### Alternatives Considered
 
@@ -28,7 +28,7 @@ This was considered because raw logs already contain enough information to compu
 
 #### Positive
 - Audit and aggregate reports can show actionable average payload sizes for MCP tools and servers even when only compact usage artifacts are present.
-- Historical and legacy records become more comparable because normalization derives missing averages and server maxima from additive totals and tool-level data.
+- Historical and legacy records become more comparable because normalization derives missing rounded averages and server maxima from additive totals and tool-level data.
 - The change remains privacy-safe because it records size metadata rather than request or response payload content.
 
 #### Negative
