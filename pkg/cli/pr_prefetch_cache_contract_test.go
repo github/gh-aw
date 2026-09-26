@@ -27,6 +27,13 @@ func TestSharedPRDiffDataFetchValidatesHeadSHAForCacheHit(t *testing.T) {
 	assert.Contains(t, text, "pr-data-head-sha.txt", "Shared PR prefetch should persist head SHA marker")
 	assert.Contains(t, text, "--json number,title,body,headRefName,headRefOid,additions,deletions,changedFiles,files", "Shared PR prefetch should capture head SHA in metadata")
 	assert.Contains(t, text, "Cache hit: using pre-fetched PR data for head", "Shared PR prefetch should verify cache by current head SHA")
+	assert.Contains(t, text, "fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number", "Shared PR prefetch should resolve centralized slash-command PR numbers")
+	assert.Contains(t, text, "::error::Unable to determine the pull request number from the event context.", "Shared PR prefetch should reject missing PR context")
+	assert.Contains(t, text, "\n      fetch_review_comments\n      # Skip diff and metadata fetch", "Shared PR prefetch should refresh review comments before checking cached diff data")
+	assert.NotContains(t, text, `-f /tmp/gh-aw/agent/pr-review-comments.json ]; then`, "Review comments should not control diff cache hits")
+	assert.Contains(t, text, "DIFF_EXIT=$?", "Shared PR prefetch should capture gh pr diff failures")
+	assert.Contains(t, text, `if [ "$DIFF_EXIT" -ne 0 ]; then`, "Shared PR prefetch should reject gh pr diff failures")
+	assert.NotContains(t, text, "|| true; } | head", "Shared PR prefetch should not suppress gh pr diff failures")
 }
 
 func TestTopReviewWorkflowsHaveHeadAwarePRDataCacheKeys(t *testing.T) {
@@ -36,10 +43,22 @@ func TestTopReviewWorkflowsHaveHeadAwarePRDataCacheKeys(t *testing.T) {
 		t.Skipf("Skipping test: not in a git repository: %v", err)
 	}
 
+	for _, workflow := range []string{
+		"mattpocock-skills-reviewer.md",
+		"ponytail-reviewer.md",
+		"pr-code-quality-reviewer.md",
+	} {
+		workflowPath := filepath.Join(repoRoot, ".github", "workflows", workflow)
+		content, readErr := os.ReadFile(workflowPath)
+		require.NoError(t, readErr, "Should read %s", workflow)
+		assert.Contains(t, string(content), "key: pr-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number || github.event.pull_request.number || fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number }}", "%s should use a head-aware key with centralized slash-command fallback", workflow)
+		assert.Contains(t, string(content), "pr-prefetch-${{ github.event.pull_request.number || github.event.issue.number || fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number }}-", "%s should restore cache data with a centralized slash-command fallback", workflow)
+	}
+
 	mattWorkflowPath := filepath.Join(repoRoot, ".github", "workflows", "mattpocock-skills-reviewer.md")
 	mattContent, err := os.ReadFile(mattWorkflowPath)
 	require.NoError(t, err, "Should read mattpocock-skills-reviewer workflow")
-	assert.Contains(t, string(mattContent), "key: pr-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}", "Matt reviewer should use head-aware key with issue fallback")
+	assert.Contains(t, string(mattContent), `${GITHUB_WORKSPACE}/.github/skills`, "Matt reviewer should discover skills from the restored workspace directory")
 
 	sentinelWorkflowPath := filepath.Join(repoRoot, ".github", "workflows", "test-quality-sentinel.md")
 	sentinelContent, err := os.ReadFile(sentinelWorkflowPath)
