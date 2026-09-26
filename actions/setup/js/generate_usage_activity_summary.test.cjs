@@ -470,7 +470,7 @@ describe("generate_usage_activity_summary.cjs", () => {
 
     it("reports an unavailable section when no activity source exists", () => {
       const friction = buildFrictionSummary({ gateway: null, integrity: null, session: null, firewall: null }, path.join(frictionDir, "missing.jsonl"));
-      expect(friction.schema).toBe("friction-cost/v1");
+      expect(friction).not.toHaveProperty("schema");
       expect(friction.canonical_unit).toBe("aic");
       expect(friction.measurement_state).toBe("unavailable");
       expect(friction.cost.aic).toBe(0);

@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-// frictionCostSchema identifies the additive friction section embedded in the
-// usage-activity-summary/v1 artifact. Runs produced before the friction feature
-// shipped simply omit the section, so every consumer must be nil-safe.
-const frictionCostSchema = "friction-cost/v1"
-
 // maxConsoleFrictionEvents caps the event list printed to the console; the full
 // list always remains available in the audit JSON.
 const maxConsoleFrictionEvents = 20
@@ -37,7 +32,6 @@ const (
 // attributable to execution-friction events in a run. It is computed once in
 // the conclusion job and consumed verbatim when the section is present.
 type FrictionCostSummary struct {
-	Schema                  string                       `json:"schema,omitempty"`
 	MeasurementState        string                       `json:"measurement_state"`
 	CanonicalUnit           string                       `json:"canonical_unit,omitempty"`
 	Sources                 []string                     `json:"sources,omitempty"`
@@ -48,7 +42,6 @@ type FrictionCostSummary struct {
 	LinkedInvocations       int                          `json:"linked_invocations,omitempty"`
 	UnattributedOccurrences int                          `json:"unattributed_occurrences,omitempty"`
 	Cost                    FrictionCost                 `json:"cost"`
-	EstimatedUSD            float64                      `json:"estimated_usd"`
 	TotalRunAIC             *float64                     `json:"total_run_aic,omitempty"`
 	FrictionRatio           *float64                     `json:"friction_ratio,omitempty"`
 	DimensionStates         map[string]string            `json:"dimension_states,omitempty"`
@@ -139,7 +132,6 @@ type FrictionEvent struct {
 	AttributionClass      string            `json:"attribution_class,omitempty"`
 	State                 string            `json:"state"`
 	EstimationMethod      string            `json:"estimation_method,omitempty"`
-	EstimatedUSD          float64           `json:"estimated_usd"`
 	LowerBoundAIC         *float64          `json:"lower_bound_aic,omitempty"`
 	UpperBoundAIC         *float64          `json:"upper_bound_aic,omitempty"`
 	Confidence            string            `json:"confidence,omitempty"`
@@ -174,7 +166,6 @@ func frictionSummaryLine(f *FrictionCostSummary) string {
 	parts := []string{fmt.Sprintf("occurrences=%d", f.CountedOccurrences)}
 	if f.MeasurementState != FrictionStateUnavailable {
 		parts = append(parts, "aic="+formatAICValue(f.Cost.AIC))
-		parts = append(parts, fmt.Sprintf("usd=$%.4f", f.EstimatedUSD))
 		if f.FrictionRatio != nil {
 			parts = append(parts, fmt.Sprintf("ratio=%.1f%%", *f.FrictionRatio*100))
 		}
@@ -340,7 +331,6 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	}
 
 	summary := &FrictionCostSummary{
-		Schema:           frictionCostSchema,
 		MeasurementState: FrictionStateUnavailable,
 		CanonicalUnit:    "aic",
 		Sources:          sortedKeys(sources),

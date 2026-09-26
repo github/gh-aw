@@ -13,7 +13,6 @@ const frictionSummaryJSON = `{
   "schema": "usage-activity-summary/v1",
   "session": {"total_events": 12, "failed_tool_executions": 3},
   "friction": {
-    "schema": "friction-cost/v1",
     "measurement_state": "statistical",
     "canonical_unit": "aic",
     "sources": ["agent_session", "agent_token_usage", "mcp_gateway"],
@@ -72,9 +71,6 @@ func TestLoadUsageActivitySummaryDecodesFriction(t *testing.T) {
 		t.Fatal("expected friction section")
 	}
 	f := summary.Friction
-	if f.Schema != frictionCostSchema {
-		t.Errorf("schema = %q, want %q", f.Schema, frictionCostSchema)
-	}
 	if f.MeasurementState != FrictionStateStatistical {
 		t.Errorf("measurement_state = %q", f.MeasurementState)
 	}

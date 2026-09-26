@@ -247,9 +247,6 @@
                   "object"
                 ],
                 "properties": {
-                  "schema": {
-                    "type": "string"
-                  },
                   "measurement_state": {
                     "type": "string"
                   },
@@ -339,9 +336,6 @@
                       "latency_ms"
                     ],
                     "additionalProperties": false
-                  },
-                  "estimated_usd": {
-                    "type": "number"
                   },
                   "total_run_aic": {
                     "type": [
@@ -609,9 +603,6 @@
                         "estimation_method": {
                           "type": "string"
                         },
-                        "estimated_usd": {
-                          "type": "number"
-                        },
                         "lower_bound_aic": {
                           "type": [
                             "null",
@@ -698,7 +689,6 @@
                         "counted_occurrences",
                         "suppressed_occurrences",
                         "state",
-                        "estimated_usd",
                         "cost"
                       ],
                       "additionalProperties": false
@@ -742,8 +732,7 @@
                   "total_occurrences",
                   "counted_occurrences",
                   "suppressed_occurrences",
-                  "cost",
-                  "estimated_usd"
+                  "cost"
                 ],
                 "additionalProperties": false
               },

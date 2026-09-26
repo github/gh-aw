@@ -268,7 +268,6 @@ Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. Th
     "invocations": 5
   },
   "friction": {
-    "schema": "friction-cost/v1",
     "measurement_state": "statistical",
     "canonical_unit": "aic",
     "sources": ["agent_session", "agent_token_usage", "firewall", "mcp_gateway"],

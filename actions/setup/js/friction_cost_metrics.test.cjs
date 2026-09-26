@@ -123,7 +123,7 @@ describe("measured friction (errored model invocations)", () => {
     expect(friction.measurement_state).toBe("measured");
     expect(friction.canonical_unit).toBe("aic");
     expect(friction.cost.aic).toBe(0.25);
-    expect(friction.estimated_usd).toBe(0.0025);
+    expect(friction).not.toHaveProperty("estimated_usd");
     expect(friction.total_run_aic).toBe(0.75);
     expect(friction.friction_ratio).toBeCloseTo(1 / 3, 10);
     expect(friction.cost.turns).toBe(1);

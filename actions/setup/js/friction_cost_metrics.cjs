@@ -55,9 +55,6 @@ const SOURCE_FIDELITY = {
 // reflect every event; only the per-event listing is truncated.
 const MAX_FRICTION_EVENTS = 200;
 
-/** Schema identifier for the additive friction section of usage-activity-summary/v1. */
-const FRICTION_SCHEMA = "friction-cost/v1";
-
 /**
  * Static driver matrix. `derived` means the dimension is attributed causally when a
  * follow-up model invocation can be linked, and statistically otherwise.
@@ -811,6 +808,7 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     driver.states.push(dimensionStates.aic);
 
     const eventState = dimensionStates.aic === DIMENSION_UNSUPPORTED ? STATE_UNAVAILABLE : dimensionStates.aic;
+    /** @type {Record<string, any>} */
     const eventRecord = {
       id: event.id,
       driver: event.driver,
@@ -828,7 +826,6 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
       estimation_method: methodForState(eventState),
       dimension_states: dimensionStates,
       cost,
-      estimated_usd: cost.aic * 0.01,
     };
     if (eventState === STATE_MEASURED) {
       eventRecord.lower_bound_aic = cost.aic;
@@ -894,7 +891,6 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
   const totalRunAIC = runAICValues.length === invocations.length && invocations.length > 0 ? runAICValues.reduce((sum, value) => sum + Number(value), 0) : null;
 
   const friction = {
-    schema: FRICTION_SCHEMA,
     measurement_state: sources.length === 0 ? STATE_UNAVAILABLE : aggregateStates.aic,
     canonical_unit: "aic",
     sources,
@@ -905,7 +901,6 @@ function computeFrictionCost({ gateway = null, integrity = null, session = null,
     linked_invocations: linkedInvocationTotal,
     unattributed_occurrences: unattributedOccurrenceTotal,
     cost: totalCost,
-    estimated_usd: totalCost.aic * 0.01,
     ...(totalRunAIC !== null ? { total_run_aic: totalRunAIC, friction_ratio: totalRunAIC > 0 ? totalCost.aic / totalRunAIC : 0 } : {}),
     dimension_states: aggregateStates,
     uncertainty,
@@ -944,5 +939,4 @@ module.exports = {
   COST_DIMENSIONS,
   TOKEN_CLASSES,
   MAX_FRICTION_EVENTS,
-  FRICTION_SCHEMA,
 };
