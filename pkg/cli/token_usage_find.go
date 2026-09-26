@@ -163,16 +163,29 @@ type apiProxySteeringLogCacheEntry struct {
 	log *apiProxySteeringLog
 }
 
+func loadAPIProxySteeringLogCache(cacheKey string) (apiProxySteeringLogCacheEntry, bool) {
+	cached, ok := apiProxySteeringLogCache.Load(cacheKey)
+	if !ok {
+		return apiProxySteeringLogCacheEntry{}, false
+	}
+	entry, ok := cached.(apiProxySteeringLogCacheEntry)
+	if !ok {
+		apiProxySteeringLogCache.Delete(cacheKey)
+		return apiProxySteeringLogCacheEntry{}, false
+	}
+	return entry, true
+}
+
 // findAPIProxyEventsLog caches the compact parsed result because audit, logs,
 // and token-usage analysis can request it concurrently for the same run.
 func findAPIProxyEventsLog(runDir string) (*apiProxySteeringLog, error) {
 	cacheKey := filepath.Clean(runDir)
-	if cached, ok := apiProxySteeringLogCache.Load(cacheKey); ok {
-		return cached.(apiProxySteeringLogCacheEntry).log, nil
+	if cached, ok := loadAPIProxySteeringLogCache(cacheKey); ok {
+		return cached.log, nil
 	}
 	result, err, _ := apiProxySteeringLogGroup.Do(cacheKey, func() (any, error) {
-		if cached, ok := apiProxySteeringLogCache.Load(cacheKey); ok {
-			return cached.(apiProxySteeringLogCacheEntry), nil
+		if cached, ok := loadAPIProxySteeringLogCache(cacheKey); ok {
+			return cached, nil
 		}
 		log, err := discoverAPIProxyEventsLog(cacheKey)
 		if err != nil {
@@ -185,7 +198,11 @@ func findAPIProxyEventsLog(runDir string) (*apiProxySteeringLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	return result.(apiProxySteeringLogCacheEntry).log, nil
+	entry, ok := result.(apiProxySteeringLogCacheEntry)
+	if !ok {
+		return nil, fmt.Errorf("unexpected API proxy steering log cache result type %T", result)
+	}
+	return entry.log, nil
 }
 
 func discoverAPIProxyEventsLog(runDir string) (*apiProxySteeringLog, error) {

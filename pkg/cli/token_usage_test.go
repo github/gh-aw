@@ -458,6 +458,25 @@ func TestFindTokenUsageFile(t *testing.T) {
 }
 
 func TestFindAPIProxyEventsLog(t *testing.T) {
+	t.Run("recovers from invalid cached value", func(t *testing.T) {
+		tmpDir := testutil.TempDir(t, "find-api-proxy-invalid-cache")
+		cacheKey := filepath.Clean(tmpDir)
+		apiProxySteeringLogCache.Store(cacheKey, "invalid")
+		t.Cleanup(func() {
+			apiProxySteeringLogCache.Delete(cacheKey)
+		})
+		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		require.NoError(t, os.MkdirAll(logsDir, 0o755))
+		eventsFile := filepath.Join(logsDir, "events.jsonl")
+		require.NoError(t, os.WriteFile(eventsFile, []byte(`{"event":"token_steering"}`+"\n"), 0o644))
+
+		result, err := findAPIProxyEventsLog(tmpDir)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, eventsFile, result.path)
+	})
+
 	t.Run("finds in sandbox/firewall/audit path", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "find-api-proxy-events")
 		auditDir := filepath.Join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs")
