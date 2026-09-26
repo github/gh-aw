@@ -150,21 +150,24 @@ func findLegacyAPIProxyLogFile(runDir, relativePath string) string {
 
 func findAPIProxyEventsFile(runDir string) string {
 	relativePaths := []string{proxyEventLogsJSONLPath, proxyEventsJSONLPath}
-	for _, root := range []string{
+	roots := []string{
 		filepath.Join(runDir, "sandbox", "firewall", "logs"),
 		filepath.Join(runDir, "sandbox", "firewall", "audit"),
-	} {
-		for _, relativePath := range relativePaths {
-			candidate := filepath.Join(root, relativePath)
-			if fileutil.FileExists(candidate) {
-				return candidate
+	}
+	if entries, err := os.ReadDir(runDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && (strings.HasPrefix(entry.Name(), "firewall-audit-logs") || strings.HasPrefix(entry.Name(), "firewall-logs")) {
+				roots = append(roots, filepath.Join(runDir, entry.Name()))
 			}
 		}
 	}
-
-	for _, relativePath := range relativePaths {
-		if legacy := findLegacyAPIProxyLogFile(runDir, relativePath); legacy != "" {
-			return legacy
+	for _, root := range roots {
+		for _, relativePath := range relativePaths {
+			candidate := filepath.Join(root, relativePath)
+			counts, err := parseAPIProxySteeringEventCounts(candidate)
+			if err == nil && len(counts) > 0 {
+				return candidate
+			}
 		}
 	}
 	return ""

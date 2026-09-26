@@ -346,7 +346,7 @@ function parseSessionLogs(sessionLogDirs = ["/tmp/gh-aw/sandbox/agent/logs/copil
 }
 
 /**
- * Parse the first available AWF API proxy event log and aggregate steering events.
+ * Parse the first AWF API proxy event log with steering events.
  *
  * @param {string[]} eventLogPaths
  * @returns {{ total_events: number, event_counts: Record<string, number> } | null}
@@ -360,7 +360,9 @@ function parseSteeringEvents(eventLogPaths = API_PROXY_EVENT_LOG_PATHS) {
       }
       const eventCounts = countSteeringEventsByTypeInApiProxyJsonl(fs.readFileSync(eventLogPath, "utf-8"));
       const totalEvents = Object.values(eventCounts).reduce((total, count) => total + count, 0);
-      return totalEvents > 0 ? { total_events: totalEvents, event_counts: eventCounts } : null;
+      if (totalEvents > 0) {
+        return { total_events: totalEvents, event_counts: eventCounts };
+      }
     } catch {
       // Ignore missing or unreadable candidate files and try the next layout.
     }

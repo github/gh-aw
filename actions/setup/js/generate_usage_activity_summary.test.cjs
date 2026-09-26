@@ -137,6 +137,25 @@ describe("generate_usage_activity_summary.cjs", () => {
         fs.rmSync(root, { recursive: true, force: true });
       }
     });
+
+    it("falls back past empty and steering-free event logs", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "steering-events-fallback-test-"));
+      const emptyPath = path.join(root, "event-logs.jsonl");
+      const unrelatedPath = path.join(root, "unrelated.jsonl");
+      const eventsPath = path.join(root, "events.jsonl");
+      fs.writeFileSync(emptyPath, "");
+      fs.writeFileSync(unrelatedPath, '{"event":"request"}\n');
+      fs.writeFileSync(eventsPath, '{"event":"token_steering"}\n');
+
+      try {
+        expect(parseSteeringEvents([emptyPath, unrelatedPath, eventsPath])).toEqual({
+          total_events: 1,
+          event_counts: { token_steering: 1 },
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("parseGatewayActivity", () => {

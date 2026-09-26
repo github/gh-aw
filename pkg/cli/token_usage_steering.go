@@ -141,8 +141,15 @@ func (e proxyEventsEntry) eventName() string {
 			return strings.ToLower(v)
 		}
 	}
-	if e.Payload != nil {
-		for _, v := range []string{e.Payload.Event, e.Payload.Type} {
+	if len(e.Payload) > 0 {
+		var payload struct {
+			Event string `json:"event"`
+			Type  string `json:"type"`
+		}
+		if json.Unmarshal(e.Payload, &payload) != nil {
+			return ""
+		}
+		for _, v := range []string{payload.Event, payload.Type} {
 			if v = strings.TrimSpace(v); v != "" {
 				return strings.ToLower(v)
 			}

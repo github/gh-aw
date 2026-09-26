@@ -130,14 +130,11 @@ type agentUsageEntry struct {
 // the message field is present on steering events.
 type proxyEventsEntry struct {
 	// Event name appears under one of these four keys; all are checked.
-	Event          string `json:"event"`
-	Type           string `json:"type"`
-	EventNameSnake string `json:"event_name"`
-	EventNameCamel string `json:"eventName"`
-	Payload        *struct {
-		Event string `json:"event"`
-		Type  string `json:"type"`
-	} `json:"payload,omitempty"`
+	Event          string          `json:"event"`
+	Type           string          `json:"type"`
+	EventNameSnake string          `json:"event_name"`
+	EventNameCamel string          `json:"eventName"`
+	Payload        json.RawMessage `json:"payload,omitempty"`
 	// Message text (present on steering events).
 	Message string `json:"message"`
 	// Optional RFC3339/RFC3339Nano timestamp (not always present).
