@@ -74,6 +74,7 @@ The package also acts as the authoritative source for the generated workflow con
 | `SafeOutputsHyphenJobName` | `JobName` | `"safe-outputs"` | Hyphenated compatibility alias for the safe-outputs job. |
 | `UploadAssetsJobName` | `JobName` | `"upload_assets"` | Built-in asset-upload job identifier. |
 | `UploadCodeScanningJobName` | `JobName` | `"upload_code_scanning_sarif"` | Built-in SARIF upload job identifier. |
+| `UploadCodeCoverageJobName` | `JobName` | `"upload_code_coverage"` | Built-in code-coverage upload job identifier. |
 | `ConclusionJobName` | `JobName` | `"conclusion"` | Built-in conclusion job identifier. |
 | `UnlockJobName` | `JobName` | `"unlock"` | Built-in unlock job identifier. |
 | `GitHubMCPServerID` | `MCPServerID` | `"github"` | Built-in GitHub MCP server identifier. |

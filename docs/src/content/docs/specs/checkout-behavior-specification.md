@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-09-23<br>
+**Publication Date**: 2026-09-26<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -107,6 +107,10 @@ Entries with the same `(repository, path, wiki)` key MUST merge with these rules
 - **Activation job** MUST use sparse checkout for `.github` and `.agents`, with `persist-credentials: false`.
 - **Agent job** MUST generate default checkout plus additional checkouts from `CheckoutManager`, with `persist-credentials: false` by default.
 - **safe_outputs job** MUST reuse the same checkout generators but set keep-credentials mode for push/fetch use and inject a `Configure Git credentials` step.
+
+For activation checkouts, the compiler MUST select `github.event.pull_request.base.sha` when the active event is `pull_request`, `pull_request_review`, or `pull_request_review_comment`, provided the pull-request payload exists. The expression MUST guard access to the pull-request payload by event name and nullability. Trigger detection MUST match exact names: `pull_request_target` alone MUST NOT enable this pin. On other events, including non-PR events in a mixed-trigger workflow, checkout MUST retain its existing ref (`github.sha` for the standard activation checkout or the resolved callee checkout SHA for `workflow_call`). This checkout occurs before runtime imports and skills are loaded; restoring agent configuration after the PR checkout is not a substitute for pinning activation.
+
+For cross-repository `workflow_call`, activation MUST retain the same-repository checkout condition whenever its token can resolve to the repository-scoped `GITHUB_TOKEN`, including the `on.github-app.ignore-if-missing` fallback. A missing optional App credential MUST NOT cause a cross-repository sparse checkout attempt with `GITHUB_TOKEN`.
 
 ### 3.4 Checkout Manifest
 
@@ -284,6 +288,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-014**: Checkout-manifest path resolution MUST reject paths that are absolute (e.g., `/etc/passwd`) or escape the workspace root (e.g., `../../sensitive`); rejected paths MUST produce an error and MUST NOT be used for checkout or file lookup
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
 - **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
+- **T-CHK-017**: Activation sparse checkout pins supported pull-request events to the base SHA, retains non-PR and `workflow_call` fallback refs, excludes `pull_request_target`, and preserves the same-repo guard for optional App token fallback
 
 ### 7.2 Compliance Checklist
 
@@ -300,6 +305,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout-manifest path-escape rejection | T-CHK-014 | C2 | Required |
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
 | Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
+| Activation checkout ref and fallback provenance | T-CHK-017 | C1 | Required |
 
 ### 7.3 Safeguards
 
@@ -342,6 +348,10 @@ The following MUST-level norms govern credential and token safety during checkou
 ---
 
 ## 9. Change Log
+
+### Version 1.3.0 (Working Draft)
+
+- Specified activation checkout base-SHA pinning, event and payload guards, and same-repository token fallback; added T-CHK-017.
 
 ### Version 1.2.0 (Working Draft)
 
