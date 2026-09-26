@@ -13,10 +13,8 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 	serverMaxOutput := make(map[string]int)
 	summaries := make([]MCPToolSummary, 0, len(usage.Summary))
 	for _, summary := range usage.Summary {
-		if summary.CallCount > 0 {
-			summary.AvgInputSize = roundPayloadAverage(summary.TotalInputSize, summary.CallCount)
-			summary.AvgOutputSize = roundPayloadAverage(summary.TotalOutputSize, summary.CallCount)
-		}
+		summary.AvgInputSize = roundPayloadAverage(summary.TotalInputSize, summary.CallCount)
+		summary.AvgOutputSize = roundPayloadAverage(summary.TotalOutputSize, summary.CallCount)
 		serverMaxInput[summary.ServerName] = max(serverMaxInput[summary.ServerName], summary.MaxInputSize)
 		serverMaxOutput[summary.ServerName] = max(serverMaxOutput[summary.ServerName], summary.MaxOutputSize)
 		summaries = append(summaries, summary)
@@ -25,10 +23,8 @@ func normalizeMCPPayloadStats(usage *MCPToolUsageData) *MCPToolUsageData {
 
 	servers := make([]MCPServerStats, 0, len(usage.Servers))
 	for _, server := range usage.Servers {
-		if server.ToolCallCount > 0 {
-			server.AvgInputSize = roundPayloadAverage(server.TotalInputSize, server.ToolCallCount)
-			server.AvgOutputSize = roundPayloadAverage(server.TotalOutputSize, server.ToolCallCount)
-		}
+		server.AvgInputSize = roundPayloadAverage(server.TotalInputSize, server.ToolCallCount)
+		server.AvgOutputSize = roundPayloadAverage(server.TotalOutputSize, server.ToolCallCount)
 		server.MaxInputSize = max(server.MaxInputSize, serverMaxInput[server.ServerName])
 		server.MaxOutputSize = max(server.MaxOutputSize, serverMaxOutput[server.ServerName])
 		servers = append(servers, server)
