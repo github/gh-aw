@@ -126,6 +126,80 @@ describe("generate_usage_activity_summary.cjs", () => {
         fs.rmSync(sessionRoot, { recursive: true, force: true });
       }
     });
+
+    it("aggregates named skill tool invocations without retaining trace payloads", () => {
+      const sessionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "session-skills-test-"));
+      try {
+        const sessionDir = path.join(sessionRoot, "session-1");
+        fs.mkdirSync(sessionDir, { recursive: true });
+        const events = [
+          { type: "tool.execution_start", timestamp: "2026-09-26T00:00:00Z", data: { toolCallId: "call-1", toolName: "skill", input: { skill: "documentation" } } },
+          { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:01Z", data: { toolCallId: "call-1", toolName: "skill", success: true } },
+          { type: "tool.execution_start", timestamp: "2026-09-26T00:00:02Z", data: { toolCallId: "call-2", toolName: "skill", arguments: { skill: "documentation" } } },
+          { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:03Z", data: { toolCallId: "call-2", toolName: "skill", success: false } },
+          { type: "tool.execution_start", timestamp: "2026-09-26T00:00:04Z", data: { toolCallId: "call-3", toolName: "view", input: { path: "/tmp/file" } } },
+        ];
+        fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map(JSON.stringify).join("\n"));
+
+        expect(parseSessionLogs([sessionRoot])).toMatchObject({
+          tool_execution_starts: 3,
+          tool_execution_completes: 2,
+          skills: {
+            total_invocations: 2,
+            unique_skills: 1,
+            items: [
+              {
+                name: "documentation",
+                invocation_count: 2,
+                failed_count: 1,
+                first_timestamp: "2026-09-26T00:00:00Z",
+                last_timestamp: "2026-09-26T00:00:02Z",
+              },
+            ],
+          },
+        });
+      } finally {
+        fs.rmSync(sessionRoot, { recursive: true, force: true });
+      }
+    });
+
+    it("correlates ID-less failures and orders skill timestamps chronologically", () => {
+      const sessionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "session-skills-order-test-"));
+      try {
+        for (const [name, events] of [
+          [
+            "a-newer",
+            [
+              { type: "tool.execution_start", timestamp: "2026-09-26T00:00:03Z", data: { toolName: "skill", input: { skill: "documentation" } } },
+              { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:04Z", data: { toolName: "skill", success: true } },
+            ],
+          ],
+          [
+            "z-older",
+            [
+              { type: "tool.execution_start", timestamp: "2026-09-26T00:00:01Z", data: { toolName: "skill", input: { skill: "documentation" } } },
+              { type: "tool.execution_complete", timestamp: "2026-09-26T00:00:02Z", data: { toolName: "skill", success: false } },
+            ],
+          ],
+        ]) {
+          const sessionDir = path.join(sessionRoot, name);
+          fs.mkdirSync(sessionDir, { recursive: true });
+          fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map(JSON.stringify).join("\n"));
+        }
+
+        expect(parseSessionLogs([sessionRoot]).skills.items).toEqual([
+          {
+            name: "documentation",
+            invocation_count: 2,
+            failed_count: 1,
+            first_timestamp: "2026-09-26T00:00:01Z",
+            last_timestamp: "2026-09-26T00:00:03Z",
+          },
+        ]);
+      } finally {
+        fs.rmSync(sessionRoot, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("parseSteeringEvents", () => {

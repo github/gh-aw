@@ -36,10 +36,10 @@ imports:
 skills:
   - DietrichGebert/ponytail/skills/ponytail-review@2ed6c52c9d7e5e56942508591085fd45dea277d3
 cache:
-  key: pr-prefetch-${{ github.event.pull_request.head.sha || github.event.issue.number }}
+  key: pr-prefetch-${{ github.event.pull_request.head.sha || format('{0}-{1}', github.event.issue.number || github.event.pull_request.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number), github.run_id) }}
   path: /tmp/gh-aw/agent
   restore-keys:
-    - pr-prefetch-${{ github.event.pull_request.number || github.event.issue.number }}-
+    - pr-prefetch-${{ github.event.pull_request.number || github.event.issue.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}-
 safe-outputs:
   create-pull-request-review-comment:
     max: 10

@@ -39,6 +39,17 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 		"steering":{
 			"total_events":3,
 			"event_counts":{"token_steering":2,"timeout_steering":1}
+		},
+		"skills":{
+			"total_invocations":2,
+			"unique_skills":1,
+			"items":[{
+				"name":"documentation",
+				"invocation_count":2,
+				"failed_count":1,
+				"first_timestamp":"2026-09-09T00:00:01Z",
+				"last_timestamp":"2026-09-09T00:00:02Z"
+			}]
 		}
 	}`), 0o644), "should write usage activity summary")
 
@@ -64,6 +75,17 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 	require.NotNil(t, result.TokenUsage, "loaded steering summary should populate token usage")
 	assert.Equal(t, 3, result.TokenUsage.TotalSteeringEvents)
 	assert.Equal(t, map[string]int{"token_steering": 2, "timeout_steering": 1}, result.TokenUsage.SteeringEventCounts)
+	require.Len(t, result.SkillActivations, 1, "loaded skill summary should populate skill activations")
+	assert.Equal(t, SkillActivation{
+		Name:            "documentation",
+		Status:          "invoked",
+		Source:          "usage_summary",
+		InvocationCount: 2,
+		FailedCount:     1,
+		ReportProvenance: ReportProvenance{
+			Timestamp: "2026-09-09T00:00:01Z",
+		},
+	}, result.SkillActivations[0])
 	assert.Equal(t, MCPToolCall{
 		ToolCallID: "call-1",
 		Timestamp:  "2026-09-09T00:00:00Z",
@@ -74,6 +96,25 @@ func TestLoadUsageActivitySummary(t *testing.T) {
 		Duration:   "25ms",
 		Status:     "success",
 	}, result.MCPToolUsage.ToolCalls[0])
+}
+
+func TestApplyUsageActivitySkillsEnrichesDetailedActivations(t *testing.T) {
+	t.Parallel()
+
+	result := DownloadResult{
+		RunAnalysis: RunAnalysis{
+			SkillActivations: []SkillActivation{{Name: "existing", Status: "invoked", Source: "log_parse"}},
+		},
+	}
+	summary := &usageActivitySummary{
+		Skills: &usageActivitySkills{
+			Items: []usageActivitySkillItem{{Name: "existing", InvocationCount: 2, FailedCount: 1}},
+		},
+	}
+
+	applyUsageActivitySummaryToResult(summary, &result, true)
+
+	assert.Equal(t, []SkillActivation{{Name: "existing", Status: "invoked", Source: "log_parse", InvocationCount: 2, FailedCount: 1}}, result.SkillActivations)
 }
 
 func TestApplyUsageActivitySummaryToResult(t *testing.T) {

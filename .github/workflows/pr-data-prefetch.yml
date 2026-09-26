@@ -40,12 +40,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/gh-aw/agent
-          { gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --exclude '**/*.lock.yml' \
-              --exclude '**/generated/**' \
-              --exclude '**/dist/**' \
-              --exclude '**/build/**' \
-              || true; } | head -n "${PR_DIFF_MAX_LINES}" > /tmp/gh-aw/agent/pr-diff.patch
+          set +e
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --exclude '**/*.lock.yml' \
+            --exclude '**/generated/**' \
+            --exclude '**/dist/**' \
+            --exclude '**/build/**' \
+            > /tmp/gh-aw/agent/pr-diff.full 2> /tmp/gh-aw/agent/pr-diff.err
+          DIFF_EXIT=$?
+          set -e
+          if [ "$DIFF_EXIT" -ne 0 ]; then
+            echo "::error::gh pr diff failed for PR #${PR_NUMBER} (exit ${DIFF_EXIT}): $(cat /tmp/gh-aw/agent/pr-diff.err)" >&2
+            rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err
+            exit 1
+          fi
+          head -n "${PR_DIFF_MAX_LINES}" /tmp/gh-aw/agent/pr-diff.full > /tmp/gh-aw/agent/pr-diff.patch
+          rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err
           LINES=$(wc -l < /tmp/gh-aw/agent/pr-diff.patch)
           gh pr view "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
