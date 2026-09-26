@@ -9,8 +9,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const req = createRequire(import.meta.url);
-const { parseFirewallLogs, parseSessionLogs, parseGatewayActivity, parseSafeOutputsManifest, parseExperimentsData, calculateWorkingSetFromJSONL, parseWorkingSetMetrics, buildFrictionSummary, readTokenUsageContent, MANIFEST_FILE_PATH } =
-  req("./generate_usage_activity_summary.cjs");
+const {
+  parseFirewallLogs,
+  parseSessionLogs,
+  parseSteeringEvents,
+  parseGatewayActivity,
+  parseSafeOutputsManifest,
+  parseExperimentsData,
+  calculateWorkingSetFromJSONL,
+  parseWorkingSetMetrics,
+  buildFrictionSummary,
+  readTokenUsageContent,
+  MANIFEST_FILE_PATH,
+} = req("./generate_usage_activity_summary.cjs");
 
 describe("generate_usage_activity_summary.cjs", () => {
   /** Unique directory for each test to avoid cross-test interference */
@@ -113,6 +124,47 @@ describe("generate_usage_activity_summary.cjs", () => {
         });
       } finally {
         fs.rmSync(sessionRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("parseSteeringEvents", () => {
+    it("aggregates steering counters from the first available AWF event log", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "steering-events-test-"));
+      const missingPath = path.join(root, "missing.jsonl");
+      const eventsPath = path.join(root, "events.jsonl");
+      fs.writeFileSync(eventsPath, ['{"event":"token_steering"}', '{"type":"TOKEN_STEERING"}', '{"event_name":"timeout_steering"}', '{"eventName":"model_steering"}', '{"event":"request"}'].join("\n"));
+
+      try {
+        expect(parseSteeringEvents([missingPath, eventsPath])).toEqual({
+          total_events: 4,
+          event_counts: {
+            model_steering: 1,
+            timeout_steering: 1,
+            token_steering: 2,
+          },
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("falls back past empty and steering-free event logs", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "steering-events-fallback-test-"));
+      const emptyPath = path.join(root, "event-logs.jsonl");
+      const unrelatedPath = path.join(root, "unrelated.jsonl");
+      const eventsPath = path.join(root, "events.jsonl");
+      fs.writeFileSync(emptyPath, "");
+      fs.writeFileSync(unrelatedPath, '{"event":"request"}\n');
+      fs.writeFileSync(eventsPath, '{"event":"token_steering"}\n');
+
+      try {
+        expect(parseSteeringEvents([emptyPath, unrelatedPath, eventsPath])).toEqual({
+          total_events: 1,
+          event_counts: { token_steering: 1 },
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
       }
     });
   });

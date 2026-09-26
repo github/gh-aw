@@ -1217,6 +1217,12 @@
             "total_steering_events": {
               "type": "integer"
             },
+            "steering_event_counts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            },
             "total_duration_ms": {
               "type": "integer"
             },
