@@ -447,7 +447,7 @@ Consequently, a counted event with unavailable AIC makes the run-level state `un
 
 `measured` means the dimension is read from the friction record itself. `derived` means the dimension is attributed causally when a follow-up invocation can be linked, and statistically otherwise. `unsupported` means no data source expresses that dimension for the driver. Firewall-block costs have no invocation-level causal link, but AIC and tokens are statistically estimated from healthy invocations when that baseline is available; otherwise those dimensions are unavailable. Drivers whose source is absent, or that produced no occurrences, are listed in `unmeasured_drivers` with a `no_occurrences` or `source_unavailable:<source>` reason.
 
-When `total_run_aic_partial` is `true`, `total_run_aic` and `friction_ratio` use only invocations that include AIC data. Malformed token-usage records make the run total unavailable instead of publishing a misleading partial denominator.
+When `total_run_aic_partial` is `true`, `total_run_aic` sums only invocations with AIC telemetry, and `friction_ratio` divides attributed friction AIC by that partial denominator. Because the numerator can include causal or statistical estimates, this ratio can exceed `1` and must not be interpreted as a bounded share of full run cost. Malformed token-usage records make the run total and ratio unavailable rather than publishing a misleading partial denominator.
 
 #### Causal grouping and double counting
 
