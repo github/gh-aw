@@ -67,6 +67,7 @@ func (c *Compiler) checkNetworkSupport(engine CodingAgentEngine, networkPermissi
 }
 
 // checkToolsNetworkSupport validates that Copilot's enabled web tools are bound by firewall policies.
+// It skips web-search when the pinned Copilot version cannot enable that tool.
 func (c *Compiler) checkToolsNetworkSupport(engine CodingAgentEngine, engineConfig *EngineConfig, tools map[string]any, networkPermissions *NetworkPermissions) error {
 	if engine.GetID() != string(constants.CopilotEngine) || !hasNetworkRestrictions(networkPermissions) {
 		return nil
