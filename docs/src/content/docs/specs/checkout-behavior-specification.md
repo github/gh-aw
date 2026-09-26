@@ -160,11 +160,12 @@ checkout:
 
 - The runtime MUST parse the resolved `GH_AW_DYNAMIC_CHECKOUTS` payload as a single checkout object or an array of checkout objects, rejecting any other JSON shape.
 - Each entry MUST be validated against a fixed field allowlist (`repository`, `ref`, `path`, `github-token`/`token`, `fetch-depth`, `sparse-checkout`, `submodules`, `lfs`, `wiki`); an unsupported field MUST fail the step.
-- `repository` MUST match `owner/repo` syntax; `path` MUST be a non-empty relative path that does not escape the workspace (no absolute paths, no `..` segments).
+- `repository` MUST match `owner/repo` syntax and MUST NOT use `.` or `..` as either segment, so that the clone URL cannot traverse outside the server URL; `path` MUST be a non-empty relative path that does not escape the workspace (no absolute paths, no `..` segments).
+- `ref` MUST be a plain git ref or object id (only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`, `/`, `+`), MUST NOT start with `-`, and MUST NOT contain `..`, start or end with `/`, or end with `.` or `.lock`; `sparse-checkout` patterns MUST NOT contain control characters. The clone server URL MUST be an `http(s)` origin with an optional simple path.
 - Every checkout's effective repository (its `.wiki` suffix stripped for the comparison when `wiki: true`) MUST be present in the resolved `allowed-repos` set (case-insensitive); a repository outside that set MUST fail the step before any checkout is attempted.
 - Checkout paths across all dynamic entries in a single declaration MUST be unique (case-insensitive); duplicates MUST fail the step.
 - Before cloning, the runtime MUST reject a checkout path whose final component is an existing file, directory, or symbolic link (including a dangling symlink), and MUST reject a path whose parent segments traverse a symbolic link or resolve outside the workspace root.
-- `ref` values and `sparse-checkout` patterns MUST be passed to `git` after an option-terminator (`--`) so that a value beginning with `-` cannot be parsed as a git option.
+- `ref` values, `sparse-checkout` patterns, and clone positional arguments MUST be passed to `git` after an option-terminator (`--`) so that a value beginning with `-` cannot be parsed as a git option.
 - Clone, checkout, sparse-checkout, and submodule operations MUST run with `GIT_LFS_SKIP_SMUDGE=1`; LFS objects MUST be fetched only when `lfs: true`, via an explicit `git lfs pull` step.
 - Agent-job dynamic checkouts MUST use ephemeral, command-level credentials (`persist-credentials: false`-equivalent behavior): the runtime MUST NOT leave a git credential configured after checkout completes unless the caller explicitly requests credential retention (used only for the `safe_outputs` job's PR/push checkout path).
 - Each successfully checked-out dynamic entry MUST be merged into the same checkout-manifest file used by static cross-repo checkouts (see §3.4), recording at least `repository`, `path`, and resolved `default_branch`.
@@ -329,6 +330,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-020**: Dynamic checkout runtime rejects checkout paths that are absolute, escape the workspace, or resolve through a symbolic link (including the checkout target itself, whether pre-existing or a dangling symlink)
 - **T-CHK-021**: Dynamic checkout runtime passes `ref` and sparse-checkout patterns to `git` after an option-terminator (`--`), and disables Git LFS smudging except in the explicit `lfs: true` pull step
 - **T-CHK-022**: Dynamic checkout entries are merged into the same checkout-manifest file as static cross-repo checkouts, and agent-job dynamic checkouts leave no persisted git credential after checkout completes
+- **T-CHK-023**: Dynamic checkout runtime rejects `.`/`..` repository segments, refs that are not plain git refs, sparse-checkout patterns containing control characters, and unsupported clone server URLs
 
 ### 7.2 Compliance Checklist
 
@@ -351,6 +353,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Dynamic checkout path/symlink workspace-escape rejection | T-CHK-020 | C2 | Required |
 | Dynamic checkout git argument hardening and LFS smudge suppression | T-CHK-021 | C2 | Required |
 | Dynamic checkout manifest merge and credential lifecycle | T-CHK-022 | C1/C2 | Required |
+| Dynamic checkout repository, ref, sparse-pattern, and server URL validation | T-CHK-023 | C2 | Required |
 
 ### 7.3 Safeguards
 
@@ -366,7 +369,9 @@ The following MUST-level norms govern credential and token safety during checkou
 
 5. **Dynamic checkout allowlist enforcement**: A dynamic checkout entry MUST NOT be cloned unless its repository is present in the resolved `allowed-repos` set. The check MUST occur before any git operation runs for that entry (see §3.6 and T-CHK-018).
 
-6. **Dynamic checkout path safety**: A dynamic checkout path that is absolute, escapes the workspace root, or resolves through a symbolic link (pre-existing target or traversed parent, including dangling symlinks) MUST be rejected before cloning (see §3.6 and T-CHK-019).
+6. **Dynamic checkout value validation**: Dynamic `repository`, `ref`, `sparse-checkout`, and server URL values MUST be validated against conservative character sets before reaching `git`, in addition to the option-terminator hardening, so that runtime-supplied values cannot alter git's command interpretation or clone target (see §3.6 and T-CHK-023).
+
+7. **Dynamic checkout path safety**: A dynamic checkout path that is absolute, escapes the workspace root, or resolves through a symbolic link (pre-existing target or traversed parent, including dangling symlinks) MUST be rejected before cloning (see §3.6 and T-CHK-019).
 
 ---
 
@@ -408,7 +413,8 @@ The following MUST-level norms govern credential and token safety during checkou
 - Specified activation checkout base-SHA pinning, event and payload guards, and same-repository token fallback; added T-CHK-017.
 - Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
 - Renamed the dynamic checkout expression field from `checkout.dynamic` to `checkout.repos`; `checkout.dynamic` is rejected with a migration error.
-- Added T-CHK-018 through T-CHK-022 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
+- Added dynamic checkout value validation for repository segments, git refs, sparse-checkout patterns, and the clone server URL; added T-CHK-023 and a third dynamic-checkout safeguard.
+- Added T-CHK-018 through T-CHK-023 to §7.1 and the §7.2 compliance checklist, and three dynamic-checkout safeguards to §7.3.
 - Added the dynamic checkout implementation files to the §8 Normative References.
 
 ### Version 1.2.0 (Working Draft)

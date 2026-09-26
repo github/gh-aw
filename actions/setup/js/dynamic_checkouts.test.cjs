@@ -42,6 +42,19 @@ describe("normalizeCheckout", () => {
     expect(() => normalizeCheckout({ repository: "owner/repo", current: true }, "/workspace")).toThrow("field 'current' is not supported");
     expect(() => normalizeCheckout({ repository: "owner/repo", ref: "--upload-pack=evil" }, "/workspace")).toThrow("ref must not start");
   });
+
+  it("rejects relative path segments in the repository name", () => {
+    expect(() => normalizeCheckout({ repository: "../.." }, "/workspace")).toThrow("owner/repo format");
+    expect(() => normalizeCheckout({ repository: "owner/.." }, "/workspace")).toThrow("owner/repo format");
+    expect(() => parseAllowedRepos('["../.."]')).toThrow("owner/repo");
+  });
+
+  it("rejects refs that are not plain git refs", () => {
+    expect(() => normalizeCheckout({ repository: "owner/repo", ref: "main;rm -rf /" }, "/workspace")).toThrow("unsupported characters");
+    expect(() => normalizeCheckout({ repository: "owner/repo", ref: "refs/heads/../evil" }, "/workspace")).toThrow("not a valid git ref");
+    expect(() => normalizeCheckout({ repository: "owner/repo", ref: "refs/heads/main.lock" }, "/workspace")).toThrow("not a valid git ref");
+    expect(normalizeCheckout({ repository: "owner/repo", ref: "refs/heads/main" }, "/workspace").ref).toBe("refs/heads/main");
+  });
 });
 
 describe("checkoutRepository", () => {
@@ -144,6 +157,29 @@ describe("checkoutRepository", () => {
         },
       })
     ).rejects.toThrow("patterns must not start");
+  });
+
+  it("rejects control characters in sparse checkout patterns and unsupported server URLs", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-"));
+    const target = path.join(workspace, "repo");
+    const runGit = async args => {
+      if (args.includes("clone")) {
+        fs.mkdirSync(path.join(target, ".git"), { recursive: true });
+      }
+      return "";
+    };
+    const checkout = normalizeCheckout({ repository: "owner/repo", "sparse-checkout": "src\u0000evil" }, workspace);
+    await expect(checkoutRepository(checkout, { workspace, runGit, maskSecret: () => {} })).rejects.toThrow("control characters");
+
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), "dynamic-checkout-"));
+    await expect(
+      checkoutRepository(normalizeCheckout({ repository: "owner/repo" }, other), {
+        workspace: other,
+        runGit,
+        serverURL: "https://github.com/evil?x=1",
+        maskSecret: () => {},
+      })
+    ).rejects.toThrow("server URL is not supported");
   });
 });
 

@@ -75,7 +75,10 @@ support `repository`, `ref`, `path`, `github-token` (or `token`), `fetch-depth`,
 `sparse-checkout`, `submodules`, `lfs`, and `wiki`.
 
 The runtime validates repository names, prevents paths from escaping the workspace,
-enforces unique paths, and removes checkout credentials before the agent starts. GitHub
+enforces unique paths, and removes checkout credentials before the agent starts. `ref`
+values must be plain git refs or object ids (letters, digits, `.`, `_`, `-`, `/`, `+`),
+and `sparse-checkout` patterns may not start with `-` or contain control characters, so
+runtime values cannot inject additional git options. GitHub
 App authentication, `current`, and additional `fetch` patterns remain available only in
 statically declared checkout entries. Agents should treat static checkouts as known from
 the workflow source and dynamic checkouts as runtime-selected repositories discovered

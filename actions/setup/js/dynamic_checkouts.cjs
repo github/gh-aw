@@ -14,6 +14,35 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const supportedFields = new Set(["repository", "ref", "path", "github-token", "token", "fetch-depth", "sparse-checkout", "submodules", "lfs", "wiki"]);
 
+const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+// Rejects owner/repo values whose segments are relative path components, which
+// would otherwise traverse out of the server URL when building the clone URL.
+function isSafeRepository(repository) {
+  if (typeof repository !== "string" || !repositoryPattern.test(repository)) {
+    return false;
+  }
+  return repository.split("/").every(segment => segment !== "." && segment !== "..");
+}
+
+// Git refs are passed to `git fetch origin -- <ref>`; `--` blocks option
+// injection, so this only needs to keep the value to a conservative subset of
+// the characters git itself accepts in a refname or object id.
+function assertSafeRef(ref) {
+  if (!ref) {
+    return;
+  }
+  if (ref.startsWith("-")) {
+    throw new Error("dynamic checkout ref must not start with '-'");
+  }
+  if (!/^[A-Za-z0-9._\-/+]+$/.test(ref)) {
+    throw new Error(`dynamic checkout ref contains unsupported characters: '${ref}'`);
+  }
+  if (ref.includes("..") || ref.startsWith("/") || ref.endsWith("/") || ref.endsWith(".lock") || ref.endsWith(".")) {
+    throw new Error(`dynamic checkout ref is not a valid git ref: '${ref}'`);
+  }
+}
+
 function parseDynamicCheckouts(value = process.env.GH_AW_DYNAMIC_CHECKOUTS || "") {
   if (!value.trim()) {
     return [];
@@ -38,7 +67,7 @@ function parseAllowedRepos(value = process.env.GH_AW_DYNAMIC_CHECKOUT_ALLOWED_RE
   } catch (error) {
     throw new Error(`dynamic checkout allowed-repos must resolve to a JSON array: ${getErrorMessage(error)}`, { cause: error });
   }
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some(repository => typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))) {
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some(repository => !isSafeRepository(repository))) {
     throw new Error("dynamic checkout allowed-repos must resolve to a non-empty array of owner/repo names");
   }
   return new Set(parsed.map(repository => repository.toLowerCase()));
@@ -52,7 +81,7 @@ function normalizeCheckout(entry, workspace) {
   }
 
   let repository = String(entry.repository || "").trim();
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+  if (!isSafeRepository(repository)) {
     throw new Error(`dynamic checkout repository must use owner/repo format, got '${repository}'`);
   }
   if (entry.lfs !== undefined && typeof entry.lfs !== "boolean") {
@@ -80,9 +109,7 @@ function normalizeCheckout(entry, workspace) {
     repository += ".wiki";
   }
   const ref = String(entry.ref || "").trim();
-  if (ref.startsWith("-")) {
-    throw new Error("dynamic checkout ref must not start with '-'");
-  }
+  assertSafeRef(ref);
   return {
     repository,
     ref,
@@ -97,9 +124,23 @@ function normalizeCheckout(entry, workspace) {
 }
 
 function assertSafeSparsePatterns(patterns) {
-  if (patterns.some(pattern => pattern.startsWith("-"))) {
-    throw new Error("dynamic checkout sparse-checkout patterns must not start with '-'");
+  for (const pattern of patterns) {
+    if (pattern.startsWith("-")) {
+      throw new Error("dynamic checkout sparse-checkout patterns must not start with '-'");
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[\x00-\x1f\x7f]/.test(pattern)) {
+      throw new Error("dynamic checkout sparse-checkout patterns must not contain control characters");
+    }
   }
+}
+
+function normalizeServerURL(value) {
+  const serverURL = String(value || "https://github.com").replace(/\/+$/, "");
+  if (!/^https?:\/\/[A-Za-z0-9._-]+(:\d+)?(\/[A-Za-z0-9._~-]+)*$/.test(serverURL)) {
+    throw new Error(`dynamic checkout server URL is not supported: '${serverURL}'`);
+  }
+  return serverURL;
 }
 
 async function defaultRunGit(args, options = {}) {
@@ -133,7 +174,7 @@ function lstatIfExists(target) {
 
 async function checkoutRepository(checkout, options = {}) {
   const workspace = options.workspace || process.env.GITHUB_WORKSPACE || "";
-  const serverURL = (options.serverURL || process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
+  const serverURL = normalizeServerURL(options.serverURL || process.env.GITHUB_SERVER_URL || "https://github.com");
   const token = checkout.token || options.overrideToken || process.env.GH_TOKEN || "";
   const persistCredentials = options.persistCredentials === true;
   const runGit = options.runGit || defaultRunGit;
@@ -180,7 +221,7 @@ async function checkoutRepository(checkout, options = {}) {
   if (checkout.fetchDepth > 0) {
     cloneArgs.push("--depth", String(checkout.fetchDepth));
   }
-  cloneArgs.push(`${serverURL}/${checkout.repository}.git`, checkoutTarget);
+  cloneArgs.push("--", `${serverURL}/${checkout.repository}.git`, checkoutTarget);
 
   core.info(`Checking out ${checkout.repository} into ${checkout.path}`);
   await runGit(cloneArgs, worktreeOptions);
