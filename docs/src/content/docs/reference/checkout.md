@@ -9,6 +9,7 @@ The `checkout:` frontmatter field controls how repositories are checked out for 
 
 By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR head ref. For `pull_request_target` events, checkout of the PR head branch is **disabled by default** — the head branch may be deleted (merged/closed PRs) or inaccessible (fork PRs), causing the step to hard-fail. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
 
+<<<<<<< HEAD
 Use `checkout:` when you need to check out additional branches, check out multiple repositories, select repositories dynamically, or disable checkout entirely for workflows that don't need a local workspace.
 
 ## Static and Dynamic Syntax
@@ -31,6 +32,11 @@ checkout:
 ```
 
 Do not use a top-level expression such as `checkout: ${{ fromJSON(...) }}` for dynamic checkout. Do not use the old `checkout.dynamic` field. Use `checkout.repos` so the compiler can distinguish the dynamic runtime expression from statically declared checkout entries.
+=======
+Before the agent job, activation separately checks out workflow configuration to load runtime imports and skills. On `pull_request`, `pull_request_review`, and `pull_request_review_comment` events, this sparse checkout uses the PR **base SHA**, not the PR head; on other events it retains the normal activation ref. For reusable `workflow_call` workflows, it uses the resolved callee SHA when there is no active PR event, and skips cross-repository checkout if authentication may fall back to the caller's repository-scoped `GITHUB_TOKEN`. The `checkout:` options below describe the agent job and do not override this activation checkout.
+
+Use `checkout:` when you need to check out additional branches, check out multiple repositories, or to disable checkout entirely for workflows that don't need to access code or can access code dynamically through the GitHub Tools.
+>>>>>>> origin/main
 
 ## Custom Checkout Settings
 

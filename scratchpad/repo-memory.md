@@ -578,7 +578,7 @@ git pull --no-rebase -X ours
 
 When `create-orphan: true` (default):
 - Branch is created if it doesn't exist
-- Uses `git checkout --orphan` for clean history
+- Uses `git checkout --orphan` to create a branch with no prior commit history
 - Empty initial state
 
 When `create-orphan: false`:

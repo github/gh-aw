@@ -116,7 +116,7 @@ Domain: constraint-solving, problem-of-the-day
 Status: good first issue, dependencies
 ```
 
-This taxonomy provides clear filtering while avoiding label sprawl. Use GitHub's issue search to combine labels effectively:
+This taxonomy separates labels into six categories, which can be combined in GitHub's issue search to filter issues:
 - `is:issue is:open label:bug label:priority-high` - Critical bugs
 - `is:issue is:open label:enhancement label:good first issue` - Beginner-friendly enhancements
 - `is:issue is:open label:plan` - Active planning issues
@@ -134,23 +134,23 @@ Analysis of the repository (as of December 2024) shows:
 
 ### Key Findings
 
-**The label distribution reflects expected usage and is working as intended.** The high percentage of workflow labels reflects active AI-assisted planning, not a labeling problem.
+The label distribution matches the patterns described in the Key Findings section below. The high percentage of workflow labels reflects active AI-assisted planning, not a labeling problem.
 
 **Why this is not a concern:**
 1. Labels reflect actual project activity (active AI planning)
-2. Clear distinction between automated and manual issues
-3. Effective filtering with label combinations
-4. Transparent AI attribution
+2. Automated issues carry the `ai-generated` label; manual issues do not
+3. Label combinations can be used to filter issues via GitHub issue search
+4. AI-generated issues are marked with the `ai-generated` label
 5. Additional labels (type, component, priority) provide needed categorization
 
 ### Recommendations
 
 ✅ **Keep current structure** - No changes needed to `plan`/`ai-generated` labels
-- Working as designed
-- Serves clear purpose for tracking AI-generated planning issues
-- Enables effective filtering with combinations
+- Matches the label lifecycle described in this document
+- Serves the purpose of tracking AI-generated planning issues
+- Enables filtering with label combinations
 
-❌ **Do not create `plan-*` subcategories** - Adds complexity without benefit
+❌ **Do not create `plan-*` subcategories** - would add label categories not currently needed for filtering
 - Current system handles this with `is:open` / `is:closed` filters
 - Would fragment label space
 
@@ -167,9 +167,9 @@ Analysis of the repository (as of December 2024) shows:
 ## Success Metrics
 
 ✅ Zero unlabeled open issues  
-✅ Clear distinction between automated and manual issues  
-✅ Effective filtering with label combinations  
-✅ Transparent AI attribution maintained
+✅ Automated issues carry `ai-generated`; manual issues do not  
+✅ Label combinations support filtering via GitHub issue search  
+✅ `ai-generated` label remains on AI-created issues
 
 ---
 

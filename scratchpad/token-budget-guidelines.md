@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document establishes token budget targets and optimization strategies for agentic workflows that consume significant Copilot tokens. These guidelines help maintain cost predictability while preserving analysis quality.
+This document establishes token budget targets and optimization strategies for agentic workflows that consume a high volume of Copilot tokens, as quantified in the per-workflow budget targets below. These guidelines help maintain cost predictability while preserving analysis quality.
 
 ## Purpose
 
@@ -84,7 +84,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 ## Execution Scope
 
 - Test 6-8 representative scenarios (not all scenarios)
-- Focus on quality over quantity
+- Prioritize the highest-severity findings over covering every scenario
 - Prioritize critical issues over complete coverage
 ```
 
@@ -94,7 +94,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 
 - Avoid verbose explanations - focus on actions
 - If stuck after 3 attempts, document and move on
-- Complete analysis within reasonable time
+- Complete analysis within the workflow's configured `timeout-minutes` limit
 - Aim for systematic approach with minimal iteration
 ```
 
@@ -118,7 +118,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 
 **Expected Impact:**
 - **Token Reduction**: 30-40% (from ~200K-300K to ~120K-180K per run)
-- **Quality**: Maintained through strategic scenario selection
+- **Quality**: Scenario count reduced from 15-20 to 6-8 while retaining representative coverage
 - **Runtime**: Reduced from 4-6 hours to 2-3 hours
 
 **Budget Target:**
@@ -130,7 +130,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 - Reduce test scenarios from 15-20 to 6-8 representative cases
 - Enforce concise output with word limits
 - Use progressive disclosure to hide verbose content
-- Focus on quality insights over complete coverage
+- Report only the top 3-5 findings ranked by severity, instead of documenting every scenario
 
 ### CI Cleaner
 
@@ -218,7 +218,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 
 **Expected Impact:**
 - **Token Reduction**: 50-65% (from ~1.78M to ~600K-900K per run)
-- **Quality**: Maintained — highest-value optimizations are still surfaced
+- **Quality**: The top 3 optimizations ranked by estimated CI-time savings are still surfaced
 - **Runtime**: Maintained at <30 minutes
 
 **Budget Target:**
@@ -247,7 +247,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 - `max-turns: 30` added to engine block
 - `timeout-minutes: 30` (unchanged)
 - Added `## Token Budget Guidelines` section in prompt:
-  - Report only top 5 most impactful issues per run
+  - Report only the top 5 issues per run, ranked by severity and frequency
   - Create at most 2 GitHub issues per run (batch findings)
   - Load glossary once; do not re-read
   - Skip workflows reviewed in the last 3 days (use cache memory)
@@ -529,7 +529,7 @@ Use the daily Copilot token report workflow:
 When adding token budgets to a workflow:
 
 - [ ] Set `max-turns` based on workflow complexity
-- [ ] Adjust `timeout-minutes` to reasonable completion time
+- [ ] Adjust `timeout-minutes` based on the workflow's measured p95 completion time
 - [ ] Add output size limits in prompt instructions
 - [ ] Add efficiency guidelines for agent behavior
 - [ ] Document budget targets in workflow comments

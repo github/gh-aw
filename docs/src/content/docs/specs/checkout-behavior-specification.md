@@ -9,7 +9,11 @@ sidebar:
 
 **Version**: 1.3.0<br>
 **Status**: Working Draft  
+<<<<<<< HEAD
 **Publication Date**: 2026-09-25<br>
+=======
+**Publication Date**: 2026-09-26<br>
+>>>>>>> origin/main
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -107,6 +111,10 @@ Entries with the same `(repository, path, wiki)` key MUST merge with these rules
 - **Activation job** MUST use sparse checkout for `.github` and `.agents`, with `persist-credentials: false`.
 - **Agent job** MUST generate default checkout plus additional checkouts from `CheckoutManager`, with `persist-credentials: false` by default.
 - **safe_outputs job** MUST reuse the same checkout generators but set keep-credentials mode for push/fetch use and inject a `Configure Git credentials` step.
+
+For activation checkouts, the compiler MUST select `github.event.pull_request.base.sha` when the active event is `pull_request`, `pull_request_review`, or `pull_request_review_comment`, provided the pull-request payload exists. The expression MUST guard access to the pull-request payload by event name and nullability. Trigger detection MUST match exact names: `pull_request_target` alone MUST NOT enable this pin. On other events, including non-PR events in a mixed-trigger workflow, checkout MUST retain its existing ref (`github.sha` for the standard activation checkout or the resolved callee checkout SHA for `workflow_call`). This checkout occurs before runtime imports and skills are loaded; restoring agent configuration after the PR checkout is not a substitute for pinning activation.
+
+For cross-repository `workflow_call`, activation MUST retain the same-repository checkout condition whenever its token can resolve to the repository-scoped `GITHUB_TOKEN`, including the `on.github-app.ignore-if-missing` fallback. A missing optional App credential MUST NOT cause a cross-repository sparse checkout attempt with `GITHUB_TOKEN`.
 
 ### 3.4 Checkout Manifest
 
@@ -319,11 +327,15 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-014**: Checkout-manifest path resolution MUST reject paths that are absolute (e.g., `/etc/passwd`) or escape the workspace root (e.g., `../../sensitive`); rejected paths MUST produce an error and MUST NOT be used for checkout or file lookup
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
 - **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
+<<<<<<< HEAD
 - **T-CHK-017**: Dynamic checkout compilation requires `allowed-repos`, rejects expressions referencing `steps.*`, and rejects/warns on expressions referencing `secrets.*` directly (strict vs. non-strict mode)
 - **T-CHK-018**: Dynamic checkout runtime rejects repositories not present in the resolved `allowed-repos` set, rejects duplicate checkout paths, and rejects unsupported entry fields
 - **T-CHK-019**: Dynamic checkout runtime rejects checkout paths that are absolute, escape the workspace, or resolve through a symbolic link (including the checkout target itself, whether pre-existing or a dangling symlink)
 - **T-CHK-020**: Dynamic checkout runtime passes `ref` and sparse-checkout patterns to `git` after an option-terminator (`--`), and disables Git LFS smudging except in the explicit `lfs: true` pull step
 - **T-CHK-021**: Dynamic checkout entries are merged into the same checkout-manifest file as static cross-repo checkouts, and agent-job dynamic checkouts leave no persisted git credential after checkout completes
+=======
+- **T-CHK-017**: Activation sparse checkout pins supported pull-request events to the base SHA, retains non-PR and `workflow_call` fallback refs, excludes `pull_request_target`, and preserves the same-repo guard for optional App token fallback
+>>>>>>> origin/main
 
 ### 7.2 Compliance Checklist
 
@@ -340,11 +352,15 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout-manifest path-escape rejection | T-CHK-014 | C2 | Required |
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
 | Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
+<<<<<<< HEAD
 | Dynamic checkout compile-time validation (`allowed-repos`, `steps.*`, `secrets.*`) | T-CHK-017 | C1 | Required |
 | Dynamic checkout runtime allowlist, duplicate-path, and field validation | T-CHK-018 | C2 | Required |
 | Dynamic checkout path/symlink workspace-escape rejection | T-CHK-019 | C2 | Required |
 | Dynamic checkout git argument hardening and LFS smudge suppression | T-CHK-020 | C2 | Required |
 | Dynamic checkout manifest merge and credential lifecycle | T-CHK-021 | C1/C2 | Required |
+=======
+| Activation checkout ref and fallback provenance | T-CHK-017 | C1 | Required |
+>>>>>>> origin/main
 
 ### 7.3 Safeguards
 
@@ -399,10 +415,14 @@ The following MUST-level norms govern credential and token safety during checkou
 
 ### Version 1.3.0 (Working Draft)
 
+<<<<<<< HEAD
 - Added §3.6: Dynamic Checkout Sets requirements covering expression-valued `checkout.repos` parsing, required `allowed-repos` enforcement, compile-time rejection of `steps.*` and `secrets.*` references, runtime field/path/symlink/uniqueness validation, git argument hardening, LFS smudge suppression, ephemeral agent-job credentials, and checkout-manifest merge.
 - Renamed the dynamic checkout expression field from `checkout.dynamic` to `checkout.repos`; `checkout.dynamic` is rejected with a migration error.
 - Added T-CHK-017 through T-CHK-021 to §7.1 and the §7.2 compliance checklist, and two dynamic-checkout safeguards to §7.3.
 - Added the dynamic checkout implementation files to the §8 Normative References.
+=======
+- Specified activation checkout base-SHA pinning, event and payload guards, and same-repository token fallback; added T-CHK-017.
+>>>>>>> origin/main
 
 ### Version 1.2.0 (Working Draft)
 

@@ -37,6 +37,16 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			expected: []string{"--allow-all-tools"},
 		},
 		{
+			name: "bash with wildcard under network restrictions",
+			tools: map[string]any{
+				"bash": []any{"*"},
+			},
+			workflowData: &WorkflowData{
+				NetworkPermissions: &NetworkPermissions{Allowed: []string{"example.com"}},
+			},
+			expected: []string{"--allow-tool", "shell"},
+		},
+		{
 			name: "bash with nil (all commands allowed)",
 			tools: map[string]any{
 				"bash": nil,

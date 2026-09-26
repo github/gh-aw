@@ -4,7 +4,7 @@ This document defines what constitutes a breaking change for the gh-aw CLI. Thes
 
 ## Overview
 
-Breaking changes require special attention during development and review because they can disrupt existing user workflows. This document provides clear criteria for identifying breaking changes and guidance on how to handle them.
+Breaking changes require special attention during development and review because they can disrupt existing user workflows. This document provides criteria for identifying breaking changes and guidance on how to handle them.
 
 ## Categories of Changes
 
@@ -81,7 +81,7 @@ The following changes are **not breaking** and typically require:
 
 **Not Breaking**:
 - Adding new commands
-- Adding new flags with reasonable defaults
+- Adding new flags with backward-compatible defaults
 - Adding new fields to JSON output
 - Adding new optional fields to schema
 - Adding new allowed values to enums
@@ -200,7 +200,7 @@ Remove deprecated `--old-flag` option
 - If you used `--old-flag value`, use `--new-flag value` instead
 - Scripts using this flag will need to be updated
 
-**Reason**: The option was deprecated in v0.X.0 and has been removed to simplify the CLI.
+**Reason**: The option was deprecated in v0.X.0 and has been removed to reduce CLI surface area.
 ```
 
 **Schema breaking change example** (removing a top-level frontmatter field):
@@ -248,7 +248,7 @@ Reviewers should verify:
 
 - [ ] **Breaking change identified correctly** - Does this change match any breaking change criteria?
 - [ ] **Changeset type appropriate** - Is it marked as major/minor/patch correctly?
-- [ ] **Migration guidance provided** - For breaking changes, is there clear migration documentation?
+- [ ] **Migration guidance provided** - For breaking changes, is migration documentation present and complete?
 - [ ] **Deprecation warning added** - If deprecating, does it warn users?
 - [ ] **Backward compatibility considered** - Could this be done without breaking compatibility?
 - [ ] **Tests updated** - Do tests cover the changed behavior?

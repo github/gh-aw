@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `gh aw logs` and `gh aw audit` commands maintain full backward and forward compatibility with both old and new artifact naming schemes.
+The `gh aw logs` and `gh aw audit` commands maintain backward and forward compatibility with both old and new artifact naming schemes.
 
 ## How It Works
 
@@ -103,7 +103,7 @@ The `flattenSingleFileArtifacts()` function assumes that artifacts containing ex
 
 1. **Empty artifact directory:** An artifact directory that was created but contains zero files will not trigger flattening. However, if a caller iterates over the directory expecting to find a specific file (e.g., `aw_info.json`), it will silently receive nothing. The function must skip empty directories without error, but callers must not treat a missing file as an empty file — they must surface a "not found" error.
 
-2. **Unexpected multi-file artifact where single-file was expected:** If an artifact that is always expected to contain one file (e.g., `aw-info`) unexpectedly contains multiple files after a future schema change, `flattenSingleFileArtifacts()` will skip flattening and leave the directory intact. Downstream CLI code that looks for `aw_info.json` at the root will then fail with a confusing "file not found" error rather than a meaningful "artifact has unexpected structure" diagnostic. A guard should log a warning when a nominally single-file artifact is encountered with multiple files.
+2. **Unexpected multi-file artifact where single-file was expected:** If an artifact that is always expected to contain one file (e.g., `aw-info`) unexpectedly contains multiple files after a future schema change, `flattenSingleFileArtifacts()` will skip flattening and leave the directory intact. Downstream CLI code that looks for `aw_info.json` at the root will then fail with an unspecific "file not found" error rather than a diagnostic that identifies the artifact's unexpected structure. A guard should log a warning when a nominally single-file artifact is encountered with multiple files.
 
 3. **File name collision at root:** If two separate artifact directories each contain a file with the same name (e.g., both `aw-info/aw_info.json` and a legacy root-level `aw_info.json` exist in the same download directory), flattening would overwrite the pre-existing file. The function must check for conflicts before moving files and abort with an error rather than silently overwriting.
 
@@ -118,7 +118,7 @@ Tests ensure compatibility:
 - `TestAuditCommandFindsNewArtifacts`: Verifies audit command works with new names
 - `TestFlattenSingleFileArtifactsWithAuditFiles`: Tests flattening with new names
 
-## Key Insight
+## Design Rationale
 
 The separation of concerns ensures compatibility:
 - **Artifact Names**: Metadata for GitHub Actions (can change)

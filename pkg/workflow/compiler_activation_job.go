@@ -21,6 +21,8 @@ const (
 	activationSymlinkPromptDir = constants.GithubDir + "prompts"
 )
 
+const pullRequestBaseSHAExpression = "(github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') && github.event.pull_request != null && github.event.pull_request.base.sha"
+
 var activationMetadataTriggerFields = map[string]struct{}{
 	"reaction":       {},
 	"status-comment": {},
@@ -377,14 +379,9 @@ func (c *Compiler) generateResolveHostRepoStep(data *WorkflowData) string {
 // prompt generation.
 func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData) []string {
 	// Check if action-tag is specified - if so, skip checkout
-	if data != nil && data.Features != nil {
-		if actionTagVal, exists := data.Features["action-tag"]; exists {
-			if actionTagStr, ok := actionTagVal.(string); ok && actionTagStr != "" {
-				// action-tag is set, no checkout needed
-				compilerActivationJobLog.Print("Skipping .github checkout in activation: action-tag specified")
-				return nil
-			}
-		}
+	if activationCheckoutDisabledByActionTag(data) {
+		compilerActivationJobLog.Print("Skipping .github checkout in activation: action-tag specified")
+		return nil
 	}
 
 	// Note: We don't check data.Permissions for contents read access here because
@@ -401,23 +398,67 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 	//
 	// Skip when inlined-imports is enabled: content is embedded at compile time and no
 	// runtime-import macros are used, so the callee's .md files are not needed at runtime.
-	// In dev mode, actions/setup is referenced via a local workspace path (./actions/setup),
-	// so it must be included in the sparse-checkout to preserve it for the post step.
-	// In release/script/action modes, the action is in the runner cache and not the workspace.
+	extraPaths := c.activationSparseCheckoutExtraPaths(data)
+
+	cm := NewCheckoutManager(nil)
+	activationToken := c.resolveActivationToken(data)
+	if data != nil && hasWorkflowCallTrigger(data.On) && !data.InlinedImports {
+		compilerActivationJobLog.Print("Adding cross-repo-aware .github checkout for workflow_call trigger")
+		cm.SetCrossRepoTargetRepo("${{ steps.resolve-host-repo.outputs.target_repo }}")
+		cm.SetCrossRepoTargetRef("${{ steps.resolve-host-repo.outputs.target_checkout_ref }}")
+		checkoutRef := cm.GetCrossRepoTargetRef()
+		if prCheckoutRef := activationCheckoutRef(data, "steps.resolve-host-repo.outputs.target_checkout_ref"); prCheckoutRef != "" {
+			checkoutRef = prCheckoutRef
+		}
+		checkoutSteps := cm.GenerateGitHubFolderCheckoutStep(
+			cm.GetCrossRepoTargetRepo(),
+			checkoutRef,
+			activationToken,
+			c.getActionPin,
+			extraPaths...,
+		)
+		// When no custom token is configured, GITHUB_TOKEN is scoped to the calling
+		// repository and cannot read a private callee repository in cross-repo invocations
+		// (e.g. nbcnews/tvOS-App calling nbcnews/.github). Add an if: condition so the
+		// checkout is only attempted for same-repo invocations where GITHUB_TOKEN works.
+		// For cross-repo scenarios, users can enable the checkout by configuring
+		// activation-github-token or activation-github-app in the workflow frontmatter.
+		if activationTokenMayUseGitHubToken(data) {
+			compilerActivationJobLog.Print("Activation token may use GITHUB_TOKEN — restricting cross-repo checkout to same-repo invocations")
+			checkoutSteps = addSameRepoIfConditionToSteps(checkoutSteps)
+		}
+		return checkoutSteps
+	}
+
+	// For activation job, sparse checkout .github, .agents, and engine-specific config directories
+	// (plus actions/setup in dev mode). Root instruction files are excluded as they are not needed
+	// during activation. sparse-checkout-cone-mode: true ensures subdirectories are recursively included.
+	compilerActivationJobLog.Print("Adding .github, .agents, and engine-specific dirs to sparse checkout for activation job")
+	return cm.GenerateGitHubFolderCheckoutStep("", activationCheckoutRef(data, "github.sha"), activationToken, c.getActionPin, extraPaths...)
+}
+
+// activationCheckoutDisabledByActionTag reports whether action-tag supplies setup
+// assets outside the workspace, making the activation sparse checkout unnecessary.
+func activationCheckoutDisabledByActionTag(data *WorkflowData) bool {
+	if data == nil || data.Features == nil {
+		return false
+	}
+	actionTagVal, exists := data.Features["action-tag"]
+	actionTagStr, ok := actionTagVal.(string)
+	return exists && ok && actionTagStr != ""
+}
+
+// activationSparseCheckoutExtraPaths returns additional activation-job sparse checkout
+// paths beyond the default .github and .agents directories.
+func (c *Compiler) activationSparseCheckoutExtraPaths(data *WorkflowData) []string {
 	var extraPaths []string
 	if c.actionMode.IsDev() {
 		compilerActivationJobLog.Print("Dev mode: adding actions/setup to sparse-checkout to preserve local action post step")
 		extraPaths = append(extraPaths, "actions/setup")
 	}
 
-	// Add engine-specific agent config directories to the sparse checkout.
-	// .github and .agents are already included in GenerateGitHubFolderCheckoutStep's hardcoded list.
-	// Root instruction files (AGENTS.md, CLAUDE.md, GEMINI.md) are excluded — they are not needed
-	// during activation and are omitted to keep the shallow checkout minimal.
-	defaultSparseCheckoutDirs := map[string]struct {
-	}{".github": {}, ".agents": {}}
-	registry := c.engineRegistry
-	for _, folder := range registry.GetAllAgentManifestFolders() {
+	defaultSparseCheckoutDirs := map[string]struct{}{".github": {}, ".agents": {}}
+	for _, folder := range c.engineRegistry.GetAllAgentManifestFolders() {
 		if !setutil.Contains(defaultSparseCheckoutDirs, folder) {
 			extraPaths = append(extraPaths, folder)
 		}
@@ -436,48 +477,48 @@ func (c *Compiler) generateCheckoutGitHubFolderForActivation(data *WorkflowData)
 	}
 	compilerActivationJobLog.Printf("Adding %d engine-specific dirs to sparse-checkout: %v", len(extraPaths), extraPaths)
 
-	// Detect symlinks for well-known .github sub-paths and add their resolved targets
-	// so that sparse checkout fetches the target directory, not just the symlink blob.
-	// Use c.gitRoot so detection works regardless of the process CWD.
 	repoRoot := c.gitRoot
 	if repoRoot == "" {
 		if cwd, err := os.Getwd(); err == nil {
 			repoRoot = cwd
 		}
 	}
-	extraPaths = resolveSymlinkExtraPaths(repoRoot, extraPaths)
+	return resolveSymlinkExtraPaths(repoRoot, extraPaths)
+}
 
-	cm := NewCheckoutManager(nil)
-	activationToken := c.resolveActivationToken(data)
-	if data != nil && hasWorkflowCallTrigger(data.On) && !data.InlinedImports {
-		compilerActivationJobLog.Print("Adding cross-repo-aware .github checkout for workflow_call trigger")
-		cm.SetCrossRepoTargetRepo("${{ steps.resolve-host-repo.outputs.target_repo }}")
-		cm.SetCrossRepoTargetRef("${{ steps.resolve-host-repo.outputs.target_checkout_ref }}")
-		checkoutSteps := cm.GenerateGitHubFolderCheckoutStep(
-			cm.GetCrossRepoTargetRepo(),
-			cm.GetCrossRepoTargetRef(),
-			activationToken,
-			c.getActionPin,
-			extraPaths...,
-		)
-		// When no custom token is configured, GITHUB_TOKEN is scoped to the calling
-		// repository and cannot read a private callee repository in cross-repo invocations
-		// (e.g. nbcnews/tvOS-App calling nbcnews/.github). Add an if: condition so the
-		// checkout is only attempted for same-repo invocations where GITHUB_TOKEN works.
-		// For cross-repo scenarios, users can enable the checkout by configuring
-		// activation-github-token or activation-github-app in the workflow frontmatter.
-		if activationToken == "${{ secrets.GITHUB_TOKEN }}" {
-			compilerActivationJobLog.Print("No custom activation token — restricting cross-repo checkout to same-repo invocations")
-			checkoutSteps = addSameRepoIfConditionToSteps(checkoutSteps)
-		}
-		return checkoutSteps
+// activationCheckoutRef returns the ref expression for activation sparse checkout.
+// It returns an empty string when the workflow has no pull-request event whose payload
+// includes a pull request. fallbackExpression must be a raw GitHub Actions expression
+// without a ${{ }} wrapper.
+func activationCheckoutRef(data *WorkflowData, fallbackExpression string) string {
+	if data == nil || !onSectionHasAnyTrigger(data.On, "pull_request", "pull_request_review", "pull_request_review_comment") {
+		return ""
 	}
+	return fmt.Sprintf("${{ %s || %s }}", pullRequestBaseSHAExpression, fallbackExpression)
+}
 
-	// For activation job, sparse checkout .github, .agents, and engine-specific config directories
-	// (plus actions/setup in dev mode). Root instruction files are excluded as they are not needed
-	// during activation. sparse-checkout-cone-mode: true ensures subdirectories are recursively included.
-	compilerActivationJobLog.Print("Adding .github, .agents, and engine-specific dirs to sparse checkout for activation job")
-	return cm.GenerateGitHubFolderCheckoutStep("", "", activationToken, c.getActionPin, extraPaths...)
+// onSectionHasAnyTrigger reports whether a rendered on: YAML section contains a trigger.
+// Structured parsing provides exact key matching for security-sensitive triggers,
+// unlike the legacy substring check used by hasWorkflowCallTrigger.
+func onSectionHasAnyTrigger(onSection string, triggers ...string) bool {
+	var parsed map[string]any
+	if err := yaml.Unmarshal([]byte(onSection), &parsed); err != nil {
+		return false
+	}
+	if onValue, ok := parsed["on"]; ok {
+		for _, trigger := range triggers {
+			if frontmatterHasTrigger(onValue, trigger) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, trigger := range triggers {
+		if frontmatterHasTrigger(parsed, trigger) {
+			return true
+		}
+	}
+	return false
 }
 
 func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
@@ -511,21 +552,24 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 			continue
 		}
 		parts := strings.Split(normalized, "/")
-		if len(parts) == 0 {
-			continue
-		}
 		invalid := false
-		for _, part := range parts {
+		topLevel := ""
+		for i, part := range parts {
 			if part == "" || part == "." || part == ".." {
 				invalid = true
 				break
+			}
+			if i == 0 {
+				topLevel = part
 			}
 		}
 		if invalid {
 			continue
 		}
 
-		topLevel := parts[0]
+		if topLevel == "" {
+			continue
+		}
 		if _, ok := seen[topLevel]; ok {
 			continue
 		}
@@ -541,11 +585,20 @@ func localSkillSparseCheckoutTopLevelDirs(data *WorkflowData) []string {
 // failing when GITHUB_TOKEN cannot read a private callee repository in cross-repo scenarios.
 func addSameRepoIfConditionToSteps(steps []string) []string {
 	const sameRepoCondition = "steps.resolve-host-repo.outputs.target_repo == github.repository"
-	result := make([]string, len(steps))
-	for i, step := range steps {
-		result[i] = injectIfConditionAfterName(step, sameRepoCondition)
+	result := make([]string, 0, len(steps))
+	for _, step := range steps {
+		result = append(result, injectIfConditionAfterName(step, sameRepoCondition))
 	}
 	return result
+}
+
+// activationTokenMayUseGitHubToken reports whether activation authentication can
+// resolve to the repository-scoped GITHUB_TOKEN at runtime.
+func activationTokenMayUseGitHubToken(data *WorkflowData) bool {
+	if data.ActivationGitHubApp != nil {
+		return data.ActivationGitHubApp.shouldIgnoreMissingKey()
+	}
+	return data.ActivationGitHubToken == "" || data.ActivationGitHubToken == "${{ secrets.GITHUB_TOKEN }}"
 }
 
 // injectIfConditionAfterName inserts an "if:" field immediately after the "- name:"
@@ -564,14 +617,14 @@ func injectIfConditionAfterName(step, condition string) string {
 			break
 		}
 	}
-	if nameLineIdx < 0 {
+	if nameLineIdx < 0 || nameLineIdx >= len(lines) {
 		compilerActivationJobLog.Printf("Warning: could not inject if-condition %q — step has no '- name:' line: %q", condition, step)
 		return step
 	}
 
 	// Idempotency: don't inject if an "if:" field is already present
-	for i := nameLineIdx + 1; i < len(lines); i++ {
-		trimmed := strings.TrimSpace(lines[i])
+	for _, line := range lines[nameLineIdx+1:] {
+		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "if:") {
 			return step
 		}
@@ -579,8 +632,7 @@ func injectIfConditionAfterName(step, condition string) string {
 
 	// Derive the field indentation from the first non-empty line after "- name:"
 	fieldIndent := ""
-	for i := nameLineIdx + 1; i < len(lines); i++ {
-		line := lines[i]
+	for _, line := range lines[nameLineIdx+1:] {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

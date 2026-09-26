@@ -1,6 +1,6 @@
 # Changeset CLI
 
-A minimalistic implementation for managing version releases, inspired by `@changesets/cli`.
+A small implementation for managing version releases, inspired by `@changesets/cli`.
 
 ## Usage
 
@@ -25,7 +25,7 @@ node scripts/changeset.js release --yes
 node scripts/changeset.js release patch -y
 ```
 
-**Note:** Using `make release` is recommended as it automatically runs tests before creating the release, ensuring code quality.
+**Note:** Using `make release` is recommended because it runs tests before creating the release.
 
 ## Commands
 
@@ -160,9 +160,9 @@ For maintenance releases with dependency updates or minor improvements that don'
 - ✅ **CHANGELOG Generation**: Creates formatted entries with proper categorization (Breaking Changes, Features, Bug Fixes)
 - ✅ **Git Integration**: Reads current version from git tags
 - ✅ **Automated Git Operations**: Automatically commits, tags, and pushes releases
-- ✅ **Safety First**: Requires explicit specification for major releases
+- ✅ **Explicit Major Version Requirement**: Requires explicit specification for major releases
 - ✅ **Optional Changeset Releases**: Supports releases with or without changeset files
-- ✅ **Clean Workflow**: Deletes processed changesets after release
+- ✅ **Changeset Cleanup**: Deletes processed changesets after release
 - ✅ **No External Dependencies**: Implemented using only Node.js standard library
 
 ## Requirements

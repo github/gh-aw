@@ -652,6 +652,37 @@ This appendix is generated from the current non-test Go source files in this pac
 | `update_workflows.go` | `UpdateWorkflowsOptions` | `type UpdateWorkflowsOptions struct { WorkflowNames []string AllowMajor bool Force bool Yes bool Verbose bool EngineOverride string WorkflowsDir string NoStopAfter bool StopAfter string NoMerge bool DisableReleaseBump bool DisableSecurityScanner bool NoCompile bool NoRedirect bool CoolDown time.Duration }` | UpdateWorkflowsOptions configures workflow update behavior. |
 | `view_command.go` | `ViewOptions` | `type ViewOptions struct { Owner string Repo string Hostname string OutputDir string Verbose bool }` | ViewOptions holds configuration for the view command. |
 
+### Additional types (verified 2026-09-26)
+
+| File | Symbol | Declaration | Description |
+|------|--------|-------------|-------------|
+| `audit_report.go` | `AuditFinding` | `type AuditFinding struct { Code AuditFindingCode; Category string; Severity scanfindings.SeverityLevel; Title string; Description string; Impact string }` | AuditFinding represents a key insight discovered during audit. |
+| `audit_report.go` | `LabelReport` | `type LabelReport struct { Name string; DatabaseID int64; NodeID string }` | LabelReport describes a GitHub label referenced by an audit report. |
+| `audit_report.go` | `IntegrityFilterSummary` | `type IntegrityFilterSummary struct { TotalFiltered int; RunsWithFilteredEvents int; FilteredServerCounts map[string]int; FilteredToolCounts map[string]int; FilteredReasonCounts map[string]int }` | IntegrityFilterSummary contains aggregate DIFC integrity-filter activity. |
+| `audit_cross_run_clusters.go` | `RunCluster` | `type RunCluster struct { Dimension string; Value string; RunIDs []int64; Count int; Metrics ClusterMetrics }` | RunCluster groups runs that share a common behavioral dimension (e.g., same conclusion, task domain, or execution style). |
+| `audit_cross_run_clusters.go` | `ClusterMetrics` | `type ClusterMetrics struct { AvgTokens int; MedianTokens float64; StdDevTokens float64; AvgTurns float64; AvgDurationNs int64; AvgErrorsPerRun float64; SuccessRate float64 }` | ClusterMetrics holds aggregate metrics for a cluster of runs. |
+| `audit_cross_run_clusters.go` | `ClusterPattern` | `type ClusterPattern struct { Kind string; Severity string; Title string; Description string; Evidence string }` | ClusterPattern describes a detected pattern across clusters (e.g., "failed runs use 2.5x more tokens than successful runs"). |
+| `audit_cross_run_clusters.go` | `ClusterAnalysis` | `type ClusterAnalysis struct { Clusters []RunCluster; Patterns []ClusterPattern }` | ClusterAnalysis is the top-level cluster/pattern output added to CrossRunAuditReport. |
+| `audit_group.go` | `GroupedAuditReport` | `type GroupedAuditReport struct { RunsAnalyzed int; SkippedRuns []int64; Entries []GroupedAuditEntry }` | GroupedAuditReport represents audit findings grouped by run and stable finding code. |
+| `audit_group.go` | `GroupedAuditEntry` | `type GroupedAuditEntry struct { RunID int64; Code AuditFindingCode; Occurrences int; RepresentativeEntry AuditFinding }` | GroupedAuditEntry summarizes all findings for one [run, audit code] pair. |
+| `audit_report_graders.go` | `GraderResult` | `type GraderResult struct { ID string; Name string; Status string; Value *float64; Unit string; Passed *bool; Direction string; Threshold *float64; Message string; Error string }` | GraderResult is a single grader outcome surfaced in the audit report. |
+| `audit_report_graders.go` | `GradersData` | `type GradersData struct { Version int; Results []GraderResult; Total int; Passed int; Failed int; ErrorCount int; UnavailableCount int }` | GradersData aggregates the grader results recorded for a single workflow run. |
+| `experiments_analyze_statistics.go` | `GuardrailVariantStatus` | `type GuardrailVariantStatus struct { Variant string; ObservationCount int; Mean *float64; Passed *bool }` | GuardrailVariantStatus reports one variant's aggregate guardrail outcome. |
+| `experiments_decision.go` | `ExperimentDecisionPolicy` | `type ExperimentDecisionPolicy struct { MinimumEffect float64; RegressionTolerance float64; Confidence float64 }` | ExperimentDecisionPolicy is the normalized deterministic policy used to interpret analysis. |
+| `experiments_decision.go` | `ExperimentDecisionEffect` | `type ExperimentDecisionEffect struct { Absolute float64; Relative *float64; NormalizedAbsolute float64 }` | ExperimentDecisionEffect reports the candidate effect in primary-metric units. |
+| `experiments_decision.go` | `ExperimentDecisionEvidence` | `type ExperimentDecisionEvidence struct { AnalysisType string; Significant bool; PValue *float64; ProbabilitySuperiority *float64 }` | ExperimentDecisionEvidence reports the analyzer evidence consumed by the decision layer. |
+| `experiments_decision.go` | `ExperimentDecisionGuardrails` | `type ExperimentDecisionGuardrails struct { Configured bool; Passed *bool }` | ExperimentDecisionGuardrails summarizes mandatory guardrail outcomes. |
+| `experiments_decision.go` | `ExperimentDecisionResult` | `type ExperimentDecisionResult struct { Decision ExperimentDecision; ReasonCode ExperimentDecisionReasonCode; DecisionReason string; Control string; Candidate string; Direction string; Samples map[string]int; Effect *ExperimentDecisionEffect; Evidence *ExperimentDecisionEvidence; Guardrails ExperimentDecisionGuardrails; Policy ExperimentDecisionPolicy }` | ExperimentDecisionResult is the stable, machine-readable deterministic recommendation returned by `DecideExperiment`. |
+| `experiments_grader_observations.go` | `GraderMetricObservation` | `type GraderMetricObservation struct { RunID string; Variant string; GraderID string; GraderStatus string; Value float64; Binary bool }` | GraderMetricObservation records one grader-derived experiment outcome. |
+| `experiments_grader_observations.go` | `ExcludedObservationSummary` | `type ExcludedObservationSummary struct { Reason string; Count int; RunIDs []string }` | ExcludedObservationSummary groups assigned runs that could not produce a usable observation. |
+| `experiments_grader_statistics.go` | `MetricComparison` | `type MetricComparison struct { ControlVariant string; Variant string; AnalysisType string; Delta float64; PValue *float64; ProbabilitySuperiority *float64; Error string }` | MetricComparison is one control-versus-variant comparison of grader observations. |
+| `logs_models.go` | `GatewaySteeringEvent` | `type GatewaySteeringEvent struct { Type string; Message string; Timestamp string }` | GatewaySteeringEvent records an AI-credit or timeout warning injected by the gateway. |
+| `logs_models.go` | `RunAnalysis` | `type RunAnalysis struct { Run WorkflowRun; Metrics LogMetrics; ... }` | RunAnalysis holds the run metadata, metrics, and analysis reports extracted from a workflow run's logs and artifacts; embedded by both `RunSummary` and `DownloadResult`. |
+| `logs_rate_limit.go` | `GitHubAPIRateLimitState` | `type GitHubAPIRateLimitState struct { Limit int; Remaining int; Reset int64; Used int }` | GitHubAPIRateLimitState holds the core API quota at one point in time. |
+| `logs_rate_limit.go` | `GitHubAPIRateLimitReport` | `type GitHubAPIRateLimitReport struct { Host string; Start *GitHubAPIRateLimitState; End *GitHubAPIRateLimitState }` | GitHubAPIRateLimitReport records the core API quota around a logs command. |
+| `logs_report.go` | `WorkflowContinuation` | `type WorkflowContinuation struct { Repository string; ContinuationData }` | WorkflowContinuation identifies a per-target cursor in a combined multi-workflow report. |
+| `logs_usage_activity.go` | `WorkingSetMetrics` | `type WorkingSetMetrics struct { MeasurementState string; RebuildFactor *float64; CumulativeInputTokens int64; PeakInputTokens int64; RebuildExcessTokens int64; Invocations int }` | WorkingSetMetrics describes cumulative model-input traffic relative to the largest invocation context observed during the agent phase. |
+
 ### Additional constants and variables
 
 | File | Kind | Symbol | Declaration | Description |
@@ -830,9 +861,24 @@ This appendix is generated from the current non-test Go source files in this pac
 
 Method-form symbols on exported types (e.g. `(*FileTracker).TrackCreated`, `(*DomainBuckets).SetAllowedDomains`, `(*ToolGraph).AddSequence`) are already documented in the "Additional functions and methods" table above; the entries here cover only package-level functions that were not yet listed.
 
+### Additional exported top-level functions (verified 2026-09-26)
+
+| File | Function | Signature | Description |
+|------|----------|-----------|-------------|
+| `compile_model_validation.go` | `PrepareCompileModelValidation` | `func PrepareCompileModelValidation(ctx context.Context, config *CompileConfig)` | Builds the active model inventory used by `compile --models`. |
+| `edit_command.go` | `NewEditCommand` | `func NewEditCommand() *cobra.Command` | Creates the experimental command for changing workflow frontmatter. |
+| `experiments_decision.go` | `DecideExperiment` | `func DecideExperiment(analysis ExperimentAnalysis) ExperimentDecisionResult` | Deterministically transforms an existing experiment analysis result into a decision; performs no I/O, statistical tests, artifact loading, or experiment mutation. |
+| `format_command.go` | `NewFormatCommand` | `func NewFormatCommand() *cobra.Command` | Creates the `format` command that applies codemods and normalizes agentic workflow frontmatter. |
+| `graders_command.go` | `NewGradersCommand` | `func NewGradersCommand() *cobra.Command` | Creates the `graders` command group for running workflow graders. |
+| `json_schema_command.go` | `NewJSONSchemaCommand` | `func NewJSONSchemaCommand() *cobra.Command` | Creates the `json-schema` command. |
+| `logs_multi.go` | `DownloadWorkflowLogsForTargets` | `func DownloadWorkflowLogsForTargets(ctx context.Context, opts LogsDownloadOptions, targets []logsWorkflowTarget, initialErrors []error) (err error)` | Downloads several workflow reports concurrently and renders one combined report, using an isolated output directory per target so run IDs from different repositories cannot collide in the local cache. |
+| `mcp_schema.go` | `GenerateNamedOutputSchema` | `func GenerateNamedOutputSchema(name string) ([]byte, error)` | Generates and serializes a known CLI output schema by name (e.g. `audit`). |
+| `mcp_schema.go` | `MarshalOutputSchema` | `func MarshalOutputSchema(schema *jsonschema.Schema) ([]byte, error)` | Serializes a generated output schema using the CLI's standard indented JSON format. |
+| `models_command.go` | `NewModelsCommand` | `func NewModelsCommand() *cobra.Command` | Creates the `models` command that lists model catalog pricing, aliases, and observed automation models. |
+
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-08-08; the "Additional exported top-level functions" table above was added after diffing the full exported-symbol list against this README. No other public-contract deltas were identified beyond the sections above.
+Reviewed against recent source updates on 2026-08-08; the "Additional exported top-level functions" table above was added after diffing the full exported-symbol list against this README. Re-verified on 2026-09-26: diffed the full exported top-level function list against all documented tables and added the "Additional exported top-level functions (verified 2026-09-26)" table above for 10 previously undocumented functions. No other public-contract deltas were identified beyond the sections above.
 
 ---
 

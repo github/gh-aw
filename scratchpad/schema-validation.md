@@ -46,7 +46,7 @@ go test -v -run TestAdditionalPropertiesFalse ./pkg/parser/
 
 ## Example Validation Error
 
-When a workflow contains a typo, the compiler provides a clear error message:
+When a workflow contains a typo, the compiler outputs an error message:
 
 ```bash
 $ ./gh-aw compile workflow-with-typo.md
@@ -58,7 +58,7 @@ $ ./gh-aw compile workflow-with-typo.md
 1. The compiler reads the workflow frontmatter (YAML between `---` markers)
 2. Parses it into a map structure
 3. Validates against the appropriate JSON schema using the `jsonschema` library
-4. If validation fails, provides a detailed error message with:
+4. If validation fails, provides an error message that includes:
    - The invalid field name(s)
    - File location (line and column)
    - List of valid field names
