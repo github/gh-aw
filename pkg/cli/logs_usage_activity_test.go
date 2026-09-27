@@ -142,11 +142,11 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 			MaxInputSize:    70,
 			MaxOutputSize:   140,
 			Servers: []usageActivityGatewayServer{
-				{ServerName: "github", RequestCount: 5, ToolCallCount: 5, FailedCalls: 2, TotalInputSize: 100, TotalOutputSize: 200, AvgDurationMS: 12},
+				{ServerName: "github", RequestCount: 5, ToolCallCount: 5, FailedCalls: 2, TotalInputSize: 100, TotalOutputSize: 200, AvgInputSize: 20, AvgOutputSize: 40, MaxInputSize: 70, MaxOutputSize: 140, AvgDurationMS: 12},
 				{ServerName: "playwright", ToolCallCount: 1, FailedCalls: 0},
 			},
 			Tools: []usageActivityGatewayTool{
-				{ServerName: "github", ToolName: "issue_read", CallCount: 5, FailedCalls: 2, TotalInputSize: 100, TotalOutputSize: 200, MaxInputSize: 70, MaxOutputSize: 140, AvgDurationMS: 12, MaxDurationMS: 30},
+				{ServerName: "github", ToolName: "issue_read", CallCount: 5, FailedCalls: 2, TotalInputSize: 100, TotalOutputSize: 200, AvgInputSize: 20, AvgOutputSize: 40, MaxInputSize: 70, MaxOutputSize: 140, AvgDurationMS: 12, MaxDurationMS: 30},
 			},
 			ToolCalls: []usageActivityGatewayCall{
 				{ToolCallID: "call-1", Timestamp: "2026-09-09T00:00:00Z", ServerName: "github", ToolName: "issue_read", RequestSize: 100, ResponseSize: 200, DurationMS: 25, Outcome: "success"},
@@ -191,10 +191,16 @@ func TestApplyUsageActivitySummaryToResult(t *testing.T) {
 	assert.Equal(t, 2, result.MCPToolUsage.Servers[0].ErrorCount, "failed call counts should map to server error counts")
 	assert.Equal(t, 100, result.MCPToolUsage.Servers[0].TotalInputSize, "server input sizes should be preserved")
 	assert.Equal(t, 200, result.MCPToolUsage.Servers[0].TotalOutputSize, "server output sizes should be preserved")
+	assert.Equal(t, 20, result.MCPToolUsage.Servers[0].AvgInputSize, "server average input sizes should be preserved")
+	assert.Equal(t, 40, result.MCPToolUsage.Servers[0].AvgOutputSize, "server average output sizes should be preserved")
+	assert.Equal(t, 70, result.MCPToolUsage.Servers[0].MaxInputSize, "server maximum input sizes should be preserved")
+	assert.Equal(t, 140, result.MCPToolUsage.Servers[0].MaxOutputSize, "server maximum output sizes should be preserved")
 	assert.Equal(t, "12ms", result.MCPToolUsage.Servers[0].AvgDuration, "server average durations should be formatted")
 	require.Len(t, result.MCPToolUsage.Summary, 1, "gateway tools should be copied from the summary")
 	assert.Equal(t, "issue_read", result.MCPToolUsage.Summary[0].ToolName, "tool names should be preserved")
 	assert.Equal(t, 100, result.MCPToolUsage.Summary[0].TotalInputSize, "tool input sizes should be preserved")
+	assert.Equal(t, 20, result.MCPToolUsage.Summary[0].AvgInputSize, "tool average input sizes should be preserved")
+	assert.Equal(t, 40, result.MCPToolUsage.Summary[0].AvgOutputSize, "tool average output sizes should be preserved")
 	assert.Equal(t, 140, result.MCPToolUsage.Summary[0].MaxOutputSize, "tool maximum output sizes should be preserved")
 	assert.Equal(t, "30ms", result.MCPToolUsage.Summary[0].MaxDuration, "tool maximum durations should be formatted")
 	require.NotNil(t, result.MCPToolUsage.Integrity, "integrity summary should be backfilled")

@@ -518,6 +518,8 @@ function getGatewayServer(gateway, serverName) {
       failed_calls: 0,
       total_input_size: 0,
       total_output_size: 0,
+      max_input_size: 0,
+      max_output_size: 0,
       total_duration_ms: 0,
     };
     gateway.servers.set(serverName, server);
@@ -578,6 +580,7 @@ function recordGatewayToolCall(gateway, serverName, toolName, inputSize, timesta
   server.request_count += 1;
   server.tool_call_count += 1;
   server.total_input_size += inputSize;
+  server.max_input_size = Math.max(server.max_input_size, inputSize);
   tool.call_count += 1;
   tool.total_input_size += inputSize;
   tool.max_input_size = Math.max(tool.max_input_size, inputSize);
@@ -604,6 +607,7 @@ function recordGatewayToolResult(gateway, serverName, toolName, result, call) {
   gateway.total_duration_ms += result.durationMs;
   gateway.max_duration_ms = Math.max(gateway.max_duration_ms, result.durationMs);
   server.total_output_size += result.outputSize;
+  server.max_output_size = Math.max(server.max_output_size, result.outputSize);
   server.total_duration_ms += result.durationMs;
   tool.total_output_size += result.outputSize;
   tool.max_output_size = Math.max(tool.max_output_size, result.outputSize);
@@ -808,6 +812,8 @@ function parseGatewayActivity(logRoots = ["/tmp/gh-aw", "/tmp/gh-aw/threat-detec
           failed_calls: activity.gateway.failed_calls,
           total_input_size: activity.gateway.total_input_size,
           total_output_size: activity.gateway.total_output_size,
+          avg_input_size: Math.round(activity.gateway.total_input_size / activity.gateway.total_calls),
+          avg_output_size: Math.round(activity.gateway.total_output_size / activity.gateway.total_calls),
           max_input_size: activity.gateway.max_input_size,
           max_output_size: activity.gateway.max_output_size,
           total_duration_ms: activity.gateway.total_duration_ms,
@@ -817,12 +823,16 @@ function parseGatewayActivity(logRoots = ["/tmp/gh-aw", "/tmp/gh-aw/threat-detec
             .sort((left, right) => left.server_name.localeCompare(right.server_name))
             .map(server => ({
               ...server,
+              avg_input_size: server.tool_call_count > 0 ? Math.round(server.total_input_size / server.tool_call_count) : 0,
+              avg_output_size: server.tool_call_count > 0 ? Math.round(server.total_output_size / server.tool_call_count) : 0,
               avg_duration_ms: server.tool_call_count > 0 ? server.total_duration_ms / server.tool_call_count : 0,
             })),
           tools: Array.from(activity.gateway.tools.values())
             .sort((left, right) => left.server_name.localeCompare(right.server_name) || left.tool_name.localeCompare(right.tool_name))
             .map(tool => ({
               ...tool,
+              avg_input_size: tool.call_count > 0 ? Math.round(tool.total_input_size / tool.call_count) : 0,
+              avg_output_size: tool.call_count > 0 ? Math.round(tool.total_output_size / tool.call_count) : 0,
               avg_duration_ms: tool.call_count > 0 ? tool.total_duration_ms / tool.call_count : 0,
             })),
         }

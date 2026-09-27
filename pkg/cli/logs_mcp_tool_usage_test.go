@@ -320,6 +320,10 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 	assert.Equal(t, 5, server.ToolCallCount, "Should sum tool call counts: 3+2=5")
 	assert.Equal(t, 5000, server.TotalInputSize, "Should sum input sizes: 3000+2000=5000")
 	assert.Equal(t, 25000, server.TotalOutputSize, "Should sum output sizes: 15000+10000=25000")
+	assert.Equal(t, 1000, server.AvgInputSize, "Should compute weighted average input size")
+	assert.Equal(t, 5000, server.AvgOutputSize, "Should compute weighted average output size")
+	assert.Equal(t, 1500, server.MaxInputSize, "Should derive the server maximum from its tools")
+	assert.Equal(t, 8000, server.MaxOutputSize, "Should derive the server maximum from its tools")
 	assert.Equal(t, 1, server.ErrorCount, "Should sum error counts: 0+1=1")
 
 	// Check tool summary aggregation
@@ -329,6 +333,8 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 	assert.Equal(t, 5, tool.CallCount, "Should sum call counts: 3+2=5")
 	assert.Equal(t, 5000, tool.TotalInputSize, "Should sum input sizes: 3000+2000=5000")
 	assert.Equal(t, 25000, tool.TotalOutputSize, "Should sum output sizes: 15000+10000=25000")
+	assert.Equal(t, 1000, tool.AvgInputSize, "Should compute weighted average input size")
+	assert.Equal(t, 5000, tool.AvgOutputSize, "Should compute weighted average output size")
 	assert.Equal(t, 1500, tool.MaxInputSize, "Should use max of max inputs: max(1200, 1500)=1500")
 	assert.Equal(t, 8000, tool.MaxOutputSize, "Should use max of max outputs: max(6000, 8000)=8000")
 	assert.Equal(t, "200ms", tool.MaxDuration, "Should use max of max durations: max(150ms, 200ms)=200ms")

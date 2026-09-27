@@ -222,6 +222,8 @@ func TestBuildAuditDataWithMCPToolUsage(t *testing.T) {
 	assert.Equal(t, 1, tool.CallCount)
 	assert.Equal(t, 1024, tool.TotalInputSize)
 	assert.Equal(t, 5120, tool.TotalOutputSize)
+	assert.Equal(t, 1024, tool.AvgInputSize)
+	assert.Equal(t, 5120, tool.AvgOutputSize)
 }
 
 func TestBuildAuditDataUsesMCPToolUsageForToolTypes(t *testing.T) {
