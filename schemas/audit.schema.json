@@ -1823,7 +1823,9 @@
                   "tool_name",
                   "call_count",
                   "total_input_size",
-                  "total_output_size"
+                  "total_output_size",
+                  "max_input_size",
+                  "max_output_size"
                 ],
                 "additionalProperties": false
               }
