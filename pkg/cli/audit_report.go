@@ -311,7 +311,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 	jobs := buildAuditJobs(processedRun.JobDetails)
 	errors := extractAuditErrors(run)
 	downloadedFiles := extractDownloadedFiles(run.LogsPath)
-	toolUsage := buildAuditToolUsage(metrics, mcpToolUsage)
+	toolUsage := buildAuditToolUsage(metrics, mcpToolUsage, processedRun.SkillActivations)
 	createdItems := resolveCreatedItems(run.LogsPath, processedRun.SafeOutputs)
 	taskDomain, behaviorFingerprint, agenticAssessments := buildAuditAssessments(processedRun, metricsData, toolUsage, createdItems, overview.AwContext)
 	findings, recommendations, observabilityInsights := buildAuditNarrative(processedRun, metricsData, errors, toolUsage, createdItems, agenticAssessments)
@@ -452,8 +452,33 @@ func extractAuditErrors(run WorkflowRun) []ValidationIssue {
 	return nil
 }
 
-func buildAuditToolUsage(metrics LogMetrics, mcpToolUsage *MCPToolUsageData) []ToolUsageInfo {
-	return mergeMCPToolUsageInfo(buildToolUsageInfo(metrics), mcpToolUsage)
+func buildAuditToolUsage(metrics LogMetrics, mcpToolUsage *MCPToolUsageData, skillActivations []SkillActivation) []ToolUsageInfo {
+	usage := mergeMCPToolUsageInfo(buildToolUsageInfo(metrics), mcpToolUsage)
+	skillCounts := make(map[string]int, len(skillActivations))
+	for _, activation := range skillActivations {
+		name := "skill:" + activation.Name
+		count := activation.InvocationCount
+		if count <= 0 {
+			count = 1
+		}
+		skillCounts[name] += count
+	}
+	merged := make([]ToolUsageInfo, 0, len(usage)+len(skillCounts))
+	for _, tool := range usage {
+		if count, ok := skillCounts[tool.Name]; ok {
+			tool.CallCount += count
+			delete(skillCounts, tool.Name)
+		}
+		merged = append(merged, tool)
+	}
+	for _, activation := range skillActivations {
+		name := "skill:" + activation.Name
+		if count, ok := skillCounts[name]; ok {
+			merged = append(merged, ToolUsageInfo{Name: name, CallCount: count})
+			delete(skillCounts, name)
+		}
+	}
+	return merged
 }
 
 func buildAuditAssessments(processedRun ProcessedRun, metricsData MetricsData, toolUsage []ToolUsageInfo, createdItems []CreatedItemReport, awContext *AwContext) (*TaskDomainInfo, *BehaviorFingerprint, []AgenticAssessment) {
