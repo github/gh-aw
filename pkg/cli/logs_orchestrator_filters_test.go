@@ -287,6 +287,10 @@ func TestBuildProcessedRun(t *testing.T) {
 				UpdatedAt:  now,
 			},
 			AwContext: awCtx,
+			SkillActivations: []SkillActivation{{
+				Name:            "documentation",
+				InvocationCount: 2,
+			}},
 		},
 			LogsPath: tmpDir,
 		}
@@ -296,6 +300,7 @@ func TestBuildProcessedRun(t *testing.T) {
 		assert.Equal(t, int64(1234), pr.Run.DatabaseID)
 		assert.Equal(t, tmpDir, pr.Run.LogsPath)
 		assert.Equal(t, awCtx, pr.AwContext)
+		assert.Equal(t, result.SkillActivations, pr.SkillActivations)
 		assert.Equal(t, 0, pr.Run.ErrorCount)
 		assert.Equal(t, 0, pr.Run.WarningCount)
 	})

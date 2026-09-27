@@ -2742,6 +2742,12 @@
                       "source": {
                         "type": "string"
                       },
+                      "invocation_count": {
+                        "type": "integer"
+                      },
+                      "failed_count": {
+                        "type": "integer"
+                      },
                       "timestamp": {
                         "type": "string"
                       },

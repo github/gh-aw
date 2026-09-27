@@ -187,14 +187,16 @@ type MCPFailureReport struct {
 	ReportProvenance
 }
 
-// SkillActivation records a detected skill invocation from agent logs.
+// SkillActivation records detected invocations of a skill from agent logs.
 // Source indicates where the invocation was detected: "agent_output" for
-// items emitted by the workflow via safe-output, or "log_parse" for
-// patterns extracted from raw agent log files.
+// items emitted by the workflow via safe-output, "log_parse" for patterns
+// extracted from raw agent logs, or "usage_summary" for compact aggregates.
 type SkillActivation struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`           // "invoked"
-	Source string `json:"source,omitempty"` // "agent_output" or "log_parse"
+	Name            string `json:"name"`
+	Status          string `json:"status"`                     // "invoked"
+	Source          string `json:"source,omitempty"`           // "agent_output", "log_parse", or "usage_summary"
+	InvocationCount int    `json:"invocation_count,omitempty"` // Defaults to one for non-aggregate sources
+	FailedCount     int    `json:"failed_count,omitempty"`
 	ReportProvenance
 }
 

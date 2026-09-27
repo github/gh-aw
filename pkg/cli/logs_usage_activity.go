@@ -24,6 +24,7 @@ type usageActivitySummary struct {
 	Gateway     *usageActivityGateway     `json:"gateway,omitempty"`
 	Integrity   *IntegrityFilterSummary   `json:"integrity,omitempty"`
 	Steering    *usageActivitySteering    `json:"steering,omitempty"`
+	Skills      *usageActivitySkills      `json:"skills,omitempty"`
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
@@ -75,6 +76,20 @@ type usageActivitySession struct {
 type usageActivitySteering struct {
 	TotalEvents int            `json:"total_events"`
 	EventCounts map[string]int `json:"event_counts,omitempty"`
+}
+
+type usageActivitySkills struct {
+	TotalInvocations int                      `json:"total_invocations"`
+	UniqueSkills     int                      `json:"unique_skills"`
+	Items            []usageActivitySkillItem `json:"items,omitempty"`
+}
+
+type usageActivitySkillItem struct {
+	Name            string `json:"name"`
+	InvocationCount int    `json:"invocation_count"`
+	FailedCount     int    `json:"failed_count"`
+	FirstTimestamp  string `json:"first_timestamp,omitempty"`
+	LastTimestamp   string `json:"last_timestamp,omitempty"`
 }
 
 type usageActivityGateway struct {
@@ -195,6 +210,7 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	applyUsageActivityFirewallSummary(summary.Firewall, result)
 	applyUsageActivityMCPSummary(summary.Gateway, summary.Integrity, result)
+	applyUsageActivitySkills(summary.Skills, result)
 	if result.Friction == nil {
 		result.Friction = deriveFrictionFallback(result.MCPToolUsage, summary.Session)
 	}
@@ -210,6 +226,54 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 	if summary.SafeOutputs != nil && len(result.SafeOutputs) == 0 && len(summary.SafeOutputs.Items) > 0 {
 		result.SafeOutputs = summary.SafeOutputs.Items
 	}
+}
+
+func applyUsageActivitySkills(skills *usageActivitySkills, result *DownloadResult) {
+	if result == nil {
+		return
+	}
+	result.SkillActivations = mergeUsageActivitySkills(skills, result.Run, result.SkillActivations)
+}
+
+func mergeUsageActivitySkills(skills *usageActivitySkills, run WorkflowRun, activations []SkillActivation) []SkillActivation {
+	if skills == nil || len(skills.Items) == 0 {
+		return activations
+	}
+	aggregates := make(map[string]usageActivitySkillItem, len(skills.Items))
+	for _, skill := range skills.Items {
+		if skill.Name != "" && skill.InvocationCount > 0 {
+			aggregates[skill.Name] = skill
+		}
+	}
+	enriched := make([]SkillActivation, 0, len(activations)+len(aggregates))
+	for _, activation := range activations {
+		if skill, ok := aggregates[activation.Name]; ok {
+			activation.InvocationCount = skill.InvocationCount
+			activation.FailedCount = skill.FailedCount
+			delete(aggregates, activation.Name)
+		}
+		enriched = append(enriched, activation)
+	}
+	for _, skill := range skills.Items {
+		if _, ok := aggregates[skill.Name]; !ok {
+			continue
+		}
+		enriched = append(enriched, SkillActivation{
+			Name:            skill.Name,
+			Status:          "invoked",
+			Source:          "usage_summary",
+			InvocationCount: skill.InvocationCount,
+			FailedCount:     skill.FailedCount,
+			ReportProvenance: buildReportProvenance(
+				run,
+				skill.FirstTimestamp,
+				"",
+				"",
+			),
+		})
+		delete(aggregates, skill.Name)
+	}
+	return enriched
 }
 
 func applyUsageActivitySteeringSummary(steering *usageActivitySteering, tokenUsage **TokenUsageSummary) {
@@ -308,20 +372,22 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 		for _, tool := range gateway.Tools {
 			activityTools[tool.ServerName+":"+tool.ToolName] = tool
 		}
-		for index := range usage.Summary {
-			tool := &usage.Summary[index]
+		updatedTools := make([]MCPToolSummary, 0, len(usage.Summary))
+		for _, tool := range usage.Summary {
 			tool.syncFieldsFromBase()
 			if activity, ok := activityTools[tool.ServerName+":"+tool.ToolName]; ok {
-				backfillUsageActivityToolMetrics(tool, activity)
+				backfillUsageActivityToolMetrics(&tool, activity)
 			}
+			updatedTools = append(updatedTools, tool)
 		}
+		usage.Summary = updatedTools
 
 		activityServers := make(map[string]usageActivityGatewayServer, len(gateway.Servers))
 		for _, server := range gateway.Servers {
 			activityServers[server.ServerName] = server
 		}
-		for index := range usage.Servers {
-			server := &usage.Servers[index]
+		updatedServers := make([]MCPServerStats, 0, len(usage.Servers))
+		for _, server := range usage.Servers {
 			if activity, ok := activityServers[server.ServerName]; ok {
 				if server.TotalInputSize == 0 {
 					server.TotalInputSize = activity.TotalInputSize
@@ -333,7 +399,9 @@ func backfillUsageActivityMCPMetrics(gateway *usageActivityGateway, integritySum
 					server.AvgDuration = formatActivityDuration(activity.AvgDurationMS)
 				}
 			}
+			updatedServers = append(updatedServers, server)
 		}
+		usage.Servers = updatedServers
 	}
 	if usage.Integrity == nil && len(usage.FilteredEvents) == 0 && integritySummary != nil {
 		usage.Integrity = cloneIntegrityFilterSummary(integritySummary)

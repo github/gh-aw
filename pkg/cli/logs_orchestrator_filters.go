@@ -238,6 +238,7 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 		Noops:                   result.Noops,
 		MCPFailures:             result.MCPFailures,
 		MCPToolUsage:            result.MCPToolUsage,
+		SkillActivations:        result.SkillActivations,
 		TokenUsage:              result.TokenUsage,
 		WorkingSet:              result.WorkingSet,
 		Friction:                result.Friction,
