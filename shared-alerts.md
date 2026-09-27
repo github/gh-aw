@@ -273,3 +273,23 @@
   meta-orchestrator `create_pull_request` capability for root-caused single-line fixes to close
   the diagnose-but-never-convert-to-PR gap.
 - `metrics/latest.json` still stale at 2026-09-01 (25 days, 15th consecutive affected run).
+
+## Update — 2026-09-27T04:45Z (Workflow Health Manager)
+- **4th re-confirmation cycle**: live tracker `#63556` (open, not yet expired) still describes all
+  3 root causes accurately — avenger.md npm-symlink (run 36284834929), metrics-collector.md
+  missing `model-provider: github` (run 36289314556), gpclean.md hardcoded retired `gpt-5-codex`
+  (run 36291452078, 4/4 retries failed). No merged fix PR exists for any of the 3 files (checked
+  open+recent PR list: only unrelated #63770/#63496/#63241/#56568 open). Posted a re-confirmation
+  comment on `#63556` rather than filing a new tracker, since it has not yet expired.
+- **New correction**: `metrics-collector.md`'s run 36289314556 actually **fails from a separate
+  post-agent secret-redaction crash** (`EACCES: permission denied, scandir
+  '/tmp/gh-aw/aw-mcp'`), not from `model_not_supported_error` (codex exited 0; that field is a
+  benign fallback-metadata warning). This is the **same `/tmp/gh-aw/aw-mcp` redaction-crash
+  class** previously tracked only against `daily-firewall-report` (there manifesting as `Maximum
+  call stack size exceeded`, reconfirmed again today in run 36288817598) — now confirmed on a
+  2nd, unrelated workflow. Elevates this from single-workflow-flaky to a genuine cross-workflow
+  AWF-firewall redaction defect, independent of the `model-provider` config fix (which is still
+  separately needed for metrics-collector.md).
+- Compilation status unchanged: 298/298 workflows have lock files (100%), compile-validate clean.
+- No dashboard issue created this run — no compilation/health-category shifts beyond the
+  redaction-crash correlation captured via the tracker comment.
