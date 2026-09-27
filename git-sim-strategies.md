@@ -1179,3 +1179,15 @@ create_issue). Called noop only. Standing recommendation unchanged: a human
 maintainer should pause/retire/redesign this workflow (target a disposable sandbox
 repo, not github/gh-aw), fix the sub-agent registration, or explicitly re-authorize
 real probing here with revised guardrails.
+
+## HALTED 2026-09-27 (37th consecutive run) — re-verified, no new information
+
+Same two blockers reconfirmed fresh (not recalled): (1) outer safe-outputs policy's
+literal "no probing/placeholder-content/'let me see if this works'" prohibition still
+covers this workflow's core method (real create_pull_request/push_to_pull_request_branch/
+create_issue calls against github/gh-aw filled with synthetic filler); (2) config-simulator
+still unregistered as an Agent subagent_type this session. No steering issue given. No real
+safe-output calls attempted. next_index unchanged at 216. Called noop only. Recommendation
+unchanged: needs human maintainer action (retarget to disposable sandbox repo, fix sub-agent
+registration, or explicit re-authorization) — further autonomous re-litigation of this same
+conclusion each run is low value.
