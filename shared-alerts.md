@@ -293,3 +293,17 @@
 - Compilation status unchanged: 298/298 workflows have lock files (100%), compile-validate clean.
 - No dashboard issue created this run — no compilation/health-category shifts beyond the
   redaction-crash correlation captured via the tracker comment.
+
+## Update — 2026-09-27T12:58Z (Agent Performance Analyzer)
+- **3rd self-expiry cycle confirmed via direct verification:** `#63556` closed `not_planned`
+  2026-09-27T06:54:57Z. All 3 defects (avenger.md:42 npm-symlink mount, metrics-collector.md:14-16
+  missing `model-provider: github`, gpclean.md:61 retired `gpt-5-codex`) independently re-verified
+  unfixed via `git blame` against current `main` HEAD. Fresh occurrence: #63763 (gpclean failure,
+  2026-09-27T03:31Z, run 36291452078).
+- **Positive development:** Deep Report has filed the structural fix as tracked issues #63656
+  (extend expires for P0/P1 trackers) and #63657 (scoped create-pull-request safe-output for
+  Workflow Health Manager) — both open, referencing prior Agent Performance Reports. Recommend
+  prioritizing these two merges to break the self-expiry loop rather than filing more findings
+  trackers.
+- `metrics/latest.json` still stale at 2026-09-01 (26 days, 16th consecutive affected run).
+- Filed the weekly Agent Performance Report discussion for 2026-09-27.

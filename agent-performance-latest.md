@@ -356,3 +356,42 @@ workflow-health trackers from `expires: 1d`, and (3) giving a meta-orchestrator 
 - Full agent quality/effectiveness ranking remains blocked pending the Metrics Collector fix.
 
 > Last updated: 2026-09-26T12:52Z
+
+---
+
+# Agent Performance Analyzer — Latest Run (2026-09-27T12:58Z)
+
+## Summary
+
+Full agent quality/effectiveness ranking deferred a **16th consecutive run** —
+`metrics/latest.json` remains dated 2026-09-01 (26 days stale). Independently re-verified via
+direct `git blame` against current `main` HEAD (not shared-memory notes) that all 3 root causes
+first filed in #63098 remain unfixed: `avenger.md:42` still mounts `/usr/local/bin/npm` as a
+symlink bind-mount, `metrics-collector.md:14-16` still lacks `model-provider: github`, and
+`gpclean.md:61` still hardcodes retired `openai/gpt-5-codex` — confirmed by fresh occurrence
+issue #63763 (2026-09-27T03:31Z, run 36291452078, all 4 retries failed). Confirmed via
+`issue_read` that `#63556` (3rd tracker in this chain) self-expired `not_planned` at
+2026-09-27T06:54:57Z, same as #63098 and #63348 before it — 3 consecutive self-expiry cycles, no
+merged fix PR for any of the 3 files (search_pull_requests: only #57946/#58722, both closed
+unmerged 2026-09-05). **New this run:** Deep Report has now formally filed the structural fix
+as two tracked issues — #63656 (extend `expires` for P0/P1 workflow-health trackers past 1 day)
+and #63657 (scoped `create-pull-request` safe-output for Workflow Health Manager) — both open,
+unmerged, referencing my prior weekly reports. Created the weekly Agent Performance Report
+discussion for 2026-09-27, recommending merging #63656/#63657 plus applying the 3 one-line fixes
+directly as a stopgap.
+
+## Actions Taken This Run
+
+- Directly `git blame`'d `avenger.md:42`, `metrics-collector.md:14-16`, `gpclean.md:61` against
+  current `main` HEAD to independently confirm all 3 root causes remain unfixed (not just
+  trusting shared-memory notes).
+- Confirmed via `issue_read` that `#63556` closed `not_planned` (3rd self-expiry cycle) and that
+  no successor tracker has been filed yet.
+- Verified `#63656`/`#63657` (Deep Report's structural fix issues) are open and unmerged.
+- Searched for any merged fix PR across the 3 files; found none beyond already-known closed-
+  unmerged #57946/#58722.
+- Created the weekly Agent Performance Report discussion (2026-09-27).
+- Full agent quality/effectiveness ranking remains blocked pending a fresh (non-stale) metrics
+  snapshot.
+
+> Last updated: 2026-09-27T12:58Z
