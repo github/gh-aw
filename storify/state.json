@@ -1,19 +1,21 @@
 {
-  "date": "2026-09-25",
-  "window_start": "2026-09-24T08:09:16Z",
-  "window_end": "2026-09-25T08:09:16Z",
+  "date": "2026-09-27",
+  "window_start": "2026-09-26T08:12:59Z",
+  "window_end": "2026-09-27T08:12:59Z",
   "themes": [
-    "safe_outputs_endpoint_fragility",
-    "activation_gating_fail_fast",
-    "stable_daily_baseline"
+    "safe_outputs_reliability_variance",
+    "agent_failure_containment",
+    "high_throughput_triage_baseline"
   ],
   "carry_forward_questions": [
-    "Does PR Sous Chef recover safe_outputs in next schedule?",
-    "Does Failure Investigator clear activation in next cycle?"
+    "Are PR Sous Chef safe_outputs failures clustering around specific tool calls (resolve thread vs create issue)?",
+    "Can AI Moderator move from repeated report_incomplete to successful agent passes next cycle?",
+    "Should Avenger conclusion semantics be tightened when agent job fails?"
   ],
   "representative_runs": [
-    36109332777,
-    36108622668,
-    36109264070
+    36269159251,
+    36283212457,
+    36276480781,
+    36304004654
   ]
 }

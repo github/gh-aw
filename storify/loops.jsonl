@@ -11,3 +11,6 @@
 {"ts":"2026-09-24T08:07:00Z","date":"2026-09-24","loop":"Cost/complexity pressure loop","direction":"uncertain","evidence":["35959597858"]}
 {"date":"2026-09-25","loop":"safe_outputs_status_inversion","direction":"stable_fragile","evidence":"36107721578->36109332777"}
 {"date":"2026-09-25","loop":"activation_fail_fast","direction":"efficient_sensitive","evidence":"36108622668"}
+{"date": "2026-09-27", "loop": "safe_output_reliability_loop", "direction": "improving", "reinforcers": ["repeated PR Sous Chef invocations", "automatic retries across independent runs"], "evidence_runs": [36269159251, 36269774156, 36270439738, 36288925216, 36298590936, 36304004654]}
+{"date": "2026-09-27", "loop": "fail_open_conclusion_loop", "direction": "stable_risky", "reinforcers": ["agent failures paired with successful conclusion jobs in Avenger"], "evidence_runs": [36276480781, 36279579807]}
+{"date": "2026-09-27", "loop": "moderation_failure_escalation_loop", "direction": "degrading", "reinforcers": ["AI Moderator agent step repeatedly fails", "safeoutputs report_incomplete used as fallback"], "evidence_runs": [36268978560, 36275030191, 36283212457]}
