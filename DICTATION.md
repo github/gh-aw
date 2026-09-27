@@ -55,6 +55,7 @@ call-workflow
 chat-ops
 checkout
 claude
+client-id
 close-issue
 close-pull-request
 codex
