@@ -1,5 +1,6 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
+/* global core */
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -42,22 +43,14 @@ async function fetchLabelNodeIds(githubClient, owner, repo, labelNames) {
   const allLabels = await fetchAllRepoLabels(githubClient, owner, repo);
   const labelMap = new Map(allLabels.map(/** @param {any} l */ l => [l.name.toLowerCase(), l.id]));
 
-  const labelIds = [];
-  const unmatched = [];
-  for (const name of labelNames) {
-    const id = labelMap.get(name.toLowerCase());
-    if (id) {
-      labelIds.push(id);
-    } else {
-      unmatched.push(name);
-    }
-  }
+  const matched = labelNames.map(name => ({ name, id: labelMap.get(name.toLowerCase()) }));
+  const unmatched = matched.filter(entry => !entry.id).map(entry => entry.name);
 
   if (unmatched.length > 0) {
     core.warning(`Could not find label IDs for: ${unmatched.join(", ")}. Ensure these labels exist in the repository.`);
   }
 
-  return labelIds;
+  return matched.filter(entry => entry.id).map(entry => /** @type {string} */ entry.id);
 }
 
 /**
