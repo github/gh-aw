@@ -215,6 +215,8 @@ type MCPToolSummary struct {
 	CallCount          int    `json:"call_count" console:"header:Calls"`
 	TotalInputSize     int    `json:"total_input_size" console:"header:Total Input,format:number"`
 	TotalOutputSize    int    `json:"total_output_size" console:"header:Total Output,format:number"`
+	AvgInputSize       int    `json:"avg_input_size,omitempty" console:"header:Avg Input,format:number"`
+	AvgOutputSize      int    `json:"avg_output_size,omitempty" console:"header:Avg Output,format:number"`
 	MaxInputSize       int    `json:"max_input_size" console:"header:Max Input,format:number"`
 	MaxOutputSize      int    `json:"max_output_size" console:"header:Max Output,format:number"`
 	AvgDuration        string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
@@ -252,6 +254,10 @@ type MCPServerStats struct {
 	RequestCount    int    `json:"request_count" console:"header:Requests"`
 	TotalInputSize  int    `json:"total_input_size" console:"header:Total Input,format:number"`
 	TotalOutputSize int    `json:"total_output_size" console:"header:Total Output,format:number"`
+	AvgInputSize    int    `json:"avg_input_size,omitempty" console:"header:Avg Input,format:number"`
+	AvgOutputSize   int    `json:"avg_output_size,omitempty" console:"header:Avg Output,format:number"`
+	MaxInputSize    int    `json:"max_input_size,omitempty" console:"header:Max Input,format:number"`
+	MaxOutputSize   int    `json:"max_output_size,omitempty" console:"header:Max Output,format:number"`
 	AvgDuration     string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
 }
 
@@ -305,6 +311,7 @@ func buildAuditData(ctx context.Context, processedRun ProcessedRun, metrics LogM
 func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData) (AuditData, []CreatedItemReport) {
 	run := processedRun.Run
 	auditReportLog.Printf("Building audit data for run ID %d", run.DatabaseID)
+	mcpToolUsage = normalizeMCPPayloadStats(mcpToolUsage)
 	expData := extractExperimentData(run.LogsPath)
 	overview := buildAuditOverview(run, expData)
 	metricsData, inferredEngineID := buildAuditMetrics(processedRun, metrics)

@@ -147,9 +147,7 @@ steps:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-When a `noop` entry is present at harness startup, the agent is never started and no AI Credits are charged. The `noop` message appears in the workflow conclusion comment or step summary. The same check also suppresses retries: if a `noop` is written during a failed run, the harness exits 0 instead of retrying.
-
-Use `pre-agent-steps:` instead of `steps:` when the check must run right before the engine starts (for example, after MCP configuration is complete).
+When a `noop` entry is present at harness startup, the agent is never started, no AI Credits are charged, and retries are suppressed. The `noop` message appears in the workflow conclusion comment or step summary. Use `pre-agent-steps:` instead of `steps:` when the check must run immediately before engine startup, such as after MCP configuration.
 
 Compared to `skip-if-match` and `skip-if-no-match`:
 
@@ -161,7 +159,7 @@ Compared to `skip-if-match` and `skip-if-no-match`:
 | **AI Credits saved** | Yes | Yes |
 | **Best for** | Simple label/status/title filters | Complex API calls or file-based conditions |
 
-For maximum savings, prefer `skip-if-match` / `skip-if-no-match` when possible. Reserve `noop` in `steps:` for conditions that require full scripting access or the agent job environment.
+Prefer `skip-if-match` / `skip-if-no-match` when possible, and reserve `noop` in `steps:` for conditions that need scripting or the full agent job environment.
 
 ### Choose a Cheaper Model
 
@@ -320,12 +318,12 @@ default_model_codex: "gpt-5.4-mini"
 gh aw env update defaults.yml --scope org --org MY_ORG
 ```
 
-`gh aw env update` shows a confirmation preview before applying changes. Pass `--yes` to skip the prompt in automation or `--dry-run` to preview without changing variables. Set a field to `null` to delete the corresponding variable from the target scope. Unknown YAML keys are rejected, `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers, and `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers; negative values disable the corresponding guardrail.
+`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` to delete the corresponding variable. Unknown YAML keys are rejected; `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; and `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
 
 3. If you compile workflows in CI, pass compiler-read defaults into the compiler process environment, for example via `${{ vars.* }}`: `GH_AW_DEFAULT_MAX_TURNS`, `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES`, and `GH_AW_DEFAULT_DETECTION_MODEL`.
 
 > [!TIP]
-> `GH_AW_DEFAULT_MODEL_*` and the `GH_AW_DEFAULT_*_TIMEOUT_MINUTES` values are resolved at workflow runtime via `${{ vars.* }}` in compiled YAML, while max-turn and token defaults are read by the compiler process at compile time.
+> `GH_AW_DEFAULT_MODEL_*` and `GH_AW_DEFAULT_*_TIMEOUT_MINUTES` are resolved at workflow runtime via `${{ vars.* }}` in compiled YAML, while max-turn and token defaults are read by the compiler process at compile time.
 
 ### Rate Limiting and Concurrency
 
@@ -416,17 +414,11 @@ See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/) for the full syntax
 
 ### Use Inline Skills to Reduce Context
 
-Move large instruction blocks out of the main prompt body using inline skills. At runtime, each `## skill:` block is extracted and written to engine-specific skill locations — the agent can invoke the skill on demand instead of receiving the guidance upfront, keeping the ambient context slim.
+Move large instruction blocks out of the main prompt body using inline skills. At runtime, each `## skill:` block is extracted and written to engine-specific skill locations, so the agent can invoke the skill on demand instead of receiving the guidance upfront.
 
-Each block ends at a matching `## end skill: \`name\`` marker if present, or otherwise at the next `##` heading or EOF. Add the explicit end marker when the skill is imported into the middle of a document, so content following it is not swallowed into the skill block.
+Each block ends at a matching `## end skill: \`name\`` marker if present, or otherwise at the next `##` heading or EOF. Add the explicit end marker when the skill is imported into the middle of a document so following content is not swallowed into the skill block.
 
-Treat the main prompt as an execution plan and sub-skills as deferred detail:
-
-- Main prompt: concise plan, sequencing, and decision points.
-- Sub-skills: verbose checklists, report templates/layout rules, and domain rubrics.
-- Invoke sub-skills only when needed (for example, at final report generation), not at startup.
-
-This progressive-disclosure pattern keeps early turns focused and reduces per-run token overhead:
+Treat the main prompt as an execution plan and sub-skills as deferred detail: keep the main prompt concise for sequencing and decisions, move verbose checklists and report templates into sub-skills, and invoke those sub-skills only when needed. This progressive-disclosure pattern keeps early turns focused and reduces per-run token overhead:
 
 ```aw wrap
 engine:

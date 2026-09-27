@@ -1796,6 +1796,12 @@
                   "total_output_size": {
                     "type": "integer"
                   },
+                  "avg_input_size": {
+                    "type": "integer"
+                  },
+                  "avg_output_size": {
+                    "type": "integer"
+                  },
                   "max_input_size": {
                     "type": "integer"
                   },
@@ -1898,6 +1904,18 @@
                     "type": "integer"
                   },
                   "total_output_size": {
+                    "type": "integer"
+                  },
+                  "avg_input_size": {
+                    "type": "integer"
+                  },
+                  "avg_output_size": {
+                    "type": "integer"
+                  },
+                  "max_input_size": {
+                    "type": "integer"
+                  },
+                  "max_output_size": {
                     "type": "integer"
                   },
                   "avg_duration": {

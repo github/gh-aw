@@ -115,6 +115,14 @@ func mergeMCPToolSummaries(destination map[string]*MCPToolSummary, summaries []M
 		existing, exists := destination[key]
 		if !exists {
 			newSummary := summary
+			if newSummary.CallCount > 0 {
+				if newSummary.AvgInputSize == 0 {
+					newSummary.AvgInputSize = newSummary.TotalInputSize / newSummary.CallCount
+				}
+				if newSummary.AvgOutputSize == 0 {
+					newSummary.AvgOutputSize = newSummary.TotalOutputSize / newSummary.CallCount
+				}
+			}
 			newSummary.syncBaseFromFields()
 			destination[key] = &newSummary
 			continue
@@ -124,6 +132,10 @@ func mergeMCPToolSummaries(destination map[string]*MCPToolSummary, summaries []M
 		existing.CallCount += summary.CallCount
 		existing.TotalInputSize += summary.TotalInputSize
 		existing.TotalOutputSize += summary.TotalOutputSize
+		if existing.CallCount > 0 {
+			existing.AvgInputSize = existing.TotalInputSize / existing.CallCount
+			existing.AvgOutputSize = existing.TotalOutputSize / existing.CallCount
+		}
 		existing.MaxInputSize = max(existing.MaxInputSize, summary.MaxInputSize)
 		existing.MaxOutputSize = max(existing.MaxOutputSize, summary.MaxOutputSize)
 		existing.ErrorCount += summary.ErrorCount
@@ -145,6 +157,14 @@ func mergeMCPServerStats(destination map[string]*MCPServerStats, servers []MCPSe
 		existing, exists := destination[server.ServerName]
 		if !exists {
 			newStats := server
+			if newStats.ToolCallCount > 0 {
+				if newStats.AvgInputSize == 0 {
+					newStats.AvgInputSize = newStats.TotalInputSize / newStats.ToolCallCount
+				}
+				if newStats.AvgOutputSize == 0 {
+					newStats.AvgOutputSize = newStats.TotalOutputSize / newStats.ToolCallCount
+				}
+			}
 			destination[server.ServerName] = &newStats
 			continue
 		}
@@ -154,6 +174,12 @@ func mergeMCPServerStats(destination map[string]*MCPServerStats, servers []MCPSe
 		existing.ToolCallCount += server.ToolCallCount
 		existing.TotalInputSize += server.TotalInputSize
 		existing.TotalOutputSize += server.TotalOutputSize
+		if existing.ToolCallCount > 0 {
+			existing.AvgInputSize = existing.TotalInputSize / existing.ToolCallCount
+			existing.AvgOutputSize = existing.TotalOutputSize / existing.ToolCallCount
+		}
+		existing.MaxInputSize = max(existing.MaxInputSize, server.MaxInputSize)
+		existing.MaxOutputSize = max(existing.MaxOutputSize, server.MaxOutputSize)
 		existing.ErrorCount += server.ErrorCount
 		if server.AvgDuration != "" && existing.RequestCount > 0 {
 			existingDuration := parseDurationString(existing.AvgDuration)
@@ -220,13 +246,17 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 
 	summaries := sortedMCPToolSummaries(toolSummaryMap)
 	servers := sortedMCPServerStats(serverStatsMap)
+	payloadStats := normalizeMCPPayloadStats(&MCPToolUsageData{
+		Summary: summaries,
+		Servers: servers,
+	})
 
 	reportLog.Printf("Built MCP tool usage summary: %d tool summaries, %d servers, %d total tool calls, %d DIFC filtered events",
-		len(summaries), len(servers), len(allToolCalls), len(allFilteredEvents))
+		len(payloadStats.Summary), len(payloadStats.Servers), len(allToolCalls), len(allFilteredEvents))
 
 	return &MCPToolUsageSummary{
-		Summary:        summaries,
-		Servers:        servers,
+		Summary:        payloadStats.Summary,
+		Servers:        payloadStats.Servers,
 		ToolCalls:      allToolCalls,
 		FilteredEvents: allFilteredEvents,
 		Integrity:      integrity,
