@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-25",
+  "last_updated": "2026-09-27",
   "daily_summary": [
     {
       "date": "2026-07-03",
@@ -80,6 +80,15 @@
       "closed": 131,
       "open": 3,
       "success_rate": 0.799,
+      "top_category": "bug_fix"
+    },
+    {
+      "date": "2026-09-27",
+      "total_prs": 598,
+      "merged": 473,
+      "closed": 122,
+      "open": 3,
+      "success_rate": 0.795,
       "top_category": "bug_fix"
     }
   ]
