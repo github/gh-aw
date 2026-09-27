@@ -42,6 +42,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-error-cause-in-rethrow`](#require-error-cause-in-rethrow) | Require `{ cause: err }` when rethrowing inside a `catch` block |
 | [`require-error-code-in-thrown-error`](#require-error-code-in-thrown-error) | Require standardized error codes in thrown errors when `error_codes.cjs` is imported |
 | [`require-error-code-for-github-api-throw`](#require-error-code-for-github-api-throw) | Require standardized error codes for `throw new Error(...)` after GitHub API calls |
+| [`require-error-code-for-fetch-throw`](#require-error-code-for-fetch-throw) | Require standardized error codes for `throw new Error(...)` after bare `fetch(...)` calls, even without `error_codes.cjs` |
 | [`require-fetch-response-body-try-catch`](#require-fetch-response-body-try-catch) | Require try/catch around `.json()` or `.text()` on Responses from `fetch(...)` |
 | [`require-fetch-timeout`](#require-fetch-timeout) | Require `fetch(...)` calls to include a non-nullish abort `signal` option |
 | [`require-fetch-try-catch`](#require-fetch-try-catch) | Require try/catch around awaited `fetch(...)` calls, including chained promise forms without rejection handlers |
@@ -1014,6 +1015,27 @@ throw new Error("failed to fetch pull request");
 const { ERR_API } = require("./error_codes.cjs");
 await githubClient.rest.pulls.get({ owner, repo, pull_number });
 throw new Error(`${ERR_API}: failed to fetch pull request`);
+```
+
+### `require-error-code-for-fetch-throw`
+
+Require `throw new Error(...)` messages to include a standardized code (`E###`, `ERR_*`, or `SAFE_OUTPUT_E###`) when an earlier bare `fetch(...)` call happens in the same function. Unlike `require-error-code-in-thrown-error` and `require-error-code-for-github-api-throw`, this rule does **not** require the file to already import `./error_codes.cjs` — it targets the common case where a handler makes raw HTTP calls (e.g. non-GitHub API integrations) but has never adopted the error-code convention at all, so those failures stay invisible to log/dashboard filtering.
+
+**Flagged form:**
+```js
+async function sendRequest(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Azure DevOps request could not be sent");
+}
+```
+
+**Safe alternative:**
+```js
+const { ERR_API } = require("./error_codes.cjs");
+async function sendRequest(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${ERR_API}: Azure DevOps request could not be sent`);
+}
 ```
 
 ### `require-invalid-date-check-before-compare`
