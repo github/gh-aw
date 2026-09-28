@@ -10,6 +10,17 @@
       "type": "string",
       "description": "JSON Schema URL for IDE validation and autocomplete."
     },
+    "experimental": {
+      "type": "object",
+      "description": "Explicit opt-ins for experimental AWF features.",
+      "additionalProperties": false,
+      "properties": {
+        "modelRouting": {
+          "type": "boolean",
+          "description": "Experimental opt-in for task-level model routing. Must be true when apiProxy.routing is configured; without apiProxy.routing, routing remains inactive."
+        }
+      }
+    },
     "network": {
       "type": "object",
       "description": "Network egress configuration.",
@@ -973,6 +984,16 @@
           "type": "integer",
           "minimum": 1,
           "description": "Maximum number of bytes transferred per minute."
+        },
+        "maxGithubApiPointsRest": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum GitHub REST API secondary-rate-limit points allowed per AWF run. Requires security.difcProxy.host."
+        },
+        "maxGithubApiPointsGraphql": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum GitHub GraphQL API secondary-rate-limit points allowed per AWF run. Requires security.difcProxy.host."
         }
       }
     },
@@ -1622,6 +1643,31 @@
             "type": "object",
             "not": {
               "required": ["stagingImage"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["apiProxy"],
+        "properties": {
+          "apiProxy": {
+            "type": "object",
+            "required": ["routing"]
+          }
+        }
+      },
+      "then": {
+        "required": ["experimental"],
+        "properties": {
+          "experimental": {
+            "type": "object",
+            "required": ["modelRouting"],
+            "properties": {
+              "modelRouting": {
+                "const": true
+              }
             }
           }
         }
