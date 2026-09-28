@@ -1,233 +1,30 @@
 {
-  "updated": "2026-07-06",
-  "date": "2026-07-06",
-  "partial": true,
-  "latest_window": {
-    "date": "2026-07-06",
-    "runs": 400,
-    "success": 345,
-    "failure": 55,
-    "rate": 86.25,
-    "prod_main_rate": 82.4,
-    "prod_main_ex_smokeci": 89.4,
-    "non_main_rate": 90.8,
-    "aic": 29611,
-    "tokens": null,
-    "note": "partial 21.5h. HEALTHY-on-baseline. ALL 55 fails 0-turn driver fails. Smoke CI 17(31%) DOMINANT chronic + copilot-sdk-longrun ~22 + claude-longrun 4 + Avenger/chroot-node/DailyFact recurs. pi 100%. 0 missing-tools/data/mcp."
+  "generated_at": "2026-09-28T21:26:47.593749+00:00",
+  "window": "-1d",
+  "total_runs": 1,
+  "raw_success_rate": 0.0,
+  "adjusted_success_rate_excl_intentional_failure": 0.0,
+  "intentional_failure_runs": 0,
+  "total_missing_tools": 0,
+  "total_errors": 0,
+  "total_tokens": 0,
+  "median_duration_seconds": 0.0,
+  "engine_counts": {
+    "unknown": 1
   },
-  "totals": {
-    "r": 171,
-    "s": 139,
-    "f": 32,
-    "rate": 81.3,
-    "prod_main_rate": 65.9,
-    "prod_main_ex_smokeci": 75.7,
-    "prod_main_ex_2clusters": 85.7,
-    "non_main_rate": 96.5,
-    "action_min": 2220,
-    "aic": null,
-    "tok": null,
-    "missing_tools": 0,
-    "missing_data": 0,
-    "mcp_failures": 0
-  },
-  "engines": {
-    "copilot": 122,
-    "claude": 31,
-    "pi": 11,
-    "codex": 5,
-    "antigravity": 1,
-    "gemini": 1
-  },
-  "history": [
-    {
-      "d": "2026-06-13",
-      "r": 98,
-      "s": 67,
-      "rate": 68.4,
-      "$": 22.62,
-      "tok": 43899856,
-      "partial": true
-    },
-    {
-      "d": "2026-06-14",
-      "r": 100,
-      "s": 87,
-      "rate": 87.0,
-      "$": 26.32,
-      "tok": 54464548,
-      "partial": true
-    },
-    {
-      "d": "2026-06-15",
-      "r": 37,
-      "s": 32,
-      "rate": 86.5,
-      "tok": 33390606,
-      "aic": 9962.87,
-      "partial": true
-    },
-    {
-      "d": "2026-06-16",
-      "r": 66,
-      "s": 47,
-      "rate": 71.2,
-      "tok": 41946177,
-      "partial": true
-    },
-    {
-      "d": "2026-06-17",
-      "r": 43,
-      "s": 42,
-      "rate": 97.7,
-      "tok": 23678641
-    },
-    {
-      "d": "2026-06-18",
-      "r": 78,
-      "s": 67,
-      "rate": 88.2,
-      "tok": 42796721,
-      "partial": true
-    },
-    {
-      "d": "2026-06-19",
-      "r": 106,
-      "s": 97,
-      "rate": 91.5,
-      "tok": null,
-      "partial": true
-    },
-    {
-      "d": "2026-06-20",
-      "r": 395,
-      "s": 275,
-      "rate": 69.6,
-      "rate_ex_skillet": 94.2,
-      "tok": 18325653,
-      "partial": true
-    },
-    {
-      "d": "2026-06-21",
-      "r": 325,
-      "s": 298,
-      "rate": 91.7,
-      "tok": null,
-      "partial": true
-    },
-    {
-      "d": "2026-06-22",
-      "r": 274,
-      "s": 259,
-      "rate": 94.5,
-      "tok": null,
-      "partial": true
-    },
-    {
-      "d": "2026-06-23",
-      "r": 174,
-      "s": 161,
-      "rate": 92.5,
-      "aic": 12635,
-      "tok": null,
-      "partial": true
-    },
-    {
-      "d": "2026-06-24",
-      "r": 342,
-      "s": 317,
-      "rate": 92.7,
-      "aic": 26654,
-      "tok": null,
-      "partial": false
-    },
-    {
-      "d": "2026-06-25",
-      "r": 382,
-      "s": 326,
-      "rate": 85.3,
-      "aic": 24173,
-      "tok": null,
-      "partial": false,
-      "note": "DEGRADED 85.3% overall / prod-main 81.0% (81.8% ex-2-intentional) \u2014 worst prod-main since ~06-18; UNLIKE 06-20 NOT skewed by one wf. 32/40 prod-main fails are 0-tok/0-turn agent-job fails across 4 eng\u2026"
-    },
-    {
-      "d": "2026-06-27",
-      "r": 320,
-      "s": 291,
-      "rate": 90.9,
-      "aic": 23272,
-      "tok": null,
-      "note": "RECOVERED to 90.9% (prod-main 86.3%, 87.3% ex-2-intentional) from 06-25 trough. Avenger 10/10 fail DOMINANT (38% of prod-main fails); ex-Avenger prod-main=91.2%. copilot/claude longrun-0turn persists \u2026"
-    },
-    {
-      "d": "2026-06-30",
-      "r": 171,
-      "s": 139,
-      "rate": 81.3,
-      "tok": null,
-      "partial": true,
-      "note": "PARTIAL ~10.5h (10:44-21:19Z) 2nd-half window; pagination stalled. prod-main 65.9% DOMINATED by 2 copilot-CLI-startup clusters: NEW Smoke CI 11/11=100% fail on push + PR Sous Chef 9/11=82%. Ex-both pr\u2026"
-    },
-    {
-      "d": "2026-07-01",
-      "r": 84,
-      "s": 72,
-      "rate": 85.7,
-      "tok": null,
-      "aic": 5703.6,
-      "partial": true,
-      "note": "partial evening window (bridge 60s cap). 3 fail clusters: copilot Execute-CLI 0-turn x8 (incl Smoke CI 4/4), NEW cross-engine Playwright-install x3, codex Process-Safe-Outputs x1. pi 16/16=100%. 0 mis\u2026"
-    },
-    {
-      "d": "2026-07-02",
-      "r": 20,
-      "s": 12,
-      "rate": 60.0,
-      "tok": null,
-      "aic": 1023.8,
-      "partial": true,
-      "note": "count-limited 20-run slice (bridge 60s cap; larger fetch timed out). 8 fails ALL 0-turn/0-tok pre-agent driver: copilot Execute-CLI 0-turn x7 (Smoke CI 2/2, PR CQR 2/2, +3) + NEW pi 0-turn PR Sous Chef(copilot/gpt-5.4). claude 6/6=100%. 0 missing-tools/data/mcp."
-    },
-    {
-      "d": "2026-07-03",
-      "r": 47,
-      "s": 32,
-      "rate": 68.1,
-      "tok": 1078019,
-      "aic": 3539.14,
-      "partial": true,
-      "note": "partial 5.4h evening. pi engine COLLAPSED 100->30.8% via PR Sous Chef sustained 80%-fail 0-turn incident (escalation of 07-02 pi-0turn). copilot 80%, claude 8/8=100%. ALL 15 fails 0-turn. tokens RECOVERED via token_usage_summary=1.08M despite empty metrics.TokenUsage. 0 missing-tools/data/mcp."
-    },
-    {
-      "d": "2026-07-04",
-      "r": 101,
-      "s": 90,
-      "rate": 89.1,
-      "tok": 4372805,
-      "aic": 6375.29,
-      "partial": true,
-      "note": "partial 9.5h 11:39-21:12Z. REBOUND 89.1% (90.9% ex-2-intentional). MAJOR: PR Sous Chef 19/19=100% recovered (07-03 pi-collapse resolved); pi 27/27=100%. ALL 9 real fails copilot 0-turn: Smoke CI 4/4 chronic + copilot-sdk-longrun x4 + chroot-node x1. claude/pi/codex all clean. 0 missing-tools/data/mcp."
-    },
-    {
-      "d": "2026-07-05",
-      "r": 108,
-      "s": 97,
-      "rate": 89.8,
-      "tok": 3361628,
-      "aic": 6311,
-      "partial": true,
-      "note": "partial 6h 15:08-21:15Z. HEALTHY-on-baseline. ALL 11 fails copilot 0-turn Execute-CLI: Smoke CI 7/7=100% chronic + copilot-sdk-longrun x4 (Daily Safe Output Integrator, PR CQR, Impeccable Skills Reviewer[new], Linter Miner[new]). claude 20/20, pi 15/15, codex 1/1 all 100%. 0 missing-tools/data/mcp."
-    },
-    {
-      "d": "2026-07-06",
-      "r": 400,
-      "s": 345,
-      "rate": 86.25,
-      "aic": 29611,
-      "tok": null,
-      "partial": true,
-      "note": "HEALTHY-baseline 86.25%/prod-main 82.4%(ex-SmokeCI 89.4%). 55 fails all 0-turn driver. Smoke CI 17 DOMINANT+copilot-longrun 22+claude-longrun 4. pi 48/48. 0 missing-tools/data/mcp. token-reporting-gap persists."
-    }
-  ]
+  "summary": {
+    "total_runs": 0,
+    "total_duration": "0ns",
+    "total_action_minutes": 0,
+    "total_turns": 0,
+    "total_errors": 0,
+    "total_warnings": 0,
+    "total_missing_tools": 0,
+    "total_missing_data": 0,
+    "total_safe_items": 0,
+    "total_driver_exit_failures": 0,
+    "total_agent_logic_failures": 0,
+    "total_episodes": 0,
+    "high_confidence_episodes": 0
+  }
 }

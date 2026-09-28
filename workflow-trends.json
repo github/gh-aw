@@ -1,1 +1,475 @@
-{"updated":"2026-07-06","note":"per-window snapshot; wfs with any fail or aic>=150. 2026-07-06.","workflows":{"Daily Safe Output Tool Optimizer":{"runs":1,"fail":0,"aic":369.6,"eng":"claude","last":"2026-07-06"},"Contribution Check":{"runs":7,"fail":3,"aic":1071.8,"eng":"copilot","last":"2026-07-06"},"Q":{"runs":5,"fail":0,"aic":490.8,"eng":"copilot","last":"2026-07-06"},"Smoke CI":{"runs":17,"fail":17,"aic":0.0,"eng":"copilot","last":"2026-07-06"},"PR Description Updater":{"runs":13,"fail":0,"aic":509.6,"eng":"copilot","last":"2026-07-06"},"Test Quality Sentinel":{"runs":29,"fail":0,"aic":477.2,"eng":"copilot","last":"2026-07-06"},"Design Decision Gate \ud83c\udfd7\ufe0f":{"runs":32,"fail":0,"aic":739.1,"eng":"claude","last":"2026-07-06"},"PR Code Quality Reviewer":{"runs":34,"fail":10,"aic":4306.6,"eng":"copilot","last":"2026-07-06"},"Matt Pocock Skills Reviewer":{"runs":33,"fail":1,"aic":2395.4,"eng":"copilot","last":"2026-07-06"},"Impeccable Skills Reviewer":{"runs":31,"fail":3,"aic":2091.5,"eng":"copilot","last":"2026-07-06"},"Daily Ambient Context Optimizer":{"runs":1,"fail":0,"aic":290.6,"eng":"copilot","last":"2026-07-06"},"[aw] Failure Investigator (6h)":{"runs":4,"fail":0,"aic":409.6,"eng":"claude","last":"2026-07-06"},"Daily Safe Output Integrator":{"runs":1,"fail":0,"aic":233.3,"eng":"copilot","last":"2026-07-06"},"Daily Code Metrics and Trend Tracking Agent":{"runs":1,"fail":1,"aic":244.1,"eng":"claude","last":"2026-07-06"},"PR Triage Agent":{"runs":4,"fail":0,"aic":380.0,"eng":"copilot","last":"2026-07-06"},"Copilot Opt":{"runs":1,"fail":1,"aic":24.9,"eng":"copilot","last":"2026-07-06"},"Linter Miner":{"runs":1,"fail":1,"aic":187.0,"eng":"copilot","last":"2026-07-06"},"Workflow Portfolio Analyst":{"runs":1,"fail":1,"aic":132.0,"eng":"claude","last":"2026-07-06"},"Daily Security Observability Report":{"runs":1,"fail":0,"aic":162.9,"eng":"copilot","last":"2026-07-06"},"Agentic Workflow AIC Usage Optimizer":{"runs":1,"fail":0,"aic":249.7,"eng":"copilot","last":"2026-07-06"},"Deep Report":{"runs":1,"fail":0,"aic":204.6,"eng":"claude","last":"2026-07-06"},"Daily Issues Report Generator":{"runs":1,"fail":1,"aic":0.0,"eng":"copilot","last":"2026-07-06"},"Super Linter Report":{"runs":1,"fail":1,"aic":0.0,"eng":null,"last":"2026-07-06"},"Daily Fact":{"runs":1,"fail":1,"aic":0.0,"eng":"codex","last":"2026-07-06"},"Daily Agent of the Day Blog Writer":{"runs":2,"fail":1,"aic":177.5,"eng":"copilot","last":"2026-07-06"},"Dead Code Removal Agent":{"runs":1,"fail":0,"aic":189.6,"eng":"copilot","last":"2026-07-06"},"CLI Consistency Checker":{"runs":1,"fail":0,"aic":177.2,"eng":"copilot","last":"2026-07-06"},"Package Specification Librarian":{"runs":1,"fail":0,"aic":245.3,"eng":"copilot","last":"2026-07-06"},"Daily Credit Limit Test":{"runs":2,"fail":1,"aic":5.0,"eng":"copilot","last":"2026-07-06"},"Detection Analysis Report":{"runs":1,"fail":0,"aic":169.0,"eng":"claude","last":"2026-07-06"},"Claude Code User Documentation Review":{"runs":1,"fail":0,"aic":380.7,"eng":"claude","last":"2026-07-06"},"Daily AIC Consumption Report (Sentry + Grafana OTel)":{"runs":1,"fail":0,"aic":179.7,"eng":"claude","last":"2026-07-06"},"GitHub MCP Structural Analysis":{"runs":1,"fail":0,"aic":201.0,"eng":"claude","last":"2026-07-06"},"Typist - Go Type Analysis":{"runs":1,"fail":0,"aic":261.8,"eng":"claude","last":"2026-07-06"},"Daily Max Ai Credits Test":{"runs":1,"fail":1,"aic":7.2,"eng":"copilot","last":"2026-07-06"},"GitHub API Consumption Report Agent":{"runs":1,"fail":0,"aic":196.1,"eng":"claude","last":"2026-07-06"},"Copilot Agent Prompt Clustering Analysis":{"runs":1,"fail":0,"aic":153.4,"eng":"claude","last":"2026-07-06"},"Weekly Workflow Analysis":{"runs":1,"fail":0,"aic":218.3,"eng":"claude","last":"2026-07-06"},"Daily AW Cross-Repo Compile Check":{"runs":1,"fail":0,"aic":348.2,"eng":"claude","last":"2026-07-06"},"Instructions Janitor":{"runs":1,"fail":0,"aic":236.2,"eng":"claude","last":"2026-07-06"},"Organization Health Report":{"runs":1,"fail":0,"aic":197.3,"eng":"copilot","last":"2026-07-06"},"Daily Rendering Scripts Verifier":{"runs":1,"fail":0,"aic":481.5,"eng":"claude","last":"2026-07-06"},"daily-experiment-report":{"runs":1,"fail":0,"aic":176.9,"eng":"copilot","last":"2026-07-06"},"Layout Specification Maintainer":{"runs":1,"fail":1,"aic":129.1,"eng":"copilot","last":"2026-07-06"},"Copilot Session Insights":{"runs":1,"fail":0,"aic":264.6,"eng":"claude","last":"2026-07-06"},"Avenger":{"runs":1,"fail":1,"aic":0.0,"eng":"claude","last":"2026-07-06"},"Daily yamllint Fixer":{"runs":2,"fail":2,"aic":436.8,"eng":"copilot","last":"2026-07-06"},"Daily AgentRx Trace Optimizer":{"runs":1,"fail":0,"aic":284.6,"eng":"claude","last":"2026-07-06"},"GitHub Remote MCP Authentication Test":{"runs":1,"fail":1,"aic":0.0,"eng":"copilot","last":"2026-07-06"},"Daily Sub-Agent Model Resolution Audit":{"runs":1,"fail":1,"aic":358.9,"eng":"copilot","last":"2026-07-06"},"Daily Cli Tools Tester":{"runs":1,"fail":0,"aic":150.6,"eng":"copilot","last":"2026-07-06"},"ESLint Refiner":{"runs":1,"fail":0,"aic":261.4,"eng":"claude","last":"2026-07-06"},"Static Analysis Report":{"runs":1,"fail":0,"aic":193.6,"eng":"claude","last":"2026-07-06"},"Smoke Copilot":{"runs":1,"fail":1,"aic":121.6,"eng":"copilot","last":"2026-07-06"},"Changeset Generator":{"runs":1,"fail":1,"aic":1.2,"eng":"codex","last":"2026-07-06"},"Smoke Gemini":{"runs":1,"fail":1,"aic":0.0,"eng":"gemini","last":"2026-07-06"},"Weekly Safe Outputs Specification Review":{"runs":1,"fail":0,"aic":232.1,"eng":"copilot","last":"2026-07-06"},"Daily Safe Outputs Git Simulator":{"runs":1,"fail":0,"aic":199.6,"eng":"claude","last":"2026-07-06"},"Safe Output Health Monitor":{"runs":1,"fail":1,"aic":1132.0,"eng":"claude","last":"2026-07-06"},"Sergo - Serena Go Expert":{"runs":1,"fail":0,"aic":217.8,"eng":"claude","last":"2026-07-06"},"Code Simplifier":{"runs":1,"fail":1,"aic":153.7,"eng":"copilot","last":"2026-07-06"},"Go Logger Enhancement":{"runs":1,"fail":0,"aic":754.3,"eng":"claude","last":"2026-07-06"},"Daily Compiler Threat Spec Optimizer":{"runs":1,"fail":0,"aic":306.5,"eng":"copilot","last":"2026-07-06"},"Daily Firewall Logs Collector and Reporter":{"runs":1,"fail":0,"aic":222.8,"eng":"copilot","last":"2026-07-06"},"Semantic Function Refactoring":{"runs":1,"fail":0,"aic":214.5,"eng":"claude","last":"2026-07-06"},"Cache directory setup":{"runs":1,"fail":0,"aic":168.3,"eng":"claude","last":"2026-07-06"}}}
+{
+  "none": {
+    "duration_seconds_total": 0.0,
+    "last_seen": "2026-09-28T21:26:47.593749+00:00",
+    "runs": 1,
+    "successes": 0,
+    "tokens": 0
+  },
+  "note": "per-window snapshot; wfs with any fail or aic>=150. 2026-07-06.",
+  "updated": "2026-07-06",
+  "workflows": {
+    "Agentic Workflow AIC Usage Optimizer": {
+      "aic": 249.7,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Avenger": {
+      "aic": 0.0,
+      "eng": "claude",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "CLI Consistency Checker": {
+      "aic": 177.2,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Cache directory setup": {
+      "aic": 168.3,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Changeset Generator": {
+      "aic": 1.2,
+      "eng": "codex",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Claude Code User Documentation Review": {
+      "aic": 380.7,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Code Simplifier": {
+      "aic": 153.7,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Contribution Check": {
+      "aic": 1071.8,
+      "eng": "copilot",
+      "fail": 3,
+      "last": "2026-07-06",
+      "runs": 7
+    },
+    "Copilot Agent Prompt Clustering Analysis": {
+      "aic": 153.4,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Copilot Opt": {
+      "aic": 24.9,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Copilot Session Insights": {
+      "aic": 264.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily AIC Consumption Report (Sentry + Grafana OTel)": {
+      "aic": 179.7,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily AW Cross-Repo Compile Check": {
+      "aic": 348.2,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Agent of the Day Blog Writer": {
+      "aic": 177.5,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 2
+    },
+    "Daily AgentRx Trace Optimizer": {
+      "aic": 284.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Ambient Context Optimizer": {
+      "aic": 290.6,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Cli Tools Tester": {
+      "aic": 150.6,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Code Metrics and Trend Tracking Agent": {
+      "aic": 244.1,
+      "eng": "claude",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Compiler Threat Spec Optimizer": {
+      "aic": 306.5,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Credit Limit Test": {
+      "aic": 5.0,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 2
+    },
+    "Daily Fact": {
+      "aic": 0.0,
+      "eng": "codex",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Firewall Logs Collector and Reporter": {
+      "aic": 222.8,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Issues Report Generator": {
+      "aic": 0.0,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Max Ai Credits Test": {
+      "aic": 7.2,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Rendering Scripts Verifier": {
+      "aic": 481.5,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Safe Output Integrator": {
+      "aic": 233.3,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Safe Output Tool Optimizer": {
+      "aic": 369.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Safe Outputs Git Simulator": {
+      "aic": 199.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Security Observability Report": {
+      "aic": 162.9,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily Sub-Agent Model Resolution Audit": {
+      "aic": 358.9,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Daily yamllint Fixer": {
+      "aic": 436.8,
+      "eng": "copilot",
+      "fail": 2,
+      "last": "2026-07-06",
+      "runs": 2
+    },
+    "Dead Code Removal Agent": {
+      "aic": 189.6,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Deep Report": {
+      "aic": 204.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Design Decision Gate \ud83c\udfd7\ufe0f": {
+      "aic": 739.1,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 32
+    },
+    "Detection Analysis Report": {
+      "aic": 169.0,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "ESLint Refiner": {
+      "aic": 261.4,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "GitHub API Consumption Report Agent": {
+      "aic": 196.1,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "GitHub MCP Structural Analysis": {
+      "aic": 201.0,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "GitHub Remote MCP Authentication Test": {
+      "aic": 0.0,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Go Logger Enhancement": {
+      "aic": 754.3,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Impeccable Skills Reviewer": {
+      "aic": 2091.5,
+      "eng": "copilot",
+      "fail": 3,
+      "last": "2026-07-06",
+      "runs": 31
+    },
+    "Instructions Janitor": {
+      "aic": 236.2,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Layout Specification Maintainer": {
+      "aic": 129.1,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Linter Miner": {
+      "aic": 187.0,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Matt Pocock Skills Reviewer": {
+      "aic": 2395.4,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 33
+    },
+    "Organization Health Report": {
+      "aic": 197.3,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "PR Code Quality Reviewer": {
+      "aic": 4306.6,
+      "eng": "copilot",
+      "fail": 10,
+      "last": "2026-07-06",
+      "runs": 34
+    },
+    "PR Description Updater": {
+      "aic": 509.6,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 13
+    },
+    "PR Triage Agent": {
+      "aic": 380.0,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 4
+    },
+    "Package Specification Librarian": {
+      "aic": 245.3,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Q": {
+      "aic": 490.8,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 5
+    },
+    "Safe Output Health Monitor": {
+      "aic": 1132.0,
+      "eng": "claude",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Semantic Function Refactoring": {
+      "aic": 214.5,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Sergo - Serena Go Expert": {
+      "aic": 217.8,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Smoke CI": {
+      "aic": 0.0,
+      "eng": "copilot",
+      "fail": 17,
+      "last": "2026-07-06",
+      "runs": 17
+    },
+    "Smoke Copilot": {
+      "aic": 121.6,
+      "eng": "copilot",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Smoke Gemini": {
+      "aic": 0.0,
+      "eng": "gemini",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Static Analysis Report": {
+      "aic": 193.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Super Linter Report": {
+      "aic": 0.0,
+      "eng": null,
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Test Quality Sentinel": {
+      "aic": 477.2,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 29
+    },
+    "Typist - Go Type Analysis": {
+      "aic": 261.8,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Weekly Safe Outputs Specification Review": {
+      "aic": 232.1,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Weekly Workflow Analysis": {
+      "aic": 218.3,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "Workflow Portfolio Analyst": {
+      "aic": 132.0,
+      "eng": "claude",
+      "fail": 1,
+      "last": "2026-07-06",
+      "runs": 1
+    },
+    "[aw] Failure Investigator (6h)": {
+      "aic": 409.6,
+      "eng": "claude",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 4
+    },
+    "daily-experiment-report": {
+      "aic": 176.9,
+      "eng": "copilot",
+      "fail": 0,
+      "last": "2026-07-06",
+      "runs": 1
+    }
+  }
+}

@@ -1,1 +1,180 @@
-{"updated":"2026-07-06","recommendations":[{"id":"rec-sdk-toolperm-allowlist-or-relax-guard","linked_issue":"copilot-sdk-driver-failures","priority":"HIGH","date":"2026-06-12","first_seen":"2026-06-02","last_seen":"2026-06-21","recurrence":12,"status":"open","rec":"TOP PRIORITY (6 consecutive days, dominant prod-main fail class \u2014 4 prod-main hard-fails today). The copilot-sdk-driver path denies routine read-only/branch-setup commands the workflows legitimately need (`git checkout -b`, `git status`, `git show`, `awk`/`sed` over source, `read` of .changeset/.md/.go/_test.go) then aborts at 5 denials with NO retry, wasting up to 6.18M tokens (Daily Agent of the Day). Two-part fix:\u2026","note":"RECONFIRM 06-22 (now DOMINANT #1 fail family \u2014 5 prod-main long-run fails today). 20+ days unresolved \u2014 TOP PRIORITY.","detail":"LONG-RUN variant of copilot-sdk-driver-failures is now the leading fail family (5 fails 06-22: Daily Compiler Threat Spec Optimizer 34m, Daily Formal Spec Verifier 29m, Layout Spec Maintainer 22m, Daily Safe Output Integrator 24m, Daily SPDD Spec Planner 24m). Agent does real work 20-34min then the job fails (session_starts=0 + failed_tool_executions signature). ~130min compute/day wasted. Fix: (1) flush emitted safe-output on session-idle/terminal instead of reddening; (2) allowlist routine read-only/branch-setup tool calls so the 5-denial abort path is not hit.","escalation":"day20+ DOMINANT \u2014 highest-ROI fix on the board","days_open":2},{"id":"rec-chroot-node-bindmount","linked_issue":"chroot-node-not-available","priority":"HIGH","date":"2026-06-12","first_seen":"2026-06-12","last_seen":"2026-06-12","recurrence":1,"status":"open","rec":"NEW prod-main failure: Daily Issues Report Generator entrypoint aborted because 'node' is not reachable inside the AWF chroot (Copilot CLI requires Node.js). Ensure the setup-node/nvm install path is bind-mounted into /host and on PATH inside the chroot, or bundle node into the chroot image. Add a pre-flight `node --version` check in the chroot entrypoint so this fails fast with a clear message. Likely a regression f\u2026"},{"id":"rec-ai-credits-soft-cap-guard","status":"OPEN","severity":"high","first_seen":"2026-06-09","linked_issue":"daily-ai-credits-cap-429","linked_workflows":["Daily Ambient Context Optimizer"],"recommendation":"Add a soft pre-cap AI-credits guard to heavy daily aggregators (esp. Daily Ambient Context Optimizer): check remaining daily credits before the heaviest turns and degrade gracefully (emit partial output + noop) instead of 429-aborting at tu\u2026","last_seen":"2026-06-14","priority":"HIGH","note":"06-14: prod-main Ambient clean under-cap, but 429 tripped on a heavy PR Smoke Copilot probe (1015/1000). Soft pre-cap guard still warranted for any heavy run since the cap is account-wide."},{"id":"rec-avenger-empty-followup-invocation","linked_issue":"avenger-err-config-no-structured-logs","priority":"HIGH","date":"2026-06-13","first_seen":"2026-06-13","last_seen":"2026-06-19","recurrence":4,"status":"ESCALATE day7","rec":"TOP NEW. Avenger reddened 6x today (claude). The agent finishes real work + posts a valid safe-output, then a follow-up engine call in the same job returns no structured log entries -> ERR_CONFIG hard-fails the agent job. Fix: (1) treat a follow-up invocation that produces no structured logs AFTER a successful prior pass as success/no-op rather than ERR_CONFIG; (2) gate the 2nd invocation behind a 'work remaining' ch\u2026","note":"ESCALATING: 06-18 x2 -> 06-19 x4 -> 06-20 x8 (100% of Avenger runs). avenger-err-config recur13, fix still ineffective. Now #1 non-Skillet prod-main offender. Needs owner attention.","last_raised":"2026-06-20"},{"id":"fix-cache-strategy-binary-path","linked_issue":"codex-gh-aw-binary-not-found-for-mcp","priority":"high","date":"2026-06-15","first_seen":"2026-06-15","last_seen":"2026-06-21","recurrence":3,"status":"open","rec":"Fix Daily Cache Strategy Analyzer (codex): MCP-helper binary lookup path must match where the build step places gh-aw (RUNNER_TEMP / /usr/local/bin). wf has 100% fail-rate \u2014 high ROI.","note":"RECONFIRM 06-19: Cache Strategy still ~100% fail (0-tok agent:failure). High ROI, unresolved.","detail":"Daily Cache Strategy Analyzer ~100% fail (count 4): codex gh-aw binary-not-found / model-not-found for MCP. 4min 0-tok agent fail again today. Unfixed for 2+ weeks.","days_open":1},{"id":"fix-safe-output-integrator-tool-perms","linked_issue":"copilot-sdk-driver-failures","priority":"high","date":"2026-06-15","first_seen":"2026-06-15","last_seen":"2026-06-15","recurrence":1,"status":"open","rec":"Resolve copilot-SDK headless tool-permission lockout on Daily Safe Output Integrator (14 perm-denied loops -> 20min action timeout). Day9 recurring. Grant required tool perms or fix SDK allowlist plumbing.","note":"Burns ~20min compute per run with no output."},{"id":"rec-avenger-fix-err-config","first_seen":"2026-06-21","last_seen":"2026-06-27","title":"Fix Avenger err-config / restore structured logs","detail":"Avenger 100% fail 5 consecutive days (7/7 today). Top chronic prod-main offender. Needs owner intervention: the err-config / missing-structured-logs root cause has persisted unfixed since ~06-08 (count 14). Recommend disabling the scheduled trigger until fixed to stop daily pr...","priority":"P1","linked_issues":["avenger-err-config-no-structured-logs"],"status":"ESCALATE-P1-TOP","days_open":4,"escalation":"RE-ESCALATE 2026-06-24: Avenger RESUMED (2/2 fail, 0-tok) after 06-22/23 absence. The pause did NOT include a fix \u2014 err-config root cause confirmed unfixed (issue recur 15). Either KEEP the schedule paused, or fix the follow-up-invocation err-config path before re-enabling. Highest-priority chronic prod-main offender that is now firing+failing again.","recurrence":1,"note":"RE-ESCALATE 06-27: now #1 highest-ROI fix. Avenger 10/10 fail = single largest reliability drain (38% of prod-main fails, 173 action-min/day). Fix the err-config/no-structured-logs root cause OR disable the schedule until fixed \u2014 it has burned compute every ~90min for days with zero successful output."},{"id":"rec-pin-autotriage-stable-model","date":"2026-06-25","severity":"HIGH","status":"OPEN","linked_issue":"pi-gpt54-0tok-agentjob-fail","workflow":"Auto-Triage Issues","title":"Pin Auto-Triage Issues off experimental pi/gpt-5.4 until it stabilizes","detail":"Auto-Triage Issues failed 5/6 on 2026-06-25 with 0-tok/0-turn agent-job failures on engine pi / model copilot/gpt-5.4 (experimental). Observability already flags model_downgrade_available (triage is read-only/moderate). Switch engine.model to a stable id (gpt-4.1-mini or claude-haiku-4-5) until the pi/gpt-5.4 driver+model path is verified, OR investigate the pi-agent-core startup failure on gpt-5.4 directly."},{"id":"rec-investigate-distributed-0tok-degradation","date":"2026-06-25","severity":"HIGH","status":"OPEN","linked_anomaly":"anom-prodmain-distributed-degradation-2026-06-25","title":"Confirm whether 06-25 distributed 0-tok agent-startup elevation is transient or systemic","detail":"32/40 prod-main fails on 06-25 were 0-tok/0-turn agent-job failures across 4 engines and ~16 wfs (prod-main 81.0%, worst since ~06-18). Spread evenly over 24h + across gh-aw versions argues against one incident/regression, but the elevated baseline is real. Action: re-run 06-26 audit and compare \u2014 if it reverts to ~92% baseline, classify transient/noisy-day; if 0-tok elevation persists across the same wf set, escalate to a systemic agent-startup investigation (driver/runner-image/launch path)."},{"id":"rec-smoke-ci-copilot-cli-100pct","status":"NEW-P1","severity":"HIGH","title":"Investigate Smoke CI 100%-fail (copilot CLI startup) on push to main","first_seen":"2026-06-30","last_seen":"2026-06-30","linked_issue":"smoke-ci-copilot-cli-100pct-fail-on-push","detail":"Smoke CI fails 11/11 at 'Execute GitHub Copilot CLI' 0-turn on every push to main. If Smoke CI validates the copilot engine, its constant red is a real signal. Capture the copilot CLI stderr/exit-code at the failing step and determine if this is a model/auth/runtime regression. Add fast-fail diagnostic. P1 because it reds main on every push and is the top prod-main drag."},{"id":"rec-copilot-cli-0turn-rootcause","status":"ESCALATE","severity":"HIGH","title":"Root-cause the copilot 'Execute GitHub Copilot CLI' 0-turn failure family (78% of fleet fails)","first_seen":"2026-06-25","last_seen":"2026-07-06","linked_issue":"copilot-sdk-driver-failures","detail":"25/32 fleet fails on 06-30 share this signature. Instrument the copilot CLI exec step to emit stderr+exit code into run artifacts so 0-turn fails stop being opaque. Distinguish instant (4-5m Smoke CI) vs longrun (19-25m) sub-variants \u2014 they may have different causes (startup vs session-idle/network). [2026-07-06]: copilot-CLI 0-turn family (Smoke CI 17 + longrun ~22) still ~71% of fleet fails; signature now confirmed CROSS-ENGINE (4 claude-longrun-0turn fails same day). Still opaque - instrument Execute-CLI stderr/exit-code."},{"id":"rec-2026-07-01-playwright-install-resilience","date":"2026-07-01","priority":"MEDIUM","linked_issue":"playwright-install-cli-failure","workflows":["Slide Deck Maintainer","Smoke Claude","Smoke Codex"],"text":"Make the 'Install Playwright CLI' agent-setup step resilient: verify the Playwright download/npm hosts are on the firewall allowlist, add retry-with-backoff, and cache browser binaries. Ideally the whole agent should not red if an optional browser tool fails to install."},{"id":"rec-2026-07-01-smoke-ci-escalate","date":"2026-07-01","priority":"HIGH","linked_issue":"smoke-ci-copilot-cli-100pct-fail-on-push","workflows":["Smoke CI"],"text":"ESCALATE: Smoke CI (copilot/claude-sonnet-4.6) has now failed 100% across 2+ observed windows at 'Execute GitHub Copilot CLI' 0-turn/0-tok. If Smoke CI is the copilot-engine canary, its constant red on push likely signals a real copilot CLI startup regression on main. Add a fast-fail diagnostic that dumps WHY the CLI aborts 0-turn. [2026-07-06 RE-ESCALATE count6]: Smoke CI 17/17=100% fail across 6 observed windows (06-30..07-06), now 31% of ALL fleet failures - the single highest-ROI reliability fix. Fixing/muting it lifts prod-main from 82.4% to 89.4%.","last_seen":"2026-07-06"},{"id":"rec-2026-07-06-token-reporting","date":"2026-07-06","priority":"LOW","linked_issue":"token-usage-reporting-gap","workflows":["fleet-wide-observability"],"text":"Fleet daily token totals have been null/near-zero since ~06-19 (metrics.TokenUsage empty) despite 300-400 runs/day, breaking the token trend chart. Either restore per-run TokenUsage aggregation in the logs pipeline, or officially switch the token-usage chart to AIC (AI credits), which is reported reliably (~29.6K/day). Low priority - cost is trackable via AIC - but the metric gap should be closed or documented."}]}
+{
+  "recommendations": [
+    {
+      "date": "2026-06-12",
+      "days_open": 2,
+      "detail": "LONG-RUN variant of copilot-sdk-driver-failures is now the leading fail family (5 fails 06-22: Daily Compiler Threat Spec Optimizer 34m, Daily Formal Spec Verifier 29m, Layout Spec Maintainer 22m, Daily Safe Output Integrator 24m, Daily SPDD Spec Planner 24m). Agent does real work 20-34min then the job fails (session_starts=0 + failed_tool_executions signature). ~130min compute/day wasted. Fix: (1) flush emitted safe-output on session-idle/terminal instead of reddening; (2) allowlist routine read-only/branch-setup tool calls so the 5-denial abort path is not hit.",
+      "escalation": "day20+ DOMINANT \u2014 highest-ROI fix on the board",
+      "first_seen": "2026-06-02",
+      "id": "rec-sdk-toolperm-allowlist-or-relax-guard",
+      "last_seen": "2026-06-21",
+      "linked_issue": "copilot-sdk-driver-failures",
+      "note": "RECONFIRM 06-22 (now DOMINANT #1 fail family \u2014 5 prod-main long-run fails today). 20+ days unresolved \u2014 TOP PRIORITY.",
+      "priority": "HIGH",
+      "rec": "TOP PRIORITY (6 consecutive days, dominant prod-main fail class \u2014 4 prod-main hard-fails today). The copilot-sdk-driver path denies routine read-only/branch-setup commands the workflows legitimately need (`git checkout -b`, `git status`, `git show`, `awk`/`sed` over source, `read` of .changeset/.md/.go/_test.go) then aborts at 5 denials with NO retry, wasting up to 6.18M tokens (Daily Agent of the Day). Two-part fix:\u2026",
+      "recurrence": 12,
+      "status": "open"
+    },
+    {
+      "date": "2026-06-12",
+      "first_seen": "2026-06-12",
+      "id": "rec-chroot-node-bindmount",
+      "last_seen": "2026-06-12",
+      "linked_issue": "chroot-node-not-available",
+      "priority": "HIGH",
+      "rec": "NEW prod-main failure: Daily Issues Report Generator entrypoint aborted because 'node' is not reachable inside the AWF chroot (Copilot CLI requires Node.js). Ensure the setup-node/nvm install path is bind-mounted into /host and on PATH inside the chroot, or bundle node into the chroot image. Add a pre-flight `node --version` check in the chroot entrypoint so this fails fast with a clear message. Likely a regression f\u2026",
+      "recurrence": 1,
+      "status": "open"
+    },
+    {
+      "first_seen": "2026-06-09",
+      "id": "rec-ai-credits-soft-cap-guard",
+      "last_seen": "2026-06-14",
+      "linked_issue": "daily-ai-credits-cap-429",
+      "linked_workflows": [
+        "Daily Ambient Context Optimizer"
+      ],
+      "note": "06-14: prod-main Ambient clean under-cap, but 429 tripped on a heavy PR Smoke Copilot probe (1015/1000). Soft pre-cap guard still warranted for any heavy run since the cap is account-wide.",
+      "priority": "HIGH",
+      "recommendation": "Add a soft pre-cap AI-credits guard to heavy daily aggregators (esp. Daily Ambient Context Optimizer): check remaining daily credits before the heaviest turns and degrade gracefully (emit partial output + noop) instead of 429-aborting at tu\u2026",
+      "severity": "high",
+      "status": "OPEN"
+    },
+    {
+      "date": "2026-06-13",
+      "first_seen": "2026-06-13",
+      "id": "rec-avenger-empty-followup-invocation",
+      "last_raised": "2026-06-20",
+      "last_seen": "2026-06-19",
+      "linked_issue": "avenger-err-config-no-structured-logs",
+      "note": "ESCALATING: 06-18 x2 -> 06-19 x4 -> 06-20 x8 (100% of Avenger runs). avenger-err-config recur13, fix still ineffective. Now #1 non-Skillet prod-main offender. Needs owner attention.",
+      "priority": "HIGH",
+      "rec": "TOP NEW. Avenger reddened 6x today (claude). The agent finishes real work + posts a valid safe-output, then a follow-up engine call in the same job returns no structured log entries -> ERR_CONFIG hard-fails the agent job. Fix: (1) treat a follow-up invocation that produces no structured logs AFTER a successful prior pass as success/no-op rather than ERR_CONFIG; (2) gate the 2nd invocation behind a 'work remaining' ch\u2026",
+      "recurrence": 4,
+      "status": "ESCALATE day7"
+    },
+    {
+      "date": "2026-06-15",
+      "days_open": 1,
+      "detail": "Daily Cache Strategy Analyzer ~100% fail (count 4): codex gh-aw binary-not-found / model-not-found for MCP. 4min 0-tok agent fail again today. Unfixed for 2+ weeks.",
+      "first_seen": "2026-06-15",
+      "id": "fix-cache-strategy-binary-path",
+      "last_seen": "2026-06-21",
+      "linked_issue": "codex-gh-aw-binary-not-found-for-mcp",
+      "note": "RECONFIRM 06-19: Cache Strategy still ~100% fail (0-tok agent:failure). High ROI, unresolved.",
+      "priority": "high",
+      "rec": "Fix Daily Cache Strategy Analyzer (codex): MCP-helper binary lookup path must match where the build step places gh-aw (RUNNER_TEMP / /usr/local/bin). wf has 100% fail-rate \u2014 high ROI.",
+      "recurrence": 3,
+      "status": "open"
+    },
+    {
+      "date": "2026-06-15",
+      "first_seen": "2026-06-15",
+      "id": "fix-safe-output-integrator-tool-perms",
+      "last_seen": "2026-06-15",
+      "linked_issue": "copilot-sdk-driver-failures",
+      "note": "Burns ~20min compute per run with no output.",
+      "priority": "high",
+      "rec": "Resolve copilot-SDK headless tool-permission lockout on Daily Safe Output Integrator (14 perm-denied loops -> 20min action timeout). Day9 recurring. Grant required tool perms or fix SDK allowlist plumbing.",
+      "recurrence": 1,
+      "status": "open"
+    },
+    {
+      "days_open": 4,
+      "detail": "Avenger 100% fail 5 consecutive days (7/7 today). Top chronic prod-main offender. Needs owner intervention: the err-config / missing-structured-logs root cause has persisted unfixed since ~06-08 (count 14). Recommend disabling the scheduled trigger until fixed to stop daily pr...",
+      "escalation": "RE-ESCALATE 2026-06-24: Avenger RESUMED (2/2 fail, 0-tok) after 06-22/23 absence. The pause did NOT include a fix \u2014 err-config root cause confirmed unfixed (issue recur 15). Either KEEP the schedule paused, or fix the follow-up-invocation err-config path before re-enabling. Highest-priority chronic prod-main offender that is now firing+failing again.",
+      "first_seen": "2026-06-21",
+      "id": "rec-avenger-fix-err-config",
+      "last_seen": "2026-06-27",
+      "linked_issues": [
+        "avenger-err-config-no-structured-logs"
+      ],
+      "note": "RE-ESCALATE 06-27: now #1 highest-ROI fix. Avenger 10/10 fail = single largest reliability drain (38% of prod-main fails, 173 action-min/day). Fix the err-config/no-structured-logs root cause OR disable the schedule until fixed \u2014 it has burned compute every ~90min for days with zero successful output.",
+      "priority": "P1",
+      "recurrence": 1,
+      "status": "ESCALATE-P1-TOP",
+      "title": "Fix Avenger err-config / restore structured logs"
+    },
+    {
+      "date": "2026-06-25",
+      "detail": "Auto-Triage Issues failed 5/6 on 2026-06-25 with 0-tok/0-turn agent-job failures on engine pi / model copilot/gpt-5.4 (experimental). Observability already flags model_downgrade_available (triage is read-only/moderate). Switch engine.model to a stable id (gpt-4.1-mini or claude-haiku-4-5) until the pi/gpt-5.4 driver+model path is verified, OR investigate the pi-agent-core startup failure on gpt-5.4 directly.",
+      "id": "rec-pin-autotriage-stable-model",
+      "linked_issue": "pi-gpt54-0tok-agentjob-fail",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "title": "Pin Auto-Triage Issues off experimental pi/gpt-5.4 until it stabilizes",
+      "workflow": "Auto-Triage Issues"
+    },
+    {
+      "date": "2026-06-25",
+      "detail": "32/40 prod-main fails on 06-25 were 0-tok/0-turn agent-job failures across 4 engines and ~16 wfs (prod-main 81.0%, worst since ~06-18). Spread evenly over 24h + across gh-aw versions argues against one incident/regression, but the elevated baseline is real. Action: re-run 06-26 audit and compare \u2014 if it reverts to ~92% baseline, classify transient/noisy-day; if 0-tok elevation persists across the same wf set, escalate to a systemic agent-startup investigation (driver/runner-image/launch path).",
+      "id": "rec-investigate-distributed-0tok-degradation",
+      "linked_anomaly": "anom-prodmain-distributed-degradation-2026-06-25",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "title": "Confirm whether 06-25 distributed 0-tok agent-startup elevation is transient or systemic"
+    },
+    {
+      "detail": "Smoke CI fails 11/11 at 'Execute GitHub Copilot CLI' 0-turn on every push to main. If Smoke CI validates the copilot engine, its constant red is a real signal. Capture the copilot CLI stderr/exit-code at the failing step and determine if this is a model/auth/runtime regression. Add fast-fail diagnostic. P1 because it reds main on every push and is the top prod-main drag.",
+      "first_seen": "2026-06-30",
+      "id": "rec-smoke-ci-copilot-cli-100pct",
+      "last_seen": "2026-06-30",
+      "linked_issue": "smoke-ci-copilot-cli-100pct-fail-on-push",
+      "severity": "HIGH",
+      "status": "NEW-P1",
+      "title": "Investigate Smoke CI 100%-fail (copilot CLI startup) on push to main"
+    },
+    {
+      "detail": "25/32 fleet fails on 06-30 share this signature. Instrument the copilot CLI exec step to emit stderr+exit code into run artifacts so 0-turn fails stop being opaque. Distinguish instant (4-5m Smoke CI) vs longrun (19-25m) sub-variants \u2014 they may have different causes (startup vs session-idle/network). [2026-07-06]: copilot-CLI 0-turn family (Smoke CI 17 + longrun ~22) still ~71% of fleet fails; signature now confirmed CROSS-ENGINE (4 claude-longrun-0turn fails same day). Still opaque - instrument Execute-CLI stderr/exit-code.",
+      "first_seen": "2026-06-25",
+      "id": "rec-copilot-cli-0turn-rootcause",
+      "last_seen": "2026-07-06",
+      "linked_issue": "copilot-sdk-driver-failures",
+      "severity": "HIGH",
+      "status": "ESCALATE",
+      "title": "Root-cause the copilot 'Execute GitHub Copilot CLI' 0-turn failure family (78% of fleet fails)"
+    },
+    {
+      "date": "2026-07-01",
+      "id": "rec-2026-07-01-playwright-install-resilience",
+      "linked_issue": "playwright-install-cli-failure",
+      "priority": "MEDIUM",
+      "text": "Make the 'Install Playwright CLI' agent-setup step resilient: verify the Playwright download/npm hosts are on the firewall allowlist, add retry-with-backoff, and cache browser binaries. Ideally the whole agent should not red if an optional browser tool fails to install.",
+      "workflows": [
+        "Slide Deck Maintainer",
+        "Smoke Claude",
+        "Smoke Codex"
+      ]
+    },
+    {
+      "date": "2026-07-01",
+      "id": "rec-2026-07-01-smoke-ci-escalate",
+      "last_seen": "2026-07-06",
+      "linked_issue": "smoke-ci-copilot-cli-100pct-fail-on-push",
+      "priority": "HIGH",
+      "text": "ESCALATE: Smoke CI (copilot/claude-sonnet-4.6) has now failed 100% across 2+ observed windows at 'Execute GitHub Copilot CLI' 0-turn/0-tok. If Smoke CI is the copilot-engine canary, its constant red on push likely signals a real copilot CLI startup regression on main. Add a fast-fail diagnostic that dumps WHY the CLI aborts 0-turn. [2026-07-06 RE-ESCALATE count6]: Smoke CI 17/17=100% fail across 6 observed windows (06-30..07-06), now 31% of ALL fleet failures - the single highest-ROI reliability fix. Fixing/muting it lifts prod-main from 82.4% to 89.4%.",
+      "workflows": [
+        "Smoke CI"
+      ]
+    },
+    {
+      "date": "2026-07-06",
+      "id": "rec-2026-07-06-token-reporting",
+      "linked_issue": "token-usage-reporting-gap",
+      "priority": "LOW",
+      "text": "Fleet daily token totals have been null/near-zero since ~06-19 (metrics.TokenUsage empty) despite 300-400 runs/day, breaking the token trend chart. Either restore per-run TokenUsage aggregation in the logs pipeline, or officially switch the token-usage chart to AIC (AI credits), which is reported reliably (~29.6K/day). Low priority - cost is trackable via AIC - but the metric gap should be closed or documented.",
+      "workflows": [
+        "fleet-wide-observability"
+      ]
+    },
+    {
+      "count": 1,
+      "evidence_signal": "adjusted_success_rate=0.0",
+      "first_seen": "2026-09-28T21:26:47.593749+00:00",
+      "id": "rec-success-rate",
+      "last_seen": "2026-09-28T21:26:47.593749+00:00",
+      "text": "Prioritize top failing workflows by token burn and failure recurrence to recover adjusted success rate above 95%."
+    }
+  ],
+  "updated": "2026-07-06"
+}
