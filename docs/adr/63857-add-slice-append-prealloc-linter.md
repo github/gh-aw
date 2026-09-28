@@ -12,7 +12,7 @@ This pull request adds a new Go static analysis linter under `pkg/linters/slicea
 
 ### Decision
 
-We will add a built-in `sliceappendpreallocmissing` analyzer to the gh-aw linter registry to report slice growth via repeated `append` in loops with statically determinable iteration counts when the slice was not pre-allocated. The analyzer will target simple `for` and `range` loop cases, honor generated-file and `nolint` exclusions, and ship with analyzer tests and fixtures. We chose this because the PR evidence frames the pattern as a high-signal, low-ambiguity performance issue with a clear remediation of pre-allocating slice capacity.
+We will add a built-in `sliceappendpreallocmissing` analyzer to the gh-aw linter registry to report slice growth via repeated `append` in loops with statically determinable iteration counts when the slice was not pre-allocated. The analyzer will target simple `for` and `range` loop cases, only flag appends that execute on every iteration, honor generated-file, coverage-gating and `nolint` exclusions, and ship with analyzer tests and fixtures. We chose this because the PR evidence frames the pattern as a high-signal, low-ambiguity performance issue with a clear remediation of pre-allocating slice capacity.
 
 ### Alternatives Considered
 

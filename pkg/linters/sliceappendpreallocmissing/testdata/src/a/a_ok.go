@@ -49,3 +49,46 @@ func rangeWithVariableLength() {
 		s = append(s, v)
 	}
 }
+
+func reassignedWithCapacityBeforeLoop() {
+	s := []int{}
+	s = make([]int, 0, 10)
+	for i := 0; i < 10; i++ {
+		s = append(s, i)
+	}
+}
+
+func steppedLoop() {
+	s := []int{}
+	for i := 0; i < 10; i += 2 {
+		s = append(s, i)
+	}
+}
+
+func mismatchedPostVariable(j int) {
+	s := []int{}
+	for i := 0; i < 10; j++ {
+		s = append(s, i)
+		break
+	}
+	_ = s
+}
+
+func decrementingLoop() {
+	s := []int{}
+	for i := 0; i < 10; i-- {
+		s = append(s, i)
+		break
+	}
+	_ = s
+}
+
+func conditionalAppend() {
+	s := []int{}
+	for i := 0; i < 10; i++ {
+		if i%2 == 0 {
+			s = append(s, i)
+		}
+	}
+	_ = s
+}

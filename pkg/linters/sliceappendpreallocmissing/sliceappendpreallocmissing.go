@@ -9,12 +9,14 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
+	"github.com/github/gh-aw/pkg/linters/internal/coverage"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -24,6 +26,13 @@ var pkgLog = logger.New("linters:sliceappendpreallocmissing")
 
 // Analyzer is the slice-append-prealloc-missing analysis pass.
 var Analyzer = analyzerutil.New("sliceappendpreallocmissing", "reports slice append operations in loops where the final length can be determined but the slice is not pre-allocated with make(..., capacity)", run)
+
+// hotThreshold gates findings on coverage data; see coverage package docs.
+var hotThreshold *int
+
+func init() {
+	hotThreshold = coverage.RegisterHotThresholdFlag(Analyzer)
+}
 
 func run(pass *analysis.Pass) (any, error) {
 	pkgLog.Printf("analyzing package %s", pass.Pkg.Path())
@@ -58,6 +67,12 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 
+		// Only flag appends that run on every iteration: a conditional append
+		// does not grow the slice by the loop trip count.
+		if !isDirectLoopBodyStmt(loopNode, assign) {
+			continue
+		}
+
 		// Check if the slice was declared before the loop with no capacity
 		declaredWithCapacity, ok := isSliceDeclaredBeforeLoop(pass, cur, appendInfo.target, loopNode)
 		if !ok || declaredWithCapacity {
@@ -77,6 +92,10 @@ func run(pass *analysis.Pass) (any, error) {
 
 		if nolint.HasDirectiveForLinter(pos, noLintIndex, "sliceappendpreallocmissing") ||
 			nolint.HasDirectiveForLinter(loopPos, noLintIndex, "sliceappendpreallocmissing") {
+			continue
+		}
+
+		if !coverage.ShouldApply(pass, assign.Pos(), *hotThreshold) {
 			continue
 		}
 
@@ -171,8 +190,25 @@ func enclosingLoop(pass *analysis.Pass, cur inspector.Cursor) (token.Position, a
 	return token.Position{}, nil, false
 }
 
-// isSliceDeclaredBeforeLoop checks if the slice was declared before the loop
-// without a capacity argument. Returns (hasCap, found).
+// isDirectLoopBodyStmt reports whether stmt is a direct statement of the loop
+// body, i.e. it is not nested inside a conditional or an inner block.
+func isDirectLoopBodyStmt(loopNode ast.Node, stmt ast.Stmt) bool {
+	var body *ast.BlockStmt
+	switch loop := loopNode.(type) {
+	case *ast.ForStmt:
+		body = loop.Body
+	case *ast.RangeStmt:
+		body = loop.Body
+	}
+	if body == nil {
+		return false
+	}
+	return slices.Contains(body.List, stmt)
+}
+
+// isSliceDeclaredBeforeLoop checks how the slice was last declared or assigned
+// before the loop. Returns (shouldSkip, found), where shouldSkip is true when
+// the state reaching the loop already has capacity or initial values.
 func isSliceDeclaredBeforeLoop(
 	pass *analysis.Pass,
 	cur inspector.Cursor,
@@ -190,7 +226,7 @@ func isSliceDeclaredBeforeLoop(
 
 	// The fact that declPos < loopPos and the variable is used in the loop
 	// means it was declared in an enclosing scope before the loop.
-	// We just need to check if it was declared with capacity or initial values.
+	// We just need to check how it was last declared or assigned before the loop.
 
 	// Walk through all enclosing blocks looking for the declaration
 	curCopy := cur
@@ -222,17 +258,23 @@ func isSliceDeclaredBeforeLoop(
 			continue
 		}
 
-		// Look through the statements in this block for our declaration
+		// Look through the statements in this block for our declaration or
+		// re-assignments. The last statement before the loop wins, since that
+		// reflects the state of the variable when the loop starts.
+		shouldSkip, found := false, false
 		for _, stmt := range stmts {
 			// Stop when we reach or pass the loop
 			if stmt.Pos() >= loopPos {
 				break
 			}
 
-			// Check if this is a declaration of our target
-			if hasCapacity, found := checkDeclareStmt(pass, stmt, target); found {
-				return hasCapacity, true
+			// Check if this is a declaration or assignment of our target
+			if skip, ok := checkDeclareStmt(pass, stmt, target); ok {
+				shouldSkip, found = skip, true
 			}
+		}
+		if found {
+			return shouldSkip, true
 		}
 
 		curCopy = parent
@@ -364,8 +406,7 @@ func getLoopSize(pass *analysis.Pass, loopNode ast.Node) (string, bool) {
 }
 
 // hasKnownRangeLength checks if the range expression has a statically known length.
-// This is true for array types, array/slice literals, string literals,
-// and slice variables that were assigned a literal.
+// This is true for array types, array/slice literals and string literals.
 func hasKnownRangeLength(pass *analysis.Pass, expr ast.Expr) bool {
 	typ := pass.TypesInfo.TypeOf(expr)
 	if typ == nil {
@@ -378,14 +419,8 @@ func hasKnownRangeLength(pass *analysis.Pass, expr ast.Expr) bool {
 		return true
 	case *types.Slice:
 		// Slice only has known length if it's a composite literal (e.g., []int{1, 2, 3})
-		if _, isLiteral := expr.(*ast.CompositeLit); isLiteral {
-			return true
-		}
-		// Or if it's an identifier that was assigned a slice literal
-		if ident, ok := expr.(*ast.Ident); ok {
-			return isSliceAssignedLiteral(pass, ident)
-		}
-		return false
+		_, isLiteral := expr.(*ast.CompositeLit)
+		return isLiteral
 	case *types.Map:
 		// Map length is never known at compile time
 		return false
@@ -401,50 +436,52 @@ func hasKnownRangeLength(pass *analysis.Pass, expr ast.Expr) bool {
 	}
 }
 
-// isSliceAssignedLiteral checks if an identifier refers to a slice that was assigned a literal.
-// We check by looking at the declaration: if it's `x := []T{...}`, return true.
-// This requires walking up the cursor to find the declaration context.
-func isSliceAssignedLiteral(pass *analysis.Pass, ident *ast.Ident) bool {
-	obj := pass.TypesInfo.ObjectOf(ident)
-	if obj == nil {
-		return false
-	}
-
-	// We can't easily trace this without the full AST context
-	// For now, return false to be conservative
-	return false
-}
-
-// getForLoopSize extracts the loop count from a for loop, but only if it's a constant bound.
+// getForLoopSize extracts the loop count from a for loop, but only if the loop
+// is a canonical counted loop: `for i := 0; i < const; i++` (or `i <= const`).
+// Loops whose post statement does not advance the condition variable by exactly
+// one are rejected, because their trip count is not the constant bound.
 func getForLoopSize(pass *analysis.Pass, loop *ast.ForStmt) (string, bool) {
 	// We need a Cond to determine the count
 	if loop.Cond == nil {
 		return "", false
 	}
 
-	// Try to extract from patterns like: i < 10, i <= 9, etc.
-	if binExpr, ok := loop.Cond.(*ast.BinaryExpr); ok {
-		// Only handle constant bounds
-		if !isConstant(pass, binExpr.Y) {
-			return "", false
-		}
+	binExpr, ok := loop.Cond.(*ast.BinaryExpr)
+	if !ok {
+		return "", false
+	}
 
-		switch binExpr.Op.String() {
-		case "<":
-			// i < n where n is constant
-			if isZeroInit(pass, loop) {
-				return astutil.NodeText(pass.Fset, binExpr.Y), true
-			}
-		case "<=":
-			// i <= n where n is constant
-			if isZeroInit(pass, loop) {
-				// Count is n+1
-				text := astutil.NodeText(pass.Fset, binExpr.Y)
-				if text != "" {
-					return fmt.Sprintf("%s + 1", text), true
-				}
-			}
-		}
+	// Only handle constant bounds
+	if !isConstant(pass, binExpr.Y) {
+		return "", false
+	}
+
+	// The condition must compare an induction variable that starts at zero and
+	// is incremented by exactly one on every iteration.
+	condIdent, ok := binExpr.X.(*ast.Ident)
+	if !ok {
+		return "", false
+	}
+	induction := pass.TypesInfo.ObjectOf(condIdent)
+	if induction == nil {
+		return "", false
+	}
+	if !isZeroInitOf(pass, loop.Init, induction) || !isUnitIncrementOf(pass, loop.Post, induction) {
+		return "", false
+	}
+
+	text := astutil.NodeText(pass.Fset, binExpr.Y)
+	if text == "" {
+		return "", false
+	}
+
+	switch binExpr.Op {
+	case token.LSS:
+		// i < n where n is constant
+		return text, true
+	case token.LEQ:
+		// i <= n where n is constant: count is n+1
+		return text + " + 1", true
 	}
 
 	return "", false
@@ -456,13 +493,9 @@ func isConstant(pass *analysis.Pass, expr ast.Expr) bool {
 	return value != nil
 }
 
-// isZeroInit checks if the loop init is i := 0 or similar.
-func isZeroInit(pass *analysis.Pass, loop *ast.ForStmt) bool {
-	if loop.Init == nil {
-		return false
-	}
-
-	assign, ok := loop.Init.(*ast.AssignStmt)
+// isZeroInitOf checks that init initializes the induction variable to 0.
+func isZeroInitOf(pass *analysis.Pass, init ast.Stmt, induction types.Object) bool {
+	assign, ok := init.(*ast.AssignStmt)
 	if !ok {
 		return false
 	}
@@ -471,8 +504,41 @@ func isZeroInit(pass *analysis.Pass, loop *ast.ForStmt) bool {
 		return false
 	}
 
+	if !isIdentOf(pass, assign.Lhs[0], induction) {
+		return false
+	}
+
 	// RHS should be 0
 	return isConstantZero(pass, assign.Rhs[0])
+}
+
+// isUnitIncrementOf checks that post advances the induction variable by exactly
+// one, i.e. `i++` or `i += 1`.
+func isUnitIncrementOf(pass *analysis.Pass, post ast.Stmt, induction types.Object) bool {
+	switch stmt := post.(type) {
+	case *ast.IncDecStmt:
+		return stmt.Tok == token.INC && isIdentOf(pass, stmt.X, induction)
+	case *ast.AssignStmt:
+		if stmt.Tok != token.ADD_ASSIGN || len(stmt.Lhs) != 1 || len(stmt.Rhs) != 1 {
+			return false
+		}
+		if !isIdentOf(pass, stmt.Lhs[0], induction) {
+			return false
+		}
+		value := pass.TypesInfo.Types[stmt.Rhs[0]].Value
+		return value != nil && constant.Compare(value, token.EQL, constant.MakeInt64(1))
+	default:
+		return false
+	}
+}
+
+// isIdentOf reports whether expr is an identifier referring to obj.
+func isIdentOf(pass *analysis.Pass, expr ast.Expr, obj types.Object) bool {
+	ident, ok := expr.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return pass.TypesInfo.ObjectOf(ident) == obj
 }
 
 // isConstantZero checks if expr evaluates to the constant 0.

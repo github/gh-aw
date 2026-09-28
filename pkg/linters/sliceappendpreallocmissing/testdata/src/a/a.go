@@ -38,3 +38,18 @@ func loopWithLeEq() {
 		s = append(s, i) // want `slice s should be pre-allocated with capacity 9 \+ 1 instead of dynamically growing via repeated append calls in a loop`
 	}
 }
+
+func reassignedWithoutCapacityBeforeLoop() {
+	s := make([]int, 0, 10)
+	s = []int{}
+	for i := 0; i < 10; i++ {
+		s = append(s, i) // want `slice s should be pre-allocated with capacity 10 instead of dynamically growing via repeated append calls in a loop`
+	}
+}
+
+func loopWithPlusEqualOne() {
+	s := []int{}
+	for i := 0; i < 10; i += 1 {
+		s = append(s, i) // want `slice s should be pre-allocated with capacity 10 instead of dynamically growing via repeated append calls in a loop`
+	}
+}
