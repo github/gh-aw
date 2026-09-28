@@ -73,6 +73,17 @@ func TestGetValidationConfigJSON(t *testing.T) {
 	}
 }
 
+func TestNoOpValidationConfig(t *testing.T) {
+	config, ok := ValidationConfig["noop"]
+	if !ok {
+		t.Fatal("noop not found in ValidationConfig")
+	}
+
+	if config.DefaultMax != 2 {
+		t.Errorf("noop DefaultMax = %d, want 2", config.DefaultMax)
+	}
+}
+
 func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	config, ok := ValidationConfig["approve_workflow_run"]
 	if !ok {

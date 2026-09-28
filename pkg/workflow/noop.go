@@ -34,11 +34,11 @@ func (c *Compiler) parseNoOpConfig(outputMap map[string]any) *NoOpConfig {
 		// Handle the case where configData is nil (noop: with no value)
 		if configData == nil {
 			// Set default max for noop messages
-			noopConfig.Max = defaultIntStr(1)
+			noopConfig.Max = defaultIntStr(2)
 			// Set default report-as-issue to true
 			trueVal := "true"
 			noopConfig.ReportAsIssue = &trueVal
-			noopLog.Print("Noop enabled with default max=1, report-as-issue=true")
+			noopLog.Print("Noop enabled with default max=2, report-as-issue=true")
 			return noopConfig
 		}
 
@@ -49,8 +49,8 @@ func (c *Compiler) parseNoOpConfig(outputMap map[string]any) *NoOpConfig {
 				return nil
 			}
 
-			// Parse common base fields with default max of 1
-			c.parseBaseSafeOutputConfig(configMap, &noopConfig.BaseSafeOutputConfig, 1)
+			// Parse common base fields with default max of 2
+			c.parseBaseSafeOutputConfig(configMap, &noopConfig.BaseSafeOutputConfig, 2)
 
 			// Parse report-as-issue field with default of true
 			if reportAsIssue, ok := configMap["report-as-issue"].(string); ok {

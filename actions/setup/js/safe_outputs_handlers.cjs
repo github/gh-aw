@@ -25,7 +25,7 @@ const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs"
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
-const { validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
+const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
@@ -447,7 +447,20 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * Per Safe Outputs Specification MCE4: invocation-time half of dual enforcement.
    * @param {Record<string, any>} entry
    */
+  /**
+   * Probing entries are schema probes (e.g. `noop` with message "test") rather than a
+   * genuine signal. They are ignored entirely: not recorded, not counted against the
+   * type budget, so a probe never crowds out or short-circuits the real signal.
+   * @param {Record<string, any>} entry
+   * @returns {boolean}
+   */
+  const isIgnoredProbingEntry = entry => entry?.type === "noop" && isProbingNoopMessage(entry?.message);
+
   const appendSafeOutputCounted = entry => {
+    if (isIgnoredProbingEntry(entry)) {
+      server.debug(`Ignoring probing noop call (not recorded, does not consume the noop budget): ${JSON.stringify(entry?.message)}`);
+      return;
+    }
     const type = entry?.type;
     if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);

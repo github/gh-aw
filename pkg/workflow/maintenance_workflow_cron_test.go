@@ -277,6 +277,8 @@ func TestScanWorkflowsForExpires_TriggerReason(t *testing.T) {
 		require.NotNil(t, safeOutputs)
 		require.NotNil(t, safeOutputs.NoOp)
 		require.True(t, safeOutputs.NoOp.Implicit, "noop should be implicit when not authored")
+		require.NotNil(t, safeOutputs.NoOp.Max)
+		require.Equal(t, "2", *safeOutputs.NoOp.Max, "implicit noop should allow a probe and a final call")
 		require.NotNil(t, safeOutputs.NoOp.ReportAsIssue)
 		require.Equal(t, "false", *safeOutputs.NoOp.ReportAsIssue, "implicit noop must not create issues without a maintenance workflow to expire them")
 
