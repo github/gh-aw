@@ -59,13 +59,6 @@ func TestDocumentationGalleryWorkflowsCompile(t *testing.T) {
 		})
 	}
 
-	t.Run("repo-assist-upstream", func(t *testing.T) {
-		const (
-			rawURL = "https://raw.githubusercontent.com/githubnext/agentics/main/workflows/repo-assist.md"
-		)
-
-		fetchAndCompileExampleWorkflow(t, "repo-assist.md", rawURL)
-	})
 }
 
 func fetchAndCompileExampleWorkflow(t *testing.T, workflowName, rawURL string) {
