@@ -8,6 +8,7 @@ const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
 const { isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { parseAllowedRepos, validateTargetRepo } = require("./repo_helpers.cjs");
+const { isProbingNoopMessage } = require("./intent_probe.cjs");
 
 async function main() {
   try {
@@ -332,6 +333,10 @@ async function main() {
         if (!expectedOutputTypes[itemType]) {
           core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
           errors.push(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
+          continue;
+        }
+        if (itemType === "noop" && isProbingNoopMessage(item.message)) {
+          core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
         const typeCount = parsedItems.filter(existing => existing.type === itemType).length;

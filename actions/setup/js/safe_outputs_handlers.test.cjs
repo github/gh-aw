@@ -4710,6 +4710,23 @@ describe("per-type max enforcement (MCE4 dual enforcement)", () => {
     expect(mockAppendSafeOutput).toHaveBeenCalledTimes(2);
   });
 
+  it("does not record or count probing noop calls against the configured max", () => {
+    const h = createHandlers(mockServer, mockAppendSafeOutput, {
+      noop: { max: 1 },
+    });
+
+    // A probing call such as {"message": "test"} is ignored entirely, so it must neither
+    // be recorded nor consume the budget reserved for the real completion signal.
+    expect(h.defaultHandler("noop")({ message: "test" })).not.toHaveProperty("isError");
+    expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+
+    expect(h.defaultHandler("noop")({ message: "Analysis complete - no issues found" })).not.toHaveProperty("isError");
+    expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+
+    expect(() => h.defaultHandler("noop")({ message: "Second real noop" })).toThrow(expect.objectContaining({ code: -32602, message: expect.stringContaining("E002") }));
+    expect(mockAppendSafeOutput).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects immediately when max is 0 and config uses hyphen-keyed type (key normalisation)", () => {
     // Ensure getSafeOutputsToolConfig's hyphen→underscore lookup works for max checks
     const h = createHandlers(mockServer, mockAppendSafeOutput, {

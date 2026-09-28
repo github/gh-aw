@@ -111,9 +111,9 @@ The primary cost lever for most workflows is how often they run.
 
 ## Reducing Cost
 
-### Use Deterministic Checks to Skip the Agent
+### Skip the Agent When It Is Not Needed
 
-The most effective cost reduction is skipping the agent job entirely when it is not needed. The `skip-if-match` and `skip-if-no-match` conditions run during the low-cost pre-activation job and cancel the workflow before the agent starts:
+The cheapest run is the one that never starts the agent. Use `skip-if-match` and `skip-if-no-match` for simple GitHub-search conditions because they run in the low-cost pre-activation job:
 
 ```aw wrap
 on:
@@ -129,11 +129,7 @@ on:
   skip-if-no-match: 'label:needs-triage'
 ```
 
-Use these to filter out noise before incurring inference costs. See [Triggers](/gh-aw/reference/triggers/) for the full syntax.
-
-### Skip the Agent from Steps Using `noop`
-
-When a condition is too complex for a GitHub search query — for example, when you need to call an API, inspect a file, or apply custom business logic — write a `noop` entry to `$GH_AW_SAFE_OUTPUTS` from a `steps:` block. The harness checks for this entry before starting the AI engine and exits cleanly without incurring any AI Credits.
+When the condition needs scripting — for example calling an API, inspecting a file, or applying custom logic — emit a `noop` to `$GH_AW_SAFE_OUTPUTS` from `steps:` or `pre-agent-steps:`. The harness exits before starting the AI engine, so no AI Credits are charged:
 
 ```aw wrap
 steps:
@@ -147,20 +143,7 @@ steps:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-When a `noop` entry is present at harness startup, the agent is never started, no AI Credits are charged, and retries are suppressed. The `noop` message appears in the workflow conclusion comment or step summary. Use `pre-agent-steps:` instead of `steps:` when the check must run immediately before engine startup, such as after MCP configuration.
-
-Compared to `skip-if-match` and `skip-if-no-match`:
-
-| | `skip-if-match` / `skip-if-no-match` | `noop` in `steps:` |
-|---|---|---|
-| **Evaluated in** | Pre-activation job (earliest, cheapest) | Agent job (after checkout and steps) |
-| **Condition type** | GitHub search query | Arbitrary shell or script logic |
-| **Actions minutes saved** | Yes — agent job is never scheduled | No — agent job still runs through setup |
-| **AI Credits saved** | Yes | Yes |
-| **Best for** | Simple label/status/title filters | Complex API calls or file-based conditions |
-
-Prefer `skip-if-match` / `skip-if-no-match` when possible, and reserve `noop` in `steps:` for conditions that need scripting or the full agent job environment.
-
+Use `skip-if-match` / `skip-if-no-match` whenever possible because they also avoid scheduling the agent job. Use `noop` when you need arbitrary shell logic. See [Triggers](/gh-aw/reference/triggers/) for the full syntax.
 ### Choose a Cheaper Model
 
 The `engine.model` field selects the AI model. Smaller or faster models cost significantly less per token while still handling many routine tasks:
@@ -294,7 +277,7 @@ EOF
 > `repository_dispatch`, and `workflow_dispatch` runs, including dispatches carrying internal
 > `aw_context` metadata.
 
-### Roll out org/repo defaults with enterprise controls
+### Roll Out Shared Defaults
 
 For large installations, set baseline model and token guardrails once and let individual workflows override them only when needed:
 
@@ -304,7 +287,7 @@ For large installations, set baseline model and token guardrails once and let in
 gh aw env get defaults.yml --scope org --org MY_ORG
 ```
 
-2. Update and apply shared defaults in batch:
+2. Update and apply shared defaults:
 
 ```yaml
 default_max_ai_credits: "5M"
@@ -318,13 +301,12 @@ default_model_codex: "gpt-5.4-mini"
 gh aw env update defaults.yml --scope org --org MY_ORG
 ```
 
-`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` to delete the corresponding variable. Unknown YAML keys are rejected; `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; and `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
+`gh aw env update` previews changes before applying them. Use `--yes` to skip confirmation in automation or `--dry-run` to preview only. Set a field to `null` to delete the corresponding variable. Unknown YAML keys are rejected. `default_max_turns`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, and `default_detection_job_timeout_minutes` must be positive integers; `default_max_ai_credits` and `default_max_daily_ai_credits` must be non-zero integers. Negative values disable the corresponding guardrail.
 
 3. If you compile workflows in CI, pass compiler-read defaults into the compiler process environment, for example via `${{ vars.* }}`: `GH_AW_DEFAULT_MAX_TURNS`, `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES`, and `GH_AW_DEFAULT_DETECTION_MODEL`.
 
 > [!TIP]
 > `GH_AW_DEFAULT_MODEL_*` and `GH_AW_DEFAULT_*_TIMEOUT_MINUTES` are resolved at workflow runtime via `${{ vars.* }}` in compiled YAML, while max-turn and token defaults are read by the compiler process at compile time.
-
 ### Rate Limiting and Concurrency
 
 Use `user-rate-limit` to cap how many times a user can trigger the workflow in a given window, and rely on concurrency controls to serialize runs rather than letting them pile up:
@@ -472,7 +454,7 @@ The [githubnext/agentic-ops](https://github.com/githubnext/agentic-ops) reposito
 
 ## Common Scenario Estimates
 
-These are rough budgeting estimates; actual costs vary by prompt size, tool usage, model, and provider pricing.
+These rough estimates help with early budgeting; actual costs vary by prompt size, tool usage, model, and provider pricing.
 
 | Scenario | Frequency | Actions minutes/month | Inference/month |
 |---|---|---:|---|
@@ -482,8 +464,7 @@ These are rough budgeting estimates; actual costs vary by prompt size, tool usag
 | On-demand via slash command | User-controlled | Varies | Varies |
 
 > [!TIP]
-> Create separate `COPILOT_GITHUB_TOKEN` service accounts per repository or team to attribute spend by workflow.
-
+> Use separate `COPILOT_GITHUB_TOKEN` service accounts per repository or team to attribute spend by workflow.
 ## Learn More
 
 - [Audit Commands](/gh-aw/reference/audit/) - Single-run analysis, diff, and cross-run reporting

@@ -19477,7 +19477,7 @@ safe-outputs:
   # Format 1: Configuration for no-op safe output (logging only, no GitHub API
   # calls). Always available as a fallback to ensure human-visible artifacts.
   noop:
-    # Maximum number of noop messages (default: 1) Supports integer or GitHub Actions
+    # Maximum number of noop messages (default: 2) Supports integer or GitHub Actions
     # expression (e.g. '${{ inputs.max }}').
     # (optional)
     # Accepted formats:
@@ -19725,7 +19725,7 @@ safe-outputs:
         # (optional)
         workflows: "read"
 
-  # Format 2: Enable noop output with default configuration (max: 1)
+  # Format 2: Enable noop output with default configuration (max: 2)
   noop: null
 
   # Format 3: Explicitly disable noop output (false). Noop is enabled by default
