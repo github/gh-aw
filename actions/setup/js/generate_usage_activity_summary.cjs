@@ -160,7 +160,7 @@ function buildFrictionStepSummary(friction) {
   const turns = Number.isFinite(cost.turns) ? cost.turns.toLocaleString() : "0";
   const toolCalls = Number.isFinite(cost.tool_calls) ? cost.tool_calls.toLocaleString() : "0";
   const latency = Number.isFinite(cost.latency_ms) ? `${cost.latency_ms.toLocaleString()} ms` : "0 ms";
-  const ratio = Number.isFinite(friction.friction_ratio) ? `${(friction.friction_ratio * 100).toFixed(1)}%` : "unavailable";
+  const ratio = state !== "unavailable" && Number.isFinite(friction.friction_ratio) ? `${(friction.friction_ratio * 100).toFixed(1)}%` : "unavailable";
   const lines = [
     "<details>",
     `<summary>Friction Cost: ${aic} AIC (${state})</summary>`,
@@ -183,6 +183,63 @@ function buildFrictionStepSummary(friction) {
 
   lines.push("", "</details>", "");
   return lines.join("\n");
+}
+
+/**
+ * Determine whether a trailing-newline separator is needed before appending to an
+ * existing file, without reading the whole file into memory (step summary files can
+ * grow large over a run).
+ *
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function needsLeadingNewlineSeparator(filePath) {
+  let fd;
+  try {
+    const { size } = fs.statSync(filePath);
+    if (size === 0) return false;
+    fd = fs.openSync(filePath, "r");
+    const buffer = Buffer.alloc(1);
+    fs.readSync(fd, buffer, 0, 1, size - 1);
+    return buffer.toString("utf8") !== "\n";
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/**
+ * Append the rendered friction-cost section to $GITHUB_STEP_SUMMARY when the
+ * GITHUB_STEP_SUMMARY env var is set (the normal Actions runner case, including under
+ * `github-script`). Otherwise falls back to `core.summary.addRaw`/`write` when that API is
+ * available, and is a no-op when neither is usable — this script normally runs as a plain
+ * `node` process where `core.summary` is not provided by the shim.
+ *
+ * @param {string} section
+ * @returns {Promise<void>}
+ */
+async function writeFrictionStepSummary(section) {
+  if (!section) return;
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) {
+    try {
+      const separator = needsLeadingNewlineSeparator(summaryPath) ? "\n" : "";
+      fs.appendFileSync(summaryPath, `${separator}${section}`, "utf8");
+    } catch (err) {
+      core.warning(`Failed to append friction-cost step summary: ${getErrorMessage(err)}`);
+    }
+    return;
+  }
+  if (core.summary && typeof core.summary.addRaw === "function") {
+    await core.summary.addRaw(section).write();
+  }
 }
 
 /**
@@ -1079,7 +1136,7 @@ async function main() {
   core.info(outputPath);
 
   if (summary.friction) {
-    await core.summary.addRaw(buildFrictionStepSummary(summary.friction)).write();
+    await writeFrictionStepSummary(buildFrictionStepSummary(summary.friction));
   }
 }
 
@@ -1103,6 +1160,7 @@ module.exports = {
   parseWorkingSetMetrics,
   buildFrictionSummary,
   buildFrictionStepSummary,
+  writeFrictionStepSummary,
   readTokenUsageContent,
   AGENT_TOKEN_USAGE_PATH,
   MANIFEST_FILE_PATH,
