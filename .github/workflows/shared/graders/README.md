@@ -51,16 +51,16 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 | 15 | `premature-termination-gap` | Completion predicates | Implemented |
 | 16 | `evidence-saturation-stopping-lag` | Completion predicates | Implemented |
 | 17 | `dependency-order-violation-rate` | Objective DAG | Implemented |
-| 18 | `objective-coverage` | Objective predicates | Not started |
-| 19 | `grounding-accuracy` | Valid-action schemas | Not started |
+| 18 | `objective-coverage` | Objective predicates | Implemented |
+| 19 | `grounding-accuracy` | Valid-action schemas | Implemented |
 
 ## Tier 3 — benchmark/evaluation mode (needs a reference trajectory/patch/process model)
 
 | Rank | Grader ID | Runtime requirement | Status |
 |---|---|---|---|
-| 20 | `tool-wise-score` | Reference trajectory | Not started |
-| 21 | `trajectory-ndtw` | Reference trajectory + state distance | Not started |
-| 22 | `code-search-recall` | Reference patch | Not started |
+| 20 | `tool-wise-score` | Reference trajectory | Implemented |
+| 21 | `trajectory-ndtw` | Reference trajectory + state distance | Implemented |
+| 22 | `code-search-recall` | Reference patch | Implemented |
 | 23 | `code-read-precision` | Reference patch + symbol extraction | Not started |
 | 24 | `code-edit-precision` | Reference patch | Not started |
 | 25 | `process-alignment-fitness` | Process model | Not started |

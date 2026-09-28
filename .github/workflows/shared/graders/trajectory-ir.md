@@ -70,7 +70,12 @@ telemetry, no network calls):
   "reference": null
   // optional: reference trajectory / patch for benchmark-mode graders (#20-#24).
   // Populate only when the workflow importing the grader supplies one; leave
-  // null otherwise and let the grader report "not-applicable".
+  // null otherwise and let the grader report "not-applicable". Shape:
+  // {
+  //   "toolCalls": [{ "name": "string", "arguments": {} }], // tool-wise-score
+  //   "states": ["states[].id"],                            // trajectory-ndtw
+  //   "patch": { "files": [{ "path": "string" }] }          // code-search-recall
+  // }
 }
 ```
 
@@ -100,7 +105,11 @@ telemetry, no network calls):
    satisfied. Preserve explicitly declared prerequisite objective IDs in
    `dependsOn`; use an empty array when no dependency is declared, and never
    infer dependencies from execution order.
-7. Write the IR to `/tmp/gh-aw/agent/graders/trajectory_ir.json` so a
+7. Record one `resources[]` entry of kind `file` for every file the agent
+   located (searched, listed, read, or edited), and set
+   `actions[].validAtIssueTime` to whether the action matched the
+   valid-action schema of the state in which it was issued.
+8. Write the IR to `/tmp/gh-aw/agent/graders/trajectory_ir.json` so a
    single run can compute more than one grader without rebuilding the IR.
 
 ### Output contract every grader in this directory follows

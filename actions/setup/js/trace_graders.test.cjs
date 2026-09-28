@@ -170,6 +170,11 @@ const backlogGraderMeta = {
   "premature-termination-gap": { name: "Premature Termination Gap", unit: "count", direction: "lower_is_better" },
   "evidence-saturation-stopping-lag": { name: "Evidence Saturation Stopping Lag", unit: "count", direction: "lower_is_better" },
   "dependency-order-violation-rate": { name: "Dependency Order Violation Rate", unit: "ratio", direction: "lower_is_better" },
+  "objective-coverage": { name: "Objective Coverage", unit: "ratio", direction: "higher_is_better" },
+  "grounding-accuracy": { name: "Grounding Accuracy", unit: "ratio", direction: "higher_is_better" },
+  "tool-wise-score": { name: "Tool-Wise Score", unit: "ratio", direction: "higher_is_better" },
+  "trajectory-ndtw": { name: "Trajectory nDTW", unit: "ratio", direction: "higher_is_better" },
+  "code-search-recall": { name: "Code Search Recall", unit: "ratio", direction: "higher_is_better" },
 };
 
 function runBacklogGrader(id, trace) {
@@ -1287,6 +1292,130 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(result.value).toBeNull();
       expect(result.status).toBe("unavailable");
       expect(result.message).toContain("unknown objective");
+    });
+  });
+
+  describe("objective and grounding backlog custom graders", () => {
+    it("scores the fraction of declared objectives completed", () => {
+      const result = runBacklogGrader("objective-coverage", {
+        trajectoryIR: {
+          objectives: [{ id: "done", satisfiedAtEventIndex: 1 }, { id: "done-too", satisfiedAtEventIndex: 0 }, { id: "missing", satisfiedAtEventIndex: null }, { id: "absent" }],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("objectives=4 completed=2");
+      expect(result.details).toContain("missing, absent");
+    });
+
+    it("rejects invalid objective satisfaction indexes", () => {
+      const result = runBacklogGrader("objective-coverage", { trajectoryIR: { objectives: [{ id: "bad", satisfiedAtEventIndex: -1 }] } });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("invalid objective satisfaction index");
+    });
+
+    it("scores actions that were valid when issued", () => {
+      const result = runBacklogGrader("grounding-accuracy", {
+        trajectoryIR: {
+          actions: [
+            { id: "a1", validAtIssueTime: true },
+            { id: "a2", validAtIssueTime: false },
+            { id: "a3", validAtIssueTime: true },
+            { id: "a4", validAtIssueTime: true },
+          ],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.75);
+      expect(result.details).toContain("actions=4 valid=3; ungrounded: a2");
+    });
+
+    it("does not guess grounding when validity is missing", () => {
+      const result = runBacklogGrader("grounding-accuracy", { trajectoryIR: { actions: [{ id: "a1", validAtIssueTime: true }, { id: "a2" }] } });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+    });
+  });
+
+  describe("reference-trajectory backlog custom graders", () => {
+    it("scores the correct tool prefix with parameter credit", () => {
+      const result = runBacklogGrader("tool-wise-score", {
+        trajectoryIR: {
+          toolCalls: [
+            { id: "t2", eventIndex: 2, name: "view", arguments: { path: "b.go", range: [1, 2] } },
+            { id: "t1", eventIndex: 0, name: "grep", arguments: { pattern: "x", path: "." } },
+            { id: "t3", eventIndex: 4, name: "bash", arguments: {} },
+          ],
+          reference: {
+            toolCalls: [{ name: "grep", arguments: { path: ".", pattern: "x" } }, { name: "view", arguments: { path: "a.go", range: [1, 2] } }, { name: "edit", arguments: { path: "a.go" } }, { name: "bash" }],
+          },
+        },
+      });
+
+      expect(result.value).toBeCloseTo((1 + 0.75) / 4);
+      expect(result.details).toContain("referenceSteps=4 observedSteps=3 correctPrefix=2");
+      expect(result.details).toContain("expected edit, got bash");
+    });
+
+    it("computes nDTW over state_change events", () => {
+      const exact = runBacklogGrader("trajectory-ndtw", {
+        trajectoryIR: {
+          events: [
+            { index: 0, kind: "state_change", ref: "s1" },
+            { index: 1, kind: "tool_call", ref: "t1" },
+            { index: 2, kind: "state_change", ref: "s2" },
+            { index: 3, kind: "state_change", ref: "s2" },
+          ],
+          reference: { states: ["s1", "s2"] },
+        },
+      });
+      const detour = runBacklogGrader("trajectory-ndtw", {
+        trajectoryIR: {
+          events: [
+            { index: 0, kind: "state_change", ref: "s1" },
+            { index: 1, kind: "state_change", ref: "s9" },
+            { index: 2, kind: "state_change", ref: "s2" },
+          ],
+          reference: { states: ["s1", "s2"] },
+        },
+      });
+
+      expect(exact.value).toBeCloseTo(1);
+      expect(detour.value).toBeCloseTo(Math.exp(-1 / 2));
+      expect(detour.details).toContain("referenceStates=2 observedStates=3 dtwDistance=1");
+    });
+
+    it("scores recall of reference patch files", () => {
+      const result = runBacklogGrader("code-search-recall", {
+        trajectoryIR: {
+          resources: [
+            { id: "r1", kind: "file", uri: "./pkg/a.go" },
+            { id: "r2", kind: "url", uri: "pkg/b.go" },
+            { id: "r3", kind: "file", uri: "pkg/c.go" },
+          ],
+          reference: { patch: { files: [{ path: "pkg/a.go" }, "pkg/b.go", "pkg/c.go", "pkg/d.go"] } },
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("referenceFiles=4 located=2; never located: pkg/b.go, pkg/d.go");
+    });
+
+    it.each([
+      ["tool-wise-score", { trajectoryIR: { toolCalls: [] } }],
+      ["trajectory-ndtw", { trajectoryIR: { events: [{ index: 0, kind: "state_change", ref: "s1" }], reference: null } }],
+      ["code-search-recall", { trajectoryIR: { resources: [], reference: { patch: { files: [] } } } }],
+      ["trajectory-ndtw", { trajectoryIR: { events: [{ index: 0, kind: "tool_call", ref: "t1" }], reference: { states: ["s1"] } } }],
+      ["tool-wise-score", { trajectoryIR: { reference: { toolCalls: [{ name: "grep" }] } } }],
+      ["code-search-recall", { trajectoryIR: { reference: { patch: { files: [{ path: "" }] } }, resources: [] } }],
+    ])("reports %s as unavailable without fabricating a score", (id, unavailableTrace) => {
+      const result = runBacklogGrader(id, unavailableTrace);
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
     });
   });
 
