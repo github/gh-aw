@@ -98,7 +98,7 @@ function parseWorkingSetMetrics(tokenUsagePath = AGENT_TOKEN_USAGE_PATH) {
   try {
     return calculateWorkingSetFromJSONL(fs.readFileSync(tokenUsagePath, "utf-8"));
   } catch (err) {
-    throw new Error(`Failed to read working-set token usage from ${tokenUsagePath}: ${String(err)}`, { cause: err });
+    throw new Error(`Failed to read working-set token usage from ${tokenUsagePath}: ${getErrorMessage(err)}`, { cause: err });
   }
 }
 
@@ -1033,7 +1033,7 @@ async function main() {
       }
     }
   } catch (err) {
-    core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${String(err)} — safe_outputs omitted from summary`);
+    core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${getErrorMessage(err)} — safe_outputs omitted from summary`);
   }
 
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
@@ -1052,7 +1052,7 @@ async function main() {
     }
   } catch (err) {
     summary.working_set = calculateWorkingSetFromJSONL("").workingSet;
-    core.warning(`Working-set rebuild measurement unavailable: ${String(err)}`);
+    core.warning(`Working-set rebuild measurement unavailable: ${getErrorMessage(err)}`);
   }
 
   // Compute precomputed friction cost from every activity section already parsed.
@@ -1066,7 +1066,7 @@ async function main() {
       firewall: summary.firewall || null,
     });
   } catch (err) {
-    core.warning(`Friction-cost measurement unavailable: ${String(err)}`);
+    core.warning(`Friction-cost measurement unavailable: ${getErrorMessage(err)}`);
   }
 
   // Write summary to file
@@ -1074,7 +1074,7 @@ async function main() {
   try {
     fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf-8");
   } catch (err) {
-    throw new Error(`Failed to write file ${outputPath}: ${String(err)}`, { cause: err });
+    throw new Error(`Failed to write file ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
   }
   core.info(outputPath);
 
