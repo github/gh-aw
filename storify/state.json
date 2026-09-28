@@ -8,14 +8,24 @@
     "high_throughput_triage_baseline"
   ],
   "carry_forward_questions": [
-    "Are PR Sous Chef safe_outputs failures clustering around specific tool calls (resolve thread vs create issue)?",
-    "Can AI Moderator move from repeated report_incomplete to successful agent passes next cycle?",
-    "Should Avenger conclusion semantics be tightened when agent job fails?"
+    "Does failure investigator continue to neutralize recurrent agent_logic failures over the next 24h?",
+    "Do integration-heavy workflows reduce report_incomplete frequency after updater cycles?",
+    "Can high-token failing workflows be pruned or constrained earlier via detection guards?"
   ],
   "representative_runs": [
     36269159251,
     36283212457,
     36276480781,
     36304004654
+  ],
+  "last_run_date": "2026-09-28",
+  "last_window": {
+    "start": "2026-09-27T08:00:00Z",
+    "end": "2026-09-28T08:00:00Z"
+  },
+  "key_themes": [
+    "scheduled failure investigation as stabilizer",
+    "high baseline success in core recurring workflows",
+    "persistent auth/integration friction pockets"
   ]
 }
