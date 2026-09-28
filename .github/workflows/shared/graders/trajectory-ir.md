@@ -65,7 +65,7 @@ telemetry, no network calls):
   ],
   "objectives": [
     // declared or inferred completion/evidence conditions
-    { "id": "string", "description": "string", "satisfiedAtEventIndex": null }
+    { "id": "string", "description": "string", "satisfiedAtEventIndex": null, "dependsOn": ["objective-id"] }
   ],
   "reference": null
   // optional: reference trajectory / patch for benchmark-mode graders (#20-#24).
@@ -97,28 +97,30 @@ telemetry, no network calls):
    (workflow `safe-outputs` config, explicit task/issue checklist, README
    "Definition of Done") and mark `satisfiedAtEventIndex` the first event
    index at which the objective's evidence appears; leave `null` if never
-   satisfied.
+   satisfied. Preserve explicitly declared prerequisite objective IDs in
+   `dependsOn`; use an empty array when no dependency is declared, and never
+   infer dependencies from execution order.
 7. Write the IR to `/tmp/gh-aw/agent/graders/trajectory_ir.json` so a
    single run can compute more than one grader without rebuilding the IR.
 
 ### Output contract every grader in this directory follows
 
-Each grader fragment produces one JSON object appended to
-`/tmp/gh-aw/agent/graders/custom_grader_results.json`:
+Each grader script returns either a finite number or an object with a finite
+numeric `value`. Return `value: null` when required trace data is unavailable
+or the grader is not applicable:
 
 ```jsonc
 {
-  "id": "policy-near-miss",
   "value": 0.0,
-  "unit": "ratio|count|ms|string",
-  "direction": "lower-is-better|higher-is-better|neutral",
-  "evidence": ["short grounded strings citing IR event indices or ids"],
-  "applicable": true,
-  "notApplicableReason": null
+  "unit": "ratio",
+  "details": "short grounded summary citing IR event indices or ids"
 }
 ```
 
-Set `applicable: false` and explain in `notApplicableReason` rather than
-fabricating a value when the run's trace does not contain the inputs the
-grader needs (e.g. no reference trajectory for the benchmark-mode graders,
-no declared objectives for `objective-coverage`).
+The grader ID, name, unit, and `higher_is_better` or `lower_is_better`
+direction come from its frontmatter. An object result may additionally include
+`passed`, `severity`, `details`, or `message`; other fields are ignored by the
+runtime. Use `{ value: null, passed: null, message: "not applicable: ..." }`
+rather than fabricating a score when the trace does not contain the inputs the
+grader needs (e.g. no reference trajectory for benchmark-mode graders or no
+declared objectives for `objective-coverage`).

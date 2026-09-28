@@ -46,11 +46,11 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 | 3 | `exploration-error` | State/task model | Implemented |
 | 4 | `exploitation-error` | State/task model | Implemented |
 | 12 | `tool-output-consumption-rate` | Provenance/reference IDs | Implemented |
-| 13 | `end-to-end-lineage-completeness` | Provenance graph | Not started |
-| 14 | `action-provenance-coverage` | Provenance graph | Not started |
-| 15 | `premature-termination-gap` | Completion predicates | Not started |
-| 16 | `evidence-saturation-stopping-lag` | Completion predicates | Not started |
-| 17 | `dependency-order-violation-rate` | Objective DAG | Not started |
+| 13 | `end-to-end-lineage-completeness` | Provenance graph | Implemented |
+| 14 | `action-provenance-coverage` | Provenance graph | Implemented |
+| 15 | `premature-termination-gap` | Completion predicates | Implemented |
+| 16 | `evidence-saturation-stopping-lag` | Completion predicates | Implemented |
+| 17 | `dependency-order-violation-rate` | Objective DAG | Implemented |
 | 18 | `objective-coverage` | Objective predicates | Not started |
 | 19 | `grounding-accuracy` | Valid-action schemas | Not started |
 

@@ -164,6 +164,25 @@ function runToolOutputConsumptionRate(trace) {
   });
 }
 
+const backlogGraderMeta = {
+  "end-to-end-lineage-completeness": { name: "End-to-End Lineage Completeness", unit: "ratio", direction: "higher_is_better" },
+  "action-provenance-coverage": { name: "Action Provenance Coverage", unit: "ratio", direction: "higher_is_better" },
+  "premature-termination-gap": { name: "Premature Termination Gap", unit: "count", direction: "lower_is_better" },
+  "evidence-saturation-stopping-lag": { name: "Evidence Saturation Stopping Lag", unit: "count", direction: "lower_is_better" },
+  "dependency-order-violation-rate": { name: "Dependency Order Violation Rate", unit: "ratio", direction: "lower_is_better" },
+};
+
+function runBacklogGrader(id, trace) {
+  const source = fs.readFileSync(path.join(__dirname, `../../../.github/workflows/shared/graders/${id}.md`), "utf8");
+  const match = source.match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
+  if (!match?.[1]) throw new Error(`unable to extract ${id} grader script`);
+  const script = match[1]
+    .split("\n")
+    .map(line => line.slice(6))
+    .join("\n");
+  return runCustomGrader(id, script, makeTrace(trace), { ...backlogGraderMeta[id], source: "inline" });
+}
+
 describe("trace_graders", () => {
   describe("buildGradersSummaryBody", () => {
     it("renders all computed grader values without emojis", () => {
@@ -1145,6 +1164,129 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(result.passed).toBeNull();
       expect(result.status).toBe("unavailable");
       expect(result.message).toContain(message);
+    });
+  });
+
+  describe("provenance backlog custom graders", () => {
+    const trace = {
+      trajectoryIR: {
+        events: [
+          { index: 0, kind: "observation", ref: "obs-1" },
+          { index: 1, kind: "safe_output", ref: "output-1" },
+          { index: 2, kind: "safe_output", ref: "output-2" },
+        ],
+        actions: [
+          { id: "action-1", type: "edit", target: "a.go" },
+          { id: "action-2", type: "comment", target: "issue-1" },
+          { id: "action-3", type: "read", target: "README.md" },
+        ],
+        toolCalls: [{ id: "tool-1" }],
+        observations: [{ id: "obs-1" }],
+        provenanceEdges: [
+          { from: "obs-1", to: "derived-1", relation: "informed" },
+          { from: "derived-1", to: "output-1", relation: "derived-from" },
+          { from: "tool-1", to: "action-1", relation: "informed" },
+        ],
+      },
+    };
+
+    it("follows multi-hop lineage from final outputs to evidence roots", () => {
+      const result = runBacklogGrader("end-to-end-lineage-completeness", trace);
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("outputs=2 traceable=1");
+      expect(result.details).toContain("output-2");
+    });
+
+    it("scores consequential actions only", () => {
+      const result = runBacklogGrader("action-provenance-coverage", trace);
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("consequentialActions=2 covered=1");
+      expect(result.details).toContain("action-2");
+    });
+
+    it.each([
+      ["end-to-end-lineage-completeness", { trajectoryIR: { events: [], provenanceEdges: [] } }],
+      ["action-provenance-coverage", { trajectoryIR: { actions: [{ id: "read-1", type: "read" }], provenanceEdges: [] } }],
+    ])("normalizes non-applicable %s evidence as unavailable", (id, unavailableTrace) => {
+      const result = runBacklogGrader(id, unavailableTrace);
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+    });
+  });
+
+  describe("completion backlog custom graders", () => {
+    it("counts every unsatisfied objective at termination", () => {
+      const result = runBacklogGrader("premature-termination-gap", {
+        trajectoryIR: {
+          objectives: [{ id: "done", satisfiedAtEventIndex: 1 }, { id: "missing", satisfiedAtEventIndex: null }, { id: "also-missing" }],
+        },
+      });
+
+      expect(result.value).toBe(2);
+      expect(result.details).toContain("objectives=3 unsatisfied=2");
+    });
+
+    it("counts events after the last objective became satisfied", () => {
+      const result = runBacklogGrader("evidence-saturation-stopping-lag", {
+        trajectoryIR: {
+          objectives: [
+            { id: "first", satisfiedAtEventIndex: 1 },
+            { id: "last", satisfiedAtEventIndex: 3 },
+          ],
+          events: [{ index: 0 }, { index: 1 }, { index: 3 }, { index: 4 }, { index: 8 }],
+        },
+      });
+
+      expect(result.value).toBe(2);
+      expect(result.details).toContain("saturationEventIndex=3 eventsAfterSaturation=2");
+    });
+
+    it("does not fabricate a stopping lag before evidence saturation", () => {
+      const result = runBacklogGrader("evidence-saturation-stopping-lag", {
+        trajectoryIR: {
+          objectives: [{ id: "missing", satisfiedAtEventIndex: null }],
+          events: [{ index: 0 }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("never saturated");
+    });
+  });
+
+  describe("dependency-order-violation-rate custom grader", () => {
+    it("scores completed dependent objectives with any late prerequisite as violations", () => {
+      const result = runBacklogGrader("dependency-order-violation-rate", {
+        trajectoryIR: {
+          objectives: [
+            { id: "prerequisite-a", satisfiedAtEventIndex: 1, dependsOn: [] },
+            { id: "prerequisite-b", satisfiedAtEventIndex: 5, dependsOn: [] },
+            { id: "ordered", satisfiedAtEventIndex: 3, dependsOn: ["prerequisite-a"] },
+            { id: "violating", satisfiedAtEventIndex: 4, dependsOn: ["prerequisite-a", "prerequisite-b"] },
+            { id: "not-executed", satisfiedAtEventIndex: null, dependsOn: ["prerequisite-a"] },
+          ],
+        },
+      });
+
+      expect(result.value).toBeCloseTo(0.5);
+      expect(result.details).toContain("completedDependentObjectives=2 violations=1");
+      expect(result.details).toContain("violating");
+    });
+
+    it("rejects incomplete dependency graphs", () => {
+      const result = runBacklogGrader("dependency-order-violation-rate", {
+        trajectoryIR: {
+          objectives: [{ id: "dependent", satisfiedAtEventIndex: 1, dependsOn: ["missing"] }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("unknown objective");
     });
   });
 
