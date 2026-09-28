@@ -122,7 +122,7 @@ func buildStandardNpmEngineInstallSteps(
 //
 // Parameters:
 //   - npmSteps: Pre-computed npm installation steps (from BuildStandardNpmEngineInstallSteps
-//     or GenerateCopilotInstallerSteps)
+//     or generateCopilotInstallerSteps)
 //   - workflowData: The workflow data (used to determine firewall configuration)
 //
 // Returns:

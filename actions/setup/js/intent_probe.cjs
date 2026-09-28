@@ -20,6 +20,19 @@ function isTrivialProbeValue(value) {
 }
 
 /**
+ * Detects noop messages that look like a schema probe (e.g. an agent testing
+ * tool availability) rather than a genuine completion signal. Probing noop
+ * calls are ignored entirely - they don't consume the noop call budget and
+ * aren't surfaced in summaries or tracking issues - so a real noop call is
+ * never crowded out by an earlier probe.
+ * @param {unknown} message
+ * @returns {boolean}
+ */
+function isProbingNoopMessage(message) {
+  return isTrivialProbeValue(message);
+}
+
+/**
  * @param {unknown} value
  * @returns {boolean}
  */
@@ -144,6 +157,7 @@ function validatePushToPullRequestBranchIntent(entry) {
 }
 
 module.exports = {
+  isProbingNoopMessage,
   looksLikeExploratoryBranch,
   normalizeProbeValue,
   resolveIssueTitleForValidation,

@@ -11413,12 +11413,12 @@
               "description": "Configuration for no-op safe output (logging only, no GitHub API calls). Always available as a fallback to ensure human-visible artifacts.",
               "properties": {
                 "max": {
-                  "description": "Maximum number of noop messages (default: 1) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
+                  "description": "Maximum number of noop messages (default: 2) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
                   "oneOf": [
                     {
                       "type": "integer",
                       "minimum": 1,
-                      "default": 1
+                      "default": 2
                     },
                     {
                       "type": "string",
@@ -11466,7 +11466,7 @@
             },
             {
               "type": "null",
-              "description": "Enable noop output with default configuration (max: 1)"
+              "description": "Enable noop output with default configuration (max: 2)"
             },
             {
               "type": "boolean",
