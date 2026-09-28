@@ -19,6 +19,8 @@ const {
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
   buildFrictionSummary,
+  buildFrictionStepSummary,
+  writeFrictionStepSummary,
   readTokenUsageContent,
   MANIFEST_FILE_PATH,
 } = req("./generate_usage_activity_summary.cjs");
@@ -652,6 +654,129 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(roundTripped.events[0].driver).toBe("firewall_block");
       expect(roundTripped.drivers[0].driver).toBe("firewall_block");
       expect(roundTripped.groups[0].group_id).toBe("network_block");
+    });
+
+    it("renders friction cost and driver data in a collapsed step summary section", () => {
+      const summary = buildFrictionStepSummary({
+        measurement_state: "causal",
+        counted_occurrences: 2,
+        friction_ratio: 0.125,
+        cost: {
+          aic: 0.25,
+          tokens: { total: 1234 },
+          turns: 1,
+          tool_calls: 2,
+          latency_ms: 500,
+        },
+        drivers: [
+          {
+            driver: "mcp_tool_error",
+            source: "mcp_gateway",
+            state: "causal",
+            counted_occurrences: 2,
+            cost: { aic: 0.25 },
+          },
+        ],
+      });
+
+      expect(summary).toContain("<details>\n<summary>Friction Cost: 0.25 AIC (causal)</summary>");
+      expect(summary).toContain("### Friction Cost");
+      expect(summary).toContain("| 0.25 | 12.5% | 2 | 1,234 | 1 | 2 | 500 ms |");
+      expect(summary).toContain("| `mcp_tool_error` | `mcp_gateway` | `causal` | 2 | 0.25 |");
+      expect(summary).toContain("</details>");
+    });
+
+    it("renders unavailable friction measurements without implying a measured ratio", () => {
+      const summary = buildFrictionStepSummary({
+        measurement_state: "unavailable",
+        counted_occurrences: 0,
+        cost: {
+          aic: 0,
+          tokens: { total: 0 },
+          turns: 0,
+          tool_calls: 0,
+          latency_ms: 0,
+        },
+        drivers: [],
+      });
+
+      expect(summary).toContain("<summary>Friction Cost: 0 AIC (unavailable)</summary>");
+      expect(summary).toContain("| 0 | unavailable | 0 | 0 | 0 | 0 | 0 ms |");
+    });
+
+    it("suppresses the ratio for an unavailable aggregate even when friction_ratio is finite", () => {
+      // Mirrors the mixed measured API-error plus unavailable firewall-block case in
+      // friction_cost_metrics.test.cjs, where computeFrictionCost can emit an unavailable
+      // aggregate alongside a finite friction_ratio.
+      const summary = buildFrictionStepSummary({
+        measurement_state: "unavailable",
+        counted_occurrences: 1,
+        friction_ratio: 0.4,
+        cost: {
+          aic: 0.1,
+          tokens: { total: 100 },
+          turns: 1,
+          tool_calls: 1,
+          latency_ms: 10,
+        },
+        drivers: [],
+      });
+
+      expect(summary).toContain("<summary>Friction Cost: 0.1 AIC (unavailable)</summary>");
+      expect(summary).toContain("| 0.1 | unavailable | 1 | 100 | 1 | 1 | 10 ms |");
+    });
+
+    describe("writeFrictionStepSummary", () => {
+      let summaryFile;
+      let previousSummaryEnv;
+
+      beforeEach(() => {
+        summaryFile = path.join(frictionDir, "step-summary.md");
+        previousSummaryEnv = process.env.GITHUB_STEP_SUMMARY;
+      });
+
+      afterEach(() => {
+        if (previousSummaryEnv === undefined) {
+          delete process.env.GITHUB_STEP_SUMMARY;
+        } else {
+          process.env.GITHUB_STEP_SUMMARY = previousSummaryEnv;
+        }
+      });
+
+      it("appends the rendered section to GITHUB_STEP_SUMMARY without using core.summary", async () => {
+        process.env.GITHUB_STEP_SUMMARY = summaryFile;
+        fs.writeFileSync(summaryFile, "existing content\n", "utf8");
+
+        await writeFrictionStepSummary("<details>friction</details>");
+
+        expect(fs.readFileSync(summaryFile, "utf8")).toBe("existing content\n<details>friction</details>");
+      });
+
+      it("inserts a newline separator when existing content has no trailing newline", async () => {
+        process.env.GITHUB_STEP_SUMMARY = summaryFile;
+        fs.writeFileSync(summaryFile, "existing content", "utf8");
+
+        await writeFrictionStepSummary("<details>friction</details>");
+
+        expect(fs.readFileSync(summaryFile, "utf8")).toBe("existing content\n<details>friction</details>");
+      });
+
+      it("does not prepend a blank line when the summary file is missing or empty", async () => {
+        process.env.GITHUB_STEP_SUMMARY = summaryFile;
+
+        await writeFrictionStepSummary("<details>friction</details>");
+
+        expect(fs.readFileSync(summaryFile, "utf8")).toBe("<details>friction</details>");
+      });
+
+      it("is a no-op when the section is empty", async () => {
+        process.env.GITHUB_STEP_SUMMARY = summaryFile;
+        fs.writeFileSync(summaryFile, "existing content\n", "utf8");
+
+        await writeFrictionStepSummary("");
+
+        expect(fs.readFileSync(summaryFile, "utf8")).toBe("existing content\n");
+      });
     });
   });
 });
