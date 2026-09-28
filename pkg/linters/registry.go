@@ -35,6 +35,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
 	"github.com/github/gh-aw/pkg/linters/lenstringzero"
 	"github.com/github/gh-aw/pkg/linters/logfatallibrary"
+	"github.com/github/gh-aw/pkg/linters/loopvarmutationinclosure"
 	"github.com/github/gh-aw/pkg/linters/manualmutexunlock"
 	"github.com/github/gh-aw/pkg/linters/manualpathconcat"
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
@@ -116,6 +117,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ioutildeprecated.Analyzer,
 	httpstatuscode.Analyzer,
 	largefunc.Analyzer,
+	loopvarmutationinclosure.Analyzer,
 	logfatallibrary.Analyzer,
 	manualmutexunlock.Analyzer,
 	manualpathconcat.Analyzer,
