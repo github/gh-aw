@@ -447,16 +447,21 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * Per Safe Outputs Specification MCE4: invocation-time half of dual enforcement.
    * @param {Record<string, any>} entry
    */
+  /**
+   * Probing entries are schema probes (e.g. `noop` with message "test") rather than a
+   * genuine signal. They are ignored entirely: not recorded, not counted against the
+   * type budget, so a probe never crowds out or short-circuits the real signal.
+   * @param {Record<string, any>} entry
+   * @returns {boolean}
+   */
+  const isIgnoredProbingEntry = entry => entry?.type === "noop" && isProbingNoopMessage(entry?.message);
+
   const appendSafeOutputCounted = entry => {
-    const type = entry?.type;
-    // Probing noop calls (e.g. `{"message": "test"}`) are schema probes rather than a
-    // genuine completion signal. They are ignored entirely: not recorded, not counted
-    // against the noop budget, so a probe never crowds out or short-circuits the real
-    // completion signal.
-    if (type === "noop" && isProbingNoopMessage(entry?.message)) {
+    if (isIgnoredProbingEntry(entry)) {
       server.debug(`Ignoring probing noop call (not recorded, does not consume the noop budget): ${JSON.stringify(entry?.message)}`);
       return;
     }
+    const type = entry?.type;
     if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);
     if (type) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
