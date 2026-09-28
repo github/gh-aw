@@ -69,7 +69,6 @@ func mismatchedPostVariable(j int) {
 	s := []int{}
 	for i := 0; i < 10; j++ {
 		s = append(s, i)
-		break
 	}
 	_ = s
 }
@@ -78,7 +77,6 @@ func decrementingLoop() {
 	s := []int{}
 	for i := 0; i < 10; i-- {
 		s = append(s, i)
-		break
 	}
 	_ = s
 }

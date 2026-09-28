@@ -73,9 +73,9 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 
-		// Check if the slice was declared before the loop with no capacity
-		declaredWithCapacity, ok := isSliceDeclaredBeforeLoop(pass, cur, appendInfo.target, loopNode)
-		if !ok || declaredWithCapacity {
+		// Check how the slice was last declared or assigned before the loop
+		shouldSkip, ok := isSliceDeclaredBeforeLoop(pass, cur, appendInfo.target, loopNode)
+		if !ok || shouldSkip {
 			continue
 		}
 
