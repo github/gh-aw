@@ -21,9 +21,14 @@ graders:
         isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
         isRecord(trace.agentOutput) ? trace.agentOutput : null,
       ].filter(isRecord);
-      const ir = candidates.find(value => Array.isArray(value.events) && Array.isArray(value.provenanceEdges));
+      const ir = candidates.find(value =>
+        Array.isArray(value.events) &&
+        Array.isArray(value.provenanceEdges) &&
+        Array.isArray(value.toolCalls) &&
+        Array.isArray(value.observations)
+      );
       if (!ir) {
-        return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks events or provenanceEdges" };
+        return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks events, provenanceEdges, toolCalls, or observations" };
       }
 
       const outputEvents = ir.events.filter(event => isRecord(event) && event.kind === "safe_output");
@@ -36,7 +41,7 @@ graders:
       }
 
       const roots = new Set();
-      for (const item of [...(Array.isArray(ir.toolCalls) ? ir.toolCalls : []), ...(Array.isArray(ir.observations) ? ir.observations : [])]) {
+      for (const item of [...ir.toolCalls, ...ir.observations]) {
         if (isRecord(item) && typeof item.id === "string" && item.id !== "") roots.add(item.id);
       }
       const parents = new Map();

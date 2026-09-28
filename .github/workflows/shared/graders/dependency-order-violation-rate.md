@@ -31,6 +31,9 @@ graders:
       if (byId.size !== ir.objectives.length) {
         return { value: null, unit: "ratio", passed: null, message: "unavailable: objective ids are not unique" };
       }
+      if (ir.objectives.some(objective => objective.dependsOn !== undefined && objective.dependsOn !== null && !Array.isArray(objective.dependsOn))) {
+        return { value: null, unit: "ratio", passed: null, message: "unavailable: objective dependsOn must be an array" };
+      }
       const dependent = ir.objectives.filter(objective => Array.isArray(objective.dependsOn) && objective.dependsOn.length > 0);
       if (dependent.length === 0) {
         return { value: null, unit: "ratio", passed: null, message: "not applicable: no objective dependencies" };
@@ -67,6 +70,7 @@ graders:
 dependency-order-violation-rate evaluates completed objectives that declare
 objectives[].dependsOn. A completed dependent objective is a violation when any
 prerequisite is incomplete, invalid, or completed at a later event index.
-Unknown dependency IDs make the graph unavailable; traces without dependencies
-or without a completed dependent objective are not applicable.
+Unknown dependency IDs or a non-array dependsOn value make the graph
+unavailable; traces without dependencies or without a completed dependent
+objective are not applicable.
 -->

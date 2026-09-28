@@ -20,19 +20,20 @@ graders:
         isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
         isRecord(trace.agentOutput) ? trace.agentOutput : null,
       ].filter(isRecord);
-      const ir = candidates.find(value => Array.isArray(value.actions) && Array.isArray(value.provenanceEdges));
+      const ir = candidates.find(value =>
+        Array.isArray(value.actions) &&
+        Array.isArray(value.provenanceEdges) &&
+        Array.isArray(value.toolCalls) &&
+        Array.isArray(value.observations)
+      );
       if (!ir) {
-        return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks actions or provenanceEdges" };
+        return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks actions, provenanceEdges, toolCalls, or observations" };
+      }
+      if (ir.actions.some(action => !isRecord(action) || typeof action.consequential !== "boolean")) {
+        return { value: null, unit: "ratio", passed: null, message: "unavailable: action is missing the canonical consequential flag" };
       }
 
-      const consequentialPattern = /(edit|write|create|update|delete|comment|issue|pull|merge|label|release|dispatch|safe[_-]?output|mutat)/i;
-      const readPattern = /(read|get|list|search|view|inspect)/i;
-      const consequential = ir.actions.filter(action =>
-        isRecord(action) &&
-        typeof action.type === "string" &&
-        consequentialPattern.test(action.type) &&
-        !readPattern.test(action.type)
-      );
+      const consequential = ir.actions.filter(action => action.consequential === true);
       if (consequential.length === 0) {
         return { value: null, unit: "ratio", passed: null, message: "not applicable: no consequential actions" };
       }
@@ -41,7 +42,7 @@ graders:
       }
 
       const roots = new Set();
-      for (const item of [...(Array.isArray(ir.toolCalls) ? ir.toolCalls : []), ...(Array.isArray(ir.observations) ? ir.observations : [])]) {
+      for (const item of [...ir.toolCalls, ...ir.observations]) {
         if (isRecord(item) && typeof item.id === "string" && item.id !== "") roots.add(item.id);
       }
       const parents = new Map();
@@ -72,8 +73,10 @@ graders:
 ---
 
 <!--
-action-provenance-coverage selects consequential actions by their canonical
-actions[].type and follows provenanceEdges backward from each actions[].id to a
-toolCalls[].id or observations[].id evidence root. Read-only actions are outside
-the denominator. Missing graph fields or action IDs make the result unavailable.
+action-provenance-coverage selects consequential actions using the canonical
+actions[].consequential flag (not a substring guess on actions[].type) and
+follows provenanceEdges backward from each actions[].id to a toolCalls[].id or
+observations[].id evidence root. Read-only actions are outside the
+denominator. Missing graph fields, a missing consequential flag, or missing
+action IDs make the result unavailable.
 -->

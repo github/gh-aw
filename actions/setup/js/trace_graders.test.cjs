@@ -1181,9 +1181,9 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
           { index: 2, kind: "safe_output", ref: "output-2" },
         ],
         actions: [
-          { id: "action-1", type: "edit", target: "a.go" },
-          { id: "action-2", type: "comment", target: "issue-1" },
-          { id: "action-3", type: "read", target: "README.md" },
+          { id: "action-1", type: "edit", target: "a.go", consequential: true },
+          { id: "action-2", type: "comment", target: "issue-1", consequential: true },
+          { id: "action-3", type: "read", target: "README.md", consequential: false },
         ],
         toolCalls: [{ id: "tool-1" }],
         observations: [{ id: "obs-1" }],
@@ -1213,12 +1213,42 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
 
     it.each([
       ["end-to-end-lineage-completeness", { trajectoryIR: { events: [], provenanceEdges: [] } }],
-      ["action-provenance-coverage", { trajectoryIR: { actions: [{ id: "read-1", type: "read" }], provenanceEdges: [] } }],
+      ["action-provenance-coverage", { trajectoryIR: { actions: [{ id: "read-1", type: "read", consequential: false }], provenanceEdges: [], toolCalls: [], observations: [] } }],
     ])("normalizes non-applicable %s evidence as unavailable", (id, unavailableTrace) => {
       const result = runBacklogGrader(id, unavailableTrace);
 
       expect(result.value).toBeNull();
       expect(result.status).toBe("unavailable");
+    });
+
+    it("rejects an action provenance graph missing the canonical consequential flag", () => {
+      const result = runBacklogGrader("action-provenance-coverage", {
+        trajectoryIR: {
+          actions: [{ id: "action-1", type: "edit" }],
+          toolCalls: [],
+          observations: [],
+          provenanceEdges: [],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("consequential flag");
+    });
+
+    it("rejects a malformed non-record action entry instead of silently excluding it", () => {
+      const result = runBacklogGrader("action-provenance-coverage", {
+        trajectoryIR: {
+          actions: [{ id: "action-1", type: "edit", consequential: true }, "not-a-record"],
+          toolCalls: [],
+          observations: [],
+          provenanceEdges: [],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("consequential flag");
     });
   });
 
@@ -1261,6 +1291,22 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(result.status).toBe("unavailable");
       expect(result.message).toContain("never saturated");
     });
+
+    it("rejects an earlier satisfaction index absent from the trace even when the latest one is present", () => {
+      const result = runBacklogGrader("evidence-saturation-stopping-lag", {
+        trajectoryIR: {
+          objectives: [
+            { id: "first", satisfiedAtEventIndex: 2 },
+            { id: "last", satisfiedAtEventIndex: 3 },
+          ],
+          events: [{ index: 0 }, { index: 1 }, { index: 3 }, { index: 4 }],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("absent from the trace");
+    });
   });
 
   describe("dependency-order-violation-rate custom grader", () => {
@@ -1292,6 +1338,21 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(result.value).toBeNull();
       expect(result.status).toBe("unavailable");
       expect(result.message).toContain("unknown objective");
+    });
+
+    it("rejects a malformed non-array dependsOn instead of treating it as no dependencies", () => {
+      const result = runBacklogGrader("dependency-order-violation-rate", {
+        trajectoryIR: {
+          objectives: [
+            { id: "prerequisite-a", satisfiedAtEventIndex: 1, dependsOn: [] },
+            { id: "malformed", satisfiedAtEventIndex: 2, dependsOn: "prerequisite-a" },
+          ],
+        },
+      });
+
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("unavailable");
+      expect(result.message).toContain("dependsOn must be an array");
     });
   });
 

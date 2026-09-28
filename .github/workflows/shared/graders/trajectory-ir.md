@@ -48,7 +48,7 @@ telemetry, no network calls):
     { "id": "string", "label": "string", "firstEventIndex": 0 }
   ],
   "actions": [
-    { "id": "string", "eventIndex": 0, "type": "string", "target": "string|null", "validAtIssueTime": true }
+    { "id": "string", "eventIndex": 0, "type": "string", "target": "string|null", "validAtIssueTime": true, "consequential": true }
   ],
   "toolCalls": [
     { "id": "string", "eventIndex": 0, "name": "string", "arguments": {}, "success": true, "durationMs": 0, "outputRef": "observations[].id|null" }
@@ -94,10 +94,14 @@ telemetry, no network calls):
    later actions reference values that only appear in that observation
    (e.g. a file path, an ID, a computed number). An observation with an
    empty `consumedByActionIds` was never used.
-5. Populate `provenanceEdges[]` for every consequential action (edits,
-   comments, issue/PR mutations, safe outputs): trace it back to the
-   tool call/observation that informed it, if any. Actions with no
-   incoming edge are provenance gaps.
+5. Set `actions[].consequential` to `true` for actions with an observable
+   side effect outside the sandbox (edits, comments, issue/PR mutations,
+   safe outputs) and `false` for read-only actions (searches, listings,
+   inspections); never infer this from substring matches on `type` at
+   grading time — record the flag once, here, from the action's real
+   effect. Populate `provenanceEdges[]` for every consequential action:
+   trace it back to the tool call/observation that informed it, if any.
+   Actions with no incoming edge are provenance gaps.
 6. Populate `objectives[]` from declared expectations when available
    (workflow `safe-outputs` config, explicit task/issue checklist, README
    "Definition of Done") and mark `satisfiedAtEventIndex` the first event
@@ -121,7 +125,6 @@ or the grader is not applicable:
 ```jsonc
 {
   "value": 0.0,
-  "unit": "ratio",
   "details": "short grounded summary citing IR event indices or ids"
 }
 ```

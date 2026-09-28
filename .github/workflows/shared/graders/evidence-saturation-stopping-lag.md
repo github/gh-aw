@@ -39,10 +39,11 @@ graders:
       if (eventIndexes.length !== ir.events.length || eventIndexes.some(index => !Number.isSafeInteger(index) || index < 0)) {
         return { value: null, unit: "count", passed: null, message: "unavailable: invalid event index" };
       }
-      const saturationIndex = Math.max(...satisfactionIndexes);
-      if (!eventIndexes.includes(saturationIndex)) {
-        return { value: null, unit: "count", passed: null, message: "unavailable: saturation event is absent from the trace" };
+      const eventIndexSet = new Set(eventIndexes);
+      if (satisfactionIndexes.some(index => !eventIndexSet.has(index))) {
+        return { value: null, unit: "count", passed: null, message: "unavailable: an objective's satisfaction event is absent from the trace" };
       }
+      const saturationIndex = Math.max(...satisfactionIndexes);
       const lag = eventIndexes.filter(index => index > saturationIndex).length;
       return {
         value: lag,
@@ -55,5 +56,5 @@ graders:
 evidence-saturation-stopping-lag finds the latest
 objectives[].satisfiedAtEventIndex and counts events[] entries after it. It is
 not applicable until every declared objective is satisfied. Invalid indexes or
-a missing saturation event make the result unavailable.
+any satisfaction index absent from the trace make the result unavailable.
 -->
