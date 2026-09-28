@@ -1785,6 +1785,16 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(ids.sort()).toEqual([...expectedIds].sort());
     });
 
+    it("reports a non-record trace as not applicable instead of throwing", () => {
+      for (const [id, grade] of Object.entries(TRAJECTORY_GRADERS)) {
+        for (const trace of [null, undefined, "trace", 42, []]) {
+          const result = grade(trace, {});
+          expect(result, id).toMatchObject({ value: null, passed: null });
+          expect(typeof result.message, id).toBe("string");
+        }
+      }
+    });
+
     it("includes every trajectory grader", () => {
       expect(Object.keys(TRAJECTORY_GRADERS)).toHaveLength(22);
       expect(Object.keys(TRAJECTORY_GRADER_META).sort()).toEqual(Object.keys(TRAJECTORY_GRADERS).sort());
