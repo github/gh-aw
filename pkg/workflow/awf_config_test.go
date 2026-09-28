@@ -2145,11 +2145,15 @@ func TestValidateAWFConfigJSON_AllowsDefaultAiCreditsPricingCachedFields(t *test
 
 func TestValidateAWFConfigJSON_GitHubAPIPointBudgets(t *testing.T) {
 	err := validateAWFConfigJSON(`{"rateLimiting":{"maxGithubApiPointsRest":2000,"maxGithubApiPointsGraphql":1500}}`)
-	require.NoError(t, err)
+	require.NoError(t, err, "the upstream schema leaves the security.difcProxy.host dependency to AWF runtime validation")
 
-	err = validateAWFConfigJSON(`{"rateLimiting":{"maxGithubApiPointsRest":0}}`)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "maxGithubApiPointsRest")
+	for _, field := range []string{"maxGithubApiPointsRest", "maxGithubApiPointsGraphql"} {
+		t.Run(field+" rejects zero", func(t *testing.T) {
+			err := validateAWFConfigJSON(`{"rateLimiting":{"` + field + `":0}}`)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), field)
+		})
+	}
 }
 
 func TestValidateAWFConfigJSON_ModelRoutingGate(t *testing.T) {
