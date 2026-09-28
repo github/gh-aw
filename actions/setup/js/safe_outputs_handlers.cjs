@@ -25,7 +25,7 @@ const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs"
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
-const { validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
+const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
@@ -449,9 +449,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    */
   const appendSafeOutputCounted = entry => {
     const type = entry?.type;
-    if (type) enforcePerTypeMax(type);
+    // Probing noop calls (e.g. `{"message": "test"}`) are schema probes rather than a
+    // genuine completion signal. They are ignored downstream, so they must not consume
+    // the invocation-time noop budget either.
+    const isProbingNoop = type === "noop" && isProbingNoopMessage(entry?.message);
+    if (type && !isProbingNoop) enforcePerTypeMax(type);
     appendSafeOutput(entry);
-    if (type) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
+    if (type && !isProbingNoop) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
   };
 
   /**
