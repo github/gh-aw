@@ -19,6 +19,8 @@ const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { countSteeringEventsByTypeInApiProxyJsonl } = require("./steering_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { computeFrictionCost } = require("./friction_cost_metrics.cjs");
+const { formatAIC } = require("./model_costs.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
 
 require("./shim.cjs");
 
@@ -96,7 +98,7 @@ function parseWorkingSetMetrics(tokenUsagePath = AGENT_TOKEN_USAGE_PATH) {
   try {
     return calculateWorkingSetFromJSONL(fs.readFileSync(tokenUsagePath, "utf-8"));
   } catch (err) {
-    throw new Error(`Failed to read working-set token usage from ${tokenUsagePath}: ${String(err)}`, { cause: err });
+    throw new Error(`Failed to read working-set token usage from ${tokenUsagePath}: ${getErrorMessage(err)}`, { cause: err });
   }
 }
 
@@ -139,6 +141,105 @@ function buildFrictionSummary(activity, tokenUsagePath = AGENT_TOKEN_USAGE_PATH)
     core.warning(warning);
   }
   return friction;
+}
+
+/**
+ * Render friction-cost data as a collapsed GitHub step summary section.
+ *
+ * @param {Record<string, any>} friction
+ * @returns {string}
+ */
+function buildFrictionStepSummary(friction) {
+  if (!friction || typeof friction !== "object") return "";
+
+  const state = typeof friction.measurement_state === "string" ? friction.measurement_state : "unavailable";
+  const cost = friction.cost && typeof friction.cost === "object" ? friction.cost : {};
+  const aic = Number.isFinite(cost.aic) ? formatAIC(cost.aic) || "0" : "unavailable";
+  const occurrences = Number.isFinite(friction.counted_occurrences) ? friction.counted_occurrences.toLocaleString() : "0";
+  const tokens = Number.isFinite(cost.tokens?.total) ? cost.tokens.total.toLocaleString() : "0";
+  const turns = Number.isFinite(cost.turns) ? cost.turns.toLocaleString() : "0";
+  const toolCalls = Number.isFinite(cost.tool_calls) ? cost.tool_calls.toLocaleString() : "0";
+  const latency = Number.isFinite(cost.latency_ms) ? `${cost.latency_ms.toLocaleString()} ms` : "0 ms";
+  const ratio = state !== "unavailable" && Number.isFinite(friction.friction_ratio) ? `${(friction.friction_ratio * 100).toFixed(1)}%` : "unavailable";
+  const lines = [
+    "<details>",
+    `<summary>Friction Cost: ${aic} AIC (${state})</summary>`,
+    "",
+    "### Friction Cost",
+    "",
+    "| AI credits | Run cost ratio | Counted occurrences | Tokens | Turns | Tool calls | Latency |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    `| ${aic} | ${ratio} | ${occurrences} | ${tokens} | ${turns} | ${toolCalls} | ${latency} |`,
+  ];
+
+  if (Array.isArray(friction.drivers) && friction.drivers.length > 0) {
+    lines.push("", "#### Drivers", "", "| Driver | Source | State | Occurrences | AI credits |", "| --- | --- | --- | ---: | ---: |");
+    for (const driver of friction.drivers) {
+      const driverAIC = Number.isFinite(driver.cost?.aic) ? formatAIC(driver.cost.aic) || "0" : "unavailable";
+      const driverOccurrences = Number.isFinite(driver.counted_occurrences) ? driver.counted_occurrences.toLocaleString() : "0";
+      lines.push(`| \`${driver.driver || "unknown"}\` | \`${driver.source || "unknown"}\` | \`${driver.state || "unavailable"}\` | ${driverOccurrences} | ${driverAIC} |`);
+    }
+  }
+
+  lines.push("", "</details>", "");
+  return lines.join("\n");
+}
+
+/**
+ * Determine whether a trailing-newline separator is needed before appending to an
+ * existing file, without reading the whole file into memory (step summary files can
+ * grow large over a run).
+ *
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function needsLeadingNewlineSeparator(filePath) {
+  let fd;
+  try {
+    const { size } = fs.statSync(filePath);
+    if (size === 0) return false;
+    fd = fs.openSync(filePath, "r");
+    const buffer = Buffer.alloc(1);
+    fs.readSync(fd, buffer, 0, 1, size - 1);
+    return buffer.toString("utf8") !== "\n";
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/**
+ * Append the rendered friction-cost section to $GITHUB_STEP_SUMMARY when the
+ * GITHUB_STEP_SUMMARY env var is set (the normal Actions runner case, including under
+ * `github-script`). Otherwise falls back to `core.summary.addRaw`/`write` when that API is
+ * available, and is a no-op when neither is usable — this script normally runs as a plain
+ * `node` process where `core.summary` is not provided by the shim.
+ *
+ * @param {string} section
+ * @returns {Promise<void>}
+ */
+async function writeFrictionStepSummary(section) {
+  if (!section) return;
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) {
+    try {
+      const separator = needsLeadingNewlineSeparator(summaryPath) ? "\n" : "";
+      fs.appendFileSync(summaryPath, `${separator}${section}`, "utf8");
+    } catch (err) {
+      core.warning(`Failed to append friction-cost step summary: ${getErrorMessage(err)}`);
+    }
+    return;
+  }
+  if (core.summary && typeof core.summary.addRaw === "function") {
+    await core.summary.addRaw(section).write();
+  }
 }
 
 /**
@@ -935,7 +1036,7 @@ function parseExperimentsData() {
 /**
  * Main function to generate usage activity summary
  */
-function main() {
+async function main() {
   const summary = { schema: "usage-activity-summary/v1" };
 
   // Parse firewall logs
@@ -989,7 +1090,7 @@ function main() {
       }
     }
   } catch (err) {
-    core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${String(err)} — safe_outputs omitted from summary`);
+    core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${getErrorMessage(err)} — safe_outputs omitted from summary`);
   }
 
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
@@ -1008,7 +1109,7 @@ function main() {
     }
   } catch (err) {
     summary.working_set = calculateWorkingSetFromJSONL("").workingSet;
-    core.warning(`Working-set rebuild measurement unavailable: ${String(err)}`);
+    core.warning(`Working-set rebuild measurement unavailable: ${getErrorMessage(err)}`);
   }
 
   // Compute precomputed friction cost from every activity section already parsed.
@@ -1022,7 +1123,7 @@ function main() {
       firewall: summary.firewall || null,
     });
   } catch (err) {
-    core.warning(`Friction-cost measurement unavailable: ${String(err)}`);
+    core.warning(`Friction-cost measurement unavailable: ${getErrorMessage(err)}`);
   }
 
   // Write summary to file
@@ -1030,14 +1131,21 @@ function main() {
   try {
     fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf-8");
   } catch (err) {
-    throw new Error(`Failed to write file ${outputPath}: ${String(err)}`, { cause: err });
+    throw new Error(`Failed to write file ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
   }
   core.info(outputPath);
+
+  if (summary.friction) {
+    await writeFrictionStepSummary(buildFrictionStepSummary(summary.friction));
+  }
 }
 
 // Run main function
 if (require.main === module) {
-  main();
+  main().catch(err => {
+    console.error(err instanceof Error && err.stack ? err.stack : getErrorMessage(err));
+    process.exitCode = 1;
+  });
 }
 
 module.exports = {
@@ -1051,6 +1159,8 @@ module.exports = {
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
   buildFrictionSummary,
+  buildFrictionStepSummary,
+  writeFrictionStepSummary,
   readTokenUsageContent,
   AGENT_TOKEN_USAGE_PATH,
   MANIFEST_FILE_PATH,
