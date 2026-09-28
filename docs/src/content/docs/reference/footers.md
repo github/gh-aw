@@ -75,6 +75,10 @@ safe-outputs:
 
 The global body footer is added to any handler-specific `body-footer`; both are appended even when `footer: false` and remain separate from the generated attribution footer. Body footers from imported agentic workflows are additive, in import order. The template supports `{workflow_name}` and `{run_url}` placeholders.
 
+## Provenance
+
+When a generated footer has a history search, it includes a separate subscript provenance line. The caller workflow ID is the link text and links to the same search previously exposed by the clock icon.
+
 ## PR Review Footer Control
 
 For PR reviews (`submit-pull-request-review`), the `footer` field supports conditional control over when the footer is added to the review body:

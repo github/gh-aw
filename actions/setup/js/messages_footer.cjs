@@ -161,7 +161,7 @@ function getAICFromEnv() {
  * @property {string} [workflowSourceUrl] - GitHub URL for the workflow source
  * @property {number|string} [triggeringNumber] - Issue, PR, or discussion number that triggered this workflow
  * @property {"issue"|"PR"|"discussion"} [triggeringType] - Triggering item type used in the default footer
- * @property {string} [historyUrl] - GitHub search URL for items created by this workflow (for the history link)
+ * @property {string} [historyUrl] - GitHub search URL for items created by this workflow
  * @property {string} [historyLink] - Pre-formatted markdown history link (e.g. " · [◷](url)"), or "" if unavailable
  * @property {number|string} [aiCredits] - Total AI Credits cost for the run (1 AIC == 0.01 USD)
  * @property {string} [emoji] - Optional emoji representing the workflow (from frontmatter)
@@ -169,6 +169,18 @@ function getAICFromEnv() {
  * @property {string} [slashCommandPlaceholder] - Custom hint text appended after the command name (replaces default "to run again")
  * @property {string} [labelCommand] - Label command name for the run-again hint, when applicable
  */
+
+/**
+ * Append a standardized provenance line when a history search is available.
+ * @param {string} footer - Rendered footer text
+ * @param {FooterContext} ctx - Context for footer generation
+ * @returns {string} Footer text with provenance
+ */
+function appendFooterProvenance(footer, ctx) {
+  if (!ctx.historyUrl) return footer;
+  const identifier = process.env.GH_AW_CALLER_WORKFLOW_ID || process.env.GH_AW_WORKFLOW_ID || ctx.workflowName;
+  return `${footer}\n> <sub>Provenance: [${identifier}](${ctx.historyUrl})</sub>`;
+}
 
 /**
  * Get the footer message, using custom template if configured.
@@ -265,7 +277,8 @@ function getFooterMessage(ctx) {
   // Use custom footer template if configured
   if (messages?.footer) {
     const renderedCustomFooter = renderTemplate(messages.footer, templateContext);
-    return renderedCustomFooter + getRunAgainHints(renderedCustomFooter);
+    const footer = appendFooterProvenance(renderedCustomFooter, ctx);
+    return footer + getRunAgainHints(footer);
   }
 
   // Default footer template - includes emoji prefix when available
@@ -285,12 +298,9 @@ function getFooterMessage(ctx) {
   if (metricSuffixes.length > 0) {
     defaultFooter += metricSuffixes.join("");
   }
-  // Append history link when available
-  if (ctx.historyUrl) {
-    defaultFooter += " · [◷]({history_url})";
-  }
   const renderedDefaultFooter = renderTemplate(defaultFooter, templateContext);
-  return renderedDefaultFooter + getRunAgainHints(renderedDefaultFooter);
+  const footer = appendFooterProvenance(renderedDefaultFooter, ctx);
+  return footer + getRunAgainHints(footer);
 }
 
 /**
@@ -496,14 +506,10 @@ function getFooterAgentFailureIssueMessage(ctx) {
     if (ambientContext) {
       defaultFooter += ambientContextSuffix;
     }
-    // Append history link when available
-    if (ctx.historyUrl) {
-      defaultFooter += " · [◷]({history_url})";
-    }
     footer = renderTemplate(defaultFooter, templateContext);
   }
 
-  return footer;
+  return appendFooterProvenance(footer, ctx);
 }
 
 /**
@@ -588,14 +594,10 @@ function getFooterAgentFailureCommentMessage(ctx) {
     if (ambientContext) {
       defaultFooter += ambientContextSuffix;
     }
-    // Append history link when available
-    if (ctx.historyUrl) {
-      defaultFooter += " · [◷]({history_url})";
-    }
     footer = renderTemplate(defaultFooter, templateContext);
   }
 
-  return footer;
+  return appendFooterProvenance(footer, ctx);
 }
 
 /**
