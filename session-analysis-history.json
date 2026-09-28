@@ -109,8 +109,41 @@
    "orphan_rate_pct": 0.0,
    "data_quality": "metadata-only (conv-logs empty 33rd+ day)",
    "notes": "See notes.md 09-25 snapshot for full detail. Headline: 20.0% completion -24pts vs 09-24; true_agentic 2/2=100% 5th day (+1 in_progress); provenance 80.0% bot-driven mid-band; branch_level_stuck_gate perfectly bimodal (0% all 4 core gates, 100% true-agentic/code-scanning); NEW RECORDS single-branch concentration 88% and burst_vs_isolated gap 12.7x; orphan 0/18 33rd healthy day; roll=92 standard run."
+  },
+  {
+   "date": "2026-09-26",
+   "sessions": 50,
+   "completion_pct": 36.0,
+   "avg_dur_min": 3.055,
+   "median_dur_min": 0.0,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 34th+ day)",
+   "notes": "36.0% completion +16pts vs 09-25; 18 success/31 action_required/1 cancelled/0 failure; true_agentic streak BROKE after 5 days (7/8=87.5%, 1 merge-triggered cancellation not genuine failure); provenance LOW again 61.1% (2nd-lowest of 30+ days); NEW RECORD merge_invalidation_cascade multiplicity 4/day (beats 09-14's 2); new 'merge -> Squad Implement Worker +6-7s' sub-signature recurred 3x in one 8min window; orphan 0/18 34th healthy day; roll=74 standard run."
+  },
+  {
+   "date": "2026-09-27",
+   "sessions": 50,
+   "completion_pct": 48.0,
+   "avg_dur_min": 4.459,
+   "median_dur_min": 3.675,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 35th+ day)",
+   "notes": "48.0% completion +12pts vs 09-26; 24 success/23 action_required/3 failure; true_agentic streak restarted (7/7=100%, day 1); provenance LOW for a 3rd time 70.8% (joins 09-23, 09-26); 2 independent merge_invalidation_cascade events (3-run PR#63688, 1-run PR#63687 Squad-Implement-Worker+6s, 4th confirmed instance); no duration outlier; orphan 0/17 35th healthy day; roll=95 standard run."
+  },
+  {
+   "date": "2026-09-28",
+   "sessions": 50,
+   "completion_pct": 50.0,
+   "avg_dur_min": 3.8373333333333335,
+   "median_dur_min": 1.475,
+   "loops": 0,
+   "orphan_rate_pct": 0.0,
+   "data_quality": "metadata-only (conv-logs empty 36th+ day)",
+   "notes": "50.0% completion +2pts vs 09-27, 4th-highest of 33 recorded days; 25 success/25 action_required/0 failure/cancelled/in_progress (first perfectly binary day since at least 09-24); true_agentic streak day 2 (9/9=100%); provenance_inversion band shift reinforced 64.0% bot-driven, below 72-86% band for the 4th time in 6 days -- now looks structural; branch_level_stuck_gate partially broken for the first time in recent memory (CJS 33.3%/CWI 50.0%/CGO 40.0% genuine mixed success vs Squad/Agentic Commands/Doc Build-Deploy still 0%); burst_vs_isolated_success_gap RESTORED to historical 3-8x band (4.13x) after two sub-band days; no cascade today; orphan 0/21 36th healthy day; roll=84 standard run."
   }
  ],
- "last_updated": "2026-09-25",
- "version": "1.9"
+ "last_updated": "2026-09-28",
+ "version": "1.10"
 }

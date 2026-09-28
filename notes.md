@@ -1,5 +1,24 @@
 # Copilot Session Insights — repo memory
 
+## 2026-09-28 snapshot
+- 50 sessions (4 branches); **50.0% completion** (25 success/25 action_required, 0 failure/cancelled/in_progress — first perfectly binary day since at least 09-24), +2pts vs 09-27 (48%), **4th-highest of 33 recorded days**, 32-day mean 31.9%.
+- **true_agentic streak day 2 of restart**: 9/9 "Addressing comment on PR" succeeded (100%), following 09-27's 7/7 restart after the 09-26 break.
+- **provenance_inversion band shift reinforced**: 64.0% bot-driven (16/25), below the 72-86% band for the 4th time in 6 days (09-23 58.3%, 09-26 61.1%, 09-27 70.8%, today 64.0%) — now looks structural, not noise.
+- **branch_level_stuck_gate partially broken**: Squad/Agentic Commands/Doc Build-Deploy still 0%, but CJS 3/9 (33.3%), CWI 3/6 (50.0%), CGO 2/5 (40.0%) posted genuine mixed success — first partial-recovery day for these three gates in recent memory.
+- Branches: dynamic-checkouts-github-action 26/50=52% (23.1% succ, concentration leader again but down from 09-27's 40%), task-...-87cd5693 12/50=24% (91.7% succ — highest single-branch rate in recent days), preserve-review-provenance-marker 9/50=18% (66.7% succ), task-...-ca3f0885 3/50=6% (66.7% succ).
+- **burst_vs_isolated_success_gap RESTORED** to historical band: isolated 100% (17/17) vs burst-fired 24.2% (8/33), 4.13x gap — back within 3-8x range after two sub-band days (09-26 1.75x, 09-27 1.47x).
+- No merge_invalidation_cascade today (0 failure conclusions); 2 more isolated single-fire "Squad Implement Worker" events consistent with the recurring merge-adjacent sub-signature, but no multi-run cascade.
+- Duration: raw mean 3.84m/median 1.48m (25 nonzero: mean 7.68m/median 5.72m); longest genuine run 23.92min; 2nd consecutive clean day without a status-resync artifact.
+- Orphans 0/21 → 0% NORMAL, 36th healthy day. Conv logs empty 36th+ day (flagged via missing_data). Standard run (roll=84).
+
+## 2026-09-27 snapshot (brief — full detail in cache-memory history.json)
+- 50 sessions; **48.0% completion** (24 success/23 action_required/3 failure), +12pts vs 09-26 (36%), 2nd-highest reading in 2 weeks after 09-24 (44%).
+- true_agentic_streak restarted after 09-26's break: 7/7 "Addressing comment on PR" succeeded (100%).
+- provenance_inversion LOW for a 3rd time: 70.8% bot-driven, just below the 72-86% band (joins 09-23, 09-26).
+- merge_invalidation_cascade x2 independent events, including a 2nd confirmed instance of "merge -> Squad Implement Worker +6-7s".
+- 4 branches: dynamic-checkouts-github-action 20/50=40% (20.0% succ), task-...-87cd5693 15/50=30% (73.3% succ, merged as PR #63687), task-...-ca3f0885 9/50=18% (55.6% succ, merged as PR #63688), preserve-review-provenance-marker 6/50=12% (66.7% succ).
+- Orphans 0/17 → 0% NORMAL, 35th healthy day. Conv logs empty 35th+ day.
+
 ## 2026-09-26 snapshot
 - 50 sessions (8 branches, mostly CI/gate re-fires); **36.0% completion** (18 success/31 action_required/1 cancelled/0 failure), +16pts vs 09-25 (20%), slightly above ~31.5% mean.
 - **true_agentic streak BROKEN**: 7/8=87.5% (5-day 100% streak 09-22..09-25 ends), but the 1 exception was a merge-triggered cancellation (PR #63474 merged 05:39:46Z, own run cancelled ~39s later), not a genuine failure.
@@ -145,3 +164,6 @@ _(Prior peak 06-27: 40% (20 succ); superseded by 54% on 07-04. Per-day detail in
 - 09-23 update: **new pr_terminal_event_cascade pattern** — first confirmed cascade triggered by a PR **close** (not merge): PR #62815 closed unmerged at 04:01:42Z invalidated 8 in-flight runs across 5 workflows 1s later, the largest cascade yet (prior peak 6, 09-13). Refines merge_invalidation_cascade to "any PR terminal event." provenance_inversion hit a new LOW (58.3% bot-driven, below the 72-86% band) even as true_agentic_100pct_streak extended to a 3rd consecutive full-recovery day (5/5). New workflow name observed: `Stale Lock Files`. Conv logs empty 31st+ day.
 - 09-24 update: pr_terminal_event_cascade NEW RECORD (9 runs, beats 8); provenance reverted to 77.3% bot-driven (in-band); true_agentic 4th 100% day (5/5); CGO/CWI posted first-ever partial passes (1/5) on a merged branch. Conv logs empty 32nd+ day.
 - 09-25 update: true_agentic 5th 100% day (2/2, +1 in_progress); provenance mid-band (80.0%); branch_level_stuck_gate back to clean 09-22-style bimodal split; NEW RECORDS single-branch concentration (88%) and burst_vs_isolated gap (12.7x); no cascade today. Conv logs empty 33rd+ day.
+- 09-26 update: true_agentic streak BROKE after 5 days (87.5%, 1 merge-triggered cancellation, not genuine failure); provenance LOW again (61.1%, 2nd-lowest of 30+ days); NEW RECORD merge_invalidation_cascade multiplicity (4/day, beats 09-14's 2); new "merge -> Squad Implement Worker +6-7s" sub-signature recurred 3x in one 8min window. Conv logs empty 34th+ day.
+- 09-27 update: true_agentic streak restarted (7/7, day 1); provenance LOW for a 3rd time (70.8%, joining 09-23/09-26 — 3 of last 5 days below band); merge_invalidation_cascade x2 independent events, including a 2nd confirmed "merge -> Squad Implement Worker" instance. Conv logs empty 35th+ day.
+- 09-28 update: true_agentic streak day 2 (9/9, 100%); **provenance_inversion band shift reinforced** — 64.0% bot-driven, below band for the 4th time in 6 days, now looks structural rather than one-off (watch for a 5th sub-band day before renaming the pattern); branch_level_stuck_gate **partially broken** for the first time in recent memory — CJS/CWI/CGO posted genuine mixed success (33-50%) instead of the usual clean 0%, while Squad/Agentic Commands/Doc Build-Deploy stayed at 0%; burst_vs_isolated_success_gap RESTORED to the historical 3-8x band (4.13x) after two sub-band days; first perfectly binary completion day (0 failure/cancelled/in_progress) since at least 09-24; no cascade today. Conv logs empty 36th+ day.
