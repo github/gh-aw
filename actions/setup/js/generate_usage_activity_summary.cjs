@@ -19,6 +19,8 @@ const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { countSteeringEventsByTypeInApiProxyJsonl } = require("./steering_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { computeFrictionCost } = require("./friction_cost_metrics.cjs");
+const { formatAIC } = require("./model_costs.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
 
 require("./shim.cjs");
 
@@ -139,6 +141,48 @@ function buildFrictionSummary(activity, tokenUsagePath = AGENT_TOKEN_USAGE_PATH)
     core.warning(warning);
   }
   return friction;
+}
+
+/**
+ * Render friction-cost data as a collapsed GitHub step summary section.
+ *
+ * @param {Record<string, any>} friction
+ * @returns {string}
+ */
+function buildFrictionStepSummary(friction) {
+  if (!friction || typeof friction !== "object") return "";
+
+  const state = typeof friction.measurement_state === "string" ? friction.measurement_state : "unavailable";
+  const cost = friction.cost && typeof friction.cost === "object" ? friction.cost : {};
+  const aic = Number.isFinite(cost.aic) ? formatAIC(cost.aic) || "0" : "unavailable";
+  const occurrences = Number.isFinite(friction.counted_occurrences) ? friction.counted_occurrences.toLocaleString() : "0";
+  const tokens = Number.isFinite(cost.tokens?.total) ? cost.tokens.total.toLocaleString() : "0";
+  const turns = Number.isFinite(cost.turns) ? cost.turns.toLocaleString() : "0";
+  const toolCalls = Number.isFinite(cost.tool_calls) ? cost.tool_calls.toLocaleString() : "0";
+  const latency = Number.isFinite(cost.latency_ms) ? `${cost.latency_ms.toLocaleString()} ms` : "0 ms";
+  const ratio = Number.isFinite(friction.friction_ratio) ? `${(friction.friction_ratio * 100).toFixed(1)}%` : "unavailable";
+  const lines = [
+    "<details>",
+    `<summary>Friction Cost: ${aic} AIC (${state})</summary>`,
+    "",
+    "### Friction Cost",
+    "",
+    "| AI credits | Run cost ratio | Counted occurrences | Tokens | Turns | Tool calls | Latency |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    `| ${aic} | ${ratio} | ${occurrences} | ${tokens} | ${turns} | ${toolCalls} | ${latency} |`,
+  ];
+
+  if (Array.isArray(friction.drivers) && friction.drivers.length > 0) {
+    lines.push("", "#### Drivers", "", "| Driver | Source | State | Occurrences | AI credits |", "| --- | --- | --- | ---: | ---: |");
+    for (const driver of friction.drivers) {
+      const driverAIC = Number.isFinite(driver.cost?.aic) ? formatAIC(driver.cost.aic) || "0" : "unavailable";
+      const driverOccurrences = Number.isFinite(driver.counted_occurrences) ? driver.counted_occurrences.toLocaleString() : "0";
+      lines.push(`| \`${driver.driver || "unknown"}\` | \`${driver.source || "unknown"}\` | \`${driver.state || "unavailable"}\` | ${driverOccurrences} | ${driverAIC} |`);
+    }
+  }
+
+  lines.push("", "</details>", "");
+  return lines.join("\n");
 }
 
 /**
@@ -935,7 +979,7 @@ function parseExperimentsData() {
 /**
  * Main function to generate usage activity summary
  */
-function main() {
+async function main() {
   const summary = { schema: "usage-activity-summary/v1" };
 
   // Parse firewall logs
@@ -1033,11 +1077,18 @@ function main() {
     throw new Error(`Failed to write file ${outputPath}: ${String(err)}`, { cause: err });
   }
   core.info(outputPath);
+
+  if (summary.friction) {
+    await core.summary.addRaw(buildFrictionStepSummary(summary.friction)).write();
+  }
 }
 
 // Run main function
 if (require.main === module) {
-  main();
+  main().catch(err => {
+    console.error(err instanceof Error && err.stack ? err.stack : getErrorMessage(err));
+    process.exitCode = 1;
+  });
 }
 
 module.exports = {
@@ -1051,6 +1102,7 @@ module.exports = {
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
   buildFrictionSummary,
+  buildFrictionStepSummary,
   readTokenUsageContent,
   AGENT_TOKEN_USAGE_PATH,
   MANIFEST_FILE_PATH,

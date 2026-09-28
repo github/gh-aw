@@ -19,6 +19,7 @@ const {
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
   buildFrictionSummary,
+  buildFrictionStepSummary,
   readTokenUsageContent,
   MANIFEST_FILE_PATH,
 } = req("./generate_usage_activity_summary.cjs");
@@ -652,6 +653,54 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(roundTripped.events[0].driver).toBe("firewall_block");
       expect(roundTripped.drivers[0].driver).toBe("firewall_block");
       expect(roundTripped.groups[0].group_id).toBe("network_block");
+    });
+
+    it("renders friction cost and driver data in a collapsed step summary section", () => {
+      const summary = buildFrictionStepSummary({
+        measurement_state: "causal",
+        counted_occurrences: 2,
+        friction_ratio: 0.125,
+        cost: {
+          aic: 0.25,
+          tokens: { total: 1234 },
+          turns: 1,
+          tool_calls: 2,
+          latency_ms: 500,
+        },
+        drivers: [
+          {
+            driver: "mcp_tool_error",
+            source: "mcp_gateway",
+            state: "causal",
+            counted_occurrences: 2,
+            cost: { aic: 0.25 },
+          },
+        ],
+      });
+
+      expect(summary).toContain("<details>\n<summary>Friction Cost: 0.25 AIC (causal)</summary>");
+      expect(summary).toContain("### Friction Cost");
+      expect(summary).toContain("| 0.25 | 12.5% | 2 | 1,234 | 1 | 2 | 500 ms |");
+      expect(summary).toContain("| `mcp_tool_error` | `mcp_gateway` | `causal` | 2 | 0.25 |");
+      expect(summary).toContain("</details>");
+    });
+
+    it("renders unavailable friction measurements without implying a measured ratio", () => {
+      const summary = buildFrictionStepSummary({
+        measurement_state: "unavailable",
+        counted_occurrences: 0,
+        cost: {
+          aic: 0,
+          tokens: { total: 0 },
+          turns: 0,
+          tool_calls: 0,
+          latency_ms: 0,
+        },
+        drivers: [],
+      });
+
+      expect(summary).toContain("<summary>Friction Cost: 0 AIC (unavailable)</summary>");
+      expect(summary).toContain("| 0 | unavailable | 0 | 0 | 0 | 0 | 0 ms |");
     });
   });
 });
