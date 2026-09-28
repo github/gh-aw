@@ -32,6 +32,22 @@ function isRecord(value) {
 }
 
 /**
+ * Records that may carry canonical Trajectory IR collections, in priority order.
+ * With `includeTrace`, the preprocessed trace object itself is considered first,
+ * since it carries flattened collections for some graders.
+ * @param {any} trace
+ * @param {{ includeTrace?: boolean }} [options]
+ * @returns {Record<string, any>[]}
+ */
+function irCandidates(trace, options) {
+  if (!isRecord(trace)) return [];
+  const agentOutput = isRecord(trace.agentOutput) ? trace.agentOutput : null;
+  const candidates = [trace.trajectoryIR, trace.trajectoryIr, trace.ir, agentOutput?.trajectoryIR, agentOutput?.trajectoryIr, agentOutput?.trajectory, agentOutput];
+  if (options?.includeTrace) candidates.unshift(trace);
+  return candidates.filter(isRecord);
+}
+
+/**
  * Return the first IR collection path whose length exceeds MAX_TRAJECTORY_ITEMS,
  * or null when every collection is within bounds.
  * @param {any} trace
@@ -39,8 +55,7 @@ function isRecord(value) {
  */
 function findOversizedTrajectoryCollection(trace) {
   if (!isRecord(trace)) return null;
-  const agentOutput = isRecord(trace.agentOutput) ? trace.agentOutput : null;
-  const candidates = [trace, trace.trajectoryIR, trace.trajectoryIr, trace.ir, agentOutput?.trajectoryIR, agentOutput?.trajectoryIr, agentOutput?.trajectory, agentOutput].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   for (const candidate of candidates) {
     for (const key of IR_COLLECTION_KEYS) {
       // The preprocessed trace.toolCalls list is only scanned linearly (by
@@ -82,16 +97,7 @@ function withTrajectoryLimits(fn) {
  * @returns {any}
  */
 function gradePolicyNearMiss(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   const candidate = candidates.find(value => Array.isArray(value.events) && Array.isArray(value.objectives));
   const events = candidate?.events ?? candidates.find(value => Array.isArray(value.events))?.events ?? [];
@@ -134,23 +140,13 @@ function gradePolicyNearMiss(trace, config) {
  * @returns {any}
  */
 function gradeSkillConstraintCoverage(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const constraints = Array.isArray(config.constraints) ? config.constraints : [];
 
   if (constraints.length === 0) {
     return { value: null, unit: "ratio", passed: null, message: "not applicable: no constraints configured" };
   }
 
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
 
   const toolCalls = (candidates.find(value => Array.isArray(value.toolCalls) && value.toolCalls.some(isRecord))?.toolCalls ?? []).filter(isRecord);
   const actions = (candidates.find(value => Array.isArray(value.actions) && value.actions.some(isRecord))?.actions ?? []).filter(isRecord);
@@ -239,16 +235,7 @@ function gradeSkillConstraintCoverage(trace, config) {
  * @returns {any}
  */
 function gradeExplorationError(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   const candidate =
     candidates.find(value => Array.isArray(value.objectives) && value.objectives.some(isRecord)) ??
@@ -299,16 +286,7 @@ function gradeExplorationError(trace, config) {
  * @returns {any}
  */
 function gradeExploitationError(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   const candidate =
     candidates.find(value => Array.isArray(value.objectives) && value.objectives.some(isRecord)) ??
@@ -373,16 +351,7 @@ function gradeExploitationError(trace, config) {
  * @returns {any}
  */
 function gradeStateRevisitProbabilityRep(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let states = [];
   let events = [];
@@ -444,16 +413,7 @@ function gradeStateRevisitProbabilityRep(trace, config) {
  * @returns {any}
  */
 function gradeRecurrenceDeterminism(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let states = [];
   let events = [];
@@ -551,16 +511,7 @@ function gradeRecurrenceDeterminism(trace, config) {
  * @returns {any}
  */
 function gradeRecurrenceLaminarity(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let states = [];
   let events = [];
@@ -660,16 +611,7 @@ function gradeRecurrenceLaminarity(trace, config) {
  * @returns {any}
  */
 function gradeRecurrenceTrappingTime(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let states = [];
   let events = [];
@@ -760,16 +702,7 @@ function gradeRecurrenceTrappingTime(trace, config) {
  * @returns {any}
  */
 function gradeRecurrenceRate(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let states = [];
   let events = [];
@@ -842,16 +775,7 @@ function gradeRecurrenceRate(trace, config) {
  * @returns {any}
  */
 function gradeEventEntropyRate(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let events = [];
   for (const candidate of candidates) {
@@ -928,16 +852,7 @@ function gradeEventEntropyRate(trace, config) {
  * @returns {any}
  */
 function gradeLempelZivTrajectoryComplexity(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace);
 
   let events = [];
   for (const candidate of candidates) {
@@ -1021,17 +936,7 @@ function gradeLempelZivTrajectoryComplexity(trace, config) {
  * @returns {any}
  */
 function gradeToolOutputConsumptionRate(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
 
   const candidate =
     candidates.find(value => Array.isArray(value.observations) && value.observations.some(isRecord) && Array.isArray(value.toolCalls) && value.toolCalls.some(isRecord)) ??
@@ -1076,17 +981,7 @@ function gradeToolOutputConsumptionRate(trace, config) {
  * @returns {any}
  */
 function gradeEndToEndLineageCompleteness(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.events) && Array.isArray(value.provenanceEdges) && Array.isArray(value.toolCalls) && Array.isArray(value.observations));
   if (!ir) {
     return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks events, provenanceEdges, toolCalls, or observations" };
@@ -1139,17 +1034,7 @@ function gradeEndToEndLineageCompleteness(trace, config) {
  * @returns {any}
  */
 function gradeActionProvenanceCoverage(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.actions) && Array.isArray(value.provenanceEdges) && Array.isArray(value.toolCalls) && Array.isArray(value.observations));
   if (!ir) {
     return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks actions, provenanceEdges, toolCalls, or observations" };
@@ -1210,17 +1095,7 @@ function gradeActionProvenanceCoverage(trace, config) {
  * @returns {any}
  */
 function gradePrematureTerminationGap(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.objectives));
   if (!ir || ir.objectives.length === 0) {
     return { value: null, unit: "count", passed: null, message: "not applicable: no declared objectives" };
@@ -1251,17 +1126,7 @@ function gradePrematureTerminationGap(trace, config) {
  * @returns {any}
  */
 function gradeEvidenceSaturationStoppingLag(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.objectives) && Array.isArray(value.events));
   if (!ir || ir.objectives.length === 0) {
     return { value: null, unit: "count", passed: null, message: "not applicable: no declared objectives" };
@@ -1302,17 +1167,7 @@ function gradeEvidenceSaturationStoppingLag(trace, config) {
  * @returns {any}
  */
 function gradeDependencyOrderViolationRate(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.objectives));
   if (!ir || ir.objectives.length === 0) {
     return { value: null, unit: "ratio", passed: null, message: "not applicable: no declared objectives" };
@@ -1375,17 +1230,7 @@ function gradeDependencyOrderViolationRate(trace, config) {
  * @returns {any}
  */
 function gradeObjectiveCoverage(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.objectives));
   if (!ir || ir.objectives.length === 0) {
     return { value: null, passed: null, message: "not applicable: no declared objectives" };
@@ -1417,17 +1262,7 @@ function gradeObjectiveCoverage(trace, config) {
  * @returns {any}
  */
 function gradeGroundingAccuracy(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => Array.isArray(value.actions));
   if (!ir || ir.actions.length === 0) {
     return { value: null, passed: null, message: "not applicable: no issued actions" };
@@ -1452,17 +1287,7 @@ function gradeGroundingAccuracy(trace, config) {
  * @returns {any}
  */
 function gradeToolWiseScore(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => isRecord(value.reference) && Array.isArray(value.reference.toolCalls));
   if (!ir || ir.reference.toolCalls.length === 0) {
     return { value: null, passed: null, message: "not applicable: no reference tool-call trajectory" };
@@ -1520,17 +1345,7 @@ function gradeToolWiseScore(trace, config) {
  * @returns {any}
  */
 function gradeTrajectoryNdtw(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => isRecord(value.reference) && Array.isArray(value.reference.states));
   if (!ir || ir.reference.states.length === 0) {
     return { value: null, passed: null, message: "not applicable: no reference state trajectory" };
@@ -1576,17 +1391,7 @@ function gradeTrajectoryNdtw(trace, config) {
  * @returns {any}
  */
 function gradeCodeSearchRecall(trace, config) {
-  const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-  const candidates = [
-    trace,
-    trace.trajectoryIR,
-    trace.trajectoryIr,
-    trace.ir,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIR : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectoryIr : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput.trajectory : null,
-    isRecord(trace.agentOutput) ? trace.agentOutput : null,
-  ].filter(isRecord);
+  const candidates = irCandidates(trace, { includeTrace: true });
   const ir = candidates.find(value => isRecord(value.reference) && isRecord(value.reference.patch) && Array.isArray(value.reference.patch.files));
   if (!ir || ir.reference.patch.files.length === 0) {
     return { value: null, passed: null, message: "not applicable: no reference patch files" };
