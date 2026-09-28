@@ -24,6 +24,7 @@ const {
   runBuiltinGrader,
   runCustomGrader,
   runOperationalValueGrader,
+  withAllBuiltinGraders,
   normalizeResult,
   buildGradersSummaryBody,
   evaluateThreshold,
@@ -48,6 +49,7 @@ const {
   gradeContextGrowth,
   gradeArtifactProduction,
 } = require("./trace_graders.cjs");
+const { TRAJECTORY_GRADERS, TRAJECTORY_GRADER_META, MAX_TRAJECTORY_ITEMS } = require("./trajectory_graders.cjs");
 
 // --- Helper to create a minimal trace ---
 
@@ -73,119 +75,32 @@ function makeTrace(overrides = {}) {
   };
 }
 
-const policyNearMissScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/policy-near-miss.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-if (!policyNearMissScriptMatch?.[1]) {
-  throw new Error("unable to extract policy-near-miss grader script");
+function runTrajectoryBuiltin(id, trace, config) {
+  return runBuiltinGrader(id, makeTrace(trace), { ...BUILTIN_META[id], source: "builtin", config });
 }
-const policyNearMissScript = policyNearMissScriptMatch[1]
-  .split("\n")
-  .map(line => line.slice(6))
-  .join("\n");
 
 function runPolicyNearMiss(trace) {
-  return runCustomGrader("policy-near-miss", policyNearMissScript, makeTrace(trace), {
-    name: "Policy Near-Miss Rate",
-    unit: "ratio",
-    direction: "lower_is_better",
-    source: "inline",
-  });
+  return runTrajectoryBuiltin("policy-near-miss", trace);
 }
-
-const explorationErrorScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/exploration-error.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-if (!explorationErrorScriptMatch?.[1]) {
-  throw new Error("unable to extract exploration-error grader script");
-}
-const explorationErrorScript = explorationErrorScriptMatch[1]
-  .split("\n")
-  .map(line => line.slice(6))
-  .join("\n");
 
 function runExplorationError(trace) {
-  return runCustomGrader("exploration-error", explorationErrorScript, makeTrace(trace), {
-    name: "Exploration Error",
-    unit: "ratio",
-    direction: "lower_is_better",
-    source: "inline",
-  });
+  return runTrajectoryBuiltin("exploration-error", trace);
 }
-
-const exploitationErrorScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/exploitation-error.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-if (!exploitationErrorScriptMatch?.[1]) {
-  throw new Error("unable to extract exploitation-error grader script");
-}
-const exploitationErrorScript = exploitationErrorScriptMatch[1]
-  .split("\n")
-  .map(line => line.slice(6))
-  .join("\n");
 
 function runExploitationError(trace) {
-  return runCustomGrader("exploitation-error", exploitationErrorScript, makeTrace(trace), {
-    name: "Exploitation Error",
-    unit: "ratio",
-    direction: "lower_is_better",
-    source: "inline",
-  });
+  return runTrajectoryBuiltin("exploitation-error", trace);
 }
-
-const skillConstraintCoverageScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/skill-constraint-coverage.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-if (!skillConstraintCoverageScriptMatch?.[1]) {
-  throw new Error("unable to extract skill-constraint-coverage grader script");
-}
-const skillConstraintCoverageScript = skillConstraintCoverageScriptMatch[1]
-  .split("\n")
-  .map(line => line.slice(6))
-  .join("\n");
 
 function runSkillConstraintCoverage(trace, config) {
-  return runCustomGrader("skill-constraint-coverage", skillConstraintCoverageScript, makeTrace(trace), {
-    name: "Skill Constraint Coverage",
-    unit: "ratio",
-    direction: "higher_is_better",
-    source: "inline",
-    config,
-  });
+  return runTrajectoryBuiltin("skill-constraint-coverage", trace, config);
 }
-
-const toolOutputConsumptionRateScriptMatch = fs.readFileSync(path.join(__dirname, "../../../.github/workflows/shared/graders/tool-output-consumption-rate.md"), "utf8").match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-if (!toolOutputConsumptionRateScriptMatch?.[1]) {
-  throw new Error("unable to extract tool-output-consumption-rate grader script");
-}
-const toolOutputConsumptionRateScript = toolOutputConsumptionRateScriptMatch[1]
-  .split("\n")
-  .map(line => line.slice(6))
-  .join("\n");
 
 function runToolOutputConsumptionRate(trace) {
-  return runCustomGrader("tool-output-consumption-rate", toolOutputConsumptionRateScript, makeTrace(trace), {
-    name: "Tool Output Consumption Rate",
-    unit: "ratio",
-    direction: "higher_is_better",
-    source: "inline",
-  });
+  return runTrajectoryBuiltin("tool-output-consumption-rate", trace);
 }
 
-const backlogGraderMeta = {
-  "end-to-end-lineage-completeness": { name: "End-to-End Lineage Completeness", unit: "ratio", direction: "higher_is_better" },
-  "action-provenance-coverage": { name: "Action Provenance Coverage", unit: "ratio", direction: "higher_is_better" },
-  "premature-termination-gap": { name: "Premature Termination Gap", unit: "count", direction: "lower_is_better" },
-  "evidence-saturation-stopping-lag": { name: "Evidence Saturation Stopping Lag", unit: "count", direction: "lower_is_better" },
-  "dependency-order-violation-rate": { name: "Dependency Order Violation Rate", unit: "ratio", direction: "lower_is_better" },
-  "objective-coverage": { name: "Objective Coverage", unit: "ratio", direction: "higher_is_better" },
-  "grounding-accuracy": { name: "Grounding Accuracy", unit: "ratio", direction: "higher_is_better" },
-  "tool-wise-score": { name: "Tool-Wise Score", unit: "ratio", direction: "higher_is_better" },
-  "trajectory-ndtw": { name: "Trajectory nDTW", unit: "ratio", direction: "higher_is_better" },
-  "code-search-recall": { name: "Code Search Recall", unit: "ratio", direction: "higher_is_better" },
-};
-
 function runBacklogGrader(id, trace) {
-  const source = fs.readFileSync(path.join(__dirname, `../../../.github/workflows/shared/graders/${id}.md`), "utf8");
-  const match = source.match(/script: \|\n([\s\S]*?)\n^---\s*$/m);
-  if (!match?.[1]) throw new Error(`unable to extract ${id} grader script`);
-  const script = match[1]
-    .split("\n")
-    .map(line => line.slice(6))
-    .join("\n");
-  return runCustomGrader(id, script, makeTrace(trace), { ...backlogGraderMeta[id], source: "inline" });
+  return runTrajectoryBuiltin(id, trace);
 }
 
 describe("trace_graders", () => {
@@ -1844,7 +1759,19 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
 
   // --- All built-in graders are registered ---
   describe("built-in grader registry", () => {
-    const expectedIds = ["tool-success-rate", "tool-failure-count", "retries", "loops", "trajectory-efficiency", "execution-step-count", "execution-duration", "working-set-rebuild-factor", "context-growth", "artifact-production"];
+    const expectedIds = [
+      "tool-success-rate",
+      "tool-failure-count",
+      "retries",
+      "loops",
+      "trajectory-efficiency",
+      "execution-step-count",
+      "execution-duration",
+      "working-set-rebuild-factor",
+      "context-growth",
+      "artifact-production",
+      ...Object.keys(TRAJECTORY_GRADERS),
+    ];
 
     it("has all expected built-in graders", () => {
       for (const id of expectedIds) {
@@ -1858,12 +1785,127 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(ids.sort()).toEqual([...expectedIds].sort());
     });
 
+    it("includes every trajectory grader", () => {
+      expect(Object.keys(TRAJECTORY_GRADERS)).toHaveLength(22);
+      expect(Object.keys(TRAJECTORY_GRADER_META).sort()).toEqual(Object.keys(TRAJECTORY_GRADERS).sort());
+    });
+
     it("all graders have metadata", () => {
       for (const id of expectedIds) {
         expect(BUILTIN_META).toHaveProperty(id);
+        expect(BUILTIN_META[id].name).toBeTruthy();
         expect(BUILTIN_META[id].unit).toBeDefined();
         expect(BUILTIN_META[id].direction).toBeDefined();
       }
+    });
+
+    it("matches the Go built-in grader registry", () => {
+      const goSource = fs.readFileSync(path.join(__dirname, "../../../pkg/workflow/graders_config.go"), "utf8");
+      const registry = goSource.slice(goSource.indexOf("var BuiltinGraderRegistry"), goSource.indexOf("// BuiltinGraderIDs"));
+      const goIds = [...registry.matchAll(/\{ID: "([a-z0-9-]+)"/g)].map(match => match[1]);
+      expect(goIds).toEqual(Object.keys(BUILTIN_GRADERS));
+    });
+  });
+
+  describe("withAllBuiltinGraders", () => {
+    it("adds every built-in missing from the manifest", () => {
+      const graders = withAllBuiltinGraders([{ id: "my-metric", source: "inline", enabled: true }]);
+      expect(graders.map(g => g.id)).toEqual(["my-metric", ...Object.keys(BUILTIN_GRADERS)]);
+      const added = graders.find(g => g.id === "recurrence-rate");
+      expect(added).toMatchObject({ source: "builtin", enabled: true, name: "Recurrence Rate (RQA RR)", unit: "ratio", direction: "lower_is_better" });
+    });
+
+    it("keeps explicitly declared entries, including disabled built-ins and inline overrides", () => {
+      const declared = [
+        { id: "loops", source: "builtin", enabled: false },
+        { id: "recurrence-rate", source: "inline", enabled: true },
+      ];
+      const graders = withAllBuiltinGraders(declared);
+      expect(graders.filter(g => g.id === "loops")).toEqual([declared[0]]);
+      expect(graders.filter(g => g.id === "recurrence-rate")).toEqual([declared[1]]);
+      expect(graders).toHaveLength(Object.keys(BUILTIN_GRADERS).length);
+    });
+  });
+
+  describe("main", () => {
+    let originalCore;
+    beforeEach(() => {
+      originalCore = global.core;
+      const summary = { addDetails: vi.fn(() => summary), write: vi.fn(async () => summary) };
+      global.core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn(), summary };
+    });
+    afterEach(() => {
+      global.core = originalCore;
+    });
+
+    it("runs every built-in grader even when the manifest lists only custom graders", async () => {
+      const manifest = { version: 1, graders: [{ id: "my-metric", name: "My Metric", source: "inline", enabled: true, unit: "count" }] };
+      const execSpec = [{ id: "my-metric", script: "return { value: 1 };" }];
+      await main(Buffer.from(JSON.stringify(manifest)).toString("base64"), Buffer.from(JSON.stringify(execSpec)).toString("base64"));
+
+      const output = JSON.parse(fs.readFileSync(RESULTS_PATH, "utf8"));
+      const ids = output.results.map(r => r.id);
+      expect(ids).toEqual(["my-metric", ...Object.keys(BUILTIN_GRADERS)]);
+      for (const result of output.results.filter(r => r.id !== "my-metric")) {
+        expect(result.source).toBe("builtin");
+        expect(result.status).not.toBe("error");
+      }
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("trajectory built-in graders", () => {
+    const states = ["a", "b", "a", "b", "c", "c", "c", "a"].map((id, index) => ({ id, firstEventIndex: index }));
+    const events = ["tool_call", "observation", "tool_call", "observation", "state_change", "message", "tool_call", "safe_output"].map((kind, index) => ({ index, kind }));
+
+    it("computes state recurrence graders over the canonical IR", () => {
+      const trace = { ir: { states, events } };
+      expect(runTrajectoryBuiltin("state-revisit-probability-rep", trace).value).toBeCloseTo((8 - 3) / 8);
+      expect(runTrajectoryBuiltin("recurrence-rate", trace).value).toBeCloseTo(14 / 56);
+      for (const id of ["recurrence-determinism", "recurrence-laminarity", "recurrence-trapping-time"]) {
+        const result = runTrajectoryBuiltin(id, trace);
+        expect(result.status).toBe("pass");
+        expect(typeof result.value).toBe("number");
+      }
+    });
+
+    it("computes event sequence complexity graders over the canonical IR", () => {
+      const trace = { ir: { events } };
+      for (const id of ["event-entropy-rate", "lempel-ziv-trajectory-complexity"]) {
+        const result = runTrajectoryBuiltin(id, trace);
+        expect(result.status).toBe("pass");
+        expect(result.value).toBeGreaterThan(0);
+        expect(result.value).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("reports every trajectory grader as unavailable or not applicable on a trace without IR", () => {
+      for (const id of Object.keys(TRAJECTORY_GRADERS)) {
+        const result = runTrajectoryBuiltin(id, {});
+        expect(result.status).not.toBe("error");
+        expect(result.status === "unavailable" || result.value === 0).toBe(true);
+      }
+    });
+
+    it("reports oversized IR collections as unavailable without running the grader", () => {
+      const oversized = Array.from({ length: MAX_TRAJECTORY_ITEMS + 1 }, (_, index) => ({ id: `s${index % 7}`, firstEventIndex: index }));
+      for (const id of Object.keys(TRAJECTORY_GRADERS)) {
+        const result = runTrajectoryBuiltin(id, { ir: { states: oversized } });
+        expect(result.status).toBe("unavailable");
+        expect(result.message).toContain(`states exceeds ${MAX_TRAJECTORY_ITEMS} items`);
+      }
+    });
+
+    it("stays cheap at the maximum supported trajectory size", () => {
+      const n = MAX_TRAJECTORY_ITEMS;
+      const bigStates = Array.from({ length: n }, (_, index) => ({ id: `s${index % 11}`, firstEventIndex: index }));
+      const bigEvents = Array.from({ length: n }, (_, index) => ({ index, kind: index % 3 === 0 ? "state_change" : "tool_call", ref: `s${index % 11}` }));
+      const trace = { ir: { states: bigStates, events: bigEvents, reference: { states: bigStates.slice(0, 200).map(state => state.id) } } };
+      const started = performance.now();
+      for (const id of Object.keys(TRAJECTORY_GRADERS)) {
+        expect(runTrajectoryBuiltin(id, trace).status).not.toBe("error");
+      }
+      expect(performance.now() - started).toBeLessThan(5000);
     });
   });
 

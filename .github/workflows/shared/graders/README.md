@@ -4,10 +4,14 @@ Deterministic, per-trace behavioral graders that go beyond the existing
 built-in graders (step count, retries, loops, duration, tool-success rate,
 trajectory efficiency — see
 [Graders reference](https://githubnext.github.io/gh-aw/reference/trace-graders/)).
-Each grader below is implemented as its own importable `graders:`
-frontmatter script under `shared/graders/<id>.md`, built once as a
-projection over the [canonical Trajectory IR](trajectory-ir.md) so adding a
-new grader never requires a new trace parser.
+Each grader below is built once as a projection over the
+[canonical Trajectory IR](trajectory-ir.md) so adding a new grader never
+requires a new trace parser. Implemented graders are built-in: their code
+lives in `actions/setup/js/trajectory_graders.cjs`, their metadata in
+`pkg/workflow/graders_config.go`, and they run on every trace whenever the
+graders step runs. They are cheap (in-process, bounded to 5,000 items per IR
+collection) and make no API calls. `shared/graders/<id>.md` remains as an
+optional import fragment that enables the built-in.
 
 Ranked by diagnostic value, novelty relative to existing built-in graders,
 deterministic computability, applicability to a single completed trace, and
@@ -95,12 +99,13 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 
 ## Consuming a grader from a workflow
 
-Import the specific grader fragment(s) you need:
+Implemented graders are built-in and run on every trace whenever a workflow
+declares `graders:`. Importing a fragment is optional:
 
 ```yaml
 imports:
   - shared/graders/state-revisit-probability-rep.md
 ```
 
-Each grader fragment contributes a deterministic custom grader script through
-frontmatter; none require network access or a second model call.
+To opt out of a built-in, set `enabled: false` for it under `graders:`.
+None of the graders need network access or a second model call.

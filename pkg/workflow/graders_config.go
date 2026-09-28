@@ -43,13 +43,38 @@ var BuiltinGraderRegistry = []BuiltinGraderMeta{
 	{ID: "working-set-rebuild-factor", Name: "Working-Set Rebuild Factor", Description: "Cumulative input tokens divided by peak invocation input tokens", Unit: "factor", Direction: "lower_is_better", Min: new(1.0)},
 	{ID: "context-growth", Name: "Context Growth", Description: "Ratio of total tokens to first-request tokens", Unit: "factor", Direction: "lower_is_better"},
 	{ID: "artifact-production", Name: "Artifact Production", Description: "Count of outputs/artifacts produced by the agent", Unit: "count", Direction: "higher_is_better"},
+	// Trajectory graders: pure projections over the canonical Trajectory IR
+	// (actions/setup/js/trajectory_graders.cjs). They run in-process on every
+	// trace, make no API calls, and report unavailable when the IR is absent.
+	{ID: "policy-near-miss", Name: "Policy Near-Miss Rate", Description: "Fraction of successful traces that left guard or policy objectives unsatisfied", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "skill-constraint-coverage", Name: "Skill Constraint Coverage", Description: "Fraction of configured skill constraints that were exercised and passed", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "exploration-error", Name: "Exploration Error", Description: "Unmet objectives attributable to insufficient search", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "exploitation-error", Name: "Exploitation Error", Description: "Unmet objectives attributable to gathered evidence that was never used", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "state-revisit-probability-rep", Name: "State Revisit Probability REP", Description: "Fraction of canonical state visits that revisit an already visited state", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "recurrence-determinism", Name: "Recurrence Determinism (RQA DET)", Description: "RQA DET: fraction of recurrent points forming diagonal (repeated-subsequence) lines", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "recurrence-laminarity", Name: "Recurrence Laminarity (RQA LAM)", Description: "RQA LAM: fraction of recurrent points forming vertical (stagnation) lines", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "recurrence-trapping-time", Name: "Recurrence Trapping Time (RQA TT)", Description: "RQA TT: average length of vertical recurrence lines", Unit: "steps", Direction: "lower_is_better", Min: new(0.0)},
+	{ID: "recurrence-rate", Name: "Recurrence Rate (RQA RR)", Description: "RQA RR: density of recurrent state pairs across the run", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "event-entropy-rate", Name: "Event Entropy Rate", Description: "Normalized conditional Shannon entropy rate of the ordered event sequence", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "lempel-ziv-trajectory-complexity", Name: "Lempel-Ziv Trajectory Complexity", Description: "Normalized LZ76 complexity of the canonical event sequence", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "tool-output-consumption-rate", Name: "Tool Output Consumption Rate", Description: "Fraction of tool outputs referenced by a later action", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "end-to-end-lineage-completeness", Name: "End-to-End Lineage Completeness", Description: "Fraction of final outputs traceable to tool or observation evidence roots", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "action-provenance-coverage", Name: "Action Provenance Coverage", Description: "Fraction of consequential actions with a provenance path to tool or observation evidence", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "premature-termination-gap", Name: "Premature Termination Gap", Description: "Declared completion conditions still unsatisfied at termination", Unit: "count", Direction: "lower_is_better", Min: new(0.0)},
+	{ID: "evidence-saturation-stopping-lag", Name: "Evidence Saturation Stopping Lag", Description: "Events elapsed between all objectives being satisfied and the run stopping", Unit: "count", Direction: "lower_is_better", Min: new(0.0)},
+	{ID: "dependency-order-violation-rate", Name: "Dependency Order Violation Rate", Description: "Fraction of dependent objectives satisfied before their prerequisites", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "objective-coverage", Name: "Objective Coverage", Description: "Fraction of declared objectives that were completed", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "grounding-accuracy", Name: "Grounding Accuracy", Description: "Fraction of actions that were valid in the state in which they were issued", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "tool-wise-score", Name: "Tool-Wise Score", Description: "Longest correct execution prefix against a reference trajectory, with parameter credit", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "trajectory-ndtw", Name: "Trajectory nDTW", Description: "Normalized dynamic time warping similarity to a reference state trajectory", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
+	{ID: "code-search-recall", Name: "Code Search Recall", Description: "Fraction of reference patch files located during the run", Unit: "ratio", Direction: "higher_is_better", Min: new(0.0), Max: new(1.0)},
 }
 
 // BuiltinGraderIDs is the ordered list of built-in grader IDs (derived from registry).
 var BuiltinGraderIDs = func() []string {
-	ids := make([]string, len(BuiltinGraderRegistry))
-	for i, m := range BuiltinGraderRegistry {
-		ids[i] = m.ID
+	ids := make([]string, 0, len(BuiltinGraderRegistry))
+	for _, m := range BuiltinGraderRegistry {
+		ids = append(ids, m.ID)
 	}
 	return ids
 }()
@@ -443,14 +468,14 @@ func parseGraderEntryFields(def *GraderDefinition, entry map[string]any, id stri
 // local to the workflow file when they start with "./". Empty components, ".",
 // and ".." are rejected to avoid traversal.
 func IsValidOperationalValueEvaluatorRunPath(evaluatorPath string) bool {
-	if evaluatorPath == "" || strings.Contains(evaluatorPath, "\\") || evaluatorPath[0] == '/' {
+	if evaluatorPath == "" || strings.Contains(evaluatorPath, "\\") || strings.HasPrefix(evaluatorPath, "/") {
 		return false
 	}
 	pathForValidation := evaluatorPath
 	if trimmed, ok := strings.CutPrefix(pathForValidation, "./"); ok {
 		pathForValidation = trimmed
 	}
-	if pathForValidation == "" || pathForValidation[0] == '/' {
+	if pathForValidation == "" || strings.HasPrefix(pathForValidation, "/") {
 		return false
 	}
 	for part := range strings.SplitSeq(pathForValidation, "/") {

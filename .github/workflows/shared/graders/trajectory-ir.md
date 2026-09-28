@@ -1,6 +1,7 @@
 ## Canonical Trajectory IR
 
-Every grader in `shared/graders/` is a projection over one shared,
+Every trajectory grader (built-in in
+`actions/setup/js/trajectory_graders.cjs`) is a projection over one shared,
 canonical intermediate representation (IR) of a completed agent run, built
 **once** per grader run rather than re-parsed per grader. Do not write a
 bespoke parser per grader — build (or reuse) this IR first, then compute the
