@@ -154,6 +154,10 @@ describe("upload_assets.cjs", () => {
       await executeScript();
       expect(orphanBranchCreated).toBe(true);
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(
+        `### Assets\n\nSuccessfully uploaded **1** asset to branch \`assets/test-workflow\`.\n\n<details>\n<summary>View 1 asset</summary>\n\n- [\`test.png\`](https://github.com/owner/repo/blob/assets/test-workflow/test.png?raw=true) → \`test.png\` (${size} bytes)\n\n</details>\n`
+      );
+      expect(mockCore.summary.write).toHaveBeenCalledOnce();
     });
 
     it("should fail when trying to create orphaned branch without 'assets/' prefix", async () => {
@@ -353,6 +357,10 @@ describe("upload_assets.cjs", () => {
       await executeScript();
       expect(pushCalled).toBe(false);
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(
+        expect.stringContaining("### Assets\n\nStaged mode: **1** asset ready for publication to branch `assets/test-workflow` (not pushed).\n\n<details>\n<summary>View 1 asset</summary>\n\n")
+      );
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("\n\n</details>\n");
     });
   });
 

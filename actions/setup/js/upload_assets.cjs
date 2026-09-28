@@ -186,9 +186,7 @@ async function main() {
     if (hasChanges) {
       const commitMessage = `[skip-ci] Add ${uploadCount} asset(s)`;
       await exec.exec(`git`, [`commit`, `-m`, commitMessage]);
-      if (isStaged) {
-        core.summary.addRaw("## 🎭 Staged Mode: Asset Publication Preview");
-      } else {
+      if (!isStaged) {
         const maxPushAttempts = 3;
         for (let attempt = 1; attempt <= maxPushAttempts; attempt++) {
           const pushResult = await exec.getExecOutput("git", ["push", "--porcelain", "origin", normalizedBranchName], { ignoreReturnCode: true });
@@ -210,14 +208,14 @@ async function main() {
             throw rebaseError;
           }
         }
-        core.summary.addRaw("## Assets").addRaw(`Successfully uploaded **${uploadCount}** assets to branch \`${normalizedBranchName}\``).addRaw("");
         core.info(`Successfully uploaded ${uploadCount} assets to branch ${normalizedBranchName}`);
       }
 
-      for (const asset of processedAssets) {
-        core.summary.addRaw(`- [\`${asset.fileName}\`](${asset.url}) → \`${asset.targetFileName}\` (${asset.size} bytes)`);
-      }
-      await core.summary.write();
+      const status = isStaged
+        ? `Staged mode: **${uploadCount}** asset${uploadCount === 1 ? "" : "s"} ready for publication to branch \`${normalizedBranchName}\` (not pushed).`
+        : `Successfully uploaded **${uploadCount}** asset${uploadCount === 1 ? "" : "s"} to branch \`${normalizedBranchName}\`.`;
+      const assetList = processedAssets.map(asset => `- [\`${asset.fileName}\`](${asset.url}) → \`${asset.targetFileName}\` (${asset.size} bytes)`).join("\n");
+      await core.summary.addRaw(`### Assets\n\n${status}\n\n<details>\n<summary>View ${processedAssets.length} asset${processedAssets.length === 1 ? "" : "s"}</summary>\n\n${assetList}\n\n</details>\n`).write();
     } else {
       core.info("No new assets to upload");
     }
