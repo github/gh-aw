@@ -522,7 +522,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		},
 	},
 	"noop": {
-		DefaultMax: 1,
+		DefaultMax: 2,
 		Fields: map[string]FieldValidation{
 			"message": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 		},
