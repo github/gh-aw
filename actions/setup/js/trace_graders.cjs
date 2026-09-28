@@ -10,6 +10,7 @@ const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
 const { executeOperationalValueEvaluator } = require("./operational_value_grader.cjs");
 const { extractStructuredToolInput } = require("./tool_call_details.cjs");
+const { TRAJECTORY_GRADERS, TRAJECTORY_GRADER_META } = require("./trajectory_graders.cjs");
 
 // --- Constants ---
 const TMP_GH_AW = "/tmp/gh-aw";
@@ -581,18 +582,19 @@ function preprocessTrace() {
 
 // --- Built-in graders ---
 
-/** @type {Record<string, {unit: string, direction: string, threshold?: number, min?: number, max?: number}>} */
+/** @type {Record<string, {name: string, description: string, unit: string, direction: string, threshold?: number, min?: number, max?: number}>} */
 const BUILTIN_META = {
-  "tool-success-rate": { unit: "ratio", direction: "higher_is_better", threshold: 0.8, min: 0, max: 1 },
-  "tool-failure-count": { unit: "count", direction: "lower_is_better", threshold: 5 },
-  retries: { unit: "count", direction: "lower_is_better", threshold: 10 },
-  loops: { unit: "count", direction: "lower_is_better", threshold: 3 },
-  "trajectory-efficiency": { unit: "ratio", direction: "higher_is_better", min: 0, max: 1 },
-  "execution-step-count": { unit: "count", direction: "lower_is_better" },
-  "execution-duration": { unit: "ms", direction: "lower_is_better" },
-  "working-set-rebuild-factor": { unit: "factor", direction: "lower_is_better", min: 1 },
-  "context-growth": { unit: "factor", direction: "lower_is_better" },
-  "artifact-production": { unit: "count", direction: "higher_is_better" },
+  "tool-success-rate": { name: "Tool Success Rate", description: "Fraction of tool calls that succeeded", unit: "ratio", direction: "higher_is_better", threshold: 0.8, min: 0, max: 1 },
+  "tool-failure-count": { name: "Tool Failure Count", description: "Number of tool calls that failed", unit: "count", direction: "lower_is_better", threshold: 5 },
+  retries: { name: "Retries", description: "Number of retry events detected in gateway logs", unit: "count", direction: "lower_is_better", threshold: 10 },
+  loops: { name: "Loops", description: "Consecutive identical tool calls (same name and arguments)", unit: "count", direction: "lower_is_better", threshold: 3 },
+  "trajectory-efficiency": { name: "Trajectory Efficiency", description: "Ratio of unique tool names to total tool calls (higher = more diverse usage)", unit: "ratio", direction: "higher_is_better", min: 0, max: 1 },
+  "execution-step-count": { name: "Execution Step Count", description: "Total LLM request count", unit: "count", direction: "lower_is_better" },
+  "execution-duration": { name: "Execution Duration", description: "Total execution duration", unit: "ms", direction: "lower_is_better" },
+  "working-set-rebuild-factor": { name: "Working-Set Rebuild Factor", description: "Cumulative input tokens divided by peak invocation input tokens", unit: "factor", direction: "lower_is_better", min: 1 },
+  "context-growth": { name: "Context Growth", description: "Ratio of total tokens to first-request tokens", unit: "factor", direction: "lower_is_better" },
+  "artifact-production": { name: "Artifact Production", description: "Count of outputs/artifacts produced by the agent", unit: "count", direction: "higher_is_better" },
+  ...TRAJECTORY_GRADER_META,
 };
 
 /**
@@ -676,7 +678,7 @@ function gradeArtifactProduction(trace) {
   return trace.artifacts.length;
 }
 
-/** @type {Record<string, (trace: PreprocessedTrace) => number|null>} */
+/** @type {Record<string, (trace: PreprocessedTrace, config?: Record<string, any>) => any>} */
 const BUILTIN_GRADERS = {
   "tool-success-rate": gradeToolSuccessRate,
   "tool-failure-count": gradeToolFailureCount,
@@ -688,6 +690,7 @@ const BUILTIN_GRADERS = {
   "working-set-rebuild-factor": gradeWorkingSetRebuildFactor,
   "context-growth": gradeContextGrowth,
   "artifact-production": gradeArtifactProduction,
+  ...TRAJECTORY_GRADERS,
 };
 
 // --- Execution ---
@@ -839,7 +842,7 @@ function normalizeResult(id, rawResult, meta) {
  * Run a single built-in grader safely.
  * @param {string} id
  * @param {PreprocessedTrace} trace
- * @param {{name: string, unit: string, direction: string, threshold?: number, source: string}} meta
+ * @param {{name: string, unit: string, direction: string, threshold?: number, source: string, config?: Record<string, any>}} meta
  * @returns {GraderResult}
  */
 function runBuiltinGrader(id, trace, meta) {
@@ -848,7 +851,7 @@ function runBuiltinGrader(id, trace, meta) {
     return { ...normalizeResult(id, null, meta), status: "error", error: `grader ${id}: no implementation found` };
   }
   try {
-    const value = fn(trace);
+    const value = fn(trace, meta.config || {});
     return normalizeResult(id, value, meta);
   } catch (err) {
     const result = normalizeResult(id, null, meta);
@@ -979,6 +982,23 @@ function runGrader(id, builtin, script, trace, config) {
 }
 
 /**
+ * Built-in graders are deterministic, in-process, and API-free, so they run on
+ * every trace. Append each built-in missing from the manifest (for example a
+ * manifest compiled before the grader existed, or one that lists only custom
+ * graders) with its default metadata. Explicitly declared entries, including
+ * disabled built-ins, are left unchanged.
+ * @param {any[]} graders
+ * @returns {any[]}
+ */
+function withAllBuiltinGraders(graders) {
+  const declared = new Set(graders.filter(isRecord).map(g => g.id));
+  const missing = Object.keys(BUILTIN_GRADERS)
+    .filter(id => !declared.has(id))
+    .map(id => ({ id, ...BUILTIN_META[id], source: "builtin", enabled: true }));
+  return [...graders, ...missing];
+}
+
+/**
  * Main entry point. Called from the github-script step with base64 manifest and exec spec.
  * @param {string} manifestB64 - Base64-encoded JSON manifest
  * @param {string} [execSpecB64] - Base64-encoded JSON array of {id, script|run}
@@ -1009,6 +1029,8 @@ async function main(manifestB64, execSpecB64) {
     }
   }
 
+  manifest = { ...manifest, graders: withAllBuiltinGraders(Array.isArray(manifest.graders) ? manifest.graders : []) };
+
   // Write manifest file
   try {
     fs.mkdirSync(GRADERS_DIR, { recursive: true });
@@ -1018,7 +1040,7 @@ async function main(manifestB64, execSpecB64) {
   }
 
   // Filter to enabled graders
-  const graders = manifest.graders || [];
+  const graders = manifest.graders;
   const enabledGraders = graders.filter(g => g.enabled);
   if (enabledGraders.length === 0) {
     core.info("Graders: no enabled graders, skipping");
@@ -1143,6 +1165,7 @@ module.exports = {
   runGrader,
   runBuiltinGrader,
   runCustomGrader,
+  withAllBuiltinGraders,
   runOperationalValueGrader,
   normalizeResult,
   buildGradersSummaryBody,

@@ -34,6 +34,48 @@ An empty map enables all built-in graders with default settings. Omitting the `g
 | `context-growth` | Total tokens / first-request tokens | ≥1 |
 | `artifact-production` | Count of outputs in agent_output.json | integer |
 
+### Trajectory graders
+
+These built-ins are deterministic projections over the canonical [Trajectory IR](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/graders/trajectory-ir.md) (`trace.trajectoryIR`, `trace.ir`, or `agentOutput.trajectory`). They run in-process with no API calls. When the IR data a grader needs is missing, the grader reports `unavailable` instead of a score. Any IR collection with more than 5,000 items is also reported as `unavailable`, which bounds the cost of the quadratic graders.
+
+| ID | Description | Value |
+|---|---|---|
+| `policy-near-miss` | Fraction of successful traces that left guard or policy objectives unsatisfied | 0–1 |
+| `skill-constraint-coverage` | Fraction of configured skill constraints that were exercised and passed | 0–1 |
+| `exploration-error` | Unmet objectives attributable to insufficient search | 0–1 |
+| `exploitation-error` | Unmet objectives attributable to gathered evidence that was never used | 0–1 |
+| `state-revisit-probability-rep` | Fraction of canonical state visits that revisit an already visited state | 0–1 |
+| `recurrence-determinism` | RQA DET: fraction of recurrent points forming diagonal (repeated-subsequence) lines | 0–1 |
+| `recurrence-laminarity` | RQA LAM: fraction of recurrent points forming vertical (stagnation) lines | 0–1 |
+| `recurrence-trapping-time` | RQA TT: average length of vertical recurrence lines | ≥0 |
+| `recurrence-rate` | RQA RR: density of recurrent state pairs across the run | 0–1 |
+| `event-entropy-rate` | Normalized conditional Shannon entropy rate of the ordered event sequence | 0–1 |
+| `lempel-ziv-trajectory-complexity` | Normalized LZ76 complexity of the canonical event sequence | 0–1 |
+| `tool-output-consumption-rate` | Fraction of tool outputs referenced by a later action | 0–1 |
+| `end-to-end-lineage-completeness` | Fraction of final outputs traceable to tool or observation evidence roots | 0–1 |
+| `action-provenance-coverage` | Fraction of consequential actions with a provenance path to tool or observation evidence | 0–1 |
+| `premature-termination-gap` | Declared completion conditions still unsatisfied at termination | integer |
+| `evidence-saturation-stopping-lag` | Events elapsed between all objectives being satisfied and the run stopping | integer |
+| `dependency-order-violation-rate` | Fraction of dependent objectives satisfied before their prerequisites | 0–1 |
+| `objective-coverage` | Fraction of declared objectives that were completed | 0–1 |
+| `grounding-accuracy` | Fraction of actions that were valid in the state in which they were issued | 0–1 |
+| `tool-wise-score` | Longest correct execution prefix against a reference trajectory, with parameter credit | 0–1 |
+| `trajectory-ndtw` | Normalized dynamic time warping similarity to a reference state trajectory | 0–1 |
+| `code-search-recall` | Fraction of reference patch files located during the run | 0–1 |
+
+`skill-constraint-coverage` reads its constraints from `config.constraints`:
+
+```yaml
+graders:
+  skill-constraint-coverage:
+    config:
+      constraints:
+        - id: uses-docs-skill
+          pattern: "skill .*documentation"
+```
+
+Every built-in grader runs on every trace whenever the graders step runs, even if the workflow lists only custom graders. To opt out of a built-in, set `enabled: false` for it.
+
 ## Selective configuration
 
 Disable a specific built-in:

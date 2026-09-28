@@ -106,7 +106,9 @@ The file must include:
    preprocessed trace data passed to custom graders. The script receives
    `trace`, `run`, `workflow`, `config`, `helpers`, and `Math`; it cannot
    read files or use `require`, `import`, `fetch`, `eval`, process APIs, or
-   nondeterminism.
+   nondeterminism. The script must not exceed 4,096 Unicode characters and
+   must not use `child_process`, `execSync`, `spawnSync`, `Function`, `Date`,
+   or `Math.random`.
 3. `name`, `unit`, `direction`, and any useful `min`/`max` metadata in the
    grader entry.
 4. The human-readable description as comments only (YAML comments and/or a
@@ -146,5 +148,5 @@ Body must include:
 
 Do not modify any file outside the two listed above. Do not edit any
 `.lock.yml` file. If you cannot produce a complete, self-contained grader
-file meeting all six required sections above, call `noop` with a clear
+file meeting all five required sections above, call `noop` with a clear
 reason instead of emitting a partial `create_pull_request`.

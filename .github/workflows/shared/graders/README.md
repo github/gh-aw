@@ -4,10 +4,14 @@ Deterministic, per-trace behavioral graders that go beyond the existing
 built-in graders (step count, retries, loops, duration, tool-success rate,
 trajectory efficiency — see
 [Graders reference](https://githubnext.github.io/gh-aw/reference/trace-graders/)).
-Each grader below is implemented as its own importable `graders:`
-frontmatter script under `shared/graders/<id>.md`, built once as a
-projection over the [canonical Trajectory IR](trajectory-ir.md) so adding a
-new grader never requires a new trace parser.
+Each grader below is built once as a projection over the
+[canonical Trajectory IR](trajectory-ir.md) so adding a new grader never
+requires a new trace parser. Implemented graders are built-in: their code
+lives in `actions/setup/js/trajectory_graders.cjs`, their metadata in
+`pkg/workflow/graders_config.go`, and they run on every trace whenever the
+graders step runs. They are cheap (in-process, bounded to 5,000 items per IR
+collection) and make no API calls. `shared/graders/<id>.md` remains as an
+optional import fragment that enables the built-in.
 
 Ranked by diagnostic value, novelty relative to existing built-in graders,
 deterministic computability, applicability to a single completed trace, and
@@ -46,21 +50,21 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 | 3 | `exploration-error` | State/task model | Implemented |
 | 4 | `exploitation-error` | State/task model | Implemented |
 | 12 | `tool-output-consumption-rate` | Provenance/reference IDs | Implemented |
-| 13 | `end-to-end-lineage-completeness` | Provenance graph | Not started |
-| 14 | `action-provenance-coverage` | Provenance graph | Not started |
-| 15 | `premature-termination-gap` | Completion predicates | Not started |
-| 16 | `evidence-saturation-stopping-lag` | Completion predicates | Not started |
-| 17 | `dependency-order-violation-rate` | Objective DAG | Not started |
-| 18 | `objective-coverage` | Objective predicates | Not started |
-| 19 | `grounding-accuracy` | Valid-action schemas | Not started |
+| 13 | `end-to-end-lineage-completeness` | Provenance graph | Implemented |
+| 14 | `action-provenance-coverage` | Provenance graph | Implemented |
+| 15 | `premature-termination-gap` | Completion predicates | Implemented |
+| 16 | `evidence-saturation-stopping-lag` | Completion predicates | Implemented |
+| 17 | `dependency-order-violation-rate` | Objective DAG | Implemented |
+| 18 | `objective-coverage` | Objective predicates | Implemented |
+| 19 | `grounding-accuracy` | Valid-action schemas | Implemented |
 
 ## Tier 3 — benchmark/evaluation mode (needs a reference trajectory/patch/process model)
 
 | Rank | Grader ID | Runtime requirement | Status |
 |---|---|---|---|
-| 20 | `tool-wise-score` | Reference trajectory | Not started |
-| 21 | `trajectory-ndtw` | Reference trajectory + state distance | Not started |
-| 22 | `code-search-recall` | Reference patch | Not started |
+| 20 | `tool-wise-score` | Reference trajectory | Implemented |
+| 21 | `trajectory-ndtw` | Reference trajectory + state distance | Implemented |
+| 22 | `code-search-recall` | Reference patch | Implemented |
 | 23 | `code-read-precision` | Reference patch + symbol extraction | Not started |
 | 24 | `code-edit-precision` | Reference patch | Not started |
 | 25 | `process-alignment-fitness` | Process model | Not started |
@@ -95,12 +99,13 @@ to `Implemented` in the same PR that adds `shared/graders/<id>.md`.
 
 ## Consuming a grader from a workflow
 
-Import the specific grader fragment(s) you need:
+Implemented graders are built-in and run on every trace whenever a workflow
+declares `graders:`. Importing a fragment is optional:
 
 ```yaml
 imports:
   - shared/graders/state-revisit-probability-rep.md
 ```
 
-Each grader fragment contributes a deterministic custom grader script through
-frontmatter; none require network access or a second model call.
+To opt out of a built-in, set `enabled: false` for it under `graders:`.
+None of the graders need network access or a second model call.

@@ -149,8 +149,34 @@ The implementation MUST recognize the following built-in grader IDs:
 - `working-set-rebuild-factor`
 - `context-growth`
 - `artifact-production`
+- `policy-near-miss`
+- `skill-constraint-coverage`
+- `exploration-error`
+- `exploitation-error`
+- `state-revisit-probability-rep`
+- `recurrence-determinism`
+- `recurrence-laminarity`
+- `recurrence-trapping-time`
+- `recurrence-rate`
+- `event-entropy-rate`
+- `lempel-ziv-trajectory-complexity`
+- `tool-output-consumption-rate`
+- `end-to-end-lineage-completeness`
+- `action-provenance-coverage`
+- `premature-termination-gap`
+- `evidence-saturation-stopping-lag`
+- `dependency-order-violation-rate`
+- `objective-coverage`
+- `grounding-accuracy`
+- `tool-wise-score`
+- `trajectory-ndtw`
+- `code-search-recall`
 
 These IDs are reserved for built-ins. A built-in grader MUST NOT accept a custom `script`.
+
+Built-in graders MUST be deterministic, MUST run in-process without network or API access, and MUST keep their cost bounded. Trajectory graders MUST report `unavailable` rather than compute a score when any Trajectory IR collection exceeds the implementation's size limit.
+
+When the graders step runs, the runtime MUST run every built-in grader on the trace, including built-ins missing from the manifest. A built-in that is explicitly disabled MUST NOT run.
 
 ---
 
