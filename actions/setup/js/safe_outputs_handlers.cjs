@@ -450,12 +450,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   const appendSafeOutputCounted = entry => {
     const type = entry?.type;
     // Probing noop calls (e.g. `{"message": "test"}`) are schema probes rather than a
-    // genuine completion signal. They are ignored downstream, so they must not consume
-    // the invocation-time noop budget either.
-    const isProbingNoop = type === "noop" && isProbingNoopMessage(entry?.message);
-    if (type && !isProbingNoop) enforcePerTypeMax(type);
+    // genuine completion signal. They are ignored entirely: not recorded, not counted
+    // against the noop budget, so a probe never crowds out or short-circuits the real
+    // completion signal.
+    if (type === "noop" && isProbingNoopMessage(entry?.message)) {
+      server.debug(`Ignoring probing noop call (not recorded, does not consume the noop budget): ${JSON.stringify(entry?.message)}`);
+      return;
+    }
+    if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);
-    if (type && !isProbingNoop) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
+    if (type) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
   };
 
   /**
