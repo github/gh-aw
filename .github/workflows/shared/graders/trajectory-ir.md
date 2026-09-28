@@ -1,6 +1,7 @@
 ## Canonical Trajectory IR
 
-Every grader in `shared/graders/` is a projection over one shared,
+Every trajectory grader (built-in in
+`actions/setup/js/trajectory_graders.cjs`) is a projection over one shared,
 canonical intermediate representation (IR) of a completed agent run, built
 **once** per grader run rather than re-parsed per grader. Do not write a
 bespoke parser per grader — build (or reuse) this IR first, then compute the
@@ -48,7 +49,7 @@ telemetry, no network calls):
     { "id": "string", "label": "string", "firstEventIndex": 0 }
   ],
   "actions": [
-    { "id": "string", "eventIndex": 0, "type": "string", "target": "string|null", "validAtIssueTime": true }
+    { "id": "string", "eventIndex": 0, "type": "string", "target": "string|null", "validAtIssueTime": true, "consequential": true }
   ],
   "toolCalls": [
     { "id": "string", "eventIndex": 0, "name": "string", "arguments": {}, "success": true, "durationMs": 0, "outputRef": "observations[].id|null" }
@@ -65,12 +66,17 @@ telemetry, no network calls):
   ],
   "objectives": [
     // declared or inferred completion/evidence conditions
-    { "id": "string", "description": "string", "satisfiedAtEventIndex": null }
+    { "id": "string", "description": "string", "satisfiedAtEventIndex": null, "dependsOn": ["objective-id"] }
   ],
   "reference": null
   // optional: reference trajectory / patch for benchmark-mode graders (#20-#24).
   // Populate only when the workflow importing the grader supplies one; leave
-  // null otherwise and let the grader report "not-applicable".
+  // null otherwise and let the grader report "not-applicable". Shape:
+  // {
+  //   "toolCalls": [{ "name": "string", "arguments": {} }], // tool-wise-score
+  //   "states": ["states[].id"],                            // trajectory-ndtw
+  //   "patch": { "files": [{ "path": "string" }] }          // code-search-recall
+  // }
 }
 ```
 
@@ -89,36 +95,45 @@ telemetry, no network calls):
    later actions reference values that only appear in that observation
    (e.g. a file path, an ID, a computed number). An observation with an
    empty `consumedByActionIds` was never used.
-5. Populate `provenanceEdges[]` for every consequential action (edits,
-   comments, issue/PR mutations, safe outputs): trace it back to the
-   tool call/observation that informed it, if any. Actions with no
-   incoming edge are provenance gaps.
+5. Set `actions[].consequential` to `true` for actions with an observable
+   side effect outside the sandbox (edits, comments, issue/PR mutations,
+   safe outputs) and `false` for read-only actions (searches, listings,
+   inspections); never infer this from substring matches on `type` at
+   grading time — record the flag once, here, from the action's real
+   effect. Populate `provenanceEdges[]` for every consequential action:
+   trace it back to the tool call/observation that informed it, if any.
+   Actions with no incoming edge are provenance gaps.
 6. Populate `objectives[]` from declared expectations when available
    (workflow `safe-outputs` config, explicit task/issue checklist, README
    "Definition of Done") and mark `satisfiedAtEventIndex` the first event
    index at which the objective's evidence appears; leave `null` if never
-   satisfied.
-7. Write the IR to `/tmp/gh-aw/agent/graders/trajectory_ir.json` so a
+   satisfied. Preserve explicitly declared prerequisite objective IDs in
+   `dependsOn`; use an empty array when no dependency is declared, and never
+   infer dependencies from execution order.
+7. Record one `resources[]` entry of kind `file` for every file the agent
+   located (searched, listed, read, or edited), and set
+   `actions[].validAtIssueTime` to whether the action matched the
+   valid-action schema of the state in which it was issued.
+8. Write the IR to `/tmp/gh-aw/agent/graders/trajectory_ir.json` so a
    single run can compute more than one grader without rebuilding the IR.
 
 ### Output contract every grader in this directory follows
 
-Each grader fragment produces one JSON object appended to
-`/tmp/gh-aw/agent/graders/custom_grader_results.json`:
+Each grader script returns either a finite number or an object with a finite
+numeric `value`. Return `value: null` when required trace data is unavailable
+or the grader is not applicable:
 
 ```jsonc
 {
-  "id": "policy-near-miss",
   "value": 0.0,
-  "unit": "ratio|count|ms|string",
-  "direction": "lower-is-better|higher-is-better|neutral",
-  "evidence": ["short grounded strings citing IR event indices or ids"],
-  "applicable": true,
-  "notApplicableReason": null
+  "details": "short grounded summary citing IR event indices or ids"
 }
 ```
 
-Set `applicable: false` and explain in `notApplicableReason` rather than
-fabricating a value when the run's trace does not contain the inputs the
-grader needs (e.g. no reference trajectory for the benchmark-mode graders,
-no declared objectives for `objective-coverage`).
+The grader ID, name, unit, and `higher_is_better` or `lower_is_better`
+direction come from its frontmatter. An object result may additionally include
+`passed`, `severity`, `details`, or `message`; other fields are ignored by the
+runtime. Use `{ value: null, passed: null, message: "not applicable: ..." }`
+rather than fabricating a score when the trace does not contain the inputs the
+grader needs (e.g. no reference trajectory for benchmark-mode graders or no
+declared objectives for `objective-coverage`).
