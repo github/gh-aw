@@ -152,6 +152,9 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `apiProxy.caCert` | config-only (frontmatter: `sandbox.agent.ca-cert`; gated to AWF v0.28.10+ via `AWFAPIProxyCACertMinVersion`) | `pkg/workflow/awf_config_test.go` |
 | `container.dockerHostPathPrefix` | `--docker-host-path-prefix` | `pkg/workflow/awf_config_test.go` |
 | `enclaves[].agent.tools.github` | config-only (frontmatter: `enclaves[].agent.tools.github`; gated to AWF v0.28.20+ via `AWFEnclaveAgentToolsMinVersion`) | `pkg/workflow/enclaves_test.go` |
+| `rateLimiting.maxGithubApiPointsRest` | `--max-github-api-points-rest` (requires `security.difcProxy.host`; AWF enforces this dependency at runtime rather than in JSON Schema) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_GitHubAPIPointBudgets`) |
+| `rateLimiting.maxGithubApiPointsGraphql` | `--max-github-api-points-graphql` (requires `security.difcProxy.host`; AWF enforces this dependency at runtime rather than in JSON Schema) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_GitHubAPIPointBudgets`) |
+| `experimental.modelRouting` | config-only (required and `true` when `apiProxy.routing` is present) | `pkg/workflow/awf_config_test.go` (`TestValidateAWFConfigJSON_ModelRoutingGate`) |
 
 Agents SHOULD treat this class of mismatch as a regression signal and open a corrective PR when detected.
 
