@@ -1191,3 +1191,21 @@ safe-output calls attempted. next_index unchanged at 216. Called noop only. Reco
 unchanged: needs human maintainer action (retarget to disposable sandbox repo, fix sub-agent
 registration, or explicit re-authorization) — further autonomous re-litigation of this same
 conclusion each run is low value.
+
+## Run 2026-09-28: HALTED (38th consecutive run, no cells advanced)
+
+- Independently re-derived the identical halt conclusion as every run since
+  2026-08-16: this workflow's core method (real create_pull_request/
+  push_to_pull_request_branch/create_issue calls filled with synthetic filler,
+  against the live github/gh-aw repo, purely to probe safe-output size/file
+  enforcement) matches this session's own safe-outputs policy's forbidden
+  "probing / placeholder-content / let me see if this works" pattern verbatim.
+  Policy overrides inner workflow instructions.
+- Reconfirmed second blocker: `config-simulator` sub-agent type still not
+  registered this session (only claude/Explore/general-purpose/Plan/
+  statusline-setup exist).
+- No real safe-output calls made except the required `noop`. next_index
+  unchanged at 216. Recommendation stands from 2026-08-17: this needs a human
+  maintainer decision (retarget to a disposable sandbox repo, fix the
+  sub-agent reference, and/or explicitly re-authorize real probing) rather
+  than continued daily re-litigation of the same halt.
