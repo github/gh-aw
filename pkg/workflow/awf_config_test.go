@@ -2143,6 +2143,30 @@ func TestValidateAWFConfigJSON_AllowsDefaultAiCreditsPricingCachedFields(t *test
 	require.NoError(t, err, "apiProxy.defaultAiCreditsPricing should allow cachedInput and cacheWrite fields")
 }
 
+func TestValidateAWFConfigJSON_GitHubAPIPointBudgets(t *testing.T) {
+	err := validateAWFConfigJSON(`{"rateLimiting":{"maxGithubApiPointsRest":2000,"maxGithubApiPointsGraphql":1500}}`)
+	require.NoError(t, err)
+
+	err = validateAWFConfigJSON(`{"rateLimiting":{"maxGithubApiPointsRest":0}}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "maxGithubApiPointsRest")
+}
+
+func TestValidateAWFConfigJSON_ModelRoutingGate(t *testing.T) {
+	routing := `"apiProxy":{"routing":{"objective":{"goal":"cost","mode":"balanced"},"task":{"conversationFile":"/tmp/gh-aw/routing-conversation.json"}}}`
+
+	require.NoError(t, validateAWFConfigJSON(`{"experimental":{"modelRouting":true},`+routing+`}`))
+	require.NoError(t, validateAWFConfigJSON(`{"experimental":{"modelRouting":true}}`))
+
+	err := validateAWFConfigJSON(`{` + routing + `}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "experimental")
+
+	err = validateAWFConfigJSON(`{"experimental":{"modelRouting":false},` + routing + `}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "modelRouting")
+}
+
 // TestBuildAWFConfigJSON_ValidateFlag verifies that schema validation runs when
 // WorkflowData.ValidateAWFConfig is true (--validate mode) and is skipped otherwise.
 func TestBuildAWFConfigJSON_ValidateFlag(t *testing.T) {
