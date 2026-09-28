@@ -1248,7 +1248,7 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
 
       expect(result.value).toBeNull();
       expect(result.status).toBe("unavailable");
-      expect(result.message).toContain("consequential flag");
+      expect(result.message).toContain("not a record");
     });
   });
 

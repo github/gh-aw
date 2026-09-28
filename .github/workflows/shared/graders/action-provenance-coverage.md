@@ -29,7 +29,10 @@ graders:
       if (!ir) {
         return { value: null, unit: "ratio", passed: null, message: "not applicable: trace lacks actions, provenanceEdges, toolCalls, or observations" };
       }
-      if (ir.actions.some(action => !isRecord(action) || typeof action.consequential !== "boolean")) {
+      if (ir.actions.some(action => !isRecord(action))) {
+        return { value: null, unit: "ratio", passed: null, message: "unavailable: action entry is not a record" };
+      }
+      if (ir.actions.some(action => typeof action.consequential !== "boolean")) {
         return { value: null, unit: "ratio", passed: null, message: "unavailable: action is missing the canonical consequential flag" };
       }
 
