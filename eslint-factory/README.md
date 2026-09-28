@@ -1016,6 +1016,31 @@ await githubClient.rest.pulls.get({ owner, repo, pull_number });
 throw new Error(`${ERR_API}: failed to fetch pull request`);
 ```
 
+### `require-error-codes-in-safe-output-handler`
+
+Files that look like safe-output handlers (they call `octokit.*`, reference `safe_output`/`safeOutput`, or write/read the `NDJSON` protocol) must use a standardized error code (`ERR_*`, `E###`, or `ERROR_*`) somewhere once they accumulate 3 or more `throw new Error(...)`/`core.setFailed(...)` calls. `require-error-code-in-thrown-error` only checks files that already `require("./error_codes.cjs")`; this rule catches handler files that never imported error codes in the first place — the recurring gap behind repeated `USE-001` conformance findings.
+
+**Flagged form:**
+```js
+async function run() {
+  await octokit.rest.issues.get({ owner, repo, issue_number });
+  if (!title) throw new Error("missing title");
+  if (!body) throw new Error("missing body");
+  if (!label) throw new Error("missing label");
+}
+```
+
+**Safe alternative:**
+```js
+const { ERR_VALIDATION } = require("./error_codes.cjs");
+async function run() {
+  await octokit.rest.issues.get({ owner, repo, issue_number });
+  if (!title) throw new Error(`${ERR_VALIDATION}: missing title`);
+  if (!body) throw new Error(`${ERR_VALIDATION}: missing body`);
+  if (!label) throw new Error(`${ERR_VALIDATION}: missing label`);
+}
+```
+
 ### `require-invalid-date-check-before-compare`
 
 Require validation of `new Date(...)` and `Date.parse(...)` results before relational comparisons. Invalid dates and NaN timestamps compare as neither greater nor less than other values, silently defeating time-window checks.
