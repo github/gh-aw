@@ -58,7 +58,7 @@ steps:
     run: npm ci
 ```
 
-Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent from Steps Using `noop`](/gh-aw/reference/cost-management/#skip-the-agent-from-steps-using-noop) for details.
+Use custom steps to precompute data, filter triggers, or prepare context for AI agents. Steps can also short-circuit the agent by writing a `noop` entry to `$GH_AW_SAFE_OUTPUTS` — the harness detects this at startup and exits cleanly without incurring any AI inference cost. See [Skip the Agent When It Is Not Needed](/gh-aw/reference/cost-management/#skip-the-agent-when-it-is-not-needed) for details.
 
 ## Custom Pre-Agent Steps (`pre-agent-steps:`)
 

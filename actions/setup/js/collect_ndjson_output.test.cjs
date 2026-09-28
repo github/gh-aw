@@ -1686,6 +1686,19 @@ describe("collect_ndjson_output.cjs", () => {
             expect(parsedOutput.items[2].message).toBe("Third message"),
             expect(parsedOutput.errors).toHaveLength(0));
         }),
+        it("should ignore probing noop messages without counting against the budget", async () => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
+            ndjsonContent = '{"type": "noop", "message": "test"}\n{"type": "noop", "message": "probe"}\n{"type": "noop", "message": "Analysis complete - no issues found"}';
+          (fs.writeFileSync(testFile, ndjsonContent), (process.env.GH_AW_SAFE_OUTPUTS = testFile));
+          const config = '{"noop": true}',
+            configPath = "/tmp/gh-aw/safeoutputs/config.json";
+          (fs.mkdirSync("/tmp/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, config), await eval(`(async () => { ${collectScript}; await main(); })()`));
+          const setOutputCalls = mockCore.setOutput.mock.calls,
+            outputCall = setOutputCalls.find(call => "output" === call[0]);
+          expect(outputCall).toBeDefined();
+          const parsedOutput = JSON.parse(outputCall[1]);
+          (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].message).toBe("Analysis complete - no issues found"), expect(parsedOutput.errors).toHaveLength(0));
+        }),
         it("should validate assign_milestone with required fields", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
             ndjsonContent = '{"type": "assign_milestone", "issue_number": 42, "milestone_number": 5}';

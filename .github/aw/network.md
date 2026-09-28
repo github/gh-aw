@@ -161,6 +161,7 @@ network:
 - **Deny-by-default**: if a Claude or Codex workflow sets `network` explicitly without a `hosted-web` policy, hosted web tools compile to disabled for that engine.
 - Setting `hosted-web` on any engine other than Claude or Codex is a compile error.
 - On import merge, allowed/blocked lists from imported files combine with the main workflow's, but only when both policies are enabled; the main workflow's scalar settings (such as `max-uses`) and an explicit `hosted-web: false` on either side win — see [syntax-tools-imports.md](syntax-tools-imports.md).
+- Copilot has no `hosted-web` policy. If `network.allowed`/`blocked` restrictions are set and `tools.web-fetch` or `tools.web-search` is enabled, the compiler warns (or errors in strict mode) that Copilot's built-in web tools ignore those restrictions — switch to `engine: codex` or `engine: claude` with `network.hosted-web`, or disable the tool (`tools.web-search: false`).
 
 ## Inferring Ecosystem From Repository Files
 

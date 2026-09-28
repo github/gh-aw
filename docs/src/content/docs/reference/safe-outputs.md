@@ -146,7 +146,7 @@ safe-outputs:
 
 | Output | Key | Description |
 |--------|-----|-------------|
-| [No-Op](#no-op-logging-noop) | `noop` | Log completion message for transparency (max: 1, same-repo only) |
+| [No-Op](#no-op-logging-noop) | `noop` | Log completion messages for transparency (max: 2, same-repo only) |
 | [Missing Tool](#missing-tool-reporting-missing-tool) | `missing-tool` | Report missing tools (max: unlimited, same-repo only) |
 | [Missing Data](#missing-data-reporting-missing-data) | `missing-data` | Report missing data required to achieve goals (max: unlimited, same-repo only) |
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Auto-injected when no `safe-outputs:` section is present or when only system types (`noop`, `missing-tool`, `missing-data`) are configured (max: 1, labels and title-prefix set to workflow ID). |
@@ -1270,6 +1270,8 @@ safe-outputs:
 **When to call `noop`**: Any time no GitHub action (issue, comment, PR, label, etc.) is needed — e.g., no issues found, no changes detected, or repository already in desired state. Do NOT call `noop` if any other safe-output action was taken.
 
 Agent output: `{"noop": {"message": "No action needed: analysis complete - no issues found"}}`. Messages appear in the workflow conclusion comment or step summary.
+
+Up to two `noop` calls are accepted by default (`max: 2`), since an agent's first call is often a probe. Calls whose `message` is an obvious placeholder (e.g. `test`, `probe`, `placeholder`, `dummy`, `todo`) are detected and ignored entirely — they don't count against the `noop` budget and aren't surfaced in summaries or tracking issues, so a probing call never crowds out a real completion message.
 
 **Always include explicit `noop` instructions in your workflow prompts:**
 

@@ -178,7 +178,7 @@ const SAMPLE_VALIDATION_CONFIG = {
     },
   },
   noop: {
-    defaultMax: 1,
+    defaultMax: 2,
     fields: {
       message: { required: true, type: "string", sanitize: true, maxLength: 65000 },
     },
@@ -926,6 +926,14 @@ describe("safe_output_type_validator", () => {
       const max = getMaxAllowedForType("create_issue");
 
       expect(max).toBe(1);
+    });
+
+    it("should allow two noop calls by default", async () => {
+      const { getMaxAllowedForType } = await import("./safe_output_type_validator.cjs");
+
+      const max = getMaxAllowedForType("noop");
+
+      expect(max).toBe(2);
     });
 
     it("should return overridden max from config", async () => {
