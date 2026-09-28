@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-10",
-    "workflow_name": "Claude Code User Documentation Review",
-    "workflow_file": "claude-code-user-docs-review",
-    "total_aic_analyzed": 705.2837,
-    "runs_audited": 2,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 155
-  },
-  {
     "date": "2026-06-11",
     "workflow_name": "Matt Pocock Skills Reviewer",
     "workflow_file": "mattpocock-skills-reviewer",
@@ -284,5 +275,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 5
+  },
+  {
+    "date": "2026-09-28",
+    "workflow_name": "Daily File Diet",
+    "workflow_file": "daily-file-diet",
+    "total_aic_analyzed": 126.05393,
+    "runs_audited": 1,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
   }
 ]
