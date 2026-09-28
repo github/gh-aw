@@ -10,20 +10,28 @@ pre-agent-steps:
       # sys.path, so a repo-local pip.py or pydantic_ai_harness/ cannot be
       # imported in place of the installed packages.
       #
-      # 2.36.0 is the first pydantic-ai-slim release carrying `pai --mcp-config`,
-      # which is how the gateway's MCP servers reach the agent.
+      # 2.36.0 carried `pai --mcp-config`, which is how the gateway's MCP servers
+      # reach the agent. The floor is 2.44.0 for a second reason: it is the first
+      # release where `Agent.from_spec()` accepts a spec that names no model, so a
+      # `PAI_AGENT` spec file no longer has to carry a `model:` that the engine's
+      # own `-m` immediately replaces.
       #
       # The anthropic extra is what an `anthropic/` model runs on: that backend of
       # the api-proxy serves the Messages API, not Chat Completions.
-      python3 -P -m pip install --quiet --user --disable-pip-version-check "pydantic-ai-harness[cli]==$GH_AW_ENGINE_VERSION" "pydantic-ai-slim[anthropic,openai,mcp]>=2.36.0"
+      # The spec extra supplies YAML parsing for PAI_AGENT spec files.
+      python3 -P -m pip install --quiet --user --disable-pip-version-check "pydantic-ai-harness[cli]==$GH_AW_ENGINE_VERSION" "pydantic-ai-slim[anthropic,openai,mcp,spec]>=2.44.0"
+      # Logfire 4.39.0 is pydantic-ai-slim's compatibility floor. Install it only
+      # when gh-aw supplies an OTLP endpoint, so other runs pay no installation cost.
+      if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
+        python3 -P -m pip install --quiet --user --disable-pip-version-check "logfire>=4.39.0"
+      fi
       "$HOME/.local/bin/pai" --version
       python3 -P -c "from pydantic_ai_harness import Coder"
 engine:
   id: pydantic-ai
-  version: "0.26.0"
+  version: "0.35.0"
   display-name: Pydantic AI
   description: Pydantic AI CLI (pai) running the pydantic-ai-harness coder agent with MCP tool support
-  experimental: true
   mcp: true
   provider:
     name: github
@@ -76,8 +84,8 @@ engine:
       // spec, and the spec format resolves capability names through a closed
       // registry that the harness capabilities are not part of, so the coder
       // composition cannot be expressed as a spec. It is written as a Python
-      // module instead: `Coder()` supplies the filesystem, shell, planning and
-      // sub-agent tools.
+      // module instead: `Coder()` supplies six filesystem and shell tools,
+      // repository context and context management.
       //
       // The gateway's MCP servers are deliberately not part of the module.
       // `pai --mcp-config` reads the same Claude-shaped config file through the
@@ -120,11 +128,50 @@ engine:
       // sys.path on its own account; PYTHONPATH below is what makes the agent
       // importable. A spec file, and the dotted `module.attribute` form the CLI also
       // accepts, are left to the CLI as before.
-      const LAUNCHER = `import runpy
+      const LAUNCHER = `import os
+      import runpy
       import sys
 
       target, *cli_args = sys.argv[1:]
       module, separator, attribute = target.rpartition(":")
+      # The endpoint is gh-aw's signal that observability is configured. The
+      # "if-token-present" setting avoids a missing-LOGFIRE_TOKEN failure while
+      # preserving OTLP export, and console=False keeps spans out of the engine's
+      # log parser, while distributed_tracing=True marks the propagated context as
+      # deliberate because joining gh-aw's trace is why it is attached.
+      # gh-aw supplies run identity through OTEL_RESOURCE_ATTRIBUTES,
+      # so the engine adds no resource attributes. This runs before the agent
+      # target import, so a user's own configure() call runs later and overrides it.
+      if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+          import atexit
+          import tempfile
+
+          # Ignore checkout configuration and credentials, including when TMPDIR
+          # points into the checkout. Register cleanup before Logfire's shutdown
+          # handlers so its exporters finish before the directory is removed.
+          logfire_dir = tempfile.TemporaryDirectory(prefix="gh-aw-logfire-", dir="/tmp")
+          atexit.register(logfire_dir.cleanup)
+
+          import logfire
+
+          logfire.configure(
+              send_to_logfire="if-token-present", console=False, distributed_tracing=True,
+              config_dir=logfire_dir.name, data_dir=logfire_dir.name,
+          )
+          logfire.instrument_pydantic_ai()
+
+          # gh-aw supplies TRACEPARENT for exactly this purpose: it lets engines
+          # nest their spans under the workflow run's span. OpenTelemetry does not
+          # read it from the environment on its own; without explicit extraction,
+          # the agent and workflow spans reach the backend as unrelated traces
+          # correlated only by shared resource attributes.
+          traceparent = os.environ.get("TRACEPARENT")
+          if traceparent:
+              from opentelemetry.context import attach
+              from opentelemetry.propagate import extract
+
+              attach(extract({"traceparent": traceparent}))
+
       if separator and not target.lower().endswith((".yml", ".yaml", ".json")):
           import importlib
 
@@ -191,6 +238,12 @@ engine:
         // of running your own agent, and it is exactly what `-P` on the install
         // step keeps off the path for the default composition.
         env.PYTHONPATH = [moduleDir, configuredAgent ? workspace : "", process.env.PYTHONPATH || ""].filter(Boolean).join(":");
+        if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
+          // Traces-only backends return 404 noise for metrics and logs. A workflow
+          // can override either default when its backend accepts those signals.
+          if (!env.OTEL_METRICS_EXPORTER) env.OTEL_METRICS_EXPORTER = "none";
+          if (!env.OTEL_LOGS_EXPORTER) env.OTEL_LOGS_EXPORTER = "none";
+        }
         delete env.COPILOT_GITHUB_TOKEN;
 
         const provider = process.env.GH_AW_LLM_PROVIDER;
@@ -314,9 +367,21 @@ engine:
         const mcpConfig = join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "mcp-config", "mcp-servers.json");
         if (existsSync(mcpConfig)) cliArgs.push("--mcp-config", mcpConfig);
         cliArgs.push("-m", `${useMessagesAPI ? "anthropic" : "openai-chat"}:${model}`, readFileSync(promptFile, "utf8"));
+        // Log only the origin because endpoint userinfo and query parameters can
+        // contain credentials, and workflow run logs are not private.
+        const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+        let otlpOrigin = "";
+        if (otlpEndpoint) {
+          try {
+            otlpOrigin = new URL(otlpEndpoint).origin;
+          } catch {
+            otlpOrigin = "(unparsable)";
+          }
+        }
         log(
           `provider=${configuredBaseUrl ? "(PAI_BASE_URL)" : provider} model=${model} baseUrl=${baseUrl}` +
-            (configuredAgent ? ` agent=${configuredAgent}` : "")
+            (configuredAgent ? ` agent=${configuredAgent}` : "") +
+            (otlpOrigin ? ` otlp=${otlpOrigin}` : "")
         );
         // The target is passed twice on purpose: once for LAUNCHER, which imports it
         // and hands the CLI a module already in sys.modules, and once as the `-a`
@@ -476,7 +541,7 @@ engine:
 
 Shared engine definition for the [Pydantic AI](https://ai.pydantic.dev) CLI
 (`pai`), running the coder agent from
-[pydantic-ai-harness](https://github.com/pydantic/pydantic-ai-harness). Import
+[pydantic-ai-harness](https://github.com/pydantic/pydantic-ai/tree/main/src/pydantic_ai_harness). Import
 this file and set `engine: id: pydantic-ai` to use it:
 
 ```yaml
@@ -488,8 +553,8 @@ engine:
 ```
 
 The agent is a `pydantic_ai.Agent` composed from the harness `Coder`
-capability — filesystem, shell, planning, repository context and an explorer
-sub-agent, with the harness's own context-management guardrails. `pai -a` accepts
+capability: six filesystem and shell tools, repository context and context
+management. Shell commands are unrestricted inside the sandbox. `pai -a` accepts
 a single target and its JSON agent-spec format cannot name harness capabilities,
 so the harness script writes that composition as `gh_aw_agent.py` in a private
 directory it creates inside the sandbox, puts that directory on `PYTHONPATH`, and
@@ -570,6 +635,6 @@ counts only from any JSON lines the run happens to emit.
 
 The CLI and the coder capabilities are installed before the agent runs with
 `pip install --user "pydantic-ai-harness[cli]==<engine version>"
-"pydantic-ai-slim[anthropic,openai,mcp]>=2.36.0"`, into `~/.local` because the
+"pydantic-ai-slim[anthropic,openai,mcp,spec]>=2.44.0"`, into `~/.local` because the
 runner tool cache holding `uv` is not writable from inside the sandbox.
 -->
