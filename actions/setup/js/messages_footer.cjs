@@ -162,7 +162,7 @@ function getAICFromEnv() {
  * @property {number|string} [triggeringNumber] - Issue, PR, or discussion number that triggered this workflow
  * @property {"issue"|"PR"|"discussion"} [triggeringType] - Triggering item type used in the default footer
  * @property {string} [historyUrl] - GitHub search URL for items created by this workflow
- * @property {string} [historyLink] - Pre-formatted markdown history link (e.g. " · [◷](url)"), or "" if unavailable
+ * @property {string} [historyLink] - Deprecated history link placeholder, always ""
  * @property {number|string} [aiCredits] - Total AI Credits cost for the run (1 AIC == 0.01 USD)
  * @property {string} [emoji] - Optional emoji representing the workflow (from frontmatter)
  * @property {string} [slashCommand] - Slash command name (without leading slash) for the run-again hint, when applicable
@@ -215,8 +215,8 @@ function getFooterMessage(ctx) {
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || undefined;
   const detectionReason = process.env.GH_AW_DETECTION_REASON || undefined;
 
-  // Pre-compute history_link as a ready-to-use markdown suffix (empty string when unavailable)
-  const historyLink = ctx.historyUrl ? ` · [◷](${ctx.historyUrl})` : "";
+  // Keep the legacy placeholder empty; provenance is rendered on its own line below.
+  const historyLink = "";
 
   // Pre-compute agentic_workflow_url as the direct link to the agentic workflow page
   const agenticWorkflowUrl = ctx.agenticWorkflowUrl || (ctx.runUrl ? `${ctx.runUrl}/agentic_workflow` : "");
@@ -432,8 +432,8 @@ function getFooterWorkflowRecompileCommentMessage(ctx) {
 function getFooterAgentFailureIssueMessage(ctx) {
   const messages = getMessages();
 
-  // Pre-compute history_link as a ready-to-use markdown suffix (empty string when unavailable)
-  const historyLink = ctx.historyUrl ? ` · [◷](${ctx.historyUrl})` : "";
+  // Keep the legacy placeholder empty; provenance is rendered on its own line below.
+  const historyLink = "";
 
   // Pre-compute agentic_workflow_url as the direct link to the agentic workflow page
   const agenticWorkflowUrl = ctx.agenticWorkflowUrl || (ctx.runUrl ? `${ctx.runUrl}/agentic_workflow` : "");
@@ -520,8 +520,8 @@ function getFooterAgentFailureIssueMessage(ctx) {
 function getFooterAgentFailureCommentMessage(ctx) {
   const messages = getMessages();
 
-  // Pre-compute history_link as a ready-to-use markdown suffix (empty string when unavailable)
-  const historyLink = ctx.historyUrl ? ` · [◷](${ctx.historyUrl})` : "";
+  // Keep the legacy placeholder empty; provenance is rendered on its own line below.
+  const historyLink = "";
 
   // Pre-compute agentic_workflow_url as the direct link to the agentic workflow page
   const agenticWorkflowUrl = ctx.agenticWorkflowUrl || (ctx.runUrl ? `${ctx.runUrl}/agentic_workflow` : "");
