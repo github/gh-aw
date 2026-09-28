@@ -226,5 +226,5 @@ func (e *CopilotEngine) GetCleanupStep(workflowData *WorkflowData) GitHubActionS
 
 // generateAWFInstallationStep is implemented in copilot_engine_installation.go
 
-// GenerateCopilotInstallerSteps is implemented in copilot_installer.go.
+// generateCopilotInstallerSteps is implemented in copilot_installer.go.
 // See that file for the full signature and priority documentation.

@@ -38,7 +38,7 @@ func TestParseNoOpConfig(t *testing.T) {
 				"noop": nil,
 			},
 			expectedNil:    false,
-			expectedMax:    strPtr("1"),
+			expectedMax:    strPtr("2"),
 			expectedReport: strPtr("true"),
 		},
 		{
@@ -47,7 +47,7 @@ func TestParseNoOpConfig(t *testing.T) {
 				"noop": map[string]any{},
 			},
 			expectedNil:    false,
-			expectedMax:    strPtr("1"),
+			expectedMax:    strPtr("2"),
 			expectedReport: strPtr("true"),
 		},
 		{
@@ -69,7 +69,7 @@ func TestParseNoOpConfig(t *testing.T) {
 				},
 			},
 			expectedNil:    false,
-			expectedMax:    strPtr("1"),
+			expectedMax:    strPtr("2"),
 			expectedReport: strPtr("true"),
 		},
 		{
@@ -80,7 +80,7 @@ func TestParseNoOpConfig(t *testing.T) {
 				},
 			},
 			expectedNil:    false,
-			expectedMax:    strPtr("1"),
+			expectedMax:    strPtr("2"),
 			expectedReport: strPtr("false"),
 		},
 		{
