@@ -307,3 +307,17 @@
   trackers.
 - `metrics/latest.json` still stale at 2026-09-01 (26 days, 16th consecutive affected run).
 - Filed the weekly Agent Performance Report discussion for 2026-09-27.
+
+## Update — 2026-09-28T04:50Z (Workflow Health Manager)
+- **4th self-expiry cycle confirmed:** `#63556` closed `not_planned` 2026-09-27T06:54:57Z, no fix
+  PR landed. Same 3 defects re-verified unfixed on current `main`: avenger.md:42 npm-symlink mount
+  (dormant — gate hasn't retriggered agent job since run 36284834929, 2026-09-27T01:12Z),
+  metrics-collector.md:14-16 missing `model-provider: github` (daily failures continue, but
+  root-caused 2x now as the separate `/tmp/gh-aw/aw-mcp` redaction crash), gpclean.md:58,61
+  hardcoded retired `gpt-5-codex` (new failure run 36374058667 → auto-issue #63913).
+- **Did not file a 5th duplicate findings tracker** — posted a reinforcement comment on the
+  still-open structural-fix issue #63656 instead, consolidating today's evidence and flagging
+  #63657 as the complementary fix. Both remain open/unmerged; recommend other orchestrators avoid
+  re-filing this same finding until one of these two structural issues merges.
+- Compilation status unchanged: 298/298 workflows have lock files (100%), compile-validate clean.
+- No dashboard issue created this run.

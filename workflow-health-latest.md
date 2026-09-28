@@ -1,64 +1,51 @@
-# Workflow Health — 2026-09-27T04:45Z
+# Workflow Health — 2026-09-28T04:50Z
 
-## 4th re-confirmation: same 3 root causes still unfixed on live tracker #63556 (not expired)
-`#63556` (filed 2026-09-26, expires ~2026-09-27T04:47Z) still accurately describes all 3 defects.
-Re-verified all 3 live today via fresh job logs, no merged fix PR found:
-1. **avenger.md — `/usr/local/bin/npm` symlink bind-mount crash.** Run 36284834929
-   (2026-09-27T01:12Z) failed with `Refusing to use symlink as bind mountpoint:
-   /usr/local/bin/npm`. Line 42 still mounts the npm symlink directly. Two prior fix PRs
-   (#57946, #58722) remain closed unmerged since 2026-09-05.
-2. **metrics-collector.md — missing `model-provider: github`.** `engine:` block (lines 14-16)
-   still only has `id: codex`, no `model-provider: github`, while `model: copilot/gpt-5.3-codex`
-   is set.
-3. **gpclean.md — hardcoded retired `gpt-5-codex`.** Line 61 still `model: openai/gpt-5-codex`.
-   Run 36291452078 (2026-09-27T03:27Z) failed all 4 codex-harness retries with `Model
-   'gpt-5-codex' is retired... Did you mean 'gpt-5.3-codex'?`.
-Posted a re-confirmation comment on the still-open `#63556` (no new tracker needed — it has not
-yet auto-expired).
+## 4th self-expiry confirmed: #63556 closed not_planned, same 3 root causes still live
+`#63556` (filed 2026-09-26) closed `not_planned` at 2026-09-27T06:54:57Z without a fix landing —
+the 4th consecutive auto-expiry of the same finding (`#63098` → `#63348` → `#63556` → now).
+Re-verified all 3 on current `main`:
+1. **avenger.md:42 — npm symlink bind-mount.** Currently dormant: `check_ci_status` gate hasn't
+   re-invoked the agent job since the last failure (run 36284834929, 2026-09-27T01:12Z); ~27
+   consecutive runs since have `agent: skipped`. Still a live landmine when the gate reopens.
+2. **metrics-collector.md:14-16 — missing `model-provider: github`.** Daily failures continue
+   (run 36371253821, 2026-09-28T02:48Z) but root-caused **2x in a row** as the separate
+   `/tmp/gh-aw/aw-mcp` secret-redaction crash (`EACCES: permission denied, scandir
+   '/tmp/gh-aw/aw-mcp'`) — a genuine cross-workflow AWF-firewall defect, independent of the
+   still-needed model-provider config fix.
+3. **gpclean.md:58,61 — hardcoded retired `gpt-5-codex`.** New failure today: run 36374058667
+   (2026-09-28T03:31Z), auto-filed as #63913. All 4 codex-harness retries failed with
+   `Model 'gpt-5-codex' is retired... Did you mean 'gpt-5.3-codex'?`.
 
-## Correction / new finding: metrics-collector's failure is actually a redaction-crash, not model_not_supported_error
-Line-by-line re-read of run 36289314556's agent job log shows codex itself **exited cleanly
-(exitCode=0)**; `model_not_supported_error` there is only a benign fallback-metadata warning. The
-job is marked `failure` by a **separate post-agent secret-redaction crash**:
-`##[error]ERR_VALIDATION: Secret redaction failed: ... Failed to scan directory
-/tmp/gh-aw/aw-mcp: EACCES: permission denied, scandir '/tmp/gh-aw/aw-mcp'`. This is the **same
-`/tmp/gh-aw/aw-mcp` redaction-crash class** previously tracked only against
-`daily-firewall-report` (there: `Maximum call stack size exceeded`, reconfirmed again today in run
-36288817598, 2026-09-27T02:32Z). Confirmed on a 2nd, unrelated workflow with a different
-sub-error signature on the same directory scan — elevates this from single-workflow-flaky to a
-genuine cross-workflow AWF-firewall redaction defect, independent of and in addition to the
-`model-provider` config fix (still separately needed for metrics-collector.md's fallback-metadata
-warning). Recommend flagging this to AWF firewall maintainers as a distinct systemic item.
+**Decision this run:** did not file a 5th duplicate findings tracker (it would self-expire under
+the current `expires: 1d` policy). Instead posted a reinforcement comment on the still-open
+structural-fix issue `#63656` (extend expires for P0/P1 trackers) — the real unblocker for this
+loop — plus noted `#63657` (scoped create-pull-request safe-output) as the complementary fix.
+Both remain open, unmerged.
 
 ## failing-workflows.json re-verified live (4 entries)
-- **daily-firewall-report**: still crashing on redaction (root-caused above, now confirmed
-  cross-workflow); agent output itself healthy (discussion created successfully both times).
-- **daily-go-test-parallelizer**: no fresh failure evidence this run beyond the pre-loaded
-  single-run snapshot; unchanged assessment from prior runs (healthy).
-- **lint-monster**: no fresh failure evidence this run beyond the pre-loaded single-run snapshot;
-  unchanged assessment from prior runs (healthy).
-- **cjs**: plain GH Actions CI workflow, out of `gh aw` scope — recent runs show `action_required`
-  (approval gate) alternating with `success`, not failures.
+- **daily-firewall-report**: same `/tmp/gh-aw/aw-mcp` redaction-crash class as metrics-collector;
+  agent output itself healthy (discussion created).
+- **daily-go-test-parallelizer**: no fresh failure evidence beyond pre-loaded snapshot; unchanged.
+- **lint-monster**: no fresh failure evidence beyond pre-loaded snapshot; unchanged.
+- **cjs**: plain GH Actions CI, out of `gh aw` scope — `action_required` (approval gate)
+  alternating with `success`, not failures.
 
 ## Compilation Status
 298/298 workflows have lock files (100%), compile-validate clean.
 
 ## Tooling limitation (carried over, unresolved)
-`workflow-health-manager.md`'s safe-outputs still lack `update-issue: target: '*'`, so this
-schedule-triggered workflow cannot update/close existing issues directly; `add_comment` used again
-this run for the tracker update. Deep-report follow-up issues #63656 (extend expires for P0/P1
-trackers) and #63657 (scoped create-pull-request safe-output) remain open and unaddressed —
-recommend prioritizing these to close the diagnose-but-never-convert-to-PR gap that has now
-produced 4 re-confirmation cycles of the same 3 defects.
+`workflow-health-manager.md` still lacks `update-issue: target: '*'` for closing/updating issues
+it didn't create this run, and `expires: 1d` on P0/P1 trackers keeps causing this exact
+self-expiry loop. Issues #63656 and #63657 track both fixes — still open, unmerged, 2nd run in a
+row recommending they be prioritized over filing more duplicate findings.
 
-## Actions Taken This Run (2026-09-27)
-- Re-verified all 3 root causes from #63556 via live job logs and current file contents — all
-  still unfixed, tracker still open (not yet expired) — posted re-confirmation comment with fresh
-  run evidence rather than filing a duplicate tracker.
-- Discovered and documented a correction: metrics-collector.md's recent failures are actually the
-  same `/tmp/gh-aw/aw-mcp` redaction-crash class as daily-firewall-report's, not a genuine
-  model-resolution failure — elevates the redaction crash to a cross-workflow systemic issue.
-- No dashboard issue created this run — no compilation/health-category shifts warranting a full
-  refresh; captured via the tracker comment instead.
+## Actions Taken This Run (2026-09-28)
+- Re-verified all 3 root causes via live job logs (metrics-collector run 36371253821, gpclean run
+  36374058667, avenger last-triggered run 36284834929) and current file contents on `main` — all
+  still unfixed.
+- No new findings tracker filed (would duplicate/self-expire); posted reinforcement comment on
+  `#63656` instead, consolidating evidence and pointing at the structural fix.
+- No dashboard issue created this run — no compilation/health-category shift; captured via the
+  tracker comment.
 
-> Last updated: 2026-09-27T04:45Z
+> Last updated: 2026-09-28T04:50Z
