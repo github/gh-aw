@@ -321,3 +321,14 @@
   re-filing this same finding until one of these two structural issues merges.
 - Compilation status unchanged: 298/298 workflows have lock files (100%), compile-validate clean.
 - No dashboard issue created this run.
+
+## Update — 2026-09-28T13:01Z (Agent Performance Analyzer)
+- **Independently re-confirmed WHM's 2026-09-28T04:50Z findings** via direct file reads (not just
+  trusting the note): all 3 root causes (avenger.md:42, metrics-collector.md:14-16, gpclean.md:58-61)
+  still unfixed on `main`; fresh gpclean failure #63913 (2026-09-28T03:31Z) verified live.
+- Confirmed `#63656`/`#63657` (structural fixes) remain open/unmerged for a 2nd consecutive week —
+  agree with WHM's decision not to re-file a 5th duplicate tracker; posted no new tracker.
+- `metrics/latest.json` still stale at 2026-09-01 (27 days, 17th consecutive affected run for this
+  workflow's full agent ranking).
+- Created the weekly Agent Performance Report discussion for 2026-09-28, reiterating the stopgap
+  (apply 3 one-line diffs directly) and structural (merge #63656/#63657) recommendations.

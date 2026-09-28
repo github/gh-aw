@@ -1,3 +1,42 @@
+# Agent Performance Analyzer — Latest Run (2026-09-28T13:01Z)
+
+## Summary
+
+Full agent quality/effectiveness ranking deferred a **17th consecutive run** —
+`metrics/latest.json` remains dated 2026-09-01 (27 days stale). Independently re-verified (direct
+file reads on current `main`, not just shared-memory notes) that all 3 root causes remain unfixed:
+`avenger.md:42` still mounts `/usr/local/bin/npm` as a symlink bind-mount, `metrics-collector.md`'s
+`engine:` block still lacks `model-provider: github` (diffed against working siblings
+`daily-go-test-parallelizer.md` and `api-consumption-report.md`), and `gpclean.md:58-61` still
+hardcodes retired `openai/gpt-5-codex` — the latter producing a **fresh failure today**
+(issue #63913, run 36374058667, all 4 codex retries failed with `retired_model`). Confirmed via
+`issue_read` that `#63556` (3rd tracker) closed `not_planned` at 2026-09-27T06:54:57Z — this is
+now the **4th consecutive self-expiry cycle** for the identical findings, with no successor
+tracker filed yet. Verified `#63656` (extend expires policy) and `#63657` (scoped
+create-pull-request safe-output) both remain open and unmerged for a 2nd consecutive week.
+Searched `search_pull_requests` across all 3 files; found no new merged fix beyond the already-
+known closed-unmerged `#57946`/`#58722` (2026-09-05). Created the weekly Agent Performance Report
+discussion for 2026-09-28, reiterating the stopgap (apply the 3 one-line diffs directly) and the
+structural fix (merge #63656/#63657) recommendations. Did not file a 5th duplicate tracker.
+
+## Actions Taken This Run
+
+- Directly re-read `avenger.md`, `metrics-collector.md`, `gpclean.md` on current `main` and diffed
+  against 2 working sibling workflows to independently confirm all 3 root causes remain unfixed.
+- Confirmed via `issue_read` that `#63556` closed `not_planned` (4th self-expiry) and that no
+  successor tracker exists yet.
+- Confirmed `#63656`/`#63657` (structural fixes) remain open, unmerged, referencing this report
+  series for a 2nd consecutive week.
+- Searched for any merged fix PR across the 3 files; found none new.
+- Created the weekly Agent Performance Report discussion (2026-09-28).
+- Did not file a 5th duplicate root-cause tracker (would self-expire without adding new
+  information beyond #63656/#63657).
+- Full agent quality/effectiveness ranking remains blocked pending the Metrics Collector fix.
+
+> Last updated: 2026-09-28T13:01Z
+
+---
+
 # Agent Performance Analyzer — Latest Run (2026-09-25T12:58Z)
 
 ## Summary
