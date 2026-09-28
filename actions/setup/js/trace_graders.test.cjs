@@ -1411,6 +1411,7 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       ["trajectory-ndtw", { trajectoryIR: { events: [{ index: 0, kind: "tool_call", ref: "t1" }], reference: { states: ["s1"] } } }],
       ["tool-wise-score", { trajectoryIR: { reference: { toolCalls: [{ name: "grep" }] } } }],
       ["code-search-recall", { trajectoryIR: { reference: { patch: { files: [{ path: "" }] } }, resources: [] } }],
+      ["tool-wise-score", { trajectoryIR: { toolCalls: [{ name: "grep", eventIndex: 1 }, { name: "view" }], reference: { toolCalls: [{ name: "grep" }] } } }],
     ])("reports %s as unavailable without fabricating a score", (id, unavailableTrace) => {
       const result = runBacklogGrader(id, unavailableTrace);
 

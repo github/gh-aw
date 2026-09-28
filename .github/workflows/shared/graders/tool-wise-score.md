@@ -33,9 +33,13 @@ graders:
       if (!Array.isArray(ir.toolCalls) || !ir.toolCalls.every(validCall)) {
         return { value: null, passed: null, message: "unavailable: trace lacks well-formed toolCalls" };
       }
+      const indexed = ir.toolCalls.filter(call => Number.isSafeInteger(call.eventIndex) && call.eventIndex >= 0).length;
+      if (indexed !== 0 && indexed !== ir.toolCalls.length) {
+        return { value: null, passed: null, message: "unavailable: toolCalls mix indexed and unindexed entries" };
+      }
       const observed = ir.toolCalls
         .map((call, position) => ({ call, position }))
-        .sort((a, b) => (Number.isFinite(a.call.eventIndex) && Number.isFinite(b.call.eventIndex) ? a.call.eventIndex - b.call.eventIndex : 0) || a.position - b.position)
+        .sort((a, b) => (indexed === 0 ? 0 : a.call.eventIndex - b.call.eventIndex) || a.position - b.position)
         .map(entry => entry.call);
 
       const canonical = value => {
@@ -64,11 +68,13 @@ graders:
 ---
 
 <!--
-tool-wise-score compares the ordered toolCalls[] (sorted by eventIndex) with
+tool-wise-score compares the ordered toolCalls[] (sorted by eventIndex when
+every call has one, otherwise in array order) with
 reference.toolCalls[]. The execution prefix extends while tool names match the
 reference step-for-step. Each prefix step earns 0.5 for the correct tool plus
 0.5 times the fraction of reference argument keys whose values match exactly
 (key-order independent). The score is total credit divided by the reference
 length. Runs without a reference trajectory are not applicable; malformed
-reference or observed tool calls are unavailable.
+reference or observed tool calls, or a mix of indexed and unindexed calls, are
+unavailable.
 -->
