@@ -1883,7 +1883,8 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       for (const id of Object.keys(TRAJECTORY_GRADERS)) {
         const result = runTrajectoryBuiltin(id, {});
         expect(result.status).not.toBe("error");
-        expect(result.status === "unavailable" || result.value === 0).toBe(true);
+        expect(result.status).toBe("unavailable");
+        expect(result.value).toBeNull();
       }
     });
 
@@ -1894,6 +1895,12 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
         expect(result.status).toBe("unavailable");
         expect(result.message).toContain(`states exceeds ${MAX_TRAJECTORY_ITEMS} items`);
       }
+    });
+
+    it("does not treat a long preprocessed toolCalls list as an oversized IR", () => {
+      const toolCalls = Array.from({ length: MAX_TRAJECTORY_ITEMS + 1 }, () => ({ name: "bash", success: true }));
+      const result = runTrajectoryBuiltin("skill-constraint-coverage", { toolCalls }, { constraints: [{ id: "uses-bash", pattern: "bash" }] });
+      expect(result.value).toBe(1);
     });
 
     it("stays cheap at the maximum supported trajectory size", () => {

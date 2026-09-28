@@ -43,6 +43,9 @@ function findOversizedTrajectoryCollection(trace) {
   const candidates = [trace, trace.trajectoryIR, trace.trajectoryIr, trace.ir, agentOutput?.trajectoryIR, agentOutput?.trajectoryIr, agentOutput?.trajectory, agentOutput].filter(isRecord);
   for (const candidate of candidates) {
     for (const key of IR_COLLECTION_KEYS) {
+      // The preprocessed trace.toolCalls list is only scanned linearly (by
+      // skill-constraint-coverage), so a long run must not disable every grader.
+      if (candidate === trace && key === "toolCalls") continue;
       if (Array.isArray(candidate[key]) && candidate[key].length > MAX_TRAJECTORY_ITEMS) return key;
     }
     const reference = candidate.reference;
@@ -414,7 +417,7 @@ function gradeStateRevisitProbabilityRep(trace, config) {
 
   const visited = ordered.length;
   if (visited < 2) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than two state visits" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than two state visits" };
   }
 
   const seen = new Set();
@@ -488,7 +491,7 @@ function gradeRecurrenceDeterminism(trace, config) {
   const sequence = ordered.map(entry => entry.id);
   const n = sequence.length;
   if (n < 4) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than four canonical state visits" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than four canonical state visits" };
   }
 
   // Recurrence matrix R[i][j] = 1 iff sequence[i] === sequence[j] and i !== j
@@ -595,7 +598,7 @@ function gradeRecurrenceLaminarity(trace, config) {
   const sequence = ordered.map(entry => entry.id);
   const n = sequence.length;
   if (n < 4) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than four canonical state visits" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than four canonical state visits" };
   }
 
   // Recurrence matrix R[i][j] = 1 iff sequence[i] === sequence[j] and i !== j
@@ -704,7 +707,7 @@ function gradeRecurrenceTrappingTime(trace, config) {
   const sequence = ordered.map(entry => entry.id);
   const n = sequence.length;
   if (n < 4) {
-    return { value: 0, unit: "steps", passed: null, message: "not applicable: fewer than four canonical state visits" };
+    return { value: null, unit: "steps", passed: null, message: "not applicable: fewer than four canonical state visits" };
   }
 
   // Recurrence matrix R[i][j] = 1 iff sequence[i] === sequence[j] and i !== j
@@ -804,7 +807,7 @@ function gradeRecurrenceRate(trace, config) {
   const sequence = ordered.map(entry => entry.id);
   const n = sequence.length;
   if (n < 2) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than two canonical state visits" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than two canonical state visits" };
   }
 
   // RR = recurrentPoints / (n * (n - 1)), where recurrentPoints counts all
@@ -875,7 +878,7 @@ function gradeEventEntropyRate(trace, config) {
   const sequence = ordered.map(entry => entry.symbol);
   const n = sequence.length;
   if (n < 2) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than two events" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than two events" };
   }
 
   const alphabet = new Set(sequence);
@@ -961,7 +964,7 @@ function gradeLempelZivTrajectoryComplexity(trace, config) {
   const sequence = ordered.map(entry => entry.symbol);
   const n = sequence.length;
   if (n < 2) {
-    return { value: 0, unit: "ratio", passed: null, message: "not applicable: fewer than two events" };
+    return { value: null, unit: "ratio", passed: null, message: "not applicable: fewer than two events" };
   }
 
   const alphabetSize = new Set(sequence).size;
