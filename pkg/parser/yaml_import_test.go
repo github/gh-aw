@@ -134,7 +134,7 @@ jobs:
 		err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
 		require.NoError(t, err, "Should write test workflow file")
 
-		jobs, services, err := processYAMLWorkflowImport(workflowFile)
+		jobs, services, _, err := processYAMLWorkflowImportWithSourceVersions(workflowFile)
 		require.NoError(t, err, "Should process YAML workflow")
 		assert.NotEmpty(t, jobs, "Should extract jobs")
 		assert.Contains(t, jobs, "test", "Should contain test job")
@@ -160,7 +160,7 @@ jobs:
 		err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
 		require.NoError(t, err, "Should write test workflow file")
 
-		jobs, services, err := processYAMLWorkflowImport(workflowFile)
+		jobs, services, _, err := processYAMLWorkflowImportWithSourceVersions(workflowFile)
 		require.NoError(t, err, "Should process YAML workflow")
 		assert.NotEmpty(t, jobs, "Should extract jobs")
 		assert.NotEmpty(t, services, "Should extract services")
@@ -177,7 +177,7 @@ runs:
 		err := os.WriteFile(actionFile, []byte(actionContent), 0644)
 		require.NoError(t, err, "Should write test action file")
 
-		_, _, err = processYAMLWorkflowImport(actionFile)
+		_, _, _, err = processYAMLWorkflowImportWithSourceVersions(actionFile)
 		require.Error(t, err, "Should reject action definition")
 		require.ErrorContains(t, err, "cannot import action definition", "Error should mention action definition")
 	})
@@ -190,7 +190,7 @@ description: This is not a valid workflow`
 		err := os.WriteFile(invalidFile, []byte(invalidContent), 0644)
 		require.NoError(t, err, "Should write test invalid file")
 
-		_, _, err = processYAMLWorkflowImport(invalidFile)
+		_, _, _, err = processYAMLWorkflowImportWithSourceVersions(invalidFile)
 		require.Error(t, err, "Should reject invalid workflow")
 		require.ErrorContains(t, err, "not a valid GitHub Actions workflow", "Error should mention invalid workflow")
 	})
