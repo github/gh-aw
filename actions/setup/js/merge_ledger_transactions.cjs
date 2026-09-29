@@ -38,16 +38,14 @@ const RECORD_ID = /^ldg-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 
 /**
  * Validate one parsed audit entry and return its redacted, normalized form.
- * @param {unknown} entry
+ * @param {any} candidate
  * @returns {Object | null}
  */
-function normalizeEntry(entry) {
-  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-  const candidate = /** @type {Record<string, unknown>} */ entry;
+function normalizeEntry(candidate) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
   if (candidate.type !== "ledger_mutation" || candidate.operation !== "append") return null;
-  const record = candidate.record;
-  if (!record || typeof record !== "object" || Array.isArray(record)) return null;
-  const fields = /** @type {Record<string, unknown>} */ record;
+  const fields = candidate.record;
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return null;
   if (typeof fields.id !== "string" || !RECORD_ID.test(fields.id)) return null;
   if (typeof fields.sha !== "string" || !HASH.test(fields.sha)) return null;
   if (typeof fields.payload_sha !== "string" || !HASH.test(fields.payload_sha)) return null;
