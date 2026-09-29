@@ -104,6 +104,7 @@ func (c *Compiler) buildMainJobDependencies(data *WorkflowData, activationJobCre
 			compilerMainJobLog.Printf("Added direct dependency on custom job '%s' because it's referenced in workflow content or engine.env", jobName)
 		}
 	}
+	data.AgentJobNeeds = depends
 	return depends, engineEnvContent
 }
 
