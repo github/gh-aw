@@ -81,7 +81,7 @@ on:
     inputs:
       aw_context:
         default: ""
-        description: "Agent caller context (used internally by Agentic Workflows). Leave empty when running manually."
+        description: "Agent caller context (Reserved for Agentic Workflows)."
         required: false
         type: string
 
