@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -11,7 +13,8 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 	if IsDetectionJobEnabled(data.SafeOutputs) && threatDetectionEnabled {
 		needs = append(needs, string(constants.DetectionJobName))
 	}
-	steps := append([]string{}, c.generateCheckoutActionsFolder(data)...)
+	steps := append([]string{}, buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), c.getActionPin)...)
+	steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 	steps = append(steps, c.generateSetupStep(data, c.resolveActionReference("./actions/setup", data), SetupActionDestination, false, "", "")...)
 	steps = append(steps,
 		"      - name: Checkout repository\n",
@@ -24,7 +27,9 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
-		"          GH_AW_LEDGER_BRANCH_PREFIX: ledgers/\n",
+		fmt.Sprintf("          GH_AW_LEDGER_TRANSACTIONS: %s%s\n", constants.TmpGhAwDirSlash, constants.SafeOutputsFilename),
+		"          GH_AW_LEDGER_TRANSACTION_ID: ${{ github.run_id }}-${{ github.run_attempt }}\n",
+		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_B64: %s\n", encodeLedgerJobConfig(data.LedgerConfig)),
 		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
@@ -40,4 +45,27 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		Needs:       needs,
 		Steps:       steps,
 	}
+}
+
+func encodeLedgerJobConfig(config *LedgerToolConfig) string {
+	if config == nil {
+		return ""
+	}
+	ledgers := make([]map[string]any, 0, len(config.Ledgers))
+	for _, ledger := range config.Ledgers {
+		ledgers = append(ledgers, map[string]any{
+			"name":         ledger.Name,
+			"schema":       ledger.Schema,
+			"schemaPath":   ledger.SchemaPath,
+			"maxRecordKB":  ledger.MaxRecordKB,
+			"maxSegmentKB": ledger.MaxSegmentKB,
+			"maxPatchKB":   ledger.MaxPatchKB,
+			"branchName":   ledger.BranchName,
+		})
+	}
+	encoded, err := json.Marshal(ledgers)
+	if err != nil {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(encoded)
 }
