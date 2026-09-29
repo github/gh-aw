@@ -337,9 +337,10 @@ func renderConsoleFriction(friction *FrictionCostSummary) {
 	}
 	fmt.Fprintln(os.Stderr, "  friction_drivers:")
 	for _, driver := range friction.Drivers {
-		line := fmt.Sprintf("    %s (%s): occurrences=%d counted=%d state=%s", driver.Driver, driver.Source, driver.Occurrences, driver.CountedOccurrences, driver.State)
-		if driver.State != FrictionStateUnavailable {
-			line += " aic=" + formatAICValue(driver.Cost.AIC)
+		line := fmt.Sprintf("    source=%s driver=%s occurrences=%d counted=%d state=%s",
+			frictionSourceLabel(driver.Source), driver.Driver, driver.Occurrences, driver.CountedOccurrences, driver.State)
+		if cost := frictionCostDetails(driver.Cost, driver.State); cost != "" {
+			line += " " + cost
 		}
 		if driver.SuppressedOccurrences > 0 {
 			line += fmt.Sprintf(" deduped=%d", driver.SuppressedOccurrences)
@@ -355,9 +356,14 @@ func renderConsoleFriction(friction *FrictionCostSummary) {
 			fmt.Fprintf(os.Stderr, "    ... %d more events\n", len(friction.Events)-maxConsoleFrictionEvents)
 			break
 		}
-		line := fmt.Sprintf("    %s: %s x%d [%s]", event.Driver, event.Label, event.Occurrences, event.State)
-		if event.State != FrictionStateUnavailable {
-			line += " aic=" + formatAICValue(event.Cost.AIC)
+		line := fmt.Sprintf("    source=%s driver=%s: %s x%d counted=%d state=%s",
+			frictionSourceLabel(event.Source), event.Driver, event.Label, event.Occurrences, event.CountedOccurrences, event.State)
+		aicState := event.State
+		if event.DimensionStates != nil && event.DimensionStates["aic"] != "" {
+			aicState = event.DimensionStates["aic"]
+		}
+		if cost := frictionCostDetails(event.Cost, aicState); cost != "" {
+			line += " " + cost
 		}
 		if event.SuppressedBy != "" {
 			line += " suppressed-by=" + event.SuppressedBy
@@ -370,6 +376,34 @@ func renderConsoleFriction(friction *FrictionCostSummary) {
 	if friction.EventsTruncated {
 		fmt.Fprintln(os.Stderr, "    (event list truncated during measurement)")
 	}
+}
+
+func frictionSourceLabel(source string) string {
+	if source == "" {
+		return "unknown"
+	}
+	return source
+}
+
+func frictionCostDetails(cost FrictionCost, aicState string) string {
+	var parts []string
+	switch aicState {
+	case FrictionStateMeasured, FrictionStateCausal, FrictionStateStatistical:
+		parts = append(parts, "aic="+formatAICValue(cost.AIC))
+	}
+	if cost.Tokens.Total > 0 {
+		parts = append(parts, fmt.Sprintf("tokens=%d", cost.Tokens.Total))
+	}
+	if cost.Turns > 0 {
+		parts = append(parts, fmt.Sprintf("turns=%d", cost.Turns))
+	}
+	if cost.ToolCalls > 0 {
+		parts = append(parts, fmt.Sprintf("tool-calls=%d", cost.ToolCalls))
+	}
+	if cost.LatencyMS > 0 {
+		parts = append(parts, fmt.Sprintf("latency=%dms", cost.LatencyMS))
+	}
+	return strings.Join(parts, " ")
 }
 
 func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
