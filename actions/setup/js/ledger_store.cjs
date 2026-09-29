@@ -729,7 +729,11 @@ class Ledger {
         }
         throw new Error("Failed to durably append ledger record", { cause: error });
       } finally {
-        fs.closeSync(fd);
+        try {
+          fs.closeSync(fd);
+        } catch {
+          // Closing after fsync must not turn a durable append into a reported failure.
+        }
       }
     } else {
       const staging = path.join(this.shardDir, `${this.writerId}.pending`);
@@ -774,7 +778,11 @@ class Ledger {
     if (this.projection) {
       const previous = this.projection;
       this.projection = null;
-      previous.db.close();
+      try {
+        previous.db.close();
+      } catch {
+        // Projection cleanup must not turn a durable append into a reported failure.
+      }
     }
     try {
       this.auditMutation("append", {
@@ -788,7 +796,11 @@ class Ledger {
         },
       });
     } catch {
-      process.stderr.write("Ledger audit failed after durable append\n");
+      try {
+        process.stderr.write("Ledger audit failed after durable append\n");
+      } catch {
+        // Audit diagnostics are best-effort after the record is durable.
+      }
     }
     return record;
   }

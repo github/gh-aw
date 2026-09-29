@@ -71,7 +71,9 @@ describe("Ledger", () => {
 
   it("acknowledges durable appends when the audit transaction log cannot be written", () => {
     const audited = new Ledger({ memoryDir, transactionLogPath: memoryDir });
-    const warning = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const warning = vi.spyOn(process.stderr, "write").mockImplementation(() => {
+      throw new Error("stderr unavailable");
+    });
     try {
       const record = audited.append("note", { value: 1 });
       expect(audited.get(record.sha)).toEqual(record);
@@ -79,6 +81,49 @@ describe("Ledger", () => {
     } finally {
       warning.mockRestore();
     }
+  });
+
+  it("acknowledges durable appends when closing the writer descriptor fails", () => {
+    const seed = new Ledger({ memoryDir });
+    seed.append("note", { value: 1 });
+    ledger.writerId = seed.writerId;
+    ledger.writerPath = seed.writerPath;
+    let durableFd;
+    const fsyncSync = fs.fsyncSync;
+    const closeSync = fs.closeSync;
+    const sync = vi.spyOn(fs, "fsyncSync").mockImplementation(fd => {
+      fsyncSync(fd);
+      durableFd = fd;
+    });
+    const close = vi.spyOn(fs, "closeSync").mockImplementation(fd => {
+      if (fd === durableFd) throw new Error("close failed");
+      closeSync(fd);
+    });
+    let record;
+    try {
+      record = ledger.append("note", { value: 2 });
+    } finally {
+      close.mockRestore();
+      sync.mockRestore();
+    }
+    expect(ledger.get(record.sha)).toEqual(record);
+    expect(ledger.status().records).toBe(2);
+  });
+
+  it("acknowledges durable appends when closing the cached projection fails", () => {
+    ledger.append("note", { value: 1 });
+    ledger.query();
+    const close = vi.spyOn(ledger.projection.db, "close").mockImplementation(() => {
+      throw new Error("projection close failed");
+    });
+    let record;
+    try {
+      record = ledger.append("note", { value: 2 });
+    } finally {
+      close.mockRestore();
+    }
+    expect(ledger.get(record.sha)).toEqual(record);
+    expect(ledger.status().records).toBe(2);
   });
 
   it("reconstructs concurrent heads, preserves orphan records and quarantines corrupt lines", () => {
