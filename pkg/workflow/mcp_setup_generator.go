@@ -148,7 +148,10 @@ func toolsWithEnclaveGitHubIssues(tools map[string]any, workflowData *WorkflowDa
 	if githubToolRaw, hasGitHub := tools["github"]; hasGitHub && githubToolRaw == false {
 		return updated
 	}
-	githubTool, _ := tools["github"].(map[string]any)
+	githubTool, ok := tools["github"].(map[string]any)
+	if !ok {
+		githubTool = nil
+	}
 	githubConfig := make(map[string]any, len(githubTool))
 	maps.Copy(githubConfig, githubTool)
 	if allowed, ok := githubConfig["allowed"].([]any); ok {

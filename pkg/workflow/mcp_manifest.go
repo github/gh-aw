@@ -74,7 +74,10 @@ func collectGitHubMCPManifestTools(toolValue any) []string {
 		return githubConfig.Allowed.ToStringSlice()
 	}
 
-	githubTool, _ := toolValue.(map[string]any)
+	githubTool, ok := toolValue.(map[string]any)
+	if !ok {
+		githubTool = nil
+	}
 	defaultTools := constants.DefaultGitHubToolsLocal
 	if getGitHubType(githubTool) == GitHubMCPModeRemote {
 		defaultTools = constants.DefaultGitHubToolsRemote

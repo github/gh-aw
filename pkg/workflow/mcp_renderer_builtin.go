@@ -90,9 +90,9 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 	if workflowData != nil {
 		safeOutputsEnvVars = append(safeOutputsEnvVars, sliceutil.SortedKeys(workflowData.SafeOutputsInputEnvVars)...)
 	}
-	quoted := make([]string, len(safeOutputsEnvVars))
-	for i, v := range safeOutputsEnvVars {
-		quoted[i] = "\"" + v + "\""
+	quoted := make([]string, 0, len(safeOutputsEnvVars))
+	for _, v := range safeOutputsEnvVars {
+		quoted = append(quoted, "\""+v+"\"")
 	}
 	yaml.WriteString("          env_vars = [" + strings.Join(quoted, ", ") + "]\n")
 

@@ -68,7 +68,10 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	rawGitHubTool, hasGitHubInTools := tools["github"]
 	githubToolEnabledInTools := hasGitHubInTools && rawGitHubTool != false
 	if hasGitHub {
-		toolConfig, _ := rawGitHubTool.(map[string]any)
+		toolConfig, ok := rawGitHubTool.(map[string]any)
+		if !ok {
+			toolConfig = nil
+		}
 
 		// Check if GitHub App is configured for token minting
 		appConfigured := hasGitHubApp(toolConfig)

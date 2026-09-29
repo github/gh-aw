@@ -11,6 +11,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -118,7 +119,7 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig, workflowID 
 			ledgerEnabled = ledgerEnabled || memory.Ledger != nil
 		}
 		if ledgerEnabled && len(memories) != 1 {
-			return nil, fmt.Errorf("tools.repo-memory.ledger requires exactly one repo-memory entry")
+			return nil, errors.New("tools.repo-memory.ledger requires exactly one repo-memory entry")
 		}
 		config.Memories = memories
 		return config, nil
@@ -142,9 +143,10 @@ func (config *RepoMemoryConfig) ledgerEntry() *RepoMemoryEntry {
 	if config == nil {
 		return nil
 	}
-	for i := range config.Memories {
-		if config.Memories[i].Ledger != nil {
-			return &config.Memories[i]
+	for _, memory := range config.Memories {
+		if memory.Ledger != nil {
+			entry := memory
+			return &entry
 		}
 	}
 	return nil
@@ -241,14 +243,14 @@ func parseRepoMemoryEntry(memoryMap map[string]any, workflowID, branchPrefix str
 			return RepoMemoryEntry{}, err
 		}
 		if !repoMemoryLedgerIDPattern.MatchString(entry.ID) {
-			return RepoMemoryEntry{}, fmt.Errorf("tools.repo-memory.ledger requires a memory id with only letters, numbers, hyphens or underscores")
+			return RepoMemoryEntry{}, errors.New("tools.repo-memory.ledger requires a memory id with only letters, numbers, hyphens or underscores")
 		}
 		hasJSONLExtension := false
 		for _, ext := range entry.AllowedExtensions {
 			hasJSONLExtension = hasJSONLExtension || strings.EqualFold(ext, ".jsonl")
 		}
 		if len(entry.AllowedExtensions) > 0 && !hasJSONLExtension {
-			return RepoMemoryEntry{}, fmt.Errorf("tools.repo-memory.ledger requires .jsonl in allowed-extensions to persist ledger records")
+			return RepoMemoryEntry{}, errors.New("tools.repo-memory.ledger requires .jsonl in allowed-extensions to persist ledger records")
 		}
 		if len(entry.FileGlob) > 0 && !slices.Contains(entry.FileGlob, "ledger/shards/*.jsonl") {
 			entry.FileGlob = append(entry.FileGlob, "ledger/shards/*.jsonl")

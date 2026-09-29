@@ -161,7 +161,10 @@ func RenderJSONMCPConfig( //nolint:largefunc // Existing renderer keeps MCP JSON
 
 		switch toolName {
 		case "github":
-			githubTool, _ := tools["github"].(map[string]any)
+			githubTool, ok := tools["github"].(map[string]any)
+			if !ok {
+				githubTool = nil
+			}
 			options.Renderers.RenderGitHub(&configBuilder, githubTool, isLast, workflowData)
 		case "cache-memory":
 			options.Renderers.RenderCacheMemory(&configBuilder, isLast, workflowData)

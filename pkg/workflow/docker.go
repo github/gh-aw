@@ -151,7 +151,10 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 						// Extract container image from docker args
 						// Args format: ["run", "--rm", "-i", ... , "container-image"]
 						// The container image is the last arg
-						image := mcpConf.Args[len(mcpConf.Args)-1]
+						var image string
+						for _, arg := range mcpConf.Args {
+							image = arg
+						}
 						// Skip if it's a docker flag (starts with -)
 						if !strings.HasPrefix(image, "-") && !setutil.Contains(imageSet, image) {
 							images = append(images, image)
@@ -201,26 +204,26 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 // Returns both the resolved image strings (for script args) and full GHAWManifestContainer
 // entries (for the manifest).
 func applyContainerPins(images []string, workflowData *WorkflowData) ([]string, []GHAWManifestContainer) {
-	result := make([]string, len(images))
-	pins := make([]GHAWManifestContainer, len(images))
+	result := make([]string, 0, len(images))
+	pins := make([]GHAWManifestContainer, 0, len(images))
 
 	var cache *ActionCache
 	if workflowData != nil {
 		cache = workflowData.ActionCache
 	}
 
-	for i, img := range images {
+	for _, img := range images {
 		// Apply container_pins mapping from aw.json before digest resolution so that
 		// redirected registries are pre-downloaded and recorded in the manifest.
 		img = applyContainerPinMappingFromData(img, workflowData)
 		if pin, ok := lookupContainerPin(img, cache); ok && pin.PinnedImage != "" {
-			result[i] = pin.PinnedImage
-			pins[i] = GHAWManifestContainer(pin)
+			result = append(result, pin.PinnedImage)
+			pins = append(pins, GHAWManifestContainer(pin))
 			dockerLog.Printf("Pinned container image: %s -> %s", img, pin.PinnedImage)
 			continue
 		}
-		result[i] = img
-		pins[i] = GHAWManifestContainer{Image: img}
+		result = append(result, img)
+		pins = append(pins, GHAWManifestContainer{Image: img})
 
 		// gh-aw-firewall images that fail to resolve a digest pin are the most
 		// security-load-bearing containers (they confine the agent sandbox), so
