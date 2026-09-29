@@ -434,3 +434,7 @@ directly as a stopgap.
   snapshot.
 
 > Last updated: 2026-09-27T12:58Z
+
+## Run 2026-09-29T12:58Z
+Metrics still stale (latest.json = 2026-09-01, 28 days; 18th consecutive deferred run). No new evidence
+to change root causes; ranking deferred. No new issue filed (avoid 5th duplicate tracker cycle).
