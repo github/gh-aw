@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +44,14 @@ type LedgerToolConfig struct {
 func (c *LedgerToolConfig) Enabled() bool { return c != nil && len(c.Ledgers) > 0 }
 
 func ledgerBranchName(name string) string { return "ledgers/" + name }
+
+func encodeLedgerConfigBase64(config *LedgerToolConfig) (string, error) {
+	encoded, err := json.Marshal(config.Ledgers)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize ledger configuration: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(encoded), nil
+}
 
 func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 	if raw == nil {
@@ -209,9 +218,11 @@ func resolveLedgerSchemas(config *LedgerToolConfig, markdownDir string) error {
 	if err != nil {
 		return err
 	}
-	for i := range config.Ledgers {
-		ledger := &config.Ledgers[i]
+	resolvedLedgers := make([]LedgerConfig, 0, len(config.Ledgers))
+	for _, definition := range config.Ledgers {
+		ledger := definition
 		if ledger.SchemaPath == "" {
+			resolvedLedgers = append(resolvedLedgers, ledger)
 			continue
 		}
 		fullPath := filepath.Join(root, filepath.Clean(ledger.SchemaPath))
@@ -239,7 +250,9 @@ func resolveLedgerSchemas(config *LedgerToolConfig, markdownDir string) error {
 			return fmt.Errorf("tools.ledger.%s.schema: %w", ledger.Name, err)
 		}
 		ledger.Schema = schema
+		resolvedLedgers = append(resolvedLedgers, ledger)
 	}
+	config.Ledgers = resolvedLedgers
 	return nil
 }
 

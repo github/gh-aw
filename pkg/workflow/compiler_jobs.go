@@ -571,7 +571,10 @@ func (c *Compiler) buildPushLedgerChangesJobWrapper(data *WorkflowData, threatDe
 	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
 		return "", nil
 	}
-	job := c.buildPushLedgerChangesJob(data, threatDetectionEnabled)
+	job, err := c.buildPushLedgerChangesJob(data, threatDetectionEnabled)
+	if err != nil {
+		return "", fmt.Errorf("push_ledger_changes job could not be built: %w", err)
+	}
 	if err := c.jobManager.AddJob(job); err != nil {
 		return "", fmt.Errorf("push_ledger_changes job could not be added: %w", err)
 	}
