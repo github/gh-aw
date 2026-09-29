@@ -3,7 +3,7 @@
 
 const { AGENT_LOGIN_NAMES, getAgentLogins, getAvailableAgentLogins, findAgent, getIssueDetails, getPullRequestDetails, assignAgentToIssue, generatePermissionErrorSummary, resolveReasoningEffort } = require("./assign_agent_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
+const { resolveTarget, isStagedMode, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { generateStagedPreview } = require("./staged_preview.cjs");
 const { isTemporaryId, normalizeTemporaryId, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { sleep } = require("./error_recovery.cjs");
@@ -168,6 +168,7 @@ async function main(config = {}) {
           .map(a => a.trim())
           .filter(Boolean)
     : null;
+  const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const allowedPullRequestRepos = parseAllowedRepos(config["allowed-pull-request-repos"]);
 
@@ -184,6 +185,7 @@ async function main(config = {}) {
   core.info(`Target configuration: ${targetConfig}`);
   core.info(`Max count: ${maxCount}`);
   core.info(`Issue intent enabled: ${issueIntentEnabled}`);
+  if (requiredLabels.length > 0) core.info(`Required labels (all): ${requiredLabels.join(", ")}`);
   if (ignoreIfError) core.info("Ignore-if-error mode enabled: Will not fail if agent assignment encounters auth or availability errors");
   if (allowedAgents) core.info(`Allowed agents: ${allowedAgents.join(", ")}`);
   core.info(`Default target repo: ${defaultTargetRepo}`);
@@ -475,6 +477,9 @@ async function main(config = {}) {
         allResults.push({ issue_number: issueNumber, pull_number: pullNumber, agent: agentName, owner: effectiveOwner, repo: effectiveRepo, pull_request_repo: effectivePullRequestRepoSlug, success: true });
         return { success: true };
       }
+
+      const filterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
+      if (filterResult) return filterResult;
 
       core.info(`Assigning ${agentName} coding agent to ${type} #${number}...`);
       if (model) core.info(`Using model: ${model}`);

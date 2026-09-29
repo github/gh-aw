@@ -9666,6 +9666,13 @@
                   "type": ["string", "number"],
                   "description": "Target issue/PR to assign agents to. Use 'triggering' (default) for the triggering issue/PR, '*' to require explicit issue_number/pull_number, or a specific issue/PR number. With 'triggering', auto-resolves from github.event.issue.number or github.event.pull_request.number."
                 },
+                "required-labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Only assign an agent if all these labels are currently present on the target issue or pull request."
+                },
                 "target-repo": {
                   "type": "string",
                   "description": "Target repository in format 'owner/repo' for cross-repository agent assignment. Takes precedence over trial target repo settings."

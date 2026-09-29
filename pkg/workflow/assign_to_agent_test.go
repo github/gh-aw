@@ -79,6 +79,28 @@ safe-outputs:
 	}
 }
 
+func TestAssignToAgentRequiredLabels(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "assign-to-agent-required-labels")
+	workflow := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  assign-to-agent:
+    required-labels: [copilot-ready, maintainer-approved]
+---
+# Test Workflow
+`
+	testFile := filepath.Join(tmpDir, "test-assign-to-agent.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(workflow), 0644))
+
+	workflowData, err := NewCompiler(WithVersion("1.0.0")).ParseWorkflowFile(testFile)
+	require.NoError(t, err)
+	require.NotNil(t, workflowData.SafeOutputs.AssignToAgent)
+	assert.Equal(t, []string{"copilot-ready", "maintainer-approved"}, workflowData.SafeOutputs.AssignToAgent.RequiredLabels)
+}
+
 func TestAssignToAgentReasoningEffortRejectsNonString(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "assign-to-agent-reasoning-effort-invalid")
 	workflow := `---

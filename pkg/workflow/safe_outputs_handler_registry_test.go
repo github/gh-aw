@@ -140,6 +140,21 @@ func TestHandlerRegistryBuilders(t *testing.T) {
 	}
 }
 
+func TestAssignToAgentHandlerIncludesRequiredLabels(t *testing.T) {
+	builder := handlerRegistry["assign_to_agent"]
+	config := &SafeOutputsConfig{
+		AssignToAgent: &AssignToAgentConfig{
+			RequiredLabels: []string{"copilot-ready"},
+		},
+	}
+
+	got := builder(config)
+
+	if !reflect.DeepEqual(got["required_labels"], []string{"copilot-ready"}) {
+		t.Fatalf("required_labels = %v, want [copilot-ready]", got["required_labels"])
+	}
+}
+
 func TestMergeHandlerMapsKeepsFirstDuplicateKey(t *testing.T) {
 	first := func(*SafeOutputsConfig) map[string]any { return map[string]any{"source": "first"} }
 	second := func(*SafeOutputsConfig) map[string]any { return map[string]any{"source": "second"} }
