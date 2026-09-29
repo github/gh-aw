@@ -7,5 +7,14 @@
     "experiment_name": "remove_redundant_context_v1",
     "pr_or_issue": "issue",
     "decision": null
+  },
+  {
+    "date": "2026-09-29",
+    "workflow_id": "pr-sous-chef",
+    "primary_dimension": "tool interaction",
+    "subtype": "retry_policy",
+    "experiment_name": "retry_policy_v1",
+    "pr_or_issue": "issue",
+    "decision": null
   }
 ]
