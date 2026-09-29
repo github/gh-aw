@@ -152,7 +152,9 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 		return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	requireSelfHostedRunners = requireSelfHostedRunners || c.requireSelfHosted
-	if repoConfig, err := c.loadRepoConfig(); err == nil && repoConfig != nil {
+	if repoConfig, err := c.loadRepoConfig(); err != nil {
+		return "", nil, nil, formatCompilerError(markdownPath, "error", fmt.Sprintf("failed to load aw.json: %v", err), err)
+	} else if repoConfig != nil {
 		requireSelfHostedRunners = requireSelfHostedRunners || repoConfig.RequireSelfHostedRunners
 	}
 

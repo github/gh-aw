@@ -76,7 +76,7 @@ func TestManager_ResolveRequireSelfHostedRunners(t *testing.T) {
 	}{
 		{name: "true enables enforcement", value: "true", want: true},
 		{name: "case-insensitive true", value: " TRUE ", want: true},
-		{name: "false disables enforcement"},
+		{name: "false disables enforcement", value: "false"},
 		{name: "invalid value errors", value: "yes", wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

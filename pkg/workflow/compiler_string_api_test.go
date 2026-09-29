@@ -363,6 +363,37 @@ Greet the user warmly.
 	assert.Contains(t, err.Error(), "self-hosted runner enforcement")
 }
 
+func TestCompileToYAML_RequiresValidRepoConfig(t *testing.T) {
+	t.Setenv(compilerenv.RequireSelfHostedRunners, "")
+	gitRoot := t.TempDir()
+	writeAWJSON(t, gitRoot, `{"require_self_hosted_runners":}`)
+
+	markdown := `---
+name: compile-runner-invalid-repo-config-test
+on:
+  workflow_dispatch:
+engine: copilot
+runs-on: self-hosted
+---
+
+# Mission
+
+Greet the user warmly.
+`
+
+	compiler := NewCompiler(
+		WithNoEmit(true),
+		WithSkipValidation(true),
+	)
+	compiler.gitRoot = gitRoot
+	workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+	require.NoError(t, err)
+
+	_, err = compiler.CompileToYAML(workflowData, "workflow.md")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load aw.json")
+}
+
 func TestCompileToYAML_GHESCompatPinsStringAPI(t *testing.T) {
 	markdown := `---
 name: ghes-string-api
