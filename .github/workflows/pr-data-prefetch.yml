@@ -40,17 +40,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/gh-aw/agent
-          set +e
-          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --exclude '**/*.lock.yml' \
-            --exclude '**/generated/**' \
-            --exclude '**/dist/**' \
-            --exclude '**/build/**' \
-            > /tmp/gh-aw/agent/pr-diff.full 2> /tmp/gh-aw/agent/pr-diff.err
-          DIFF_EXIT=$?
-          set -e
-          if [ "$DIFF_EXIT" -ne 0 ]; then
-            echo "::error::gh pr diff failed for PR #${PR_NUMBER} (exit ${DIFF_EXIT}): $(cat /tmp/gh-aw/agent/pr-diff.err)" >&2
+          # Filter generated files before assembling the patch; the whole-PR
+          # diff endpoint rejects PRs with more than 300 files.
+          if ! gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | select(.filename | test("(^|/)(generated|dist|build)/|\\.lock\\.yml$|^\\.changeset/[^/]+\\.md$|^\\.github/aw/(github-agentic-workflows\\.md|imports/)|^pkg/cli/templates/(campaign-[^/]*|create-agentic-workflow)\\.md$|^pkg/workflow/(js/[^/]+\\.(js|cjs)|sh/[^/]+\\.sh|\\.github/aw/imports/)|^actions/([^/]+/index\\.js|setup-cli/install\\.(sh|ps1))$|^specs/artifacts\\.md$") | not) | select(.patch != null) | "diff --git a/\(.previous_filename // .filename) b/\(.filename)\n" + (if .status == "added" then "new file mode 100644\n--- /dev/null\n+++ b/\(.filename)\n" elif .status == "removed" then "deleted file mode 100644\n--- a/\(.filename)\n+++ /dev/null\n" else "--- a/\(.previous_filename // .filename)\n+++ b/\(.filename)\n" end) + .patch + "\n"' \
+            > /tmp/gh-aw/agent/pr-diff.full 2> /tmp/gh-aw/agent/pr-diff.err; then
+            echo "::error::Failed to fetch files for PR #${PR_NUMBER}: $(cat /tmp/gh-aw/agent/pr-diff.err)" >&2
             rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err
             exit 1
           fi

@@ -344,11 +344,42 @@ func TestRenderConsoleFrictionShowsAggregateAndEvents(t *testing.T) {
 		"friction: occurrences=3",
 		"state=statistical",
 		"friction_drivers:",
-		"mcp_tool_error (mcp_gateway): occurrences=1 counted=1 state=causal",
-		"session_tool_failure (agent_session): occurrences=3 counted=2 state=statistical",
+		"source=mcp_gateway driver=mcp_tool_error occurrences=1 counted=1 state=causal aic=0.5 tokens=128 tool-calls=1 latency=250ms",
+		"source=agent_session driver=session_tool_failure occurrences=3 counted=2 state=statistical aic=0.75 tokens=128 tool-calls=2",
 		"friction_events:",
-		"github/issue_read",
+		"source=mcp_gateway driver=mcp_tool_error: github/issue_read x1 counted=1 state=causal aic=0.5 tokens=128 tool-calls=1 latency=250ms",
 		"suppressed-by=causal-group:tool_failure",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("console output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRenderConsoleFrictionAttributesCostsToSource(t *testing.T) {
+	friction := &FrictionCostSummary{
+		Drivers: []FrictionDriverSummary{{
+			Driver:             "firewall_block",
+			Source:             "firewall",
+			Occurrences:        2,
+			CountedOccurrences: 2,
+			State:              FrictionStateStatistical,
+			Cost:               FrictionCost{AIC: 0.25, Tokens: FrictionTokens{Total: 64}},
+		}},
+		Events: []FrictionEvent{{
+			Driver:             "firewall_block",
+			Source:             "firewall",
+			Label:              "blocked.example",
+			Occurrences:        2,
+			CountedOccurrences: 2,
+			State:              FrictionStateStatistical,
+			Cost:               FrictionCost{AIC: 0.25, Tokens: FrictionTokens{Total: 64}},
+		}},
+	}
+	output := captureFrictionStderr(t, func() { renderConsoleFriction(friction) })
+	for _, want := range []string{
+		"source=firewall driver=firewall_block occurrences=2 counted=2 state=statistical aic=0.25 tokens=64",
+		"source=firewall driver=firewall_block: blocked.example x2 counted=2 state=statistical aic=0.25 tokens=64",
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("console output missing %q:\n%s", want, output)
@@ -396,6 +427,12 @@ func TestAuditDataSerializesFriction(t *testing.T) {
 	}
 	if len(decoded.Friction.Events) != 2 {
 		t.Errorf("expected event-level detail in audit JSON, got %d events", len(decoded.Friction.Events))
+	}
+	if decoded.Friction.Drivers[0].Source != "mcp_gateway" || decoded.Friction.Drivers[0].Cost.AIC != 0.5 {
+		t.Errorf("audit JSON must retain source-attributed driver cost: %+v", decoded.Friction.Drivers[0])
+	}
+	if decoded.Friction.Events[0].Source != "mcp_gateway" || decoded.Friction.Events[0].Cost.AIC != 0.5 {
+		t.Errorf("audit JSON must retain source-attributed event cost: %+v", decoded.Friction.Events[0])
 	}
 	if _, duplicated := decoded.Metrics["friction"]; duplicated {
 		t.Error("friction must be serialized once, at the top level")
