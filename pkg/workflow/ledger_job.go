@@ -8,7 +8,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetectionEnabled bool) *Job {
+func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) {
 	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName), "safe_outputs"}
 	if IsDetectionJobEnabled(data.SafeOutputs) && threatDetectionEnabled {
 		needs = append(needs, string(constants.DetectionJobName))
@@ -24,7 +24,10 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
 		"          path: ${{ runner.temp }}/gh-aw\n",
 	)
-	ledgerConfig, _ := json.Marshal(data.LedgerConfig.Ledgers)
+	ledgerConfig, err := json.Marshal(data.LedgerConfig.Ledgers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode ledger persistence configuration: %w", err)
+	}
 	steps = append(steps,
 		"      - name: Checkout repository\n",
 		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
@@ -52,5 +55,5 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		Permissions: "permissions:\n      contents: write",
 		Needs:       needs,
 		Steps:       steps,
-	}
+	}, nil
 }

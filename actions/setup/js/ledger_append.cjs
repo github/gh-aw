@@ -32,7 +32,12 @@ async function main(config = {}) {
     }
     const file = transactionPath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `${JSON.stringify(artifact)}\n`, { mode: 0o600 });
+    const descriptor = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o600);
+    try {
+      fs.writeFileSync(descriptor, `${JSON.stringify(artifact)}\n`);
+    } finally {
+      fs.closeSync(descriptor);
+    }
   };
 
   return handleLedgerAppend;

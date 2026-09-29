@@ -48,3 +48,24 @@ test("rejects invalid records at finalization", async () => {
   await handler({ record: { other: true } });
   assert.throws(() => handler.finalize(), /does not match schema/);
 });
+
+test("does not follow a symlink when writing the transaction artifact", async () => {
+  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-symlink-"));
+  const previousRunnerTemp = process.env.RUNNER_TEMP;
+  const target = path.join(runnerTemp, "target");
+  process.env.RUNNER_TEMP = runnerTemp;
+  try {
+    fs.mkdirSync(path.dirname(transactionPath()), { recursive: true });
+    fs.writeFileSync(target, "unchanged");
+    fs.symlinkSync(target, transactionPath());
+    const handler = await main({ ledgers: [{ name: "findings" }] });
+    await handler({ record: { subject: "attempt" } });
+
+    assert.throws(() => handler.finalize(), /ELOOP|symbolic link/i);
+    assert.equal(fs.readFileSync(target, "utf8"), "unchanged");
+  } finally {
+    if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previousRunnerTemp;
+    fs.rmSync(runnerTemp, { recursive: true, force: true });
+  }
+});

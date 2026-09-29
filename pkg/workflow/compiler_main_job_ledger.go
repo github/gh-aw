@@ -7,11 +7,14 @@ import (
 	"strings"
 )
 
-func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *WorkflowData) {
+func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *WorkflowData) error {
 	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
-		return
+		return nil
 	}
-	ledgerConfig, _ := json.Marshal(data.LedgerConfig.Ledgers)
+	ledgerConfig, err := json.Marshal(data.LedgerConfig.Ledgers)
+	if err != nil {
+		return fmt.Errorf("failed to encode ledger projection configuration: %w", err)
+	}
 	yaml.WriteString("      - name: Create read-only ledger projections\n")
 	yaml.WriteString("        id: ledger_projections\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
@@ -24,4 +27,5 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('" + SetupActionDestination + "/create_ledger_projection.cjs');\n")
 	yaml.WriteString("            await main({ githubClient: github, owner: context.repo.owner, repo: context.repo.repo });\n")
+	return nil
 }

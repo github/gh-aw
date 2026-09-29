@@ -14,7 +14,9 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	if err != nil {
 		return err
 	}
-	c.generateLedgerProjectionStep(yaml, data)
+	if err := c.generateLedgerProjectionStep(yaml, data); err != nil {
+		return err
+	}
 	compilerYamlLog.Printf("Initial and checkout steps generated (needsCheckout=%v)", needsCheckout)
 
 	for _, line := range generateComponentExecutionEvidenceStep("agent", "not_started", agentExecutionEvidencePath, "") {
