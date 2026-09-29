@@ -36,6 +36,20 @@ describe("Ledger", () => {
     expect(() => ledger.append("note", { missing: undefined })).toThrow();
   });
 
+  it("serializes successful agent mutations to the safe-output transaction log", () => {
+    const transactionLogPath = path.join(memoryDir, "safe-output-items.jsonl");
+    const audited = new Ledger({ memoryDir, transactionLogPath, clock: () => new Date("2026-09-29T00:00:00.000Z") });
+    const record = audited.append("note", { secret: "not copied into the audit event" });
+    const entry = JSON.parse(fs.readFileSync(transactionLogPath, "utf8"));
+    expect(entry).toMatchObject({
+      type: "ledger_mutation",
+      operation: "append",
+      timestamp: "2026-09-29T00:00:00.000Z",
+      record: { id: record.id, type: "note", sha: record.sha, payload_sha: sha256(record.payload) },
+    });
+    expect(JSON.stringify(entry)).not.toContain("not copied into the audit event");
+  });
+
   it("reconstructs concurrent heads, preserves orphan records and quarantines corrupt lines", () => {
     const first = ledger.append("note", { branch: "base" });
     const other = new Ledger({ memoryDir });

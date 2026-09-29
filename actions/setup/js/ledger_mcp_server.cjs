@@ -67,6 +67,7 @@ function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPa
     maxSegmentBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_SEGMENT_KB),
     maxRecordBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_RECORD_KB),
     maxPatchBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_PATCH_KB),
+    transactionLogPath: process.env.GH_AW_LEDGER_TRANSACTION_LOG || "/tmp/gh-aw/safe-output-items.jsonl",
   });
   const server = createServer({ name: "ledger", version: "1.0.0" });
 

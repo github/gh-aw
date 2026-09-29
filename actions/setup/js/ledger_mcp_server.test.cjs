@@ -12,12 +12,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function withMemory(test) {
   const memoryDir = mkdtempSync(path.join(__dirname, ".ledger-mcp-test-"));
   const priorRunId = process.env.GITHUB_RUN_ID;
+  const priorTransactionLog = process.env.GH_AW_LEDGER_TRANSACTION_LOG;
   process.env.GITHUB_RUN_ID = "991";
+  process.env.GH_AW_LEDGER_TRANSACTION_LOG = path.join(memoryDir, "safe-output-items.jsonl");
   try {
     test(memoryDir);
   } finally {
     if (priorRunId === undefined) delete process.env.GITHUB_RUN_ID;
     else process.env.GITHUB_RUN_ID = priorRunId;
+    if (priorTransactionLog === undefined) delete process.env.GH_AW_LEDGER_TRANSACTION_LOG;
+    else process.env.GH_AW_LEDGER_TRANSACTION_LOG = priorTransactionLog;
     rmSync(memoryDir, { recursive: true, force: true });
   }
 }
@@ -37,6 +41,11 @@ describe("ledger MCP server", () => {
       expect(Object.keys(server.tools).sort()).toEqual(["ledger_append", "ledger_get", "ledger_query", "ledger_status"]);
       const append = output(invoke(server, "ledger_append", { type: "build", payload: { ok: true, score: 5, label: "alpha" } }));
       expect(append.id).toEqual(expect.any(String));
+      expect(JSON.parse(readFileSync(path.join(memoryDir, "safe-output-items.jsonl"), "utf8"))).toMatchObject({
+        type: "ledger_mutation",
+        operation: "append",
+        record: { id: append.id, sha: append.sha },
+      });
       expect(output(invoke(server, "ledger_get", { id: append.id }))).toEqual(append);
       expect(output(invoke(server, "ledger_get", { sha: append.sha }))).toEqual(append);
       expect(invoke(server, "ledger_get", {}).isError).toBe(true);

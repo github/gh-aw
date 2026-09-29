@@ -211,8 +211,18 @@ function sqlPayloadFilter(filters, type) {
 }
 
 class Ledger {
-  /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, maxSegmentBytes?: number, maxRecordBytes?: number, clock?: () => Date, excludeSegments?: string[]}} [options] */
-  constructor({ memoryDir, schemaPath, maxFiles = MAX_FILES, maxPatchBytes = DEFAULT_PATCH_BYTES, maxSegmentBytes = DEFAULT_SEGMENT_BYTES, maxRecordBytes = MAX_RECORD_BYTES, clock = () => new Date(), excludeSegments = [] } = {}) {
+  /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, maxSegmentBytes?: number, maxRecordBytes?: number, clock?: () => Date, excludeSegments?: string[], transactionLogPath?: string}} [options] */
+  constructor({
+    memoryDir,
+    schemaPath,
+    maxFiles = MAX_FILES,
+    maxPatchBytes = DEFAULT_PATCH_BYTES,
+    maxSegmentBytes = DEFAULT_SEGMENT_BYTES,
+    maxRecordBytes = MAX_RECORD_BYTES,
+    clock = () => new Date(),
+    excludeSegments = [],
+    transactionLogPath,
+  } = {}) {
     if (typeof memoryDir !== "string" || !memoryDir.trim()) throw new TypeError("memoryDir is required");
     if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || maxFiles > MAX_FILES) throw new RangeError("Invalid maxFiles");
     if (!Number.isSafeInteger(maxSegmentBytes) || maxSegmentBytes < 1 || maxSegmentBytes > MAX_SEGMENT_BYTES) throw new RangeError("Invalid maxSegmentBytes");
@@ -229,10 +239,38 @@ class Ledger {
     this.writerId = crypto.randomUUID();
     this.writerPath = path.join(this.shardDir, `${this.writerId}.jsonl`);
     this.excludeSegments = new Set(excludeSegments);
+    this.transactionLogPath = transactionLogPath;
     this.authorizedCoverage = new Set();
     /** @type {{db: import("node:sqlite").DatabaseSync, fingerprint: string} | null} */
     this.projection = null;
     if (schemaPath !== undefined) this.validate = compileSchema(schemaPath);
+  }
+
+  auditMutation(operation, details) {
+    if (!this.transactionLogPath) return;
+    if (typeof this.transactionLogPath !== "string" || !this.transactionLogPath.trim()) {
+      throw new TypeError("Invalid ledger transaction log");
+    }
+    try {
+      if (fs.lstatSync(this.transactionLogPath).isSymbolicLink()) throw new TypeError("Invalid ledger transaction log");
+    } catch (error) {
+      if (error && typeof error === "object" && Reflect.get(error, "code") !== "ENOENT") throw error;
+    }
+    const entry = {
+      type: "ledger_mutation",
+      operation,
+      timestamp: this.clock().toISOString(),
+      ...details,
+    };
+    const directory = path.dirname(this.transactionLogPath);
+    fs.mkdirSync(directory, { recursive: true });
+    const fd = fs.openSync(this.transactionLogPath, fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | (fs.constants.O_NOFOLLOW || 0), 0o600);
+    try {
+      fs.writeFileSync(fd, `${canonicalJSON(entry)}\n`);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
   }
 
   segmentPath(id) {
@@ -712,6 +750,16 @@ class Ledger {
       this.projection = null;
       previous.db.close();
     }
+    this.auditMutation("append", {
+      record: {
+        id: record.id,
+        type: record.type,
+        timestamp: record.timestamp,
+        parents: record.parents,
+        sha: record.sha,
+        payload_sha: sha256(record.payload),
+      },
+    });
     return record;
   }
 
