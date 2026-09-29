@@ -1,4 +1,4 @@
 {
-  "caveman": "no",
-  "subagent_model": "large"
+  "caveman": "yes",
+  "subagent_model": "small"
 }
