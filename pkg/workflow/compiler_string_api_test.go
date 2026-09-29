@@ -3,8 +3,10 @@
 package workflow
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -287,6 +289,46 @@ Greet the user warmly.
 	assert.Contains(t, yaml, "name:")
 	assert.Contains(t, yaml, "on:")
 	assert.Contains(t, yaml, "jobs:")
+}
+
+func TestCompileToYAML_RequiresSelfHostedRunners(t *testing.T) {
+	t.Setenv(compilerenv.RequireSelfHostedRunners, "true")
+	markdown := `---
+name: compile-runner-policy-test
+on:
+  workflow_dispatch:
+engine: copilot
+runs-on: self-hosted
+---
+
+# Mission
+
+Greet the user warmly.
+`
+
+	compiler := NewCompiler(
+		WithNoEmit(true),
+		WithSkipValidation(true),
+	)
+	workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+	require.NoError(t, err)
+
+	_, err = compiler.CompileToYAML(workflowData, "workflow.md")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ubuntu-slim")
+	assert.Contains(t, err.Error(), "self-hosted runner")
+
+	markdown = strings.Replace(markdown, "runs-on: self-hosted\n", "runs-on: self-hosted\nruns-on-slim: self-hosted\n", 1)
+	compiler = NewCompiler(
+		WithNoEmit(true),
+		WithSkipValidation(true),
+	)
+	workflowData, err = compiler.ParseWorkflowString(markdown, "workflow.md")
+	require.NoError(t, err)
+
+	compiledYAML, err := compiler.CompileToYAML(workflowData, "workflow.md")
+	require.NoError(t, err)
+	assert.Contains(t, compiledYAML, "runs-on: self-hosted")
 }
 
 func TestCompileToYAML_GHESCompatPinsStringAPI(t *testing.T) {

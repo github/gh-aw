@@ -172,6 +172,24 @@ gh variable set GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST \
 See [Runtime Policy Variables](/gh-aw/reference/environment-variables/#runtime-policy-variables)
 for the complete list of `GH_AW_POLICY_*` variables.
 
+## Compile-Time Runner Enforcement
+
+Set `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` to `true` in the trusted compiler process to make `gh aw compile` fail unless every generated job selects a self-hosted runner. The check examines the compiled workflow, so it also catches GitHub-hosted runners selected by defaults when a runner key is omitted.
+
+```yaml title="Required compile check"
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile workflows
+        env:
+          GH_AW_REQUIRE_SELF_HOSTED_RUNNERS: "true"
+        run: gh aw compile
+```
+
+The compiler accepts an explicit `self-hosted` label or a runner group as evidence of self-hosted selection; custom labels without either are rejected. To enforce this organization- or enterprise-wide, make the centrally managed compile check required through a ruleset. This is a compile-time setting and is not managed by `gh aw env`.
+
 ---
 
 ## Pull request rulesets for agentic workflow injection
