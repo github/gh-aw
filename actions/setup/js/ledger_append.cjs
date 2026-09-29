@@ -31,12 +31,22 @@ async function main(config = {}) {
       artifact.ledgers[append.ledger].appends.push(append);
     }
     const file = transactionPath();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const descriptor = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW, 0o600);
+    const directory = path.dirname(file);
     try {
-      fs.writeFileSync(descriptor, `${JSON.stringify(artifact)}\n`);
+      fs.mkdirSync(directory, { recursive: true });
+    } catch (error) {
+      throw new Error("Failed to create ledger artifact directory", { cause: error });
+    }
+    if (!fs.lstatSync(directory).isDirectory()) throw new TypeError("Ledger artifact directory must be a real directory");
+    const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
+    try {
+      try {
+        fs.writeFileSync(fd, `${JSON.stringify(artifact)}\n`);
+      } catch (error) {
+        throw new Error("Failed to write ledger transaction artifact", { cause: error });
+      }
     } finally {
-      fs.closeSync(descriptor);
+      fs.closeSync(fd);
     }
   };
 

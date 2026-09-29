@@ -1,14 +1,16 @@
 package workflow
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 
 	"github.com/github/gh-aw/pkg/constants"
 )
 
 func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) {
+	ledgerConfig, err := encodeLedgerConfigBase64(data.LedgerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode ledger persistence configuration: %w", err)
+	}
 	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName), "safe_outputs"}
 	if IsDetectionJobEnabled(data.SafeOutputs) && threatDetectionEnabled {
 		needs = append(needs, string(constants.DetectionJobName))
@@ -24,10 +26,6 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
 		"          path: ${{ runner.temp }}/gh-aw\n",
 	)
-	ledgerConfig, err := json.Marshal(data.LedgerConfig.Ledgers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode ledger persistence configuration: %w", err)
-	}
 	steps = append(steps,
 		"      - name: Checkout repository\n",
 		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
@@ -40,7 +38,7 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
 		"          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
-		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", base64.StdEncoding.EncodeToString(ledgerConfig)),
+		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig),
 		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",

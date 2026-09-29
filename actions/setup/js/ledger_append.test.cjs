@@ -49,20 +49,21 @@ test("rejects invalid records at finalization", async () => {
   assert.throws(() => handler.finalize(), /does not match schema/);
 });
 
-test("does not follow a symlink when writing the transaction artifact", async () => {
+test("does not overwrite a file through a pre-existing artifact symlink", async () => {
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-symlink-"));
   const previousRunnerTemp = process.env.RUNNER_TEMP;
-  const target = path.join(runnerTemp, "target");
   process.env.RUNNER_TEMP = runnerTemp;
   try {
-    fs.mkdirSync(path.dirname(transactionPath()), { recursive: true });
-    fs.writeFileSync(target, "unchanged");
-    fs.symlinkSync(target, transactionPath());
+    const artifactPath = transactionPath();
+    const sentinelPath = path.join(path.dirname(artifactPath), "sentinel.json");
+    fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
+    fs.writeFileSync(sentinelPath, "unchanged");
+    fs.symlinkSync(sentinelPath, artifactPath);
     const handler = await main({ ledgers: [{ name: "findings" }] });
-    await handler({ record: { subject: "attempt" } });
-
-    assert.throws(() => handler.finalize(), /ELOOP|symbolic link/i);
-    assert.equal(fs.readFileSync(target, "utf8"), "unchanged");
+    await handler({ record: { subject: "blocked" } });
+    assert.throws(() => handler.finalize());
+    assert.equal(fs.readFileSync(sentinelPath, "utf8"), "unchanged");
+    assert.equal(fs.readFileSync(sentinelPath, "utf8"), "unchanged");
   } finally {
     if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
     else process.env.RUNNER_TEMP = previousRunnerTemp;

@@ -110,6 +110,23 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.Contains(t, projectionStep.String(), "create_ledger_projection.cjs")
 }
 
+func TestLedgerConfigEncodingErrors(t *testing.T) {
+	config := &LedgerToolConfig{Ledgers: []LedgerConfig{{
+		Name:   "findings",
+		Schema: map[string]any{"invalid": make(chan int)},
+	}}}
+
+	_, err := encodeLedgerConfigBase64(config)
+	require.ErrorContains(t, err, "failed to serialize ledger configuration")
+
+	data := &WorkflowData{LedgerConfig: config}
+	var projectionStep strings.Builder
+	require.ErrorContains(t, NewCompiler().generateLedgerProjectionStep(&projectionStep, data), "failed to encode ledger projection configuration")
+
+	_, err = NewCompiler().buildPushLedgerChangesJob(data, false)
+	require.ErrorContains(t, err, "failed to encode ledger persistence configuration")
+}
+
 func TestLegacyRepoMemoryLedgerDetection(t *testing.T) {
 	require.True(t, containsLegacyRepoMemoryLedger(map[string]any{"ledger": map[string]any{}}))
 	require.False(t, containsLegacyRepoMemoryLedger(map[string]any{"schema": "record.json"}))

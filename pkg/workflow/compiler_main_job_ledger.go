@@ -1,8 +1,6 @@
 package workflow
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -11,7 +9,7 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
 		return nil
 	}
-	ledgerConfig, err := json.Marshal(data.LedgerConfig.Ledgers)
+	ledgerConfig, err := encodeLedgerConfigBase64(data.LedgerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to encode ledger projection configuration: %w", err)
 	}
@@ -20,7 +18,7 @@ func (c *Compiler) generateLedgerProjectionStep(yaml *strings.Builder, data *Wor
 	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", base64.StdEncoding.EncodeToString(ledgerConfig))
+	fmt.Fprintf(yaml, "          GH_AW_LEDGER_CONFIG_BASE64: %s\n", ledgerConfig)
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")

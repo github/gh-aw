@@ -573,7 +573,7 @@ func (c *Compiler) buildPushLedgerChangesJobWrapper(data *WorkflowData, threatDe
 	}
 	job, err := c.buildPushLedgerChangesJob(data, threatDetectionEnabled)
 	if err != nil {
-		return "", fmt.Errorf("push_ledger_changes job configuration could not be encoded: %w", err)
+		return "", fmt.Errorf("push_ledger_changes job could not be built: %w", err)
 	}
 	if err := c.jobManager.AddJob(job); err != nil {
 		return "", fmt.Errorf("push_ledger_changes job could not be added: %w", err)
