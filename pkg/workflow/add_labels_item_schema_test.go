@@ -20,7 +20,7 @@ func TestNormalizedAddLabelsItemSchema(t *testing.T) {
 			"confidence": map[string]any{"type": "string", "enum": []any{"HIGH", "MEDIUM"}},
 			"suggest":    map[string]any{"type": "boolean"},
 		},
-	})
+	}, false)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"name", "confidence"}, schema["required"])
@@ -63,11 +63,41 @@ func TestNormalizedAddLabelsItemSchemaRejectsWidening(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := normalizedAddLabelsItemSchema(tt.schema)
+			_, err := normalizedAddLabelsItemSchema(tt.schema, false)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.match)
 		})
 	}
+}
+
+func TestNormalizedAddLabelsItemSchemaPreservesIssueIntentRequirements(t *testing.T) {
+	narrowing := map[string]any{
+		"type":     "object",
+		"required": []any{"name"},
+		"properties": map[string]any{
+			"name":       map[string]any{"type": "string"},
+			"rationale":  map[string]any{"type": "string"},
+			"confidence": map[string]any{"type": "string"},
+		},
+	}
+
+	schema, err := normalizedAddLabelsItemSchema(narrowing, true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"name", "rationale", "confidence"}, schema["required"])
+
+	_, err = normalizedAddLabelsItemSchema(map[string]any{
+		"type": "string",
+	}, true)
+	require.ErrorContains(t, err, `type must be "object" when issue-intent is enabled`)
+
+	_, err = normalizedAddLabelsItemSchema(map[string]any{
+		"type":     "object",
+		"required": []any{"name"},
+		"properties": map[string]any{
+			"name": map[string]any{"type": "string"},
+		},
+	}, true)
+	require.ErrorContains(t, err, `requires "rationale", so that field must be defined in properties`)
 }
 
 func TestGenerateToolsMetaJSONIncludesAddLabelsItemSchema(t *testing.T) {
@@ -91,4 +121,32 @@ func TestGenerateToolsMetaJSONIncludesAddLabelsItemSchema(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
 	require.Contains(t, meta.ItemSchemas, "add_labels")
 	assert.Equal(t, []any{"LOW", "MEDIUM", "HIGH"}, meta.ItemSchemas["add_labels"]["labels"]["properties"].(map[string]any)["confidence"].(map[string]any)["enum"])
+}
+
+func TestGenerateToolsMetaJSONPreservesAddLabelsIssueIntentRequirements(t *testing.T) {
+	enabled := true
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			AddLabels: &AddLabelsConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{IssueIntent: &enabled},
+				ItemSchema: map[string]any{
+					"type":     "object",
+					"required": []any{"name"},
+					"properties": map[string]any{
+						"name":       map[string]any{"type": "string"},
+						"rationale":  map[string]any{"type": "string"},
+						"confidence": map[string]any{"type": "string"},
+					},
+				},
+			},
+		},
+	}
+
+	metaJSON, err := generateToolsMetaJSON(data, "")
+	require.NoError(t, err)
+	var meta ToolsMeta
+	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
+
+	itemSchema := meta.ItemSchemas["add_labels"]["labels"]
+	assert.Equal(t, []any{"name", "rationale", "confidence"}, itemSchema["required"])
 }

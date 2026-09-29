@@ -12,16 +12,125 @@ func validateAddLabelsItemSchema(config *SafeOutputsConfig) error {
 	if config == nil || config.AddLabels == nil || config.AddLabels.ItemSchema == nil {
 		return nil
 	}
-	_, err := normalizedAddLabelsItemSchema(config.AddLabels.ItemSchema)
+	_, err := normalizedAddLabelsItemSchema(config.AddLabels.ItemSchema, issueIntentRequired(config.AddLabels.IssueIntent))
 	return err
 }
 
-func normalizedAddLabelsItemSchema(narrowing map[string]any) (map[string]any, error) {
+func validateAddLabelsItemSchemaAndSamples(config *SafeOutputsConfig) error {
+	if err := validateAddLabelsItemSchema(config); err != nil {
+		return err
+	}
+	if config == nil || config.AddLabels == nil || len(config.AddLabels.Samples) == 0 {
+		return nil
+	}
+
+	itemSchema, err := configuredAddLabelsSampleItemSchema(config.AddLabels)
+	if err != nil {
+		return err
+	}
+	if itemSchema == nil {
+		return nil
+	}
+
+	schemas, err := getCompiledToolSchemas()
+	if err != nil {
+		return err
+	}
+	entry, found := schemas["add_labels"]
+	if !found {
+		return errors.New("samples: no MCP tool schema found for \"add_labels\" (yaml key \"add-labels\")")
+	}
+	rawSchema := cloneSchemaMap(entry.raw)
+	properties, ok := rawSchema["properties"].(map[string]any)
+	if !ok {
+		return errors.New("samples: MCP tool schema for \"add_labels\" has no properties")
+	}
+	properties = cloneSchemaMap(properties)
+	labelsSchema, ok := properties["labels"].(map[string]any)
+	if !ok {
+		return errors.New("samples: MCP tool schema for \"add_labels\" has no labels property")
+	}
+	labelsSchema = cloneSchemaMap(labelsSchema)
+	labelsSchema["items"] = itemSchema
+	properties["labels"] = labelsSchema
+	rawSchema["properties"] = properties
+
+	configuredSchemaBytes, err := json.Marshal(rawSchema)
+	if err != nil {
+		return fmt.Errorf("failed to serialize configured inputSchema for tool %q: %w", "add_labels", err)
+	}
+	configuredSchema, err := compileSchema(string(configuredSchemaBytes), "inmem://safe-outputs-tools/add_labels-configured.json")
+	if err != nil {
+		return fmt.Errorf("failed to compile configured inputSchema for tool %q: %w", "add_labels", err)
+	}
+	for i, sample := range config.AddLabels.Samples {
+		substituted, ok := substituteRuntimeExpressionsForValidation(sample, rawSchema).(map[string]any)
+		if !ok {
+			substituted = sample
+		}
+		if err := configuredSchema.Validate(substituted); err != nil {
+			return fmt.Errorf("safe-outputs.add-labels.samples[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func normalizedAddLabelsItemSchema(narrowing map[string]any, requireIssueIntent bool) (map[string]any, error) {
 	base, err := addLabelsBaseItemSchema(narrowing["type"])
 	if err != nil {
 		return nil, err
 	}
+	if requireIssueIntent {
+		if err := requireAddLabelsIssueIntentFields(base); err != nil {
+			return nil, err
+		}
+	}
 	return narrowItemSchema(base, narrowing, "safe-outputs.add-labels.item-schema")
+}
+
+func configuredAddLabelsSampleItemSchema(config *AddLabelsConfig) (map[string]any, error) {
+	if config == nil {
+		return nil, nil
+	}
+	requireIssueIntent := issueIntentRequired(config.IssueIntent)
+	if config.ItemSchema != nil {
+		return normalizedAddLabelsItemSchema(config.ItemSchema, requireIssueIntent)
+	}
+	if !requireIssueIntent {
+		return nil, nil
+	}
+	base, err := addLabelsBaseItemSchema("object")
+	if err != nil {
+		return nil, err
+	}
+	if err := requireAddLabelsIssueIntentFields(base); err != nil {
+		return nil, err
+	}
+	return base, nil
+}
+
+func requireAddLabelsIssueIntentFields(base map[string]any) error {
+	if base["type"] != "object" {
+		return errors.New("safe-outputs.add-labels.item-schema.type must be \"object\" when issue-intent is enabled")
+	}
+	required, ok := base["required"].([]any)
+	if !ok {
+		return errors.New("safe-outputs.add-labels.item-schema: built-in object label schema has invalid required fields")
+	}
+	for _, field := range []string{"rationale", "confidence"} {
+		found := false
+		for _, existing := range required {
+			if existing == field {
+				found = true
+				break
+			}
+		}
+		if !found {
+			required = append(required, field)
+		}
+	}
+	base["required"] = required
+	return nil
 }
 
 func addLabelsBaseItemSchema(itemType any) (map[string]any, error) {

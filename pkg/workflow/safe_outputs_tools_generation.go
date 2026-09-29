@@ -451,7 +451,10 @@ func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, err
 	propertyInjections := computePropertyInjections(data.SafeOutputs)
 	itemSchemas := make(map[string]map[string]map[string]any)
 	if data.SafeOutputs.AddLabels != nil && data.SafeOutputs.AddLabels.ItemSchema != nil {
-		itemSchema, itemSchemaErr := normalizedAddLabelsItemSchema(data.SafeOutputs.AddLabels.ItemSchema)
+		itemSchema, itemSchemaErr := normalizedAddLabelsItemSchema(
+			data.SafeOutputs.AddLabels.ItemSchema,
+			issueIntentRequired(data.SafeOutputs.AddLabels.IssueIntent),
+		)
 		if itemSchemaErr != nil {
 			return "", itemSchemaErr
 		}
