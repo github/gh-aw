@@ -3335,6 +3335,7 @@ process.exit(1);`,
               "gpt-5-mini": { wire_api: "responses" },
               "gpt-5.5": { wire_api: "responses" },
               "gpt-5.6-luna": { wire_api: "responses" },
+              "gpt-4.1": { wire_api: "completions" },
               "gemini-2.5-pro": { wire_api: "completions" },
               "mai-code-1-flash-picker": { wire_api: "responses" },
               "claude-sonnet-4": {},
@@ -3356,6 +3357,12 @@ process.exit(1);`,
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
 
+    it("defaults GPT models to the responses API when absent from the catalog", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna-utility";
+      applyCopilotWireAPI({ modelsJson: { providers: { "github-copilot": { models: {} } } }, logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
     it.each(["grok-4.5", "grok-4.6", "grok-4.7"])("uses the responses API from the bundled catalog for %s", model => {
       process.env.COPILOT_MODEL = model;
       const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
@@ -3365,6 +3372,12 @@ process.exit(1);`,
 
     it("sets COPILOT_PROVIDER_WIRE_API=completions for a completions model", () => {
       process.env.COPILOT_MODEL = "gemini-2.5-pro";
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+    });
+
+    it("uses the catalog wire API in preference to the GPT default", () => {
+      process.env.COPILOT_MODEL = "gpt-4.1";
       applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
     });
@@ -3408,10 +3421,10 @@ process.exit(1);`,
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
     });
 
-    it("skips configuration when modelsJson is null", () => {
+    it("defaults GPT models to responses when modelsJson is null", () => {
       process.env.COPILOT_MODEL = "gpt-5-mini";
       applyCopilotWireAPI({ modelsJson: null, logger: () => {} });
-      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
   });
 

@@ -446,7 +446,8 @@ async function applyCopilotModelAliasResolution(options) {
  *
  * Skips configuration when COPILOT_PROVIDER_WIRE_API is already set so that
  * explicit engine.env values always take precedence. Looks up the wire_api for
- * the current COPILOT_MODEL in the github-copilot provider section of models.json.
+ * the current COPILOT_MODEL in the github-copilot provider section of models.json,
+ * defaulting GPT models to the responses API when the catalog does not specify one.
  *
  * @param {{
  *   modelsJson: Record<string, unknown> | null,
@@ -465,7 +466,6 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
   const providers = modelsJson !== null && typeof modelsJson === "object" && "providers" in modelsJson ? modelsJson.providers : null;
   const githubCopilotData = providers !== null && typeof providers === "object" && "github-copilot" in providers ? providers["github-copilot"] : null;
   const models = githubCopilotData !== null && typeof githubCopilotData === "object" && "models" in githubCopilotData ? githubCopilotData.models : null;
-  if (!models || typeof models !== "object") return;
 
   // Strip query parameters before catalog lookup (e.g. "gpt-5-mini?effort=high" → "gpt-5-mini").
   const baseModelName = modelName.split("?")[0];
@@ -475,17 +475,24 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
   if (normalizedModelName.endsWith("-utility")) {
     lookupModelNames.push(normalizedModelName.slice(0, -"-utility".length));
   }
-  for (const lookupModelName of lookupModelNames) {
-    const modelEntry = Object.entries(models).find(([key]) => key.toLowerCase() === lookupModelName);
-    if (!modelEntry) continue;
+  if (models && typeof models === "object") {
+    for (const lookupModelName of lookupModelNames) {
+      const modelEntry = Object.entries(models).find(([key]) => key.toLowerCase() === lookupModelName);
+      if (!modelEntry) continue;
 
-    const [, value] = modelEntry;
-    const wireApi = value !== null && typeof value === "object" && "wire_api" in value ? value.wire_api : null;
-    if (wireApi && typeof wireApi === "string") {
-      logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
-      process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
+      const [, value] = modelEntry;
+      const wireApi = value !== null && typeof value === "object" && "wire_api" in value ? value.wire_api : null;
+      if (wireApi && typeof wireApi === "string") {
+        logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
+        process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
+        return;
+      }
     }
-    return;
+  }
+
+  if (normalizedModelName.startsWith("gpt-")) {
+    logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=responses for GPT model ${modelName}`);
+    process.env.COPILOT_PROVIDER_WIRE_API = "responses";
   }
 }
 
