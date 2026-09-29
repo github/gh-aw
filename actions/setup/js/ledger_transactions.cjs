@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const TEMPORARY_ID = /^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const RESERVED_RECORD_KEYS = new Set(["hash", "id", "parents", "sha", "timestamp", "transaction_id", "version"]);
+const RESERVED_RECORD_KEYS = new Set(["hash", "id", "parents", "payload_sha", "sha", "timestamp", "transaction_id", "version"]);
 const MAX_RECORD_DEPTH = 32;
 const MAX_RECORD_FIELDS = 128;
 const MAX_RECORD_KEY_BYTES = 256;
@@ -21,10 +21,12 @@ function finalId(transactionId, index) {
  * @param {{transactionId: string, ledgerNames: Set<string>, ledgers?: Record<string, {schema?: object, max_record_kb?: number, max_patch_kb?: number}>}} options
  */
 function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers = {} }) {
+  if (typeof transactionId !== "string" || !transactionId || transactionId.length > 128) throw new TypeError("Invalid ledger transaction ID");
+  if (!(ledgerNames instanceof Set) || ledgerNames.size === 0) throw new TypeError("No ledgers are configured");
+  if (!ledgers || typeof ledgers !== "object" || Array.isArray(ledgers)) throw new TypeError("Invalid ledger configuration");
   if (!Array.isArray(requests) || requests.length > 100) throw new RangeError("Invalid ledger append batch");
   const mapping = new Map();
   const normalized = [];
-  const patchBytes = new Map();
   for (const [index, request] of requests.entries()) {
     if (!request || typeof request !== "object" || !request.record || typeof request.record !== "object" || Array.isArray(request.record)) throw new TypeError("Invalid ledger append request");
     const ledger = request.ledger || (ledgerNames.size === 1 ? [...ledgerNames][0] : undefined);
@@ -48,9 +50,6 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
     const normalizedRecordBytes = Buffer.byteLength(JSON.stringify(normalizedRecord), "utf8");
     if (normalizedRecordBytes > maxRecordBytes) throw new RangeError("Ledger record exceeds max-record-kb");
     normalized.push({ ledger, transaction_id: transactionId, index, record: normalizedRecord });
-    const totalBytes = (patchBytes.get(ledger) || 0) + normalizedRecordBytes;
-    if (totalBytes > (options.max_patch_kb || 10) * 1024) throw new RangeError("Ledger append batch exceeds max-patch-kb");
-    patchBytes.set(ledger, totalBytes);
   }
   const rewrite = (value, ledger) => {
     if (typeof value === "string") {
@@ -61,7 +60,16 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, rewrite(child, ledger)]));
     return value;
   };
-  for (const item of normalized) item.record = rewrite(item.record, item.ledger);
+  const patchBytes = new Map();
+  for (const item of normalized) {
+    item.record = rewrite(item.record, item.ledger);
+    const config = ledgers[item.ledger] || {};
+    const recordBytes = Buffer.byteLength(JSON.stringify(item.record), "utf8");
+    if (recordBytes > (config.max_record_kb || 32) * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
+    const totalBytes = (patchBytes.get(item.ledger) || 0) + recordBytes;
+    if (totalBytes > (config.max_patch_kb || 10) * 1024) throw new RangeError("Ledger append batch exceeds max-patch-kb");
+    patchBytes.set(item.ledger, totalBytes);
+  }
   return { version: 1, transaction_id: transactionId, appends: normalized };
 }
 

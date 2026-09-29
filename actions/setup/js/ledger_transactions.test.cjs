@@ -50,7 +50,23 @@ test("validates schemas and configured record and patch limits before assigning 
   };
   assert.throws(() => normalizeLedgerAppends([{ record: { subject: 1 } }], options), /does not match schema/);
   assert.throws(() => normalizeLedgerAppends([{ record: { id: "agent-controlled", subject: "x" } }], options), /reserved field/);
+  assert.throws(() => normalizeLedgerAppends([{ record: { payload_sha: "agent-controlled", subject: "x" } }], options), /reserved field/);
   assert.throws(() => normalizeLedgerAppends([{ record: { subject: "x".repeat(1024) } }], options), /max-record-kb/);
   assert.throws(() => normalizeLedgerAppends([{ record: { subject: "x".repeat(600) } }, { record: { subject: "y".repeat(600) } }], options), /max-patch-kb/);
   assert.deepEqual(normalizeLedgerAppends([{ record: { subject: "valid" } }], options).appends[0].record.subject, "valid");
+});
+
+test("rewrites temporary IDs only within the selected ledger and only for explicit references", () => {
+  const result = normalizeLedgerAppends(
+    [
+      { ledger: "first", temp_id: "same", record: { subject: "first" } },
+      { ledger: "second", temp_id: "same", record: { subject: "second" } },
+      { ledger: "first", record: { parent: "#same", note: "same" } },
+      { ledger: "second", record: { parent: "#same" } },
+    ],
+    { transactionId: "tx-1", ledgerNames: new Set(["first", "second"]) }
+  );
+  assert.equal(result.appends[2].record.parent, result.appends[0].record.id);
+  assert.equal(result.appends[2].record.note, "same");
+  assert.equal(result.appends[3].record.parent, result.appends[1].record.id);
 });

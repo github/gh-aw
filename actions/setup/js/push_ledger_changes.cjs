@@ -9,10 +9,12 @@ const { pushRepoMemoryChangesWithRetry, configureRepoMemoryMergePolicy } = requi
 const { finalId } = require("./ledger_transactions.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
+const MAX_TRANSACTION_BYTES = 12 * 1024 * 1024;
 const LEDGER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const RESERVED_RECORD_KEYS = new Set(["hash", "parents", "sha", "timestamp", "transaction_id", "version"]);
+const RESERVED_RECORD_KEYS = new Set(["hash", "parents", "payload_sha", "sha", "timestamp", "transaction_id", "version"]);
 const MAX_RECORD_FIELDS = 128;
 const MAX_RECORD_DEPTH = 32;
+const MAX_RECORD_KEY_BYTES = 256;
 
 /**
  * Consume only the versioned artifact emitted by safe-output validation.
@@ -21,10 +23,17 @@ const MAX_RECORD_DEPTH = 32;
 function readTransactions(file = process.env.GH_AW_LEDGER_TRANSACTIONS) {
   if (!file) return { version: 1, ledgers: {} };
   let artifact;
+  let fd;
   try {
-    artifact = JSON.parse(fs.readFileSync(path.resolve(file), "utf8"));
+    fd = fs.openSync(path.resolve(file), fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_TRANSACTION_BYTES) throw new TypeError("Invalid ledger transaction artifact");
+    artifact = JSON.parse(fs.readFileSync(fd, "utf8"));
   } catch (error) {
+    if (error instanceof TypeError && error.message === "Invalid ledger transaction artifact") throw error;
     throw new Error("Failed to read validated ledger transaction artifact", { cause: error });
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
   }
   if (!artifact || artifact.version !== 1 || !artifact.ledgers || typeof artifact.ledgers !== "object" || Array.isArray(artifact.ledgers)) {
     throw new TypeError("Invalid validated ledger transaction artifact");
@@ -69,6 +78,9 @@ function validateTransactions(artifact, ledgerConfigs) {
   if (!artifact || artifact.version !== 1 || !artifact.ledgers || typeof artifact.ledgers !== "object" || Array.isArray(artifact.ledgers)) {
     throw new TypeError("Invalid validated ledger transaction artifact");
   }
+  if (Object.keys(artifact).some(key => !["ledgers", "transaction_id", "version"].includes(key))) {
+    throw new TypeError("Invalid validated ledger transaction artifact");
+  }
   const configs = new Map(ledgerConfigs.map(config => [config.name, config]));
   if (Object.keys(artifact.ledgers).length && (typeof artifact.transaction_id !== "string" || !artifact.transaction_id)) {
     throw new TypeError("Invalid ledger transaction ID");
@@ -79,7 +91,7 @@ function validateTransactions(artifact, ledgerConfigs) {
   let total = 0;
   for (const [name, ledger] of Object.entries(artifact.ledgers)) {
     const config = configs.get(name);
-    if (!config || !ledger || !Array.isArray(ledger.appends)) throw new TypeError("Invalid ledger transaction list");
+    if (!config || !ledger || !Array.isArray(ledger.appends) || Object.keys(ledger).some(key => key !== "appends")) throw new TypeError("Invalid ledger transaction list");
     for (const append of ledger.appends) {
       total++;
       if (
@@ -121,7 +133,7 @@ function validateTransactions(artifact, ledgerConfigs) {
       patchBytes.set(name, currentPatchBytes);
     }
   }
-  if (total !== seenIndices.size || [...seenIndices].some((index, i) => index !== i)) {
+  if (total !== seenIndices.size || Array.from({ length: total }, (_, index) => !seenIndices.has(index)).some(Boolean)) {
     throw new TypeError("Ledger transaction indices are incomplete");
   }
   return configs;
@@ -137,7 +149,10 @@ function validateRecordShape(record) {
     if (!value || typeof value !== "object") continue;
     const keys = Object.keys(value);
     if (keys.length > MAX_RECORD_FIELDS) throw new RangeError("Ledger record exceeds maximum field count");
-    for (const key of keys) if (value[key] && typeof value[key] === "object") stack.push({ value: value[key], depth: depth + 1 });
+    for (const key of keys) {
+      if (Buffer.byteLength(key, "utf8") > MAX_RECORD_KEY_BYTES) throw new RangeError("Ledger record field name is too long");
+      if (value[key] && typeof value[key] === "object") stack.push({ value: value[key], depth: depth + 1 });
+    }
   }
 }
 
@@ -175,12 +190,12 @@ async function checkoutLedgerBranch({ githubClient, owner, repo, branchName, wor
   return baseRef || execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
 }
 
-async function persistLedgerAppends({ appends, config, githubClient, owner, repo, token, serverHost, workspaceDir }) {
+async function persistLedgerAppends({ appends, config, githubClient, owner, repo, token, serverHost, workspaceDir, checkoutLedgerBranchFn = checkoutLedgerBranch, pushChangesFn = pushRepoMemoryChangesWithRetry }) {
   const originalHead = execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
   const branchName = `ledgers/${config.name}`;
   let ledger;
   try {
-    const baseRef = await checkoutLedgerBranch({ githubClient, owner, repo, branchName, workspaceDir, token, serverHost });
+    const baseRef = await checkoutLedgerBranchFn({ githubClient, owner, repo, branchName, workspaceDir, token, serverHost });
     configureRepoMemoryMergePolicy(workspaceDir);
     ledger = new Ledger({
       memoryDir: workspaceDir,
@@ -209,7 +224,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       cwd: workspaceDir,
       stdio: "pipe",
     });
-    const pushed = await pushRepoMemoryChangesWithRetry({
+    const pushed = await pushChangesFn({
       githubClient,
       targetOwner: owner,
       targetRepoName: repo,

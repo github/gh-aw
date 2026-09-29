@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -111,8 +112,8 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema must be a path or JSON Schema object", name)
 			}
 		case "max-record-kb", "max-segment-kb", "max-patch-kb":
-			number, ok := value.(int)
-			if !ok || number < 1 || number > 10240 {
+			number, ok := parseLedgerLimit(value)
+			if !ok {
 				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.%s must be a positive integer", name, key)
 			}
 			switch key {
@@ -134,6 +135,28 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 		return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.max-record-kb cannot exceed max-segment-kb", name)
 	}
 	return cfg, nil
+}
+
+func parseLedgerLimit(value any) (int, bool) {
+	switch number := value.(type) {
+	case int:
+		if number >= 1 && number <= 10240 {
+			return number, true
+		}
+	case int64:
+		if number >= 1 && number <= 10240 {
+			return int(number), true
+		}
+	case uint64:
+		if number >= 1 && number <= 10240 {
+			return int(number), true
+		}
+	case float64:
+		if number >= 1 && number <= 10240 && math.Trunc(number) == number {
+			return int(number), true
+		}
+	}
+	return 0, false
 }
 
 func validateLedgerSchema(value map[string]any) error {

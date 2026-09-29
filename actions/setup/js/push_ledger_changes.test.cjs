@@ -1,61 +1,141 @@
 // @ts-check
 "use strict";
 
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { persistLedgerAppends, readLedgerAppendRequests } = require("./push_ledger_changes.cjs");
+import { test } from "vitest";
+import assert from "node:assert/strict";
+import { execFileSync, execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { finalId } from "./ledger_transactions.cjs";
+import { execGitSync } from "./git_helpers.cjs";
+import { main, persistLedgerAppends, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
 
-test("reads only ledger append requests from the safe-output artifact", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-safe-outputs-"));
-  const file = path.join(directory, "safeoutputs.jsonl");
+const ledgerConfigs = [
+  {
+    name: "findings",
+    schema: { type: "object", required: ["subject"], properties: { subject: { type: "string" } }, additionalProperties: false },
+    max_record_kb: 32,
+    max_segment_kb: 100,
+    max_patch_kb: 10,
+  },
+];
+
+function transaction(record = { subject: "A finding" }) {
+  const transactionId = "run-42:1";
+  return {
+    version: 1,
+    transaction_id: transactionId,
+    ledgers: {
+      findings: {
+        appends: [
+          {
+            ledger: "findings",
+            transaction_id: transactionId,
+            index: 0,
+            record: { ...record, id: finalId(transactionId, 0) },
+          },
+        ],
+      },
+    },
+  };
+}
+
+test("reads and validates only versioned transaction artifacts", () => {
+  assert.deepEqual(readTransactions(undefined), { version: 1, ledgers: {} });
+  assert.throws(() => validateTransactions({ version: 2, ledgers: {} }, ledgerConfigs), /Invalid validated ledger transaction artifact/);
+  assert.throws(() => validateTransactions({ version: 1, ledgers: [] }, ledgerConfigs), /Invalid validated ledger transaction artifact/);
+  assert.throws(() => validateTransactions({ ...transaction(), forged: true }, ledgerConfigs), /Invalid validated ledger transaction artifact/);
+});
+
+test("revalidates record schemas, reserved envelope fields, and record sizes", () => {
+  assert.throws(() => validateTransactions(transaction({ subject: 5 }), ledgerConfigs), /does not match configured schema/);
+  assert.throws(() => validateTransactions(transaction({ subject: "valid", parents: [] }), ledgerConfigs), /reserved field/);
+  assert.throws(() => validateTransactions(transaction({ subject: "x".repeat(32 * 1024) }), ledgerConfigs), /max-record-kb/);
+});
+
+test("main reports records only after the trusted persister succeeds", async () => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-push-"));
+  const outputFile = path.join(outputDir, "output");
   try {
-    fs.writeFileSync(file, `${JSON.stringify({ type: "ledger_append", ledger: "findings", record: { subject: "bug" } })}\n${JSON.stringify({ type: "create_issue", title: "other" })}\n`);
-    assert.deepEqual(readLedgerAppendRequests(file), [{ ledger: "findings", temp_id: undefined, record: { subject: "bug" } }]);
+    const result = await main({
+      artifact: transaction(),
+      ledgerConfigs,
+      outputFile,
+      owner: "octo",
+      repo: "repo",
+      token: "test-token",
+      serverHost: "github.com",
+      workspaceDir: outputDir,
+      githubClient: {},
+      persistLedger: async ({ appends, config }) => {
+        assert.equal(config.name, "findings");
+        assert.equal(appends.length, 1);
+        return { persisted: 1, already_present: 0, reconciled: 0 };
+      },
+    });
+    assert.equal(result.ledgers.findings.persisted, 1);
+    assert.match(fs.readFileSync(outputFile, "utf8"), /"persisted":1/);
   } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(outputDir, { recursive: true, force: true });
   }
 });
 
-test("commits ledger transactions and delegates upstream pushes to repo-memory helpers", async () => {
-  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-push-"));
-  const commands = [];
+test("appends canonical ledger state and delegates the upstream push", async () => {
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-persist-"));
   const pushCalls = [];
+  const previousCore = global.core;
+  global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
   try {
-    fs.mkdirSync(path.join(workspaceDir, ".git"));
-    const result = await persistLedgerAppends({
-      name: "findings",
-      ledger: {
-        appends: [{ transaction_id: "run-1", record: { id: "ldg-record" } }],
-      },
-      config: { branchName: "ledgers/findings", maxSegmentKB: 1 },
-      transactionId: "run-1",
-      workspaceDir,
-      targetRepo: "owner/repo",
-      githubClient: {},
-      ghToken: "test-token",
-      serverHost: "github.test",
-      checkoutBranchFn: async ({ branchName }) => {
-        assert.equal(branchName, "ledgers/findings");
-        return "base-sha";
-      },
-      execGitSyncFn: (args, options) => {
-        commands.push({ args, options });
-        return args[0] === "branch" ? "main\n" : "";
-      },
-      pushChangesFn: async options => pushCalls.push(options),
+    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base", {
+      cwd: workspaceDir,
+      stdio: "pipe",
     });
-
-    assert.equal(result.persisted, 1);
-    assert.equal(result.branch, "ledgers/findings");
+    const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const persisted = await persistLedgerAppends({
+      appends: transaction().ledgers.findings.appends,
+      config: ledgerConfigs[0],
+      githubClient: {},
+      owner: "octo",
+      repo: "repo",
+      token: "test-token",
+      serverHost: "github.com",
+      workspaceDir,
+      checkoutLedgerBranchFn: async ({ branchName }) => {
+        execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
+        return baseRef;
+      },
+      pushChangesFn: async options => {
+        pushCalls.push(options);
+        return true;
+      },
+    });
+    const shard = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const canonical = execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" });
+    assert.equal(persisted.persisted, 1);
     assert.equal(pushCalls.length, 1);
-    assert.equal(pushCalls[0].baseRef, "base-sha");
+    assert.equal(pushCalls[0].baseRef, baseRef);
     assert.equal(pushCalls[0].branchName, "ledgers/findings");
-    assert.ok(commands.some(({ args }) => args[0] === "commit"));
-    assert.equal(fs.readFileSync(path.join(workspaceDir, "ledger/transactions/run-1.jsonl"), "utf8"), `${JSON.stringify({ transaction_id: "run-1", record: { id: "ldg-record" } })}\n`);
+    assert.match(shard, /^ledger\/shards\//);
+    assert.equal(JSON.parse(canonical.trim()).payload.id, transaction().ledgers.findings.appends[0].record.id);
   } finally {
+    if (previousCore === undefined) delete global.core;
+    else global.core = previousCore;
     fs.rmSync(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("readTransactions rejects malformed JSON and symlink artifacts", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-transactions-"));
+  const file = path.join(directory, "artifact.json");
+  const link = path.join(directory, "link.json");
+  try {
+    fs.writeFileSync(file, "{");
+    assert.throws(() => readTransactions(file), /Failed to read validated ledger transaction artifact/);
+    fs.writeFileSync(file, JSON.stringify(transaction()));
+    fs.symlinkSync(file, link);
+    assert.throws(() => readTransactions(link), /Failed to read validated ledger transaction artifact/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
