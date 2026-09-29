@@ -78,7 +78,9 @@ gh aw audit 12345 12346 --group                # Group findings by run and code
 gh aw audit 12345 12346 --group --json         # JSON grouped findings
 ```
 
-**Single-run report sections** (rendered in Markdown or JSON): Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders.
+**Single-run report sections**: Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Friction, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders.
+
+The Friction section attributes execution-friction costs by driver and source. In JSON, `friction.drivers[]` provides each driver's `source`, counted and deduplicated occurrences, attribution state, and cost dimensions; `friction.events[]` provides the corresponding event-level source and label. Console output includes the source and available AIC, token, turn, tool-call, and latency costs on each driver and event, so a high-cost source such as `firewall`, `mcp_gateway`, or `agent_session` can be investigated directly. Unavailable dimensions are omitted rather than presented as measured zeroes.
 
 The Gateway Steering Events section reports `token_steering` and `timeout_steering` warnings emitted when a run approaches its AI Credits or time limit. JSON output includes each event's type, message, and timestamp when available.
 
