@@ -95,6 +95,13 @@ describe("redact_secrets.cjs", () => {
           process.env.SECRET_API_KEY = secretValue;
 
           const originalReaddirSync = fs.readdirSync;
+          const accessSpy = vi.spyOn(fs, "accessSync").mockImplementation((dirPath, mode) => {
+            if (dirPath === unreadableDir && mode === fs.constants.X_OK) {
+              const error = new Error(`EACCES: permission denied, access '${unreadableDir}'`);
+              error.code = "EACCES";
+              throw error;
+            }
+          });
           const readdirSpy = vi.spyOn(fs, "readdirSync").mockImplementation((dirPath, options) => {
             if (dirPath === unreadableDir) {
               const error = new Error(`EACCES: permission denied, scandir '${unreadableDir}'`);
@@ -109,11 +116,35 @@ describe("redact_secrets.cjs", () => {
             await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           } finally {
             readdirSpy.mockRestore();
+            accessSpy.mockRestore();
           }
 
           expect(fs.readFileSync(readableFile, "utf8")).toBe("Secret: ***REDACTED***");
           expect(mockCore.setFailed).not.toHaveBeenCalled();
-          expect(mockCore.warning).toHaveBeenCalledWith(`Skipping unreadable directory during secret redaction: ${unreadableDir} (EACCES)`);
+          expect(mockCore.warning).toHaveBeenCalledWith(`Skipping non-traversable directory during secret redaction: ${unreadableDir} (EACCES)`);
+        }),
+        it("should fail closed when a directory cannot be listed but remains traversable", async () => {
+          const listDeniedDir = path.join(tempDir, "list-denied");
+          fs.mkdirSync(listDeniedDir);
+
+          const originalReaddirSync = fs.readdirSync;
+          const readdirSpy = vi.spyOn(fs, "readdirSync").mockImplementation((dirPath, options) => {
+            if (dirPath === listDeniedDir) {
+              const error = new Error(`EACCES: permission denied, scandir '${listDeniedDir}'`);
+              error.code = "EACCES";
+              throw error;
+            }
+            return originalReaddirSync(dirPath, options);
+          });
+
+          try {
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          } finally {
+            readdirSpy.mockRestore();
+          }
+
+          expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(`Failed to scan directory ${listDeniedDir}`));
         }),
         it("should use core.info for logging hits", async () => {
           const testFile = path.join(tempDir, "test.txt"),

@@ -28,8 +28,12 @@ function findFiles(dir, extensions) {
   } catch (error) {
     const errorCode = error && typeof error === "object" && "code" in error ? error.code : undefined;
     if (errorCode === "EACCES" || errorCode === "EPERM") {
-      core.warning(`Skipping unreadable directory during secret redaction: ${dir} (${errorCode})`);
-      return results;
+      try {
+        fs.accessSync(dir, fs.constants.X_OK);
+      } catch {
+        core.warning(`Skipping non-traversable directory during secret redaction: ${dir} (${errorCode})`);
+        return results;
+      }
     }
     throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${dir}: ${getErrorMessage(error)}`, { cause: error });
   }
