@@ -871,11 +871,11 @@ Unlike `gh aw compile --fix`, `gh aw upgrade` runs codemods, action version upda
 
 #### `env`
 
-Manage compiler defaults as GitHub variables at repository, organization, or enterprise scope.
+Manage compiler defaults and enforcement settings as GitHub variables at repository, organization, or enterprise scope.
 
 ##### `env get [file]`
 
-Download default compiler variables into a YAML file (`file.yml` by default).
+Download managed compiler variables into a YAML file (`file.yml` by default).
 
 ```bash wrap
 gh aw env get
@@ -890,7 +890,7 @@ For repository scope, `--repo` currently accepts `owner/repo` only. To target Gi
 
 ##### `env update [file]`
 
-Upload default compiler variables from a YAML file (`file.yml` by default). Use `null` (or omit a field) to delete that variable in the selected scope.
+Upload managed compiler variables from a YAML file (`file.yml` by default). Use `null` (or omit a field) to delete that variable in the selected scope.
 
 ```bash wrap
 gh aw env update defaults.yml --scope repo

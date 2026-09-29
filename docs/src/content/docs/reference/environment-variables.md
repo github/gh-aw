@@ -288,6 +288,8 @@ these `GH_AW_DEFAULT_*` variables at repo, org, or enterprise scope with
 `default_`-prefixed YAML keys such as `default_max_ai_credits`,
 `default_max_turn_cache_misses`,
 `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, and `default_model_copilot`.
+The same commands manage `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` through the
+`require_self_hosted_runners` key.
 
 ### Agent runs
 

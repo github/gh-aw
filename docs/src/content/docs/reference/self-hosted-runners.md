@@ -19,6 +19,8 @@ To enforce self-hosted runners for every generated job, set `require_self_hosted
 
 The compiler checks all generated jobs, including framework and safe-output jobs. Each must use the `self-hosted` label or a runner group. The `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS=true` compiler environment variable also enables this enforcement.
 
+To manage the enforcement variable at repository, organization, or enterprise scope, set `require_self_hosted_runners: "true"` with `gh aw env update`, then expose `${{ vars.GH_AW_REQUIRE_SELF_HOSTED_RUNNERS }}` as `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` in the trusted compile job. See [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/#enterprise-control-variables).
+
 Self-hosted runners may require `sudo` depending on the selected engine and configuration. For the default GitHub Copilot engine, there are two distinct sudo considerations:
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.

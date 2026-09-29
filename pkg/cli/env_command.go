@@ -45,6 +45,7 @@ type defaultsFile struct {
 	DefaultModelCopilot               *string `yaml:"default_model_copilot"`
 	DefaultModelClaude                *string `yaml:"default_model_claude"`
 	DefaultModelCodex                 *string `yaml:"default_model_codex"`
+	RequireSelfHostedRunners          *string `yaml:"require_self_hosted_runners"`
 }
 
 type defaultsBinding struct {
@@ -115,6 +116,7 @@ var defaultsBindings = []defaultsBinding{
 	{envName: compilerenv.DefaultModelCopilot, fieldName: "default_model_copilot", get: func(f *defaultsFile) **string { return &f.DefaultModelCopilot }},
 	{envName: compilerenv.DefaultModelClaude, fieldName: "default_model_claude", get: func(f *defaultsFile) **string { return &f.DefaultModelClaude }},
 	{envName: compilerenv.DefaultModelCodex, fieldName: "default_model_codex", get: func(f *defaultsFile) **string { return &f.DefaultModelCodex }},
+	{envName: compilerenv.RequireSelfHostedRunners, fieldName: "require_self_hosted_runners", get: func(f *defaultsFile) **string { return &f.RequireSelfHostedRunners }},
 }
 
 var defaultsExecGH = workflow.ExecGH
@@ -123,10 +125,10 @@ var defaultsGetCurrentRepoSlug = GetCurrentRepoSlug
 func NewEnvCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env",
-		Short: "Manage compiler defaults as GitHub Actions variables",
-		Long: `Manage compiler default variables in bulk for a repository, organization, or enterprise scope.
+		Short: "Manage compiler settings as GitHub Actions variables",
+		Long: `Manage compiler variables in bulk for a repository, organization, or enterprise scope.
 
-The YAML file is flat and uses default_-prefixed lowercase keys (e.g., default_max_turns).
+The YAML file is flat and uses lowercase keys (e.g., default_max_turns and require_self_hosted_runners).
 Set a field to null (or omit it) in update mode to delete the variable from the selected scope.
 Any field with a non-null string value will be set or updated.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -145,8 +147,8 @@ func newDefaultsGetCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "get [file]",
-		Short: "Download default compiler variables into a YAML file",
-		Long: `Download compiler defaults into a YAML file.
+		Short: "Download compiler variables into a YAML file",
+		Long: `Download managed compiler variables into a YAML file.
 
 When [file] is omitted, the command writes to file.yml in the current directory.
 
@@ -159,7 +161,7 @@ Scope resolution:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			outputFile := "file.yml"
 			if len(args) == 1 {
-				outputFile = args[0]
+				outputFile = args[0] //nolint:uncheckedsliceindex // len(args) == 1
 			}
 			target, err := resolveDefaultsTarget(scope, repo, org, enterprise, "", false)
 			if err != nil {
@@ -182,8 +184,8 @@ func newDefaultsUpdateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "update [file]",
-		Short: "Upload default compiler variables from a YAML file",
-		Long: `Upload compiler defaults from a YAML file.
+		Short: "Upload compiler variables from a YAML file",
+		Long: `Upload managed compiler variables from a YAML file.
 
 When [file] is omitted, the command reads from file.yml in the current directory.
 
@@ -199,7 +201,7 @@ Scope and flag behavior:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inputFile := "file.yml"
 			if len(args) == 1 {
-				inputFile = args[0]
+				inputFile = args[0] //nolint:uncheckedsliceindex // len(args) == 1
 			}
 			if err := validateDefaultsVisibility(scope, visibility, cmd.Flags().Changed("visibility")); err != nil {
 				return errors.New(console.FormatErrorMessage(err.Error()))
@@ -339,7 +341,6 @@ func defaultsValidateFile(file *defaultsFile) error {
 			validationErrors = append(validationErrors, field+" "+err.Error())
 		}
 	}
-
 	validateNonZeroInt("default_max_ai_credits", file.DefaultMaxAICredits)
 	validatePositiveInt("default_max_turn_cache_misses", file.DefaultMaxTurnCacheMisses)
 	validateNonZeroInt("default_detection_max_ai_credits", file.DefaultDetectionMaxAICredits)
@@ -353,11 +354,22 @@ func defaultsValidateFile(file *defaultsFile) error {
 	validateNonEmpty("default_model_copilot", file.DefaultModelCopilot)
 	validateNonEmpty("default_model_claude", file.DefaultModelClaude)
 	validateNonEmpty("default_model_codex", file.DefaultModelCodex)
+	validateDefaultsBoolean(&validationErrors, "require_self_hosted_runners", file.RequireSelfHostedRunners)
 
 	if len(validationErrors) > 0 {
 		return fmt.Errorf("invalid defaults file: %s", strings.Join(validationErrors, "; "))
 	}
 	return nil
+}
+
+func validateDefaultsBoolean(validationErrors *[]string, field string, value *string) {
+	if value == nil {
+		return
+	}
+	trimmed := strings.TrimSpace(*value)
+	if !strings.EqualFold(trimmed, "true") && !strings.EqualFold(trimmed, "false") {
+		*validationErrors = append(*validationErrors, field+" must be true or false when set")
+	}
 }
 
 func defaultsBuildUpdateChanges(file *defaultsFile) []defaultsUpdateChange {
