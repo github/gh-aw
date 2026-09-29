@@ -47,6 +47,10 @@ tools:
 
 ## Structured Ledger
 
+:::caution[Experimental]
+The repo-memory ledger is experimental and its configuration or behavior may change. Enabling it emits a compile-time warning.
+:::
+
 Enable an optional, domain-neutral ledger within repo memory:
 
 ```aw wrap

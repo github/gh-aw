@@ -13711,7 +13711,7 @@
   "$defs": {
     "repoMemoryLedger": {
       "type": ["object", "null"],
-      "description": "Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema.",
+      "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Using this field emits a compile-time warning.",
       "properties": {
         "schema": {
           "type": "string",
