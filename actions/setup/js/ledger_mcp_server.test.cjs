@@ -54,6 +54,7 @@ describe("ledger MCP server", () => {
       expect(JSON.stringify(output(invoke(server, "ledger_query", { type: "build" })))).toContain("build");
       expect(output(invoke(server, "ledger_query", { type: "build", where: { "payload.ok": { eq: true } } })).rows.map(record => record.id)).toContain(append.id);
       expect(output(invoke(server, "ledger_query", { type: "build", where: { "payload.ok": { eq: false } } })).rows).toEqual([]);
+      expect(output(invoke(server, "ledger_query", { type: "build", limit: 1 }))).toMatchObject({ hasMore: false, nextCursor: null });
       for (const [field, predicate] of [
         ["payload.ok", { in: [false, true] }],
         ["payload.ok", { exists: true }],
@@ -73,6 +74,25 @@ describe("ledger MCP server", () => {
         heads: expect.any(Array),
         shards: expect.any(Number),
         diagnostics: expect.any(Array),
+      });
+    });
+  });
+
+  it("exposes the bounded exclusive cursor contract through ledger_query", () => {
+    withMemory(memoryDir => {
+      const server = createLedgerServer({ memoryDir });
+      const records = [1, 2, 3].map(value => output(invoke(server, "ledger_append", { type: "build", payload: { value } }))).sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
+      const first = output(invoke(server, "ledger_query", { type: "build", limit: 2 }));
+      expect(first).toMatchObject({
+        rows: records.slice(0, 2),
+        hasMore: true,
+        nextCursor: records[1].sha,
+      });
+      const second = output(invoke(server, "ledger_query", { type: "build", limit: 2, after: first.nextCursor }));
+      expect(second).toMatchObject({
+        rows: [records[2]],
+        hasMore: false,
+        nextCursor: null,
       });
     });
   });

@@ -125,6 +125,14 @@ The agent MAY request `ledger_append`, `ledger_get`, `ledger_query`, and
 validate arguments and MUST NOT expose filesystem paths or runtime exception
 details.
 
+`ledger_query` MUST return matching records in ascending record-SHA order. It
+MUST support an exclusive `after` cursor containing a record SHA, and return
+`hasMore` plus `nextCursor` so a caller can retrieve bounded pages without
+silently treating a truncated result as complete. `nextCursor` MUST be the last
+returned record's SHA when more matches remain, and `null` otherwise. Each page
+uses the same query filters and limit. Pagination is not a snapshot: concurrent
+writes may add matches between requests.
+
 After a durable append, the server MUST serialize one `ledger_mutation` event
 to the ledger transaction log. The event MUST identify the operation, record ID,
 record type, timestamp, parent hashes, record SHA, and a hash of the payload.

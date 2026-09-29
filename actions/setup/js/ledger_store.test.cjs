@@ -168,6 +168,23 @@ describe("Ledger", () => {
     expect(ledger.projection).toBeNull();
   });
 
+  it("paginates matching records in SHA order with an exclusive continuation cursor", () => {
+    const records = [ledger.append("note", { value: 1 }), ledger.append("note", { value: 2 }), ledger.append("note", { value: 3 })].sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
+    const first = ledger.query({ type: "note", limit: 2 });
+    expect(first.rows.map(record => record.sha)).toEqual(records.slice(0, 2).map(record => record.sha));
+    expect(first).toMatchObject({ hasMore: true, nextCursor: records[1].sha });
+
+    const second = ledger.query({ type: "note", limit: 2, after: first.nextCursor });
+    expect(second.rows.map(record => record.sha)).toEqual([records[2].sha]);
+    expect(second).toMatchObject({ hasMore: false, nextCursor: null });
+    expect(ledger.query({ type: "note", after: `sha256:${"f".repeat(64)}` })).toMatchObject({
+      rows: [],
+      hasMore: false,
+      nextCursor: null,
+    });
+    expect(() => ledger.query({ after: "invalid" })).toThrow("Invalid query cursor");
+  });
+
   it("validates payloads with the existing simplified schema and rejects unsupported keywords", () => {
     const schemaPath = path.join(memoryDir, "schema.json");
     fs.writeFileSync(

@@ -123,10 +123,11 @@ function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPa
           },
         },
         limit: { type: "integer", minimum: 1, maximum: 500 },
+        after: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
       },
       additionalProperties: false,
     },
-    handler: toolHandler(({ type, where, limit }) => ledger.query({ type, where, limit })),
+    handler: toolHandler(({ type, where, limit, after }) => ledger.query({ type, where, limit, after })),
   });
 
   registerTool(server, {

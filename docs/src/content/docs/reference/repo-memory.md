@@ -61,7 +61,7 @@ tools:
 ---
 ```
 
-The ledger tools append immutable structured records and retrieve or query them without exposing storage paths or SQL to the agent. Repo memory persists the append-only records in Git; an ephemeral local index is reconstructed from those records on each run. Independent concurrent writers can append records, and their histories converge when repo memory merges them. A missing parent is reported as incomplete rather than discarding its record; malformed records are isolated and reported in ledger status.
+The ledger tools append immutable structured records and retrieve or query them without exposing storage paths or SQL to the agent. Queries return records in stable SHA order and support bounded cursor pagination: pass the previous response's `nextCursor` as `after` and continue while `hasMore` is true. A cursor is exclusive and applies to the same query filters; concurrent writes may change the matching set between pages, so pagination is not a snapshot. Repo memory persists the append-only records in Git; an ephemeral local index is reconstructed from those records on each run. Independent concurrent writers can append records, and their histories converge when repo memory merges them. A missing parent is reported as incomplete rather than discarding its record; malformed records are isolated and reported in ledger status.
 
 To validate application records as well as the built-in envelope, specify a repository-relative local schema using the supported simplified JSON Schema vocabulary:
 

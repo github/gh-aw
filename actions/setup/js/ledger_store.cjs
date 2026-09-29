@@ -824,10 +824,11 @@ class Ledger {
     return db;
   }
 
-  /** @param {{type?: string, where?: Record<string, any>, limit?: number}} [filter] */
-  query({ type, where, limit = 100 } = {}) {
+  /** @param {{type?: string, where?: Record<string, any>, limit?: number, after?: string}} [filter] */
+  query({ type, where, limit = 100, after } = {}) {
     if (type !== undefined && (typeof type !== "string" || !type || type.length > 128)) throw new TypeError("Invalid query type");
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_QUERY_LIMIT) throw new RangeError("Invalid query limit");
+    if (after !== undefined && (typeof after !== "string" || !HASH.test(after))) throw new TypeError("Invalid query cursor");
     if (where !== undefined && (!where || typeof where !== "object" || Array.isArray(where) || Object.keys(where).length > 8)) throw new TypeError("Invalid query where filter");
     const filters = Object.entries(where || {});
     for (const [key, condition] of filters) {
@@ -844,17 +845,18 @@ class Ledger {
     }
     const state = this.reconstruct();
     const db = this.project(state);
+    let matches;
     if (!db) {
-      const rows = state.records.filter(record => (type === undefined || record.type === type) && matchesPayload(record.payload, filters)).slice(0, limit);
-      return { rows, heads: state.heads, diagnostics: state.diagnostics };
+      matches = state.records.filter(record => (type === undefined || record.type === type) && (!after || record.sha > after) && matchesPayload(record.payload, filters));
+    } else {
+      const sql = sqlPayloadFilter(filters, type);
+      const ordinals = db.prepare(`SELECT ordinal FROM records${sql.where} ORDER BY ordinal`).all(...sql.params);
+      matches = ordinals.map(row => state.records[Number(row.ordinal)]).filter(record => record && (!after || record.sha > after) && matchesPayload(record.payload, filters));
     }
-    const sql = sqlPayloadFilter(filters, type);
-    const ordinals = db.prepare(`SELECT ordinal FROM records${sql.where} ORDER BY ordinal`).all(...sql.params);
-    const rows = ordinals
-      .map(row => state.records[Number(row.ordinal)])
-      .filter(record => matchesPayload(record.payload, filters))
-      .slice(0, limit);
-    return { rows, heads: state.heads, diagnostics: state.diagnostics };
+    matches.sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
+    const hasMore = matches.length > limit;
+    const rows = matches.slice(0, limit);
+    return { rows, hasMore, nextCursor: hasMore ? rows.at(-1).sha : null, heads: state.heads, diagnostics: state.diagnostics };
   }
 
   status() {
