@@ -3874,35 +3874,35 @@
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Agent container image that runs the agentic engine."
                         },
-                        "apiProxy": {
+                        "api-proxy": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "API proxy sidecar image that holds provider credentials."
                         },
-                        "cliProxy": {
+                        "cli-proxy": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "CLI proxy sidecar image used by tools.github.mode: gh-proxy, integrity-reactions, or raw --difc-proxy-host AWF arguments."
                         },
-                        "buildTools": {
+                        "build-tools": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Build-tools image used as the chroot sysroot base on runner.topology: arc-dind."
                         },
-                        "dohProxy": {
+                        "doh-proxy": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "DNS-over-HTTPS proxy image required when legacy-security raw AWF arguments enable --dns-over-https."
                         },
-                        "enclaveScript": {
+                        "enclave-script": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Script enclave image."
                         },
-                        "enclaveAgent": {
+                        "enclave-agent": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Agent enclave image."
                         },
-                        "enclaveMcpServer": {
+                        "enclave-mcp-server": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Shared enclave MCP server image required whenever any enclave is enabled."
                         },
-                        "dindStaging": {
+                        "dind-staging": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "Docker-in-Docker staging image required when raw AWF arguments enable directory or engine-binary pre-staging."
                         }
@@ -3911,7 +3911,7 @@
                         {
                           "squid": "registry.example.com/approved/squid:v0.28.4@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                           "agent": "registry.example.com/approved/agent:v0.28.4@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                          "apiProxy": "registry.example.com/approved/api-proxy:v0.28.4@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                          "api-proxy": "registry.example.com/approved/api-proxy:v0.28.4@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                         }
                       ]
                     },
@@ -3944,21 +3944,21 @@
                         "filesystem": {
                           "type": "object",
                           "properties": {
-                            "denyRead": {
+                            "deny-read": {
                               "type": "array",
                               "description": "List of paths to deny read access",
                               "items": {
                                 "type": "string"
                               }
                             },
-                            "allowWrite": {
+                            "allow-write": {
                               "type": "array",
                               "description": "List of paths to allow write access",
                               "items": {
                                 "type": "string"
                               }
                             },
-                            "denyWrite": {
+                            "deny-write": {
                               "type": "array",
                               "description": "List of paths to deny write access",
                               "items": {
@@ -3969,7 +3969,7 @@
                           "additionalProperties": false,
                           "description": "Filesystem access control configuration for the agent within the sandbox. Controls read/write permissions and path restrictions."
                         },
-                        "ignoreViolations": {
+                        "ignore-violations": {
                           "type": "object",
                           "description": "Map of command patterns to paths that should ignore violations",
                           "additionalProperties": {
@@ -3979,7 +3979,7 @@
                             }
                           }
                         },
-                        "enableWeakerNestedSandbox": {
+                        "enable-weaker-nested-sandbox": {
                           "type": "boolean",
                           "description": "Enable weaker nested sandbox mode (recommended: true for Docker access)"
                         }
@@ -4024,21 +4024,21 @@
                 "filesystem": {
                   "type": "object",
                   "properties": {
-                    "denyRead": {
+                    "deny-read": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       },
                       "description": "Array of path patterns that deny read access in the sandboxed environment. Takes precedence over other read permissions."
                     },
-                    "allowWrite": {
+                    "allow-write": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       },
                       "description": "Array of path patterns that allow write access in the sandboxed environment. Paths outside these patterns are read-only."
                     },
-                    "denyWrite": {
+                    "deny-write": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -4049,7 +4049,7 @@
                   "additionalProperties": false,
                   "description": "Filesystem access control configuration for sandboxed workflows. Controls read/write permissions and path restrictions for file operations."
                 },
-                "ignoreViolations": {
+                "ignore-violations": {
                   "type": "object",
                   "additionalProperties": {
                     "type": "array",
@@ -4059,7 +4059,7 @@
                   },
                   "description": "When true, log sandbox violations without blocking execution. Useful for debugging and gradual enforcement of sandbox policies."
                 },
-                "enableWeakerNestedSandbox": {
+                "enable-weaker-nested-sandbox": {
                   "type": "boolean",
                   "description": "When true, allows nested sandbox processes to run with relaxed restrictions. Required for certain containerized tools that spawn subprocesses."
                 }
@@ -4096,7 +4096,7 @@
                   },
                   "description": "Arguments for docker run"
                 },
-                "entrypointArgs": {
+                "entrypoint-args": {
                   "type": "array",
                   "x-internal": true,
                   "items": {
@@ -16066,7 +16066,7 @@
       "type": "object",
       "description": "AWF API proxy target configuration for a single LLM provider.",
       "properties": {
-        "authHeader": {
+        "auth-header": {
           "type": "string",
           "description": "Custom authentication header name to use when forwarding requests to this provider's API. Overrides the provider default (\"Authorization\" for OpenAI, \"x-api-key\" for Anthropic). Example: \"api-key\" for Azure OpenAI gateways."
         }
@@ -16077,25 +16077,25 @@
       "type": "object",
       "description": "AWF API proxy target configuration for the Copilot BYOK provider. Supports injecting additional headers, body fields, and an optional session ID on upstream requests.",
       "properties": {
-        "authHeader": {
+        "auth-header": {
           "type": "string",
           "description": "Custom authentication header name to use when forwarding requests to the Copilot API. Example: \"api-key\" for Azure OpenAI gateways."
         },
-        "extraHeaders": {
+        "extra-headers": {
           "type": "object",
           "description": "Additional non-sensitive HTTP headers to inject on Copilot BYOK upstream requests. Maps to AWF_BYOK_EXTRA_HEADERS. Example: { \"x-openrouter-title\": \"my-workflow\" }.",
           "additionalProperties": {
             "type": "string"
           }
         },
-        "extraBodyFields": {
+        "extra-body-fields": {
           "type": "object",
           "description": "Additional non-sensitive JSON body fields to inject on Copilot BYOK upstream requests. Maps to AWF_BYOK_EXTRA_BODY_FIELDS. Example: { \"custom-field\": \"custom-value\" }.",
           "additionalProperties": {
             "type": "string"
           }
         },
-        "sessionId": {
+        "session-id": {
           "type": "string",
           "description": "Optional session identifier injected as the x-session-id request header and session_id body field on Copilot BYOK upstream requests. Maps to AWF_PROVIDER_SESSION_ID. Only set this field when your upstream supports it \u2014 strict OpenAI-compatible upstreams (e.g. Azure OpenAI) reject the unknown session_id body field with HTTP 400. Example: \"${{ github.run_id }}\"."
         }

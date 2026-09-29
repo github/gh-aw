@@ -28,7 +28,7 @@ sandbox:
   agent:
     config:
       filesystem:
-        allowWrite:
+        allow-write:
           - ${{ github.workspace }}
           - /tmp/gh-aw/agent
 runtimes:

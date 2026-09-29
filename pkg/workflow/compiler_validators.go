@@ -369,7 +369,7 @@ func validateWorkflowConcurrency(workflowData *WorkflowData, markdownPath string
 func (c *Compiler) emitSandboxRuntimeWarnings(workflowData *WorkflowData, markdownPath string) {
 	if declaresIgnoredFilesystemAllowWrite(workflowData) {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
-			"sandbox.agent.config.filesystem.allowWrite is ignored for this runtime and was not written to the AWF config. "+
+			"sandbox.agent.config.filesystem.allow-write is ignored for this runtime and was not written to the AWF config. "+
 				"Only sandbox.agent.runtime: cloud-hypervisor enforces the policy without breaking the agent container: "+
 				"the Docker runtimes narrow AWF's own writable bind mounts (including its internal /tmp/awf-init mount) "+
 				"to read-only."))

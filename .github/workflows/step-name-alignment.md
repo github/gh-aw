@@ -55,7 +55,7 @@ sandbox:
   agent:
     config:
       filesystem:
-        allowWrite:
+        allow-write:
         - /tmp/gh-aw/agent
 name: Step Name Alignment
 timeout-minutes: 30

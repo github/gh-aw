@@ -3003,11 +3003,25 @@ func TestMainWorkflowSchema_SandboxAgentImagesCanonicalReferences(t *testing.T) 
 				},
 			},
 		}
+
 	}
 
 	valid := "registry.example.com/approved/squid:v0.28.4@sha256:" + strings.Repeat("a", 64)
 	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatterWithImage(valid), "/tmp/gh-aw/sandbox-agent-images-valid-test.md"); err != nil {
 		t.Fatalf("expected canonical digest-pinned image to pass schema validation: %v", err)
+	}
+
+	apiProxyImage := "registry.example.com/approved/api-proxy:v0.28.4@sha256:" + strings.Repeat("b", 64)
+	apiProxyFrontmatter := frontmatterWithImage(valid)
+	apiProxyFrontmatter["sandbox"].(map[string]any)["agent"].(map[string]any)["images"].(map[string]any)["api-proxy"] = apiProxyImage
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(apiProxyFrontmatter, "/tmp/gh-aw/sandbox-agent-images-api-proxy-test.md"); err != nil {
+		t.Fatalf("expected kebab-cased image role to pass schema validation: %v", err)
+	}
+
+	camelCaseFrontmatter := frontmatterWithImage(valid)
+	camelCaseFrontmatter["sandbox"].(map[string]any)["agent"].(map[string]any)["images"].(map[string]any)["apiProxy"] = apiProxyImage
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(camelCaseFrontmatter, "/tmp/gh-aw/sandbox-agent-images-camel-case-test.md"); err == nil {
+		t.Fatal("expected camel-cased image role to be rejected by schema validation")
 	}
 
 	for _, invalid := range []string{
@@ -3155,7 +3169,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"openai": map[string]any{
-							"authHeader": "api-key",
+							"auth-header": "api-key",
 						},
 					},
 				},
@@ -3175,7 +3189,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"anthropic": map[string]any{
-							"authHeader": "api-key",
+							"auth-header": "api-key",
 						},
 					},
 				},
@@ -3195,7 +3209,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"openai": map[string]any{
-							"authHeader": 42,
+							"auth-header": 42,
 						},
 					},
 				},
@@ -3207,6 +3221,26 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 		}
 	})
 
+	t.Run("camel-cased authHeader is rejected", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"on":     "push",
+			"engine": "codex",
+			"sandbox": map[string]any{
+				"agent": map[string]any{
+					"targets": map[string]any{
+						"openai": map[string]any{
+							"authHeader": "api-key",
+						},
+					},
+				},
+			},
+		}
+		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/awf-auth-header-camel-case-test.md")
+		if err == nil {
+			t.Error("camel-cased authHeader should be rejected by schema validation")
+		}
+	})
+
 	t.Run("unknown provider in targets is rejected", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"on":     "push",
@@ -3215,12 +3249,13 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"unknown-provider": map[string]any{
-							"authHeader": "api-key",
+							"auth-header": "api-key",
 						},
 					},
 				},
 			},
 		}
+
 		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/tmp/gh-aw/awf-unknown-provider-test.md")
 		if err == nil {
 			t.Error("unknown provider in sandbox.agent.targets should be rejected")
@@ -3235,7 +3270,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"copilot": map[string]any{
-							"extraHeaders": map[string]any{
+							"extra-headers": map[string]any{
 								"x-openrouter-title": "my-workflow",
 								"http-referer":       "https://github.com/org/repo",
 							},
@@ -3258,7 +3293,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"copilot": map[string]any{
-							"extraBodyFields": map[string]any{
+							"extra-body-fields": map[string]any{
 								"custom-field": "custom-value",
 							},
 						},
@@ -3280,7 +3315,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"copilot": map[string]any{
-							"sessionId": "${{ github.run_id }}",
+							"session-id": "${{ github.run_id }}",
 						},
 					},
 				},
@@ -3300,13 +3335,13 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"copilot": map[string]any{
-							"extraHeaders": map[string]any{
+							"extra-headers": map[string]any{
 								"x-openrouter-title": "my-workflow",
 							},
-							"extraBodyFields": map[string]any{
+							"extra-body-fields": map[string]any{
 								"custom-field": "custom-value",
 							},
-							"sessionId": "${{ github.run_id }}",
+							"session-id": "${{ github.run_id }}",
 						},
 					},
 				},
@@ -3326,7 +3361,7 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 				"agent": map[string]any{
 					"targets": map[string]any{
 						"copilot": map[string]any{
-							"extraHeaders": map[string]any{
+							"extra-headers": map[string]any{
 								"x-count": 42,
 							},
 						},
@@ -3359,6 +3394,48 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AwfApiProxyTargets
 			t.Error("unknown field in copilot target should be rejected by schema validation")
 		}
 	})
+}
+
+func TestMainWorkflowSchema_SandboxFieldsUseKebabCase(t *testing.T) {
+	t.Parallel()
+
+	valid := map[string]any{
+		"on":     "push",
+		"engine": "copilot",
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"config": map[string]any{
+					"filesystem": map[string]any{
+						"deny-read":   []any{"/secret"},
+						"allow-write": []any{"/workspace"},
+						"deny-write":  []any{"/root"},
+					},
+					"ignore-violations":            map[string]any{"git *": []any{"/tmp"}},
+					"enable-weaker-nested-sandbox": true,
+				},
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(valid, "/tmp/gh-aw/sandbox-kebab-case-test.md"); err != nil {
+		t.Fatalf("expected kebab-cased sandbox fields to pass schema validation: %v", err)
+	}
+
+	invalid := map[string]any{
+		"on":     "push",
+		"engine": "copilot",
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"config": map[string]any{
+					"filesystem": map[string]any{
+						"allowWrite": []any{"/workspace"},
+					},
+				},
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(invalid, "/tmp/gh-aw/sandbox-camel-case-test.md"); err == nil {
+		t.Fatal("expected camel-cased sandbox field to be rejected by schema validation")
+	}
 }
 
 // TestValidateMainWorkflowFrontmatter_OnPermissionsVulnerabilityAlerts validates that

@@ -240,7 +240,7 @@ sandbox:
     images:
       squid: registry.example.com/approved/squid:v0.28.4@sha256:<64-hex-digest>
       agent: registry.example.com/approved/agent:v0.28.4@sha256:<64-hex-digest>
-      apiProxy: registry.example.com/approved/api-proxy:v0.28.4@sha256:<64-hex-digest>
+      api-proxy: registry.example.com/approved/api-proxy:v0.28.4@sha256:<64-hex-digest>
 ```
 
 The compiler emits the manifest as `container.images` in the generated AWF configuration.
@@ -273,18 +273,18 @@ sandbox:
   agent:
     targets:
       copilot:
-        extraHeaders:
+        extra-headers:
           x-openrouter-title: my-workflow
           http-referer: https://github.com/${{ github.repository }}
-        extraBodyFields:
+        extra-body-fields:
           custom-field: custom-value
-        sessionId: ${{ github.run_id }}
+        session-id: ${{ github.run_id }}
 ```
 
-Use this for OpenAI-compatible proxies and gateways that expect additional request metadata. `sessionId` is opt-in only; gh-aw does not derive it automatically.
+Use this for OpenAI-compatible proxies and gateways that expect additional request metadata. `session-id` is opt-in only; gh-aw does not derive it automatically.
 
 > [!NOTE]
-> Set `sessionId` only when your upstream expects a session identifier. Some strict OpenAI-compatible providers reject unknown `session_id` fields, so automatic injection would be unsafe.
+> Set `session-id` only when your upstream expects a session identifier. Some strict OpenAI-compatible providers reject unknown `session_id` fields, so automatic injection would be unsafe.
 
 #### Go cache paths in AWF (`GOMODCACHE` / `GOCACHE`)
 

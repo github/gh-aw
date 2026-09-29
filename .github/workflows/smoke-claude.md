@@ -54,7 +54,7 @@ sandbox:
   agent:
     config:
       filesystem:
-        allowWrite:
+        allow-write:
           - /tmp/gh-aw/agent
 tools:
   agentic-workflows:

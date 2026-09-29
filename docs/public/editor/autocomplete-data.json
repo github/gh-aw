@@ -893,42 +893,42 @@
                   "desc": "Agent container image that runs the agentic engine.",
                   "leaf": true
                 },
-                "apiProxy": {
+                "api-proxy": {
                   "type": "string",
                   "desc": "API proxy sidecar image that holds provider credentials.",
                   "leaf": true
                 },
-                "cliProxy": {
+                "cli-proxy": {
                   "type": "string",
                   "desc": "CLI proxy sidecar image used by tools.github.mode: gh-proxy, integrity-reactions, or raw --difc-proxy-host AWF argume...",
                   "leaf": true
                 },
-                "buildTools": {
+                "build-tools": {
                   "type": "string",
                   "desc": "Build-tools image used as the chroot sysroot base on runner.topology: arc-dind.",
                   "leaf": true
                 },
-                "dohProxy": {
+                "doh-proxy": {
                   "type": "string",
                   "desc": "DNS-over-HTTPS proxy image required when legacy-security raw AWF arguments enable --dns-over-https.",
                   "leaf": true
                 },
-                "enclaveScript": {
+                "enclave-script": {
                   "type": "string",
                   "desc": "Script enclave image.",
                   "leaf": true
                 },
-                "enclaveAgent": {
+                "enclave-agent": {
                   "type": "string",
                   "desc": "Agent enclave image.",
                   "leaf": true
                 },
-                "enclaveMcpServer": {
+                "enclave-mcp-server": {
                   "type": "string",
                   "desc": "Shared enclave MCP server image required whenever any enclave is enabled.",
                   "leaf": true
                 },
-                "dindStaging": {
+                "dind-staging": {
                   "type": "string",
                   "desc": "Docker-in-Docker staging image required when raw AWF arguments enable directory or engine-binary pre-staging.",
                   "leaf": true
@@ -965,11 +965,11 @@
                   "type": "object",
                   "desc": "Filesystem access control configuration for the agent within the sandbox."
                 },
-                "ignoreViolations": {
+                "ignore-violations": {
                   "type": "object",
                   "desc": "Map of command patterns to paths that should ignore violations"
                 },
-                "enableWeakerNestedSandbox": {
+                "enable-weaker-nested-sandbox": {
                   "type": "boolean",
                   "desc": "Enable weaker nested sandbox mode (recommended: true for Docker access)",
                   "enum": [true, false],
@@ -1010,28 +1010,28 @@
               "type": "object",
               "desc": "Filesystem access control configuration for sandboxed workflows.",
               "children": {
-                "denyRead": {
+                "deny-read": {
                   "type": "array",
                   "desc": "Array of path patterns that deny read access in the sandboxed environment.",
                   "array": true
                 },
-                "allowWrite": {
+                "allow-write": {
                   "type": "array",
                   "desc": "Array of path patterns that allow write access in the sandboxed environment.",
                   "array": true
                 },
-                "denyWrite": {
+                "deny-write": {
                   "type": "array",
                   "desc": "Array of path patterns that deny write access in the sandboxed environment.",
                   "array": true
                 }
               }
             },
-            "ignoreViolations": {
+            "ignore-violations": {
               "type": "object",
               "desc": "When true, log sandbox violations without blocking execution."
             },
-            "enableWeakerNestedSandbox": {
+            "enable-weaker-nested-sandbox": {
               "type": "boolean",
               "desc": "When true, allows nested sandbox processes to run with relaxed restrictions.",
               "enum": [true, false],
@@ -1063,7 +1063,7 @@
               "desc": "Arguments for docker run",
               "array": true
             },
-            "entrypointArgs": {
+            "entrypoint-args": {
               "type": "array",
               "desc": "Arguments to add after the container image (container entrypoint arguments)",
               "array": true

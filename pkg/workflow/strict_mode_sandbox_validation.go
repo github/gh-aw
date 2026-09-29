@@ -27,7 +27,7 @@ func internalSandboxFieldError(fieldPath string) error {
 // are not allowed in strict mode:
 //   - sandbox.agent.command, sandbox.agent.args, sandbox.agent.env  (AWF customization)
 //   - sandbox.mcp.container, sandbox.mcp.version, sandbox.mcp.entrypoint,
-//     sandbox.mcp.args, sandbox.mcp.entrypointArgs  (MCP gateway customization)
+//     sandbox.mcp.args, sandbox.mcp.entrypoint-args  (MCP gateway customization)
 //
 // A sandbox.agent object without an explicit 'id' is explicitly set to AWF in strict mode.
 func (c *Compiler) validateStrictSandboxCustomization(sandboxConfig *SandboxConfig) error {
@@ -75,7 +75,7 @@ func (c *Compiler) validateStrictSandboxCustomization(sandboxConfig *SandboxConf
 			return internalSandboxFieldError("sandbox.mcp.args")
 		}
 		if len(mcp.EntrypointArgs) > 0 {
-			return internalSandboxFieldError("sandbox.mcp.entrypointArgs")
+			return internalSandboxFieldError("sandbox.mcp.entrypoint-args")
 		}
 	}
 
