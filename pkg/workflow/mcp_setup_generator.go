@@ -205,6 +205,9 @@ func collectMCPTools(workflowData *WorkflowData) []string {
 	if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
 		mcpTools = append(mcpTools, "safe-outputs")
 	}
+	if workflowData.RepoMemoryConfig.ledgerEntry() != nil {
+		mcpTools = append(mcpTools, "ledger")
+	}
 	if IsMCPScriptsEnabled(workflowData.MCPScripts) {
 		mcpTools = append(mcpTools, "mcp-scripts")
 	}

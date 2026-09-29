@@ -153,6 +153,12 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 			envVars["GH_AW_ASSETS_ALLOWED_EXTS"] = "${{ env.GH_AW_ASSETS_ALLOWED_EXTS }}"
 		}
 	}
+	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil {
+		envVars["GH_AW_MEMORY_DIR"] = constants.TmpRepoMemoryDir + memory.ID
+		if memory.Ledger.Schema != "" {
+			envVars["GH_AW_LEDGER_SCHEMA"] = memory.Ledger.Schema
+		}
+	}
 
 	// Check for mcp-scripts env vars
 	// Only add env vars if mcp-scripts is actually enabled (has tools configured)

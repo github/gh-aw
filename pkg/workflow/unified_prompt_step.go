@@ -136,6 +136,12 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 		if section != nil {
 			sections = append(sections, *section)
 		}
+		if memory := data.RepoMemoryConfig.ledgerEntry(); memory != nil {
+			sections = append(sections, PromptSection{
+				Content: "Use `ledger_append`, `ledger_query`, `ledger_get`, and `ledger_status` to record and inspect structured events. " +
+					"Do not edit ledger storage directly.",
+			})
+		}
 	}
 
 	// 8. Safe outputs instructions (if enabled)

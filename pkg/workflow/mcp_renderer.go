@@ -169,6 +169,10 @@ func RenderJSONMCPConfig( //nolint:largefunc // Existing renderer keeps MCP JSON
 			options.Renderers.RenderAgenticWorkflows(&configBuilder, isLast)
 		case "safe-outputs":
 			options.Renderers.RenderSafeOutputs(&configBuilder, isLast, workflowData)
+		case "ledger":
+			if options.Renderers.RenderLedger != nil {
+				options.Renderers.RenderLedger(&configBuilder, isLast, workflowData)
+			}
 		case "mcp-scripts":
 			if options.Renderers.RenderMCPScripts != nil {
 				options.Renderers.RenderMCPScripts(&configBuilder, workflowData.MCPScripts, isLast)

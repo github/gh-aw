@@ -48,10 +48,8 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 		}
 	}
 
-	// Check for safe-outputs MCP server.
-	// Safe outputs run in the published gh-aw node container and must be part of
-	// the default predownload set and lock-file manifest whenever enabled.
-	if workflowData != nil && HasSafeOutputsEnabled(workflowData.SafeOutputs) {
+	// Safe outputs and ledger MCP servers share the published gh-aw node container.
+	if workflowData != nil && (HasSafeOutputsEnabled(workflowData.SafeOutputs) || workflowData.RepoMemoryConfig.ledgerEntry() != nil) {
 		image := constants.DefaultGhAwNodeImage
 		if !setutil.Contains(imageSet, image) {
 			images = append(images, image)

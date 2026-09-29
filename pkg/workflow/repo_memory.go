@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -60,6 +61,12 @@ type RepoMemoryEntry struct {
 	Wiki              bool                    `yaml:"wiki,omitempty"`               // use the GitHub Wiki git repository instead of the regular repo
 	FormatJSON        bool                    `yaml:"format-json,omitempty"`        // pretty-print all .json files before committing (default: false)
 	Validation        *MemoryValidationConfig `yaml:"validation,omitempty"`         // optional custom JavaScript validation hook
+	Ledger            *RepoMemoryLedgerConfig `yaml:"ledger,omitempty"`             // optional ledger projection
+}
+
+// RepoMemoryLedgerConfig enables the ledger projection for this memory.
+type RepoMemoryLedgerConfig struct {
+	Schema string `yaml:"schema,omitempty"`
 }
 
 // RepoMemoryToolConfig represents the configuration for repo-memory in tools
@@ -106,9 +113,17 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig, workflowID 
 		if err != nil {
 			return nil, err
 		}
+		ledgerEnabled := false
+		for _, memory := range memories {
+			ledgerEnabled = ledgerEnabled || memory.Ledger != nil
+		}
+		if ledgerEnabled && len(memories) != 1 {
+			return nil, fmt.Errorf("tools.repo-memory.ledger requires exactly one repo-memory entry")
+		}
 		config.Memories = memories
 		return config, nil
 	}
+
 	if configMap, ok := repoMemoryValue.(map[string]any); ok {
 		if err := applyRepoMemoryBranchPrefix(configMap, config); err != nil {
 			return nil, err
@@ -121,6 +136,18 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig, workflowID 
 		return config, nil
 	}
 	return nil, nil
+}
+
+func (config *RepoMemoryConfig) ledgerEntry() *RepoMemoryEntry {
+	if config == nil {
+		return nil
+	}
+	for i := range config.Memories {
+		if config.Memories[i].Ledger != nil {
+			return &config.Memories[i]
+		}
+	}
+	return nil
 }
 
 func newDefaultRepoMemoryEntry(workflowID, branchPrefix string) RepoMemoryEntry {
@@ -207,6 +234,26 @@ func parseRepoMemoryEntry(memoryMap map[string]any, workflowID, branchPrefix str
 	}
 	if err := applyRepoMemoryOptionalFields(&entry, memoryMap); err != nil {
 		return RepoMemoryEntry{}, err
+	}
+	if ledger, exists := memoryMap["ledger"]; exists {
+		config, err := parseRepoMemoryLedgerConfig(ledger)
+		if err != nil {
+			return RepoMemoryEntry{}, err
+		}
+		if !repoMemoryLedgerIDPattern.MatchString(entry.ID) {
+			return RepoMemoryEntry{}, fmt.Errorf("tools.repo-memory.ledger requires a memory id with only letters, numbers, hyphens or underscores")
+		}
+		hasJSONLExtension := false
+		for _, ext := range entry.AllowedExtensions {
+			hasJSONLExtension = hasJSONLExtension || strings.EqualFold(ext, ".jsonl")
+		}
+		if len(entry.AllowedExtensions) > 0 && !hasJSONLExtension {
+			return RepoMemoryEntry{}, fmt.Errorf("tools.repo-memory.ledger requires .jsonl in allowed-extensions to persist ledger records")
+		}
+		if len(entry.FileGlob) > 0 && !slices.Contains(entry.FileGlob, "ledger/shards/*.jsonl") {
+			entry.FileGlob = append(entry.FileGlob, "ledger/shards/*.jsonl")
+		}
+		entry.Ledger = config
 	}
 	finalizeRepoMemoryEntry(&entry, explicitBranchName)
 	return entry, nil
@@ -547,6 +594,7 @@ func generateRepoMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
 		fmt.Fprintf(builder, "          CREATE_ORPHAN: %t\n", memory.CreateOrphan)
 		builder.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh\"\n")
+
 	}
 }
 

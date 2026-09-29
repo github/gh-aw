@@ -45,6 +45,31 @@ tools:
 
 `branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.script` runs a custom JavaScript domain validator before persistence, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
+## Structured Ledger
+
+Enable an optional, domain-neutral ledger within repo memory:
+
+```aw wrap
+---
+tools:
+  repo-memory:
+    ledger:
+---
+```
+
+The ledger tools append immutable structured records and retrieve or query them without exposing storage paths or SQL to the agent. Repo memory persists the append-only records in Git; an ephemeral local index is reconstructed from those records on each run. Independent concurrent writers can append records, and their histories converge when repo memory merges them. A missing parent is reported as incomplete rather than discarding its record; malformed records are isolated and reported in ledger status.
+
+To validate application records as well as the built-in envelope, specify a repository-relative local schema using the supported simplified JSON Schema vocabulary:
+
+```yaml
+tools:
+  repo-memory:
+    ledger:
+      schema: .github/schemas/ledger.schema.json
+```
+
+The ledger is an eventually convergent append-only store, not a distributed transactional database. Applications must define their own deterministic conflict resolution for concurrent records.
+
 **File Glob Matching Rules**:
 
 - Patterns are matched against the **relative path** within the artifact directory — do **not** include the branch name.

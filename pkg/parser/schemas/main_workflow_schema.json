@@ -5572,6 +5572,9 @@
                   "type": "boolean",
                   "description": "When true, all .json files are pretty-printed (2-space indent) before being committed, making them human-readable in the repository (default: false)"
                 },
+                "ledger": {
+                  "$ref": "#/$defs/repoMemoryLedger"
+                },
                 "validation": {
                   "type": "object",
                   "properties": {
@@ -5685,6 +5688,9 @@
                   "format-json": {
                     "type": "boolean",
                     "description": "When true, all .json files are pretty-printed (2-space indent) before being committed, making them human-readable in the repository (default: false)"
+                  },
+                  "ledger": {
+                    "$ref": "#/$defs/repoMemoryLedger"
                   },
                   "validation": {
                     "type": "object",
@@ -13703,6 +13709,18 @@
     }
   ],
   "$defs": {
+    "repoMemoryLedger": {
+      "type": ["object", "null"],
+      "description": "Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema.",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path to a JSON schema for ledger entries."
+        }
+      },
+      "additionalProperties": false
+    },
     "azure_devops_create_work_item": {
       "description": "Experimental. Create Azure DevOps work items through a trusted safe-output handler. Using this field emits a compile-time warning.",
       "oneOf": [

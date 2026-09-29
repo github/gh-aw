@@ -22,10 +22,49 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"path"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
+
+var repoMemoryLedgerSchemaPathPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
+var repoMemoryLedgerIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
+	if raw == nil {
+		return &RepoMemoryLedgerConfig{}, nil
+	}
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("tools.repo-memory.ledger must be an object (use ledger: {} to enable defaults)")
+	}
+	config := &RepoMemoryLedgerConfig{}
+	for key, value := range fields {
+		if key != "schema" {
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema is supported)", key)
+		}
+		schema, ok := value.(string)
+		if !ok {
+			return nil, errors.New("tools.repo-memory.ledger.schema must be a repository-relative path")
+		}
+		if err := validateRepoMemoryLedgerSchemaPath(schema); err != nil {
+			return nil, err
+		}
+		config.Schema = schema
+	}
+	return config, nil
+}
+
+func validateRepoMemoryLedgerSchemaPath(schema string) error {
+	if schema == "" || !repoMemoryLedgerSchemaPathPattern.MatchString(schema) ||
+		strings.HasPrefix(schema, "/") || path.Clean(schema) != schema ||
+		schema == "." || schema == ".." || strings.HasPrefix(schema, "../") {
+		return fmt.Errorf("tools.repo-memory.ledger.schema must be a repository-relative path without traversal or expressions, got %q", schema)
+	}
+	return nil
+}
 
 var repoMemValidationLog = logger.New("workflow:repo_memory_validation")
 

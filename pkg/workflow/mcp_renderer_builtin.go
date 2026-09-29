@@ -23,6 +23,45 @@ func (r *MCPConfigRendererUnified) RenderSafeOutputsMCP(yaml *strings.Builder, w
 	renderSafeOutputsMCPConfigWithOptions(yaml, r.options.IsLast, r.options.IncludeCopilotFields, workflowData)
 }
 
+// RenderLedgerMCP registers the ledger server in the existing gh-aw node MCP container.
+func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workflowData *WorkflowData) {
+	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
+	if r.options.Format == "toml" {
+		yaml.WriteString("          \n")
+		yaml.WriteString("          [mcp_servers.ledger]\n")
+		yaml.WriteString("          container = \"" + image + "\"\n")
+		yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
+		yaml.WriteString("          entrypoint = \"node\"\n")
+		yaml.WriteString("          entrypointArgs = [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"]\n")
+		yaml.WriteString("          env_vars = [\"GH_AW_MEMORY_DIR\", \"GITHUB_RUN_ID\", \"GITHUB_WORKSPACE\", \"RUNNER_TEMP\"")
+		if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
+			yaml.WriteString(", \"GH_AW_LEDGER_SCHEMA\"")
+		}
+		yaml.WriteString("]\n")
+		return
+	}
+	yaml.WriteString("              \"ledger\": {\n")
+	if r.options.IncludeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+	}
+	yaml.WriteString("                \"container\": \"" + image + "\",\n")
+	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
+	yaml.WriteString("                \"entrypoint\": \"node\",\n")
+	yaml.WriteString("                \"entrypointArgs\": [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"],\n")
+	yaml.WriteString("                \"env\": {\n")
+	yaml.WriteString("                  \"GH_AW_MEMORY_DIR\": \"\\${GH_AW_MEMORY_DIR}\",\n")
+	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
+		yaml.WriteString("                  \"GH_AW_LEDGER_SCHEMA\": \"\\${GH_AW_LEDGER_SCHEMA}\",\n")
+	}
+	yaml.WriteString("                  \"GITHUB_RUN_ID\": \"\\${GITHUB_RUN_ID}\"\n")
+	yaml.WriteString("                }\n")
+	if r.options.IsLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}
+
 // renderSafeOutputsTOML generates Safe Outputs MCP configuration in TOML format
 // Uses containerized stdio transport in the gh-aw-node image, overriding the container's
 // default entrypoint to run the stdio MCP server script.
