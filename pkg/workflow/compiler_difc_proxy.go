@@ -562,8 +562,13 @@ func (c *Compiler) buildStartCliProxyStepYAML(data *WorkflowData) string {
 	githubToolConfig, _ := data.Tools["github"].(map[string]any)
 
 	// Get token for the proxy
-	customGitHubToken := getGitHubToken(githubToolConfig)
-	resolvedToken := resolveGitHubToken(customGitHubToken)
+	var resolvedToken string
+	if isGitHubAppTokenForCLIProxy(data) {
+		resolvedToken = "${{ steps.github-mcp-app-token.outputs.token }}"
+	} else {
+		customGitHubToken := getGitHubToken(githubToolConfig)
+		resolvedToken = resolveGitHubToken(customGitHubToken)
+	}
 
 	// Build the guard policy JSON (static fields only, plus reaction fields when enabled).
 	// The CLI proxy requires a policy to forward requests — without one, all API

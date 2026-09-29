@@ -119,6 +119,59 @@ Test workflow with GitHub MCP app token minting.
 	assert.Contains(t, lockContent, "GITHUB_MCP_SERVER_TOKEN: ${{ steps.github-mcp-app-token.outputs.token }}", "Should use agent job step token for GitHub MCP Server")
 }
 
+func TestGitHubMCPAppTokenForCLIProxyDoesNotChangeSafeOutputsAuth(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	markdown := `---
+on: issues
+permissions:
+  contents: read
+  pull-requests: read
+strict: false
+tools:
+  github:
+    mode: gh-proxy
+    github-app:
+      client-id: ${{ vars.SOURCE_APP_ID }}
+      private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
+      owner: example-org
+      repositories: [private-source-repo]
+safe-outputs:
+  github-token: ${{ secrets.SAFE_OUTPUTS_TOKEN }}
+  create-pull-request:
+    allowed-files: ["docs/**/*.md"]
+---
+
+Test that gh-proxy uses the GitHub App token while safe outputs retain their own credential.
+`
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "gh-proxy-app-token.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(markdown), 0600))
+	require.NoError(t, compiler.CompileWorkflow(testFile))
+
+	lockFile := strings.TrimSuffix(testFile, ".md") + ".lock.yml"
+	content, err := os.ReadFile(lockFile)
+	require.NoError(t, err)
+	lockContent := string(content)
+
+	appMintIndex := strings.Index(lockContent, "id: github-mcp-app-token")
+	proxyIndex := strings.Index(lockContent, "name: Start CLI Proxy")
+	require.NotEqual(t, -1, appMintIndex, "compiled workflow should mint the GitHub App token")
+	require.NotEqual(t, -1, proxyIndex, "compiled workflow should start the CLI proxy")
+	assert.Less(t, appMintIndex, proxyIndex, "the App token must be minted before the proxy starts")
+
+	agentJobEnd := strings.Index(lockContent, "\n  safe_outputs:")
+	require.NotEqual(t, -1, agentJobEnd, "compiled workflow should include a safe_outputs job")
+	agentJob := lockContent[:agentJobEnd]
+	assert.Contains(t, agentJob, "GH_TOKEN: ${{ steps.github-mcp-app-token.outputs.token }}")
+
+	safeOutputsJob := lockContent[agentJobEnd:]
+	assert.Contains(t, safeOutputsJob, "github-token: ${{ secrets.SAFE_OUTPUTS_TOKEN }}",
+		"safe outputs should use their separately configured credential")
+	assert.NotContains(t, safeOutputsJob, "steps.github-mcp-app-token.outputs.token",
+		"the source App token must not be used by safe outputs")
+}
+
 // TestGitHubMCPAppTokenAndGitHubTokenMutuallyExclusive tests that setting both app and github-token is rejected
 func TestGitHubMCPAppTokenAndGitHubTokenMutuallyExclusive(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
@@ -129,7 +182,7 @@ permissions:
   contents: read
 tools:
   github:
-    mode: local
+    mode: gh-proxy
     github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
     github-app:
       app-id: ${{ vars.APP_ID }}

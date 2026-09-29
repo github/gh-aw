@@ -179,6 +179,11 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 	}
 
 	app := data.ParsedTools.GitHub.GitHubApp
+	if isGitHubAppTokenForCLIProxy(data) && app.shouldIgnoreMissingKey() {
+		appCopy := *app
+		appCopy.IgnoreIfMissing = false
+		app = &appCopy
+	}
 	githubConfigLog.Printf("Generating GitHub App token minting step for GitHub MCP server: client-id=%s", app.AppID)
 
 	// Get permissions from the agent job - use cached permissions when available to avoid YAML re-parsing.

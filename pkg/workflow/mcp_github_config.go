@@ -270,6 +270,18 @@ func isGitHubCLIModeEnabled(data *WorkflowData) bool {
 	return isFeatureEnabled(constants.CliProxyFeatureFlag, data)
 }
 
+func isGitHubAppTokenForCLIProxy(data *WorkflowData) bool {
+	if data == nil || data.ParsedTools == nil || data.ParsedTools.GitHub == nil || data.ParsedTools.GitHub.GitHubApp == nil {
+		return false
+	}
+	switch data.ParsedTools.GitHub.Mode {
+	case GitHubMCPModeGHProxy, GitHubMCPModeCLI:
+		return true
+	default:
+		return false
+	}
+}
+
 // normalizeGitHubType normalizes and validates GitHub MCP transport values.
 // Supported values are `local` and `remote`.
 func normalizeGitHubType(value string) (GitHubMCPMode, bool) {

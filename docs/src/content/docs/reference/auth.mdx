@@ -477,6 +477,8 @@ gh aw secrets set APP_PRIVATE_KEY --value "$(cat path/to/private-key.pem)"
 
 At workflow start, a token is automatically minted with **permissions matching your job's `permissions:` field**. The token is passed to the GitHub MCP server and automatically revoked at workflow end (even on failure).
 
+With `tools.github.mode: gh-proxy`, the CLI proxy uses this same-job App token for the agent's `gh` commands. Its installation scope and the proxy's `allowed-repos` and integrity policies are separate restrictions. The token does not replace the credential used by safe outputs, which continues to use its own configured token or the workflow repository's `GITHUB_TOKEN` fallback.
+
 You can also use GitHub App tokens for safe outputs operations:
 
 ```yaml wrap
@@ -534,7 +536,7 @@ safe-outputs:
   create-issue:
 ```
 
-The same field is accepted under `tools.github.github-app:` and applies consistently to all token mint paths (safe outputs, activation, pre-activation, and checkout). Default behavior (fail when keys are empty) is unchanged when the field is omitted or `false`.
+The same field is accepted under `tools.github.github-app:` and applies consistently to token mint paths. For `tools.github.mode: gh-proxy`, the App token is required for proxy authentication, so missing App credentials fail the mint step instead of falling back to another token. Default behavior (fail when keys are empty) is unchanged when the field is omitted or `false`.
 
 ---
 
