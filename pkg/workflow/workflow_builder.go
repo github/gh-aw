@@ -42,6 +42,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		FrontmatterName:            toolsResult.frontmatterName,
 		FrontmatterEmoji:           toolsResult.frontmatterEmoji,
 		FrontmatterYAML:            strings.Join(result.FrontmatterLines, "\n"),
+		ActionPinSourceVersions:    sourceActionPinVersions(result, importsResult.ActionPinSourceVersions),
 		FrontmatterFieldLines:      result.FieldLines,
 		RawMarkdown:                result.Markdown,
 		Description:                c.extractDescription(result.Frontmatter),
@@ -258,4 +259,18 @@ func (c *Compiler) buildInitialWorkflowData(
 	}
 
 	return workflowData
+}
+
+// sourceActionPinVersions collects inline labels from frontmatter and imported action steps.
+func sourceActionPinVersions(result *parser.FrontmatterResult, imported map[string]string) map[string]string {
+	versions := parser.ActionPinSourceVersions([]byte(strings.Join(result.FrontmatterLines, "\n")))
+	if versions == nil {
+		versions = make(map[string]string)
+	}
+	for reference, label := range imported {
+		if _, exists := versions[reference]; !exists {
+			versions[reference] = label
+		}
+	}
+	return versions
 }

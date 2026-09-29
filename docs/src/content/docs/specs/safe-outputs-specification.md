@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.6<br>
+**Version**: 1.29.7<br>
 **Status**: Working Draft<br>
 **Publication Date**: 2026-09-23<br>
 **Editor**: GitHub Agentic Workflows Team<br>
@@ -575,6 +575,27 @@ This specification addresses five primary threat scenarios:
 | **Deferred trust** | Durable `safe.directory` trust is granted only to the resolved, allowlist-validated checkout directory at the point of the git write operations | Medium |
 
 *Residual Risk*: A spoofed `remote.origin.url` can still redirect an allowlisted operation to a different workspace directory, so the pushed content is agent-controlled — as it is for any safe output. Two further residuals remain: a `.git` gitdir-link file may point its git directory outside the workspace even though the worktree path is confined, and pushes use the local remote name `origin` rather than a remote URL reconstructed from `GITHUB_SERVER_URL`. Mitigation: configure `allowed-repos`/`allowed-github-references` so the target set is explicit, prefer `checkout:` entries (which populate the manifest and take precedence over the scan) over ad-hoc workspace clones, and rely on branch protection and review for the receiving repository.
+
+**Threat T8: Private-to-Public Data Exposure**
+
+*Attack Vector*: A workflow opts out of the gateway's cross-visibility protections, allowing data read from a private repository to reach public Actions logs or a public repository selected by the agent.
+
+*Examples*:
+
+- An agent includes private issue or source content in a safe-output body targeting a public repository.
+- A safe-output failure or diagnostic includes private data in a public workflow log.
+- A blanket or server-specific `private-to-public-flows` opt-out disables the default sink-visibility guard.
+
+*Architectural Mitigations*:
+
+| Layer | Mechanism | Effectiveness |
+|-------|-----------|---------------|
+| **Default policy** | Private workflows enforce public sink visibility restrictions unless an explicit opt-out is configured | High |
+| **Compiler gate** | Strict mode rejects both blanket and server-list opt-outs; non-strict mode emits a security warning | High when strict mode is enabled |
+| **Target authorization** | Safe-output handlers continue to enforce configured repository and per-type allowlists | High |
+| **Auditability** | The opt-out and resulting safe-output operations are retained in compiler and workflow audit records | Medium |
+
+*Residual Risk*: A non-strict workflow can still intentionally configure the opt-out, and public logs remain visible to repository readers. Mitigation: use strict mode for workflows processing private data, keep the default sink-visibility policy enabled, and review any non-strict warning before deployment.
 
 **Repository Reference Format**
 
@@ -3922,6 +3943,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target issue or pull request before assignment
 
 **Target Authorization**:
 
@@ -3934,6 +3956,10 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **ATA-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied `issue_number`/`pull_number`; only in this mode MUST the processor reject a message that specifies both fields as mutually exclusive.
 
 **ATA-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Required Labels**:
+
+**ATA-006**: When `required-labels` is configured, the processor MUST check the current labels on the resolved target issue or pull request immediately before assignment. If any configured label is missing, the processor MUST skip agent assignment.
 
 **Required Permissions**:
 
@@ -5134,6 +5160,26 @@ Cross-repository allowlist validation (SP6, SP7) MUST succeed before a discovery
 
 When resolution fails, the error returned to the agent MUST identify the requested slug and the supported remediation (a `checkout:` entry or a workspace clone) and MUST NOT include scanned filesystem paths or credentials.
 
+### 9.7 Private-to-Public Flow Containment
+
+Safe-output processing MUST preserve the default separation between data read from private repositories and public logs or repositories. The `tools.github.private-to-public-flows` compiler setting is an explicit opt-out from this protection and does not weaken safe-output target authorization.
+
+**Requirement PPF1: Default Sink Visibility**
+
+When a workflow can process private data, the gateway MUST enforce public sink visibility restrictions unless `private-to-public-flows` is explicitly configured. The default MUST NOT permit an agent to select a public destination for private data solely because the destination is reachable with the workflow token.
+
+**Requirement PPF2: Compiler Enforcement**
+
+The compiler MUST reject `tools.github.private-to-public-flows` in strict mode for both the blanket `allow` form and the server-ID list form. In non-strict mode, the compiler MUST emit a security warning that identifies public Actions logs and public destinations as exposure channels.
+
+**Requirement PPF3: Server-ID Validation**
+
+When the server-ID list form is used, every ID MUST resolve to a declared MCP server before the workflow is compiled. Unknown IDs MUST be rejected regardless of strict-mode setting.
+
+**Requirement PPF4: Target Authorization Preservation**
+
+An accepted opt-out MUST NOT bypass safe-output target authorization. Repository allowlists, per-type allowlists, permission checks, content validation, and audit recording MUST continue to apply to every safe-output operation.
+
 ---
 
 ## 10. Execution Guarantees
@@ -5998,6 +6044,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.7** (2026-09-29):
+
+- **Added**: Threat T8 "Private-to-Public Data Exposure" to Section 3.2, covering public Actions logs and public safe-output destinations.
+- **Specified**: The compiler gate and target-authorization requirements for `tools.github.private-to-public-flows` opt-outs.
+- **Updated**: Publication metadata to 1.29.7.
 
 **Version 1.29.6** (2026-09-23):
 

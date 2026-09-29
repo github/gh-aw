@@ -880,6 +880,22 @@ describe("awf_reflect.cjs", () => {
       expect(entry).toEqual({ provider_type: "openai", wire_api: "responses", cost: {} });
     });
 
+    it("looks up utility variants through their base model after exact matches", () => {
+      const modelsJson = {
+        providers: {
+          "github-copilot": {
+            models: {
+              "gpt-5.6-luna": { wire_api: "responses" },
+              "gpt-5.6-luna-utility": { wire_api: "completions" },
+            },
+          },
+        },
+      };
+      expect(getCatalogModelEntry(modelsJson, "gpt-5.6-luna-utility?effort=high", "github-copilot")).toEqual({ wire_api: "completions" });
+      delete modelsJson.providers["github-copilot"].models["gpt-5.6-luna-utility"];
+      expect(getCatalogModelEntry(modelsJson, "gpt-5.6-luna-utility", "github-copilot")).toEqual({ wire_api: "responses" });
+    });
+
     it("uses the requested provider when duplicate model names exist", () => {
       const modelsJson = {
         providers: {
@@ -1061,6 +1077,23 @@ describe("awf_reflect.cjs", () => {
       expect(result.providers[0]).toMatchObject({ name: "copilot", type: "openai", wireApi: "responses" });
       expect(result.providers[1]).toMatchObject({ name: "anthropic", type: "anthropic" });
       expect(result.providers[1]).not.toHaveProperty("wireApi");
+    });
+
+    it("infers wireApi from the base catalog model for a Copilot utility variant", () => {
+      const reflectData = {
+        endpoints: [{ provider: "copilot", port: 10002, configured: true, models: ["gpt-5.6-luna-utility"] }],
+      };
+      const modelsJson = {
+        providers: {
+          "github-copilot": { models: { "gpt-5.6-luna": { provider_type: "openai", wire_api: "responses", cost: {} } } },
+        },
+      };
+      const result = resolveMultiProviderFromReflect({
+        model: "gpt-5.6-luna-utility",
+        reflectData,
+        modelsJson,
+      });
+      expect(result.providers[0]).toMatchObject({ name: "copilot", type: "openai", wireApi: "responses" });
     });
 
     it("handles duplicate provider names by appending a numeric suffix", () => {

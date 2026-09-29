@@ -11,6 +11,7 @@ This package is imported only in test files (`_test.go`). It provides:
 - Per-test subdirectories that are cleaned up automatically.
 - Helpers for capturing `os.Stderr` output during tests.
 - A helper for stripping YAML comment headers from compiled workflow output.
+- A helper for locating the built `gh-aw` binary for integration tests.
 
 ## Public API
 
@@ -21,6 +22,7 @@ This package is imported only in test files (`_test.go`). It provides:
 | `GetTestRunDir` | `func() string` | Returns the path to the unique top-level directory for the current test run, created once per process under `$TMPDIR/gh-aw-test-runs/<timestamp>-<pid>` |
 | `TempDir` | `func(t *testing.T, pattern string) string` | Creates a temporary subdirectory inside the test run directory matching `pattern`; the directory is automatically removed when the test completes via `t.Cleanup` |
 | `CaptureStderr` | `func(t *testing.T, fn func()) string` | Runs `fn` and returns everything written to `os.Stderr` during its execution; `os.Stderr` is restored via `defer` when `fn` returns |
+| `RequireGhAwBinary` | `func(t *testing.T) string` | Returns the absolute path to the built `gh-aw` binary (`gh-aw.exe` on Windows) at the repository root, found by walking up from the working directory to `go.mod`; the test is skipped via `t.Skip` if the root or binary is missing (run `make build` first) |
 | `StripYAMLCommentHeader` | `func(yamlContent string) string` | Removes the leading comment block from a generated YAML file and returns only the non-comment content |
 
 ## Usage Examples
@@ -66,7 +68,7 @@ This appendix is generated from the current non-test Go source files in this pac
 | Types | 0 |
 | Constants | 0 |
 | Variables | 0 |
-| Functions and methods | 4 |
+| Functions and methods | 5 |
 | Additional symbols documented in this appendix | 0 |
 
 The sections above already mention every exported top-level symbol in the current source tree.

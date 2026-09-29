@@ -55,6 +55,7 @@ safe-outputs:
     custom-agent: "agent-id"   # default custom agent ID (optional)
     custom-instructions: "..."  # default custom instructions (optional)
     allowed: [copilot]         # restrict to specific agents (optional)
+    required-labels: [copilot-ready] # assign only while all labels are present (optional)
     max: 1                     # max assignments (default: 1)
     target: "triggering"       # "triggering" (default), "*", or number
     target-repo: "owner/repo"  # where the issue lives (cross-repository)

@@ -30,6 +30,33 @@ type fixedResolver struct {
 	called int
 }
 
+func TestResolveActionPin_AlreadyPinnedSourceVersion(t *testing.T) {
+	const sha = "c19371144df3bb44fab255c43d04cbc2ab54d1c4"
+	const repo = "Swatinem/rust-cache"
+	for _, tt := range []struct {
+		name  string
+		label string
+		want  string
+	}{
+		{"unlabelled", "", repo + "@" + sha},
+		{"source label", "v2.9.1", repo + "@" + sha + " # v2.9.1"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &PinContext{SourceVersions: map[string]string{repo + "@" + sha: tt.label}}
+			got, err := ResolveActionPin(repo, sha, ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+
+	pin := GetActionPinsByRepo("actions/checkout")[0]
+	got, err := ResolveActionPin(pin.Repo, pin.SHA, &PinContext{
+		SourceVersions: map[string]string{pin.Repo + "@" + pin.SHA: "v0.0.0"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, pin.Repo+"@"+pin.SHA+" # "+pin.Version, got)
+}
+
 func (r *fixedResolver) ResolveSHA(_ context.Context, _, _ string) (string, error) {
 	r.called++
 	return r.sha, nil

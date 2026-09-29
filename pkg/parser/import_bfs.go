@@ -302,10 +302,11 @@ func handleYAMLWorkflowImportItem(item importQueueItem, state *importBFSState) (
 		return false, nil
 	}
 	parserLog.Printf("Detected YAML workflow file: %s", item.fullPath)
-	jobsOrStepsData, servicesJSON, err := processYAMLWorkflowImport(item.fullPath)
+	jobsOrStepsData, servicesJSON, sourceVersions, err := processYAMLWorkflowImportWithSourceVersions(item.fullPath)
 	if err != nil {
 		return true, fmt.Errorf("failed to process YAML workflow '%s': %w", item.importPath, err)
 	}
+	state.acc.addActionPinSourceVersions(sourceVersions)
 	appendYAMLImportJobsOrSteps(state.acc, item.importPath, item.fullPath, jobsOrStepsData)
 	appendYAMLImportServices(state.acc, item.importPath, servicesJSON)
 	return true, nil

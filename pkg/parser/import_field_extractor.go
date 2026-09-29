@@ -25,6 +25,7 @@ type importAccumulator struct {
 	promptImports            []PromptImportEntry
 	stepsBuilder             strings.Builder
 	copilotSetupStepsBuilder strings.Builder // Steps from copilot-setup-steps.yml (inserted at start)
+	actionPinSourceVersions  map[string]string
 	preStepsBuilder          strings.Builder
 	preAgentStepsBuilder     strings.Builder
 	runtimesBuilder          strings.Builder
@@ -111,15 +112,16 @@ const (
 // during deduplication. Slices are left as nil, which is valid for append operations.
 func newImportAccumulator() *importAccumulator {
 	return &importAccumulator{
-		botsSet:               make(map[string]bool),
-		labelsSet:             make(map[string]bool),
-		skipRolesSet:          make(map[string]bool),
-		skipBotsSet:           make(map[string]bool),
-		ambientFoldersSet:     make(map[string]bool),
-		importInputs:          make(map[string]any),
-		envSources:            make(map[string]string),
-		sandboxAgentMountsSet: make(map[string]bool),
-		excludedEnvSet:        make(map[string]bool),
+		botsSet:                 make(map[string]bool),
+		labelsSet:               make(map[string]bool),
+		skipRolesSet:            make(map[string]bool),
+		skipBotsSet:             make(map[string]bool),
+		ambientFoldersSet:       make(map[string]bool),
+		importInputs:            make(map[string]any),
+		envSources:              make(map[string]string),
+		sandboxAgentMountsSet:   make(map[string]bool),
+		excludedEnvSet:          make(map[string]bool),
+		actionPinSourceVersions: make(map[string]string),
 	}
 }
 
@@ -180,13 +182,20 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueueItem, visited map[string]struct{}) (origFm, fm map[string]any, err error) {
 	origContent := string(content)
 	origParsed, origParseErr := parseOriginalFrontmatter(content, item.fullPath, origContent)
+	if origParseErr == nil {
+		acc.collectActionPinSourceVersions([]byte(strings.Join(origParsed.FrontmatterLines, "\n")))
+	}
 	origFm = frontmatterMapOrEmpty(origParsed, origParseErr)
 	rawContent, wasSubstituted := acc.applyImportDefaultsToContent(origContent, origFm, item.inputs)
+	if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
+		acc.collectActionPinSourceVersions([]byte(strings.Join(parsed.FrontmatterLines, "\n")))
+	}
 	acc.collectInlineSubAgentWarnings(item.importPath, rawContent, wasSubstituted, origParsed, origParseErr)
 	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	acc.toolsBuilder.WriteString(toolsContent + "\n")
 	importRelPath := computeImportRelPath(item.fullPath, item.importPath)
 	if err := acc.trackRuntimeOrInlineImport(item.fullPath, importRelPath, rawContent, wasSubstituted); err != nil {
@@ -195,6 +204,18 @@ func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueu
 
 	fm = parseFrontmatterForExtraction(rawContent, wasSubstituted, origFm)
 	return origFm, fm, nil
+}
+
+func (acc *importAccumulator) collectActionPinSourceVersions(content []byte) {
+	acc.addActionPinSourceVersions(ActionPinSourceVersions(content))
+}
+
+func (acc *importAccumulator) addActionPinSourceVersions(sourceVersions map[string]string) {
+	for reference, label := range sourceVersions {
+		if _, exists := acc.actionPinSourceVersions[reference]; !exists {
+			acc.actionPinSourceVersions[reference] = label
+		}
+	}
 }
 
 func parseOriginalFrontmatter(content []byte, fullPath, origContent string) (*FrontmatterResult, error) {
@@ -1014,6 +1035,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		PromptImports:                 acc.promptImports,
 		MergedSteps:                   acc.stepsBuilder.String(),
 		CopilotSetupSteps:             acc.copilotSetupStepsBuilder.String(),
+		ActionPinSourceVersions:       acc.actionPinSourceVersions,
 		MergedPreSteps:                acc.preStepsBuilder.String(),
 		MergedPreAgentSteps:           acc.preAgentStepsBuilder.String(),
 		MergedRuntimes:                acc.runtimesBuilder.String(),

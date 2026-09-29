@@ -110,6 +110,44 @@ func TestValidateSafeOutputsSamples_SidecarStripped(t *testing.T) {
 	}
 }
 
+func TestValidateAddLabelsSamples_UsesConfiguredItemSchema(t *testing.T) {
+	cfg := &SafeOutputsConfig{
+		AddLabels: &AddLabelsConfig{
+			ItemSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"name": map[string]any{"type": "string"},
+				},
+			},
+			BaseSafeOutputConfig: BaseSafeOutputConfig{
+				Samples: []map[string]any{
+					{"labels": []any{"bug"}},
+				},
+			},
+		},
+	}
+
+	err := validateAddLabelsItemSchemaAndSamples(cfg)
+	require.ErrorContains(t, err, "safe-outputs.add-labels.samples[0]")
+}
+
+func TestValidateAddLabelsSamples_UsesIssueIntentSchema(t *testing.T) {
+	enabled := true
+	cfg := &SafeOutputsConfig{
+		AddLabels: &AddLabelsConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{
+				IssueIntent: &enabled,
+				Samples: []map[string]any{
+					{"labels": []any{map[string]any{"name": "bug"}}},
+				},
+			},
+		},
+	}
+
+	err := validateAddLabelsItemSchemaAndSamples(cfg)
+	require.ErrorContains(t, err, "safe-outputs.add-labels.samples[0]")
+}
+
 // TestCollectSampleEntries_DeterministicOrdering verifies that entries are
 // emitted in a stable order across runs (sorted by SafeOutputsConfig field name)
 // so that compiled YAML is deterministic.

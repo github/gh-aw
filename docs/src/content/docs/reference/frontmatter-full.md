@@ -4032,8 +4032,9 @@ tools:
     # Opts out of cross-visibility protections for private-to-public data flows. Set
     # to 'allow' for a blanket opt-out (disables forcePublicRepos and default
     # sink-visibility enforcement), or provide an array of MCP server IDs to exempt
-    # only those servers from default sink-visibility enforcement. Incompatible with
-    # strict mode when set to 'allow'. See MCP Gateway Specification Section 10.9.
+    # only those servers from default sink-visibility enforcement. Both forms are
+    # rejected in strict mode and warn in non-strict mode. See MCP Gateway
+    # Specification Section 10.9.
     # (optional)
     # Accepted formats:
 
@@ -4042,7 +4043,7 @@ tools:
     private-to-public-flows: "allow"
 
     # Format 2: Selective exemption: disables default sink-visibility enforcement for
-    # the listed MCP server IDs only. Compatible with strict mode.
+    # the listed MCP server IDs only. Not allowed in strict mode.
     private-to-public-flows: []
       # Array items: MCP server ID to exempt from sink-visibility enforcement
 
@@ -14358,6 +14359,12 @@ safe-outputs:
     # github.event.issue.number or github.event.pull_request.number.
     # (optional)
     target: null
+
+    # Only assign an agent if all these labels are currently present on the target
+    # issue or pull request.
+    # (optional)
+    required-labels: []
+      # Array of strings
 
     # Target repository in format 'owner/repo' for cross-repository agent assignment.
     # Takes precedence over trial target repo settings.

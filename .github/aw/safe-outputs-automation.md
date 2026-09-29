@@ -265,6 +265,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
   ```yaml
   safe-outputs:
     noop:
+      max: 2                          # Optional: max noop messages (default: 2)
       report-as-issue: false          # Optional: report noop as issue (default: true)
   ```
 

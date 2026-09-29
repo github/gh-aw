@@ -189,6 +189,149 @@ describe("generate_safe_outputs_tools", () => {
     expect(createIssueTool.inputSchema.required).toEqual(expect.arrayContaining(["title", "temporary_id"]));
   });
 
+  it("replaces array item schemas when specified in tools_meta", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+            required: ["labels"],
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      required: ["name", "confidence"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string" },
+        confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result[0].inputSchema.properties.labels.items).toEqual(itemSchema);
+    expect(result[0].inputSchema.properties.labels.description).toContain("plain string label names are not permitted");
+    expect(result[0].description).not.toContain("INTENT ENCOURAGED:");
+  });
+
+  it("keeps issue-intent requirements and guidance with a narrowed add_labels item schema", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: {
+                type: "array",
+                items: {
+                  oneOf: [
+                    { type: "string" },
+                    {
+                      type: "object",
+                      required: ["name"],
+                      properties: {
+                        name: { type: "string" },
+                        rationale: { type: "string" },
+                        confidence: { type: "string" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: { issue_intent: true } }));
+    const itemSchema = {
+      type: "object",
+      required: ["name", "rationale", "confidence"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string" },
+        rationale: { type: "string" },
+        confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    const addLabelsTool = result.find((/** @type {{name: string}} */ t) => t.name === "add_labels");
+    expect(addLabelsTool.inputSchema.properties.labels.items).toEqual(itemSchema);
+    expect(addLabelsTool.inputSchema.properties.labels.items.required).toEqual(expect.arrayContaining(["name", "rationale", "confidence"]));
+    expect(addLabelsTool.inputSchema.properties.labels.description).toContain("Plain string label names are not permitted");
+    expect(addLabelsTool.description).toContain("INTENT REQUIRED:");
+  });
+
+  it("describes configured string-only add_labels schemas accurately", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: { type: "string" } } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result[0].inputSchema.properties.labels.items).toEqual({ type: "string" });
+    expect(result[0].inputSchema.properties.labels.description).toContain("Each label must be a plain string");
+    expect(result[0].description).not.toContain("INTENT ENCOURAGED:");
+  });
+
   it("adds anyOf alternative requirements for assign_milestone", () => {
     fs.writeFileSync(
       toolsSourcePath,

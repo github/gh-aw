@@ -15,6 +15,7 @@ var assignmentHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("custom-agent", c.DefaultCustomAgent).
 			AddIfNotEmpty("custom-instructions", c.DefaultCustomInstructions).
 			AddStringSlice("allowed", c.Allowed).
+			AddStringSlice("required_labels", c.RequiredLabels).
 			AddBoolPtr("issue_intent", c.IssueIntent).
 			AddIfTrue("ignore-if-error", c.IgnoreIfError).
 			AddIfNotEmpty("target", c.Target).

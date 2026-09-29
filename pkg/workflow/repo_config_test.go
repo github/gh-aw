@@ -71,6 +71,15 @@ func TestLoadRepoConfig_StrictTrue(t *testing.T) {
 	assert.True(t, cfg.Strict, "strict mode should be enforced")
 }
 
+func TestLoadRepoConfig_RequireSelfHostedRunners(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"require_self_hosted_runners": true}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err)
+	assert.True(t, cfg.RequireSelfHostedRunners)
+}
+
 func TestLoadRepoConfig_StrictFalseRejected(t *testing.T) {
 	dir := t.TempDir()
 	writeAWJSON(t, dir, `{"strict": false}`)

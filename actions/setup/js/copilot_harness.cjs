@@ -78,6 +78,7 @@ const {
   fetchAWFReflect,
   fetchModelsFromUrl,
   inferProviderTypeForModel,
+  getCatalogModelEntry,
   resolveMultiProviderFromReflect,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
@@ -446,7 +447,8 @@ async function applyCopilotModelAliasResolution(options) {
  *
  * Skips configuration when COPILOT_PROVIDER_WIRE_API is already set so that
  * explicit engine.env values always take precedence. Looks up the wire_api for
- * the current COPILOT_MODEL in the github-copilot provider section of models.json.
+ * the current COPILOT_MODEL in the github-copilot provider section of models.json,
+ * defaulting GPT models to the responses API when the catalog does not specify one.
  *
  * @param {{
  *   modelsJson: Record<string, unknown> | null,
@@ -461,25 +463,17 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
   const modelName = typeof process.env.COPILOT_MODEL === "string" ? process.env.COPILOT_MODEL.trim() : "";
   if (!modelName) return;
 
-  // Look up wire_api for the resolved model in the github-copilot provider catalog.
-  const providers = modelsJson !== null && typeof modelsJson === "object" && "providers" in modelsJson ? modelsJson.providers : null;
-  const githubCopilotData = providers !== null && typeof providers === "object" && "github-copilot" in providers ? providers["github-copilot"] : null;
-  const models = githubCopilotData !== null && typeof githubCopilotData === "object" && "models" in githubCopilotData ? githubCopilotData.models : null;
-  if (!models || typeof models !== "object") return;
+  const catalogEntry = getCatalogModelEntry(modelsJson, modelName, "github-copilot");
+  const wireApi = catalogEntry && typeof catalogEntry.wire_api === "string" ? catalogEntry.wire_api : null;
+  if (wireApi) {
+    logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
+    process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
+    return;
+  }
 
-  // Strip query parameters before catalog lookup (e.g. "gpt-5-mini?effort=high" → "gpt-5-mini").
-  const baseModelName = modelName.split("?")[0];
-  // Case-insensitive lookup.
-  const normalizedModelName = baseModelName.toLowerCase();
-  for (const [key, value] of Object.entries(models)) {
-    if (key.toLowerCase() === normalizedModelName) {
-      const wireApi = value !== null && typeof value === "object" && "wire_api" in value ? value.wire_api : null;
-      if (wireApi && typeof wireApi === "string") {
-        logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
-        process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
-      }
-      return;
-    }
+  if (modelName.split("?")[0].toLowerCase().startsWith("gpt-")) {
+    logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=responses for GPT model ${modelName}`);
+    process.env.COPILOT_PROVIDER_WIRE_API = "responses";
   }
 }
 

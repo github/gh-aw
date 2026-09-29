@@ -251,6 +251,42 @@ describe("assign_to_agent", () => {
     );
   });
 
+  it("should skip assignment when the target lacks a required label", async () => {
+    const handler = await eval(`(async () => {
+      ${assignToAgentScript};
+      return main({ target: "*", required_labels: ["copilot-ready", "maintainer-approved"] });
+    })()`);
+    mockGithub.rest.issues.get
+      .mockResolvedValueOnce({
+        data: { id: 12345, number: 42, assignees: [], labels: [{ name: "copilot-ready" }, { name: "maintainer-approved" }], html_url: "", title: "", body: "" },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 12345, number: 42, assignees: [], labels: [{ name: "copilot-ready" }], html_url: "", title: "", body: "" },
+      });
+
+    const result = await handler({ type: "assign_to_agent", issue_number: 42, agent: "copilot" }, {}, new Map());
+
+    expect(result).toMatchObject({ success: false, skipped: true, error: "Item does not match required-labels filter" });
+    expect(mockGithub.request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", expect.anything());
+    expect(mockGithub.rest.issues.get).toHaveBeenCalledTimes(2);
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("does not match required-labels filter"));
+  });
+
+  it("should assign when the target has every required label", async () => {
+    const handler = await eval(`(async () => {
+      ${assignToAgentScript};
+      return main({ target: "*", required_labels: ["copilot-ready", "maintainer-approved"] });
+    })()`);
+    mockGithub.rest.issues.get.mockResolvedValue({
+      data: { id: 12345, number: 42, assignees: [], labels: [{ name: "copilot-ready" }, { name: "maintainer-approved" }], html_url: "", title: "", body: "" },
+    });
+
+    const result = await handler({ type: "assign_to_agent", issue_number: 42, agent: "copilot" }, {}, new Map());
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/issues/{issue_number}/assignees", expect.anything());
+  });
+
   it("should respect max count configuration", async () => {
     process.env.GH_AW_AGENT_MAX_COUNT = "2";
     setAgentOutput({

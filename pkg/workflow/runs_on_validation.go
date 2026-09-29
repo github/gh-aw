@@ -26,6 +26,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -187,4 +188,59 @@ func extractRunnerLabels(runsOn any) []string {
 	}
 
 	return labels
+}
+
+// validateSelfHostedRunners verifies that each generated job has a statically
+// identifiable self-hosted runner selection.
+func validateSelfHostedRunners(workflow map[string]any) error {
+	jobs, ok := workflow["jobs"].(map[string]any)
+	if !ok || len(jobs) == 0 {
+		return errors.New("compiled workflow has no jobs to validate")
+	}
+
+	jobNames := make([]string, 0, len(jobs))
+	for name := range jobs {
+		jobNames = append(jobNames, name)
+	}
+	sort.Strings(jobNames)
+
+	var violations []string
+	for _, name := range jobNames {
+		job, ok := jobs[name].(map[string]any)
+		if !ok {
+			violations = append(violations, fmt.Sprintf("job %q has no statically verifiable runner", name))
+			continue
+		}
+
+		runsOn, exists := job["runs-on"]
+		if !exists || isEmptyRunsOnValue(runsOn) {
+			violations = append(violations, fmt.Sprintf("job %q has no runs-on value", name))
+			continue
+		}
+		if !usesSelfHostedRunner(runsOn) {
+			labels := strings.Join(extractRunnerLabels(runsOn), ", ")
+			violations = append(violations, fmt.Sprintf("job %q uses runner labels [%s] without selecting a self-hosted runner", name, labels))
+		}
+	}
+
+	if len(violations) > 0 {
+		return fmt.Errorf("self-hosted runner enforcement is enabled, but every generated job must select a self-hosted runner using the \"self-hosted\" label or a runner group:\n- %s",
+			strings.Join(violations, "\n- "))
+	}
+	return nil
+}
+
+func usesSelfHostedRunner(runsOn any) bool {
+	if runner, ok := runsOn.(map[string]any); ok {
+		if group, ok := runner["group"].(string); ok && strings.TrimSpace(group) != "" {
+			return true
+		}
+	}
+
+	for _, label := range extractRunnerLabels(runsOn) {
+		if strings.EqualFold(strings.TrimSpace(label), "self-hosted") {
+			return true
+		}
+	}
+	return false
 }

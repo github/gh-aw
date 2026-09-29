@@ -483,6 +483,8 @@ Use `required-labels` to only add labels to issues/PRs that already have **all**
 
 By default, labels that don't already exist in the target repository are rejected with an error. Set `create-if-missing: true` to automatically create any missing labels before they are applied.
 
+Use `item-schema` to narrow the label item shape shown to the agent and enforced when the MCP tool is called. The schema must remain compatible with the built-in string-or-object label schema: it can require existing fields, exclude optional fields, or restrict values, but cannot add fields or loosen built-in constraints.
+
 ```yaml wrap
 safe-outputs:
   add-labels:
@@ -495,6 +497,15 @@ safe-outputs:
     required-labels: [automated, bot]  # only operate if item has ALL of these labels
     required-title-prefix: "[bot] "    # only operate if item title starts with this prefix
     create-if-missing: true            # auto-create labels that don't already exist (default: false)
+    item-schema:
+      type: object
+      required: [name, confidence]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
+        suggest: { type: boolean }
+        rationale: { type: string }
 ```
 
 #### Blocked Label Patterns
@@ -526,6 +537,8 @@ safe-outputs:
 Removes labels from issues or PRs. Specify `allowed` to restrict which labels can be removed (specific labels or glob patterns), or `blocked` to prevent removal of specific label patterns. If a label is not present on the item, it will be silently skipped.
 
 Use `required-labels` to only remove labels from issues/PRs that already have **all** of the specified labels. Use `required-title-prefix` to only remove labels from issues/PRs whose title starts with the given prefix.
+
+The `remove_labels` tool accepts structured label objects for compatibility, but ignores their `rationale`, `confidence`, and `suggest` fields.
 
 ```yaml wrap
 safe-outputs:
@@ -1618,6 +1631,7 @@ safe-outputs:
     custom-agent: "agent-id"   # default custom agent ID (optional)
     custom-instructions: "..."  # default custom instructions (optional)
     allowed: [copilot]         # restrict to specific agents (optional)
+    required-labels: [copilot-ready] # only assign if all these labels are present
     max: 1                     # max assignments (default: 1)
     target: "triggering"       # "triggering" (default), "*", or number
     target-repo: "owner/repo"  # where the issue lives (cross-repository)
@@ -1626,6 +1640,8 @@ safe-outputs:
     base-branch: "develop"     # target branch for PR (default: target repo's default branch)
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }} # optional custom token for permissions
 ```
+
+When configured, `required-labels` checks that every listed label is still present on the target issue or pull request immediately before the agent is assigned.
 
 `reasoning-effort` accepts `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`, as well as GitHub Actions expressions. Valid values are forwarded without enforcing model-specific capabilities; invalid runtime values produce a warning and are omitted without failing assignment.
 

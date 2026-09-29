@@ -265,7 +265,7 @@ Controls full Data Integrity and Flow Control (DIFC) proxy enforcement. When `to
 
 ### `private-to-public-flows` (`tools.github.private-to-public-flows`)
 
-A frontmatter field that opts a workflow out of cross-visibility protections enforced by the [MCP Gateway](#mcp-gateway). By default, workflows running in private repositories are prevented from writing to public repositories (the gateway enforces `sink-visibility="public"` which blocks agents with non-empty secrecy). Setting `private-to-public-flows: allow` disables this enforcement for all MCP servers; setting it to a list of server IDs disables it only for those servers. Incompatible with `guards_mode: strict` when using the blanket `allow` form. See [MCP Gateway Reference](/gh-aw/reference/mcp-gateway/).
+A frontmatter field that opts a workflow out of cross-visibility protections enforced by the [MCP Gateway](#mcp-gateway). By default, workflows running in private repositories are prevented from writing to public repositories (the gateway enforces `sink-visibility="public"` which blocks agents with non-empty secrecy). Setting `private-to-public-flows: allow` disables this enforcement for all MCP servers; setting it to a list of server IDs disables it only for those servers. Both forms are rejected in strict mode and warn in non-strict mode because GitHub Actions logs are public and agents may expose private data. See [MCP Gateway Reference](/gh-aw/reference/mcp-gateway/).
 
 ```aw wrap
 tools:
@@ -1298,6 +1298,10 @@ A CLI command that downloads workflow run artifacts and logs, analyzes MCP tool 
 ### Audit Diff (multi-run mode)
 
 Passing two or more run IDs to `gh aw audit` activates diff mode: the first ID is the base and the rest are compared against it. Reports domain additions and removals, allowed/denied status changes, request volume drift, and anomaly flags across firewall, MCP tool usage, and run metrics dimensions. Useful for detecting regressions and behavioral drift between runs. See [Audit Commands](/gh-aw/reference/audit/).
+
+### Friction Cost
+
+The estimated avoidable marginal cost attributable to an execution-friction event, relative to a counterfactual run in which the event did not occur. Friction events include failed tool calls, filtered responses, blocked requests, and errored or retried model invocations. The conclusion job precomputes it into the `friction` section of the `usage` artifact, in AI credits (`aic`) as the canonical unit, and `gh aw logs` and `gh aw audit` prefer that section when present. Each figure carries an attribution state (`measured`, `causal`, `statistical`, `unavailable`, or `unsupported`). See [Artifacts Reference](/gh-aw/reference/artifacts/#friction-cost).
 
 ### Grouped Audit Findings (`gh aw audit --group`)
 

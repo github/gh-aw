@@ -596,6 +596,7 @@ function isOpenAIModelName(model) {
 
 /**
  * Look up a model entry in the models.json catalog, case-insensitively.
+ * Exact model IDs take precedence over the base-model fallback for `-utility` variants.
  *
  * @param {any} modelsJson
  * @param {string} modelName
@@ -604,6 +605,7 @@ function isOpenAIModelName(model) {
  */
 function getCatalogModelEntry(modelsJson, modelName, providerName) {
   const model = String(modelName || "")
+    .split("?")[0]
     .toLowerCase()
     .trim();
   const provider = String(providerName || "")
@@ -624,17 +626,26 @@ function getCatalogModelEntry(modelsJson, modelName, providerName) {
             .trim() === provider
       )
     : Object.entries(providers);
+  const modelEntriesByProvider = [];
   for (const [, providerData] of providerEntries) {
     const models = providerData && typeof providerData === "object" ? providerData.models : null;
     if (!models || typeof models !== "object" || Array.isArray(models)) continue;
+    const modelEntriesByName = new Map();
     for (const [catalogModel, catalogEntry] of Object.entries(models)) {
-      if (
-        String(catalogModel || "")
-          .toLowerCase()
-          .trim() === model
-      ) {
-        return catalogEntry && typeof catalogEntry === "object" && !Array.isArray(catalogEntry) ? catalogEntry : null;
-      }
+      const normalizedCatalogModel = String(catalogModel || "")
+        .toLowerCase()
+        .trim();
+      if (!modelEntriesByName.has(normalizedCatalogModel)) modelEntriesByName.set(normalizedCatalogModel, catalogEntry);
+    }
+    modelEntriesByProvider.push(modelEntriesByName);
+  }
+  const lookupModelNames = [model];
+  if (model.endsWith("-utility")) lookupModelNames.push(model.slice(0, -"-utility".length));
+  for (const lookupModelName of lookupModelNames) {
+    for (const modelEntriesByName of modelEntriesByProvider) {
+      if (!modelEntriesByName.has(lookupModelName)) continue;
+      const catalogEntry = modelEntriesByName.get(lookupModelName);
+      return catalogEntry && typeof catalogEntry === "object" && !Array.isArray(catalogEntry) ? catalogEntry : null;
     }
   }
   return null;

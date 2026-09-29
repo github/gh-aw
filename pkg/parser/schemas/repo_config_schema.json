@@ -48,6 +48,10 @@
       "description": "Enable GitHub Enterprise Server (GHES) compatibility mode. Artifact actions use upload-artifact@v3.2.2 and download-artifact@v3.1.0.",
       "type": "boolean"
     },
+    "require_self_hosted_runners": {
+      "description": "Require every generated workflow job to select a self-hosted runner. Jobs must use the self-hosted label or a runner group.",
+      "type": "boolean"
+    },
     "help_command": {
       "description": "Enable or disable the builtin centralized /help slash command handler. Defaults to true when omitted. Set to false to disable.",
       "type": "boolean"

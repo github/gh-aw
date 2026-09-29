@@ -46,6 +46,8 @@ const ADD_LABELS_STRICT_FIELD_DESC =
   'Labels to add. Each label must be an object with required fields: name (string), rationale (string, max 280 chars), and confidence (exactly one of: LOW, MEDIUM, HIGH). Plain string label names are not permitted. Example: [{"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH"}]. Labels must exist in the repository.';
 const ADD_LABELS_OPTIONAL_FIELD_DESC =
   'Labels to add. Prefer structured label objects: {"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH", "suggest": true}. Plain strings are also accepted for compatibility. Include rationale (string, max 280 chars) and confidence (LOW, MEDIUM, or HIGH) to improve transparency; use suggest: true to route for human review. Labels must exist in the repository.';
+const ADD_LABELS_OBJECT_ONLY_FIELD_DESC = "Labels to add. Each label must be an object matching the configured item schema; plain string label names are not permitted. Labels must exist in the repository.";
+const ADD_LABELS_STRING_ONLY_FIELD_DESC = "Labels to add. Each label must be a plain string matching the configured item schema. Labels must exist in the repository.";
 const ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX = /Example usage: assign_to_agent\([^)]+\)(?: or assign_to_agent\([^)]+\))?/g;
 const ASSIGN_TO_AGENT_STRICT_EXAMPLE_USAGE =
   'Example usage: assign_to_agent(issue_number=123, agent="copilot", rationale="Delegate this coding task to the agent.", confidence="HIGH") or assign_to_agent(pull_number=456, agent="copilot", pull_request_repo="owner/repo", rationale="The agent should implement this PR fix.", confidence="HIGH")';
@@ -286,7 +288,7 @@ async function main() {
   }
 
   // Load tools meta (description suffixes, repo params, dynamic tools)
-  /** @type {{description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<unknown>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>}} */
+  /** @type {{description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<unknown>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>, item_schemas?: Record<string, Record<string, unknown>>}} */
   let toolsMeta = { description_suffixes: {}, repo_params: {}, dynamic_tools: [] };
   if (fs.existsSync(toolsMetaPath)) {
     /** @type {string} */
@@ -442,6 +444,31 @@ async function main() {
         }
         for (const [propName, propSchema] of Object.entries(propertyInjections)) {
           enhancedTool.inputSchema.properties[propName] = propSchema;
+        }
+      }
+
+      const itemSchemas = toolsMeta.item_schemas?.[tool.name];
+      if (itemSchemas && typeof itemSchemas === "object") {
+        for (const [propertyName, itemSchema] of Object.entries(itemSchemas)) {
+          const propertySchema = enhancedTool.inputSchema?.properties?.[propertyName];
+          if (propertySchema?.type === "array") {
+            propertySchema.items = itemSchema;
+            if (tool.name === "add_labels" && propertyName === "labels") {
+              /** @type {{type?: unknown, properties?: Record<string, unknown>, required?: unknown}} */
+              const configuredItemSchema = itemSchema && typeof itemSchema === "object" ? itemSchema : {};
+              if (configuredItemSchema.type === "object") {
+                propertySchema.description = isIssueIntentEnabledForTool(tool.name, config[tool.name]) ? ADD_LABELS_STRICT_FIELD_DESC : ADD_LABELS_OBJECT_ONLY_FIELD_DESC;
+                const itemProperties = configuredItemSchema.properties && typeof configuredItemSchema.properties === "object" ? configuredItemSchema.properties : {};
+                const required = Array.isArray(configuredItemSchema.required) ? configuredItemSchema.required : [];
+                if (!isIssueIntentEnabledForTool(tool.name, config[tool.name]) && (!("rationale" in itemProperties) || !("confidence" in itemProperties) || required.includes("rationale") || required.includes("confidence"))) {
+                  enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
+                }
+              } else if (configuredItemSchema.type === "string") {
+                propertySchema.description = ADD_LABELS_STRING_ONLY_FIELD_DESC;
+                enhancedTool.description = (enhancedTool.description || "").replace(ISSUE_INTENT_OPTIONAL_SUFFIX, "").trim();
+              }
+            }
+          }
         }
       }
 

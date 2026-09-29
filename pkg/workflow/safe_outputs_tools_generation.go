@@ -31,6 +31,8 @@ import (
 // custom safe-jobs, dispatch_workflow targets, and call_workflow targets.
 // These tools are not in safe_outputs_tools.json and must be generated from
 // the workflow configuration at compile time.
+//
+//nolint:largefunc // Dynamic tool generation is intentionally kept as one exhaustive flow.
 func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string]any, error) {
 	var dynamicTools []map[string]any
 
@@ -231,6 +233,8 @@ type ToolsMeta struct {
 	// If the property already exists in the static schema its definition is replaced;
 	// otherwise it is added as a new optional property.
 	PropertyInjections map[string]map[string]any `json:"property_injections,omitempty"`
+	// ItemSchemas maps tool name → array property name → narrowed item schema.
+	ItemSchemas map[string]map[string]map[string]any `json:"item_schemas,omitempty"`
 }
 
 // computeRequiredFieldRemovals returns a map of tool name → required fields to remove
@@ -301,6 +305,8 @@ var closeIssueStateReasonValues = []string{"completed", "not_planned", "duplicat
 //   - Omitted config (no state-reason): inject state_reason with all three supported values.
 //   - List config (state-reason: [...]): inject state_reason with the configured subset.
 //   - Scalar config (state-reason: "..."): no injection (fixed reason, agent cannot choose).
+//
+//nolint:largefunc // Property injection cases are intentionally kept together.
 func computePropertyInjections(safeOutputs *SafeOutputsConfig) map[string]map[string]any {
 	injections := make(map[string]map[string]any)
 	if safeOutputs == nil {
@@ -388,6 +394,8 @@ func computePropertyInjections(safeOutputs *SafeOutputsConfig) map[string]map[st
 // At runtime, generate_safe_outputs_tools.cjs reads safe_outputs_tools.json from
 // the actions folder, applies the meta overrides from tools_meta.json, and writes
 // the final ${RUNNER_TEMP}/gh-aw/safeoutputs/tools.json.
+//
+//nolint:largefunc // Tool metadata assembly is intentionally kept as one flow.
 func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, error) {
 	if data.SafeOutputs == nil {
 		empty := ToolsMeta{
@@ -441,6 +449,17 @@ func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, err
 
 	// Compute property injections (e.g. state_reason enum for close_issue).
 	propertyInjections := computePropertyInjections(data.SafeOutputs)
+	itemSchemas := make(map[string]map[string]map[string]any)
+	if data.SafeOutputs.AddLabels != nil && data.SafeOutputs.AddLabels.ItemSchema != nil {
+		itemSchema, itemSchemaErr := normalizedAddLabelsItemSchema(
+			data.SafeOutputs.AddLabels.ItemSchema,
+			issueIntentRequired(data.SafeOutputs.AddLabels.IssueIntent),
+		)
+		if itemSchemaErr != nil {
+			return "", itemSchemaErr
+		}
+		itemSchemas["add_labels"] = map[string]map[string]any{"labels": itemSchema}
+	}
 
 	meta := ToolsMeta{
 		DescriptionSuffixes:    descriptionSuffixes,
@@ -449,6 +468,7 @@ func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, err
 		RequiredFieldRemovals:  requiredFieldRemovals,
 		RequiredFieldAdditions: requiredFieldAdditions,
 		PropertyInjections:     propertyInjections,
+		ItemSchemas:            itemSchemas,
 	}
 
 	result, err := json.MarshalIndent(meta, "", "  ")

@@ -61,6 +61,8 @@ import { preferActionsExecOverChildProcessRule } from "./rules/prefer-actions-ex
 import { noMisplacedErrorCodeDefinitionRule } from "./rules/no-misplaced-error-code-definition";
 import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
+import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
+
 const plugin = {
   meta: {
     name: "@github/gh-aw-eslint-factory",
@@ -129,6 +131,7 @@ const plugin = {
     "prefer-actions-exec-over-child-process": preferActionsExecOverChildProcessRule,
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
+    "no-single-char-string-replace": noSingleCharStringReplaceRule,
   },
 };
 
