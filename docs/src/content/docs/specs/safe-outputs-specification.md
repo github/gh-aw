@@ -3922,6 +3922,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+- `required-labels`: Labels that must ALL be present on the target issue or pull request before assignment
 
 **Target Authorization**:
 
@@ -3934,6 +3935,10 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **ATA-004**: Only `target: "*"` MAY select an issue or pull request from the agent-supplied `issue_number`/`pull_number`; only in this mode MUST the processor reject a message that specifies both fields as mutually exclusive.
 
 **ATA-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**Required Labels**:
+
+**ATA-006**: When `required-labels` is configured, the processor MUST check the current labels on the resolved target issue or pull request immediately before assignment. If any configured label is missing, the processor MUST skip agent assignment.
 
 **Required Permissions**:
 
