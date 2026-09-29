@@ -235,7 +235,8 @@ directly.
 
 The ledger is experimental and bounded: it inspects at most 1024 shard files
 (configurable with `ledger.max-shards`),
-each record is limited to 8 KiB, and each query returns at most 500 records.
+each record is limited to 32 KiB, each shard is limited to 10 MiB, and each query
+returns at most 500 records.
 Each writing workflow invocation creates a shard, so a frequently running
 workflow can exhaust the shard limit. Use ordinary repo-memory files for
 replaceable snapshots, pruned baselines, or histories that need more than 100

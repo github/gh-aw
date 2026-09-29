@@ -120,6 +120,13 @@ func memoryValidationScriptBase64(config *MemoryValidationConfig) string {
 	return base64.StdEncoding.EncodeToString([]byte(config.Script))
 }
 
+func ledgerCompactorScriptBase64(config *RepoMemoryLedgerConfig) string {
+	if config == nil || config.Compactor == nil || config.Compactor.Script == "" {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString([]byte(config.Compactor.Script))
+}
+
 func memoryValidationStepID(prefix, memoryID string) string {
 	return fmt.Sprintf("%s_%x", prefix, memoryID)
 }

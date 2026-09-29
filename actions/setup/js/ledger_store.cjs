@@ -3,16 +3,19 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const vm = require("node:vm");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const MAX_FILES = 1024;
-const MAX_BYTES = 8 * 1024;
+const MAX_SEGMENT_BYTES = 10 * 1024 * 1024;
+const MAX_RECORD_BYTES = 32 * 1024;
 const MAX_SCHEMA_BYTES = 1024 * 1024;
 const MAX_PARENTS = 64;
 const MAX_QUERY_LIMIT = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const RECORD_ID = /^ldg-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HASH = /^sha256:[0-9a-f]{64}$/;
+const SEGMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function canonicalJSON(value) {
   const seen = new Set();
@@ -207,21 +210,173 @@ function sqlPayloadFilter(filters, type) {
 }
 
 class Ledger {
-  /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, clock?: () => Date}} [options] */
-  constructor({ memoryDir, schemaPath, maxFiles = MAX_FILES, maxPatchBytes = MAX_BYTES, clock = () => new Date() } = {}) {
+  /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, clock?: () => Date, excludeSegments?: string[]}} [options] */
+  constructor({ memoryDir, schemaPath, maxFiles = MAX_FILES, maxPatchBytes = MAX_SEGMENT_BYTES, clock = () => new Date(), excludeSegments = [] } = {}) {
     if (typeof memoryDir !== "string" || !memoryDir.trim()) throw new TypeError("memoryDir is required");
     if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || maxFiles > MAX_FILES) throw new RangeError("Invalid maxFiles");
-    if (!Number.isSafeInteger(maxPatchBytes) || maxPatchBytes < 1 || maxPatchBytes > 1024 * 1024) throw new RangeError("Invalid maxPatchBytes");
+    if (!Number.isSafeInteger(maxPatchBytes) || maxPatchBytes < 1 || maxPatchBytes > MAX_SEGMENT_BYTES) throw new RangeError("Invalid maxPatchBytes");
     this.shardDir = path.join(memoryDir, "ledger", "shards");
+    this.coverageDir = path.join(memoryDir, "ledger", "coverage");
     this.maxFiles = maxFiles;
     this.maxPatchBytes = maxPatchBytes;
     this.writtenBytes = 0;
     this.clock = clock;
     this.writerId = crypto.randomUUID();
     this.writerPath = path.join(this.shardDir, `${this.writerId}.jsonl`);
+    this.excludeSegments = new Set(excludeSegments);
     /** @type {{db: import("node:sqlite").DatabaseSync, fingerprint: string} | null} */
     this.projection = null;
     if (schemaPath !== undefined) this.validate = compileSchema(schemaPath);
+  }
+
+  segmentPath(id) {
+    if (typeof id !== "string" || !SEGMENT_ID.test(id)) throw new TypeError("Invalid ledger segment ID");
+    return path.join(this.shardDir, `${id}.jsonl`);
+  }
+
+  listSegments({ closed = true, excludeCurrent = true } = {}) {
+    const state = this.reconstruct();
+    const byFile = new Map();
+    for (const record of state.records) {
+      const location = state.locations.get(record.sha);
+      if (!location) continue;
+      if (!byFile.has(location.shard)) byFile.set(location.shard, []);
+      byFile.get(location.shard).push(record);
+    }
+    return state.shards
+      .filter(shard => UUID.test(shard.file.slice(0, -6)))
+      .filter(shard => !excludeCurrent || (shard.file !== path.basename(this.writerPath) && !this.excludeSegments.has(shard.file.slice(0, -6))))
+      .map(shard => ({
+        id: shard.file.slice(0, -6),
+        file: shard.file,
+        closed: shard.file !== path.basename(this.writerPath),
+        bytes: shard.size,
+        records: (byFile.get(shard.file) || []).length,
+      }))
+      .filter(segment => !closed || segment.closed)
+      .sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  readRecords(segmentId) {
+    const segment = this.listSegments({ closed: false, excludeCurrent: false }).find(item => item.id === segmentId);
+    if (!segment) throw new TypeError("Unknown ledger segment");
+    const state = this.reconstruct();
+    return state.records.filter(record => state.locations.get(record.sha)?.shard === segment.file).sort((left, right) => left.sha.localeCompare(right.sha));
+  }
+
+  createSegment(records, metadata = {}) {
+    if (!Array.isArray(records) || records.length === 0) throw new TypeError("Ledger segment records are required");
+    const unique = new Map();
+    for (const input of records) {
+      const record = JSON.parse(JSON.stringify(input));
+      if (!recordShape(record) || sha256(Object.fromEntries(Object.entries(record).filter(([key]) => key !== "sha"))) !== record.sha || canonicalJSON(record) !== JSON.stringify(record)) {
+        throw new TypeError("Ledger segment contains an invalid record");
+      }
+      unique.set(record.sha, record);
+    }
+    const ordered = [...unique.values()].sort((left, right) => left.sha.localeCompare(right.sha));
+    const body = { records: ordered, metadata: canonicalJSON(JSON.parse(JSON.stringify(metadata))) };
+    const digest = crypto.createHash("sha256").update(canonicalJSON(body)).digest("hex");
+    const id = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-${((parseInt(digest.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0")}${digest.slice(18, 20)}-${digest.slice(20, 32)}`;
+    const content = Buffer.from(ordered.map(record => `${canonicalJSON(record)}\n`).join(""));
+    if (content.length > MAX_SEGMENT_BYTES) throw new RangeError("Ledger segment exceeds maximum size");
+    checkShardDirectories(this.shardDir, true);
+    const destination = this.segmentPath(id);
+    if (fs.existsSync(destination)) {
+      if (!fs.readFileSync(destination).equals(content)) throw new Error("Ledger segment identity collision");
+      return { id, records: ordered.length };
+    }
+    const staging = path.join(this.shardDir, `${id}.pending`);
+    const fd = fs.openSync(staging, "wx", 0o600);
+    try {
+      fs.writeFileSync(fd, content);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(staging, destination);
+    const directory = fs.openSync(this.shardDir, "r");
+    try {
+      fs.fsyncSync(directory);
+    } finally {
+      fs.closeSync(directory);
+    }
+    return { id, records: ordered.length };
+  }
+
+  markCovered(sourceIds, replacementId) {
+    if (!Array.isArray(sourceIds) || sourceIds.length === 0 || !sourceIds.every(id => SEGMENT_ID.test(id)) || !SEGMENT_ID.test(replacementId)) {
+      throw new TypeError("Invalid ledger coverage declaration");
+    }
+    const declaration = { sources: [...new Set(sourceIds)].sort(), replacement: replacementId };
+    checkShardDirectories(this.coverageDir, true);
+    const name = sha256(declaration).slice("sha256:".length);
+    const destination = path.join(this.coverageDir, `${name}.jsonl`);
+    if (!fs.existsSync(destination)) {
+      fs.writeFileSync(destination, `${canonicalJSON(declaration)}\n`, { flag: "wx", mode: 0o600 });
+      const directory = fs.openSync(this.coverageDir, "r");
+      try {
+        fs.fsyncSync(directory);
+      } finally {
+        fs.closeSync(directory);
+      }
+    }
+    return { id: name, sources: declaration.sources, replacement: replacementId };
+  }
+
+  retireCovered() {
+    if (!fs.existsSync(this.coverageDir)) return 0;
+    const available = new Set(this.listSegments({ closed: false, excludeCurrent: false }).map(segment => segment.id));
+    let retired = 0;
+    for (const file of fs
+      .readdirSync(this.coverageDir)
+      .filter(name => name.endsWith(".jsonl"))
+      .sort()) {
+      let declaration;
+      try {
+        const lines = fs.readFileSync(path.join(this.coverageDir, file), "utf8").trim().split("\n");
+        declaration = JSON.parse(lines[0]);
+      } catch {
+        continue;
+      }
+      if (!declaration || !Array.isArray(declaration.sources) || !available.has(declaration.replacement) || !declaration.sources.every(source => available.has(source))) continue;
+      for (const source of declaration.sources) {
+        if (source === this.writerId) continue;
+        const sourcePath = this.segmentPath(source);
+        if (fs.existsSync(sourcePath)) {
+          fs.unlinkSync(sourcePath);
+          retired++;
+        }
+      }
+    }
+    return retired;
+  }
+
+  async runCompactor(script) {
+    if (typeof script !== "string" || !script.trim()) return { changed: false, logs: [] };
+    const logs = [];
+    const api = {
+      listSegments: async options => this.listSegments(options),
+      readRecords: async id => this.readRecords(id),
+      createSegment: async (records, metadata) => this.createSegment(records, metadata),
+      markCovered: async (sources, replacement) => this.markCovered(sources, replacement),
+      compact: async segments => {
+        const selected = segments.filter(segment => segment.closed && segment.id !== this.writerId);
+        const records = (await Promise.all(selected.map(segment => this.readRecords(segment.id)))).flat();
+        if (!records.length) return null;
+        const replacement = await this.createSegment(records);
+        await this.markCovered(
+          selected.map(segment => segment.id),
+          replacement.id
+        );
+        return replacement;
+      },
+      log: (...values) => logs.push(values.map(value => (typeof value === "string" ? value : JSON.stringify(value))).join(" ")),
+      runTimestamp: this.clock().toISOString(),
+    };
+    const context = vm.createContext(Object.freeze({ ledger: api }), { codeGeneration: { strings: false, wasm: false } });
+    await vm.runInContext(`(async () => {${script}\n})()`, context, { timeout: 1000 });
+    return { changed: this.retireCovered() > 0, logs };
   }
 
   reconstruct() {
@@ -262,15 +417,15 @@ class Ledger {
           diagnostics.push({ code: "invalid-envelope", file });
           continue;
         }
-        if (!stat.isFile() || stat.size > MAX_BYTES) {
+        if (!stat.isFile() || stat.size > MAX_SEGMENT_BYTES) {
           diagnostics.push({ code: "invalid-envelope", file });
           continue;
         }
         const fd = fs.openSync(fullPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
         try {
-          const buffer = Buffer.alloc(MAX_BYTES + 1);
+          const buffer = Buffer.alloc(MAX_SEGMENT_BYTES + 1);
           const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
-          if (length > MAX_BYTES) {
+          if (length > MAX_SEGMENT_BYTES) {
             diagnostics.push({ code: "invalid-envelope", file });
             continue;
           }
@@ -373,7 +528,7 @@ class Ledger {
     const body = { version: 1, id: `ldg-${crypto.randomUUID()}`, type, timestamp: this.clock().toISOString(), parents: state.heads, payload: copy };
     const record = { ...body, sha: sha256(body) };
     const line = Buffer.from(`${canonicalJSON(record)}\n`);
-    if (line.length > MAX_BYTES) throw new RangeError("Ledger record exceeds maximum patch size");
+    if (line.length > MAX_RECORD_BYTES) throw new RangeError("Ledger record exceeds maximum message size");
     if (this.writtenBytes + line.length > this.maxPatchBytes) throw new RangeError("Ledger run exceeds maximum patch size");
     try {
       checkShardDirectories(this.shardDir, true);
@@ -392,8 +547,8 @@ class Ledger {
         if (!writerStat.isFile() || writerStat.isSymbolicLink()) throw new TypeError("Ledger writer shard must be a regular file, not a symlink");
         existing = writerStat.size;
       }
-      if (existing && state.diagnostics.some(entry => entry.file === path.basename(this.writerPath))) existing = MAX_BYTES;
-      if (existing + line.length > MAX_BYTES) {
+      if (existing && state.diagnostics.some(entry => entry.file === path.basename(this.writerPath))) existing = MAX_SEGMENT_BYTES;
+      if (existing + line.length > MAX_SEGMENT_BYTES) {
         this.writerId = crypto.randomUUID();
         this.writerPath = path.join(this.shardDir, `${this.writerId}.jsonl`);
         existing = 0;

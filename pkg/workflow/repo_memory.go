@@ -67,8 +67,14 @@ type RepoMemoryEntry struct {
 
 // RepoMemoryLedgerConfig enables the ledger projection for this memory.
 type RepoMemoryLedgerConfig struct {
-	Schema    string `yaml:"schema,omitempty"`
-	MaxShards int    `yaml:"max-shards,omitempty"`
+	Schema    string                           `yaml:"schema,omitempty"`
+	MaxShards int                              `yaml:"max-shards,omitempty"`
+	Compactor *RepoMemoryLedgerCompactorConfig `yaml:"compactor,omitempty"`
+}
+
+// RepoMemoryLedgerCompactorConfig configures trusted deterministic ledger compaction.
+type RepoMemoryLedgerCompactorConfig struct {
+	Script string `yaml:"script"`
 }
 
 // RepoMemoryToolConfig represents the configuration for repo-memory in tools
@@ -253,8 +259,13 @@ func parseRepoMemoryEntry(memoryMap map[string]any, workflowID, branchPrefix str
 		if len(entry.AllowedExtensions) > 0 && !hasJSONLExtension {
 			return RepoMemoryEntry{}, errors.New("tools.repo-memory.ledger requires .jsonl in allowed-extensions to persist ledger records")
 		}
-		if len(entry.FileGlob) > 0 && !slices.Contains(entry.FileGlob, "ledger/shards/*.jsonl") {
-			entry.FileGlob = append(entry.FileGlob, "ledger/shards/*.jsonl")
+		if len(entry.FileGlob) > 0 {
+			if !slices.Contains(entry.FileGlob, "ledger/shards/*.jsonl") {
+				entry.FileGlob = append(entry.FileGlob, "ledger/shards/*.jsonl")
+			}
+			if config.Compactor != nil && !slices.Contains(entry.FileGlob, "ledger/coverage/*.jsonl") {
+				entry.FileGlob = append(entry.FileGlob, "ledger/coverage/*.jsonl")
+			}
 		}
 		entry.Ledger = config
 	}
@@ -754,6 +765,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 		fmt.Fprintf(&step, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))
 		fmt.Fprintf(&step, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation))
 	}
+	appendRepoMemoryLedgerCompactorEnv(&step, memory.Ledger)
 	step.WriteString("        with:\n")
 	step.WriteString("          script: |\n")
 	step.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
@@ -767,6 +779,12 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 		}
 	}
 	return step.String()
+}
+
+func appendRepoMemoryLedgerCompactorEnv(step *strings.Builder, ledger *RepoMemoryLedgerConfig) {
+	if compactor := ledgerCompactorScriptBase64(ledger); compactor != "" {
+		fmt.Fprintf(step, "          LEDGER_COMPACTOR_SCRIPT_B64: %s\n", compactor)
+	}
 }
 
 func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob bool) string {

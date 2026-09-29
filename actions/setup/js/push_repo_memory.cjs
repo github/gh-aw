@@ -14,6 +14,7 @@ const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligib
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
+const { Ledger } = require("./ledger_store.cjs");
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
@@ -296,6 +297,7 @@ async function main() {
   const formatJSON = process.env.FORMAT_JSON === "true";
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
+  const compactorScriptBase64 = process.env.LEDGER_COMPACTOR_SCRIPT_B64 || "";
   if (
     !Number.isFinite(maxFileSize) ||
     !Number.isSafeInteger(maxFileSize) ||
@@ -553,6 +555,15 @@ async function main() {
   // but files go at the branch root, not in a nested subdirectory
   const destMemoryPath = workspaceDir;
   core.info(`Destination directory: ${destMemoryPath}`);
+  const existingLedgerShardDir = path.join(destMemoryPath, "ledger", "shards");
+  const existingLedgerSegments = fs.existsSync(existingLedgerShardDir)
+    ? new Set(
+        fs
+          .readdirSync(existingLedgerShardDir)
+          .filter(name => name.endsWith(".jsonl"))
+          .map(name => name.slice(0, -6))
+      )
+    : new Set();
 
   // Remove any pre-existing files in the checked-out branch that no longer pass the
   // current allowed-extensions/file-glob filters (e.g. left over from a prior run with
@@ -705,6 +716,26 @@ async function main() {
     return;
   }
 
+  if (compactorScriptBase64) {
+    try {
+      const script = Buffer.from(compactorScriptBase64, "base64").toString("utf8");
+      const shardDir = path.join(destMemoryPath, "ledger", "shards");
+      const excludedSegments = fs.existsSync(shardDir)
+        ? fs
+            .readdirSync(shardDir)
+            .filter(name => name.endsWith(".jsonl"))
+            .map(name => name.slice(0, -6))
+            .filter(id => !existingLedgerSegments.has(id))
+        : [];
+      const ledger = new Ledger({ memoryDir: destMemoryPath, excludeSegments: excludedSegments });
+      const compaction = await ledger.runCompactor(script);
+      compaction.logs.forEach(message => core.info(`Ledger compactor: ${message}`));
+      core.info(`Ledger compactor completed${compaction.changed ? " with retired source segments" : " without source retirement"}.`);
+    } catch (error) {
+      core.warning(`Ledger compaction failed open; continuing without compaction: ${getErrorMessage(error)}`);
+    }
+  }
+
   // Format JSON files if requested
   if (formatJSON) {
     core.info("FORMAT_JSON is enabled: formatting .json files as human-readable...");
@@ -757,6 +788,7 @@ async function main() {
   // preventing glob expansion or pathspec-magic interpretation (e.g. :(top),
   // wildcards) even when a filename happens to contain those characters.
   const literalPathspecs = Array.from(new Set(filesToCopy.map(file => `:(literal)${file.relativePath}`))).sort();
+  if (compactorScriptBase64) literalPathspecs.push(":(glob)ledger/**/*.jsonl");
 
   // Check if we have any changes to commit, scoped to managed memory files only.
   let changedFileCount = 0;

@@ -182,19 +182,48 @@ describe("Ledger", () => {
 
   it("limits per-file patches and rotates before limits, including corrupted files in count", () => {
     const bounded = new Ledger({ memoryDir, maxFiles: 2, maxPatchBytes: 24000 });
-    bounded.append("note", "a".repeat(7000));
-    bounded.append("note", "b".repeat(7000));
+    fs.mkdirSync(bounded.shardDir, { recursive: true });
+    for (const id of ["00000000-0000-4000-8000-000000000000", "00000000-0000-4000-8000-000000000001"]) {
+      fs.writeFileSync(path.join(bounded.shardDir, `${id}.jsonl`), "");
+    }
     expect(fs.readdirSync(bounded.shardDir)).toHaveLength(2);
     expect(() => bounded.append("note", "x".repeat(7000))).toThrow("file-count limit");
-    expect(() => bounded.append("note", "x".repeat(8192))).toThrow(RangeError);
-    for (const file of fs.readdirSync(bounded.shardDir)) expect(fs.statSync(path.join(bounded.shardDir, file)).size).toBeLessThan(8192);
-    const defaultBudget = new Ledger({ memoryDir: fs.mkdtempSync(path.join(memoryDir, "budget-")) });
+    expect(() => bounded.append("note", "x".repeat(32768))).toThrow(RangeError);
+    for (const file of fs.readdirSync(bounded.shardDir)) expect(fs.statSync(path.join(bounded.shardDir, file)).size).toBeLessThan(32768);
+    const defaultBudget = new Ledger({ memoryDir: fs.mkdtempSync(path.join(memoryDir, "budget-")), maxPatchBytes: 8000 });
     defaultBudget.append("note", "x".repeat(7000));
     expect(() => defaultBudget.append("note", "x".repeat(1000))).toThrow("run exceeds maximum patch");
   });
 
   it("uses a default shard limit of 1024", () => {
     expect(new Ledger({ memoryDir }).maxFiles).toBe(1024);
+  });
+
+  it("runs a constrained compactor and retires covered closed segments", async () => {
+    const first = ledger.append("note", { value: 1 });
+    const secondLedger = new Ledger({ memoryDir });
+    secondLedger.append("note", { value: 2 });
+    const compactor = new Ledger({ memoryDir });
+    const segments = compactor.listSegments();
+    expect(segments).toHaveLength(2);
+    const result = await compactor.runCompactor(`
+      const selected = await ledger.listSegments({ closed: true })
+      const records = []
+      for (const segment of selected) records.push(...await ledger.readRecords(segment.id))
+      const replacement = await ledger.createSegment(records, { policy: "test" })
+      await ledger.markCovered(selected.map(segment => segment.id), replacement.id)
+      ledger.log("compacted", selected.length)
+    `);
+    expect(result.logs).toEqual(["compacted 2"]);
+    expect(result.changed).toBe(true);
+    expect(compactor.get(first.sha)).toEqual(first);
+    expect(compactor.get(secondLedger.status().heads[0])).toMatchObject({ type: "note" });
+    expect(compactor.listSegments()).toHaveLength(1);
+  });
+
+  it("fails compaction open without exposing filesystem APIs", async () => {
+    await expect(ledger.runCompactor("await ledger.readRecords('00000000-0000-4000-8000-000000000000')")).rejects.toThrow("Unknown ledger segment");
+    await expect(ledger.runCompactor("typeof process")).resolves.toMatchObject({ changed: false });
   });
 
   it("does not publish or project new files when file or directory fsync fails", () => {

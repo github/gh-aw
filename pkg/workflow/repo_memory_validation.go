@@ -42,6 +42,18 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 	}
 	config := &RepoMemoryLedgerConfig{}
 	for key, value := range fields {
+		if key == "compactor" {
+			compactor, ok := value.(map[string]any)
+			if !ok || len(compactor) != 1 {
+				return nil, errors.New("tools.repo-memory.ledger.compactor must contain only script")
+			}
+			script, ok := compactor["script"].(string)
+			if !ok || strings.TrimSpace(script) == "" || len(script) > 65536 {
+				return nil, errors.New("tools.repo-memory.ledger.compactor.script must be a non-empty script no larger than 65536 bytes")
+			}
+			config.Compactor = &RepoMemoryLedgerCompactorConfig{Script: script}
+			continue
+		}
 		if key == "max-shards" {
 			maxShards, ok := value.(int)
 			if !ok || maxShards < 1 || maxShards > 1024 {
@@ -51,7 +63,7 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 			continue
 		}
 		if key != "schema" {
-			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema and max-shards are supported)", key)
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, and compactor are supported)", key)
 		}
 		schema, ok := value.(string)
 		if !ok {

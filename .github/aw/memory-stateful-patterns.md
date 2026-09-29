@@ -136,7 +136,8 @@ and resolve conflicts using deterministic application rules; the ledger
 converges after branch merges but does not provide transactions.
 
 The ledger is experimental and bounded to 1024 shard files by default (set
-`ledger.max-shards` to choose a lower limit), 8 KiB per record,
+`ledger.max-shards` to choose a lower limit), 32 KiB per record and 10 MiB per
+shard,
 and 500 records per query. A new writer shard is created by each workflow
 invocation, and there is no compaction or deletion API. Avoid it for daily
 histories, replaceable snapshots, expiring baselines, or any workload expected

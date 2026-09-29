@@ -13724,6 +13724,19 @@
           "maximum": 1024,
           "default": 1024,
           "description": "Maximum number of JSONL ledger shard files to inspect."
+        },
+        "compactor": {
+          "type": "object",
+          "properties": {
+            "script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 65536,
+              "description": "Trusted deterministic JavaScript compaction policy executed outside the agent."
+            }
+          },
+          "required": ["script"],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

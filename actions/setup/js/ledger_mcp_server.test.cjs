@@ -74,7 +74,7 @@ describe("ledger MCP server", () => {
       const invalid = invoke(server, "ledger_append", { type: "", payload: true });
       expect(invalid.isError).toBe(true);
       expect(invalid.content[0].text).not.toContain(memoryDir);
-      const oversized = invoke(server, "ledger_append", { type: "build", payload: { data: "x".repeat(20 * 1024) } });
+      const oversized = invoke(server, "ledger_append", { type: "build", payload: { data: "x".repeat(40 * 1024) } });
       expect(oversized.isError).toBe(true);
       expect(oversized.content[0].text).toContain("patch-size limit");
       expect(oversized.content[0].text).not.toContain("xxx");

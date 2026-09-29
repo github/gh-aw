@@ -53,6 +53,7 @@ func TestRepoMemoryLedgerSchema(t *testing.T) {
 		{"null value", map[string]any{"ledger": nil}, true},
 		{"schema object", map[string]any{"ledger": map[string]any{"schema": "schemas/events.json"}}, true},
 		{"max shards", map[string]any{"ledger": map[string]any{"max-shards": 256}}, true},
+		{"compactor", map[string]any{"ledger": map[string]any{"compactor": map[string]any{"script": "return;"}}}, true},
 		{"array entry", []any{map[string]any{"id": "events", "ledger": map[string]any{}}}, true},
 		{"invalid value", map[string]any{"ledger": true}, false},
 		{"invalid field", map[string]any{"ledger": map[string]any{"typo": true}}, false},
@@ -159,12 +160,17 @@ func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 			assert.Equal(t, "memory/ledger-test", config.Memories[0].BranchName)
 		})
 	}
+	tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": map[string]any{"compactor": map[string]any{"script": "return;"}}}})
+	require.NoError(t, err)
+	config, err := NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
+	require.NoError(t, err)
+	assert.Equal(t, "return;", config.Memories[0].Ledger.Compactor.Script)
 
-	tools, err := ParseToolsConfig(map[string]any{"repo-memory": []any{
+	tools, err = ParseToolsConfig(map[string]any{"repo-memory": []any{
 		map[string]any{"id": "events", "ledger": map[string]any{}},
 	}})
 	require.NoError(t, err)
-	config, err := NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
+	config, err = NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
 	require.NoError(t, err)
 	assert.NotNil(t, config.Memories[0].Ledger)
 }
@@ -209,6 +215,8 @@ func TestRepoMemoryLedgerRejectsInvalidConfiguration(t *testing.T) {
 		{"zero max shards", map[string]any{"max-shards": 0}},
 		{"too many max shards", map[string]any{"max-shards": 1025}},
 		{"non-integer max shards", map[string]any{"max-shards": "256"}},
+		{"empty compactor", map[string]any{"compactor": map[string]any{"script": ""}}},
+		{"unknown compactor field", map[string]any{"compactor": map[string]any{"script": "return;", "extra": true}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": tc.value}})
