@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-11",
-    "workflow_name": "Matt Pocock Skills Reviewer",
-    "workflow_file": "mattpocock-skills-reviewer",
-    "total_aic_analyzed": 806.05131,
-    "runs_audited": 5,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 93
-  },
-  {
     "date": "2026-06-12",
     "workflow_name": "CLI Consistency Checker",
     "workflow_file": "cli-consistency-checker",
@@ -95,7 +86,7 @@
   },
   {
     "date": "2026-06-24",
-    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
+    "workflow_name": "Design Decision Gate 🏗️",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 432.592,
     "runs_audited": 7,
@@ -285,5 +276,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-09-29",
+    "workflow_name": "[aw] Failure Investigator (6h)",
+    "workflow_file": "aw-failure-investigator",
+    "total_aic_analyzed": 87.2,
+    "runs_audited": 3,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 10
   }
 ]
