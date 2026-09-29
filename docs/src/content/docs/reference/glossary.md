@@ -1299,6 +1299,10 @@ A CLI command that downloads workflow run artifacts and logs, analyzes MCP tool 
 
 Passing two or more run IDs to `gh aw audit` activates diff mode: the first ID is the base and the rest are compared against it. Reports domain additions and removals, allowed/denied status changes, request volume drift, and anomaly flags across firewall, MCP tool usage, and run metrics dimensions. Useful for detecting regressions and behavioral drift between runs. See [Audit Commands](/gh-aw/reference/audit/).
 
+### Friction Cost
+
+The estimated avoidable marginal cost attributable to an execution-friction event, relative to a counterfactual run in which the event did not occur. Friction events include failed tool calls, filtered responses, blocked requests, and errored or retried model invocations. The conclusion job precomputes it into the `friction` section of the `usage` artifact, in AI credits (`aic`) as the canonical unit, and `gh aw logs` and `gh aw audit` prefer that section when present. Each figure carries an attribution state (`measured`, `causal`, `statistical`, `unavailable`, or `unsupported`). See [Artifacts Reference](/gh-aw/reference/artifacts/#friction-cost).
+
 ### Grouped Audit Findings (`gh aw audit --group`)
 
 An aggregation mode for multi-run `gh aw audit` that replaces per-run diffing with a single table where each `[run, code]` pair appears once alongside an occurrence count and a representative entry. Combine with `--json` for machine-readable grouped output. Useful for spotting recurring findings across many runs without scrolling through a per-run diff. See [Audit Commands](/gh-aw/reference/audit/).
