@@ -2160,6 +2160,25 @@ network:
     # '*.example.com' (matches sub.example.com, deep.nested.example.com, and
     # example.com itself) and ecosystem names like 'python', 'node'.
 
+  # Policy for Claude and Codex provider-hosted web search and fetch tools. This is
+  # independent from network.allowed because hosted retrieval runs on provider
+  # infrastructure.
+  # (optional)
+  # Accepted formats:
+
+  # Format 2: object
+  hosted-web:
+    # (optional)
+    allowed: []
+      # Array of strings
+
+    # (optional)
+    blocked: []
+      # Array of strings
+
+    # (optional)
+    max-uses: 1
+
 # AWF-owned private-repository executors exposed only through the
 # compiler-launched MCP gateway. Omit this field to disable enclaves.
 # (optional)
@@ -2260,38 +2279,38 @@ sandbox:
 
       # API proxy sidecar image that holds provider credentials.
       # (optional)
-      apiProxy: "example-value"
+      api-proxy: "example-value"
 
       # CLI proxy sidecar image used by tools.github.mode: gh-proxy,
       # integrity-reactions, or raw --difc-proxy-host AWF arguments.
       # (optional)
-      cliProxy: "example-value"
+      cli-proxy: "example-value"
 
       # Build-tools image used as the chroot sysroot base on runner.topology: arc-dind.
       # (optional)
-      buildTools: "example-value"
+      build-tools: "example-value"
 
       # DNS-over-HTTPS proxy image required when legacy-security raw AWF arguments
       # enable --dns-over-https.
       # (optional)
-      dohProxy: "example-value"
+      doh-proxy: "example-value"
 
       # Script enclave image.
       # (optional)
-      enclaveScript: "example-value"
+      enclave-script: "example-value"
 
       # Agent enclave image.
       # (optional)
-      enclaveAgent: "example-value"
+      enclave-agent: "example-value"
 
       # Shared enclave MCP server image required whenever any enclave is enabled.
       # (optional)
-      enclaveMcpServer: "example-value"
+      enclave-mcp-server: "example-value"
 
       # Docker-in-Docker staging image required when raw AWF arguments enable directory
       # or engine-binary pre-staging.
       # (optional)
-      dindStaging: "example-value"
+      dind-staging: "example-value"
 
     # Enable or disable model fallback for unresolved model selections. Set to false
     # for BYOK Azure OpenAI deployments to prevent deployment-name rewriting. Supports
@@ -2338,27 +2357,27 @@ sandbox:
       filesystem:
         # List of paths to deny read access
         # (optional)
-        denyRead: []
+        deny-read: []
           # Array of strings
 
         # List of paths to allow write access
         # (optional)
-        allowWrite: []
+        allow-write: []
           # Array of strings
 
         # List of paths to deny write access
         # (optional)
-        denyWrite: []
+        deny-write: []
           # Array of strings
 
       # Map of command patterns to paths that should ignore violations
       # (optional)
-      ignoreViolations:
+      ignore-violations:
         {}
 
       # Enable weaker nested sandbox mode (recommended: true for Docker access)
       # (optional)
-      enableWeakerNestedSandbox: true
+      enable-weaker-nested-sandbox: true
 
     # Per-provider API proxy target overrides. Settings are compiled into the AWF
     # config JSON.
@@ -2371,7 +2390,7 @@ sandbox:
         # provider's API. Overrides the provider default ("Authorization" for OpenAI,
         # "x-api-key" for Anthropic). Example: "api-key" for Azure OpenAI gateways.
         # (optional)
-        authHeader: "example-value"
+        auth-header: "example-value"
 
       # AWF API proxy target configuration for a single LLM provider.
       # (optional)
@@ -2380,7 +2399,7 @@ sandbox:
         # provider's API. Overrides the provider default ("Authorization" for OpenAI,
         # "x-api-key" for Anthropic). Example: "api-key" for Azure OpenAI gateways.
         # (optional)
-        authHeader: "example-value"
+        auth-header: "example-value"
 
       # AWF API proxy target configuration for the Copilot BYOK provider. Supports
       # injecting additional headers, body fields, and an optional session ID on
@@ -2390,20 +2409,20 @@ sandbox:
         # Custom authentication header name to use when forwarding requests to the Copilot
         # API. Example: "api-key" for Azure OpenAI gateways.
         # (optional)
-        authHeader: "example-value"
+        auth-header: "example-value"
 
         # Additional non-sensitive HTTP headers to inject on Copilot BYOK upstream
         # requests. Maps to AWF_BYOK_EXTRA_HEADERS. Example: { "x-openrouter-title":
         # "my-workflow" }.
         # (optional)
-        extraHeaders:
+        extra-headers:
           {}
 
         # Additional non-sensitive JSON body fields to inject on Copilot BYOK upstream
         # requests. Maps to AWF_BYOK_EXTRA_BODY_FIELDS. Example: { "custom-field":
         # "custom-value" }.
         # (optional)
-        extraBodyFields:
+        extra-body-fields:
           {}
 
         # Optional session identifier injected as the x-session-id request header and
@@ -2412,7 +2431,7 @@ sandbox:
         # strict OpenAI-compatible upstreams (e.g. Azure OpenAI) reject the unknown
         # session_id body field with HTTP 400. Example: "${{ github.run_id }}".
         # (optional)
-        sessionId: "example-value"
+        session-id: "example-value"
 
     # Additional host TCP ports the agent may connect to. Requires runtime:
     # docker-sudo-iptables. Ports published by `services:` are reached via
@@ -2432,31 +2451,31 @@ sandbox:
       # Array of path patterns that deny read access in the sandboxed environment. Takes
       # precedence over other read permissions.
       # (optional)
-      denyRead: []
+      deny-read: []
         # Array of strings
 
       # Array of path patterns that allow write access in the sandboxed environment.
       # Paths outside these patterns are read-only.
       # (optional)
-      allowWrite: []
+      allow-write: []
         # Array of strings
 
       # Array of path patterns that deny write access in the sandboxed environment.
       # Takes precedence over other write permissions.
       # (optional)
-      denyWrite: []
+      deny-write: []
         # Array of strings
 
     # When true, log sandbox violations without blocking execution. Useful for
     # debugging and gradual enforcement of sandbox policies.
     # (optional)
-    ignoreViolations:
+    ignore-violations:
       {}
 
     # When true, allows nested sandbox processes to run with relaxed restrictions.
     # Required for certain containerized tools that spawn subprocesses.
     # (optional)
-    enableWeakerNestedSandbox: true
+    enable-weaker-nested-sandbox: true
 
   # MCP Gateway configuration for routing MCP server calls through a unified HTTP
   # gateway. Requires the 'mcp-gateway' feature flag to be enabled. Per MCP Gateway
@@ -3392,8 +3411,8 @@ max-ai-credits: "example-value"
 # (optional)
 max-turn-cache-misses: 1
 
-# 24-hour AI Credits guardrail for runs triggered by the same user. Omit the field
-# to leave the guardrail disabled. Supports GitHub Actions expressions.
+# 24-hour AI Credits guardrail for all runs of this workflow. Omit the field to
+# leave the guardrail disabled. Supports GitHub Actions expressions.
 # (optional)
 # Accepted formats:
 
@@ -3406,8 +3425,8 @@ max-daily-ai-credits: 1
 max-daily-ai-credits: "example-value"
 
 # Format 4: Object form: specify a 'value' (the credit limit), an optional
-# 'github-app' to mint a dedicated token for the guardrail API calls, and optional
-# error handling.
+# 'github-app' to mint a dedicated token for the guardrail API calls, an optional
+# backend, and optional error handling.
 max-daily-ai-credits:
   # The maximum AI Credits budget (positive integer, K/M suffix, or expression). To
   # disable the guardrail, use the scalar form `max-daily-ai-credits: -1` instead.
@@ -3622,6 +3641,13 @@ max-daily-ai-credits:
   # workflow to continue. Defaults to false.
   # (optional)
   continue-on-error: true
+
+  # Optional storage backend for the daily AI Credits rolling ledger. Use
+  # 'repo-memory' to read and write date-bucketed JSONL ledger files through
+  # tools.repo-memory. It selects the memory named 'default', or the first
+  # configured memory when no default exists.
+  # (optional)
+  backend: "repo-memory"
 
 # MCP server definitions
 # (optional)
@@ -4033,7 +4059,8 @@ tools:
     # to 'allow' for a blanket opt-out (disables forcePublicRepos and default
     # sink-visibility enforcement), or provide an array of MCP server IDs to exempt
     # only those servers from default sink-visibility enforcement. Both forms are
-    # rejected in strict mode and warn in non-strict mode. See MCP Gateway
+    # rejected in strict mode and emit a warning in non-strict mode because action
+    # logs are public and agents may expose private data. See MCP Gateway
     # Specification Section 10.9.
     # (optional)
     # Accepted formats:
@@ -13173,6 +13200,13 @@ safe-outputs:
     # repository. Default (omitted or false) rejects labels that don't already exist.
     # (optional)
     create-if-missing: true
+
+    # Optional JSON Schema that narrows each labels item in the add_labels MCP tool.
+    # The schema must remain compatible with the built-in string or object label
+    # schema and may only tighten fields, required properties, or values.
+    # (optional)
+    item-schema:
+      {}
 
     # When true, emit step summary messages instead of making GitHub API calls for
     # this specific output type (preview mode)

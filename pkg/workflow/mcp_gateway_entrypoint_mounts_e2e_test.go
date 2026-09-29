@@ -24,7 +24,7 @@ sandbox:
   mcp:
     container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /custom/start.sh
-    entrypointArgs:
+    entrypoint-args:
       - --verbose
       - --port
       - "8080"
@@ -128,7 +128,7 @@ sandbox:
   mcp:
     container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /bin/bash
-    entrypointArgs:
+    entrypoint-args:
       - -c
       - "exec /app/start.sh"
     mounts:
@@ -231,7 +231,7 @@ sandbox:
   mcp:
     container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /usr/bin/env
-    entrypointArgs:
+    entrypoint-args:
       - bash
       - -c
       - "echo 'Hello World' && /app/start.sh"

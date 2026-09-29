@@ -128,6 +128,7 @@ func getLaterCodemods() []Codemod {
 		getSandboxMCPContainerRemovalCodemod(),            // Remove deprecated sandbox.mcp.container (now managed internally)
 		getSandboxMCPVersionRemovalCodemod(),              // Remove deprecated sandbox.mcp.version (now managed internally)
 		getSandboxRuntimeProfileCodemod(),                 // Migrate sandbox.agent.sudo / legacy-security to sandbox.agent.runtime profiles
+		getSandboxFieldsCodemod(),                         // Normalize camel-cased sandbox fields to kebab-case
 		getInferToDisableModelInvocationCodemod(),         // Migrate deprecated 'infer' to 'disable-model-invocation'
 		getRunInstallScriptsToRuntimesNodeCodemod(),       // Move top-level run-install-scripts under runtimes.node
 		getMentionsAllowTeamMembersCodemod(),              // Rename allow-team-members to allowed-collaborators in safe-outputs.mentions

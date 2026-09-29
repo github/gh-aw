@@ -105,14 +105,14 @@ func TestValidateStrictSandboxCustomization(t *testing.T) {
 			errorMsg:    "strict mode: 'sandbox.mcp.args' is not allowed because it is an internal implementation detail",
 		},
 		{
-			name: "sandbox.mcp.entrypointArgs is rejected",
+			name: "sandbox.mcp.entrypoint-args is rejected",
 			sandbox: &SandboxConfig{
 				MCP: &MCPGatewayRuntimeConfig{
 					EntrypointArgs: []string{"--listen", "0.0.0.0:8000"},
 				},
 			},
 			expectError: true,
-			errorMsg:    "strict mode: 'sandbox.mcp.entrypointArgs' is not allowed because it is an internal implementation detail",
+			errorMsg:    "strict mode: 'sandbox.mcp.entrypoint-args' is not allowed because it is an internal implementation detail",
 		},
 		{
 			name: "sandbox.mcp with only allowed fields is permitted",

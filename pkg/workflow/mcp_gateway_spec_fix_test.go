@@ -19,18 +19,18 @@ func TestMCPServerEntrypointField(t *testing.T) {
 		expectError          bool
 	}{
 		{
-			name: "entrypoint with entrypointArgs",
+			name: "entrypoint with entrypoint-args",
 			mcpConfig: map[string]any{
-				"container":      "ghcr.io/example/server:latest",
-				"entrypoint":     "/custom/entrypoint.sh",
-				"entrypointArgs": []any{"--verbose", "--port", "8080"},
+				"container":       "ghcr.io/example/server:latest",
+				"entrypoint":      "/custom/entrypoint.sh",
+				"entrypoint-args": []any{"--verbose", "--port", "8080"},
 			},
 			expectEntrypoint:     "/custom/entrypoint.sh",
 			expectEntrypointArgs: []string{"--verbose", "--port", "8080"},
 			expectError:          false,
 		},
 		{
-			name: "entrypoint without entrypointArgs",
+			name: "entrypoint without entrypoint-args",
 			mcpConfig: map[string]any{
 				"container":  "ghcr.io/example/server:latest",
 				"entrypoint": "/bin/sh",
@@ -40,17 +40,17 @@ func TestMCPServerEntrypointField(t *testing.T) {
 			expectError:          false,
 		},
 		{
-			name: "entrypointArgs without entrypoint (existing behavior)",
+			name: "entrypoint-args without entrypoint (existing behavior)",
 			mcpConfig: map[string]any{
-				"container":      "ghcr.io/example/server:latest",
-				"entrypointArgs": []any{"--config", "/etc/config.json"},
+				"container":       "ghcr.io/example/server:latest",
+				"entrypoint-args": []any{"--config", "/etc/config.json"},
 			},
 			expectEntrypoint:     "",
 			expectEntrypointArgs: []string{"--config", "/etc/config.json"},
 			expectError:          false,
 		},
 		{
-			name: "no entrypoint or entrypointArgs",
+			name: "no entrypoint or entrypoint-args",
 			mcpConfig: map[string]any{
 				"container": "ghcr.io/example/server:latest",
 			},
@@ -141,9 +141,9 @@ func TestMCPServerMountsInServerConfig(t *testing.T) {
 // TestMCPServerEntrypointAndMountsCombined tests entrypoint and mounts together in extraction
 func TestMCPServerEntrypointAndMountsCombinedExtraction(t *testing.T) {
 	mcpConfig := map[string]any{
-		"container":      "ghcr.io/example/server:latest",
-		"entrypoint":     "/usr/bin/custom-start",
-		"entrypointArgs": []any{"--config", "/etc/app.conf"},
+		"container":       "ghcr.io/example/server:latest",
+		"entrypoint":      "/usr/bin/custom-start",
+		"entrypoint-args": []any{"--config", "/etc/app.conf"},
 		"mounts": []any{
 			"/var/data:/app/data:rw",
 			"/etc/secrets:/app/secrets:ro",

@@ -109,7 +109,7 @@ type AgentAPIProxyTargetConfig struct {
 	// When set, the raw API key is sent as "<authHeader>: <key>" instead of the
 	// provider default ("Authorization" for OpenAI, "x-api-key" for Anthropic).
 	// Example: "api-key" for Azure OpenAI gateways.
-	AuthHeader string `yaml:"authHeader,omitempty"`
+	AuthHeader string `yaml:"auth-header,omitempty"`
 
 	// ExtraHeaders holds additional non-sensitive headers to include on Copilot BYOK
 	// upstream requests. Applies only to the "copilot" provider target.
@@ -119,22 +119,22 @@ type AgentAPIProxyTargetConfig struct {
 	//     agent:
 	//       targets:
 	//         copilot:
-	//           extraHeaders:
+	//           extra-headers:
 	//             x-openrouter-title: my-workflow
 	//             http-referer: https://github.com/org/repo
-	ExtraHeaders map[string]string `yaml:"extraHeaders,omitempty"`
+	ExtraHeaders map[string]string `yaml:"extra-headers,omitempty"`
 
 	// ExtraBodyFields holds additional non-sensitive JSON body fields to include on Copilot
 	// BYOK upstream requests. Applies only to the "copilot" provider target.
 	// Maps to apiProxy.targets.copilot.extraBodyFields in the AWF config (AWF_BYOK_EXTRA_BODY_FIELDS).
-	ExtraBodyFields map[string]string `yaml:"extraBodyFields,omitempty"`
+	ExtraBodyFields map[string]string `yaml:"extra-body-fields,omitempty"`
 
 	// SessionId is an opt-in session identifier injected as the x-session-id request header
 	// and session_id body field on Copilot BYOK upstream requests. Applies only to the
 	// "copilot" provider target. Strict OpenAI-compatible servers (e.g. Azure OpenAI) reject
 	// the unknown body field with HTTP 400, so this value must be set explicitly.
 	// Maps to apiProxy.targets.copilot.sessionId in the AWF config (AWF_PROVIDER_SESSION_ID).
-	SessionId string `yaml:"sessionId,omitempty"`
+	SessionId string `yaml:"session-id,omitempty"`
 }
 
 // SandboxRuntimeConfig represents the Anthropic Sandbox Runtime configuration
@@ -146,24 +146,24 @@ type SandboxRuntimeConfig struct {
 	// The json tag is needed for output serialization to .srt-settings.json.
 	Network                   *SRTNetworkConfig    `yaml:"-" json:"network,omitempty"`
 	Filesystem                *SRTFilesystemConfig `yaml:"filesystem,omitempty" json:"filesystem,omitempty"`
-	IgnoreViolations          map[string][]string  `yaml:"ignoreViolations,omitempty" json:"ignoreViolations,omitempty"`
-	EnableWeakerNestedSandbox bool                 `yaml:"enableWeakerNestedSandbox" json:"enableWeakerNestedSandbox"`
+	IgnoreViolations          map[string][]string  `yaml:"ignore-violations,omitempty" json:"ignoreViolations,omitempty"`
+	EnableWeakerNestedSandbox bool                 `yaml:"enable-weaker-nested-sandbox" json:"enableWeakerNestedSandbox"`
 }
 
 // SRTNetworkConfig represents network configuration for SRT
 type SRTNetworkConfig struct {
-	AllowedDomains      []string `yaml:"allowedDomains,omitempty" json:"allowedDomains,omitempty"`
-	BlockedDomains      []string `yaml:"blockedDomains,omitempty" json:"blockedDomains"`
-	AllowUnixSockets    []string `yaml:"allowUnixSockets,omitempty" json:"allowUnixSockets,omitempty"`
-	AllowLocalBinding   bool     `yaml:"allowLocalBinding" json:"allowLocalBinding"`
-	AllowAllUnixSockets bool     `yaml:"allowAllUnixSockets" json:"allowAllUnixSockets"`
+	AllowedDomains      []string `yaml:"allowed-domains,omitempty" json:"allowedDomains,omitempty"`
+	BlockedDomains      []string `yaml:"blocked-domains,omitempty" json:"blockedDomains"`
+	AllowUnixSockets    []string `yaml:"allow-unix-sockets,omitempty" json:"allowUnixSockets,omitempty"`
+	AllowLocalBinding   bool     `yaml:"allow-local-binding" json:"allowLocalBinding"`
+	AllowAllUnixSockets bool     `yaml:"allow-all-unix-sockets" json:"allowAllUnixSockets"`
 }
 
 // SRTFilesystemConfig represents filesystem configuration for SRT
 type SRTFilesystemConfig struct {
-	DenyRead   []string `yaml:"denyRead" json:"denyRead"`
-	AllowWrite []string `yaml:"allowWrite,omitempty" json:"allowWrite,omitempty"`
-	DenyWrite  []string `yaml:"denyWrite" json:"denyWrite"`
+	DenyRead   []string `yaml:"deny-read" json:"denyRead"`
+	AllowWrite []string `yaml:"allow-write,omitempty" json:"allowWrite,omitempty"`
+	DenyWrite  []string `yaml:"deny-write" json:"denyWrite"`
 }
 
 // getAgentType returns the effective agent type from AgentSandboxConfig

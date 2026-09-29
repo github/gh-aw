@@ -57,6 +57,31 @@ var awfImageRoles = []string{
 	awfImageRoleDindStaging,
 }
 
+// sandboxImageRoleFromFrontmatter converts the hyphenated frontmatter spelling to
+// the camel-cased role name required by the AWF config schema.
+func sandboxImageRoleFromFrontmatter(role string) string {
+	switch role {
+	case "api-proxy":
+		return awfImageRoleAPIProxy
+	case "cli-proxy":
+		return awfImageRoleCliProxy
+	case "build-tools":
+		return awfImageRoleBuildTools
+	case "doh-proxy":
+		return awfImageRoleDohProxy
+	case "enclave-script":
+		return awfImageRoleEnclaveScript
+	case "enclave-agent":
+		return awfImageRoleEnclaveAgent
+	case "enclave-mcp-server":
+		return awfImageRoleEnclaveMcpServer
+	case "dind-staging":
+		return awfImageRoleDindStaging
+	default:
+		return role
+	}
+}
+
 // awfPinnedImagePattern is AWF's canonical digestPinnedImage grammar. It follows
 // distribution/reference while requiring an explicit registry host, tag, and
 // lowercase SHA-256 digest.

@@ -14,8 +14,8 @@ import (
 )
 
 // TestCopilotBYOKExtraFieldsInCompiledWorkflow is an end-to-end compilation test
-// verifying that sandbox.agent.targets.copilot.extraHeaders, extraBodyFields, and
-// sessionId in frontmatter flow all the way through compilation into the AWF config
+// verifying that sandbox.agent.targets.copilot.extra-headers, extra-body-fields, and
+// session-id in frontmatter flow all the way through compilation into the AWF config
 // JSON embedded in the generated .lock.yml file.
 //
 // This test covers the full path: frontmatter schema validation → WorkflowData parsing
@@ -34,12 +34,12 @@ sandbox:
   agent:
     targets:
       copilot:
-        extraHeaders:
+        extra-headers:
           x-openrouter-title: my-workflow
           http-referer: https://github.com/org/repo
-        extraBodyFields:
+        extra-body-fields:
           custom-field: custom-value
-        sessionId: "${{ github.run_id }}"
+        session-id: "${{ github.run_id }}"
 strict: false
 safe-outputs:
   create-issue:

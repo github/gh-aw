@@ -285,7 +285,7 @@ func TestEmitGeneralToolWarningsIgnoredFilesystemAllowWrite(t *testing.T) {
 		{name: "cloud-hypervisor runtime does not warn", runtime: AgentRuntimeCloudHypervisor, expectWarning: false},
 	}
 
-	const expectedMessage = "sandbox.agent.config.filesystem.allowWrite is ignored for this runtime"
+	const expectedMessage = "sandbox.agent.config.filesystem.allow-write is ignored for this runtime"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

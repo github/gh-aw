@@ -126,7 +126,7 @@ func isCloudHypervisorRuntime(workflowData *WorkflowData) bool {
 }
 
 // declaresIgnoredFilesystemAllowWrite returns true when a workflow declares
-// sandbox.agent.config.filesystem.allowWrite on a runtime where the compiler drops
+// sandbox.agent.config.filesystem.allow-write on a runtime where the compiler drops
 // it (see awfEmitsFilesystemAllowWrite). Only explicit opt-ins are reported: the
 // implicit defaults are seeded for the Cloud Hypervisor runtime alone.
 func declaresIgnoredFilesystemAllowWrite(workflowData *WorkflowData) bool {
