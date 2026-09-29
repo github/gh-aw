@@ -298,6 +298,7 @@ async function main() {
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
   const compactorScriptBase64 = process.env.LEDGER_COMPACTOR_SCRIPT_B64 || "";
+  /** @type {{compaction: {before: number, after: number, retired: number, logs: number} | null, normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
   const ledgerActivity = {
     compaction: null,
     normalized: [],
