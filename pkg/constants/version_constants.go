@@ -39,7 +39,7 @@ const DefaultClaudeCodeVersion Version = "2.1.280"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.87"
+const DefaultCopilotVersion Version = "1.0.89"
 
 // CopilotWebSearchMinVersion is the first known Copilot CLI version that
 // exposes the built-in web_search tool.
@@ -49,13 +49,13 @@ const CopilotWebSearchMinVersion Version = "1.0.87"
 const DefaultCopilotSDKVersion Version = "1.0.13"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.154.0"
+const DefaultCodexVersion Version = "0.159.1"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
-const DefaultGeminiVersion Version = "0.59.0"
+const DefaultGeminiVersion Version = "0.62.0"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "0.87.0"
+const DefaultPiVersion Version = "0.99.1"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v1.12.2"

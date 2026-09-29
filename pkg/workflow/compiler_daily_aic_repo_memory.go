@@ -20,7 +20,7 @@ func (c *Compiler) generateDailyAICRepoMemoryLedgerSteps(data *WorkflowData, has
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		steps = append(steps, buildDetectionArtifactDownloadSteps(prefix, c.getActionPin)...)
 	}
-	steps = append(steps, buildUsageArtifactInputDownloadSteps(prefix, hasEvals, c.getActionPin)...)
+	steps = append(steps, buildUsageArtifactInputDownloadSteps(prefix, hasEvals, "", c.getActionPin)...)
 	ledgerDir := dailyAICRepoMemoryDir(entry)
 	hydrationDir := dailyAICLedgerHydrationDir(entry)
 	steps = append(steps, buildDailyAICRepoMemoryHydrationSteps(entry, ledgerDir, hydrationDir)...)

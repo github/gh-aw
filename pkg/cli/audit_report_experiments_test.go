@@ -52,6 +52,35 @@ func TestFindExperimentStatePath(t *testing.T) {
 		assert.Equal(t, statePath, got, "should find state.json in experiment subdirectory")
 	})
 
+	t.Run("finds state.jsonl in usage artifact experiment subdirectory", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "usage", "experiment")
+		require.NoError(t, os.MkdirAll(subDir, 0o755))
+		statePath := filepath.Join(subDir, "state.jsonl")
+		require.NoError(t, os.WriteFile(statePath, []byte("{}"), 0o600))
+
+		got := findExperimentStatePath(dir)
+		assert.Equal(t, statePath, got, "should find state.jsonl staged in the usage artifact")
+	})
+
+	t.Run("finds state.jsonl in prefixed experiment and usage directories", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		subDir := filepath.Join(dir, "abc123-usage", "experiment")
+		require.NoError(t, os.MkdirAll(subDir, 0o755))
+		statePath := filepath.Join(subDir, "state.jsonl")
+		require.NoError(t, os.WriteFile(statePath, []byte("{}"), 0o600))
+		assert.Equal(t, statePath, findExperimentStatePath(dir), "should find state.jsonl in workflow_call prefixed usage artifact")
+
+		dir2 := t.TempDir()
+		expDir := filepath.Join(dir2, "myworkflow-experiment")
+		require.NoError(t, os.MkdirAll(expDir, 0o755))
+		statePath2 := filepath.Join(expDir, "state.jsonl")
+		require.NoError(t, os.WriteFile(statePath2, []byte("{}"), 0o600))
+		assert.Equal(t, statePath2, findExperimentStatePath(dir2), "should find state.jsonl in workflow-ID prefixed experiment artifact")
+	})
+
 	t.Run("returns empty when no state.json exists", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
