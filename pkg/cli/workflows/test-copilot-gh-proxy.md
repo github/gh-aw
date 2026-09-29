@@ -10,6 +10,11 @@ permissions:
 tools:
   github:
     mode: gh-proxy
+    github-app:
+      client-id: ${{ vars.SOURCE_APP_ID }}
+      private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
+      owner: example-org
+      repositories: [private-source-repo]
 ---
 
 # Test Copilot GH Proxy
