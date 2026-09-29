@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
 	"github.com/github/gh-aw/pkg/linters/bytescomparestring"
+	"github.com/github/gh-aw/pkg/linters/closeerrorunchecked"
 	"github.com/github/gh-aw/pkg/linters/contextcancelnotdeferred"
 	"github.com/github/gh-aw/pkg/linters/ctxbackground"
 	"github.com/github/gh-aw/pkg/linters/deferinloop"
@@ -95,6 +96,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	bufioscannererunchecked.Analyzer,
 	bytesbufferstring.Analyzer,
 	bytescomparestring.Analyzer,
+	closeerrorunchecked.Analyzer,
 	contextcancelnotdeferred.Analyzer,
 	ctxbackground.Analyzer,
 	deferinloop.Analyzer,
