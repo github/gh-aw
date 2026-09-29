@@ -128,6 +128,21 @@ describe("update_network_allowed.cjs", () => {
     expect(result.network.allowDomains).toEqual(["existing.example.com", "observabilityci.ingest.us-east-2.gcp.elasticcloud.com", "secondary.example.com"]);
   });
 
+  it("logs OTLP allowlist counts without exposing collector hostnames", async () => {
+    writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] } }) + "\n");
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://private-collector.example.com:4318/v1/traces" }]);
+    const logSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    try {
+      await main();
+
+      expect(logSpy).toHaveBeenCalledWith("OTLP firewall allowlist: 1 collector host(s) resolved, 1 added, 0 already allowed.\n");
+      expect(logSpy.mock.calls.flat().join("")).not.toContain("private-collector.example.com");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it("ignores malformed and non-HTTP OTLP endpoint values", async () => {
     const initial = { network: { allowDomains: [] } };
     writeFileSync(configPath, JSON.stringify(initial) + "\n");

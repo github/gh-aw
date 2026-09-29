@@ -152,11 +152,20 @@ async function main() {
     const allowDomains = toStringArray(network.allowDomains);
     const seen = new Set(allowDomains);
 
-    for (const domain of endpointDomains) {
+    const uniqueEndpointDomains = [...new Set(endpointDomains)];
+    let addedEndpointDomains = 0;
+    let existingEndpointDomains = 0;
+    for (const domain of uniqueEndpointDomains) {
       if (!seen.has(domain)) {
         allowDomains.push(domain);
         seen.add(domain);
+        addedEndpointDomains++;
+      } else {
+        existingEndpointDomains++;
       }
+    }
+    if (uniqueEndpointDomains.length > 0) {
+      process.stdout.write(`OTLP firewall allowlist: ${uniqueEndpointDomains.length} collector host(s) resolved, ${addedEndpointDomains} added, ${existingEndpointDomains} already allowed.\n`);
     }
 
     for (const token of tokens) {
