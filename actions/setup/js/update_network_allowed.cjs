@@ -5,7 +5,8 @@
  * update_network_allowed.cjs
  *
  * Updates the AWF config file's network.allowDomains list based on the
- * GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED environment variable.
+ * GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED environment variable and the configured
+ * OTLP collector endpoints.
  *
  * The variable contains a comma-separated list of ecosystem tokens (e.g. "node,python")
  * or raw domain names. Each token is expanded to its known set of domains using the
@@ -16,6 +17,8 @@
  *   RUNNER_TEMP                       - GitHub Actions runner temp directory
  *   GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED - Comma-separated allowed tokens/domains
  *   GH_AW_ECOSYSTEM_MAP_JSON          - JSON object mapping ecosystem names to domain arrays
+ *   GH_AW_OTLP_ENDPOINTS              - JSON array of OTLP endpoint entries
+ *   OTEL_EXPORTER_OTLP_ENDPOINT       - Primary OTLP endpoint (fallback)
  *
  * Exit codes:
  *   0 — Success (including when no tokens are specified)
@@ -29,6 +32,22 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const NETWORK_ALLOWED_ENV_VAR = "GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED";
 /** @typedef {{allowDomains?: string[]}} AWFNetworkConfig */
 /** @typedef {Record<string, unknown> & {network?: AWFNetworkConfig | unknown}} AWFConfig */
+
+/**
+ * @param {string} endpoint
+ * @returns {string}
+ */
+function getOTLPEndpointDomain(endpoint) {
+  try {
+    const parsed = new URL(endpoint);
+    if ((parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname) {
+      return parsed.hostname;
+    }
+  } catch {
+    // Ignore malformed endpoint values and leave firewall behavior unchanged.
+  }
+  return "";
+}
 
 /**
  * @param {any} value
@@ -81,21 +100,49 @@ async function main() {
     .map(t => t.trim())
     .filter(t => t.length > 0);
 
-  if (tokens.length > 0) {
-    const ecosystemMapJSON = process.env.GH_AW_ECOSYSTEM_MAP_JSON;
-    if (!ecosystemMapJSON) {
-      process.stderr.write("GH_AW_ECOSYSTEM_MAP_JSON is not set\n");
-      process.exit(1);
+  /** @type {string[]} */
+  const endpointDomains = [];
+  const addEndpointDomain = endpoint => {
+    if (typeof endpoint === "string") {
+      const domain = getOTLPEndpointDomain(endpoint);
+      if (domain) {
+        endpointDomains.push(domain);
+      }
     }
-
-    /** @type {Record<string, string[]>} */
-    let ecosystemMap;
+  };
+  addEndpointDomain(process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "");
+  if (process.env.GH_AW_OTLP_ENDPOINTS) {
     try {
-      ecosystemMap = JSON.parse(ecosystemMapJSON);
-    } catch (/** @type {unknown} */ err) {
-      const errMessage = getErrorMessage(err);
-      process.stderr.write(`Invalid GH_AW_ECOSYSTEM_MAP_JSON: ${errMessage}\n`);
-      process.exit(1);
+      const endpoints = JSON.parse(process.env.GH_AW_OTLP_ENDPOINTS);
+      if (Array.isArray(endpoints)) {
+        for (const endpoint of endpoints) {
+          if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
+            addEndpointDomain(endpoint.url);
+          }
+        }
+      }
+    } catch {
+      // Intentionally ignore malformed endpoint-list JSON; primary endpoint handling continues.
+    }
+  }
+
+  if (tokens.length > 0 || endpointDomains.length > 0) {
+    /** @type {Record<string, string[]>} */
+    let ecosystemMap = {};
+    if (tokens.length > 0) {
+      const ecosystemMapJSON = process.env.GH_AW_ECOSYSTEM_MAP_JSON;
+      if (!ecosystemMapJSON) {
+        process.stderr.write("GH_AW_ECOSYSTEM_MAP_JSON is not set\n");
+        process.exit(1);
+      }
+
+      try {
+        ecosystemMap = JSON.parse(ecosystemMapJSON);
+      } catch (/** @type {unknown} */ err) {
+        const errMessage = getErrorMessage(err);
+        process.stderr.write(`Invalid GH_AW_ECOSYSTEM_MAP_JSON: ${errMessage}\n`);
+        process.exit(1);
+      }
     }
 
     // Arrays are treated as malformed for this field and reset to an object shape.
@@ -108,6 +155,13 @@ async function main() {
     }
     const allowDomains = toStringArray(network.allowDomains);
     const seen = new Set(allowDomains);
+
+    for (const domain of endpointDomains) {
+      if (!seen.has(domain)) {
+        allowDomains.push(domain);
+        seen.add(domain);
+      }
+    }
 
     for (const token of tokens) {
       const domains = ecosystemMap[token] || [token];

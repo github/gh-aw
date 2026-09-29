@@ -2525,6 +2525,28 @@ func TestBuildAWFCommand_WorkflowCallNetworkAllowedUpdaterUsesRunnerTempEnv(t *t
 	assert.NotContains(t, command, `Path("${RUNNER_TEMP}/gh-aw/awf-config.json")`, "workflow_call network updater should not embed an unexpanded RUNNER_TEMP literal")
 }
 
+func TestBuildAWFCommand_OTLPEndpointRunsNetworkAllowedUpdater(t *testing.T) {
+	config := AWFCommandConfig{
+		EngineName:     "copilot",
+		EngineCommand:  "copilot --prompt-file /tmp/prompt.txt",
+		LogFile:        "/tmp/gh-aw/agent-stdio.log",
+		AllowedDomains: "github.com",
+		WorkflowData: &WorkflowData{
+			EngineConfig:  &EngineConfig{ID: "copilot"},
+			OTLPEndpoint:  "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}",
+			OTLPEndpoints: `[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}"}]`,
+			NetworkPermissions: &NetworkPermissions{
+				Firewall: &FirewallConfig{Enabled: true},
+			},
+		},
+	}
+
+	command := BuildAWFCommand(config)
+
+	assert.Contains(t, command, `update_network_allowed.cjs`, "OTLP endpoint should trigger the runtime firewall allowlist updater")
+	assert.NotContains(t, command, `GH_AW_ECOSYSTEM_MAP_JSON=`, "OTLP-only updater should not require workflow_call ecosystem expansion")
+}
+
 // TestBuildAWFCommand_WritesAgentCLIStartTimestamp verifies that BuildAWFCommand
 // always emits a printf command that writes the epoch-ms timestamp to
 // AgentCLIStartMsPath at the very beginning of the run block, before any

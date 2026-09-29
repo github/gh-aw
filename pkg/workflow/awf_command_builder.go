@@ -213,6 +213,8 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 		} else {
 			configFileSetup += "\n" + updateScript
 		}
+	} else if config.WorkflowData != nil && config.WorkflowData.OTLPEndpoint != "" {
+		configFileSetup += "\nnode \"${RUNNER_TEMP}/gh-aw/actions/update_network_allowed.cjs\""
 	}
 	if mkdirScript := buildCloudHypervisorFilesystemMkdirScript(config.WorkflowData); mkdirScript != "" {
 		configFileSetup = mkdirScript + "\n" + configFileSetup

@@ -31,11 +31,15 @@ describe("update_network_allowed.cjs", () => {
       RUNNER_TEMP: process.env.RUNNER_TEMP,
       GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED: process.env.GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED,
       GH_AW_ECOSYSTEM_MAP_JSON: process.env.GH_AW_ECOSYSTEM_MAP_JSON,
+      GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
+      OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     };
 
     process.env.RUNNER_TEMP = tempDir;
     process.env.GH_AW_ECOSYSTEM_MAP_JSON = JSON.stringify(ECOSYSTEM_MAP);
     delete process.env.GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED;
+    delete process.env.GH_AW_OTLP_ENDPOINTS;
+    delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   });
 
   afterEach(() => {
@@ -106,6 +110,30 @@ describe("update_network_allowed.cjs", () => {
     const result = JSON.parse(readFileSync(configPath, "utf8"));
     const count = result.network.allowDomains.filter((/** @type {string} */ d) => d === "registry.npmjs.org").length;
     expect(count).toBe(1);
+  });
+
+  it("allows all configured OTLP endpoint hosts at runtime", async () => {
+    const initial = { network: { allowDomains: ["existing.example.com"] } };
+    writeFileSync(configPath, JSON.stringify(initial) + "\n");
+
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://observabilityci.ingest.us-east-2.gcp.elasticcloud.com:443/v1/traces" }, { url: "https://secondary.example.com:4318/v1/traces" }]);
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://observabilityci.ingest.us-east-2.gcp.elasticcloud.com:443/v1/traces";
+    await main();
+
+    const result = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(result.network.allowDomains).toEqual(["existing.example.com", "observabilityci.ingest.us-east-2.gcp.elasticcloud.com", "secondary.example.com"]);
+  });
+
+  it("ignores malformed and non-HTTP OTLP endpoint values", async () => {
+    const initial = { network: { allowDomains: [] } };
+    writeFileSync(configPath, JSON.stringify(initial) + "\n");
+
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "not a URL" }, { url: "file:///etc/passwd" }]);
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "invalid";
+    await main();
+
+    const result = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(result.network.allowDomains).toEqual([]);
   });
 
   it("initialises network.allowDomains when not present", async () => {
