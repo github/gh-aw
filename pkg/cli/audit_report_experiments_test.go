@@ -510,7 +510,8 @@ func TestExtractExperimentDataFallsBackToUsageSummary(t *testing.T) {
 		summary := map[string]any{
 			"schema": "usage-activity-summary/v1",
 			"experiments": map[string]any{
-				"assignments": map[string]string{"style": "concise", "caveman": "yes"},
+				"assignments":       map[string]string{"style": "concise", "caveman": "yes"},
+				"cumulative_counts": map[string]map[string]int{"style": {"concise": 3, "detailed": 2}},
 			},
 		}
 		raw, err := json.Marshal(summary)
@@ -521,7 +522,7 @@ func TestExtractExperimentDataFallsBackToUsageSummary(t *testing.T) {
 		require.NotNil(t, got, "should return non-nil ExperimentData from usage summary")
 		assert.Equal(t, "concise", got.Assignments["style"])
 		assert.Equal(t, "yes", got.Assignments["caveman"])
-		assert.Nil(t, got.CumulativeCounts, "usage summary fallback does not have cumulative counts")
+		assert.Equal(t, map[string]int{"concise": 3, "detailed": 2}, got.CumulativeCounts["style"])
 	})
 
 	t.Run("prefers state file over usage summary when both exist", func(t *testing.T) {

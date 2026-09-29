@@ -16,6 +16,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
+const { loadState: loadExperimentState } = require("./pick_experiment.cjs");
 const { countSteeringEventsByTypeInApiProxyJsonl } = require("./steering_helpers.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { computeFrictionCost } = require("./friction_cost_metrics.cjs");
@@ -1023,12 +1024,17 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
  * Reads the assignments.json file written by pick_experiment.cjs.
  * Returns null when no experiments are active for this run.
  *
- * @returns {{ assignments: Record<string, string> } | null}
+ * @returns {{ assignments: Record<string, string>, cumulative_counts?: Record<string, Record<string, number>> } | null}
  */
 function parseExperimentsData() {
   const assignments = readExperimentAssignments();
   if (!assignments || Object.keys(assignments).length === 0) {
     return null;
+  }
+  const stateFile = process.env.GH_AW_EXPERIMENT_STATE_FILE || "/tmp/gh-aw/experiments/state.jsonl";
+  const state = loadExperimentState(stateFile);
+  if (state.counts && Object.keys(state.counts).length > 0) {
+    return { assignments, cumulative_counts: state.counts };
   }
   return { assignments };
 }

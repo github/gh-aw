@@ -79,7 +79,7 @@ func extractExperimentData(logsPath string) *ExperimentData {
 				// When per-run records are available, use the most recent run's assignments directly
 				// instead of inferring them from cumulative counts.
 				if len(state.Runs) > 0 {
-					lastRun := state.Runs[len(state.Runs)-1]
+					lastRun := state.Runs[len(state.Runs)-1] //nolint:uncheckedsliceindex // guarded by the len check above
 					if len(lastRun.Assignments) > 0 {
 						experimentDataLog.Printf("Using run record from run_id=%s (timestamp=%s)", lastRun.RunID, lastRun.Timestamp)
 						return &ExperimentData{
@@ -110,18 +110,24 @@ func extractExperimentData(logsPath string) *ExperimentData {
 	// Fall back to the usage activity summary (written by the conclusion job).
 	// This is available when the experiment artifact was not downloaded separately,
 	// and the conclusion job was run with pick_experiment.cjs v2+ (JSONL ledger).
-	usageSummary, err := loadUsageActivitySummary(logsPath)
-	if err == nil && usageSummary != nil && usageSummary.Experiments != nil {
-		if len(usageSummary.Experiments.Assignments) > 0 {
-			experimentDataLog.Printf("Loaded experiment assignments from usage activity summary (%d experiment(s))", len(usageSummary.Experiments.Assignments))
-			return &ExperimentData{
-				Assignments: usageSummary.Experiments.Assignments,
-			}
-		}
+	if experimentData := extractExperimentDataFromUsageSummary(logsPath); experimentData != nil {
+		return experimentData
 	}
 
 	experimentDataLog.Print("No experiment data found")
 	return nil
+}
+
+func extractExperimentDataFromUsageSummary(logsPath string) *ExperimentData {
+	usageSummary, err := loadUsageActivitySummary(logsPath)
+	if err != nil || usageSummary == nil || usageSummary.Experiments == nil || len(usageSummary.Experiments.Assignments) == 0 {
+		return nil
+	}
+	experimentDataLog.Printf("Loaded experiment assignments from usage activity summary (%d experiment(s))", len(usageSummary.Experiments.Assignments))
+	return &ExperimentData{
+		Assignments:      usageSummary.Experiments.Assignments,
+		CumulativeCounts: usageSummary.Experiments.CumulativeCounts,
+	}
 }
 
 // formatExperimentLabel returns a compact, human-readable label summarising the
@@ -155,7 +161,7 @@ func firstExperimentAssignment(exp *ExperimentData) (name, variant string, ok bo
 		return "", "", false
 	}
 	names := sliceutil.SortedKeys(exp.Assignments)
-	name = names[0]
+	name = names[0] //nolint:uncheckedsliceindex // non-empty assignments guarantee a sorted key
 	return name, exp.Assignments[name], true
 }
 
@@ -199,7 +205,7 @@ func deriveLastSelectedVariant(variantCounts map[string]int) string {
 
 	variants := sliceutil.SortedKeys(variantCounts)
 
-	selected := variants[0]
+	selected := variants[0] //nolint:uncheckedsliceindex // non-empty counts guarantee a sorted key
 	maxCount := variantCounts[selected]
 	for _, v := range variants[1:] {
 		if variantCounts[v] > maxCount {

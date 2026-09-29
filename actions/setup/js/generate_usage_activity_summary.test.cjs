@@ -30,6 +30,7 @@ describe("generate_usage_activity_summary.cjs", () => {
   let squidLogDir;
   let experimentStateDir;
   const origExperimentStateDir = process.env.GH_AW_EXPERIMENT_STATE_DIR;
+  const origExperimentStateFile = process.env.GH_AW_EXPERIMENT_STATE_FILE;
 
   beforeEach(() => {
     squidLogDir = path.join("/tmp/gh-aw", `squid-logs-unit-test-${Date.now()}`);
@@ -50,6 +51,11 @@ describe("generate_usage_activity_summary.cjs", () => {
       delete process.env.GH_AW_EXPERIMENT_STATE_DIR;
     } else {
       process.env.GH_AW_EXPERIMENT_STATE_DIR = origExperimentStateDir;
+    }
+    if (origExperimentStateFile === undefined) {
+      delete process.env.GH_AW_EXPERIMENT_STATE_FILE;
+    } else {
+      process.env.GH_AW_EXPERIMENT_STATE_FILE = origExperimentStateFile;
     }
   });
 
@@ -505,6 +511,24 @@ describe("generate_usage_activity_summary.cjs", () => {
       const result = parseExperimentsData();
       expect(result).not.toBeNull();
       expect(result.assignments).toEqual(assignments);
+    });
+
+    it("returns cumulative counts from experiment state", () => {
+      const assignments = { style: "concise", caveman: "yes" };
+      fs.writeFileSync(path.join(experimentStateDir, "assignments.json"), JSON.stringify(assignments));
+      fs.writeFileSync(
+        path.join(experimentStateDir, "state.jsonl"),
+        [JSON.stringify({ run_id: "1", timestamp: "2026-09-29T00:00:00Z", assignments: { style: "concise", caveman: "no" } }), JSON.stringify({ run_id: "2", timestamp: "2026-09-29T01:00:00Z", assignments })].join("\n")
+      );
+      process.env.GH_AW_EXPERIMENT_STATE_FILE = path.join(experimentStateDir, "state.jsonl");
+
+      expect(parseExperimentsData()).toEqual({
+        assignments,
+        cumulative_counts: {
+          style: { concise: 2 },
+          caveman: { no: 1, yes: 1 },
+        },
+      });
     });
 
     it("returns null when assignments file is invalid JSON", () => {

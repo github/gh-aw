@@ -154,7 +154,8 @@ type usageActivitySafeOutputs struct {
 
 type usageActivityExperiments struct {
 	// Assignments maps each experiment name to the variant selected for this run.
-	Assignments map[string]string `json:"assignments,omitempty"`
+	Assignments      map[string]string         `json:"assignments,omitempty"`
+	CumulativeCounts map[string]map[string]int `json:"cumulative_counts,omitempty"`
 }
 
 func loadUsageActivitySummary(runDir string) (*usageActivitySummary, error) {
