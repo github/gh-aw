@@ -77,6 +77,8 @@ type PinContext struct {
 	// Warnings is a shared map for deduplicating warning messages.
 	// Keys are cache keys in the form "repo@version".
 	Warnings map[string]bool
+	// SourceVersions holds inline version comments for already-pinned steps, keyed by repo@SHA.
+	SourceVersions map[string]string
 	// RecordResolutionFailure receives unresolved pinning failures for auditing.
 	RecordResolutionFailure func(f ResolutionFailure)
 	// SkipHardcodedFallback skips version→SHA hardcoded fallback when dynamic

@@ -79,6 +79,60 @@ This is a test workflow to verify SHA pinning.
 	t.Logf("Found %d SHA-based action references", len(shaMatches))
 }
 
+func TestCompileWorkflowPreservesUnknownSHALabel(t *testing.T) {
+	const sha = "c19371144df3bb44fab255c43d04cbc2ab54d1c4"
+	for _, tt := range []struct {
+		name    string
+		comment string
+		want    string
+	}{
+		{"labelled", " # v2.9.1", " # v2.9.1"},
+		{"unlabelled", "", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "demo.md")
+			content := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: copilot\nsteps:\n  - uses: Swatinem/rust-cache@" + sha + tt.comment + "\n---\n\nSay hello.\n"
+			if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(path); err != nil {
+				t.Fatal(err)
+			}
+			lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "      - uses: Swatinem/rust-cache@" + sha + tt.want
+			if !strings.Contains(string(lock), want+"\n") {
+				t.Fatalf("lock file missing %q", want)
+			}
+			if strings.Contains(string(lock), "uses: Swatinem/rust-cache@"+sha+" # "+sha) {
+				t.Fatal("lock file uses SHA as version comment")
+			}
+			manifest, err := ExtractGHAWManifestFromLockFile(string(lock))
+			if err != nil {
+				t.Fatal(err)
+			}
+			version := sha
+			if tt.comment != "" {
+				version = "v2.9.1"
+			}
+			found := false
+			for _, action := range manifest.Actions {
+				if action.Repo == "Swatinem/rust-cache" && action.SHA == sha {
+					found = true
+					if action.Version != version {
+						t.Errorf("manifest version = %q, want %q", action.Version, version)
+					}
+				}
+			}
+			if !found {
+				t.Fatal("missing action in manifest")
+			}
+		})
+	}
+}
+
 // TestCompileWorkflowActionReferences tests that commonly used actions are pinned to SHAs
 func TestCompileWorkflowActionReferences(t *testing.T) {
 	testDir := testutil.TempDir(t, "test-*")

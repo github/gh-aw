@@ -70,7 +70,10 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (string, erro
 
 	if isAlreadySHA {
 		actionPinsLog.Printf("SHA %s not found in hardcoded pins, returning as-is", version)
-		return FormatPinnedActionReference(actionRepo, version, version), nil
+		if label := ctx.SourceVersions[actionRepo+"@"+version]; label != "" {
+			return FormatPinnedActionReference(actionRepo, version, label), nil
+		}
+		return actionRepo + "@" + version, nil
 	}
 
 	cacheKey := FormatCacheKey(actionRepo, version)
