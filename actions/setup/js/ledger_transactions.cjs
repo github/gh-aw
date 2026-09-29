@@ -95,7 +95,7 @@ function sanitizeRecord(record) {
       if (child && typeof child === "object") stack.push({ value: child, depth: depth + 1 });
     }
   }
-  return JSON.parse(JSON.stringify(record));
+  return structuredClone(record);
 }
 
 module.exports = { finalId, normalizeLedgerAppends };
