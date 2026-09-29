@@ -562,6 +562,8 @@ func TestCacheMemoryArtifactUploadAddsGitIntegrityCheck(t *testing.T) {
 		"Should run shared integrity script before upload")
 	assert.Contains(t, output, "- name: Upload cache-memory data as artifact",
 		"Should still upload artifact after integrity check")
+	assert.Contains(t, output, "if: always() && steps.redact_secrets.outcome == 'success'",
+		"Cache-memory upload should require successful secret redaction")
 }
 
 // TestCacheMemoryGitSetupStep_AllowedExtensionsEnvVar verifies that the git setup step

@@ -481,18 +481,14 @@ type repoMemoryUploadStepParams struct {
 // or unvalidated directory being uploaded.
 func generateRepoMemoryUploadArtifactStep(builder *strings.Builder, p repoMemoryUploadStepParams) {
 	fmt.Fprintf(builder, "      - name: Upload %s artifact (%s)\n", p.memoryLabel, p.memory.ID)
-	var conditions []string
+	conditions := []string{"steps.redact_secrets.outcome == 'success'"}
 	if p.filterStepID != "" {
 		conditions = append(conditions, fmt.Sprintf("steps.%s.outcome == 'success'", p.filterStepID))
 	}
 	if p.validationStepID != "" {
 		conditions = append(conditions, fmt.Sprintf("steps.%s.outcome == 'success'", p.validationStepID))
 	}
-	if len(conditions) > 0 {
-		fmt.Fprintf(builder, "        if: always() && %s\n", strings.Join(conditions, " && "))
-	} else {
-		builder.WriteString("        if: always()\n")
-	}
+	fmt.Fprintf(builder, "        if: always() && %s\n", strings.Join(conditions, " && "))
 	fmt.Fprintf(builder, "        uses: %s\n", p.pinAction("actions/upload-artifact"))
 	builder.WriteString("        with:\n")
 	fmt.Fprintf(builder, "          name: %srepo-memory-%s\n", p.prefix, p.sanitizedID)

@@ -376,6 +376,8 @@ func TestRepoMemoryFilterStepGatesUpload(t *testing.T) {
 		"Validation step must be gated on the filter step's success")
 
 	uploadSection := output[uploadNamePos:]
+	assert.Contains(t, uploadSection, "steps.redact_secrets.outcome == 'success'",
+		"Upload step must be gated on successful secret redaction")
 	assert.Contains(t, uploadSection, "steps."+filterStepID+".outcome == 'success'",
 		"Upload step must be gated on the filter step's success")
 	assert.Contains(t, uploadSection, "steps."+validationStepID+".outcome == 'success'",

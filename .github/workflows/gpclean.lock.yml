@@ -1232,7 +1232,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_cache_memory_git_integrity.sh"
       - name: Upload cache-memory data as artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         with:
           name: cache-memory
           include-hidden-files: true

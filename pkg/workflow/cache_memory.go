@@ -271,9 +271,9 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 		}
 		fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
 		if cacheHasValidationStep(cache) {
-			fmt.Fprintf(builder, "        if: always() && steps.%s.outcome == 'success'\n", cacheMemoryValidationStepID(cache.ID))
+			fmt.Fprintf(builder, "        if: always() && steps.redact_secrets.outcome == 'success' && steps.%s.outcome == 'success'\n", cacheMemoryValidationStepID(cache.ID))
 		} else {
-			builder.WriteString("        if: always()\n")
+			builder.WriteString("        if: always() && steps.redact_secrets.outcome == 'success'\n")
 		}
 		builder.WriteString("        with:\n")
 		// Always use the new artifact name and path format, with prefix in workflow_call context

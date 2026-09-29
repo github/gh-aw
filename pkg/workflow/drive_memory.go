@@ -152,9 +152,9 @@ func generateDriveMemoryPersistence(builder *strings.Builder, data *WorkflowData
 		if threatDetectionEnabled {
 			fmt.Fprintf(builder, "      - name: Upload drive-memory data as artifact (%s)\n", drive.ID)
 			if driveHasValidationStep(drive) {
-				fmt.Fprintf(builder, "        if: always() && steps.%s.outcome == 'success'\n", driveMemoryValidationStepID(drive.ID))
+				fmt.Fprintf(builder, "        if: always() && steps.redact_secrets.outcome == 'success' && steps.%s.outcome == 'success'\n", driveMemoryValidationStepID(drive.ID))
 			} else {
-				builder.WriteString("        if: always()\n")
+				builder.WriteString("        if: always() && steps.redact_secrets.outcome == 'success'\n")
 			}
 			fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
 			builder.WriteString("        with:\n")

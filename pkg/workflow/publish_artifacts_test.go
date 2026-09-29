@@ -230,7 +230,8 @@ func TestGenerateSafeOutputsArtifactStagingUpload(t *testing.T) {
 		result := b.String()
 		assert.Contains(t, result, "safe-outputs-upload-artifacts", "should reference staging artifact name")
 		assert.Contains(t, result, artifactStagingDirExpr, "should reference staging directory")
-		assert.Contains(t, result, "if: always()", "should have always() condition")
+		assert.Contains(t, result, "if: always() && steps.redact_secrets.outcome == 'success'",
+			"should require successful secret redaction")
 	})
 
 	t.Run("generates nothing when UploadArtifact is nil", func(t *testing.T) {

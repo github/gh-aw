@@ -381,6 +381,7 @@ Use drive memory.
 	assert.Contains(t, agentSection, "write: false")
 	assert.Contains(t, agentSection, "Capture drive-memory baseline")
 	assert.Contains(t, agentSection, "Upload drive-memory data as artifact")
+	assert.Contains(t, agentSection, "if: always() && steps.redact_secrets.outcome == 'success'")
 	assert.Contains(t, agentSection, "Upload drive-memory baseline")
 	assert.Contains(t, agentSection, "drives: read")
 	assert.NotContains(t, agentSection, "actions/gh-drives-preview/commit@")

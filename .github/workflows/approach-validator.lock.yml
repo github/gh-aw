@@ -1342,7 +1342,7 @@ jobs:
           fi
       # Upload safe-outputs upload-artifact staging for the upload_artifact job
       - name: Upload upload-artifact staging
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: safe-outputs-upload-artifacts

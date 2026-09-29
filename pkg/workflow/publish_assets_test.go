@@ -7,6 +7,21 @@ import (
 	"testing"
 )
 
+func TestGenerateSafeOutputsAssetsArtifactUploadRequiresRedaction(t *testing.T) {
+	var builder strings.Builder
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			UploadAssets: &UploadAssetsConfig{},
+		},
+	}
+
+	generateSafeOutputsAssetsArtifactUpload(&builder, data, getActionPin)
+
+	if !strings.Contains(builder.String(), "if: always() && steps.redact_secrets.outcome == 'success'") {
+		t.Error("Expected assets artifact upload to require successful secret redaction")
+	}
+}
+
 func TestParseUploadAssetConfig(t *testing.T) {
 	c := &Compiler{}
 

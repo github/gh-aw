@@ -1308,7 +1308,7 @@ jobs:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
         run: bash "${RUNNER_TEMP}/gh-aw/actions/sanitize_repo_memory_filenames.sh"
       - name: Upload wiki-memory artifact (default)
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: repo-memory-default
@@ -1328,14 +1328,14 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_cache_memory_git_integrity.sh"
       - name: Upload cache-memory data as artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         with:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
       # Upload safe-outputs upload-artifact staging for the upload_artifact job
       - name: Upload upload-artifact staging
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: safe-outputs-upload-artifacts

@@ -1335,7 +1335,7 @@ jobs:
             const { validateMemoryStep } = require(path.join(actionsDir, 'validate_memory_step.cjs'));
             validateMemoryStep(core, { kind: 'drive', writeMarker: true });
       - name: Upload drive-memory data as artifact (default)
-        if: always() && steps.validate_drive_memory_64656661756c74.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_drive_memory_64656661756c74.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: drive-memory-default

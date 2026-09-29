@@ -344,6 +344,9 @@ func TestGenerateSafeOutputsCodeCoverageStagingUpload(t *testing.T) {
 	if !strings.Contains(out, "actions/upload-artifact") {
 		t.Error("Expected staging upload step to use actions/upload-artifact")
 	}
+	if !strings.Contains(out, "if: always() && steps.redact_secrets.outcome == 'success'") {
+		t.Error("Expected staging upload step to require successful secret redaction")
+	}
 }
 
 func TestGenerateSafeOutputsCodeCoverageStagingUploadNoConfig(t *testing.T) {

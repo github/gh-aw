@@ -1416,7 +1416,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'memory_file_eligibility.cjs'));
             await main();
       - name: Upload repo-memory artifact (default)
-        if: always() && steps.filter_repo_memory_64656661756c74.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.filter_repo_memory_64656661756c74.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: repo-memory-default
