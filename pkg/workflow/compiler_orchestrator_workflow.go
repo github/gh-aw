@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -488,6 +489,14 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	}
 	workflowData.RepoMemoryConfig = repoMemoryConfig
 	ensureRepoMemoryWritePaths(workflowData.SandboxConfig, repoMemoryConfig)
+	workflowData.LedgerConfig = toolsConfig.Ledger
+	if workflowData.RepoMemoryConfig != nil {
+		for _, memory := range workflowData.RepoMemoryConfig.Memories {
+			if memory.Ledger != nil {
+				return errors.New("tools.repo-memory.ledger is no longer supported; migrate to tools.ledger")
+			}
+		}
+	}
 
 	// Extract and process mcp-scripts and safe-outputs
 	workflowData.Command, workflowData.CommandEvents, workflowData.CommandCentralized, workflowData.CommandPlaceholder = c.extractCommandConfig(frontmatter)

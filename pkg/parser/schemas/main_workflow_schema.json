@@ -5485,6 +5485,11 @@
           "x-removed": true,
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
+        "ledger": {
+          "description": "Standalone Git-backed ledger configuration. Use an empty object or schema/limit properties for one default ledger, or name independent ledgers under this object.",
+          "type": "object",
+          "additionalProperties": true
+        },
         "repo-memory": {
           "description": "Repo memory configuration for git-based persistent storage",
           "oneOf": [

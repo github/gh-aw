@@ -20,6 +20,7 @@ const runtimeFeaturesEnvVarExpression = "${{ vars.GH_AW_RUNTIME_FEATURES }}"
 const pushExperimentsStateJobName = "push_experiments_state"
 const pushEvalsStateJobName = "push_evals_state"
 const pushRepoMemoryJobName = "push_repo_memory"
+const pushLedgerChangesJobName = "push_ledger_changes"
 const updateCacheMemoryJobName = "update_cache_memory"
 
 var runtimeFeaturesBuiltInJobNames = map[string]struct{}{
@@ -36,6 +37,7 @@ var runtimeFeaturesBuiltInJobNames = map[string]struct{}{
 	pushExperimentsStateJobName:                 {},
 	pushEvalsStateJobName:                       {},
 	pushRepoMemoryJobName:                       {},
+	pushLedgerChangesJobName:                    {},
 	updateCacheMemoryJobName:                    {},
 	updateDriveMemoryJobName:                    {},
 }

@@ -101,6 +101,7 @@ var knownTools = map[string]struct{}{
 	"drive-memory":      {},
 	"comment-memory":    {},
 	"repo-memory":       {},
+	"ledger":            {},
 	"safety-prompt":     {},
 	"timeout":           {},
 	"startup-timeout":   {},
@@ -161,6 +162,14 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 	}
 	if val, exists := toolsMap["repo-memory"]; exists {
 		tools.RepoMemory = parseRepoMemoryTool(val)
+	}
+	if val, exists := toolsMap["ledger"]; exists {
+		ledger, err := parseLedgerToolConfig(val)
+		if err != nil {
+			return tools
+		} else {
+			tools.Ledger = ledger
+		}
 	}
 	if val, exists := toolsMap["timeout"]; exists {
 		tools.Timeout = parseTimeoutTool(val)

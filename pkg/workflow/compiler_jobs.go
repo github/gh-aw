@@ -532,6 +532,10 @@ func (c *Compiler) buildMemoryManagementJobs(data *WorkflowData) error {
 	if err != nil {
 		return err
 	}
+	pushLedgerJobName, err := c.buildPushLedgerChangesJobWrapper(data, threatDetectionEnabledForSafeJobs)
+	if err != nil {
+		return err
+	}
 
 	// Build update_cache_memory job if cache-memory is configured and threat detection is enabled
 	updateCacheMemoryJobName, err := c.buildUpdateCacheMemoryJobWrapper(data, threatDetectionEnabledForSafeJobs)
@@ -556,11 +560,22 @@ func (c *Compiler) buildMemoryManagementJobs(data *WorkflowData) error {
 	}
 
 	// Update conclusion job dependencies
-	if err := c.updateConclusionJobDependencies(pushRepoMemoryJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName); err != nil {
+	if err := c.updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (c *Compiler) buildPushLedgerChangesJobWrapper(data *WorkflowData, threatDetectionEnabled bool) (string, error) {
+	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
+		return "", nil
+	}
+	job := c.buildPushLedgerChangesJob(data, threatDetectionEnabled)
+	if err := c.jobManager.AddJob(job); err != nil {
+		return "", fmt.Errorf("push_ledger_changes job could not be added: %w", err)
+	}
+	return job.Name, nil
 }
 
 // buildPushRepoMemoryJobWrapper builds the push_repo_memory job if repo-memory is configured.
@@ -687,7 +702,7 @@ func (c *Compiler) buildPushEvalsStateJobWrapper(data *WorkflowData) (string, er
 }
 
 // updateConclusionJobDependencies updates the conclusion job to depend on memory management jobs if they exist.
-func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName string) error {
+func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, pushLedgerJobName, updateCacheMemoryJobName, pushExperimentsJobName, pushEvalsJobName string) error {
 	conclusionJob, exists := c.jobManager.GetJob("conclusion")
 	if !exists {
 		return nil
@@ -696,6 +711,9 @@ func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, update
 	if pushRepoMemoryJobName != "" {
 		conclusionJob.Needs = append(conclusionJob.Needs, pushRepoMemoryJobName)
 		compilerJobsLog.Printf("Added push_repo_memory dependency to conclusion job")
+	}
+	if pushLedgerJobName != "" {
+		conclusionJob.Needs = append(conclusionJob.Needs, pushLedgerJobName)
 	}
 
 	if updateCacheMemoryJobName != "" {

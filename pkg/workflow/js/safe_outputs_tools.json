@@ -1,5 +1,19 @@
 [
   {
+    "name": "ledger_append",
+    "description": "Submit a record append to a configured Git-backed ledger. This requests validation only; durable persistence is performed later by push_ledger_changes. Temporary IDs may be used for references within the same batch.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["record"],
+      "properties": {
+        "ledger": { "type": "string", "description": "Configured ledger name." },
+        "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
+        "record": { "type": "object", "description": "Record envelope and payload." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "linear_create_issue",
     "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team UUID/key/name, and project ID are trusted workflow configuration and are not agent inputs.",
     "inputSchema": {

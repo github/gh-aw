@@ -81,6 +81,7 @@ type ToolsConfig struct {
 	DriveMemory      *DriveMemoryToolConfig      `yaml:"drive-memory,omitempty"`
 	CommentMemory    *CommentMemoryToolConfig    `yaml:"comment-memory,omitempty"`
 	RepoMemory       *RepoMemoryToolConfig       `yaml:"repo-memory,omitempty"`
+	Ledger           *LedgerToolConfig           `yaml:"ledger,omitempty"`
 	Timeout          *TemplatableInt32           `yaml:"timeout,omitempty"`
 	StartupTimeout   *TemplatableInt32           `yaml:"startup-timeout,omitempty"`
 
@@ -109,6 +110,11 @@ type Tools = ToolsConfig
 // unknown tools in the Custom map.
 func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 	toolsTypesLog.Printf("Parsing tools configuration: tool_count=%d", len(toolsMap))
+	if raw, ok := toolsMap["ledger"]; ok {
+		if _, err := parseLedgerToolConfig(raw); err != nil {
+			return nil, err
+		}
+	}
 	config := NewTools(toolsMap)
 	if config.GitHub != nil && config.GitHub.reposParseErr != nil {
 		return nil, config.GitHub.reposParseErr
@@ -642,6 +648,9 @@ func (t *Tools) GetToolNames() []string {
 	}
 	if t.RepoMemory != nil {
 		names = append(names, "repo-memory")
+	}
+	if t.Ledger != nil {
+		names = append(names, "ledger")
 	}
 	if t.Timeout != nil {
 		names = append(names, "timeout")

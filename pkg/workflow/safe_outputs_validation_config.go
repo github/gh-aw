@@ -508,6 +508,14 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"memory_id": {Type: "string", Sanitize: true, MaxLength: 128},
 		},
 	},
+	"ledger_append": {
+		DefaultMax: 100,
+		Fields: map[string]FieldValidation{
+			"ledger":  {Type: "string", Sanitize: true, MaxLength: 64},
+			"temp_id": {Type: "string", Pattern: `^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`},
+			"record":  {Required: true, Type: "object"},
+		},
+	},
 	// ledger_mutation entries are emitted by the trusted ledger MCP server after a
 	// durable append, never by the agent through a safe-output tool. They carry
 	// redacted record metadata only, so threat detection and the log-only handler

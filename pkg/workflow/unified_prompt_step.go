@@ -128,6 +128,9 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	if section := buildDriveMemoryPromptSection(data.DriveMemoryConfig); section != nil {
 		sections = append(sections, *section)
 	}
+	if section := buildLedgerPromptSection(data.LedgerConfig); section != nil {
+		sections = append(sections, *section)
+	}
 
 	// 7. Repo memory instructions (if enabled)
 	if data.RepoMemoryConfig != nil && len(data.RepoMemoryConfig.Memories) > 0 {

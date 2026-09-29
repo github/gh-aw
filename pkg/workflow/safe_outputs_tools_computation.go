@@ -233,6 +233,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		enabledTools["push_repo_memory"] = struct {
 		}{}
 	}
+	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
+		enabledTools["ledger_append"] = struct{}{}
+	}
 
 	safeOutputsToolsComputationLog.Printf("Computed %d enabled safe output tool names", len(enabledTools))
 	return enabledTools
