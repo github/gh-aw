@@ -2532,9 +2532,10 @@ func TestBuildAWFCommand_OTLPEndpointRunsNetworkAllowedUpdater(t *testing.T) {
 		LogFile:        "/tmp/gh-aw/agent-stdio.log",
 		AllowedDomains: "github.com",
 		WorkflowData: &WorkflowData{
-			EngineConfig:  &EngineConfig{ID: "copilot"},
-			OTLPEndpoint:  "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}",
-			OTLPEndpoints: `[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}"}]`,
+			EngineConfig:               &EngineConfig{ID: "copilot"},
+			OTLPEndpoint:               "${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}",
+			OTLPEndpoints:              `[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}"}]`,
+			OTLPUsesEnterpriseDefaults: true,
 			NetworkPermissions: &NetworkPermissions{
 				Firewall: &FirewallConfig{Enabled: true},
 			},
@@ -2544,7 +2545,13 @@ func TestBuildAWFCommand_OTLPEndpointRunsNetworkAllowedUpdater(t *testing.T) {
 	command := BuildAWFCommand(config)
 
 	assert.Contains(t, command, `update_network_allowed.cjs`, "OTLP endpoint should trigger the runtime firewall allowlist updater")
+	assert.Contains(t, command, `if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then node`, "skip the updater when the enterprise default resolves empty")
 	assert.NotContains(t, command, `GH_AW_ECOSYSTEM_MAP_JSON=`, "OTLP-only updater should not require workflow_call ecosystem expansion")
+
+	config.WorkflowData.OTLPUsesEnterpriseDefaults = false
+	command = BuildAWFCommand(config)
+	assert.Contains(t, command, `node "${RUNNER_TEMP}/gh-aw/actions/update_network_allowed.cjs"`, "explicit OTLP endpoints should run the updater directly")
+	assert.NotContains(t, command, `if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then`, "explicit OTLP endpoints should not use the enterprise-default guard")
 }
 
 // TestBuildAWFCommand_WritesAgentCLIStartTimestamp verifies that BuildAWFCommand
