@@ -3357,6 +3357,14 @@ process.exit(1);`,
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
 
+    it("prefers an exact catalog match over the utility model base", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna-utility";
+      const modelsJson = makeModelsJson();
+      modelsJson.providers["github-copilot"].models["gpt-5.6-luna-utility"] = { wire_api: "completions" };
+      applyCopilotWireAPI({ modelsJson, logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+    });
+
     it("defaults GPT models to the responses API when absent from the catalog", () => {
       process.env.COPILOT_MODEL = "gpt-5.6-luna-utility";
       applyCopilotWireAPI({ modelsJson: { providers: { "github-copilot": { models: {} } } }, logger: () => {} });
@@ -3399,6 +3407,12 @@ process.exit(1);`,
 
     it("leaves COPILOT_PROVIDER_WIRE_API unset for unknown models", () => {
       process.env.COPILOT_MODEL = "some-unknown-byok-model";
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
+    });
+
+    it("leaves COPILOT_PROVIDER_WIRE_API unset when a utility model and its base are unknown", () => {
+      process.env.COPILOT_MODEL = "totally-unknown-model-utility";
       applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
     });
