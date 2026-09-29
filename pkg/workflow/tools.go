@@ -69,6 +69,9 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	data.Tools = c.applyDefaultTools(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions)
 	data.BashDisabled = isBashFullyDisabled(data.Tools, bashExplicitlyFalse)
 	data.ParsedTools = NewTools(data.Tools)
+	if err := data.ParsedTools.ParseError(); err != nil {
+		return err
+	}
 
 	// Explicitly empty permissions ({}) means user wants no permissions — do not apply defaults.
 	if data.Permissions == "permissions: {}" {

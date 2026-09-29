@@ -88,6 +88,7 @@ const HANDLER_MAP = {
   missing_tool: "./missing_tool.cjs",
   create_missing_data_issue: "./create_missing_data_issue.cjs",
   missing_data: "./missing_data.cjs",
+  ledger_append: "./ledger_append.cjs",
   ledger_mutation: "./ledger_mutation.cjs",
   noop: "./noop_handler.cjs",
   report_incomplete: "./report_incomplete_handler.cjs",
@@ -1766,6 +1767,10 @@ async function main() {
 
     // Process all messages in order of appearance
     const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
+    const ledgerAppendHandler = messageHandlers.get("ledger_append");
+    if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
+      ledgerAppendHandler.finalize();
+    }
 
     // Finalize buffered PR reviews — one review submission per distinct PR
     const registryEntries = prReviewBufferRegistry.getAllEntries();

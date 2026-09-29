@@ -1,52 +1,14 @@
 package workflow
 
 import (
-	"encoding/base64"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestEncodeLedgerJobConfig(t *testing.T) {
-	encoded := encodeLedgerJobConfig(&LedgerToolConfig{Ledgers: []LedgerConfig{{
-		Name:         "findings",
-		Schema:       map[string]any{"type": "object"},
-		SchemaPath:   ".github/schemas/findings.json",
-		MaxRecordKB:  8,
-		MaxSegmentKB: 64,
-		MaxPatchKB:   4,
-		BranchName:   "ledgers/findings",
-	}}})
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	require.NoError(t, err)
-	var configs []map[string]any
-	require.NoError(t, json.Unmarshal(decoded, &configs))
-	require.Equal(t, "findings", configs[0]["name"])
-	require.Equal(t, ".github/schemas/findings.json", configs[0]["schemaPath"])
-	require.Equal(t, "ledgers/findings", configs[0]["branchName"])
-	require.EqualValues(t, 8, configs[0]["maxRecordKB"])
-}
-
-func TestPushLedgerChangesJobDownloadsAndPassesLedgerConfiguration(t *testing.T) {
-	compiler := NewCompiler()
-	data := &WorkflowData{
-		LedgerConfig: &LedgerToolConfig{Ledgers: []LedgerConfig{{
-			Name:         "findings",
-			MaxRecordKB:  8,
-			MaxSegmentKB: 64,
-			MaxPatchKB:   4,
-			BranchName:   "ledgers/findings",
-		}}},
-	}
-	job := compiler.buildPushLedgerChangesJob(data, false)
-	steps := strings.Join(job.Steps, "")
-	require.Contains(t, steps, "Download agent output artifact")
-	require.Contains(t, steps, "safeoutputs.jsonl")
-	require.Contains(t, steps, "GH_AW_LEDGER_TRANSACTION_ID: ${{ github.run_id }}-${{ github.run_attempt }}")
-	require.Contains(t, steps, "GH_AW_LEDGER_CONFIG_B64:")
-}
 
 func TestParseStandaloneLedgerForms(t *testing.T) {
 	single, err := parseLedgerToolConfig(map[string]any{
@@ -75,6 +37,29 @@ func TestStandaloneLedgerRejectsUnsafeSchemas(t *testing.T) {
 
 	_, err = parseLedgerToolConfig(map[string]any{"schema": "../schema.json"})
 	require.ErrorContains(t, err, "repository-relative")
+
+	_, err = parseLedgerToolConfig(map[string]any{"schema": map[string]any{"oneOf": true}})
+	require.ErrorContains(t, err, "invalid JSON Schema")
+
+	_, err = parseLedgerToolConfig(map[string]any{"schema": map[string]any{"oneOf": []any{map[string]any{"type": "string", "description": "${{ inputs.x }}"}}}})
+	require.ErrorContains(t, err, "expressions")
+}
+
+func TestResolveLedgerSchemas(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".github", "schemas"), 0o700))
+	schemaPath := filepath.Join(root, ".github", "schemas", "ledger.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{"type":"object","required":["subject"],"properties":{"subject":{"type":"string"}}}`), 0o600))
+
+	config, err := parseLedgerToolConfig(map[string]any{"findings": map[string]any{"schema": ".github/schemas/ledger.json"}})
+	require.NoError(t, err)
+	require.NoError(t, resolveLedgerSchemas(config, filepath.Join(root, ".github", "workflows")))
+	require.Equal(t, "string", config.Ledgers[0].Schema["properties"].(map[string]any)["subject"].(map[string]any)["type"])
+
+	config, err = parseLedgerToolConfig(map[string]any{"findings": map[string]any{"schema": ".github/schemas/missing.json"}})
+	require.NoError(t, err)
+	require.ErrorContains(t, resolveLedgerSchemas(config, filepath.Join(root, ".github", "workflows")), "cannot resolve")
 }
 
 func TestStandaloneLedgerPrompt(t *testing.T) {
@@ -85,4 +70,46 @@ func TestStandaloneLedgerPrompt(t *testing.T) {
 	require.Contains(t, section.Content, "/tmp/gh-aw/ledgers/findings/ledger.db")
 	require.Contains(t, section.Content, "push_ledger_changes")
 	require.NotContains(t, strings.ToLower(section.Content), "ledger_append")
+}
+
+func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T) {
+	config := &LedgerToolConfig{Ledgers: []LedgerConfig{{
+		Name:         "findings",
+		Schema:       map[string]any{"type": "object", "required": []any{"subject"}},
+		MaxRecordKB:  16,
+		MaxSegmentKB: 100,
+		MaxPatchKB:   10,
+		BranchName:   "ledgers/findings",
+	}}}
+	data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{}, LedgerConfig: config}
+	configJSON, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+	var safeOutputConfig map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &safeOutputConfig))
+	ledgerAppendConfig := safeOutputConfig["ledger_append"].(map[string]any)
+	ledgerDefinitions := ledgerAppendConfig["ledgers"].([]any)
+	require.Equal(t, "findings", ledgerDefinitions[0].(map[string]any)["name"])
+	require.InDelta(t, 16, ledgerDefinitions[0].(map[string]any)["max_record_kb"], 0)
+
+	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
+	require.True(t, hasHandlerManagerTypes(data))
+
+	job := NewCompiler().buildPushLedgerChangesJob(data, false)
+	require.Contains(t, job.Needs, "safe_outputs")
+	jobSteps := strings.Join(job.Steps, "")
+	require.Contains(t, jobSteps, "Download validated ledger transactions")
+	require.Contains(t, jobSteps, ledgerTransactionsArtifactName)
+	require.Contains(t, jobSteps, "GH_AW_LEDGER_TRANSACTIONS")
+	require.Contains(t, jobSteps, "GH_AW_LEDGER_CONFIG_BASE64")
+
+	var projectionStep strings.Builder
+	NewCompiler().generateLedgerProjectionStep(&projectionStep, data)
+	require.Contains(t, projectionStep.String(), "Create read-only ledger projections")
+	require.Contains(t, projectionStep.String(), "create_ledger_projection.cjs")
+}
+
+func TestLegacyRepoMemoryLedgerDetection(t *testing.T) {
+	require.True(t, containsLegacyRepoMemoryLedger(map[string]any{"ledger": map[string]any{}}))
+	require.False(t, containsLegacyRepoMemoryLedger(map[string]any{"schema": "record.json"}))
+	require.False(t, containsLegacyRepoMemoryLedger(map[string]any{"default": map[string]any{"schema": "record.json"}}))
 }

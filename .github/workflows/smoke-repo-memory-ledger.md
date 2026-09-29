@@ -2,7 +2,7 @@
 private: true
 emoji: "🧪"
 name: Smoke Repo-Memory Ledger
-description: Smoke test for structured repo-memory ledger status, append, and query operations
+description: Smoke test for structured Git-backed ledger projections and append operations
 on:
   schedule: every 2 days
   workflow_dispatch:
@@ -17,14 +17,21 @@ sandbox:
     id: awf
     runtime: cloud-hypervisor
 tools:
-  repo-memory:
-    branch-name: memory/smoke-repo-memory-ledger
-    description: "Smoke-test records for repo-memory ledger operations"
-    allowed-extensions: [".jsonl"]
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
+  ledger:
+    smoke:
+      schema:
+        type: object
+        required: [record_type, workflow_run_id, result]
+        properties:
+          record_type:
+            enum: [repo_memory_ledger_smoke]
+          workflow_run_id:
+            type: string
+          result:
+            enum: [passed]
+        additionalProperties: false
+      max-record-kb: 4
+      max-patch-kb: 10
 safe-outputs:
   create-issue:
     max: 1
@@ -44,30 +51,35 @@ evals:
     question: Did the agent append or find the current run record and verify it with a ledger query?
 ---
 
-# Repo-Memory Ledger Smoke Test
+# Git-Backed Ledger Smoke Test
 
-Exercise ledger status, append, and query without writing ledger files directly.
+Exercise the read-only SQLite projection and safe-output append without editing ledger files directly.
 
-1. Call `ledger_status`. Confirm the tool responds with ledger status and
-   diagnostics; report any malformed or incomplete records, but do not fail this
-   run solely because of unrelated historical diagnostics.
-2. Call `ledger_query` for type `repo_memory_ledger_smoke` with
-   `where: {"payload.workflow_run_id": {"eq": "${{ github.run_id }}"}}`.
-3. If no record exists for this run, call `ledger_append` once with type
-   `repo_memory_ledger_smoke` and payload:
+1. Query the projection at `/tmp/gh-aw/ledgers/smoke/ledger.db` for diagnostics.
+   Report malformed or incomplete records, but do not fail solely because of
+   unrelated historical diagnostics.
+2. Query the projection for the current run:
+
+   ```sql
+   SELECT payload FROM records
+   WHERE json_extract(payload, '$.record_type') = 'repo_memory_ledger_smoke'
+     AND json_extract(payload, '$.workflow_run_id') = '${{ github.run_id }}'
+   LIMIT 1;
+   ```
+
+3. If no record exists, submit one `ledger_append` record:
 
    ```json
    {
+     "record_type": "repo_memory_ledger_smoke",
      "workflow_run_id": "${{ github.run_id }}",
      "result": "passed"
    }
    ```
 
-4. Query the same type and run ID again. Verify that a matching record exists
-   and that its payload contains the expected run ID and result. On workflow
-   reruns, reuse the existing run record instead of appending a duplicate.
-5. Do not inspect or modify ledger shard files directly and do not invoke
-   compaction; the trusted persistence job owns both.
+4. Query the same run ID again. Verify the payload contains the expected run ID
+   and result. On reruns, reuse the existing record instead of appending a duplicate.
+5. Do not inspect or modify ledger shard files directly.
 
 If every check passes, call `noop` with a brief summary. If any ledger operation
 fails or the round-trip record is incorrect, create one issue using the

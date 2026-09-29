@@ -347,6 +347,7 @@ func (c *Compiler) buildMainJobEnv(data *WorkflowData) map[string]string { //nol
 // permissions from gh CLI commands found in all agent job step sections.
 func (c *Compiler) buildMainJobPermissions(data *WorkflowData) (string, error) {
 	permissions := augmentPermissionsForDevMode(c, data, filterJobLevelPermissions(data.Permissions, data.CachedPermissions))
+	permissions = augmentPermissionsForLedger(data, permissions)
 
 	agentAllScripts := collectAgentJobScripts(data)
 	if len(agentAllScripts) == 0 {
@@ -383,6 +384,21 @@ func (c *Compiler) buildMainJobPermissions(data *WorkflowData) (string, error) {
 	}
 
 	return permissions, nil
+}
+
+func augmentPermissionsForLedger(data *WorkflowData, permissions string) string {
+	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
+		return permissions
+	}
+	if permissions == "" {
+		return NewPermissionsContentsRead().RenderToYAML()
+	}
+	parsed := NewPermissionsParser(permissions).ToPermissions()
+	if level, exists := parsed.Get(PermissionContents); !exists || level == PermissionNone {
+		parsed.Set(PermissionContents, PermissionRead)
+		return filterJobLevelPermissions(parsed.RenderToYAML())
+	}
+	return permissions
 }
 
 func operationalValueGraderEnabled(data *WorkflowData) bool {

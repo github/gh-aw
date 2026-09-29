@@ -407,12 +407,16 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 }
 
 func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, agenticEngine CodingAgentEngine, tools map[string]any) error {
+	parsedTools := NewTools(tools)
+	if err := parsedTools.ParseError(); err != nil {
+		return err
+	}
 	validators := []func() error{
 		func() error { return c.validateMaxTurnsSupport(frontmatter, agenticEngine) },
 		func() error { return c.validateMaxContinuationsSupport(frontmatter, agenticEngine) },
 		func() error { return c.validateMaxToolDenialsSupport(frontmatter, agenticEngine) },
 		func() error { return c.validateUniversalLLMConsumerModel(frontmatter, agenticEngine) },
-		func() error { return c.validatePiEngineRequirements(NewTools(tools), agenticEngine) },
+		func() error { return c.validatePiEngineRequirements(parsedTools, agenticEngine) },
 		func() error { return c.validateBashCommandAllowlistSupport(tools, agenticEngine) },
 	}
 	for _, validator := range validators {

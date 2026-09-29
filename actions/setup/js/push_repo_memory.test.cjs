@@ -1928,7 +1928,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       expect(scriptContent).toContain("BASE_DELAY_MS * Math.pow(2, attempt)");
     });
 
-    it("refreshes retry base with the authenticated repository URL instead of origin", async () => {
+    it("refreshes retry base with Git environment credentials and no tokenized URL", async () => {
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-auth-ls-remote-"));
       const baseRef = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
       const retryRepoUrl = "authenticated-retry-url";
@@ -1949,12 +1949,20 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
           ghToken: "token",
           serverHost: "github.com",
           pushSignedCommitsFn,
-          repoUrlWithTokenForRetry: retryRepoUrl,
+          repoUrlForRetry: retryRepoUrl,
           execGetExecOutput,
           sleepFn: vi.fn(),
         });
 
-        expect(execGetExecOutput).toHaveBeenCalledWith("git", ["ls-remote", retryRepoUrl, "refs/heads/memory/test"], { cwd: repoDir, silent: true });
+        expect(execGetExecOutput).toHaveBeenCalledWith("git", ["ls-remote", retryRepoUrl, "refs/heads/memory/test"], {
+          cwd: repoDir,
+          env: {
+            GIT_CONFIG_COUNT: "1",
+            GIT_CONFIG_KEY_0: `http.${(process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/$/, "")}/.extraheader`,
+            GIT_CONFIG_VALUE_0: `Authorization: basic ${Buffer.from("x-access-token:token").toString("base64")}`,
+          },
+          silent: true,
+        });
         expect(pushSignedCommitsFn).toHaveBeenCalledTimes(2);
         expect(global.core.setFailed).not.toHaveBeenCalled();
       } finally {
@@ -2012,7 +2020,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
           ghToken: "token",
           serverHost: "github.com",
           pushSignedCommitsFn,
-          repoUrlWithTokenForRetry: path.join(repoDir, "missing-remote.git"),
+          repoUrlForRetry: path.join(repoDir, "missing-remote.git"),
           execGetExecOutput: vi.fn().mockResolvedValue({ stdout: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\trefs/heads/memory/test\n" }),
           sleepFn: vi.fn(),
         });
@@ -2080,7 +2088,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
           ghToken: "token",
           serverHost: "github.com",
           pushSignedCommitsFn,
-          repoUrlWithTokenForRetry: remoteDir,
+          repoUrlForRetry: remoteDir,
           originUrlForPush: remoteDir,
           execGetExecOutput: async (command, args, options) => ({
             stdout: execFileSync(command, args, { cwd: options.cwd, encoding: "utf8" }),

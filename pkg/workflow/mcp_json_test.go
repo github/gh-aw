@@ -619,6 +619,7 @@ func TestValidateToolsSection(t *testing.T) {
 				"github":     map[string]any{"mode": "local"},
 				"playwright": map[string]any{"version": "v1.41.0"},
 				"bash":       []any{"echo", "ls"},
+				"ledger":     map[string]any{"findings": map[string]any{"schema": map[string]any{"type": "object"}}},
 				"web-fetch":  nil,
 			},
 			wantErr: false,

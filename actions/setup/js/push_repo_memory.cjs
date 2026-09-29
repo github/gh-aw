@@ -78,16 +78,16 @@ function isDeterministicPushValidationError(errorMessage) {
  * without creating a merge commit. JSONL conflicts keep both rows via the
  * checkout-local merge=union policy; non-JSONL conflicts keep this run's files.
  *
- * @param {{workspaceDir: string, branchName: string, repoUrlWithToken: string, previousBaseRef: string, remoteHead: string}} opts
+ * @param {{workspaceDir: string, branchName: string, repoUrl: string, previousBaseRef: string, remoteHead: string, gitAuthEnv?: Record<string, string>}} opts
  */
-function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead }) {
+function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousBaseRef, remoteHead, gitAuthEnv }) {
   try {
     configureRepoMemoryMergePolicy(workspaceDir);
   } catch (mergePolicyError) {
     core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
   }
 
-  execGitSync(["fetch", repoUrlWithToken, `refs/heads/${branchName}`], { cwd: workspaceDir, stdio: "pipe", suppressLogs: true });
+  execGitSync(["fetch", repoUrl, `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitAuthEnv, stdio: "pipe", suppressLogs: true });
 
   const rebaseArgs = previousBaseRef ? ["rebase", "-X", "theirs", "--onto", remoteHead, previousBaseRef] : ["rebase", "-X", "theirs", "--onto", remoteHead, "--root"];
   try {
@@ -118,8 +118,8 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, 
  * @param {typeof pushSignedCommits} [opts.pushSignedCommitsFn]
  * @param {typeof exec.getExecOutput} [opts.execGetExecOutput]
  * @param {(delay: number) => Promise<void>} [opts.sleepFn]
- * @param {string} [opts.repoUrlWithTokenForRetry]
  * @param {string} [opts.originUrlForPush]
+ * @param {string} [opts.repoUrlForRetry]
  */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
@@ -134,13 +134,10 @@ async function pushRepoMemoryChangesWithRetry({
   pushSignedCommitsFn = pushSignedCommits,
   execGetExecOutput = exec.getExecOutput,
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
-  repoUrlWithTokenForRetry,
   originUrlForPush,
+  repoUrlForRetry,
 }) {
-  // URL with embedded token used for the fetch/rebase-on-retry step only;
-  // pushSignedCommits authenticates via the git extraheader set by
-  // actions/checkout (and the gitAuthEnv fallback for the git-push path).
-  const repoUrlWithToken = repoUrlWithTokenForRetry || `https://x-access-token:${ghToken}@${serverHost}/${targetRepo}.git`;
+  const retryUrl = repoUrlForRetry || `https://${serverHost}/${targetRepo}.git`;
 
   // Point origin at the memory target repo so pushSignedCommits can resolve
   // the remote branch HEAD (ls-remote origin) and the git-push fallback
@@ -169,12 +166,12 @@ async function pushRepoMemoryChangesWithRetry({
         gitAuthEnv: getGitAuthEnv(ghToken),
       });
       core.info(`Successfully pushed changes to ${branchName} branch`);
-      return;
+      return true;
     } catch (error) {
       const errMsg = getErrorMessage(error);
       if (isDeterministicPushValidationError(errMsg)) {
         core.setFailed(`Failed to push changes: ${errMsg}`);
-        return;
+        return false;
       }
       if (attempt < MAX_RETRIES) {
         const ceiling = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * Math.pow(2, attempt));
@@ -187,14 +184,25 @@ async function pushRepoMemoryChangesWithRetry({
         // pushSignedCommits while still preserving concurrent JSONL rows via the
         // checkout-local merge=union policy.
         try {
-          const { stdout: lsOut } = await execGetExecOutput("git", ["ls-remote", repoUrlWithToken, `refs/heads/${branchName}`], { cwd: workspaceDir, silent: true });
+          const { stdout: lsOut } = await execGetExecOutput("git", ["ls-remote", retryUrl, `refs/heads/${branchName}`], {
+            cwd: workspaceDir,
+            env: getGitAuthEnv(ghToken),
+            silent: true,
+          });
           const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
           if (remoteHead && remoteHead !== currentBaseRef) {
             const previousBaseRef = currentBaseRef;
             currentBaseRef = remoteHead;
             core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
             try {
-              reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrlWithToken, previousBaseRef, remoteHead });
+              reconcileRepoMemoryRetry({
+                workspaceDir,
+                branchName,
+                repoUrl: retryUrl,
+                previousBaseRef,
+                remoteHead,
+                gitAuthEnv: getGitAuthEnv(ghToken),
+              });
             } catch (reconcileError) {
               core.setFailed(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
               return;
@@ -217,10 +225,11 @@ async function pushRepoMemoryChangesWithRetry({
         } else {
           core.setFailed(`Failed to push changes after ${MAX_RETRIES + 1} attempts: ${errMsg}`);
         }
-        return;
+        return false;
       }
     }
   }
+  return false;
 }
 
 /**

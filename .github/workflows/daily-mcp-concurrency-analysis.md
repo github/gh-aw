@@ -65,11 +65,26 @@ tools:
   - "git log -1 --format=\"%ai\" -- actions/setup/js/*.cjs"
   - "git log -3 --format=\"%ai %s\" -- actions/setup/js/*.cjs"
   cache-memory: true
-  repo-memory:
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
+  ledger:
+    concurrency-audits:
+      schema:
+        type: object
+        required: [record_type, run_id, analyzed_tool, status]
+        properties:
+          record_type:
+            enum: [mcp_concurrency_audit]
+          run_id:
+            type: string
+          analyzed_tool:
+            type: string
+          status:
+            type: string
+          issue_number:
+            type: integer
+            minimum: 1
+        additionalProperties: false
+      max-record-kb: 4
+      max-patch-kb: 10
   cli-proxy: true
   edit: null
   github:
@@ -535,7 +550,16 @@ If you emitted any actionable safe outputs, do not emit `noop`.
 {"noop": {"message": "No actionable concurrency issues found in <tool_name>; analysis completed and cache state updated."}}
 ```
 
-After the safe output, query the ledger for this run ID and append one `mcp_concurrency_audit` record if it is absent. Include only the run ID, analyzed tool, status, and issue number if one was created; do not store code or raw analysis notes. Declarative compaction runs in the trusted persistence job after 32 stable shards accumulate.
+After the safe output, query the read-only SQLite projection at `/tmp/gh-aw/ledgers/concurrency-audits/ledger.db` for this run ID:
+
+```sql
+SELECT payload FROM records
+WHERE json_extract(payload, '$.record_type') = 'mcp_concurrency_audit'
+  AND json_extract(payload, '$.run_id') = '${{ github.run_id }}'
+LIMIT 1;
+```
+
+If absent, submit one `ledger_append` record with `record_type: mcp_concurrency_audit`. Include only the run ID, analyzed tool, status, and issue number if one was created; do not store code or raw analysis notes. Do not edit ledger branches directly.
 
 ## Concurrency Analysis Best Practices
 

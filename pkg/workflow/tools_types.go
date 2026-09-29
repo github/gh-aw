@@ -97,7 +97,8 @@ type ToolsConfig struct {
 	CLIProxy bool `yaml:"cli-proxy,omitempty"`
 
 	// Raw map for backwards compatibility
-	raw map[string]any
+	raw            map[string]any
+	ledgerParseErr error
 }
 
 // Tools is a type alias for ToolsConfig for backward compatibility.
@@ -119,9 +120,19 @@ func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 	if config.GitHub != nil && config.GitHub.reposParseErr != nil {
 		return nil, config.GitHub.reposParseErr
 	}
+	if config.ledgerParseErr != nil {
+		return nil, config.ledgerParseErr
+	}
 	toolNames := config.GetToolNames()
 	toolsTypesLog.Printf("Parsed tools configuration: result_count=%d, tools=%v", len(toolNames), toolNames)
 	return config, nil
+}
+
+func (t *ToolsConfig) ParseError() error {
+	if t == nil {
+		return nil
+	}
+	return t.ledgerParseErr
 }
 
 // mcpServerConfigToMap converts an MCPServerConfig to map[string]any for backward compatibility

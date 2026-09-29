@@ -68,11 +68,29 @@ sandbox:
 tools:
   cli-proxy: true
   cache-memory: true
-  repo-memory:
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
+  ledger:
+    caveman-run-history:
+      schema:
+        type: object
+        required: [record_type, run_id, date, files_processed, files_optimized, planned_outcome]
+        properties:
+          record_type:
+            enum: [caveman_run]
+          run_id:
+            type: string
+          date:
+            type: string
+          files_processed:
+            type: integer
+            minimum: 0
+          files_optimized:
+            type: integer
+            minimum: 0
+          planned_outcome:
+            enum: [pull_request_requested, noop]
+        additionalProperties: false
+      max-record-kb: 4
+      max-patch-kb: 10
   github:
     mode: local
     toolsets: [default]
@@ -166,7 +184,7 @@ Expected format:
 - If the file does not exist, this is the first run and the cache is intentionally empty. Do **not** call `missing_data` — proceed normally. Count the total number of files in the sorted list (`TOTAL=$(...)`) and pick a **random** starting index with `$(( RANDOM % TOTAL ))`. This avoids always processing the same files first when the cache is cold.
 - If the queue in cache differs from the current file list (files added/removed), rebuild the queue from the current sorted list and reset the index to 0.
 - Pick the **next 5 files** starting from `last_processed_index + 1` (wrapping around if needed). This is your **batch** for this run.
-- **Keep cache-memory for the round-robin cursor.** Use the repo-memory ledger only for durable run audit records.
+- **Keep cache-memory for the round-robin cursor.** Use the Git-backed ledger only for durable run audit records.
 
 ## Step 3: Analyze and Optimize Each File
 
@@ -224,7 +242,16 @@ Use filesystem-safe format `YYYY-MM-DD` for the date (no colons, no T, no Z).
 
 ## Step 5: Record the Run
 
-Before requesting a PR or `noop`, use `ledger_query` to check whether a `caveman_run` record for `${{ github.run_id }}` already exists. If not, append one with the run ID, date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. The ledger compacts eligible closed segments automatically; do not invoke compaction yourself.
+Before requesting a PR or `noop`, query the read-only projection at `/tmp/gh-aw/ledgers/caveman-run-history/ledger.db` for a `caveman_run` record whose `payload.run_id` matches `${{ github.run_id }}`:
+
+```sql
+SELECT payload FROM records
+WHERE json_extract(payload, '$.record_type') = 'caveman_run'
+  AND json_extract(payload, '$.run_id') = '${{ github.run_id }}'
+LIMIT 1;
+```
+
+If absent, submit one `ledger_append` record with `record_type: caveman_run`, the run ID, date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. Do not edit ledger branches directly.
 
 ## Step 6: Output
 

@@ -9,14 +9,78 @@ permissions:
   contents: read
   copilot-requests: write
 tools:
+  ledger:
+    centralization:
+      schema:
+        type: object
+        required: [record_type, run_id, generated_at, repository, overall_stats, intent_buckets, workflow_opportunities]
+        properties:
+          record_type:
+            enum: [centralization_snapshot]
+          run_id:
+            type: string
+          generated_at:
+            type: string
+          repository:
+            type: string
+          overall_stats:
+            type: object
+          intent_buckets:
+            type: array
+            maxItems: 10
+            items:
+              type: object
+              required: [intent_bucket, task_count, distinct_users, avg_sessions, fallback_rate]
+              properties:
+                intent_bucket:
+                  type: string
+                task_count:
+                  type: integer
+                  minimum: 0
+                distinct_users:
+                  type: integer
+                  minimum: 0
+                avg_sessions:
+                  type: number
+                  minimum: 0
+                fallback_rate:
+                  type: number
+                  minimum: 0
+              additionalProperties: false
+          workflow_opportunities:
+            type: array
+            maxItems: 10
+            items:
+              type: object
+              required: [intent_bucket, artifact_types, start_context_guess, task_count, distinct_users, centralization_score, recommendation_kind]
+              properties:
+                intent_bucket:
+                  type: string
+                artifact_types:
+                  type: array
+                  items:
+                    type: string
+                start_context_guess:
+                  type: string
+                task_count:
+                  type: integer
+                  minimum: 0
+                distinct_users:
+                  type: integer
+                  minimum: 0
+                centralization_score:
+                  type: number
+                  minimum: 0
+                recommendation_kind:
+                  type: string
+              additionalProperties: false
+        additionalProperties: false
+      max-record-kb: 8
+      max-patch-kb: 10
   repo-memory:
     branch-name: memory/copilot-centralization-optimizer
     description: Long-lived centralization trend snapshots and history
     file-glob: ["*.json", "*.jsonl"]
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
 engine:
   id: codex
   model-provider: github
@@ -353,7 +417,7 @@ Read only these prepared files first:
 - `/tmp/gh-aw/data/current-snapshot.json`
 - `/tmp/gh-aw/data/run-context.json`
 - optional prior baseline: `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
-- prior append-only results from `ledger_query` (`type: centralization_snapshot`, `limit: 100`)
+- prior append-only results from the read-only SQLite projection at `/tmp/gh-aw/ledgers/centralization/ledger.db`
 
 These files were precomputed in `steps:` to keep token usage low.
 
@@ -363,11 +427,18 @@ Investigate whether repeated cross-user prompting suggests centralizing intellig
 
 Before drafting the report:
 - If `/tmp/gh-aw/repo-memory/default/centralization-baseline.json` exists, recompute `/tmp/gh-aw/data/trend-analysis.json` by comparing that baseline to `/tmp/gh-aw/data/current-snapshot.json`.
-- Query `centralization_snapshot` ledger records to identify recent runs and avoid strong trend claims based on a single snapshot.
+- Query `centralization_snapshot` records to identify recent runs and avoid strong trend claims based on a single snapshot:
+
+  ```sql
+  SELECT payload FROM records
+  WHERE json_extract(payload, '$.record_type') = 'centralization_snapshot'
+  ORDER BY ordinal DESC LIMIT 100;
+  ```
+
 - Persist the sanitized current snapshot for the next run:
   - write `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
   - strip `top_exact_repeats[].sample_prompt` before persisting the snapshot or ledger record.
-- Append one `centralization_snapshot` ledger record per run with `run_id`, `generated_at`, `repository`, `overall_stats`, up to 10 `intent_buckets`, and up to 10 `workflow_opportunities`. For intent buckets, include only `intent_bucket`, `task_count`, `distinct_users`, `avg_sessions`, and `fallback_rate`; for opportunities, include only `intent_bucket`, `artifact_types`, `start_context_guess`, `task_count`, `distinct_users`, `centralization_score`, and `recommendation_kind`. Never include prompts, samples, or other raw user input. Use the `run_id` as the stable application key, and skip the append if that run ID is already present.
+- Submit one `ledger_append` record per run with `record_type: centralization_snapshot`, `run_id`, `generated_at`, `repository`, `overall_stats`, up to 10 `intent_buckets`, and up to 10 `workflow_opportunities`. For intent buckets, include only `intent_bucket`, `task_count`, `distinct_users`, `avg_sessions`, and `fallback_rate`; for opportunities, include only `intent_bucket`, `artifact_types`, `start_context_guess`, `task_count`, `distinct_users`, `centralization_score`, and `recommendation_kind`. Never include prompts, samples, or other raw user input. Use the `run_id` as the stable application key, and skip the append if that run ID is already present.
 - Keep the ledger record compact and below the 8 KiB record limit. The existing `centralization-baseline.json` remains the replaceable snapshot used for detailed trend comparison; do not append to `centralization-history.jsonl`.
 
 Focus on:

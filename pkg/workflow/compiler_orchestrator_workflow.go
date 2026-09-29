@@ -463,6 +463,10 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 ) error {
 	orchestratorWorkflowLog.Print("Extracting additional configurations")
 
+	if repoMemory, ok := tools["repo-memory"]; ok && containsLegacyRepoMemoryLedger(repoMemory) {
+		return errors.New("tools.repo-memory.ledger is no longer supported; migrate to tools.ledger")
+	}
+
 	// Extract cache-memory config and check for errors
 	cacheMemoryConfig, err := c.extractCacheMemoryConfigFromMap(tools)
 	if err != nil {
@@ -474,6 +478,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	// Extract experimental drive-memory config and check for errors.
 	toolsConfig, err := ParseToolsConfig(tools)
 	if err != nil {
+		return err
+	}
+	if err := resolveLedgerSchemas(toolsConfig.Ledger, markdownDir); err != nil {
 		return err
 	}
 	driveMemoryConfig, err := c.extractDriveMemoryConfig(toolsConfig)
@@ -490,11 +497,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.RepoMemoryConfig = repoMemoryConfig
 	ensureRepoMemoryWritePaths(workflowData.SandboxConfig, repoMemoryConfig)
 	workflowData.LedgerConfig = toolsConfig.Ledger
-	if workflowData.RepoMemoryConfig != nil {
-		for _, memory := range workflowData.RepoMemoryConfig.Memories {
-			if memory.Ledger != nil {
-				return errors.New("tools.repo-memory.ledger is no longer supported; migrate to tools.ledger")
-			}
+	if workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {
+		if workflowData.CheckoutDisabled || workflowData.CheckoutSkipDefault || workflowData.Permissions == "permissions: {}" {
+			return errors.New("tools.ledger requires the workflow repository checkout and contents: read permission")
 		}
 	}
 
@@ -589,6 +594,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)
 	}
 	workflowData.SafeOutputs = mergedSafeOutputs
+	if workflowData.SafeOutputs == nil && workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {
+		workflowData.SafeOutputs = &SafeOutputsConfig{}
+	}
 
 	// Force-disable threat detection when samples replay is active. This mirrors the
 	// force-disable in extractSafeOutputsConfig, but is re-applied here because

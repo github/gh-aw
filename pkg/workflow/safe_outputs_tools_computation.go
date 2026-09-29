@@ -14,6 +14,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 	enabledTools := make(map[string]struct {
 	})
 	if data.SafeOutputs == nil {
+		if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
+			enabledTools["ledger_append"] = struct{}{}
+		}
 		safeOutputsToolsComputationLog.Print("No safe outputs configuration, returning empty tool set")
 		return enabledTools
 	}

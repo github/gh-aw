@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -11,25 +12,26 @@ import (
 )
 
 const (
-	defaultLedgerName      = "default"
-	maxLedgerSchemaBytes   = 1024 * 1024
-	defaultLedgerRecordKB  = 32
-	defaultLedgerSegmentKB = 100
-	defaultLedgerPatchKB   = 10
-	ledgerProjectionRoot   = "/tmp/gh-aw/ledgers"
+	defaultLedgerName              = "default"
+	maxLedgerSchemaBytes           = 1024 * 1024
+	defaultLedgerRecordKB          = 32
+	defaultLedgerSegmentKB         = 100
+	defaultLedgerPatchKB           = 10
+	ledgerProjectionRoot           = "/tmp/gh-aw/ledgers"
+	ledgerTransactionsArtifactName = "gh-aw-ledger-transactions"
 )
 
 var ledgerNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 // LedgerConfig describes one standalone, Git-backed ledger.
 type LedgerConfig struct {
-	Name         string
-	Schema       map[string]any
-	SchemaPath   string
-	MaxRecordKB  int
-	MaxSegmentKB int
-	MaxPatchKB   int
-	BranchName   string
+	Name         string         `json:"name"`
+	Schema       map[string]any `json:"schema,omitempty"`
+	SchemaPath   string         `json:"-"`
+	MaxRecordKB  int            `json:"max_record_kb"`
+	MaxSegmentKB int            `json:"max_segment_kb"`
+	MaxPatchKB   int            `json:"max_patch_kb"`
+	BranchName   string         `json:"branch_name"`
 }
 
 // LedgerToolConfig is the normalized tools.ledger configuration.
@@ -59,15 +61,7 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 			single = true
 		}
 	}
-	if single {
-		cfg, err := parseLedgerConfig(defaultLedgerName, root)
-		if err != nil {
-			return nil, err
-		}
-		result.Ledgers = []LedgerConfig{cfg}
-		return result, nil
-	}
-	if len(root) == 0 {
+	if single || len(root) == 0 {
 		cfg, err := parseLedgerConfig(defaultLedgerName, root)
 		if err != nil {
 			return nil, err
@@ -104,17 +98,13 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 		case "schema":
 			switch schema := value.(type) {
 			case string:
-				if schema == "" || strings.HasPrefix(schema, "/") || strings.Contains(schema, "..") || strings.ContainsAny(schema, `\${{}`) {
+				if schema == "" || !filepath.IsLocal(schema) || strings.ContainsAny(schema, `\${{}`) {
 					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema must be a repository-relative path without expressions or traversal", name)
 				}
 				cfg.SchemaPath = schema
 			case map[string]any:
-				if err := validateInlineLedgerSchema(schema, 0); err != nil {
+				if err := validateLedgerSchema(schema); err != nil {
 					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema: %w", name, err)
-				}
-				encoded, err := json.Marshal(schema)
-				if err != nil || len(encoded) > maxLedgerSchemaBytes {
-					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema exceeds the maximum size", name)
 				}
 				cfg.Schema = schema
 			default:
@@ -127,6 +117,9 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 			}
 			switch key {
 			case "max-record-kb":
+				if number > defaultLedgerRecordKB {
+					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.max-record-kb cannot exceed %d", name, defaultLedgerRecordKB)
+				}
 				cfg.MaxRecordKB = number
 			case "max-segment-kb":
 				cfg.MaxSegmentKB = number
@@ -143,51 +136,105 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 	return cfg, nil
 }
 
-func validateInlineLedgerSchema(value map[string]any, depth int) error {
+func validateLedgerSchema(value map[string]any) error {
+	encoded, err := json.Marshal(value)
+	if err != nil || len(encoded) > maxLedgerSchemaBytes {
+		return errors.New("schema exceeds the maximum size")
+	}
+	if err := validateLedgerSchemaTree(value, 0); err != nil {
+		return err
+	}
+	if _, err := compileSchema(string(encoded), "https://github.com/github/gh-aw/ledger.schema.json"); err != nil {
+		return fmt.Errorf("invalid JSON Schema: %w", err)
+	}
+	return nil
+}
+
+func validateLedgerSchemaTree(value any, depth int) error {
 	if depth > 32 {
 		return errors.New("schema is too deeply nested")
 	}
-	for key, child := range value {
-		if strings.Contains(key, "${{") {
+	switch node := value.(type) {
+	case string:
+		if strings.Contains(node, "${{") {
 			return errors.New("schema cannot contain GitHub expressions")
 		}
-		switch key {
-		case "type", "enum", "required":
-			if strings.Contains(fmt.Sprint(child), "${{") {
-				return errors.New("schema cannot contain GitHub expressions")
-			}
-		case "properties":
-			properties, ok := child.(map[string]any)
-			if !ok {
-				return errors.New("properties must be an object")
-			}
-			for name, property := range properties {
-				if strings.Contains(name, "${{") {
-					return errors.New("schema cannot contain GitHub expressions")
-				}
-				object, ok := property.(map[string]any)
-				if !ok {
-					return fmt.Errorf("property %q must be an object", name)
-				}
-				if err := validateInlineLedgerSchema(object, depth+1); err != nil {
-					return err
-				}
-			}
-		case "items":
-			object, ok := child.(map[string]any)
-			if !ok {
-				return errors.New("items must be an object")
-			}
-			if err := validateInlineLedgerSchema(object, depth+1); err != nil {
+	case []any:
+		for _, child := range node {
+			if err := validateLedgerSchemaTree(child, depth+1); err != nil {
 				return err
 			}
-		case "additionalProperties", "oneOf", "anyOf":
-			// These keywords are accepted by the existing JSON-schema validator.
-		default:
-			return fmt.Errorf("unsupported JSON Schema keyword %q", key)
+		}
+	case map[string]any:
+		for key, child := range node {
+			if strings.Contains(key, "${{") {
+				return errors.New("schema cannot contain GitHub expressions")
+			}
+			if err := validateLedgerSchemaTree(child, depth+1); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func resolveLedgerSchemas(config *LedgerToolConfig, markdownDir string) error {
+	if !config.Enabled() {
+		return nil
+	}
+	root, err := findLedgerSchemaRoot(markdownDir)
+	if err != nil {
+		return err
+	}
+	for i := range config.Ledgers {
+		ledger := &config.Ledgers[i]
+		if ledger.SchemaPath == "" {
+			continue
+		}
+		fullPath := filepath.Join(root, filepath.Clean(ledger.SchemaPath))
+		resolved, err := filepath.EvalSymlinks(fullPath)
+		if err != nil {
+			return fmt.Errorf("tools.ledger.%s.schema: cannot resolve %q: %w", ledger.Name, ledger.SchemaPath, err)
+		}
+		relative, err := filepath.Rel(root, resolved)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("tools.ledger.%s.schema must resolve inside the repository", ledger.Name)
+		}
+		info, err := os.Stat(resolved)
+		if err != nil || !info.Mode().IsRegular() || info.Size() > maxLedgerSchemaBytes {
+			return fmt.Errorf("tools.ledger.%s.schema must be a regular file no larger than %d bytes", ledger.Name, maxLedgerSchemaBytes)
+		}
+		contents, err := os.ReadFile(resolved)
+		if err != nil {
+			return fmt.Errorf("tools.ledger.%s.schema: failed to read schema: %w", ledger.Name, err)
+		}
+		var schema map[string]any
+		if err := json.Unmarshal(contents, &schema); err != nil {
+			return fmt.Errorf("tools.ledger.%s.schema must contain a JSON Schema object: %w", ledger.Name, err)
+		}
+		if err := validateLedgerSchema(schema); err != nil {
+			return fmt.Errorf("tools.ledger.%s.schema: %w", ledger.Name, err)
+		}
+		ledger.Schema = schema
+	}
+	return nil
+}
+
+func findLedgerSchemaRoot(markdownDir string) (string, error) {
+	root, err := filepath.Abs(markdownDir)
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
+			return root, nil
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			return filepath.Abs(markdownDir)
+		}
+		root = parent
+	}
 }
 
 func buildLedgerPromptSection(config *LedgerToolConfig) *PromptSection {
@@ -201,4 +248,13 @@ func buildLedgerPromptSection(config *LedgerToolConfig) *PromptSection {
 	}
 	b.WriteString("Query the SQLite projection to inspect prior records. Submit durable records only with the ledger append safe output; never edit ledger files or SQLite directly. Temporary IDs may reference records in the same batch and are resolved during trusted validation. Accepted requests are not durable until push_ledger_changes succeeds.")
 	return &PromptSection{Content: b.String()}
+}
+
+func containsLegacyRepoMemoryLedger(value any) bool {
+	config, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, found := config["ledger"]
+	return found
 }

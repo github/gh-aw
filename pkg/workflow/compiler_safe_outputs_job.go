@@ -307,6 +307,7 @@ func (c *Compiler) buildSafeOutputsHandlerOutputsAndActionSteps(data *WorkflowDa
 	if err := c.appendHandlerManagerStep(data, &state); err != nil {
 		return nil, nil, nil, err
 	}
+	c.appendLedgerTransactionsArtifactUpload(data, &state)
 	c.appendSarifArtifactUploadStep(data, agentArtifactPrefix, &state)
 	c.appendCustomActionSteps(data, markdownPath, &state)
 	addNamedSafeOutputHandlerOutputs(data, state.outputs)
@@ -368,7 +369,23 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.UploadArtifact != nil || // upload_artifact is handled inline in the handler loop
 		data.SafeOutputs.UploadCodeCoverage != nil || // upload_code_coverage is handled inline in the handler loop
 		len(data.SafeOutputs.Scripts) > 0 || // Custom scripts run in the handler loop
-		len(data.SafeOutputs.Actions) > 0 // Custom actions need handler to export their payloads
+		len(data.SafeOutputs.Actions) > 0 || // Custom actions need handler to export their payloads
+		(data.LedgerConfig != nil && data.LedgerConfig.Enabled())
+}
+
+func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, state *safeOutputsHandlerOutputsAndActionState) {
+	if data.LedgerConfig == nil || !data.LedgerConfig.Enabled() {
+		return
+	}
+	state.steps = append(state.steps,
+		"      - name: Upload validated ledger transactions\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		"        with:\n",
+		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
+		"          path: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
+		"          if-no-files-found: error\n",
+		"          retention-days: 1\n",
+	)
 }
 
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to

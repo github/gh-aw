@@ -24,13 +24,31 @@ tools:
   github:
     mode: local
     toolsets: [default, issues, pull_requests]
-  repo-memory:
-    branch-name: memory/awf-feature-surfacing
-    allowed-extensions: [".jsonl"]
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
+  ledger:
+    awf-feature-reviews:
+      schema:
+        type: object
+        required: [record_type, run_id, reviewed_at, reviewed_sha, schema_sha256, open_feature_ids, outcome]
+        properties:
+          record_type:
+            enum: [awf_spec_surfacing_review]
+          run_id:
+            type: string
+          reviewed_at:
+            type: string
+          reviewed_sha:
+            type: string
+          schema_sha256:
+            type: string
+          open_feature_ids:
+            type: array
+            items:
+              type: string
+          outcome:
+            enum: [issue_created, noop]
+        additionalProperties: false
+      max-record-kb: 8
+      max-patch-kb: 10
   bash: true
 safe-outputs:
   create-issue:
@@ -72,9 +90,9 @@ Start with the main AWF schema, then expand to nearby specification/compiler sou
 - `pkg/parser/`
 - `pkg/workflow/`
 
-## Persistent Review History (repo-memory ledger)
+## Persistent Review History
 
-Use the repo-memory ledger as the authoritative cross-run history. Query recent
+Use the read-only SQLite projection at `/tmp/gh-aw/ledgers/awf-feature-reviews/ledger.db` as the authoritative cross-run history. Query recent
 `awf_spec_surfacing_review` records and use the newest valid record's
 `payload.reviewed_sha` as the previous review cursor and its
 `payload.open_feature_ids` to avoid duplicate issues. If no valid record exists,
@@ -90,7 +108,13 @@ not store full diffs, source excerpts, or raw analysis notes in the ledger.
 
 1. Get current commit SHA.
 2. Compute SHA-256 of `pkg/parser/schemas/main_workflow_schema.json`.
-3. Query recent `awf_spec_surfacing_review` ledger records and inspect their stable feature IDs.
+3. Query recent `awf_spec_surfacing_review` records and inspect their stable feature IDs:
+
+   ```sql
+   SELECT payload FROM records
+   WHERE json_extract(payload, '$.record_type') = 'awf_spec_surfacing_review'
+   ORDER BY ordinal DESC LIMIT 100;
+   ```
 4. Build the diff window from the newest valid `reviewed_sha` (if present) to `HEAD`; if absent, use the last 7 days.
 
 ### 2) Detect candidate AWF feature changes
@@ -131,10 +155,10 @@ If no actionable gap exists, return `noop` with a brief explanation.
 ### 5) Persist the review event
 
 After creating the issue or using `noop`, query for a record whose
-`payload.run_id` matches `${{ github.run_id }}`. If absent, append one
-`awf_spec_surfacing_review` record with the run ID, UTC timestamp, current
-commit SHA, schema SHA-256, stable open feature IDs, and outcome. Do not edit
-ledger shards directly or invoke compaction.
+`payload.run_id` matches `${{ github.run_id }}`. If absent, submit one
+`ledger_append` record with `record_type: awf_spec_surfacing_review`, the run ID,
+UTC timestamp, current commit SHA, schema SHA-256, stable open feature IDs, and
+outcome. Do not edit ledger branches directly or invoke compaction.
 
 ## Output Quality Bar
 

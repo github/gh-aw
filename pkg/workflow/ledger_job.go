@@ -9,13 +9,22 @@ import (
 )
 
 func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetectionEnabled bool) *Job {
-	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
+	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName), "safe_outputs"}
 	if IsDetectionJobEnabled(data.SafeOutputs) && threatDetectionEnabled {
 		needs = append(needs, string(constants.DetectionJobName))
 	}
-	steps := append([]string{}, buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), c.getActionPin)...)
-	steps = append(steps, c.generateCheckoutActionsFolder(data)...)
+	steps := append([]string{}, c.generateCheckoutActionsFolder(data)...)
 	steps = append(steps, c.generateSetupStep(data, c.resolveActionReference("./actions/setup", data), SetupActionDestination, false, "", "")...)
+	steps = append(steps,
+		"      - name: Download validated ledger transactions\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+		"        with:\n",
+		fmt.Sprintf("          name: %s\n", ledgerTransactionsArtifactName),
+		"          path: ${{ runner.temp }}/gh-aw\n",
+	)
+	ledgerConfig, _ := json.Marshal(data.LedgerConfig.Ledgers)
 	steps = append(steps,
 		"      - name: Checkout repository\n",
 		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
@@ -27,9 +36,8 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_TOKEN: ${{ github.token }}\n",
-		fmt.Sprintf("          GH_AW_LEDGER_TRANSACTIONS: %s%s\n", constants.TmpGhAwDirSlash, constants.SafeOutputsFilename),
-		"          GH_AW_LEDGER_TRANSACTION_ID: ${{ github.run_id }}-${{ github.run_attempt }}\n",
-		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_B64: %s\n", encodeLedgerJobConfig(data.LedgerConfig)),
+		"          GH_AW_LEDGER_TRANSACTIONS: ${{ runner.temp }}/gh-aw/ledger-transactions.json\n",
+		fmt.Sprintf("          GH_AW_LEDGER_CONFIG_BASE64: %s\n", base64.StdEncoding.EncodeToString(ledgerConfig)),
 		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
@@ -45,27 +53,4 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		Needs:       needs,
 		Steps:       steps,
 	}
-}
-
-func encodeLedgerJobConfig(config *LedgerToolConfig) string {
-	if config == nil {
-		return ""
-	}
-	ledgers := make([]map[string]any, 0, len(config.Ledgers))
-	for _, ledger := range config.Ledgers {
-		ledgers = append(ledgers, map[string]any{
-			"name":         ledger.Name,
-			"schema":       ledger.Schema,
-			"schemaPath":   ledger.SchemaPath,
-			"maxRecordKB":  ledger.MaxRecordKB,
-			"maxSegmentKB": ledger.MaxSegmentKB,
-			"maxPatchKB":   ledger.MaxPatchKB,
-			"branchName":   ledger.BranchName,
-		})
-	}
-	encoded, err := json.Marshal(ledgers)
-	if err != nil {
-		return ""
-	}
-	return base64.StdEncoding.EncodeToString(encoded)
 }

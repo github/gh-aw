@@ -37,13 +37,52 @@ sandbox:
 tools:
   cli-proxy: true
   agentic-workflows:
-  repo-memory:
-    branch-name: memory/audit-workflows
-    description: "Structured workflow run audit history"
-    ledger:
-      compaction:
-        min-segments: 32
-        max-segments: 32
+  ledger:
+    audit-history:
+      schema:
+        type: object
+        required: [record_type, run_id, audited_at, audit_window, runs_reviewed, aggregate_metrics, finding_ids, recommendation_ids, anomaly_ids, recurring_finding_ids, outcome]
+        properties:
+          record_type:
+            enum: [workflow_run_audit]
+          run_id:
+            type: string
+          audited_at:
+            type: string
+          audit_window:
+            type: object
+            properties:
+              start:
+                type: string
+              end:
+                type: string
+            additionalProperties: false
+          runs_reviewed:
+            type: integer
+            minimum: 0
+          aggregate_metrics:
+            type: object
+          finding_ids:
+            type: array
+            items:
+              type: string
+          recommendation_ids:
+            type: array
+            items:
+              type: string
+          anomaly_ids:
+            type: array
+            items:
+              type: string
+          recurring_finding_ids:
+            type: array
+            items:
+              type: string
+          outcome:
+            enum: [findings_reported, noop]
+        additionalProperties: false
+      max-record-kb: 16
+      max-patch-kb: 10
   timeout: 300
 safe-outputs:
   upload-asset:
@@ -144,9 +183,17 @@ Before writing the final report, verify that each recommendation cites at least 
 Before writing the final report, verify recommendations are concrete and evidence-based.
 {{/if}}
 
-**Audit history**: Use the repo-memory ledger as the durable record of each audit. Query recent `workflow_run_audit` records before analysis to compare stable finding, recommendation, and anomaly IDs, and query by `payload.run_id` before appending to avoid duplicate records for a run. Use run logs as the source for the 30-day charts and rollups; do not maintain a second copy of those metrics in mutable memory files.
+**Audit history**: Use the read-only SQLite projection at `/tmp/gh-aw/ledgers/audit-history/ledger.db` as the durable record of each audit. Query recent `workflow_run_audit` records before analysis to compare stable finding, recommendation, and anomaly IDs, and query by `payload.run_id` before appending to avoid duplicate records for a run:
 
-After completing the report, append one `workflow_run_audit` record containing the run ID, UTC audit timestamp, audit window, number of runs reviewed, compact aggregate metrics, stable IDs for findings/recommendations/anomalies, recurring finding IDs, and the outcome (`findings_reported` or `noop`). Keep records structured and bounded; never store logs, prompts, raw tool output, or other sensitive content. Use `ledger_status` to inspect malformed or incomplete records when needed. Ledger shards are append-only: do not edit them directly or invoke compaction.
+```sql
+SELECT payload FROM records
+WHERE json_extract(payload, '$.record_type') = 'workflow_run_audit'
+ORDER BY ordinal DESC LIMIT 100;
+```
+
+Use run logs as the source for the 30-day charts and rollups; do not maintain a second copy of those metrics in mutable memory files.
+
+After completing the report, submit one `ledger_append` record with `record_type: workflow_run_audit`, containing the run ID, UTC audit timestamp, audit window, number of runs reviewed, compact aggregate metrics, stable IDs for findings/recommendations/anomalies, recurring finding IDs, and the outcome (`findings_reported` or `noop`). Keep records structured and bounded; never store logs, prompts, raw tool output, or other sensitive content. Query the projection's `diagnostics` table to inspect malformed or incomplete records. Ledger branches are append-only: do not edit them directly or invoke compaction.
 
 ## Guidelines
 
@@ -154,6 +201,6 @@ After completing the report, append one `workflow_run_audit` record containing t
 **Quality**: Be thorough, specific, actionable, accurate  
 **Efficiency**: Use repo memory, batch operations, respect timeouts
 
-Memory is stored as bounded structured `workflow_run_audit` events in the configured repo-memory ledger.
+History is stored as bounded structured `workflow_run_audit` records in the configured Git-backed ledger.
 
 Always create discussion with findings and update repo memory.

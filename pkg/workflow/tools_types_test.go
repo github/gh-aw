@@ -66,6 +66,16 @@ func TestNewTools(t *testing.T) {
 		}
 	})
 
+	t.Run("preserves invalid ledger configuration errors", func(t *testing.T) {
+		tools := NewTools(map[string]any{"ledger": map[string]any{"findings": "invalid"}})
+		if err := tools.ParseError(); err == nil {
+			t.Fatal("expected NewTools to preserve the ledger parse error")
+		}
+		if _, err := ParseToolsConfig(map[string]any{"ledger": map[string]any{"findings": "invalid"}}); err == nil {
+			t.Fatal("expected ParseToolsConfig to return the ledger parse error")
+		}
+	})
+
 	t.Run("parses known tools", func(t *testing.T) {
 		toolsMap := map[string]any{
 			"github":    map[string]any{"allowed": []any{"issue_read"}},

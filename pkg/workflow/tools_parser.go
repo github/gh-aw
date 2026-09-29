@@ -166,7 +166,7 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 	if val, exists := toolsMap["ledger"]; exists {
 		ledger, err := parseLedgerToolConfig(val)
 		if err != nil {
-			return tools
+			tools.ledgerParseErr = err
 		} else {
 			tools.Ledger = ledger
 		}
