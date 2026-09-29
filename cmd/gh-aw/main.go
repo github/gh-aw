@@ -27,6 +27,7 @@ var (
 // Global flags
 var verboseFlag bool
 var bannerFlag bool
+var versionFlag bool
 
 // formatListWithOr formats a list of strings with commas and "or" before the last item
 // Example: ["a", "b", "c"] -> "a, b, or c"
@@ -79,9 +80,8 @@ func validateEngine(engine string) error {
 }
 
 var rootCmd = &cobra.Command{
-	Use:     string(constants.CLIExtensionPrefix),
-	Short:   "GitHub Agentic Workflows CLI",
-	Version: version,
+	Use:   string(constants.CLIExtensionPrefix),
+	Short: "GitHub Agentic Workflows CLI",
 	Long: `GitHub Agentic Workflows CLI
 
 Common Tasks:
@@ -104,6 +104,10 @@ For detailed help on any command, use:
 		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if versionFlag {
+			fmt.Fprintf(os.Stdout, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+			return nil
+		}
 		return cmd.Help()
 	},
 }
@@ -387,7 +391,7 @@ var versionCmd = &cobra.Command{
 	Long:    `Print the current version and build information for the gh aw CLI extension.`,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` version   # Print the current version`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+		fmt.Fprintf(os.Stdout, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
 		return nil
 	},
 }
@@ -696,17 +700,13 @@ func configureRootCommand() {
 	rootCmd.AddGroup(&cobra.Group{ID: "utilities", Title: "Utilities:"})
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output showing detailed information")
 	rootCmd.PersistentFlags().BoolVar(&bannerFlag, "banner", false, "Display ASCII logo banner with purple GitHub color theme")
-	rootCmd.SetOut(os.Stdout)
+	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "Print the current version")
+	rootCmd.SetOut(os.Stderr)
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
-	rootCmd.SetVersionTemplate(string(constants.CLIExtensionPrefix) + " version {{.Version}}\n")
 	rootCmd.InitDefaultHelpFlag()
 	if f := rootCmd.Flags().Lookup("help"); f != nil {
 		f.Usage = "Show help for " + string(constants.CLIExtensionPrefix)
-	}
-	rootCmd.InitDefaultVersionFlag()
-	if f := rootCmd.Flags().Lookup("version"); f != nil {
-		f.Usage = "Print the current version"
 	}
 	rootCmd.SetUsageFunc(rootUsageFunc)
 }
