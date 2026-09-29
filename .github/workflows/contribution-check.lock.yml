@@ -1727,7 +1727,7 @@ jobs:
           rm -rf /tmp/gh-aw/sandbox/firewall/logs
           rm -rf /tmp/gh-aw/sandbox/firewall/audit
       - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.28.27@sha256:8d14865f96d57d9b4f22b30b3e148d2d926384f0aa543a139f15593e450f0e90 ghcr.io/github/gh-aw-firewall/api-proxy:0.28.27@sha256:b767b95ad787fae126e0224e547e31daa22950aaa4f03c34e1224f3ce80f314e ghcr.io/github/gh-aw-firewall/squid:0.28.27@sha256:c89d35cbc15c1c8614cc01da321a26a0685a71b51858965ce6fdd78252df64a9
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.28.27@sha256:8d14865f96d57d9b4f22b30b3e148d2d926384f0aa543a139f15593e450f0e90 ghcr.io/github/gh-aw-firewall/api-proxy:0.28.27@sha256:b767b95ad787fae126e0224e547e31daa22950aaa4f03c34e1224f3ce80f314e ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.27@sha256:7536c8d5b9b4f77d48f3617df6b3d303d363945c7490bd0e708ddb420986448d ghcr.io/github/gh-aw-firewall/squid:0.28.27@sha256:c89d35cbc15c1c8614cc01da321a26a0685a71b51858965ce6fdd78252df64a9
       - name: Check if detection needed
         id: detection_guard
         if: always()
@@ -2005,7 +2005,7 @@ jobs:
           rm -rf /tmp/gh-aw/sandbox/firewall/logs
           rm -rf /tmp/gh-aw/sandbox/firewall/audit
       - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.28.27@sha256:8d14865f96d57d9b4f22b30b3e148d2d926384f0aa543a139f15593e450f0e90 ghcr.io/github/gh-aw-firewall/api-proxy:0.28.27@sha256:b767b95ad787fae126e0224e547e31daa22950aaa4f03c34e1224f3ce80f314e ghcr.io/github/gh-aw-firewall/squid:0.28.27@sha256:c89d35cbc15c1c8614cc01da321a26a0685a71b51858965ce6fdd78252df64a9
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.28.27@sha256:8d14865f96d57d9b4f22b30b3e148d2d926384f0aa543a139f15593e450f0e90 ghcr.io/github/gh-aw-firewall/api-proxy:0.28.27@sha256:b767b95ad787fae126e0224e547e31daa22950aaa4f03c34e1224f3ce80f314e ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.27@sha256:7536c8d5b9b4f77d48f3617df6b3d303d363945c7490bd0e708ddb420986448d ghcr.io/github/gh-aw-firewall/squid:0.28.27@sha256:c89d35cbc15c1c8614cc01da321a26a0685a71b51858965ce6fdd78252df64a9
       - name: Prepare evals files
         run: |
           mkdir -p /tmp/gh-aw/evals
