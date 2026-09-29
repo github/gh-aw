@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"sort"
@@ -27,7 +28,11 @@ var (
 // Global flags
 var verboseFlag bool
 var bannerFlag bool
-var versionFlag bool
+
+// printVersion writes the CLI name and version string to the given writer.
+func printVersion(w io.Writer) {
+	fmt.Fprintf(w, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+}
 
 // formatListWithOr formats a list of strings with commas and "or" before the last item
 // Example: ["a", "b", "c"] -> "a, b, or c"
@@ -104,8 +109,12 @@ For detailed help on any command, use:
 		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if versionFlag {
-			fmt.Fprintf(os.Stdout, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+			// Reset the flag's value immediately so repeated in-process
+			// executions (e.g. tests reusing rootCmd) don't keep printing
+			// the version after a run that didn't pass --version.
+			_ = cmd.Flags().Set("version", "false")
+			printVersion(os.Stdout)
 			return nil
 		}
 		return cmd.Help()
@@ -391,7 +400,7 @@ var versionCmd = &cobra.Command{
 	Long:    `Print the current version and build information for the gh aw CLI extension.`,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` version   # Print the current version`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Fprintf(os.Stdout, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+		printVersion(os.Stdout)
 		return nil
 	},
 }
@@ -700,7 +709,7 @@ func configureRootCommand() {
 	rootCmd.AddGroup(&cobra.Group{ID: "utilities", Title: "Utilities:"})
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output showing detailed information")
 	rootCmd.PersistentFlags().BoolVar(&bannerFlag, "banner", false, "Display ASCII logo banner with purple GitHub color theme")
-	rootCmd.Flags().BoolVar(&versionFlag, "version", false, "Print the current version")
+	rootCmd.Flags().Bool("version", false, "Print the current version")
 	rootCmd.SetOut(os.Stderr)
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
