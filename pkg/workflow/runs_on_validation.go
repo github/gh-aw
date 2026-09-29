@@ -224,8 +224,8 @@ func validateSelfHostedRunners(workflow map[string]any) error {
 	}
 
 	if len(violations) > 0 {
-		return fmt.Errorf("%s is enabled, but every generated job must select a self-hosted runner using the \"self-hosted\" label or a runner group:\n- %s",
-			"GH_AW_REQUIRE_SELF_HOSTED_RUNNERS", strings.Join(violations, "\n- "))
+		return fmt.Errorf("self-hosted runner enforcement is enabled, but every generated job must select a self-hosted runner using the \"self-hosted\" label or a runner group:\n- %s",
+			strings.Join(violations, "\n- "))
 	}
 	return nil
 }

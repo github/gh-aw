@@ -9,6 +9,16 @@ Use the `runs-on` frontmatter field to target a self-hosted runner instead of th
 
 Runners must be Linux with Docker support. macOS and Windows are not supported.
 
+To enforce self-hosted runners for every generated job, set `require_self_hosted_runners` in `.github/workflows/aw.json` or pass `--require-self-hosted-runners` for a one-off compile:
+
+```json title=".github/workflows/aw.json"
+{
+  "require_self_hosted_runners": true
+}
+```
+
+The compiler checks all generated jobs, including framework and safe-output jobs. Each must use the `self-hosted` label or a runner group. The `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS=true` compiler environment variable also enables this enforcement.
+
 Self-hosted runners may require `sudo` depending on the selected engine and configuration. For the default GitHub Copilot engine, there are two distinct sudo considerations:
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.

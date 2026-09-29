@@ -151,6 +151,10 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	if err != nil {
 		return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	requireSelfHostedRunners = requireSelfHostedRunners || c.requireSelfHosted
+	if repoConfig, err := c.loadRepoConfig(); err == nil && repoConfig != nil {
+		requireSelfHostedRunners = requireSelfHostedRunners || repoConfig.RequireSelfHostedRunners
+	}
 
 	// Generate the YAML content along with the collected body secrets and action refs
 	// (returned to avoid a second scan of the full YAML in the caller for safe update enforcement).

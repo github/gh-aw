@@ -63,3 +63,20 @@ func TestCompileOptionsPropagateModels(t *testing.T) {
 		t.Fatal("expected Models to be propagated to CompileConfig")
 	}
 }
+
+func TestCompileOptionsPropagateRequireSelfHostedRunners(t *testing.T) {
+	t.Parallel()
+
+	flag := compileCmd.Flags().Lookup("require-self-hosted-runners")
+	if flag == nil {
+		t.Fatal("expected --require-self-hosted-runners flag on compile command")
+	}
+	if flag.DefValue != "false" {
+		t.Fatalf("expected --require-self-hosted-runners default to be false, got %s", flag.DefValue)
+	}
+
+	config := (&compileCmdOptions{requireSelfHostedRunners: true}).toCompileConfig(nil)
+	if !config.RequireSelfHostedRunners {
+		t.Fatal("expected RequireSelfHostedRunners to be propagated to CompileConfig")
+	}
+}

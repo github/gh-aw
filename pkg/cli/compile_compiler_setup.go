@@ -142,6 +142,7 @@ func configureCompilerFlags(compiler *workflow.Compiler, config CompileConfig) {
 	compiler.SetStrictMode(config.Strict)
 	compiler.SetAllowActionRefs(config.AllowActionRefs)
 	compiler.SetForceStaged(config.Staged)
+	compiler.SetRequireSelfHostedRunners(config.RequireSelfHostedRunners)
 
 	// Set trial mode if specified
 	if config.TrialMode {

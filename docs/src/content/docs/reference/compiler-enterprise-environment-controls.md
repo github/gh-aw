@@ -36,7 +36,7 @@ variables in batch. These commands operate on GitHub Actions variables and suppo
 `default_model_copilot`, `default_otlp_endpoint`, and `default_utc`. `gh aw env update --scope ent` writes only the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
 `gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is always a secret and must also be set with `gh secret set` at repository or organization scope. If both endpoint values exist, clearing only one leaves the other effective through the fallback expression; clear both the endpoint secret and variable to disable OTLP export.
 
-`GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` is a compile-time enforcement setting, not a `GH_AW_DEFAULT_*` default, and is not managed by `gh aw env`. Set it in the environment of the trusted compile process.
+`GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` is a compile-time enforcement setting, not a `GH_AW_DEFAULT_*` default, and is not managed by `gh aw env`. The same policy can be enabled persistently with `require_self_hosted_runners: true` in `.github/workflows/aw.json`, or for a single invocation with `gh aw compile --require-self-hosted-runners`.
 
 ```yaml title="Required compile check"
 jobs:

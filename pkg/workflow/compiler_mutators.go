@@ -25,6 +25,12 @@ func (c *Compiler) SetRequireDocker(require bool) {
 	c.requireDocker = require
 }
 
+// SetRequireSelfHostedRunners configures whether every generated job must select
+// a self-hosted runner.
+func (c *Compiler) SetRequireSelfHostedRunners(require bool) {
+	c.requireSelfHosted = require
+}
+
 // SetQuiet configures whether to suppress success messages (for interactive mode)
 func (c *Compiler) SetQuiet(quiet bool) {
 	c.quiet = quiet

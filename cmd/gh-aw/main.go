@@ -408,6 +408,7 @@ type compileCmdOptions struct {
 	noEmit                    bool
 	purge                     bool
 	strict                    bool
+	requireSelfHostedRunners  bool
 	trial                     bool
 	dependabot                bool
 	forceOverwrite            bool
@@ -452,6 +453,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	noEmit, _ := cmd.Flags().GetBool("no-emit")
 	purge, _ := cmd.Flags().GetBool("purge")
 	strict, _ := cmd.Flags().GetBool("strict")
+	requireSelfHostedRunners, _ := cmd.Flags().GetBool("require-self-hosted-runners")
 	trial, _ := cmd.Flags().GetBool("trial")
 	logicalRepo, _ := cmd.Flags().GetString("logical-repo")
 	dependabot, _ := cmd.Flags().GetBool("dependabot")
@@ -487,7 +489,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	return compileCmdOptions{
 		engineOverride: engineOverride, actionMode: actionMode, actionTag: actionTag, actionsRepo: actionsRepo, ghAwRef: ghAwRef,
 		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile,
-		validate: validate, watch: watch, noEmit: noEmit, purge: purge, strict: strict, trial: trial, dependabot: dependabot,
+		validate: validate, watch: watch, noEmit: noEmit, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
 		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
 		zizmor: zizmor, poutine: poutine, actionlint: actionlint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
@@ -520,7 +522,8 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		MarkdownFiles: args, Verbose: o.verbose, EngineOverride: o.engineOverride, ActionMode: o.actionMode, ActionTag: o.actionTag,
 		ActionsRepo: o.actionsRepo, Validate: o.validate, Watch: o.watch, WorkflowDir: o.workflowDir(),
 		NoEmit: o.noEmit, Purge: o.purge, TrialMode: o.trial, TrialLogicalRepoSlug: o.logicalRepo, Strict: o.strict,
-		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
+		RequireSelfHostedRunners: o.requireSelfHostedRunners,
+		Dependabot:               o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
 		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
@@ -771,6 +774,7 @@ func configureCompileBuildFlags() {
 	compileCmd.Flags().Bool("no-emit", false, "Validate workflow without generating lock files")
 	compileCmd.Flags().Bool("purge", false, "Delete .lock.yml files that were not regenerated during compilation (only when no specific files are provided)")
 	compileCmd.Flags().Bool("strict", false, "Override frontmatter to enforce strict mode validation for all workflows (enforces action pinning, network config, safe-outputs, disallows write permissions and deprecated fields). Note: Workflows default to strict mode unless frontmatter sets strict: false")
+	compileCmd.Flags().Bool("require-self-hosted-runners", false, "Fail compilation unless every generated workflow job selects a self-hosted runner")
 	compileCmd.Flags().Bool("trial", false, "Enable trial mode compilation (modifies workflows for trial execution)")
 	compileCmd.Flags().StringP("logical-repo", "l", "", "Repository to simulate workflow execution against (for trial mode)")
 	compileCmd.Flags().Bool("use-samples", false, "Hidden: replace the agentic 'Execute coding agent' step with a deterministic driver that replays the workflow's safe-outputs `samples` frontmatter entries through the safe-outputs MCP server. Used to make end-to-end tests deterministic.")
