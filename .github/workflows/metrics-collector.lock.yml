@@ -1131,6 +1131,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/stop_mcp_gateway.sh" "$GATEWAY_PID"
       - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -1283,7 +1284,7 @@ jobs:
         run: "set -euo pipefail\nmemory_dir=\"/tmp/gh-aw/repo-memory/default\"\nlatest=\"${memory_dir}/metrics/latest.json\"\n\nif [ ! -f \"$latest\" ]; then\n  echo \"ERROR: ${latest} was not written. The agent finished without collecting any metrics.\"\n  exit 1\nfi\n\nif ! jq -e . \"$latest\" >/dev/null 2>&1; then\n  echo \"ERROR: ${latest} does not contain valid JSON.\"\n  exit 1\nfi\n\nnew_timestamp=\"$(jq -r '.timestamp // empty' \"$latest\")\"\nif [ -z \"$new_timestamp\" ]; then\n  echo \"ERROR: ${latest} has no 'timestamp' field.\"\n  exit 1\nfi\n\nbaseline_timestamp=\"\"\nif [ -f /tmp/gh-aw/metrics-collector/baseline-timestamp.txt ]; then\n  baseline_timestamp=\"$(cat /tmp/gh-aw/metrics-collector/baseline-timestamp.txt)\"\nfi\nif [ -n \"$baseline_timestamp\" ] && [ \"$new_timestamp\" = \"$baseline_timestamp\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp is unchanged (${new_timestamp}). No new metrics were collected.\"\n  exit 1\nfi\n\nif ! new_epoch=\"$(date -u -d \"$new_timestamp\" +%s 2>/dev/null)\"; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not a parseable ISO 8601 date.\"\n  exit 1\nfi\nnow_epoch=\"$(date -u +%s)\"\nage=$(( now_epoch - new_epoch ))\nmax_age_seconds=86400   # the collection window is 24h\nmax_skew_seconds=3600   # tolerance for clock skew on future-dated timestamps\nif [ \"$age\" -gt \"$max_age_seconds\" ] || [ \"$age\" -lt \"-${max_skew_seconds}\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not from the current collection window.\"\n  exit 1\nfi\n\ndaily_count=\"$( { find \"${memory_dir}/metrics/daily\" -maxdepth 1 -name '*.json' -type f 2>/dev/null || true; } | wc -l)\"\nif [ \"$daily_count\" -eq 0 ]; then\n  echo \"ERROR: no daily metrics file was written under metrics/daily/.\"\n  exit 1\nfi\n\nworkflow_count=\"$(jq '.workflows | length' \"$latest\")\"\nif [ \"$workflow_count\" -eq 0 ]; then\n  echo \"ERROR: metrics/latest.json contains zero workflows. The collection loop did not run.\"\n  exit 1\nfi\n\necho \"Metrics collection verified: timestamp ${new_timestamp}, ${workflow_count} workflow(s), ${daily_count} daily file(s).\""
 
       - name: Upload agent artifacts
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

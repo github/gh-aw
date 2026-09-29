@@ -648,11 +648,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
-	if hasSafeJobArtifactPaths(data) {
-		c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
-	} else {
-		c.generateSecretRedactionStep(yaml, yaml.String(), data)
-	}
+	c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
 
 	// Append the agent step summary to the real $GITHUB_STEP_SUMMARY after secrets are redacted.
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside

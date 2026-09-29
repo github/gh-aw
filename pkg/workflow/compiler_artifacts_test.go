@@ -368,13 +368,13 @@ This workflow should generate a unified artifact upload step that includes the p
 		t.Error("Expected 'if-no-files-found: ignore' in upload step")
 	}
 
-	// Verify the upload step runs always (with if: always())
+	// Verify the upload step runs only after successful secret redaction.
 	uploadStepIndex := strings.Index(lockYAML, "- name: Upload agent artifacts")
 	if uploadStepIndex == -1 {
 		t.Fatal("Upload agent artifacts step not found")
 	}
 
-	// Check for "if: always()" in the section after the upload step name
+	// Check the condition in the section after the upload step name.
 	afterUploadStep := lockYAML[uploadStepIndex:]
 	nextStepIndex := strings.Index(afterUploadStep[20:], "- name:")
 	if nextStepIndex == -1 {
@@ -382,8 +382,8 @@ This workflow should generate a unified artifact upload step that includes the p
 	}
 	uploadStepSection := afterUploadStep[:20+nextStepIndex]
 
-	if !strings.Contains(uploadStepSection, "if: always()") {
-		t.Error("Expected 'if: always()' in upload agent artifacts step")
+	if !strings.Contains(uploadStepSection, "if: always() && steps.redact_secrets.outcome == 'success'") {
+		t.Error("Expected upload agent artifacts step to require successful secret redaction")
 	}
 
 	// Verify continue-on-error is set
@@ -634,6 +634,7 @@ Body.
 	uploadSection := extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact")
 	for _, expected := range []string{
 		"name: agent-output-fallback\n",
+		"if: always() && steps.redact_secrets.outcome == 'success'",
 		"/tmp/gh-aw/agent_output.json",
 		"/tmp/gh-aw/safeoutputs.jsonl",
 		"/tmp/gh-aw/agent_execution.json",
