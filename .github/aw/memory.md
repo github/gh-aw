@@ -219,7 +219,10 @@ persisted JSONL shards.
 tools:
   repo-memory:
     branch-name: memory/audit-history
-    ledger: {}
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
 ```
 
 Optionally set `ledger.schema` to a repository-relative JSON Schema file to
@@ -243,10 +246,19 @@ when ledger limits exceed the corresponding repo-memory persistence limits.
 Each writing workflow invocation creates a shard, so a frequently running
 workflow can exhaust the shard limit. Use ordinary repo-memory files for
 replaceable snapshots, pruned baselines, or histories that need more than 1024
-writer shards. An optional trusted `ledger.compactor.script` can create verified
-replacement segments; the runtime alone decides when stable covered sources are
-safe to retire. Compaction is fail-open and its counts are included in the
-persistence step summary.
+writer shards. Use bounded declarative `ledger.compaction` options to compact
+stable segments; custom JavaScript compactor scripts are disabled because Node's
+in-process VM is not a security boundary. Ledger workflows require AWF's
+Cloud Hypervisor runtime, which keeps ledger storage outside the agent's
+`filesystem.allowWrite` paths; only the MCP ledger server can append records.
+The persistence job ignores agent-supplied coverage files and overwrites of
+trusted shards, then verifies replacement coverage before retirement.
+
+The ledger is eventually convergent, not transactional or exactly-once. Record
+SHA-256 values are unkeyed checksums, not authentication; rely on the AWF write
+boundary, use stable application keys, and deterministically resolve duplicates
+and concurrent conflicts. Compaction, normalization, and save details appear in
+the persistence step summary.
 
 ### Tradeoffs
 

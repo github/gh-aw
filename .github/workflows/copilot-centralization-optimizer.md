@@ -13,12 +13,24 @@ tools:
     branch-name: memory/copilot-centralization-optimizer
     description: Long-lived centralization trend snapshots and history
     file-glob: ["*.json", "*.jsonl"]
-    ledger: {}
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
 engine:
   id: codex
   model-provider: github
 model: copilot/gpt-5.3-codex
 strict: true
+sandbox:
+  agent:
+    id: awf
+    runtime: cloud-hypervisor
+    config:
+      filesystem:
+        allowWrite:
+          - /tmp/gh-aw/data
+          - /tmp/gh-aw/repo-memory/default/centralization-baseline.json
 max-ai-credits: 250
 max-daily-ai-credits: 1000
 safe-outputs:

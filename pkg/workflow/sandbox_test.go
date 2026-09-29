@@ -438,6 +438,25 @@ func TestEnsureRepoMemoryWritePathsSkipsNonCloudHypervisorRuntime(t *testing.T) 
 	}
 }
 
+func TestEnsureRepoMemoryWritePathsLeavesLedgerStorageReadOnly(t *testing.T) {
+	sandboxConfig := applySandboxDefaults(&SandboxConfig{
+		Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Runtime: AgentRuntimeCloudHypervisor},
+	}, &EngineConfig{ID: "claude"})
+	repoMemoryConfig := &RepoMemoryConfig{
+		Memories: []RepoMemoryEntry{
+			{ID: "events", Ledger: &RepoMemoryLedgerConfig{}},
+			{ID: "notes"},
+		},
+	}
+
+	ensureRepoMemoryWritePaths(sandboxConfig, repoMemoryConfig)
+
+	require.NotNil(t, sandboxConfig.Agent.Config)
+	require.NotNil(t, sandboxConfig.Agent.Config.Filesystem)
+	assert.NotContains(t, sandboxConfig.Agent.Config.Filesystem.AllowWrite, "/tmp/gh-aw/repo-memory/events")
+	assert.Contains(t, sandboxConfig.Agent.Config.Filesystem.AllowWrite, "/tmp/gh-aw/repo-memory/notes")
+}
+
 func TestMergeImportedSandboxAgentMounts(t *testing.T) {
 	tests := []struct {
 		name           string

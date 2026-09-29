@@ -48,6 +48,11 @@ timeout-minutes: 45
 sandbox:
   agent:
     id: awf
+    runtime: cloud-hypervisor
+    config:
+      filesystem:
+        allowWrite:
+          - /tmp/gh-aw/agent
 tools:
   bash:
   - cat pkg/workflow/js/safe_outputs_tools.json
@@ -60,10 +65,15 @@ tools:
   - "git log -1 --format=\"%ai\" -- actions/setup/js/*.cjs"
   - "git log -3 --format=\"%ai %s\" -- actions/setup/js/*.cjs"
   cache-memory: true
+  repo-memory:
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
   cli-proxy: true
   edit: null
   github:
-    mode: gh-proxy
+    mode: local
     toolsets:
     - default
 tracker-id: mcp-concurrency-analysis
@@ -97,6 +107,7 @@ When issues are identified, create detailed issues with specific recommendations
 
 - **Repository**: ${{ github.repository }}
 - **Analysis Date**: $(date +%Y-%m-%d)
+- **Run ID**: ${{ github.run_id }}
 - **Workspace**: ${{ github.workspace }}
 - **Tools Location**: `actions/setup/js/*.cjs`
 - **Tool Definitions**: `pkg/workflow/js/safe_outputs_tools.json`
@@ -523,6 +534,8 @@ If you emitted any actionable safe outputs, do not emit `noop`.
 ```json
 {"noop": {"message": "No actionable concurrency issues found in <tool_name>; analysis completed and cache state updated."}}
 ```
+
+After the safe output, query the ledger for this run ID and append one `mcp_concurrency_audit` record if it is absent. Include only the run ID, analyzed tool, status, and issue number if one was created; do not store code or raw analysis notes. Declarative compaction runs in the trusted persistence job after 32 stable shards accumulate.
 
 ## Concurrency Analysis Best Practices
 

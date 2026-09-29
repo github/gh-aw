@@ -13711,7 +13711,7 @@
   "$defs": {
     "repoMemoryLedger": {
       "type": ["object", "null"],
-      "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Using this field emits a compile-time warning.",
+      "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation. Using this field emits a compile-time warning.",
       "properties": {
         "schema": {
           "type": "string",
@@ -13746,17 +13746,25 @@
           "default": 10,
           "description": "Maximum patch size appended by one ledger writer in KiB. The default matches repo-memory's 10 KiB per-push limit."
         },
-        "compactor": {
+        "compaction": {
           "type": "object",
+          "description": "Deterministic compaction policy. The runtime selects the oldest stable closed segments and owns validation, segment creation, and safe retirement.",
           "properties": {
-            "script": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 65536,
-              "description": "Trusted deterministic JavaScript compaction policy executed outside the agent."
+            "min-segments": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1024,
+              "default": 32,
+              "description": "Minimum eligible closed segments before compaction runs."
+            },
+            "max-segments": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1024,
+              "default": 32,
+              "description": "Maximum oldest eligible segments compacted in one run; must be at least min-segments."
             }
           },
-          "required": ["script"],
           "additionalProperties": false
         }
       },

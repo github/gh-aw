@@ -342,11 +342,8 @@ func ensureCacheMemoryWritePaths(sandboxConfig *SandboxConfig, cacheMemoryConfig
 }
 
 // ensureRepoMemoryWritePaths adds compiler-provisioned repo-memory directories to the
-// Cloud Hypervisor write policy. Wiki memories are stored in the same RepoMemoryConfig
-// and share the /tmp/gh-aw/repo-memory/<id> layout. Without these entries the
-// /tmp/gh-aw export is narrowed to read-only outside the allowlist, so the agent cannot
-// write to the cloned memory working tree (writes fail with EROFS) and the repo-memory
-// push job has nothing to commit.
+// Cloud Hypervisor write policy. Ledger-backed memories are excluded: the agent accesses
+// ledger data through MCP, while the trusted persistence job owns ledger file writes.
 func ensureRepoMemoryWritePaths(sandboxConfig *SandboxConfig, repoMemoryConfig *RepoMemoryConfig) {
 	if repoMemoryConfig == nil || sandboxConfig == nil || sandboxConfig.Agent == nil ||
 		sandboxConfig.Agent.Runtime != AgentRuntimeCloudHypervisor {
@@ -359,6 +356,9 @@ func ensureRepoMemoryWritePaths(sandboxConfig *SandboxConfig, repoMemoryConfig *
 		sandboxConfig.Agent.Config.Filesystem = &SRTFilesystemConfig{}
 	}
 	for _, memory := range repoMemoryConfig.Memories {
+		if memory.Ledger != nil {
+			continue
+		}
 		addAllowWritePathIfMissing(sandboxConfig.Agent.Config.Filesystem, constants.TmpRepoMemoryDir+memory.ID)
 	}
 }

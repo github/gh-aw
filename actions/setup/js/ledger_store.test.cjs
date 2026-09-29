@@ -212,29 +212,76 @@ describe("Ledger", () => {
     expect(() => bounded.append("note", "x".repeat(1024))).toThrow("maximum message size");
   });
 
-  it("runs a constrained compactor and retires covered closed segments", async () => {
+  it("compacts deterministic batches of stable closed segments and retires covered sources", async () => {
     const first = ledger.append("note", { value: 1 });
     const secondLedger = new Ledger({ memoryDir });
     secondLedger.append("note", { value: 2 });
     const compactor = new Ledger({ memoryDir });
     const segments = compactor.listSegments();
     expect(segments).toHaveLength(2);
-    const result = await compactor.runCompactor(`
-      const selected = await ledger.listSegments({ closed: true })
-      const records = []
-      for (const segment of selected) records.push(...await ledger.readRecords(segment.id))
-      const replacement = await ledger.createSegment(records, { policy: "test" })
-      await ledger.markCovered(selected.map(segment => segment.id), replacement.id)
-      ledger.log("compacted", selected.length)
-    `);
-    expect(result.logs).toEqual(["compacted 2"]);
-    expect(result.changed).toBe(true);
+    const result = await compactor.compact({ minSegments: 2, maxSegments: 2 });
+    expect(result).toMatchObject({ changed: true, selected: 2, records: 2, retired: 2, before: 2, after: 1 });
+    expect(result.replacement).toMatch(/^[0-9a-f-]{36}$/);
     expect(compactor.get(first.sha)).toEqual(first);
     expect(compactor.get(secondLedger.status().heads[0])).toMatchObject({ type: "note" });
     expect(compactor.listSegments()).toHaveLength(1);
   });
 
-  it("does not retire forged, incomplete, or current-run coverage declarations", () => {
+  it("deduplicates and hashes compacted records deterministically", async () => {
+    const first = ledger.append("note", { value: 1 });
+    const secondLedger = new Ledger({ memoryDir });
+    const second = secondLedger.append("note", { value: 2 });
+    const compactor = new Ledger({ memoryDir });
+    const forward = compactor.createSegment([first, second]);
+    const reverse = compactor.createSegment([second, first, first]);
+    expect(reverse).toEqual(forward);
+    expect(compactor.readRecords(forward.id)).toHaveLength(2);
+    await expect(compactor.compact({ minSegments: 1 })).rejects.toThrow("Invalid minSegments");
+    await expect(compactor.compact({ minSegments: 3, maxSegments: 2 })).rejects.toThrow("Invalid maxSegments");
+  });
+
+  it("does not compact below threshold or include excluded current-run segments", async () => {
+    ledger.append("note", { value: 1 });
+    const secondLedger = new Ledger({ memoryDir });
+    secondLedger.append("note", { value: 2 });
+    const currentLedger = new Ledger({ memoryDir });
+    currentLedger.append("note", { value: 3 });
+    const excluded = currentLedger.writerId;
+    const compactor = new Ledger({ memoryDir, excludeSegments: [excluded] });
+    expect(await compactor.compact({ minSegments: 3, maxSegments: 3 })).toMatchObject({
+      changed: false,
+      selected: 0,
+      before: 2,
+      after: 2,
+    });
+    expect(await compactor.compact({ minSegments: 2, maxSegments: 2 })).toMatchObject({
+      changed: true,
+      selected: 2,
+      before: 2,
+      after: 1,
+    });
+    expect(fs.existsSync(path.join(compactor.shardDir, `${excluded}.jsonl`))).toBe(true);
+  });
+
+  it("does not retire a source containing malformed ledger records", () => {
+    const first = ledger.append("note", { value: 1 });
+    const secondLedger = new Ledger({ memoryDir });
+    secondLedger.append("note", { value: 2 });
+    const compactor = new Ledger({ memoryDir });
+    const sources = compactor.listSegments();
+    const records = sources.flatMap(segment => compactor.readRecords(segment.id));
+    const replacement = compactor.createSegment(records);
+    compactor.markCovered(
+      sources.map(segment => segment.id),
+      replacement.id
+    );
+    fs.appendFileSync(path.join(compactor.shardDir, `${sources[0].id}.jsonl`), '{"forged":true}\n');
+    expect(compactor.retireCovered()).toBe(0);
+    expect(fs.existsSync(path.join(compactor.shardDir, `${sources[0].id}.jsonl`))).toBe(true);
+    expect(compactor.get(first.sha)).toEqual(first);
+  });
+
+  it("does not retire forged, incomplete, self-referential, or current-run coverage declarations", () => {
     const first = ledger.append("note", { value: 1 });
     const secondLedger = new Ledger({ memoryDir });
     const second = secondLedger.append("note", { value: 2 });
@@ -249,6 +296,20 @@ describe("Ledger", () => {
     expect(compactor.retireCovered()).toBe(0);
     expect(compactor.listSegments()).toHaveLength(3);
 
+    const selfCoverage = new Ledger({ memoryDir });
+    const stableSource = sources[0].id;
+    selfCoverage.markCovered([stableSource], stableSource);
+    expect(selfCoverage.retireCovered()).toBe(0);
+    expect(fs.existsSync(path.join(selfCoverage.shardDir, `${stableSource}.jsonl`))).toBe(true);
+
+    const forged = new Ledger({ memoryDir });
+    const forgedDeclaration = { sources: [stableSource], replacement: incomplete.id };
+    const forgedName = sha256(forgedDeclaration).slice("sha256:".length);
+    fs.mkdirSync(forged.coverageDir, { recursive: true });
+    fs.writeFileSync(path.join(forged.coverageDir, `${forgedName}.jsonl`), `${canonicalJSON(forgedDeclaration)}\n`);
+    expect(forged.retireCovered()).toBe(0);
+    expect(fs.existsSync(path.join(forged.shardDir, `${stableSource}.jsonl`))).toBe(true);
+
     const current = compactor.append("note", { value: 3 });
     const complete = compactor.createSegment([...sourceRecords, ...compactor.readRecords(compactor.writerId)]);
     compactor.markCovered([compactor.writerId], complete.id);
@@ -256,9 +317,8 @@ describe("Ledger", () => {
     expect(fs.existsSync(path.join(compactor.shardDir, `${compactor.writerId}.jsonl`))).toBe(true);
   });
 
-  it("fails compaction open without exposing filesystem APIs", async () => {
-    await expect(ledger.runCompactor("await ledger.readRecords('00000000-0000-4000-8000-000000000000')")).rejects.toThrow("Unknown ledger segment");
-    await expect(ledger.runCompactor("typeof process")).resolves.toMatchObject({ changed: false });
+  it("rejects JavaScript compactor scripts instead of running them in-process", async () => {
+    await expect(ledger.runCompactor("ledger.log.constructor('return process')()")).rejects.toThrow("disabled until a least-privilege worker");
   });
 
   it("does not publish or project new files when file or directory fsync fails", () => {

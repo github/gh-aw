@@ -58,9 +58,21 @@ safe-outputs:
 sandbox:
   agent:
     id: awf
+    runtime: cloud-hypervisor
+    config:
+      filesystem:
+        allowWrite:
+          - /tmp/gh-aw/agent
+          - /workspace/.github/aw
+          - /workspace/.github/agents
 tools:
   cli-proxy: true
   cache-memory: true
+  repo-memory:
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
   github:
     mode: local
     toolsets: [default]
@@ -154,6 +166,7 @@ Expected format:
 - If the file does not exist, this is the first run and the cache is intentionally empty. Do **not** call `missing_data` — proceed normally. Count the total number of files in the sorted list (`TOTAL=$(...)`) and pick a **random** starting index with `$(( RANDOM % TOTAL ))`. This avoids always processing the same files first when the cache is cold.
 - If the queue in cache differs from the current file list (files added/removed), rebuild the queue from the current sorted list and reset the index to 0.
 - Pick the **next 5 files** starting from `last_processed_index + 1` (wrapping around if needed). This is your **batch** for this run.
+- **Keep cache-memory for the round-robin cursor.** Use the repo-memory ledger only for durable run audit records.
 
 ## Step 3: Analyze and Optimize Each File
 
@@ -209,7 +222,11 @@ Write the updated state to `/tmp/gh-aw/cache-memory/caveman-optimizer/state.json
 
 Use filesystem-safe format `YYYY-MM-DD` for the date (no colons, no T, no Z).
 
-## Step 5: Output
+## Step 5: Record the Run
+
+Before requesting a PR or `noop`, use `ledger_query` to check whether a `caveman_run` record for `${{ github.run_id }}` already exists. If not, append one with the run ID, date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. The ledger compacts eligible closed segments automatically; do not invoke compaction yourself.
+
+## Step 6: Output
 
 **If you made changes to any files**, create a pull request using `create_pull_request`:
 

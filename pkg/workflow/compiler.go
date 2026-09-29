@@ -103,6 +103,10 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
+	if err := validateRepoMemoryLedgerIsolation(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
 	if err := validateRunnerConfig(workflowData.RunnerConfig); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
@@ -139,7 +143,11 @@ func shouldDowngradeDefaultToolsetPermissionError(githubTool *GitHubToolConfig) 
 		return true
 	}
 
-	return len(githubTool.Toolset) == 1 && githubTool.Toolset[0] == GitHubToolset("default")
+	for _, toolset := range githubTool.Toolset {
+		return toolset == GitHubToolset("default")
+	}
+
+	return false
 }
 
 // generateAndValidateYAML generates GitHub Actions YAML and validates

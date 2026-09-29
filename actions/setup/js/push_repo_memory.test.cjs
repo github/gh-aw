@@ -4,10 +4,20 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
-import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
+import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
 
 const mockCore = { info: vi.fn() };
 global.core = mockCore;
+
+describe("push_repo_memory.cjs - untrusted ledger artifacts", () => {
+  it("ignores coverage files and artifacts that overwrite trusted shards", () => {
+    const trusted = new Set(["00000000-0000-4000-8000-000000000000"]);
+    expect(isUntrustedLedgerArtifact("ledger/coverage/claim.jsonl", trusted)).toBe(true);
+    expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000000.jsonl", trusted)).toBe(true);
+    expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000001.jsonl", trusted)).toBe(false);
+    expect(isUntrustedLedgerArtifact("summary.json", trusted)).toBe(false);
+  });
+});
 
 describe("push_repo_memory.cjs - temporary ID substitutions", () => {
   it("applies final mappings only to memory files selected for persistence", () => {
@@ -1723,7 +1733,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
     const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
     const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
 
-    expect(scriptContent).toContain("if (filesToCopy.length === 0)");
+    expect(scriptContent).toContain("if (filesToCopy.length === 0 && !compactionOptionsBase64 && !formatJSON)");
     expect(scriptContent).toContain("No eligible files to copy from artifact");
   });
 

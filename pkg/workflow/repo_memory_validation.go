@@ -22,10 +22,12 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"regexp"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -37,6 +39,7 @@ const (
 	defaultRepoMemoryLedgerSegment = defaultRepoMemoryMaxFileSize / 1024
 	defaultRepoMemoryLedgerRecord  = 32
 	defaultRepoMemoryLedgerPatch   = defaultRepoMemoryMaxPatchSize / 1024
+	defaultRepoMemoryLedgerCompact = 32
 	maxRepoMemoryLedgerSegmentKB   = 10 * 1024
 	maxRepoMemoryLedgerRecordKB    = 32
 	maxRepoMemoryLedgerPatchKB     = maxRepoMemoryPatchSize / 1024
@@ -52,16 +55,12 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 	}
 	config := &RepoMemoryLedgerConfig{}
 	for key, value := range fields {
-		if key == "compactor" {
-			compactor, ok := value.(map[string]any)
-			if !ok || len(compactor) != 1 {
-				return nil, errors.New("tools.repo-memory.ledger.compactor must contain only script")
+		if key == "compaction" {
+			compaction, err := parseRepoMemoryLedgerCompaction(value)
+			if err != nil {
+				return nil, err
 			}
-			script, ok := compactor["script"].(string)
-			if !ok || strings.TrimSpace(script) == "" || len(script) > 65536 {
-				return nil, errors.New("tools.repo-memory.ledger.compactor.script must be a non-empty script no larger than 65536 bytes")
-			}
-			config.Compactor = &RepoMemoryLedgerCompactorConfig{Script: script}
+			config.Compaction = compaction
 			continue
 		}
 		if key == "max-shards" {
@@ -78,7 +77,7 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 			continue
 		}
 		if key != "schema" {
-			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, max-segment-kb, max-record-kb, max-patch-kb, and compactor are supported)", key)
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, max-segment-kb, max-record-kb, max-patch-kb, and compaction are supported)", key)
 		}
 		schema, ok := value.(string)
 		if !ok {
@@ -101,6 +100,61 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 		return nil, errors.New("tools.repo-memory.ledger.max-record-kb cannot exceed max-segment-kb")
 	}
 	return config, nil
+}
+
+func parseRepoMemoryLedgerCompaction(raw any) (*RepoMemoryLedgerCompactionConfig, error) {
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("tools.repo-memory.ledger.compaction must be an object")
+	}
+	config := &RepoMemoryLedgerCompactionConfig{
+		MinSegments: defaultRepoMemoryLedgerCompact,
+		MaxSegments: defaultRepoMemoryLedgerCompact,
+	}
+	for key, value := range fields {
+		if key != "min-segments" && key != "max-segments" {
+			return nil, fmt.Errorf("tools.repo-memory.ledger.compaction has unknown property %q (only min-segments and max-segments are supported)", key)
+		}
+		parsed, ok := parseLedgerCompactionBound(value)
+		if !ok {
+			return nil, fmt.Errorf("tools.repo-memory.ledger.compaction.%s must be an integer between 2 and %d", key, maxRepoMemoryLedgerShards)
+		}
+		switch key {
+		case "min-segments":
+			config.MinSegments = parsed
+		case "max-segments":
+			config.MaxSegments = parsed
+		}
+	}
+	if config.MaxSegments < config.MinSegments {
+		return nil, errors.New("tools.repo-memory.ledger.compaction.max-segments cannot be smaller than min-segments")
+	}
+	return config, nil
+}
+
+func parseLedgerCompactionBound(value any) (int, bool) {
+	switch number := value.(type) {
+	case int:
+		return number, number >= 2 && number <= maxRepoMemoryLedgerShards
+	case int64:
+		if number < 2 || number > maxRepoMemoryLedgerShards {
+			return 0, false
+		}
+		return int(number), true
+	case uint64:
+		if number < 2 || number > maxRepoMemoryLedgerShards {
+			return 0, false
+		}
+		return int(number), true
+	case float64:
+		if math.IsNaN(number) || math.IsInf(number, 0) || number != math.Trunc(number) ||
+			number < 2 || number > maxRepoMemoryLedgerShards {
+			return 0, false
+		}
+		return int(number), true
+	default:
+		return 0, false
+	}
 }
 
 func applyRepoMemoryLedgerLimit(config *RepoMemoryLedgerConfig, key string, raw any) (bool, error) {
@@ -131,6 +185,35 @@ func validateRepoMemoryLedgerSchemaPath(schema string) error {
 		return fmt.Errorf("tools.repo-memory.ledger.schema must be a repository-relative path without traversal or expressions, got %q", schema)
 	}
 	return nil
+}
+
+func validateRepoMemoryLedgerIsolation(workflowData *WorkflowData) error {
+	if workflowData == nil || workflowData.RepoMemoryConfig == nil {
+		return nil
+	}
+	memory := workflowData.RepoMemoryConfig.ledgerEntry()
+	if memory == nil {
+		return nil
+	}
+	if !isCloudHypervisorRuntime(workflowData) {
+		return errors.New("tools.repo-memory.ledger requires sandbox.agent.runtime: cloud-hypervisor so AWF can deny the agent write access to ledger storage")
+	}
+	if workflowData.SandboxConfig == nil || workflowData.SandboxConfig.Agent == nil ||
+		workflowData.SandboxConfig.Agent.Config == nil || workflowData.SandboxConfig.Agent.Config.Filesystem == nil {
+		return nil
+	}
+	ledgerPath := path.Join(constants.TmpRepoMemoryDir, memory.ID, "ledger")
+	for _, allowed := range workflowData.SandboxConfig.Agent.Config.Filesystem.AllowWrite {
+		allowedPath := path.Clean(allowed)
+		if pathContains(ledgerPath, allowedPath) || pathContains(allowedPath, ledgerPath) {
+			return fmt.Errorf("sandbox.agent.config.filesystem.allowWrite path %q overlaps repo-memory ledger storage; keep ledger/shards read-only and write records through ledger MCP tools", allowed)
+		}
+	}
+	return nil
+}
+
+func pathContains(child, parent string) bool {
+	return child == parent || strings.HasPrefix(child, strings.TrimSuffix(parent, "/")+"/")
 }
 
 func repoMemoryLedgerLimitWarnings(config *RepoMemoryConfig) []string {

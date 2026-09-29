@@ -54,7 +54,7 @@ func TestRepoMemoryLedgerSchema(t *testing.T) {
 		{"schema object", map[string]any{"ledger": map[string]any{"schema": "schemas/events.json"}}, true},
 		{"max shards", map[string]any{"ledger": map[string]any{"max-shards": 256}}, true},
 		{"size limits", map[string]any{"ledger": map[string]any{"max-segment-kb": 1024, "max-record-kb": 16, "max-patch-kb": 512}}, true},
-		{"compactor", map[string]any{"ledger": map[string]any{"compactor": map[string]any{"script": "return;"}}}, true},
+		{"compaction", map[string]any{"ledger": map[string]any{"compaction": map[string]any{"min-segments": 8, "max-segments": 16}}}, true},
 		{"array entry", []any{map[string]any{"id": "events", "ledger": map[string]any{}}}, true},
 		{"invalid value", map[string]any{"ledger": true}, false},
 		{"invalid field", map[string]any{"ledger": map[string]any{"typo": true}}, false},
@@ -98,7 +98,10 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	data := &WorkflowData{
 		Tools: map[string]any{"repo-memory": map[string]any{}},
 		RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{{
-			ID: "events", Ledger: &RepoMemoryLedgerConfig{Schema: "schemas/events.json", MaxSegmentKB: 1024, MaxRecordKB: 16, MaxPatchKB: 512},
+			ID: "events", Ledger: &RepoMemoryLedgerConfig{
+				Schema: "schemas/events.json", MaxSegmentKB: 1024, MaxRecordKB: 16, MaxPatchKB: 512,
+				Compaction: &RepoMemoryLedgerCompactionConfig{MinSegments: 8, MaxSegments: 16},
+			},
 		}}},
 	}
 	assert.Contains(t, collectMCPTools(data), "ledger")
@@ -114,6 +117,8 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_SEGMENT_KB: 1024")
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_RECORD_KB: 16")
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_PATCH_KB: 512")
+	assert.Contains(t, pushStep, "LEDGER_COMPACTION_OPTIONS_B64:")
+	assert.NotContains(t, pushStep, "LEDGER_COMPACTOR_SCRIPT_B64")
 
 	var setup strings.Builder
 	require.NoError(t, NewCompiler().generateMCPSetup(&setup, data.Tools, NewClaudeEngine(), data))
@@ -176,11 +181,19 @@ func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 			assert.Equal(t, "memory/ledger-test", config.Memories[0].BranchName)
 		})
 	}
-	tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": map[string]any{"compactor": map[string]any{"script": "return;"}}}})
+	tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": map[string]any{"compaction": map[string]any{}}}})
 	require.NoError(t, err)
 	config, err := NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
 	require.NoError(t, err)
-	assert.Equal(t, "return;", config.Memories[0].Ledger.Compactor.Script)
+	assert.Equal(t, &RepoMemoryLedgerCompactionConfig{MinSegments: 32, MaxSegments: 32}, config.Memories[0].Ledger.Compaction)
+
+	tools, err = ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": map[string]any{
+		"compaction": map[string]any{"min-segments": 8, "max-segments": 64},
+	}}})
+	require.NoError(t, err)
+	config, err = NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
+	require.NoError(t, err)
+	assert.Equal(t, &RepoMemoryLedgerCompactionConfig{MinSegments: 8, MaxSegments: 64}, config.Memories[0].Ledger.Compaction)
 
 	tools, err = ParseToolsConfig(map[string]any{"repo-memory": []any{
 		map[string]any{"id": "events", "ledger": map[string]any{}},
@@ -189,6 +202,33 @@ func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 	config, err = NewCompiler().extractRepoMemoryConfig(tools, "ledger-test")
 	require.NoError(t, err)
 	assert.NotNil(t, config.Memories[0].Ledger)
+}
+
+func TestRepoMemoryLedgerRequiresAWFWriteIsolation(t *testing.T) {
+	memory := &RepoMemoryConfig{Memories: []RepoMemoryEntry{{ID: "events", Ledger: &RepoMemoryLedgerConfig{}}}}
+	require.ErrorContains(t, validateRepoMemoryLedgerIsolation(&WorkflowData{RepoMemoryConfig: memory}), "cloud-hypervisor")
+	for _, allowWrite := range []string{"/tmp/gh-aw/repo-memory", "/tmp/gh-aw/repo-memory/events", "/tmp/gh-aw/repo-memory/events/ledger/shards"} {
+		t.Run(allowWrite, func(t *testing.T) {
+			workflow := &WorkflowData{
+				RepoMemoryConfig: memory,
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+					ID: "awf", Runtime: AgentRuntimeCloudHypervisor,
+					Config: &SandboxRuntimeConfig{Filesystem: &SRTFilesystemConfig{AllowWrite: []string{allowWrite}}},
+				}},
+			}
+			require.ErrorContains(t, validateRepoMemoryLedgerIsolation(workflow), "overlaps repo-memory ledger storage")
+		})
+	}
+	workflow := &WorkflowData{
+		RepoMemoryConfig: memory,
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+			ID: "awf", Runtime: AgentRuntimeCloudHypervisor,
+			Config: &SandboxRuntimeConfig{Filesystem: &SRTFilesystemConfig{AllowWrite: []string{
+				"/workspace", "/tmp/gh-aw/agent", "/tmp/gh-aw/repo-memory/events/centralization-baseline.json",
+			}}},
+		}},
+	}
+	require.NoError(t, validateRepoMemoryLedgerIsolation(workflow))
 }
 
 func TestRepoMemoryLedgerPersistsNestedShards(t *testing.T) {
@@ -236,8 +276,11 @@ func TestRepoMemoryLedgerRejectsInvalidConfiguration(t *testing.T) {
 		{"too many patch kb", map[string]any{"max-patch-kb": 1025}},
 		{"record larger than segment", map[string]any{"max-segment-kb": 10}},
 		{"non-integer max shards", map[string]any{"max-shards": "256"}},
-		{"empty compactor", map[string]any{"compactor": map[string]any{"script": ""}}},
-		{"unknown compactor field", map[string]any{"compactor": map[string]any{"script": "return;", "extra": true}}},
+		{"compactor script disabled", map[string]any{"compactor": map[string]any{"script": "return;"}}},
+		{"unknown compaction field", map[string]any{"compaction": map[string]any{"unknown": 32}}},
+		{"compaction too few segments", map[string]any{"compaction": map[string]any{"min-segments": 1}}},
+		{"compaction exceeds shard limit", map[string]any{"compaction": map[string]any{"max-segments": 1025}}},
+		{"compaction max below min", map[string]any{"compaction": map[string]any{"min-segments": 20, "max-segments": 10}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": tc.value}})

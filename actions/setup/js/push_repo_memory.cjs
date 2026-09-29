@@ -19,6 +19,20 @@ const { Ledger } = require("./ledger_store.cjs");
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
 /**
+ * Exclude agent-supplied files that can mutate trusted ledger state.
+ *
+ * @param {string} relativePath
+ * @param {Set<string>} trustedSegments
+ * @returns {boolean}
+ */
+function isUntrustedLedgerArtifact(relativePath, trustedSegments) {
+  const normalizedPath = relativePath.replace(/\\/g, "/");
+  if (normalizedPath.startsWith("ledger/coverage/")) return true;
+  const match = /^ledger\/shards\/([0-9a-f-]{36})\.jsonl$/.exec(normalizedPath);
+  return Boolean(match && trustedSegments.has(match[1]));
+}
+
+/**
  * Configure a checkout-local merge policy that keeps both sides of conflicting
  * JSONL regions. The info attributes file is not committed to the memory branch.
  *
@@ -297,22 +311,24 @@ async function main() {
   const formatJSON = process.env.FORMAT_JSON === "true";
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
-  const compactorScriptBase64 = process.env.LEDGER_COMPACTOR_SCRIPT_B64 || "";
-  /** @type {{compaction: {before: number, after: number, retired: number, logs: number} | null, normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
+  const compactionOptionsBase64 = process.env.LEDGER_COMPACTION_OPTIONS_B64 || "";
+  /** @type {{compaction: {before: number, after: number, selected: number, records: number, replacement: string | null, retired: number, changed: boolean} | null, normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
   const ledgerActivity = {
     compaction: null,
     normalized: [],
     saving: { changedFiles: 0, patchBytes: 0, pushed: false },
   };
   const writeLedgerSummary = async () => {
-    if (!compactorScriptBase64 && !formatJSON && ledgerActivity.normalized.length === 0) return;
+    if (!compactionOptionsBase64 && !formatJSON && ledgerActivity.normalized.length === 0) return;
     const lines = ["<details>", "<summary>Repo-memory ledger activity</summary>", "", "### Compaction"];
     if (ledgerActivity.compaction) {
       lines.push(
         `- ${ledgerActivity.compaction.before} stable shard(s) before compaction`,
         `- ${ledgerActivity.compaction.after} shard(s) after compaction`,
+        `- ${ledgerActivity.compaction.selected} shard(s) selected; ${ledgerActivity.compaction.records} record(s) copied`,
+        `- Replacement: ${ledgerActivity.compaction.replacement || "none"}`,
         `- ${ledgerActivity.compaction.retired} source shard(s) retired`,
-        `- ${ledgerActivity.compaction.logs} diagnostic log message(s)`
+        `- ${ledgerActivity.compaction.changed ? "Compaction changed storage." : "Compaction was a no-op."}`
       );
     } else {
       lines.push("- Not configured or not run.");
@@ -650,6 +666,12 @@ async function main() {
         }
         const normalizedRelPath = relativeFilePath.replace(/\\/g, "/");
 
+        if (isUntrustedLedgerArtifact(normalizedRelPath, existingLedgerSegments)) {
+          core.info(`  [skip] ${normalizedRelPath} (untrusted ledger artifact)`);
+          filteredOutFiles.push({ path: normalizedRelPath, reason: "untrusted ledger artifact" });
+          continue;
+        }
+
         // Allowed extensions and file-glob are persistence filters: files that do not
         // pass are logged and ignored (never uploaded, validated, counted toward
         // max-file-count/size/patch-size, or pushed) rather than causing a hard failure.
@@ -698,7 +720,7 @@ async function main() {
     return;
   }
 
-  if (filesToCopy.length === 0) {
+  if (filesToCopy.length === 0 && !compactionOptionsBase64 && !formatJSON) {
     core.info("No eligible files to copy from artifact (all files were filtered out or none present)");
     return;
   }
@@ -743,9 +765,9 @@ async function main() {
     return;
   }
 
-  if (compactorScriptBase64) {
+  if (compactionOptionsBase64) {
     try {
-      const script = Buffer.from(compactorScriptBase64, "base64").toString("utf8");
+      const options = JSON.parse(Buffer.from(compactionOptionsBase64, "base64").toString("utf8"));
       const shardDir = path.join(destMemoryPath, "ledger", "shards");
       const excludedSegments = fs.existsSync(shardDir)
         ? fs
@@ -766,15 +788,17 @@ async function main() {
         maxRecordBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_RECORD_KB"),
         maxPatchBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_PATCH_KB"),
       });
-      const before = ledger.listSegments({ closed: true }).length;
-      const compaction = await ledger.runCompactor(script);
-      compaction.logs.forEach(message => core.info(`Ledger compactor: ${message}`));
-      core.info(`Ledger compactor completed${compaction.changed ? " with retired source segments" : " without source retirement"}.`);
+      const before = ledger.listSegments({ closed: true, excludeCurrent: true }).length;
+      const compaction = await ledger.compact(options);
+      core.info(`Ledger compaction ${compaction.changed ? "retired source segments" : "was a no-op"}: ` + `${compaction.selected} selected, ${compaction.records} records copied, ${compaction.retired} retired.`);
       ledgerActivity.compaction = {
         before,
-        after: ledger.listSegments({ closed: true }).length,
+        after: ledger.listSegments({ closed: true, excludeCurrent: true }).length,
+        selected: compaction.selected,
+        records: compaction.records,
+        replacement: compaction.replacement,
         retired: compaction.retired,
-        logs: compaction.logs.length,
+        changed: compaction.changed,
       };
     } catch (error) {
       core.warning(`Ledger compaction failed open; continuing without compaction: ${getErrorMessage(error)}`);
@@ -834,7 +858,7 @@ async function main() {
   // preventing glob expansion or pathspec-magic interpretation (e.g. :(top),
   // wildcards) even when a filename happens to contain those characters.
   const literalPathspecs = Array.from(new Set(filesToCopy.map(file => `:(literal)${file.relativePath}`))).sort();
-  if (compactorScriptBase64) literalPathspecs.push(":(glob)ledger/**/*.jsonl");
+  if (compactionOptionsBase64) literalPathspecs.push(":(glob)ledger/shards/*.jsonl");
 
   // Check if we have any changes to commit, scoped to managed memory files only.
   let changedFileCount = 0;
@@ -963,4 +987,4 @@ async function main() {
   await writeLedgerSummary();
 }
 
-module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };
+module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };

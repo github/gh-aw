@@ -124,7 +124,10 @@ Configure it alongside repo-memory:
 tools:
   repo-memory:
     branch-name: memory/audit-history
-    ledger: {}
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
 ```
 
 At the start of a run, use `ledger_query` or `ledger_get` to inspect relevant
@@ -138,9 +141,17 @@ converges after branch merges but does not provide transactions.
 The ledger is experimental and bounded to 1024 shard files by default (set
 `ledger.max-shards` to choose a lower limit), 32 KiB per record and 100 KiB per
 shard by default, and 500 records per query. A new writer shard is created by each workflow
-invocation. An optional trusted compactor can create verified replacement
-segments; runtime retirement is fail-open and excludes the current writer shard.
+invocation. `ledger.compaction` defaults to compacting 32 stable closed shards
+once that threshold is reached; the trusted runtime selects, validates,
+deduplicates, writes, verifies, and retires segments. Custom JavaScript
+compactor scripts are disabled because Node's in-process VM is not a security
+boundary. Ledger workflows require AWF Cloud Hypervisor, and the compiler keeps
+ledger paths out of agent write permissions; append through MCP only.
 The default per-run append limit is 10 KiB. Configure `max-segment-kb`,
 `max-record-kb`, and `max-patch-kb` when daily volume needs tighter bounds;
 compilation warns if those limits exceed the repo-memory file or patch limits.
-Avoid it for replaceable snapshots or expiring baselines.
+Compaction, normalization, and save details appear in the persistence step
+summary. Record SHA-256 values are unkeyed checksums rather than authentication;
+the ledger is eventually convergent but neither transactional nor exactly-once.
+Use application idempotency keys, deduplicate, and resolve concurrent conflicts
+deterministically. Avoid it for replaceable snapshots or expiring baselines.
