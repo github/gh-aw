@@ -976,6 +976,16 @@ func experimentArtifactDownloadName(data *WorkflowData) string {
 	return sanitizedID + "-" + constants.ExperimentArtifactName.String()
 }
 
+// usageExperimentArtifactName returns the experiment artifact name the conclusion job downloads
+// so experiment state and assignments can be staged into the usage artifact. It returns an
+// empty string when no experiments are declared.
+func usageExperimentArtifactName(data *WorkflowData) string {
+	if len(data.Experiments) == 0 {
+		return ""
+	}
+	return experimentArtifactDownloadName(data)
+}
+
 // buildExperimentArtifactDownloadSteps creates a download step for the experiment artifact.
 // The artifact is downloaded to experimentsCacheDir so the detection agent can read the
 // current variant assignments from state.jsonl/state.json.

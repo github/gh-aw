@@ -1282,6 +1282,9 @@ jobs:
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/experiment/state.jsonl
+            /tmp/gh-aw/usage/experiment/state.json
+            /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
       - name: Wait before retrying usage artifact upload
@@ -1310,6 +1313,9 @@ jobs:
             /tmp/gh-aw/usage/detection/execution.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/experiment/state.jsonl
+            /tmp/gh-aw/usage/experiment/state.json
+            /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true

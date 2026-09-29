@@ -1547,8 +1547,83 @@ func TestConclusionJobIncludesEvalsInUsageArtifact(t *testing.T) {
 	}
 }
 
+func TestConclusionJobIncludesExperimentsInUsageArtifact(t *testing.T) {
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{
+		Name:        "Test Workflow",
+		WorkflowID:  "my-workflow",
+		On:          "issues",
+		SafeOutputs: &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+		Experiments: map[string][]string{"style": {"concise", "detailed"}},
+	}
+
+	job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
+	if err != nil {
+		t.Fatalf("Failed to build conclusion job: %v", err)
+	}
+	if job == nil {
+		t.Fatal("Expected conclusion job to be created")
+	}
+
+	allSteps := strings.Join(job.Steps, "\n")
+	if !strings.Contains(allSteps, "id: download-experiment-artifact") {
+		t.Errorf("Expected conclusion job to download the experiment artifact.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "pattern: "+experimentArtifactDownloadName(workflowData)) {
+		t.Errorf("Expected experiment artifact download to use the experiment artifact name.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "path: /tmp/gh-aw/experiments/") {
+		t.Errorf("Expected experiment artifact to be downloaded into the experiments directory.\nGenerated steps:\n%s", allSteps)
+	}
+	downloadIdx := strings.Index(allSteps, "Download experiment artifact")
+	collectIdx := strings.Index(allSteps, "Collect usage artifact files")
+	if downloadIdx == -1 || collectIdx == -1 || downloadIdx > collectIdx {
+		t.Errorf("Expected experiment artifact download before usage collection.\nGenerated steps:\n%s", allSteps)
+	}
+	for _, path := range []string{
+		"/tmp/gh-aw/usage/experiment/state.jsonl",
+		"/tmp/gh-aw/usage/experiment/state.json",
+		"/tmp/gh-aw/usage/experiment/assignments.json",
+	} {
+		if !strings.Contains(allSteps, path) {
+			t.Errorf("Expected usage artifact upload to include %s.\nGenerated steps:\n%s", path, allSteps)
+		}
+	}
+
+	scriptBytes, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "sh", "collect_usage_artifact_files.sh"))
+	if err != nil {
+		t.Fatalf("Failed to read collect_usage_artifact_files.sh: %v", err)
+	}
+	script := string(scriptBytes)
+	if !strings.Contains(script, `cp "/tmp/gh-aw/experiments/$file" "/tmp/gh-aw/usage/experiment/$file"`) {
+		t.Errorf("Expected collect script to stage experiment files into the usage artifact.\nScript:\n%s", script)
+	}
+	if !strings.Contains(script, "cp /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
+		t.Errorf("Expected collect script to stage nested evals execution evidence.\nScript:\n%s", script)
+	}
+}
+
+func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
+	compiler := NewCompiler()
+	workflowData := &WorkflowData{
+		Name:        "Test Workflow",
+		On:          "issues",
+		SafeOutputs: &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+	}
+	job, err := compiler.buildConclusionJob(workflowData, string(constants.AgentJobName), []string{})
+	if err != nil {
+		t.Fatalf("Failed to build conclusion job: %v", err)
+	}
+	if job == nil {
+		t.Fatal("Expected conclusion job to be created")
+	}
+	if strings.Contains(strings.Join(job.Steps, "\n"), "download-experiment-artifact") {
+		t.Errorf("Expected no experiment artifact download when no experiments are declared")
+	}
+}
+
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", true, func(string) string {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
 	}), "")
 

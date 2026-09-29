@@ -185,10 +185,11 @@ func conclusionMayCreateIssue(data *WorkflowData) bool {
 
 // buildUsageArtifactInputDownloadSteps creates the artifact download steps that feed the
 // usage artifact: the safe-outputs items manifest (used by
-// generate_usage_activity_summary.cjs) and, when the workflow declares evals, the evals
-// artifact. Grader results need no dedicated download because the conclusion job already
-// downloads the unified agent artifact, which contains them.
-func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, pinAction func(string) string) []string {
+// generate_usage_activity_summary.cjs), the experiment artifact when the workflow declares
+// experiments (experimentArtifactName is non-empty), and the evals artifact when the
+// workflow declares evals. Grader results need no dedicated download because the
+// conclusion job already downloads the unified agent artifact, which contains them.
+func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experimentArtifactName string, pinAction func(string) string) []string {
 	safeOutputsItemsArtifactName := prefix + constants.SafeOutputItemsArtifactName.String()
 	safeOutputsDownloadAction := pinAction("actions/download-artifact")
 	steps := []string{
@@ -201,6 +202,19 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, pinActio
 	}
 	steps = append(steps, downloadArtifactInputLines(safeOutputsItemsArtifactName, safeOutputsDownloadAction)...)
 	steps = append(steps, "          path: /tmp/gh-aw/\n")
+	if experimentArtifactName != "" {
+		experimentDownloadAction := pinAction("actions/download-artifact")
+		steps = append(steps,
+			"      - name: Download experiment artifact\n",
+			"        id: download-experiment-artifact\n",
+			"        if: always()\n",
+			"        continue-on-error: true\n",
+			fmt.Sprintf("        uses: %s\n", experimentDownloadAction),
+			"        with:\n",
+		)
+		steps = append(steps, downloadArtifactInputLines(experimentArtifactName, experimentDownloadAction)...)
+		steps = append(steps, fmt.Sprintf("          path: %s/\n", experimentsCacheDir))
+	}
 	if !hasEvals {
 		return steps
 	}
@@ -220,12 +234,14 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, pinActio
 
 // buildUsageArtifactUploadSteps creates steps that collect and upload a compact usage artifact.
 // The artifact includes aw_info.json, aw-info.jsonl, agent_usage.json, agent_usage.jsonl, detection_usage.jsonl,
-// evals.jsonl, grader results, and agent/detection token usage JSONL files (when present).
+// evals.jsonl, evals token usage and execution evidence, A/B experiment state and assignments,
+// grader results, and agent/detection token usage JSONL files (when present), so the audit
+// command can mine experiments and evals data from the usage artifact alone.
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
-func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(string) string) []string {
+func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, pinAction func(string) string) []string {
 	usageArtifactName := prefix + "usage"
-	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, pinAction)
+	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
 	steps = append(steps,
 		"      - name: Collect usage artifact files\n",
 		"        if: always()\n",
@@ -252,6 +268,9 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, pinAction func(
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
+		"            /tmp/gh-aw/usage/experiment/state.jsonl\n",
+		"            /tmp/gh-aw/usage/experiment/state.json\n",
+		"            /tmp/gh-aw/usage/experiment/assignments.json\n",
 		"            /tmp/gh-aw/usage/activity/summary.json\n",
 		"          if-no-files-found: ignore\n",
 	}

@@ -29,19 +29,51 @@ type ExperimentData struct {
 	CumulativeCounts map[string]map[string]int `json:"cumulative_counts,omitempty"`
 }
 
-// findExperimentStatePath returns the first existing experiment state path inside the experiment
-// artifact directory. The file may be flattened to the run root or nested inside the
-// artifact subdirectory.
-func findExperimentStatePath(logsPath string) string {
+// experimentStateDirCandidates returns the directories that may contain experiment state
+// files: the run root (flattened artifact), the experiment artifact directory, and the
+// experiment/ subdirectory of the compact usage artifact staged by the conclusion job.
+// Prefixed artifact directories ("{prefix}-experiment" for regular workflows and
+// "{hash}-usage" for workflow_call runs) are also included.
+func experimentStateDirCandidates(logsPath string) []string {
+	experimentDir := constants.ExperimentArtifactName.String()
+	usageDir := constants.UsageArtifactName.String()
 	candidates := []string{
-		filepath.Join(logsPath, "state.jsonl"),
-		filepath.Join(logsPath, constants.ExperimentArtifactName.String(), "state.jsonl"),
-		filepath.Join(logsPath, "state.json"),
-		filepath.Join(logsPath, constants.ExperimentArtifactName.String(), "state.json"),
+		logsPath,
+		filepath.Join(logsPath, experimentDir),
+		filepath.Join(logsPath, usageDir, experimentDir),
 	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
+	entries, err := os.ReadDir(logsPath)
+	if err != nil {
+		return candidates
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, "-"+experimentDir) {
+			candidates = append(candidates, filepath.Join(logsPath, name))
+		}
+		if strings.HasSuffix(name, "-"+usageDir) {
+			candidates = append(candidates, filepath.Join(logsPath, name, experimentDir))
+		}
+	}
+	return candidates
+}
+
+// findExperimentStatePath returns the first existing experiment state path. The JSONL run
+// ledger is preferred over the legacy JSON state in every candidate directory.
+func findExperimentStatePath(logsPath string) string {
+	if logsPath == "" {
+		return ""
+	}
+	dirs := experimentStateDirCandidates(logsPath)
+	for _, filename := range []string{"state.jsonl", "state.json"} {
+		for _, dir := range dirs {
+			p := filepath.Join(dir, filename)
+			if info, err := os.Stat(p); err == nil && !info.IsDir() {
+				return p
+			}
 		}
 	}
 	return ""
