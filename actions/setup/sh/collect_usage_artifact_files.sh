@@ -3,8 +3,9 @@ set +o histexpand
 set -euo pipefail
 
 # Collect usage artifact files into /tmp/gh-aw/usage/ for upload.
-# Copies aw_info, agent/detection usage JSONL, evals, grader results, rate limits,
-# and token-usage logs from the firewall sandbox directories.
+# Copies aw_info, agent/detection usage JSONL, evals, A/B experiment state, grader
+# results, rate limits, and token-usage logs from the firewall sandbox directories,
+# so the audit command can mine experiments and evals from the usage artifact alone.
 #
 # Token-usage files are copied in ascending priority order so the last source
 # wins:
@@ -23,6 +24,12 @@ for file in \
   /tmp/gh-aw/detection_usage.jsonl \
   /tmp/gh-aw/threat-detection/detection_usage.jsonl \
   /tmp/gh-aw/evals/evals.jsonl \
+  /tmp/gh-aw/evals/evals_token_usage.jsonl \
+  /tmp/gh-aw/evals/execution.json \
+  /tmp/gh-aw/evals/evals/execution.json \
+  /tmp/gh-aw/experiments/state.jsonl \
+  /tmp/gh-aw/experiments/state.json \
+  /tmp/gh-aw/experiments/assignments.json \
   /tmp/gh-aw/agent/graders/grader_manifest.json \
   /tmp/gh-aw/agent/graders/grader_results.json \
   /tmp/gh-aw/github_rate_limits.jsonl \
@@ -47,12 +54,21 @@ elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
 fi
 if [ -f /tmp/gh-aw/agent_execution.json ]; then cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
-if [ -f /tmp/gh-aw/evals/execution.json ]; then mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true; fi
+# The evals artifact is rooted at /tmp/gh-aw/ in the evals job, so its execution evidence
+# lands under evals/evals/ when downloaded into /tmp/gh-aw/evals/.
+if [ -f /tmp/gh-aw/evals/evals/execution.json ]; then
+  mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true
+elif [ -f /tmp/gh-aw/evals/execution.json ]; then
+  mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true
+fi
 if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
 if [ -f /tmp/gh-aw/evals/evals_token_usage.jsonl ]; then
   mkdir -p /tmp/gh-aw/usage/evals
   cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl
 fi
+for file in state.jsonl state.json assignments.json; do
+  if [ -f "/tmp/gh-aw/experiments/$file" ]; then mkdir -p /tmp/gh-aw/usage/experiment && cp "/tmp/gh-aw/experiments/$file" "/tmp/gh-aw/usage/experiment/$file" || true; fi
+done
 if [ -f /tmp/gh-aw/agent/graders/grader_manifest.json ]; then mkdir -p /tmp/gh-aw/usage/graders && cp /tmp/gh-aw/agent/graders/grader_manifest.json /tmp/gh-aw/usage/graders/grader_manifest.json || true; fi
 if [ -f /tmp/gh-aw/agent/graders/grader_results.json ]; then mkdir -p /tmp/gh-aw/usage/graders && cp /tmp/gh-aw/agent/graders/grader_results.json /tmp/gh-aw/usage/graders/grader_results.json || true; fi
 if [ -f /tmp/gh-aw/github_rate_limits.jsonl ]; then cp /tmp/gh-aw/github_rate_limits.jsonl /tmp/gh-aw/usage/github_rate_limits.jsonl || true; fi

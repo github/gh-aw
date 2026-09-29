@@ -167,6 +167,11 @@ func TestResolveArtifactFilter(t *testing.T) {
 			expected: []string{"activation", "agent"},
 		},
 		{
+			name:     "experiment resolves to experiment and usage artifacts",
+			sets:     []string{"experiment"},
+			expected: []string{constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String()},
+		},
+		{
 			name:     "usage resolves to usage artifact",
 			sets:     []string{"usage"},
 			expected: []string{"usage"},

@@ -304,9 +304,9 @@ func extractFloat(raw any) (float64, bool) {
 }
 
 func extractContinualExperimentConfig(raw map[string]any) *ContinualExperimentConfig {
-	seed, _ := raw["seed"].(string)
+	seed, ok := raw["seed"].(string)
 	ramp := extractIntSlice(raw["ramp"])
-	if seed == "" || len(ramp) == 0 {
+	if !ok || seed == "" || len(ramp) == 0 {
 		return nil
 	}
 	return &ContinualExperimentConfig{Seed: seed, Ramp: ramp}
@@ -356,8 +356,14 @@ func extractGuardrailMetrics(raw any) []GuardrailMetric {
 		if !ok {
 			continue
 		}
-		name, _ := m["name"].(string)
-		direction, _ := m["direction"].(string)
+		name, ok := m["name"].(string)
+		if !ok {
+			continue
+		}
+		direction, ok := m["direction"].(string)
+		if !ok {
+			direction = ""
+		}
 		threshold := extractGuardrailThreshold(m["threshold"])
 		if name == "" || threshold == "" {
 			continue
@@ -431,8 +437,8 @@ func ParseExperimentMetricEvalReference(metric string) (string, bool) {
 		if rest == "" {
 			return "", true
 		}
-		parts := strings.SplitN(rest, ".", 2)
-		return parts[0], true
+		id, _, _ := strings.Cut(rest, ".")
+		return id, true
 	}
 	return "", false
 }
@@ -456,8 +462,8 @@ func ParseExperimentMetricGraderReference(metric string) (string, bool) {
 		if rest == "" {
 			return "", true
 		}
-		parts := strings.SplitN(rest, ".", 2)
-		return parts[0], true
+		id, _, _ := strings.Cut(rest, ".")
+		return id, true
 	}
 	return "", false
 }
@@ -835,28 +841,34 @@ func expressionBodySpans(s string) []byteSpan {
 // the format string in `format('experiments.model-{0}', inputs.suffix)`) is data, not an
 // expression reference, and must be preserved verbatim.
 func unquotedSpans(s string, span byteSpan) []byteSpan {
+	if span.start < 0 || span.end > len(s) || span.start > span.end {
+		return nil
+	}
 	var spans []byteSpan
 	segStart := span.start
 	i := span.start
 	for i < span.end {
-		if s[i] != '\'' {
-			i++
-			continue
+		quoteOffset := strings.IndexByte(s[i:span.end], '\'')
+		if quoteOffset < 0 {
+			break
 		}
-		if segStart < i {
-			spans = append(spans, byteSpan{start: segStart, end: i})
+		quote := i + quoteOffset
+		if segStart < quote {
+			spans = append(spans, byteSpan{start: segStart, end: quote})
 		}
-		i++ // opening quote
+		i = quote + 1
 		for i < span.end {
-			if s[i] != '\'' {
-				i++
+			quoteOffset = strings.IndexByte(s[i:span.end], '\'')
+			if quoteOffset < 0 {
+				i = span.end
+				break
+			}
+			quote = i + quoteOffset
+			if strings.HasPrefix(s[quote:span.end], "''") {
+				i = quote + 2
 				continue
 			}
-			if i+1 < span.end && s[i+1] == '\'' {
-				i += 2 // escaped quote inside the literal
-				continue
-			}
-			i++ // closing quote
+			i = quote + 1
 			break
 		}
 		segStart = i
@@ -865,6 +877,26 @@ func unquotedSpans(s string, span byteSpan) []byteSpan {
 		spans = append(spans, byteSpan{start: segStart, end: span.end})
 	}
 	return spans
+}
+
+func regexpSubmatchSpans(match []int) (byteSpan, byteSpan, bool) {
+	if len(match) >= 4 {
+		var fullMatch, capture byteSpan
+		for index, offset := range match {
+			switch index {
+			case 0:
+				fullMatch.start = offset
+			case 1:
+				fullMatch.end = offset
+			case 2:
+				capture.start = offset
+			case 3:
+				capture.end = offset
+				return fullMatch, capture, true
+			}
+		}
+	}
+	return byteSpan{}, byteSpan{}, false
 }
 
 // rewriteDeclaredExperimentNames replaces every match of re whose first captured group (the
@@ -892,18 +924,29 @@ func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, r
 	rewritten := false
 	for _, body := range expressionBodySpans(s) {
 		for _, seg := range unquotedSpans(s, body) {
-			for _, m := range re.FindAllStringSubmatchIndex(s[seg.start:seg.end], -1) {
-				// m[0]:m[1] is the full match span and m[2]:m[3] the captured name span,
-				// both relative to the segment; translate them to absolute offsets in s.
-				start, end := seg.start+m[0], seg.start+m[1]
-				name := s[seg.start+m[2] : seg.start+m[3]]
+			for _, match := range re.FindAllStringSubmatchIndex(s[seg.start:seg.end], -1) {
+				fullMatch, capture, ok := regexpSubmatchSpans(match)
+				if !ok {
+					continue
+				}
+				if fullMatch.start < 0 || fullMatch.end < fullMatch.start || fullMatch.end > seg.end-seg.start ||
+					capture.start < 0 || capture.end < capture.start || capture.end > seg.end-seg.start {
+					continue
+				}
+				start, end := seg.start+fullMatch.start, seg.start+fullMatch.end
+				nameStart, nameEnd := seg.start+capture.start, seg.start+capture.end
+				if start < 0 || end > len(s) || start > end ||
+					nameStart < 0 || nameEnd > len(s) || nameStart > nameEnd {
+					continue
+				}
+				name := s[nameStart:nameEnd]
 				if _, ok := experiments[name]; !ok {
 					continue
 				}
-				if start > 0 && s[start-1] == '.' {
+				if start > 0 && strings.HasSuffix(s[:start], ".") {
 					continue // property of another value, e.g. fromJSON(x).experiments.model
 				}
-				if end < len(s) && s[end] == '.' {
+				if end < len(s) && strings.HasPrefix(s[end:], ".") {
 					continue // property of the variant value, e.g. experiments.model.foo
 				}
 				b.WriteString(s[last:start])
@@ -974,6 +1017,16 @@ func experimentArtifactDownloadName(data *WorkflowData) string {
 		return constants.ExperimentArtifactName.String()
 	}
 	return sanitizedID + "-" + constants.ExperimentArtifactName.String()
+}
+
+// usageExperimentArtifactName returns the experiment artifact name the conclusion job downloads
+// so experiment state and assignments can be staged into the usage artifact. It returns an
+// empty string when no experiments are declared.
+func usageExperimentArtifactName(data *WorkflowData) string {
+	if len(data.Experiments) == 0 {
+		return ""
+	}
+	return experimentArtifactDownloadName(data)
 }
 
 // buildExperimentArtifactDownloadSteps creates a download step for the experiment artifact.
