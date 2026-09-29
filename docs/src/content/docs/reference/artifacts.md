@@ -48,9 +48,9 @@ The `gh aw logs` and `gh aw audit` commands support `--artifacts` to download on
 | `firewall` | `firewall-audit-logs` | Network policy and firewall audit data |
 | `mcp` | `firewall-audit-logs` | MCP gateway traffic logs |
 | `detection` | `detection` | Threat detection output |
-| `experiment` | `experiment` | A/B experiment state (only present when experiments are declared) |
+| `experiment` | `experiment`, `usage` | A/B experiment state (only present when experiments are declared) |
 | `usage` | `usage` | Compact conclusion-job artifact for lightweight reporting and forecasting |
-| `evals` | `evals` | BinEval evaluation results (only present when `evals` are declared) |
+| `evals` | `usage` | BinEval evaluation results (only present when `evals` are declared) |
 | `graders` | `usage`, `agent`, `agent-output-fallback` | Deterministic grader results (only present when `graders` are declared) |
 | `github-api` | `activation`, `agent` | GitHub API rate limit logs |
 
@@ -177,6 +177,8 @@ The `detection` artifact is conditional:
 The `experiment` artifact is uploaded by the activation job only when the workflow frontmatter declares one or more `experiments` entries. It contains:
 
 - `state.json` — Cumulative per-variant invocation counters used to balance A/B assignments across runs
+
+The conclusion job also copies the experiment state (`state.jsonl` or `state.json`) and the current run's `assignments.json` into the `experiment/` directory of the `usage` artifact, so `gh aw audit` can report experiment assignments from the `usage` artifact alone.
 
 ### Accessing experiment data
 
@@ -470,6 +472,11 @@ Each dimension carries an `uncertainty` entry with its `state`, the `method` use
 
 Friction cost is an efficiency signal, not an attribution of blame, a claim that the underlying action was unnecessary, or a prediction of task success. Statistical attribution assumes the cost of recovering from friction resembles the average invocation of the same run, which is an approximation, not a measurement.
 
+
+The `usage` artifact also carries experiment and evals data when the workflow declares them, so `gh aw audit --artifacts usage` can mine both without downloading other artifacts:
+
+- `experiment/state.jsonl`, `experiment/state.json`, `experiment/assignments.json` — A/B experiment state and the current run's variant assignments
+- `evals.jsonl`, `evals/token_usage.jsonl`, `evals/execution.json` — BinEval results, evals token usage, and evals execution evidence
 
 ### Accessing usage data
 
