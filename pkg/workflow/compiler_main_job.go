@@ -37,8 +37,9 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		compilerMainJobLog.Print("Adding runtime-paths step for safe-outputs")
 		steps = append(steps, c.generateSetRuntimePathsStep()...)
 	}
-
 	jobCondition := c.buildMainJobCondition(data, activationJobCreated)
+	depends, engineEnvContent := c.buildMainJobDependencies(data, activationJobCreated)
+	c.warnBuiltinJobEnvReferences(depends, engineEnvContent)
 
 	// Build agent step content (checkout app tokens minted here to avoid masked-value drops).
 	var stepBuilder strings.Builder
@@ -48,9 +49,6 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	if stepsContent := stepBuilder.String(); stepsContent != "" {
 		steps = append(steps, stepsContent)
 	}
-
-	depends, engineEnvContent := c.buildMainJobDependencies(data, activationJobCreated)
-	c.warnBuiltinJobEnvReferences(depends, engineEnvContent)
 
 	outputs := c.buildMainJobOutputs(data)
 	env := c.buildMainJobEnv(data)
