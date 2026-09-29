@@ -471,15 +471,21 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
   const baseModelName = modelName.split("?")[0];
   // Case-insensitive lookup.
   const normalizedModelName = baseModelName.toLowerCase();
-  for (const [key, value] of Object.entries(models)) {
-    if (key.toLowerCase() === normalizedModelName) {
-      const wireApi = value !== null && typeof value === "object" && "wire_api" in value ? value.wire_api : null;
-      if (wireApi && typeof wireApi === "string") {
-        logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
-        process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
-      }
-      return;
+  const lookupModelNames = [normalizedModelName];
+  if (normalizedModelName.endsWith("-utility")) {
+    lookupModelNames.push(normalizedModelName.slice(0, -"-utility".length));
+  }
+  for (const lookupModelName of lookupModelNames) {
+    const modelEntry = Object.entries(models).find(([key]) => key.toLowerCase() === lookupModelName);
+    if (!modelEntry) continue;
+
+    const [, value] = modelEntry;
+    const wireApi = value !== null && typeof value === "object" && "wire_api" in value ? value.wire_api : null;
+    if (wireApi && typeof wireApi === "string") {
+      logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
+      process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
     }
+    return;
   }
 }
 

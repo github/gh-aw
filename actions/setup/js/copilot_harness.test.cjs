@@ -3334,6 +3334,7 @@ process.exit(1);`,
             models: {
               "gpt-5-mini": { wire_api: "responses" },
               "gpt-5.5": { wire_api: "responses" },
+              "gpt-5.6-luna": { wire_api: "responses" },
               "gemini-2.5-pro": { wire_api: "completions" },
               "mai-code-1-flash-picker": { wire_api: "responses" },
               "claude-sonnet-4": {},
@@ -3345,6 +3346,12 @@ process.exit(1);`,
 
     it("sets COPILOT_PROVIDER_WIRE_API=responses for a responses model", () => {
       process.env.COPILOT_MODEL = "gpt-5-mini";
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
+    it("uses the catalog wire API for a Copilot utility model variant", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna-utility";
       applyCopilotWireAPI({ modelsJson: makeModelsJson(), logger: () => {} });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
