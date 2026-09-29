@@ -304,9 +304,9 @@ func transformExperimentsExpression(expr string) string {
 //
 // Example:
 //
-//	github.aw.context.item_number -> fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number
+//	github.aw.context.item_number -> fromJSON(needs.activation.outputs.aw_context || '{}').item_number
 func transformAwContextExpression(expr string) string {
-	return awContextExpressionRegex.ReplaceAllString(expr, "fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').$1$2")
+	return awContextExpressionRegex.ReplaceAllString(expr, "fromJSON(needs.activation.outputs.aw_context || '{}').$1$2")
 }
 
 // simpleIdentifierRegex matches simple JavaScript property access chains like

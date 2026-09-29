@@ -372,6 +372,17 @@ describe("generate_aw_info.cjs", () => {
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(awInfo.context).toBeUndefined();
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("must be a JSON object"));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
+  });
+
+  it("should ignore non-JSON aw_context in downstream expressions", async () => {
+    await main(mockCore, {
+      ...mockContext,
+      payload: { inputs: { aw_context: "SomeProject" } },
+    });
+
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to parse aw_context input as JSON"));
   });
 
   it("should reject aw_context with nested objects", async () => {
@@ -440,6 +451,7 @@ describe("generate_aw_info.cjs", () => {
     await main(mockCore, contextWithValid);
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(awInfo.context).toEqual(validContext);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(validContext));
     expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
   });
 

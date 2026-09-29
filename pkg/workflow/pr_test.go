@@ -149,8 +149,8 @@ func TestGeneratePRReadyForReviewCheckout_IncludesWorkflowDispatchIssueCommentCo
 	assert.Contains(t, rendered, "github.event.pull_request")
 	assert.Contains(t, rendered, "github.event.issue.pull_request")
 	assert.Contains(t, rendered, "github.event_name == 'workflow_dispatch'")
-	assert.Contains(t, rendered, "fromJSON(github.event.inputs.aw_context || '{}').item_type == 'pull_request'")
-	assert.NotContains(t, rendered, "fromJSON(github.event.inputs.aw_context || '{}').event_type")
+	assert.NotContains(t, rendered, "fromJSON(")
+	assert.Contains(t, rendered, "github.event.pull_request || github.event.issue.pull_request || github.event_name == 'workflow_dispatch'")
 }
 
 func TestFrontmatterHasTrigger(t *testing.T) {

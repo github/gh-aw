@@ -20,7 +20,7 @@ const NetworkAllowedInputName = "network_allowed"
 
 // awContextInputDescription is the description for the aw_context workflow_dispatch input.
 // It signals to users that this input is managed internally by the agentic workflow system.
-const awContextInputDescription = "Agent caller context (used internally by Agentic Workflows)."
+const awContextInputDescription = "Agent caller context (used internally by Agentic Workflows). Leave empty when running manually."
 
 const networkAllowedInputDescription = "Additional allowed network domains or ecosystem identifiers to union with network.allowed (comma-separated, for example: \"rust\" or \"python,github.com\")."
 
