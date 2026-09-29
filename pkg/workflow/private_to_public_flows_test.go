@@ -295,6 +295,61 @@ tools:
 	})
 }
 
+func TestPrivateToPublicFlowsParsedDataCompileUsesEffectiveStrictMode(t *testing.T) {
+	compileFunctions := []struct {
+		name    string
+		compile func(*Compiler, *WorkflowData, string) error
+	}{
+		{
+			name: "CompileWorkflowData",
+			compile: func(compiler *Compiler, workflowData *WorkflowData, markdownPath string) error {
+				return compiler.CompileWorkflowData(workflowData, markdownPath)
+			},
+		},
+		{
+			name: "CompileToYAML",
+			compile: func(compiler *Compiler, workflowData *WorkflowData, markdownPath string) error {
+				_, err := compiler.CompileToYAML(workflowData, markdownPath)
+				return err
+			},
+		},
+	}
+
+	for _, compileFunction := range compileFunctions {
+		t.Run(compileFunction.name, func(t *testing.T) {
+			markdown := `---
+name: parsed-private-to-public-flows
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: copilot
+network:
+  allowed:
+    - github.com
+strict: false
+tools:
+  github: {}
+---
+
+# Test workflow
+`
+			compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+			workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+			require.NoError(t, err)
+
+			workflowData.RawFrontmatter["strict"] = true
+			require.NotNil(t, workflowData.ParsedTools)
+			require.NotNil(t, workflowData.ParsedTools.GitHub)
+			workflowData.ParsedTools.GitHub.PrivateToPublicFlows = "allow"
+
+			err = compileFunction.compile(compiler, workflowData, "workflow.md")
+			require.ErrorContains(t, err, "tools.github.private-to-public-flows")
+			require.ErrorContains(t, err, "strict mode")
+		})
+	}
+}
+
 func TestValidatePrivateToPublicFlowsPolicy(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -315,6 +370,7 @@ func TestValidatePrivateToPublicFlowsPolicy(t *testing.T) {
 			compiler.strictMode = tt.strictMode
 			initialWarnings := compiler.GetWarningCount()
 			workflowData := &WorkflowData{
+				RawFrontmatter: map[string]any{"strict": false},
 				ParsedTools: &Tools{
 					GitHub: &GitHubToolConfig{PrivateToPublicFlows: tt.value},
 				},

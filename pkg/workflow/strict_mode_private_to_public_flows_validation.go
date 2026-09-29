@@ -22,7 +22,7 @@ func (c *Compiler) validatePrivateToPublicFlowsPolicy(workflowData *WorkflowData
 	}
 
 	const reason = "private-to-public flows can expose private data through public action logs or public destinations used by the agent"
-	if c.strictMode {
+	if c.effectiveStrictMode(workflowData.RawFrontmatter) {
 		return NewValidationError(
 			"tools.github.private-to-public-flows",
 			fmt.Sprintf("%v", value),
