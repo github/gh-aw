@@ -98,10 +98,10 @@
       "version": "v7.0.1",
       "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     },
-    "actions/upload-code-coverage@v1.4.2": {
+    "actions/upload-code-coverage@v1.4.3": {
       "repo": "actions/upload-code-coverage",
-      "version": "v1.4.2",
-      "sha": "d8e329117199404bba6fc81efe8093dc7c015e34"
+      "version": "v1.4.3",
+      "sha": "bfa741d815a28cb064a8e3a0837e577457a017d5"
     },
     "anchore/sbom-action@v0.24.2": {
       "repo": "anchore/sbom-action",
