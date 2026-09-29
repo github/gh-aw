@@ -391,18 +391,7 @@ func frictionCostDetails(cost FrictionCost, aicState string) string {
 	case FrictionStateMeasured, FrictionStateCausal, FrictionStateStatistical:
 		parts = append(parts, "aic="+formatAICValue(cost.AIC))
 	}
-	if cost.Tokens.Total > 0 {
-		parts = append(parts, fmt.Sprintf("tokens=%d", cost.Tokens.Total))
-	}
-	if cost.Turns > 0 {
-		parts = append(parts, fmt.Sprintf("turns=%d", cost.Turns))
-	}
-	if cost.ToolCalls > 0 {
-		parts = append(parts, fmt.Sprintf("tool-calls=%d", cost.ToolCalls))
-	}
-	if cost.LatencyMS > 0 {
-		parts = append(parts, fmt.Sprintf("latency=%dms", cost.LatencyMS))
-	}
+	parts = append(parts, frictionCostDimensionParts(cost)...)
 	return strings.Join(parts, " ")
 }
 
