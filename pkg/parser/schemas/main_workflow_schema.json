@@ -13725,6 +13725,27 @@
           "default": 1024,
           "description": "Maximum number of JSONL ledger shard files to inspect."
         },
+        "max-segment-bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760,
+          "default": 10485760,
+          "description": "Maximum size of one JSONL ledger segment."
+        },
+        "max-record-bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768,
+          "default": 32768,
+          "description": "Maximum size of one serialized ledger record."
+        },
+        "max-patch-bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760,
+          "default": 10485760,
+          "description": "Maximum bytes appended by one ledger writer."
+        },
         "compactor": {
           "type": "object",
           "properties": {

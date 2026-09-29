@@ -298,6 +298,32 @@ async function main() {
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
   const compactorScriptBase64 = process.env.LEDGER_COMPACTOR_SCRIPT_B64 || "";
+  const ledgerActivity = {
+    compaction: null,
+    normalized: [],
+    saving: { changedFiles: 0, patchBytes: 0, pushed: false },
+  };
+  const writeLedgerSummary = async () => {
+    if (!compactorScriptBase64 && !formatJSON && ledgerActivity.normalized.length === 0) return;
+    const lines = ["<details>", "<summary>Repo-memory ledger activity</summary>", "", "### Compaction"];
+    if (ledgerActivity.compaction) {
+      lines.push(
+        `- ${ledgerActivity.compaction.before} stable shard(s) before compaction`,
+        `- ${ledgerActivity.compaction.after} shard(s) after compaction`,
+        `- ${ledgerActivity.compaction.retired} source shard(s) retired`,
+        `- ${ledgerActivity.compaction.logs} diagnostic log message(s)`
+      );
+    } else {
+      lines.push("- Not configured or not run.");
+    }
+    lines.push("", "### Normalizing");
+    lines.push(ledgerActivity.normalized.length ? `- Formatted ${ledgerActivity.normalized.length} JSON file(s).` : "- No JSON normalization requested.");
+    lines.push("", "### Saving");
+    lines.push(`- ${ledgerActivity.saving.changedFiles} managed file(s) changed; ${ledgerActivity.saving.patchBytes} staged patch byte(s).`, `- ${ledgerActivity.saving.pushed ? "Changes pushed." : "No changes pushed."}`, "", "</details>");
+    if (core.summary && typeof core.summary.addRaw === "function" && typeof core.summary.write === "function") {
+      await core.summary.addRaw(lines.join("\n")).write();
+    }
+  };
   if (
     !Number.isFinite(maxFileSize) ||
     !Number.isSafeInteger(maxFileSize) ||
@@ -727,10 +753,28 @@ async function main() {
             .map(name => name.slice(0, -6))
             .filter(id => !existingLedgerSegments.has(id))
         : [];
-      const ledger = new Ledger({ memoryDir: destMemoryPath, excludeSegments: excludedSegments });
+      const parseLedgerLimit = name => {
+        const value = process.env[name];
+        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined;
+      };
+      const ledger = new Ledger({
+        memoryDir: destMemoryPath,
+        excludeSegments: excludedSegments,
+        maxFiles: parseLedgerLimit("GH_AW_LEDGER_MAX_SHARDS"),
+        maxSegmentBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_SEGMENT_BYTES"),
+        maxRecordBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_RECORD_BYTES"),
+        maxPatchBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_PATCH_BYTES"),
+      });
+      const before = ledger.listSegments({ closed: true }).length;
       const compaction = await ledger.runCompactor(script);
       compaction.logs.forEach(message => core.info(`Ledger compactor: ${message}`));
       core.info(`Ledger compactor completed${compaction.changed ? " with retired source segments" : " without source retirement"}.`);
+      ledgerActivity.compaction = {
+        before,
+        after: ledger.listSegments({ closed: true }).length,
+        retired: compaction.retired,
+        logs: compaction.logs.length,
+      };
     } catch (error) {
       core.warning(`Ledger compaction failed open; continuing without compaction: ${getErrorMessage(error)}`);
     }
@@ -742,6 +786,7 @@ async function main() {
 
     try {
       const formattedFiles = formatJSONFiles(destMemoryPath, maxFileSize);
+      ledgerActivity.normalized.push(...formattedFiles);
       for (const formattedFile of formattedFiles) {
         core.info(`Formatted JSON: ${formattedFile}`);
       }
@@ -810,6 +855,7 @@ async function main() {
 
   if (changedFileCount === 0) {
     core.info("No changes detected after copying files");
+    await writeLedgerSummary();
     return;
   }
 
@@ -849,6 +895,8 @@ async function main() {
   // even though only a small portion of the data actually changed.
   try {
     const patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: workspaceDir });
+    ledgerActivity.saving.changedFiles = changedFileCount;
+    ledgerActivity.saving.patchBytes = patchSizeBytes;
     const patchSizeKb = Math.ceil(patchSizeBytes / 1024);
     const maxPatchSizeKb = Math.floor(maxPatchSize / 1024);
     // Allow 20% overhead to account for git diff format (headers, context lines, etc.)
@@ -910,6 +958,8 @@ async function main() {
     ghToken,
     serverHost,
   });
+  ledgerActivity.saving.pushed = true;
+  await writeLedgerSummary();
 }
 
 module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };

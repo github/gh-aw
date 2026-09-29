@@ -32,6 +32,13 @@ import (
 var repoMemoryLedgerSchemaPathPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 var repoMemoryLedgerIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
+const (
+	maxRepoMemoryLedgerShards       = 1024
+	maxRepoMemoryLedgerSegmentBytes = 10 * 1024 * 1024
+	maxRepoMemoryLedgerRecordBytes  = 32 * 1024
+	maxRepoMemoryLedgerPatchBytes   = 10 * 1024 * 1024
+)
+
 func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 	if raw == nil {
 		return &RepoMemoryLedgerConfig{}, nil
@@ -56,14 +63,19 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 		}
 		if key == "max-shards" {
 			maxShards, ok := value.(int)
-			if !ok || maxShards < 1 || maxShards > 1024 {
-				return nil, fmt.Errorf("tools.repo-memory.ledger.max-shards must be between 1 and 1024, got %v", value)
+			if !ok || maxShards < 1 || maxShards > maxRepoMemoryLedgerShards {
+				return nil, fmt.Errorf("tools.repo-memory.ledger.max-shards must be between 1 and %d, got %v", maxRepoMemoryLedgerShards, value)
 			}
 			config.MaxShards = maxShards
 			continue
 		}
+		if handled, err := applyRepoMemoryLedgerLimit(config, key, value); err != nil {
+			return nil, err
+		} else if handled {
+			continue
+		}
 		if key != "schema" {
-			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, and compactor are supported)", key)
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, max-segment-bytes, max-record-bytes, max-patch-bytes, and compactor are supported)", key)
 		}
 		schema, ok := value.(string)
 		if !ok {
@@ -74,7 +86,31 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 		}
 		config.Schema = schema
 	}
+	if config.MaxSegmentBytes > 0 && config.MaxRecordBytes > config.MaxSegmentBytes {
+		return nil, errors.New("tools.repo-memory.ledger.max-record-bytes cannot exceed max-segment-bytes")
+	}
 	return config, nil
+}
+
+func applyRepoMemoryLedgerLimit(config *RepoMemoryLedgerConfig, key string, raw any) (bool, error) {
+	limits := map[string]struct {
+		target *int
+		max    int
+	}{
+		"max-segment-bytes": {&config.MaxSegmentBytes, maxRepoMemoryLedgerSegmentBytes},
+		"max-record-bytes":  {&config.MaxRecordBytes, maxRepoMemoryLedgerRecordBytes},
+		"max-patch-bytes":   {&config.MaxPatchBytes, maxRepoMemoryLedgerPatchBytes},
+	}
+	limit, ok := limits[key]
+	if !ok {
+		return false, nil
+	}
+	value, ok := raw.(int)
+	if !ok || value < 1 || value > limit.max {
+		return true, fmt.Errorf("tools.repo-memory.ledger.%s must be between 1 and %d, got %v", key, limit.max, raw)
+	}
+	*limit.target = value
+	return true, nil
 }
 
 func validateRepoMemoryLedgerSchemaPath(schema string) error {

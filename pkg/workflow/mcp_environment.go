@@ -165,6 +165,15 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		if memory.Ledger.MaxShards > 0 {
 			envVars["GH_AW_LEDGER_MAX_SHARDS"] = strconv.Itoa(memory.Ledger.MaxShards)
 		}
+		if memory.Ledger.MaxSegmentBytes > 0 {
+			envVars["GH_AW_LEDGER_MAX_SEGMENT_BYTES"] = strconv.Itoa(memory.Ledger.MaxSegmentBytes)
+		}
+		if memory.Ledger.MaxRecordBytes > 0 {
+			envVars["GH_AW_LEDGER_MAX_RECORD_BYTES"] = strconv.Itoa(memory.Ledger.MaxRecordBytes)
+		}
+		if memory.Ledger.MaxPatchBytes > 0 {
+			envVars["GH_AW_LEDGER_MAX_PATCH_BYTES"] = strconv.Itoa(memory.Ledger.MaxPatchBytes)
+		}
 	}
 
 	// Check for mcp-scripts env vars

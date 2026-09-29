@@ -33,14 +33,9 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 		yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"]\n")
-		yaml.WriteString("          env_vars = [\"GH_AW_MEMORY_DIR\", \"GITHUB_RUN_ID\", \"GITHUB_WORKSPACE\", \"RUNNER_TEMP\"")
-		if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
-			yaml.WriteString(", \"GH_AW_LEDGER_SCHEMA\"")
-		}
-		if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.MaxShards > 0 {
-			yaml.WriteString(", \"GH_AW_LEDGER_MAX_SHARDS\"")
-		}
-		yaml.WriteString("]\n")
+		names := []string{"GH_AW_MEMORY_DIR", "GITHUB_RUN_ID", "GITHUB_WORKSPACE", "RUNNER_TEMP"}
+		names = append(names, ledgerMCPConfiguredEnvNames(workflowData)...)
+		yaml.WriteString("          env_vars = [\"" + strings.Join(names, "\", \"") + "\"]\n")
 		return
 	}
 	yaml.WriteString("              \"ledger\": {\n")
@@ -53,11 +48,8 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 	yaml.WriteString("                \"entrypointArgs\": [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"],\n")
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"GH_AW_MEMORY_DIR\": \"\\${GH_AW_MEMORY_DIR}\",\n")
-	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
-		yaml.WriteString("                  \"GH_AW_LEDGER_SCHEMA\": \"\\${GH_AW_LEDGER_SCHEMA}\",\n")
-	}
-	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.MaxShards > 0 {
-		yaml.WriteString("                  \"GH_AW_LEDGER_MAX_SHARDS\": \"\\${GH_AW_LEDGER_MAX_SHARDS}\",\n")
+	for _, name := range ledgerMCPConfiguredEnvNames(workflowData) {
+		yaml.WriteString("                  \"" + name + "\": \"\\${" + name + "}\",\n")
 	}
 	yaml.WriteString("                  \"GITHUB_RUN_ID\": \"\\${GITHUB_RUN_ID}\"\n")
 	yaml.WriteString("                }\n")
@@ -66,6 +58,31 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 	} else {
 		yaml.WriteString("              },\n")
 	}
+
+}
+
+func ledgerMCPConfiguredEnvNames(workflowData *WorkflowData) []string {
+	memory := workflowData.RepoMemoryConfig.ledgerEntry()
+	if memory == nil {
+		return nil
+	}
+	names := []string{}
+	if memory.Ledger.Schema != "" {
+		names = append(names, "GH_AW_LEDGER_SCHEMA")
+	}
+	if memory.Ledger.MaxShards > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_SHARDS")
+	}
+	if memory.Ledger.MaxSegmentBytes > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_SEGMENT_BYTES")
+	}
+	if memory.Ledger.MaxRecordBytes > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_RECORD_BYTES")
+	}
+	if memory.Ledger.MaxPatchBytes > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_PATCH_BYTES")
+	}
+	return names
 }
 
 // renderSafeOutputsTOML generates Safe Outputs MCP configuration in TOML format

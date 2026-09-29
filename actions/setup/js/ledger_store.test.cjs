@@ -199,6 +199,15 @@ describe("Ledger", () => {
     expect(new Ledger({ memoryDir }).maxFiles).toBe(1024);
   });
 
+  it("applies configurable record, segment, and patch bounds", () => {
+    const bounded = new Ledger({ memoryDir, maxSegmentBytes: 4096, maxRecordBytes: 1024, maxPatchBytes: 2048 });
+    expect(bounded.maxSegmentBytes).toBe(4096);
+    expect(bounded.maxRecordBytes).toBe(1024);
+    expect(bounded.maxPatchBytes).toBe(2048);
+    expect(() => new Ledger({ memoryDir, maxSegmentBytes: 1024, maxRecordBytes: 2048 })).toThrow("Invalid maxRecordBytes");
+    expect(() => bounded.append("note", "x".repeat(1024))).toThrow("maximum message size");
+  });
+
   it("runs a constrained compactor and retires covered closed segments", async () => {
     const first = ledger.append("note", { value: 1 });
     const secondLedger = new Ledger({ memoryDir });
@@ -219,6 +228,28 @@ describe("Ledger", () => {
     expect(compactor.get(first.sha)).toEqual(first);
     expect(compactor.get(secondLedger.status().heads[0])).toMatchObject({ type: "note" });
     expect(compactor.listSegments()).toHaveLength(1);
+  });
+
+  it("does not retire forged, incomplete, or current-run coverage declarations", () => {
+    const first = ledger.append("note", { value: 1 });
+    const secondLedger = new Ledger({ memoryDir });
+    const second = secondLedger.append("note", { value: 2 });
+    const compactor = new Ledger({ memoryDir });
+    const sources = compactor.listSegments();
+    const sourceRecords = sources.flatMap(segment => compactor.readRecords(segment.id));
+    const incomplete = compactor.createSegment([sourceRecords[0]]);
+    compactor.markCovered(
+      sources.map(segment => segment.id),
+      incomplete.id
+    );
+    expect(compactor.retireCovered()).toBe(0);
+    expect(compactor.listSegments()).toHaveLength(3);
+
+    const current = compactor.append("note", { value: 3 });
+    const complete = compactor.createSegment([...sourceRecords, ...compactor.readRecords(compactor.writerId)]);
+    compactor.markCovered([compactor.writerId], complete.id);
+    expect(compactor.retireCovered()).toBe(0);
+    expect(fs.existsSync(path.join(compactor.shardDir, `${compactor.writerId}.jsonl`))).toBe(true);
   });
 
   it("fails compaction open without exposing filesystem APIs", async () => {

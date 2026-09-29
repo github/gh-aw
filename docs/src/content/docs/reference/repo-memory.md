@@ -71,6 +71,9 @@ tools:
     ledger:
       schema: .github/schemas/ledger.schema.json
       max-shards: 256          # default 1024
+      max-segment-bytes: 10485760 # default 10 MiB
+      max-record-bytes: 32768     # default 32 KiB
+      max-patch-bytes: 10485760   # default 10 MiB per run
       compactor:
         script: |
           const segments = await ledger.listSegments({ closed: true })
@@ -78,6 +81,8 @@ tools:
 ```
 
 The ledger is an eventually convergent append-only store, not a distributed transactional database. Applications must define their own deterministic conflict resolution for concurrent records.
+
+The optional compactor runs once in the trusted persistence job, outside the agent. Its API can list and read closed segments, create verified immutable replacement segments, declare coverage, and write diagnostics. It has no Git, network, filesystem, shell, randomness, or GitHub API access. Compaction is fail-open; the runtime verifies coverage before retiring stable source segments and excludes the current run's writer shard. Ledger activity is reported in the persistence step summary.
 
 **File Glob Matching Rules**:
 

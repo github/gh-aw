@@ -53,6 +53,7 @@ func TestRepoMemoryLedgerSchema(t *testing.T) {
 		{"null value", map[string]any{"ledger": nil}, true},
 		{"schema object", map[string]any{"ledger": map[string]any{"schema": "schemas/events.json"}}, true},
 		{"max shards", map[string]any{"ledger": map[string]any{"max-shards": 256}}, true},
+		{"size limits", map[string]any{"ledger": map[string]any{"max-segment-bytes": 1048576, "max-record-bytes": 16384, "max-patch-bytes": 2097152}}, true},
 		{"compactor", map[string]any{"ledger": map[string]any{"compactor": map[string]any{"script": "return;"}}}, true},
 		{"array entry", []any{map[string]any{"id": "events", "ledger": map[string]any{}}}, true},
 		{"invalid value", map[string]any{"ledger": true}, false},
@@ -97,13 +98,16 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	data := &WorkflowData{
 		Tools: map[string]any{"repo-memory": map[string]any{}},
 		RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{{
-			ID: "events", Ledger: &RepoMemoryLedgerConfig{Schema: "schemas/events.json"},
+			ID: "events", Ledger: &RepoMemoryLedgerConfig{Schema: "schemas/events.json", MaxSegmentBytes: 1048576, MaxRecordBytes: 16384, MaxPatchBytes: 2097152},
 		}}},
 	}
 	assert.Contains(t, collectMCPTools(data), "ledger")
 	env := collectMCPEnvironmentVariables(data.Tools, collectMCPTools(data), data, false)
 	assert.Equal(t, "/tmp/gh-aw/repo-memory/events", env["GH_AW_MEMORY_DIR"])
 	assert.Equal(t, "schemas/events.json", env["GH_AW_LEDGER_SCHEMA"])
+	assert.Equal(t, "1048576", env["GH_AW_LEDGER_MAX_SEGMENT_BYTES"])
+	assert.Equal(t, "16384", env["GH_AW_LEDGER_MAX_RECORD_BYTES"])
+	assert.Equal(t, "2097152", env["GH_AW_LEDGER_MAX_PATCH_BYTES"])
 	assert.NotContains(t, env, "GH_AW_LEDGER_SCHEMA_ROOT")
 
 	var setup strings.Builder
@@ -138,15 +142,19 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 
 func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		ledger    any
-		schema    string
-		maxShards int
+		name            string
+		ledger          any
+		schema          string
+		maxShards       int
+		maxSegmentBytes int
+		maxRecordBytes  int
+		maxPatchBytes   int
 	}{
-		{"null enabled defaults", nil, "", 0},
-		{"defaults", map[string]any{}, "", 0},
-		{"schema", map[string]any{"schema": "schemas/events.schema.json"}, "schemas/events.schema.json", 0},
-		{"max shards", map[string]any{"max-shards": 256}, "", 256},
+		{"null enabled defaults", nil, "", 0, 0, 0, 0},
+		{"defaults", map[string]any{}, "", 0, 0, 0, 0},
+		{"schema", map[string]any{"schema": "schemas/events.schema.json"}, "schemas/events.schema.json", 0, 0, 0, 0},
+		{"max shards", map[string]any{"max-shards": 256}, "", 256, 0, 0, 0},
+		{"size limits", map[string]any{"max-segment-bytes": 1048576, "max-record-bytes": 16384, "max-patch-bytes": 2097152}, "", 0, 1048576, 16384, 2097152},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": tc.ledger}})
@@ -157,6 +165,9 @@ func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 			require.NotNil(t, config.Memories[0].Ledger)
 			assert.Equal(t, tc.schema, config.Memories[0].Ledger.Schema)
 			assert.Equal(t, tc.maxShards, config.Memories[0].Ledger.MaxShards)
+			assert.Equal(t, tc.maxSegmentBytes, config.Memories[0].Ledger.MaxSegmentBytes)
+			assert.Equal(t, tc.maxRecordBytes, config.Memories[0].Ledger.MaxRecordBytes)
+			assert.Equal(t, tc.maxPatchBytes, config.Memories[0].Ledger.MaxPatchBytes)
 			assert.Equal(t, "memory/ledger-test", config.Memories[0].BranchName)
 		})
 	}
@@ -214,6 +225,10 @@ func TestRepoMemoryLedgerRejectsInvalidConfiguration(t *testing.T) {
 		{"newline", map[string]any{"schema": "events\n.json"}},
 		{"zero max shards", map[string]any{"max-shards": 0}},
 		{"too many max shards", map[string]any{"max-shards": 1025}},
+		{"too many segment bytes", map[string]any{"max-segment-bytes": 10485761}},
+		{"too many record bytes", map[string]any{"max-record-bytes": 32769}},
+		{"too many patch bytes", map[string]any{"max-patch-bytes": 10485761}},
+		{"record larger than segment", map[string]any{"max-segment-bytes": 1024, "max-record-bytes": 2048}},
 		{"non-integer max shards", map[string]any{"max-shards": "256"}},
 		{"empty compactor", map[string]any{"compactor": map[string]any{"script": ""}}},
 		{"unknown compactor field", map[string]any{"compactor": map[string]any{"script": "return;", "extra": true}}},

@@ -59,6 +59,9 @@ function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPa
     memoryDir,
     schemaPath: resolveSchemaPath(schemaPath, schemaRoot),
     maxFiles: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_SHARDS),
+    maxSegmentBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_SEGMENT_BYTES),
+    maxRecordBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_RECORD_BYTES),
+    maxPatchBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_PATCH_BYTES),
   });
   const server = createServer({ name: "ledger", version: "1.0.0" });
 
