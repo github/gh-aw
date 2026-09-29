@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"gopkg.in/yaml.v3"
 )
 
 var sandboxFieldsCodemodLog = logger.New("cli:codemod_sandbox_fields")
@@ -62,7 +64,15 @@ func getSandboxFieldsCodemod() Codemod {
 				return content, false, nil
 			}
 
-			updated, applied, err := applyFrontmatterLineTransform(content, normalizeSandboxFieldLines)
+			var transformErr error
+			updated, applied, err := applyFrontmatterLineTransform(content, func(lines []string) ([]string, bool) {
+				result, modified, parseErr := normalizeSandboxFieldLines(lines)
+				transformErr = parseErr
+				return result, modified
+			})
+			if transformErr != nil {
+				return content, false, transformErr
+			}
 			if applied {
 				sandboxFieldsCodemodLog.Print("Normalized camel-cased sandbox frontmatter fields")
 			}
@@ -88,68 +98,77 @@ func hasCamelizedSandboxField(frontmatter map[string]any) bool {
 	return visit(frontmatter, nil)
 }
 
-type sandboxYAMLPathEntry struct {
-	indent int
-	key    string
+type sandboxKeyEdit struct {
+	column int
+	oldKey string
+	newKey string
 }
 
-func normalizeSandboxFieldLines(lines []string) ([]string, bool) {
-	result := make([]string, 0, len(lines))
-	stack := make([]sandboxYAMLPathEntry, 0)
-	modified := false
+func normalizeSandboxFieldLines(lines []string) ([]string, bool, error) {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(strings.Join(lines, "\n")), &document); err != nil {
+		return lines, false, err
+	}
+	edits := make(map[int][]sandboxKeyEdit)
+	for _, root := range document.Content {
+		if err := collectSandboxKeyEdits(root, nil, lines, edits); err != nil {
+			return lines, false, err
+		}
+	}
 
-	for _, line := range lines {
-		key, ok := frontmatterMappingKey(line)
+	result := append([]string(nil), lines...)
+	for lineIndex, line := range result {
+		lineEdits, ok := edits[lineIndex]
 		if !ok {
-			result = append(result, line)
 			continue
 		}
-
-		indent := len(getIndentation(line))
-		for {
-			last, ok := lastSandboxYAMLPathEntry(stack)
-			if !ok || last.indent < indent {
-				break
+		slices.SortFunc(lineEdits, func(a, b sandboxKeyEdit) int { return b.column - a.column })
+		for _, edit := range lineEdits {
+			runes := []rune(line)
+			if edit.column > len(runes) {
+				return lines, false, fmt.Errorf("cannot locate sandbox field %q on line %d", edit.oldKey, lineIndex+1)
 			}
-			stack = stack[:len(stack)-1]
+			offset := len(string(runes[:edit.column]))
+			if strings.HasPrefix(line[offset:], "'") || strings.HasPrefix(line[offset:], `"`) {
+				offset++
+			}
+			if !strings.HasPrefix(line[offset:], edit.oldKey) {
+				return lines, false, fmt.Errorf("cannot locate sandbox field %q on line %d", edit.oldKey, lineIndex+1)
+			}
+			line = line[:offset] + edit.newKey + line[offset+len(edit.oldKey):]
 		}
-
-		parent := make([]string, 0, len(stack))
-		for _, entry := range stack {
-			parent = append(parent, entry.key)
-		}
-		if replacement := sandboxFieldReplacement(parent, key); replacement != "" {
-			line, _ = findAndReplaceInLine(line, key, replacement)
-			key = replacement
-			modified = true
-		}
-		result = append(result, line)
-		stack = append(stack, sandboxYAMLPathEntry{indent: indent, key: key})
+		result[lineIndex] = line
 	}
-
-	return result, modified
+	return result, len(edits) > 0, nil
 }
 
-func lastSandboxYAMLPathEntry(stack []sandboxYAMLPathEntry) (sandboxYAMLPathEntry, bool) {
-	var last sandboxYAMLPathEntry
-	found := false
-	for _, entry := range stack {
-		last = entry
-		found = true
+func collectSandboxKeyEdits(node *yaml.Node, path []string, lines []string, edits map[int][]sandboxKeyEdit) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
 	}
-	return last, found
-}
-
-func frontmatterMappingKey(line string) (string, bool) {
-	trimmed := strings.TrimSpace(line)
-	if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "-") {
-		return "", false
+	var key *yaml.Node
+	for i, value := range node.Content {
+		if i%2 == 0 {
+			key = value
+			continue
+		}
+		replacement := sandboxFieldReplacement(path, key.Value)
+		if replacement != "" {
+			for j, sibling := range node.Content {
+				if j%2 == 0 && sibling.Value == replacement {
+					return fmt.Errorf("cannot migrate sandbox field %s: %q and %q are both present; remove one before running gh aw fix", strings.Join(append(path, key.Value), "."), key.Value, replacement)
+				}
+			}
+			if key.Line < 1 || key.Line > len(lines) || key.Column < 1 {
+				return fmt.Errorf("cannot locate sandbox field %q in frontmatter", key.Value)
+			}
+			edits[key.Line-1] = append(edits[key.Line-1], sandboxKeyEdit{column: key.Column - 1, oldKey: key.Value, newKey: replacement})
+		}
+		if err := collectSandboxKeyEdits(value, append(path, key.Value), lines, edits); err != nil {
+			return err
+		}
 	}
-	key, _, ok := strings.Cut(trimmed, ":")
-	if !ok || key == "" || strings.ContainsAny(key, " \t{}[]") {
-		return "", false
-	}
-	return key, true
+	return nil
 }
 
 func sandboxFieldReplacement(parent []string, key string) string {

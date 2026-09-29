@@ -239,7 +239,7 @@ sandbox:
 > [!NOTE]
 > The digest values in this example are placeholders. Replace them with the exact digests from your approved registry images.
 
-When this manifest is set, AWF uses these references as authoritative runtime role images. Keep values literal and digest-pinned; expressions are rejected at compile time. For role requirements and constraints (for example `cliProxy` with `tools.github.mode: gh-proxy`, or `buildTools` with `runner.topology: arc-dind`), see [Sandbox custom infrastructure images](/gh-aw/reference/sandbox/#custom-infrastructure-images-sandboxagentimages).
+When this manifest is set, AWF uses these references as authoritative runtime role images. Keep values literal and digest-pinned; expressions are rejected at compile time. For role requirements and constraints (for example `cli-proxy` with `tools.github.mode: gh-proxy`, or `build-tools` with `runner.topology: arc-dind`), see [Sandbox custom infrastructure images](/gh-aw/reference/sandbox/#custom-infrastructure-images-sandboxagentimages).
 
 ### Combined example
 

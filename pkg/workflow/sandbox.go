@@ -119,7 +119,7 @@ type AgentAPIProxyTargetConfig struct {
 	//     agent:
 	//       targets:
 	//         copilot:
-	//           extraHeaders:
+	//           extra-headers:
 	//             x-openrouter-title: my-workflow
 	//             http-referer: https://github.com/org/repo
 	ExtraHeaders map[string]string `yaml:"extra-headers,omitempty"`

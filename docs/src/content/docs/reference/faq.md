@@ -200,7 +200,7 @@ See [Using MCPs](/gh-aw/guides/mcps/).
 Use the existing image override paths instead of raw `sandbox.agent.args`:
 
 - For repository-wide container substitutions (tooling images, MCP images, and default AWF tags), configure `.github/workflows/aw.json` `container_pins`.
-- For AWF infrastructure roles specifically (for example `squid`, `agent`, `apiProxy`, `cliProxy`, `buildTools`), configure `sandbox.agent.images` with digest-pinned references.
+- For AWF infrastructure roles specifically (for example `squid`, `agent`, `api-proxy`, `cli-proxy`, `build-tools`), configure `sandbox.agent.images` with digest-pinned references.
 
 ```json title=".github/workflows/aw.json"
 {

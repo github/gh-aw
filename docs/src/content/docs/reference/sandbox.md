@@ -245,13 +245,13 @@ sandbox:
 
 The compiler emits the manifest as `container.images` in the generated AWF configuration.
 
-Supported image roles: `squid`, `agent`, `apiProxy`, `cliProxy`, `buildTools`, `dohProxy`, `enclaveScript`, `enclaveAgent`, `enclaveMcpServer`, and `dindStaging`.
+Supported image roles: `squid`, `agent`, `api-proxy`, `cli-proxy`, `build-tools`, `doh-proxy`, `enclave-script`, `enclave-agent`, `enclave-mcp-server`, and `dind-staging`.
 
 Rules enforced at compile time:
 
 - Every value must be a literal, registry-qualified reference with both a tag and an immutable digest: `registry/repository:tag@sha256:<64 lowercase hex characters>`. Expressions (`${{ ... }}`), environment interpolation, and any other dynamic value are rejected, so no runtime input can influence an infrastructure image.
 - Unknown roles are rejected.
-- The manifest must cover every role required by the enabled features: `squid`, `agent`, and `apiProxy` are always required; `cliProxy` is required with [`tools.github.mode: gh-proxy`](/gh-aw/reference/tools/), the `integrity-reactions` feature, or raw `--difc-proxy-host` AWF arguments; `buildTools` is required with [`runner.topology: arc-dind`](/gh-aw/reference/self-hosted-runners/); `dohProxy` is required when legacy-security raw AWF arguments enable `--dns-over-https`; `dindStaging` is required when raw AWF arguments enable `--dind-pre-stage-dirs`, `--dind-stage-engine-binary-path`, or `--dind-stage-engine-binary-target-path`; `enclaveScript` and `enclaveAgent` are required for their corresponding [enclave](/gh-aw/experimental/enclaves/) executors, and `enclaveMcpServer` is required whenever any enclave is enabled. AWF fails closed rather than falling back to a default, so an incomplete manifest is a compile error.
+- The manifest must cover every role required by the enabled features: `squid`, `agent`, and `api-proxy` are always required; `cli-proxy` is required with [`tools.github.mode: gh-proxy`](/gh-aw/reference/tools/), the `integrity-reactions` feature, or raw `--difc-proxy-host` AWF arguments; `build-tools` is required with [`runner.topology: arc-dind`](/gh-aw/reference/self-hosted-runners/); `doh-proxy` is required when legacy-security raw AWF arguments enable `--dns-over-https`; `dind-staging` is required when raw AWF arguments enable `--dind-pre-stage-dirs`, `--dind-stage-engine-binary-path`, or `--dind-stage-engine-binary-target-path`; `enclave-script` and `enclave-agent` are required for their corresponding [enclave](/gh-aw/experimental/enclaves/) executors, and `enclave-mcp-server` is required whenever any enclave is enabled. AWF fails closed rather than falling back to a default, so an incomplete manifest is a compile error.
 - The manifest cannot be combined with controls that select a different effective image: SSL bump, per-enclave `image` overrides, and AWF arguments such as `--image-tag`, `--image-registry`, `--agent-image`, `--build-local`, `--sysroot-image`, and `--dind-staging-image`. The compiler-owned `container.imageTag` is suppressed when the manifest is set.
 
 Omit the field to keep AWF's default role references and gh-aw's existing digest-pin resolution.

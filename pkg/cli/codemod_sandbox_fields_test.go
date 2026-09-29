@@ -159,8 +159,69 @@ sandbox:
 	}
 
 	result, applied, err := codemod.Apply(content, frontmatter)
-
 	require.NoError(t, err)
 	assert.False(t, applied)
 	assert.Equal(t, content, result)
+}
+
+func TestSandboxFieldsCodemodInlineMappings(t *testing.T) {
+	t.Parallel()
+	content := `---
+sandbox: {agent: {config: {filesystem: {allowWrite: [/workspace], "denyRead": [/secret]}, network: {allowedDomains: [example.com]}}, targets: {copilot: {extraHeaders: {x-customHeader: value}}}}}
+---
+
+Keep allowWrite here.
+`
+	frontmatter := map[string]any{
+		"sandbox": map[string]any{"agent": map[string]any{
+			"config": map[string]any{
+				"filesystem": map[string]any{"allowWrite": []any{"/workspace"}, "denyRead": []any{"/secret"}},
+				"network":    map[string]any{"allowedDomains": []any{"example.com"}},
+			},
+			"targets": map[string]any{"copilot": map[string]any{"extraHeaders": map[string]any{"x-customHeader": "value"}}},
+		}},
+	}
+	result, applied, err := getSandboxFieldsCodemod().Apply(content, frontmatter)
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Contains(t, result, `{allow-write: [/workspace], "deny-read": [/secret]}`)
+	assert.Contains(t, result, `network: {allowed-domains: [example.com]}`)
+	assert.Contains(t, result, `copilot: {extra-headers: {x-customHeader: value}}`)
+	assert.Contains(t, result, "Keep allowWrite here.")
+
+	canonical := map[string]any{
+		"sandbox": map[string]any{"agent": map[string]any{
+			"config": map[string]any{
+				"filesystem": map[string]any{"allow-write": []any{"/workspace"}, "deny-read": []any{"/secret"}},
+				"network":    map[string]any{"allowed-domains": []any{"example.com"}},
+			},
+			"targets": map[string]any{"copilot": map[string]any{"extra-headers": map[string]any{"x-customHeader": "value"}}},
+		}},
+	}
+	again, changed, err := getSandboxFieldsCodemod().Apply(result, canonical)
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, result, again)
+}
+
+func TestSandboxFieldsCodemodConflictingKeys(t *testing.T) {
+	t.Parallel()
+	for _, mapping := range []string{
+		"filesystem:\n        allowWrite: [/workspace]\n        allow-write: [/other]",
+		"filesystem:\n        allow-write: [/other]\n        allowWrite: [/workspace]",
+		"filesystem: {allowWrite: [/workspace], allow-write: [/other]}",
+	} {
+		t.Run(mapping, func(t *testing.T) {
+			content := "---\nsandbox:\n  agent:\n    config:\n      " + mapping + "\n---\n"
+			frontmatter := map[string]any{"sandbox": map[string]any{"agent": map[string]any{
+				"config": map[string]any{"filesystem": map[string]any{
+					"allowWrite": []any{"/workspace"}, "allow-write": []any{"/other"},
+				}},
+			}}}
+			result, applied, err := getSandboxFieldsCodemod().Apply(content, frontmatter)
+			require.ErrorContains(t, err, "remove one before running gh aw fix")
+			assert.False(t, applied)
+			assert.Equal(t, content, result)
+		})
+	}
 }
