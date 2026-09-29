@@ -363,6 +363,36 @@ Greet the user warmly.
 	assert.Contains(t, err.Error(), "self-hosted runner enforcement")
 }
 
+func TestCompileToYAML_AllowsMissingRepoConfig(t *testing.T) {
+	t.Setenv(compilerenv.RequireSelfHostedRunners, "")
+	gitRoot := t.TempDir()
+
+	markdown := `---
+name: compile-runner-missing-repo-config-test
+on:
+  workflow_dispatch:
+engine: copilot
+runs-on: self-hosted
+---
+
+# Mission
+
+Greet the user warmly.
+`
+
+	compiler := NewCompiler(
+		WithNoEmit(true),
+		WithSkipValidation(true),
+	)
+	compiler.gitRoot = gitRoot
+	workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+	require.NoError(t, err)
+
+	compiledYAML, err := compiler.CompileToYAML(workflowData, "workflow.md")
+	require.NoError(t, err)
+	assert.Contains(t, compiledYAML, "compile-runner-missing-repo-config-test")
+}
+
 func TestCompileToYAML_RequiresValidRepoConfig(t *testing.T) {
 	t.Setenv(compilerenv.RequireSelfHostedRunners, "")
 	gitRoot := t.TempDir()
