@@ -436,7 +436,6 @@ MCPCLIFeatureFlag            FeatureFlag = "mcp-cli"
 DisableXPIAPromptFeatureFlag FeatureFlag = "disable-xpia-prompt"
 CopilotRequestsFeatureFlag   FeatureFlag = "copilot-requests"
 DIFCProxyFeatureFlag         FeatureFlag = "difc-proxy"  // Deprecated: use tools.github.integrity-proxy
-CliProxyFeatureFlag          FeatureFlag = "cli-proxy"
 ByokCopilotFeatureFlag       FeatureFlag = "byok-copilot"
 AwfDiagnosticLogsFeatureFlag FeatureFlag = "awf-diagnostic-logs"
 IntegrityReactionsFeatureFlag FeatureFlag = "integrity-reactions"

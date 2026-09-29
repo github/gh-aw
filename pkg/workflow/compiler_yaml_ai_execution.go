@@ -589,7 +589,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 		}
 	}
 
-	// Start CLI proxy on the host before AWF execution. When features.cli-proxy is enabled,
+	// Start CLI proxy on the host before AWF execution. When tools.github.mode is gh-proxy,
 	// the compiler starts a difc-proxy container on the host that AWF's cli-proxy sidecar
 	// connects to via host.docker.internal:18443.
 	c.generateStartCliProxyStep(yaml, data)

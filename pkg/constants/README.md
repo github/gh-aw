@@ -57,7 +57,6 @@ The package also acts as the authoritative source for the generated workflow con
 | `MCPGatewayFeatureFlag` | `FeatureFlag` | `"mcp-gateway"` | Enables MCP gateway workflow support. |
 | `DisableXPIAPromptFeatureFlag` | `FeatureFlag` | `"disable-xpia-prompt"` | Disables the XPIA prompt path. |
 | `DIFCProxyFeatureFlag` | `FeatureFlag` | `"difc-proxy"` | Deprecated integrity proxy flag kept for compatibility. |
-| `CliProxyFeatureFlag` | `FeatureFlag` | `"cli-proxy"` | Enables the AWF CLI proxy sidecar path. |
 | `AwfDiagnosticLogsFeatureFlag` | `FeatureFlag` | `"awf-diagnostic-logs"` | Enables AWF failure diagnostics capture. |
 | `ByokCopilotFeatureFlag` | `FeatureFlag` | `"byok-copilot"` | Deprecated legacy Copilot BYOK flag. |
 | `IntegrityReactionsFeatureFlag` | `FeatureFlag` | `"integrity-reactions"` | Enables reaction-based integrity promotion and demotion. |

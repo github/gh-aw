@@ -198,17 +198,20 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 	}
 }
 
-func TestBuildPullAWFContainersStepPropagatesFeatures(t *testing.T) {
+func TestBuildPullAWFContainersStepPropagatesGitHubCLIMode(t *testing.T) {
 	compiler := NewCompiler()
 
-	t.Run("cli-proxy image included when feature flag is enabled", func(t *testing.T) {
+	t.Run("cli-proxy image included when GitHub gh-proxy mode is enabled", func(t *testing.T) {
 		data := &WorkflowData{
 			AI: "copilot",
 			SafeOutputs: &SafeOutputsConfig{
 				ThreatDetection: &ThreatDetectionConfig{},
 			},
-			Features: map[string]any{
-				string(constants.CliProxyFeatureFlag): true,
+			Tools: map[string]any{
+				"github": map[string]any{"mode": "gh-proxy"},
+			},
+			NetworkPermissions: &NetworkPermissions{
+				Firewall: &FirewallConfig{Enabled: true, Version: "v0.26.0"},
 			},
 			SandboxConfig: &SandboxConfig{
 				Agent: &AgentSandboxConfig{
@@ -221,7 +224,7 @@ func TestBuildPullAWFContainersStepPropagatesFeatures(t *testing.T) {
 		stepsString := strings.Join(steps, "")
 
 		if !strings.Contains(stepsString, "cli-proxy") {
-			t.Error("Expected cli-proxy image in pull step when cli-proxy feature flag is enabled")
+			t.Error("Expected cli-proxy image in pull step when GitHub gh-proxy mode is enabled")
 		}
 	})
 
@@ -243,7 +246,7 @@ func TestBuildPullAWFContainersStepPropagatesFeatures(t *testing.T) {
 		stepsString := strings.Join(steps, "")
 
 		if strings.Contains(stepsString, "cli-proxy") {
-			t.Error("Expected no cli-proxy image in pull step when cli-proxy feature flag is not set")
+			t.Error("Expected no cli-proxy image in pull step when GitHub gh-proxy mode is not enabled")
 		}
 	})
 }

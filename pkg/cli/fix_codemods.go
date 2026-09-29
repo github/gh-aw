@@ -120,7 +120,6 @@ func getLaterCodemods() []Codemod {
 		getCopilotRequestsFeatureToPermissionsCodemod(),   // Migrate features.copilot-requests to permissions.copilot-requests
 		getByokCopilotFeatureRemovalCodemod(),             // Remove deprecated features.byok-copilot (Copilot BYOK is default)
 		getInlineAgentsFeatureRemovalCodemod(),            // Remove deprecated features.inline-agents (inline sub-agents now default)
-		getCliProxyFeatureToGitHubModeCodemod(),           // Migrate features.cli-proxy: true to tools.github.mode: gh-proxy
 		getDIFCProxyToIntegrityProxyCodemod(),             // Migrate deprecated features.difc-proxy to tools.github.integrity-proxy
 		getMountAsCLIsToCLIProxyCodemod(),                 // Rename tools.mount-as-clis to tools.cli-proxy and remove features.mcp-cli
 		getMinIntegrityNoneRequiresBashCodemod(),          // Add tools.bash: false when tools.github.min-integrity is 'none'

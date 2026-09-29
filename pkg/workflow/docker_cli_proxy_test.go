@@ -15,7 +15,7 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 	// Use a version without "v" prefix — getAWFImageTag strips it
 	awfImageTag := "0.25.20"
 
-	t.Run("includes cli-proxy image when feature flag is enabled", func(t *testing.T) {
+	t.Run("includes cli-proxy image when gh-proxy mode is enabled", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			AI: "claude",
 			NetworkPermissions: &NetworkPermissions{
@@ -24,7 +24,9 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 					Version: awfImageTag,
 				},
 			},
-			Features: map[string]any{"cli-proxy": true},
+			Tools: map[string]any{
+				"github": map[string]any{"mode": "gh-proxy"},
+			},
 		}
 
 		images := collectDockerImages(nil, workflowData, ActionModeRelease)
@@ -34,7 +36,7 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 			"Expected cli-proxy image %q in collected images, got: %v", cliProxyImage, images)
 	})
 
-	t.Run("excludes cli-proxy image when feature flag is absent", func(t *testing.T) {
+	t.Run("excludes cli-proxy image when gh-proxy mode is absent", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			AI: "claude",
 			NetworkPermissions: &NetworkPermissions{
@@ -49,7 +51,7 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 
 		cliProxyImage := constants.DefaultFirewallRegistry + "/cli-proxy:" + awfImageTag
 		assert.False(t, slices.Contains(images, cliProxyImage),
-			"Did not expect cli-proxy image %q in collected images without feature flag, got: %v", cliProxyImage, images)
+			"Did not expect cli-proxy image %q in collected images without gh-proxy mode, got: %v", cliProxyImage, images)
 	})
 
 	t.Run("excludes cli-proxy image when AWF version is too old", func(t *testing.T) {
@@ -61,7 +63,9 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 					Version: "v0.25.16", // older than AWFCliProxyMinVersion
 				},
 			},
-			Features: map[string]any{"cli-proxy": true},
+			Tools: map[string]any{
+				"github": map[string]any{"mode": "gh-proxy"},
+			},
 		}
 
 		images := collectDockerImages(nil, workflowData, ActionModeRelease)
@@ -83,7 +87,9 @@ func TestCollectDockerImages_CliProxy(t *testing.T) {
 					Version: customTag,
 				},
 			},
-			Features: map[string]any{"cli-proxy": true},
+			Tools: map[string]any{
+				"github": map[string]any{"mode": "gh-proxy"},
+			},
 		}
 
 		images := collectDockerImages(nil, workflowData, ActionModeRelease)

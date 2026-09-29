@@ -2225,7 +2225,7 @@ tools:
     min-integrity: approved
 ```
 
-Note: `cli-proxy` is implicitly enabled by the compiler when `integrity-reactions: true` — no explicit `features.cli-proxy: true` is required. Reactions only work through the CLI proxy, not the gateway mode.
+Note: `cli-proxy` is implicitly enabled by the compiler when `integrity-reactions: true`. Reactions only work through the CLI proxy, not the gateway mode.
 
 See `scratchpad/guard-policies-specification.md` for the full specification including type hierarchy and error message reference.
 

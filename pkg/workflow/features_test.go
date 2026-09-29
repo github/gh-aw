@@ -176,15 +176,6 @@ func TestIsFeatureEnabledWithData(t *testing.T) {
 			expected:    true,
 			description: "When frontmatter is empty, should check env",
 		},
-		{
-			name:        "explicit frontmatter false disables cli-proxy for copilot",
-			envValue:    "",
-			frontmatter: map[string]any{"cli-proxy": false},
-			engineID:    string(constants.CopilotEngine),
-			flag:        constants.CliProxyFeatureFlag,
-			expected:    false,
-			description: "explicit frontmatter value should disable cli-proxy",
-		},
 	}
 
 	for _, tt := range tests {

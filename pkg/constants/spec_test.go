@@ -302,8 +302,6 @@ func TestSpec_FeatureFlags_Values(t *testing.T) {
 		{name: "DisableXPIAPromptFeatureFlag", constant: constants.DisableXPIAPromptFeatureFlag, expected: "disable-xpia-prompt"},
 		// From spec: DIFCProxyFeatureFlag // "difc-proxy" (deprecated)
 		{name: "DIFCProxyFeatureFlag", constant: constants.DIFCProxyFeatureFlag, expected: "difc-proxy"},
-		// From spec: CliProxyFeatureFlag // "cli-proxy"
-		{name: "CliProxyFeatureFlag", constant: constants.CliProxyFeatureFlag, expected: "cli-proxy"},
 		// From spec: AwfDiagnosticLogsFeatureFlag // "awf-diagnostic-logs"
 		{name: "AwfDiagnosticLogsFeatureFlag", constant: constants.AwfDiagnosticLogsFeatureFlag, expected: "awf-diagnostic-logs"},
 		// From spec: ByokCopilotFeatureFlag // "byok-copilot" (deprecated)

@@ -1037,11 +1037,9 @@ func TestGitHubMCPAppTokenFailsClosedForGhProxy(t *testing.T) {
 	assert.Contains(t, stepYAML, "id: github-mcp-app-token")
 	assert.True(t, app.IgnoreIfMissing, "proxy-specific failure behavior must not mutate parsed configuration")
 
-	data.Tools["github"] = map[string]any{}
-	data.Features = map[string]any{"cli-proxy": true}
-	data.ParsedTools.GitHub.Mode = ""
-	legacySteps := (&Compiler{}).generateGitHubMCPAppTokenMintingSteps(data)
-	assert.NotContains(t, strings.Join(legacySteps, ""), "if: ${{", "legacy CLI proxy must also fail closed")
+	assert.False(t, isGitHubCLIModeEnabled(&WorkflowData{
+		Features: map[string]any{"cli-proxy": true},
+	}), "the removed features.cli-proxy flag must not enable GitHub CLI mode")
 
 	data.NetworkPermissions.Firewall.Enabled = false
 	disabledSteps := (&Compiler{}).generateGitHubMCPAppTokenMintingSteps(data)
@@ -1126,7 +1124,7 @@ func TestIsCliProxyNeeded_IntegrityReactionsImplicitEnable(t *testing.T) {
 			desc:     "integrity-reactions should implicitly enable the CLI proxy",
 		},
 		{
-			name: "explicit cli-proxy still works",
+			name: "gh-proxy mode and integrity reactions enabled",
 			data: &WorkflowData{
 				NetworkPermissions: &NetworkPermissions{
 					Firewall: &FirewallConfig{
@@ -1134,27 +1132,16 @@ func TestIsCliProxyNeeded_IntegrityReactionsImplicitEnable(t *testing.T) {
 						Version: awfVersion,
 					},
 				},
-				Features: map[string]any{"cli-proxy": true},
-			},
-			expected: true,
-			desc:     "explicit cli-proxy feature flag should still enable the CLI proxy",
-		},
-		{
-			name: "both flags enabled",
-			data: &WorkflowData{
-				NetworkPermissions: &NetworkPermissions{
-					Firewall: &FirewallConfig{
-						Enabled: true,
-						Version: awfVersion,
-					},
+				Features: map[string]any{"integrity-reactions": true},
+				Tools: map[string]any{
+					"github": map[string]any{"mode": "gh-proxy"},
 				},
-				Features: map[string]any{"cli-proxy": true, "integrity-reactions": true},
 			},
 			expected: true,
-			desc:     "both flags together should enable the CLI proxy",
+			desc:     "gh-proxy mode and integrity reactions should enable the CLI proxy",
 		},
 		{
-			name: "tools.github.mode local overrides legacy cli-proxy feature",
+			name: "tools.github.mode local disables cli proxy",
 			data: &WorkflowData{
 				NetworkPermissions: &NetworkPermissions{
 					Firewall: &FirewallConfig{
@@ -1167,10 +1154,9 @@ func TestIsCliProxyNeeded_IntegrityReactionsImplicitEnable(t *testing.T) {
 						"mode": "local",
 					},
 				},
-				Features: map[string]any{"cli-proxy": true},
 			},
 			expected: false,
-			desc:     "explicit tools.github.mode=local should disable cli proxy even when legacy feature is set",
+			desc:     "explicit tools.github.mode=local should disable cli proxy",
 		},
 		{
 			name: "tools.github.mode gh-proxy enables cli proxy without legacy feature",

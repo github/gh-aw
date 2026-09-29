@@ -172,40 +172,6 @@ Test that gh-proxy uses the GitHub App token while safe outputs retain their own
 		"the source App token must not be used by safe outputs")
 }
 
-func TestGitHubMCPAppTokenForLegacyCLIProxy(t *testing.T) {
-	compiler := NewCompiler(WithVersion("1.0.0"))
-	markdown := `---
-on: issues
-permissions:
-  contents: read
-strict: false
-features:
-  cli-proxy: true
-tools:
-  github:
-    github-app:
-      client-id: ${{ vars.APP_ID }}
-      private-key: ${{ secrets.APP_PRIVATE_KEY }}
-      ignore-if-missing: true
----
-
-# Legacy CLI proxy
-`
-	testFile := filepath.Join(t.TempDir(), "legacy-proxy.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(markdown), 0600))
-	require.NoError(t, compiler.CompileWorkflow(testFile))
-
-	content, err := os.ReadFile(strings.TrimSuffix(testFile, ".md") + ".lock.yml")
-	require.NoError(t, err)
-	lockContent := string(content)
-	mintIndex := strings.Index(lockContent, "id: github-mcp-app-token")
-	proxyIndex := strings.Index(lockContent, "name: Start CLI Proxy")
-	require.NotEqual(t, -1, mintIndex)
-	require.NotEqual(t, -1, proxyIndex)
-	assert.Less(t, mintIndex, proxyIndex)
-	assert.Contains(t, lockContent, "GH_TOKEN: ${{ steps.github-mcp-app-token.outputs.token }}")
-}
-
 // TestGitHubMCPAppTokenAndGitHubTokenMutuallyExclusive tests that setting both app and github-token is rejected
 func TestGitHubMCPAppTokenAndGitHubTokenMutuallyExclusive(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))

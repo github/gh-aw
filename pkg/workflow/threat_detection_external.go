@@ -194,8 +194,11 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 	// collectDockerImages returns only the AWF firewall images (no MCP tool images).
 	detectionData := buildThreatDetectionWorkflowData(data, "")
 	detectionData.Tools = map[string]any{}
+	if isGitHubCLIModeEnabled(data) {
+		detectionData.Tools["github"] = map[string]any{"mode": "gh-proxy"}
+	}
 
-	images := collectDockerImages(detectionData.Tools, detectionData, c.actionMode)
+	images := collectDockerImages(map[string]any{}, detectionData, c.actionMode)
 	if len(images) == 0 {
 		threatLog.Print("No AWF container images to pre-pull for detection job")
 		return nil

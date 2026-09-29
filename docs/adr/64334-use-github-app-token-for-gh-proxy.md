@@ -12,7 +12,7 @@ This pull request changes how `tools.github.mode: gh-proxy` authenticates `gh` c
 
 ### Decision
 
-We will make `gh-proxy` use the same-job GitHub App installation token whenever CLI proxy mode is enabled (through `tools.github.mode: gh-proxy` or the legacy `features.cli-proxy: true`) and `tools.github.github-app` is configured. When the proxy actually starts, App token minting requires credentials instead of silently honoring `ignore-if-missing` fallback behavior. Safe outputs authentication remains independent: the proxy App token is used only for the agent job's `gh` access, while safe outputs continue to use their separately configured token or workflow fallback. We chose this because the PR evidence shows the default token path could not access private repositories granted to the App installation, breaking proxy-backed GitHub reads.
+We will make `gh-proxy` use the same-job GitHub App installation token whenever `tools.github.mode: gh-proxy` and `tools.github.github-app` are configured. The legacy `features.cli-proxy` flag does not enable proxy mode. When the proxy actually starts, App token minting requires credentials instead of silently honoring `ignore-if-missing` fallback behavior. Safe outputs authentication remains independent: the proxy App token is used only for the agent job's `gh` access, while safe outputs continue to use their separately configured token or workflow fallback. We chose this because the PR evidence shows the default token path could not access private repositories granted to the App installation, breaking proxy-backed GitHub reads.
 
 ### Alternatives Considered
 

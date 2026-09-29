@@ -376,7 +376,7 @@ func TestCollectPromptSections_GitHubMCPAndSafeOutputsConsistency(t *testing.T) 
 	})
 }
 
-// TestCollectPromptSections_CliProxy tests that when the cli-proxy feature flag is
+// TestCollectPromptSections_CliProxy tests that when GitHub gh-proxy mode is
 // enabled, the cli-proxy prompt is used instead of the GitHub MCP tools prompt,
 // and that the GitHub MCP server guidance is never injected.
 func TestCollectPromptSections_CliProxy(t *testing.T) {
@@ -384,8 +384,8 @@ func TestCollectPromptSections_CliProxy(t *testing.T) {
 		compiler := &Compiler{}
 
 		data := &WorkflowData{
+			Tools:       map[string]any{"github": map[string]any{"mode": "gh-proxy"}},
 			ParsedTools: NewTools(map[string]any{"github": true}),
-			Features:    map[string]any{"cli-proxy": true},
 			SafeOutputs: nil,
 		}
 
@@ -439,8 +439,8 @@ func TestCollectPromptSections_CliProxy(t *testing.T) {
 		compiler := &Compiler{}
 
 		data := &WorkflowData{
+			Tools:       map[string]any{"github": map[string]any{"mode": "gh-proxy"}},
 			ParsedTools: NewTools(map[string]any{"github": true}),
-			Features:    map[string]any{"cli-proxy": true},
 			SafeOutputs: &SafeOutputsConfig{
 				MissingData: &MissingDataConfig{},
 				NoOp:        &NoOpConfig{},
@@ -469,7 +469,7 @@ func TestCollectPromptSections_CliProxy(t *testing.T) {
 		}
 	})
 
-	t.Run("cli-proxy enabled without github tool still adds cli-proxy prompt", func(t *testing.T) {
+	t.Run("legacy features flag does not enable cli-proxy prompt", func(t *testing.T) {
 		compiler := &Compiler{}
 
 		data := &WorkflowData{
@@ -480,15 +480,11 @@ func TestCollectPromptSections_CliProxy(t *testing.T) {
 
 		sections := compiler.collectPromptSections(data)
 
-		// Should include cli-proxy prompt even without github tool configured
-		var cliProxySection *PromptSection
 		for i := range sections {
 			if sections[i].IsFile && sections[i].Content == cliProxyPromptFile {
-				cliProxySection = &sections[i]
-				break
+				t.Fatal("legacy features flag must not add cli_proxy_prompt.md")
 			}
 		}
-		require.NotNil(t, cliProxySection, "Should include cli_proxy_prompt.md when cli-proxy is enabled regardless of tools.github")
 	})
 
 	t.Run("cli-proxy disabled uses GitHub MCP tools prompt when github tool is enabled", func(t *testing.T) {
