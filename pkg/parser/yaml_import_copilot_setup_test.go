@@ -336,7 +336,7 @@ jobs:
 	require.NoError(t, err, "Failed to write workflow file")
 
 	// Process the file
-	stepsYAML, services, err := processYAMLWorkflowImport(workflowFile)
+	stepsYAML, services, _, err := processYAMLWorkflowImportWithSourceVersions(workflowFile)
 	require.NoError(t, err, "Should process copilot-setup-steps.yml without error")
 	assert.Empty(t, services, "Should not extract services from copilot-setup-steps.yml")
 	assert.NotEmpty(t, stepsYAML, "Should return steps YAML")
@@ -380,7 +380,7 @@ jobs:
 	require.NoError(t, err, "Failed to write workflow file")
 
 	// Process the file
-	jobsJSON, services, err := processYAMLWorkflowImport(workflowFile)
+	jobsJSON, services, _, err := processYAMLWorkflowImportWithSourceVersions(workflowFile)
 	require.NoError(t, err, "Should process regular workflow without error")
 	assert.Empty(t, services, "Should not extract services from this workflow")
 	assert.NotEmpty(t, jobsJSON, "Should return jobs JSON")

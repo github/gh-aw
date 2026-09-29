@@ -66,14 +66,6 @@ func isCopilotSetupStepsFile(filePath string) bool {
 	return strings.EqualFold(base, "copilot-setup-steps.yml") || strings.EqualFold(base, "copilot-setup-steps.yaml")
 }
 
-// processYAMLWorkflowImport processes an imported YAML workflow file
-// Returns the extracted jobs in JSON format for merging
-// Special case: For copilot-setup-steps.yml, returns steps in YAML format instead of jobs
-func processYAMLWorkflowImport(filePath string) (jobs string, services string, err error) {
-	jobs, services, _, err = processYAMLWorkflowImportWithSourceVersions(filePath)
-	return jobs, services, err
-}
-
 func processYAMLWorkflowImportWithSourceVersions(filePath string) (jobs string, services string, sourceVersions map[string]string, err error) {
 	yamlImportLog.Printf("Processing YAML workflow import: %s", filePath)
 
