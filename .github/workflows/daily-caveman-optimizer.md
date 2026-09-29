@@ -61,7 +61,7 @@ sandbox:
     runtime: cloud-hypervisor
     config:
       filesystem:
-        allowWrite:
+        allow-write:
           - /tmp/gh-aw/agent
           - /workspace/.github/aw
           - /workspace/.github/agents

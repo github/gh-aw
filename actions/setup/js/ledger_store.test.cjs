@@ -110,6 +110,31 @@ describe("Ledger", () => {
     expect(ledger.status().records).toBe(2);
   });
 
+  it("acknowledges a published shard when closing its directory descriptor fails", () => {
+    let directoryFd;
+    const openSync = fs.openSync;
+    const closeSync = fs.closeSync;
+    const open = vi.spyOn(fs, "openSync").mockImplementation((file, ...args) => {
+      const fd = openSync(file, ...args);
+      if (file === ledger.shardDir) directoryFd = fd;
+      return fd;
+    });
+    const close = vi.spyOn(fs, "closeSync").mockImplementation(fd => {
+      if (fd === directoryFd) throw new Error("directory close failed");
+      closeSync(fd);
+    });
+    let record;
+    try {
+      record = ledger.append("note", { value: 1 });
+    } finally {
+      close.mockRestore();
+      open.mockRestore();
+      if (directoryFd !== undefined) closeSync(directoryFd);
+    }
+    expect(ledger.get(record.sha)).toEqual(record);
+    expect(ledger.status().records).toBe(1);
+  });
+
   it("acknowledges durable appends when closing the cached projection fails", () => {
     ledger.append("note", { value: 1 });
     ledger.query();

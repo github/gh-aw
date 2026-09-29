@@ -28,7 +28,7 @@ sandbox:
     runtime: cloud-hypervisor
     config:
       filesystem:
-        allowWrite:
+        allow-write:
           - /tmp/gh-aw/data
           - /tmp/gh-aw/repo-memory/default/centralization-baseline.json
 max-ai-credits: 250

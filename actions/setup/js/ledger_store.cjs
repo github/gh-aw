@@ -761,7 +761,11 @@ class Ledger {
         try {
           fs.fsyncSync(directory);
         } finally {
-          fs.closeSync(directory);
+          try {
+            fs.closeSync(directory);
+          } catch {
+            // Closing after the directory sync must not reject a published shard.
+          }
         }
       } catch (error) {
         try {
