@@ -274,12 +274,7 @@ func isGitHubAppTokenForCLIProxy(data *WorkflowData) bool {
 	if data == nil || data.ParsedTools == nil || data.ParsedTools.GitHub == nil || data.ParsedTools.GitHub.GitHubApp == nil {
 		return false
 	}
-	switch data.ParsedTools.GitHub.Mode {
-	case GitHubMCPModeGHProxy, GitHubMCPModeCLI:
-		return true
-	default:
-		return false
-	}
+	return isGitHubCLIModeEnabled(data)
 }
 
 // normalizeGitHubType normalizes and validates GitHub MCP transport values.

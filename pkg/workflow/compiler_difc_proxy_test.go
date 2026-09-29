@@ -1016,6 +1016,9 @@ func TestGitHubMCPAppTokenFailsClosedForGhProxy(t *testing.T) {
 		IgnoreIfMissing: true,
 	}
 	data := &WorkflowData{
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
 		Tools: map[string]any{
 			"github": map[string]any{"mode": "gh-proxy"},
 		},
@@ -1033,6 +1036,16 @@ func TestGitHubMCPAppTokenFailsClosedForGhProxy(t *testing.T) {
 	assert.NotContains(t, stepYAML, "if: ${{")
 	assert.Contains(t, stepYAML, "id: github-mcp-app-token")
 	assert.True(t, app.IgnoreIfMissing, "proxy-specific failure behavior must not mutate parsed configuration")
+
+	data.Tools["github"] = map[string]any{}
+	data.Features = map[string]any{"cli-proxy": true}
+	data.ParsedTools.GitHub.Mode = ""
+	legacySteps := (&Compiler{}).generateGitHubMCPAppTokenMintingSteps(data)
+	assert.NotContains(t, strings.Join(legacySteps, ""), "if: ${{", "legacy CLI proxy must also fail closed")
+
+	data.NetworkPermissions.Firewall.Enabled = false
+	disabledSteps := (&Compiler{}).generateGitHubMCPAppTokenMintingSteps(data)
+	assert.Contains(t, strings.Join(disabledSteps, ""), "if: ${{", "skip fail-closed override when no CLI proxy starts")
 }
 
 // TestResolveProxyContainerImage verifies that the helper builds the correct container

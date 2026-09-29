@@ -179,7 +179,7 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 	}
 
 	app := data.ParsedTools.GitHub.GitHubApp
-	if isGitHubAppTokenForCLIProxy(data) && app.shouldIgnoreMissingKey() {
+	if isGitHubAppTokenForCLIProxy(data) && isCliProxyNeeded(data) && app.shouldIgnoreMissingKey() {
 		appCopy := *app
 		appCopy.IgnoreIfMissing = false
 		app = &appCopy
