@@ -159,6 +159,7 @@ sandbox:
 	}
 
 	result, applied, err := codemod.Apply(content, frontmatter)
+
 	require.NoError(t, err)
 	assert.False(t, applied)
 	assert.Equal(t, content, result)
@@ -166,62 +167,83 @@ sandbox:
 
 func TestSandboxFieldsCodemodInlineMappings(t *testing.T) {
 	t.Parallel()
+	codemod := getSandboxFieldsCodemod()
 	content := `---
-sandbox: {agent: {config: {filesystem: {allowWrite: [/workspace], "denyRead": [/secret]}, network: {allowedDomains: [example.com]}}, targets: {copilot: {extraHeaders: {x-customHeader: value}}}}}
+sandbox:
+  agent:
+    config: {filesystem: {"allowWrite": [/workspace], denyWrite: [/root]}}
+    targets: {copilot: {authHeader: api-key}}
 ---
-
-Keep allowWrite here.
 `
 	frontmatter := map[string]any{
-		"sandbox": map[string]any{"agent": map[string]any{
-			"config": map[string]any{
-				"filesystem": map[string]any{"allowWrite": []any{"/workspace"}, "denyRead": []any{"/secret"}},
-				"network":    map[string]any{"allowedDomains": []any{"example.com"}},
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"config":  map[string]any{"filesystem": map[string]any{"allowWrite": []any{"/workspace"}, "denyWrite": []any{"/root"}}},
+				"targets": map[string]any{"copilot": map[string]any{"authHeader": "api-key"}},
 			},
-			"targets": map[string]any{"copilot": map[string]any{"extraHeaders": map[string]any{"x-customHeader": "value"}}},
-		}},
+		},
 	}
-	result, applied, err := getSandboxFieldsCodemod().Apply(content, frontmatter)
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
 	require.NoError(t, err)
 	assert.True(t, applied)
-	assert.Contains(t, result, `{allow-write: [/workspace], "deny-read": [/secret]}`)
-	assert.Contains(t, result, `network: {allowed-domains: [example.com]}`)
-	assert.Contains(t, result, `copilot: {extra-headers: {x-customHeader: value}}`)
-	assert.Contains(t, result, "Keep allowWrite here.")
-
-	canonical := map[string]any{
-		"sandbox": map[string]any{"agent": map[string]any{
-			"config": map[string]any{
-				"filesystem": map[string]any{"allow-write": []any{"/workspace"}, "deny-read": []any{"/secret"}},
-				"network":    map[string]any{"allowed-domains": []any{"example.com"}},
-			},
-			"targets": map[string]any{"copilot": map[string]any{"extra-headers": map[string]any{"x-customHeader": "value"}}},
-		}},
-	}
-	again, changed, err := getSandboxFieldsCodemod().Apply(result, canonical)
-	require.NoError(t, err)
-	assert.False(t, changed)
-	assert.Equal(t, result, again)
+	assert.Contains(t, result, `filesystem: {"allow-write": [/workspace], deny-write: [/root]}`)
+	assert.Contains(t, result, "copilot: {auth-header: api-key}")
 }
 
-func TestSandboxFieldsCodemodConflictingKeys(t *testing.T) {
+func TestSandboxFieldsCodemodRejectsCanonicalKeyCollision(t *testing.T) {
 	t.Parallel()
-	for _, mapping := range []string{
-		"filesystem:\n        allowWrite: [/workspace]\n        allow-write: [/other]",
-		"filesystem:\n        allow-write: [/other]\n        allowWrite: [/workspace]",
-		"filesystem: {allowWrite: [/workspace], allow-write: [/other]}",
-	} {
-		t.Run(mapping, func(t *testing.T) {
-			content := "---\nsandbox:\n  agent:\n    config:\n      " + mapping + "\n---\n"
-			frontmatter := map[string]any{"sandbox": map[string]any{"agent": map[string]any{
-				"config": map[string]any{"filesystem": map[string]any{
-					"allowWrite": []any{"/workspace"}, "allow-write": []any{"/other"},
-				}},
-			}}}
-			result, applied, err := getSandboxFieldsCodemod().Apply(content, frontmatter)
-			require.ErrorContains(t, err, "remove one before running gh aw fix")
-			assert.False(t, applied)
-			assert.Equal(t, content, result)
-		})
+	codemod := getSandboxFieldsCodemod()
+	content := `---
+sandbox:
+  agent:
+    config:
+      filesystem:
+        allowWrite: [/workspace]
+        allow-write: [/other]
+---
+`
+	frontmatter := map[string]any{
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"config": map[string]any{
+					"filesystem": map[string]any{"allowWrite": []any{"/workspace"}, "allow-write": []any{"/other"}},
+				},
+			},
+		},
 	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.ErrorContains(t, err, "both spellings are present")
+	assert.False(t, applied)
+	assert.Equal(t, content, result)
+}
+
+func TestSandboxFieldsCodemodRejectsInlineCanonicalKeyCollision(t *testing.T) {
+	t.Parallel()
+	codemod := getSandboxFieldsCodemod()
+	content := `---
+sandbox:
+  agent:
+    config:
+      filesystem: {allowWrite: [/workspace], allow-write: [/other]}
+---
+`
+	frontmatter := map[string]any{
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"config": map[string]any{
+					"filesystem": map[string]any{"allowWrite": []any{"/workspace"}, "allow-write": []any{"/other"}},
+				},
+			},
+		},
+	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.ErrorContains(t, err, "both spellings are present")
+	assert.False(t, applied)
+	assert.Equal(t, content, result)
 }
