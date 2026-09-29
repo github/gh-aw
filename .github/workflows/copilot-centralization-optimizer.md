@@ -13,6 +13,7 @@ tools:
     branch-name: memory/copilot-centralization-optimizer
     description: Long-lived centralization trend snapshots and history
     file-glob: ["*.json", "*.jsonl"]
+    ledger: {}
 engine:
   id: codex
   model-provider: github
@@ -340,6 +341,7 @@ Read only these prepared files first:
 - `/tmp/gh-aw/data/current-snapshot.json`
 - `/tmp/gh-aw/data/run-context.json`
 - optional prior baseline: `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
+- prior append-only results from `ledger_query` (`type: centralization_snapshot`, `limit: 100`)
 
 These files were precomputed in `steps:` to keep token usage low.
 
@@ -349,10 +351,12 @@ Investigate whether repeated cross-user prompting suggests centralizing intellig
 
 Before drafting the report:
 - If `/tmp/gh-aw/repo-memory/default/centralization-baseline.json` exists, recompute `/tmp/gh-aw/data/trend-analysis.json` by comparing that baseline to `/tmp/gh-aw/data/current-snapshot.json`.
+- Query `centralization_snapshot` ledger records to identify recent runs and avoid strong trend claims based on a single snapshot.
 - Persist the sanitized current snapshot for the next run:
   - write `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
-  - append to `/tmp/gh-aw/repo-memory/default/centralization-history.jsonl`
-  - strip `top_exact_repeats[].sample_prompt` before writing either file.
+  - strip `top_exact_repeats[].sample_prompt` before persisting the snapshot or ledger record.
+- Append one `centralization_snapshot` ledger record per run with `run_id`, `generated_at`, `repository`, `overall_stats`, up to 10 `intent_buckets`, and up to 10 `workflow_opportunities`. For intent buckets, include only `intent_bucket`, `task_count`, `distinct_users`, `avg_sessions`, and `fallback_rate`; for opportunities, include only `intent_bucket`, `artifact_types`, `start_context_guess`, `task_count`, `distinct_users`, `centralization_score`, and `recommendation_kind`. Never include prompts, samples, or other raw user input. Use the `run_id` as the stable application key, and skip the append if that run ID is already present.
+- Keep the ledger record compact and below the 8 KiB record limit. The existing `centralization-baseline.json` remains the replaceable snapshot used for detailed trend comparison; do not append to `centralization-history.jsonl`.
 
 Focus on:
 

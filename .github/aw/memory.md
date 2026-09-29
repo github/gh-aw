@@ -20,6 +20,7 @@ For workflows that **persist state across runs** — deduplication, incremental 
 | Track a numeric metric and compare current vs. baseline (runs at least every 7 days) | `cache-memory` ✅ first choice |
 | Long-lived knowledge base visible in PRs and code reviews | `repo-memory` |
 | Baselines that must survive cache expiry (e.g. security findings, dedup lists) | `repo-memory` |
+| Bounded append-only structured event history with record-level queries | `repo-memory` with the experimental ledger |
 | Human-readable wiki pages for knowledge accumulation | `repo-memory` with `wiki: true` |
 | Persist notes/state inline on the triggering issue or PR | `comment-memory` |
 | Private-preview GitHub Drives backend (enrolled repos only) | `drive-memory` — see [drive-memory.md](drive-memory.md) |
@@ -205,6 +206,40 @@ tools:
 
 Compiler creates a separate `push_repo_memory` job with `contents: write`; main agent job stays read-only.
 
+### Structured event history: repo-memory ledger (experimental)
+
+Use the ledger for immutable, structured events when each run should add records
+and later runs need to query them. For example, a low-volume audit can append
+one result per scan and query prior results by a stable application-level key.
+The ledger exposes `ledger_append`, `ledger_get`, `ledger_query`, and
+`ledger_status`; its SQLite query projection is disposable and rebuilt from the
+persisted JSONL shards.
+
+```yaml
+tools:
+  repo-memory:
+    branch-name: memory/audit-history
+    ledger: {}
+```
+
+Optionally set `ledger.schema` to a repository-relative JSON Schema file to
+validate payloads. The supported schema vocabulary is intentionally limited;
+see the [repo-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/repo-memory.md#structured-ledger).
+
+Ledger records are append-only and concurrent histories converge when their
+repo-memory branches merge, but this is not a transactional database. Include
+stable event keys and timestamps in payloads, deduplicate and resolve
+conflicting application events deterministically, and use `ledger_status` to
+check for malformed or incomplete records. Do not edit ledger shard files
+directly.
+
+The ledger is experimental and bounded: it inspects at most 100 shard files,
+each record is limited to 8 KiB, and each query returns at most 500 records.
+Each writing workflow invocation creates a shard, so a frequently running
+workflow can exhaust the shard limit. Use ordinary repo-memory files for
+replaceable snapshots, pruned baselines, or histories that need more than 100
+writer shards; the ledger currently has no compaction or record-deletion API.
+
 ### Tradeoffs
 
 | ✅ Pros | ❌ Cons |
@@ -214,6 +249,7 @@ Compiler creates a separate `push_repo_memory` job with `contents: write`; main 
 | Survives cache invalidation | Not available for Copilot engine (requires GitHub tools) |
 | Human-readable via GitHub branch UI | More complex setup |
 | Can target a different repository | |
+| Ledger mode provides immutable structured records and queries | Experimental, append-only, and limited to 100 shard files |
 
 ---
 
@@ -304,6 +340,11 @@ Multiple memory IDs in one comment are supported; each maps to a separate `*.md`
 ## Stateful Scanning Pattern (repo-memory)
 
 Persist a baseline JSON file between runs to alert only on *new* findings — vulnerability scans, dependency audits, licence checks. Unlike `cache-memory`, the baseline survives cache expiry, so a missed cycle won't flood the repo with duplicate issues. Store only stable identifiers (advisory IDs), cap output with `max:`, treat missing baseline as `[]`. Requires Claude or custom engine — not Copilot.
+
+Keep this as a replaceable repo-memory snapshot by default. Use the experimental
+ledger only when the audit needs an append-only record of each scan or finding
+and its expected writer count fits the 100-shard limit; it does not replace,
+prune, or compact an existing baseline.
 
 > **Worked example** (nightly npm vulnerability scan, with key design decisions): [memory-stateful-patterns.md](memory-stateful-patterns.md#stateful-scanning-repo-memory).
 
