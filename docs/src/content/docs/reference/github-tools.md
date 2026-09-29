@@ -192,7 +192,7 @@ tools:
 This disables both `forcePublicRepos` and the default `sink-visibility` enforcement for **all** MCP servers. The MCP Gateway emits `"forcePublicRepos": false` in its startup config.
 
 :::caution
-`private-to-public-flows: allow` is **not compatible with strict mode**. Strict mode workflows that require this opt-out must use the list form instead.
+`private-to-public-flows` is **not compatible with strict mode** in either form. In non-strict mode, the compiler warns because GitHub Actions logs are public and agents may expose private data through public destinations.
 :::
 
 ### Selective exemption (list of server IDs)
@@ -209,7 +209,7 @@ mcp-servers:
     url: "http://localhost:9000/mcp"
 ```
 
-This exempts only the listed MCP server IDs from the default `sink-visibility` enforcement. `forcePublicRepos` is **not** disabled; private repo access still requires the allow-only policy to permit it. This form is compatible with strict mode.
+This exempts only the listed MCP server IDs from the default `sink-visibility` enforcement. `forcePublicRepos` is **not** disabled; private repo access still requires the allow-only policy to permit it. This form is rejected in strict mode.
 
 The compiler emits `"sinkVisibilityExemptServers": ["github", "my-custom-server"]` in the gateway config. The built-in GitHub MCP server ID is `github`. Custom server IDs match the key used in `mcp-servers`.
 

@@ -98,7 +98,6 @@ func (c *Compiler) validateStrictMCPNetwork(frontmatter map[string]any, networkP
 
 // validateStrictTools validates tools configuration in strict mode
 func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
-	// Check tools section
 	toolsValue, exists := frontmatter["tools"]
 	if !exists {
 		strictModeValidationLog.Print("No tools section, skipping strict tools validation")
@@ -111,29 +110,31 @@ func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
 		return nil
 	}
 
-	// Reject private-to-public-flows: allow in strict mode.
-	// Per MCP Gateway Specification Section 10.9.4, the blanket "allow" value is incompatible
-	// with strict mode because it disables both forcePublicRepos and sink-visibility enforcement.
-	// The list form (specific server IDs) is allowed in strict mode.
 	if githubValue, hasGitHub := toolsMap["github"]; hasGitHub {
 		if githubMap, ok := githubValue.(map[string]any); ok {
-			if ptpFlows, exists := githubMap["private-to-public-flows"]; exists {
-				if ptpStr, ok := ptpFlows.(string); ok && ptpStr == "allow" {
-					strictModeValidationLog.Printf("private-to-public-flows: allow rejected in strict mode")
-					return NewValidationError(
-						"tools.github.private-to-public-flows",
-						ptpStr,
-						"strict mode: 'private-to-public-flows: allow' is not allowed; it disables forcePublicRepos and sink-visibility enforcement, which is incompatible with strict mode",
-						"To exempt specific MCP servers from sink-visibility enforcement in strict mode, use the list form:\n\ntools:\n  github:\n    private-to-public-flows:\n      - my-server-id\n      - other-server-id",
-					)
-				}
+			if value, exists := githubMap["private-to-public-flows"]; exists {
+				return NewValidationError(
+					"tools.github.private-to-public-flows",
+					fmt.Sprintf("%v", value),
+					"strict mode: tools.github.private-to-public-flows is not allowed because private-to-public flows can expose private data through public action logs or public destinations used by the agent",
+					"Remove private-to-public-flows:\n\ntools:\n  github:\n    mode: local",
+				)
 			}
 		}
 	}
 
-	// Require bash to be explicitly specified when min-integrity is none.
-	// When min-integrity is none, any external user can trigger the workflow.
-	// Requiring an explicit bash setting ensures the author has considered shell access.
+	if err := validateStrictMinIntegrityTools(toolsMap); err != nil {
+		return err
+	}
+	if err := validateStrictCLIProxyTools(toolsMap); err != nil {
+		return err
+	}
+	return validateStrictCacheMemoryTools(toolsMap)
+}
+
+// validateStrictMinIntegrityTools ensures shell access is intentional when
+// min-integrity is none.
+func validateStrictMinIntegrityTools(toolsMap map[string]any) error {
 	if githubValue, hasGitHub := toolsMap["github"]; hasGitHub {
 		if githubMap, ok := githubValue.(map[string]any); ok {
 			if minIntegrity, exists := githubMap["min-integrity"]; exists {
@@ -152,11 +153,12 @@ func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
 			}
 		}
 	}
+	return nil
+}
 
-	// Require cli-proxy to be explicitly disabled when bash is refused.
-	// cli-proxy mounts MCP servers as CLI executables that can only be invoked from a shell,
-	// so it is incompatible with 'tools.bash: false'. Requiring an explicit
-	// 'tools.cli-proxy: false' makes that incompatibility visible in the workflow source.
+// validateStrictCLIProxyTools requires cli-proxy to be explicitly disabled
+// when bash is refused because CLI-mounted MCP servers require a shell.
+func validateStrictCLIProxyTools(toolsMap map[string]any) error {
 	if isBashExplicitlyRefused(toolsMap) {
 		cliProxyValue, hasCLIProxy := toolsMap["cli-proxy"]
 		enabled, isBool := cliProxyValue.(bool)
@@ -183,41 +185,39 @@ func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
 			)
 		}
 	}
+	return nil
+}
 
-	// Check if cache-memory is configured with scope: repo
+// validateStrictCacheMemoryTools rejects repository-scoped cache memory.
+func validateStrictCacheMemoryTools(toolsMap map[string]any) error {
 	cacheMemoryValue, hasCacheMemory := toolsMap["cache-memory"]
-	if hasCacheMemory {
-		strictModeValidationLog.Print("Checking cache-memory scope in strict mode")
-		// Helper function to check scope in a cache entry
-		checkScope := func(cacheMap map[string]any) error {
-			if scope, hasScope := cacheMap["scope"]; hasScope {
-				if scopeStr, ok := scope.(string); ok && scopeStr == "repo" {
-					strictModeValidationLog.Printf("Cache-memory repo scope validation failed")
-					return NewValidationError(
-						"tools.cache-memory.scope",
-						scopeStr,
-						"strict mode: cache-memory with 'scope: repo' is not allowed for security reasons; expected 'scope: workflow' to isolate cache data per workflow",
-						"Use workflow-scoped cache entries:\n\ntools:\n  cache-memory:\n    key: my-cache\n    scope: workflow",
-					)
-				}
-			}
-			return nil
-		}
-
-		// Check if cache-memory is a map (object notation)
-		if cacheMemoryConfig, ok := cacheMemoryValue.(map[string]any); ok {
-			if err := checkScope(cacheMemoryConfig); err != nil {
-				return err
+	if !hasCacheMemory {
+		return nil
+	}
+	strictModeValidationLog.Print("Checking cache-memory scope in strict mode")
+	checkScope := func(cacheMap map[string]any) error {
+		if scope, hasScope := cacheMap["scope"]; hasScope {
+			if scopeStr, ok := scope.(string); ok && scopeStr == "repo" {
+				strictModeValidationLog.Printf("Cache-memory repo scope validation failed")
+				return NewValidationError(
+					"tools.cache-memory.scope",
+					scopeStr,
+					"strict mode: cache-memory with 'scope: repo' is not allowed for security reasons; expected 'scope: workflow' to isolate cache data per workflow",
+					"Use workflow-scoped cache entries:\n\ntools:\n  cache-memory:\n    key: my-cache\n    scope: workflow",
+				)
 			}
 		}
+		return nil
+	}
 
-		// Check if cache-memory is an array (array notation)
-		if cacheMemoryArray, ok := cacheMemoryValue.([]any); ok {
-			for _, item := range cacheMemoryArray {
-				if cacheMap, ok := item.(map[string]any); ok {
-					if err := checkScope(cacheMap); err != nil {
-						return err
-					}
+	if cacheMemoryConfig, ok := cacheMemoryValue.(map[string]any); ok {
+		return checkScope(cacheMemoryConfig)
+	}
+	if cacheMemoryArray, ok := cacheMemoryValue.([]any); ok {
+		for _, item := range cacheMemoryArray {
+			if cacheMap, ok := item.(map[string]any); ok {
+				if err := checkScope(cacheMap); err != nil {
+					return err
 				}
 			}
 		}
