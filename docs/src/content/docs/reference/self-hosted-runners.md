@@ -19,7 +19,7 @@ To enforce self-hosted runners for every generated job, set `require_self_hosted
 
 The compiler checks all generated jobs, including framework and safe-output jobs. Each must use the `self-hosted` label or a runner group. The `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS=true` compiler environment variable also enables this enforcement.
 
-To manage the enforcement variable at repository, organization, or enterprise scope, set `require_self_hosted_runners: "true"` with `gh aw env update`, then expose `${{ vars.GH_AW_REQUIRE_SELF_HOSTED_RUNNERS }}` as `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` in the trusted compile job. See [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/#enterprise-control-variables).
+To manage the enforcement default at repository, organization, or enterprise scope, set `default_require_self_hosted_runners: "true"` with `gh aw env update`, then expose `${{ vars.GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS }}` as `GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS` in the trusted compile job. The existing `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` compiler environment variable overrides that default. See [Compiler Enterprise Environment Controls](/gh-aw/reference/compiler-enterprise-environment-controls/#enterprise-control-variables).
 
 Self-hosted runners may require `sudo` depending on the selected engine and configuration. For the default GitHub Copilot engine, there are two distinct sudo considerations:
 

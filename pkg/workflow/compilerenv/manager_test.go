@@ -69,21 +69,32 @@ func TestManager_FallbackWhenEnvEmpty(t *testing.T) {
 
 func TestManager_ResolveRequireSelfHostedRunners(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		value   string
-		want    bool
-		wantErr bool
+		name       string
+		override   string
+		managed    string
+		want       bool
+		wantErrVar string
 	}{
-		{name: "true enables enforcement", value: "true", want: true},
-		{name: "case-insensitive true", value: " TRUE ", want: true},
-		{name: "false disables enforcement", value: "false"},
-		{name: "invalid value errors", value: "yes", wantErr: true},
+		{name: "true enables enforcement", override: "true", want: true},
+		{name: "case-insensitive true", override: " TRUE ", want: true},
+		{name: "false disables enforcement", override: "false"},
+		{name: "managed true enables enforcement", managed: "true", want: true},
+		{name: "managed false disables enforcement", managed: "false"},
+		{name: "override true wins over managed false", override: "true", managed: "false", want: true},
+		{name: "override false wins over managed true", override: "false", managed: "true"},
+		{name: "invalid override errors", override: "yes", managed: "true", wantErrVar: RequireSelfHostedRunners},
+		{name: "invalid managed value errors", managed: "yes", wantErrVar: DefaultRequireSelfHostedRunners},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			m := New(func(string) string { return tt.value })
+			m := New(func(key string) string {
+				if key == RequireSelfHostedRunners {
+					return tt.override
+				}
+				return tt.managed
+			})
 			got, err := m.ResolveRequireSelfHostedRunners()
-			if tt.wantErr {
-				assert.Error(t, err)
+			if tt.wantErrVar != "" {
+				require.ErrorContains(t, err, tt.wantErrVar)
 				return
 			}
 			require.NoError(t, err)

@@ -28,18 +28,19 @@ In this enterprise controls reference, OTLP defaults are the scope-sensitive exc
 | `GH_AW_DEFAULT_MODEL_CODEX` | GitHub Actions `vars.*` at runtime | Default fallback model for Codex | `GH_AW_MODEL_AGENT_CODEX` / `GH_AW_MODEL_DETECTION_CODEX` is unset |
 | `GH_AW_DEFAULT_OTLP_ENDPOINT` | GitHub Actions `secrets.*` or `vars.*` at runtime | Default OTLP exporter endpoint | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
 | `GH_AW_DEFAULT_OTLP_HEADERS` | GitHub Actions `secrets.*` at runtime | Default OTLP exporter headers for `GH_AW_DEFAULT_OTLP_ENDPOINT` | `observability.otlp.endpoint` is not set in frontmatter or any imported workflow |
-| `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Fail compilation unless every generated job selects a self-hosted runner | Set to `true` in a trusted compile environment to enforce self-hosted-only runners |
+| `GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Default enforcement that every generated job selects a self-hosted runner | Set to `true` in a trusted compile environment; `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` overrides it |
+| `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` | Compiler process environment | Override self-hosted runner enforcement | Set to `true` or `false` in a trusted compile environment to override the managed default |
 
 Use `gh aw env get` and `gh aw env update` to manage `GH_AW_DEFAULT_*`
-variables and `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` in batch. These commands operate on GitHub Actions variables and support repo, org, or enterprise scope, so `default_otlp_endpoint` can still be managed as an enterprise variable. Set OTLP secrets separately with `gh secret set`; those secrets are limited to repository or organization scope. The defaults file uses
+variables in batch. These commands operate on GitHub Actions variables and support repo, org, or enterprise scope, so `default_otlp_endpoint` can still be managed as an enterprise variable. Set OTLP secrets separately with `gh secret set`; those secrets are limited to repository or organization scope. The defaults file uses
 `default_`-prefixed keys such as `default_max_ai_credits`, `default_max_turn_cache_misses`, `default_detection_max_ai_credits`, `default_max_daily_ai_credits`, `default_timeout_minutes`, `default_agent_job_timeout_minutes`, `default_detection_job_timeout_minutes`,
-`default_model_copilot`, `default_otlp_endpoint`, and `default_utc`, plus `require_self_hosted_runners`. `gh aw env update --scope ent` writes only the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
+`default_model_copilot`, `default_otlp_endpoint`, `default_utc`, and `default_require_self_hosted_runners`. `gh aw env update --scope ent` writes only the `GH_AW_DEFAULT_OTLP_ENDPOINT` variable, not an endpoint secret. To mask the endpoint value, set `GH_AW_DEFAULT_OTLP_ENDPOINT` with
 `gh secret set` at repository or organization scope instead. `GH_AW_DEFAULT_OTLP_HEADERS` is always a secret and must also be set with `gh secret set` at repository or organization scope. If both endpoint values exist, clearing only one leaves the other effective through the fallback expression; clear both the endpoint secret and variable to disable OTLP export.
 
-`GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` is a compile-time enforcement setting, not a `GH_AW_DEFAULT_*` default. To manage it centrally, set `require_self_hosted_runners` to `"true"` in the file passed to `gh aw env update`:
+To manage self-hosted runner enforcement centrally, set `default_require_self_hosted_runners` to `"true"` in the file passed to `gh aw env update`:
 
 ```yaml title="defaults.yml"
-require_self_hosted_runners: "true"
+default_require_self_hosted_runners: "true"
 ```
 
 Expose the resulting GitHub Actions variable to the trusted compiler process:
@@ -52,11 +53,11 @@ jobs:
       - uses: actions/checkout@v5
       - name: Compile workflows
         env:
-          GH_AW_REQUIRE_SELF_HOSTED_RUNNERS: ${{ vars.GH_AW_REQUIRE_SELF_HOSTED_RUNNERS }}
+          GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS: ${{ vars.GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS }}
         run: gh aw compile
 ```
 
-The same policy can be enabled persistently with `require_self_hosted_runners: true` in `.github/workflows/aw.json`, or for a single invocation with `gh aw compile --require-self-hosted-runners`.
+The direct `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS` compiler environment variable takes precedence over this managed default when set to `true` or `false`. The policy can also be enabled persistently with `require_self_hosted_runners: true` in `.github/workflows/aw.json`, or for a single invocation with `gh aw compile --require-self-hosted-runners`.
 
 When enabled, compilation checks the generated workflow jobs, including framework jobs and jobs whose runner comes from a default. Each job must include the `self-hosted` label or select a runner group. Custom labels alone are not sufficient because the compiler cannot verify that they identify self-hosted runners. An organization can make this check mandatory with a centrally managed required workflow or ruleset check.
 

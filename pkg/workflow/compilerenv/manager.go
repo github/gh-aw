@@ -111,14 +111,22 @@ const (
 	// create_pull_request safe-output tool at runtime.
 	PolicyAllowCreatePullRequest = "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST"
 	// RequireSelfHostedRunners enables compile-time validation that every generated
-	// job selects a self-hosted runner.
+	// job selects a self-hosted runner, overriding the managed default.
 	RequireSelfHostedRunners = "GH_AW_REQUIRE_SELF_HOSTED_RUNNERS"
+	// DefaultRequireSelfHostedRunners is the managed compile-time default for
+	// self-hosted runner enforcement.
+	DefaultRequireSelfHostedRunners = "GH_AW_DEFAULT_REQUIRE_SELF_HOSTED_RUNNERS"
 )
 
 // ResolveRequireSelfHostedRunners reports whether self-hosted runner enforcement is
-// enabled. An unset value disables enforcement; any other value must be true or false.
+// enabled. The direct override takes precedence over the managed default.
 func (m *Manager) ResolveRequireSelfHostedRunners() (bool, error) {
+	name := RequireSelfHostedRunners
 	raw := strings.TrimSpace(m.getenv(RequireSelfHostedRunners))
+	if raw == "" {
+		name = DefaultRequireSelfHostedRunners
+		raw = strings.TrimSpace(m.getenv(name))
+	}
 	if raw == "" {
 		return false, nil
 	}
@@ -128,7 +136,7 @@ func (m *Manager) ResolveRequireSelfHostedRunners() (bool, error) {
 	if strings.EqualFold(raw, "false") {
 		return false, nil
 	}
-	return false, fmt.Errorf("%s must be \"true\" or \"false\", got %q", RequireSelfHostedRunners, raw)
+	return false, fmt.Errorf("%s must be \"true\" or \"false\", got %q", name, raw)
 }
 
 // ResolveRequireSelfHostedRunners is a convenience wrapper that delegates to the

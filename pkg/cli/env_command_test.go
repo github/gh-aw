@@ -125,18 +125,18 @@ func TestDefaultsUpdateVisibilityValidation(t *testing.T) {
 func TestDefaultsFileYAMLKeys(t *testing.T) {
 	t.Parallel()
 	file := defaultsFile{
-		DefaultMaxAICredits:          new("1000"),
-		DefaultMaxTurnCacheMisses:    new("5"),
-		DefaultDetectionMaxAICredits: new("400"),
-		DefaultMaxDailyAICredits:     new("500000"),
-		DefaultMaxTurns:              new("42"),
-		DefaultTimeoutMinutes:        new("90"),
-		DefaultDetectionModel:        new("claude-sonnet-4.6"),
-		DefaultUTC:                   new("-08:00"),
-		DefaultModelCopilot:          new("claude-sonnet-4.7"),
-		DefaultModelClaude:           new("claude-opus-4.7"),
-		DefaultModelCodex:            new("gpt-5.5"),
-		RequireSelfHostedRunners:     new("true"),
+		DefaultMaxAICredits:             new("1000"),
+		DefaultMaxTurnCacheMisses:       new("5"),
+		DefaultDetectionMaxAICredits:    new("400"),
+		DefaultMaxDailyAICredits:        new("500000"),
+		DefaultMaxTurns:                 new("42"),
+		DefaultTimeoutMinutes:           new("90"),
+		DefaultDetectionModel:           new("claude-sonnet-4.6"),
+		DefaultUTC:                      new("-08:00"),
+		DefaultModelCopilot:             new("claude-sonnet-4.7"),
+		DefaultModelClaude:              new("claude-opus-4.7"),
+		DefaultModelCodex:               new("gpt-5.5"),
+		DefaultRequireSelfHostedRunners: new("true"),
 	}
 
 	data, err := yaml.Marshal(&file)
@@ -154,7 +154,7 @@ func TestDefaultsFileYAMLKeys(t *testing.T) {
 	assert.Contains(t, yml, "default_model_copilot:")
 	assert.Contains(t, yml, "default_model_claude:")
 	assert.Contains(t, yml, "default_model_codex:")
-	assert.Contains(t, yml, "require_self_hosted_runners:")
+	assert.Contains(t, yml, "default_require_self_hosted_runners:")
 }
 
 func TestDefaultsFileYAMLNullDelete(t *testing.T) {
@@ -194,18 +194,18 @@ func TestDefaultsParseFileDisallowsUnknownFields(t *testing.T) {
 func TestDefaultsValidateFile(t *testing.T) {
 	t.Run("accepts valid values", func(t *testing.T) {
 		err := defaultsValidateFile(&defaultsFile{
-			DefaultMaxAICredits:          new("1000"),
-			DefaultMaxTurnCacheMisses:    new("5"),
-			DefaultDetectionMaxAICredits: new("400"),
-			DefaultMaxDailyAICredits:     new("500000"),
-			DefaultMaxTurns:              new("12"),
-			DefaultTimeoutMinutes:        new("30"),
-			DefaultDetectionModel:        new("claude-sonnet-4.6"),
-			DefaultUTC:                   new("-08:00"),
-			DefaultModelCopilot:          new("gpt-5-mini"),
-			DefaultModelClaude:           new("claude-haiku-4.5"),
-			DefaultModelCodex:            new("gpt-5.4-mini"),
-			RequireSelfHostedRunners:     new("true"),
+			DefaultMaxAICredits:             new("1000"),
+			DefaultMaxTurnCacheMisses:       new("5"),
+			DefaultDetectionMaxAICredits:    new("400"),
+			DefaultMaxDailyAICredits:        new("500000"),
+			DefaultMaxTurns:                 new("12"),
+			DefaultTimeoutMinutes:           new("30"),
+			DefaultDetectionModel:           new("claude-sonnet-4.6"),
+			DefaultUTC:                      new("-08:00"),
+			DefaultModelCopilot:             new("gpt-5-mini"),
+			DefaultModelClaude:              new("claude-haiku-4.5"),
+			DefaultModelCodex:               new("gpt-5.4-mini"),
+			DefaultRequireSelfHostedRunners: new("true"),
 		})
 		require.NoError(t, err)
 	})
@@ -219,15 +219,15 @@ func TestDefaultsValidateFile(t *testing.T) {
 
 	t.Run("rejects invalid numeric and empty model values", func(t *testing.T) {
 		err := defaultsValidateFile(&defaultsFile{
-			DefaultMaxAICredits:          new("0"),
-			DefaultMaxTurnCacheMisses:    new("0"),
-			DefaultDetectionMaxAICredits: new("0"),
-			DefaultMaxDailyAICredits:     new("0"),
-			DefaultMaxTurns:              new("abc"),
-			DefaultTimeoutMinutes:        new("0"),
-			DefaultUTC:                   new("west"),
-			DefaultModelCopilot:          new("   "),
-			RequireSelfHostedRunners:     new("yes"),
+			DefaultMaxAICredits:             new("0"),
+			DefaultMaxTurnCacheMisses:       new("0"),
+			DefaultDetectionMaxAICredits:    new("0"),
+			DefaultMaxDailyAICredits:        new("0"),
+			DefaultMaxTurns:                 new("abc"),
+			DefaultTimeoutMinutes:           new("0"),
+			DefaultUTC:                      new("west"),
+			DefaultModelCopilot:             new("   "),
+			DefaultRequireSelfHostedRunners: new("yes"),
 		})
 		require.Error(t, err)
 		validationErr := err
@@ -243,7 +243,7 @@ func TestDefaultsValidateFile(t *testing.T) {
 			{name: "timeout_minutes", expectedErrMessage: "default_timeout_minutes must be a positive integer when set"},
 			{name: "utc", expectedErrMessage: "default_utc must be a numeric UTC offset"},
 			{name: "model_copilot", expectedErrMessage: "default_model_copilot cannot be empty when set"},
-			{name: "require_self_hosted_runners", expectedErrMessage: "require_self_hosted_runners must be true or false when set"},
+			{name: "default_require_self_hosted_runners", expectedErrMessage: "default_require_self_hosted_runners must be true or false when set"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				require.ErrorContains(t, validationErr, tc.expectedErrMessage)
@@ -453,17 +453,17 @@ func TestDefaultsBuildUpdateChanges(t *testing.T) {
 	assert.Equal(t, "gpt-5.5", change.value)
 }
 
-func TestDefaultsBuildUpdateChangesRequireSelfHostedRunners(t *testing.T) {
+func TestDefaultsBuildUpdateChangesDefaultRequireSelfHostedRunners(t *testing.T) {
 	t.Parallel()
 	changes := defaultsBuildUpdateChanges(&defaultsFile{
-		RequireSelfHostedRunners: new("true"),
+		DefaultRequireSelfHostedRunners: new("true"),
 	})
 
 	index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
-		return change.field == "require_self_hosted_runners"
+		return change.field == "default_require_self_hosted_runners"
 	})
 	require.NotEqual(t, -1, index)
-	assert.Equal(t, compilerenv.RequireSelfHostedRunners, changes[index].envName)
+	assert.Equal(t, compilerenv.DefaultRequireSelfHostedRunners, changes[index].envName)
 	assert.Equal(t, "true", changes[index].value)
 	assert.False(t, changes[index].delete)
 }

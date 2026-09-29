@@ -45,7 +45,7 @@ type defaultsFile struct {
 	DefaultModelCopilot               *string `yaml:"default_model_copilot"`
 	DefaultModelClaude                *string `yaml:"default_model_claude"`
 	DefaultModelCodex                 *string `yaml:"default_model_codex"`
-	RequireSelfHostedRunners          *string `yaml:"require_self_hosted_runners"`
+	DefaultRequireSelfHostedRunners   *string `yaml:"default_require_self_hosted_runners"`
 }
 
 type defaultsBinding struct {
@@ -116,7 +116,7 @@ var defaultsBindings = []defaultsBinding{
 	{envName: compilerenv.DefaultModelCopilot, fieldName: "default_model_copilot", get: func(f *defaultsFile) **string { return &f.DefaultModelCopilot }},
 	{envName: compilerenv.DefaultModelClaude, fieldName: "default_model_claude", get: func(f *defaultsFile) **string { return &f.DefaultModelClaude }},
 	{envName: compilerenv.DefaultModelCodex, fieldName: "default_model_codex", get: func(f *defaultsFile) **string { return &f.DefaultModelCodex }},
-	{envName: compilerenv.RequireSelfHostedRunners, fieldName: "require_self_hosted_runners", get: func(f *defaultsFile) **string { return &f.RequireSelfHostedRunners }},
+	{envName: compilerenv.DefaultRequireSelfHostedRunners, fieldName: "default_require_self_hosted_runners", get: func(f *defaultsFile) **string { return &f.DefaultRequireSelfHostedRunners }},
 }
 
 var defaultsExecGH = workflow.ExecGH
@@ -128,7 +128,7 @@ func NewEnvCommand() *cobra.Command {
 		Short: "Manage compiler settings as GitHub Actions variables",
 		Long: `Manage compiler variables in bulk for a repository, organization, or enterprise scope.
 
-The YAML file is flat and uses lowercase keys (e.g., default_max_turns and require_self_hosted_runners).
+The YAML file is flat and uses default_-prefixed lowercase keys (e.g., default_max_turns and default_require_self_hosted_runners).
 Set a field to null (or omit it) in update mode to delete the variable from the selected scope.
 Any field with a non-null string value will be set or updated.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -354,7 +354,7 @@ func defaultsValidateFile(file *defaultsFile) error {
 	validateNonEmpty("default_model_copilot", file.DefaultModelCopilot)
 	validateNonEmpty("default_model_claude", file.DefaultModelClaude)
 	validateNonEmpty("default_model_codex", file.DefaultModelCodex)
-	validateDefaultsBoolean(&validationErrors, "require_self_hosted_runners", file.RequireSelfHostedRunners)
+	validateDefaultsBoolean(&validationErrors, "default_require_self_hosted_runners", file.DefaultRequireSelfHostedRunners)
 
 	if len(validationErrors) > 0 {
 		return fmt.Errorf("invalid defaults file: %s", strings.Join(validationErrors, "; "))

@@ -331,6 +331,33 @@ Greet the user warmly.
 	assert.Contains(t, compiledYAML, "runs-on: self-hosted")
 }
 
+func TestCompileToYAML_ManagedSelfHostedRunnerDefault(t *testing.T) {
+	t.Setenv(compilerenv.RequireSelfHostedRunners, "")
+	t.Setenv(compilerenv.DefaultRequireSelfHostedRunners, "true")
+	markdown := `---
+name: compile-runner-default-test
+on:
+  workflow_dispatch:
+engine: copilot
+runs-on: self-hosted
+---
+
+# Mission
+
+Greet the user warmly.
+`
+	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+	workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+	require.NoError(t, err)
+
+	_, err = compiler.CompileToYAML(workflowData, "workflow.md")
+	require.ErrorContains(t, err, "self-hosted runner")
+
+	t.Setenv(compilerenv.RequireSelfHostedRunners, "false")
+	_, err = compiler.CompileToYAML(workflowData, "workflow.md")
+	require.NoError(t, err)
+}
+
 func TestCompileToYAML_RequiresSelfHostedRunnersFromRepoConfig(t *testing.T) {
 	t.Setenv(compilerenv.RequireSelfHostedRunners, "")
 	gitRoot := t.TempDir()
