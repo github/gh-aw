@@ -6,10 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/goccy/go-yaml"
-
 	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 )
@@ -45,7 +42,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		FrontmatterName:            toolsResult.frontmatterName,
 		FrontmatterEmoji:           toolsResult.frontmatterEmoji,
 		FrontmatterYAML:            strings.Join(result.FrontmatterLines, "\n"),
-		ActionPinSourceVersions:    sourceActionPinVersions(result),
+		ActionPinSourceVersions:    sourceActionPinVersions(result, importsResult.ActionPinSourceVersions),
 		FrontmatterFieldLines:      result.FieldLines,
 		RawMarkdown:                result.Markdown,
 		Description:                c.extractDescription(result.Frontmatter),
@@ -264,40 +261,15 @@ func (c *Compiler) buildInitialWorkflowData(
 	return workflowData
 }
 
-// sourceActionPinVersions collects inline labels from SHA-pinned frontmatter steps.
-func sourceActionPinVersions(result *parser.FrontmatterResult) map[string]string {
-	steps, ok := result.Frontmatter["steps"].([]any)
-	if !ok {
-		return nil
+// sourceActionPinVersions collects inline labels from frontmatter and imported action steps.
+func sourceActionPinVersions(result *parser.FrontmatterResult, imported map[string]string) map[string]string {
+	versions := parser.ActionPinSourceVersions([]byte(strings.Join(result.FrontmatterLines, "\n")))
+	if versions == nil {
+		versions = make(map[string]string)
 	}
-	comments := yaml.CommentMap{}
-	var decoded map[string]any
-	if err := yaml.UnmarshalWithOptions([]byte(strings.Join(result.FrontmatterLines, "\n")), &decoded, yaml.CommentToMap(comments)); err != nil {
-		return nil
-	}
-	versions := make(map[string]string)
-	for i, item := range steps {
-		step, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		uses, ok := step["uses"].(string)
-		if !ok {
-			continue
-		}
-		repo, sha, found := strings.Cut(uses, "@")
-		if !found || !gitutil.IsValidFullSHA(sha) {
-			continue
-		}
-		for _, comment := range comments[fmt.Sprintf("$.steps[%d].uses", i)] {
-			if comment.Position == yaml.CommentLinePosition {
-				for _, text := range comment.Texts {
-					if label := strings.TrimSpace(text); label != "" {
-						versions[repo+"@"+sha] = label
-					}
-					break
-				}
-			}
+	for reference, label := range imported {
+		if _, exists := versions[reference]; !exists {
+			versions[reference] = label
 		}
 	}
 	return versions

@@ -57,6 +57,7 @@ type ImportsResult struct {
 	MergedTopLevelGitHubApp       string                // JSON-encoded top-level github-app from first imported workflow that defines it
 	MergedCheckout                string                // JSON-encoded checkout configurations from imported workflows (one JSON value per line)
 	MergedPostSteps               string                // Merged post-steps configuration from all imports (appended in order)
+	ActionPinSourceVersions       map[string]string     // Inline labels for imported SHA-pinned action references
 	MergedLabels                  []string              // Merged labels from all imports (union of label names)
 	MergedCaches                  []string              // Merged cache configurations from all imports (appended in order)
 	MergedJobs                    string                // Merged jobs from imported YAML workflows (JSON format)

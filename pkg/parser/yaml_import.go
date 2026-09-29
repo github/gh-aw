@@ -70,33 +70,39 @@ func isCopilotSetupStepsFile(filePath string) bool {
 // Returns the extracted jobs in JSON format for merging
 // Special case: For copilot-setup-steps.yml, returns steps in YAML format instead of jobs
 func processYAMLWorkflowImport(filePath string) (jobs string, services string, err error) {
+	jobs, services, _, err = processYAMLWorkflowImportWithSourceVersions(filePath)
+	return jobs, services, err
+}
+
+func processYAMLWorkflowImportWithSourceVersions(filePath string) (jobs string, services string, sourceVersions map[string]string, err error) {
 	yamlImportLog.Printf("Processing YAML workflow import: %s", filePath)
 
 	content, err := readYAMLWorkflowImportFile(filePath)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	workflow, err := parseAndValidateYAMLWorkflowImport(filePath, content)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
+	sourceVersions = ActionPinSourceVersions(content)
 
 	if isCopilotSetupStepsFile(filePath) {
 		yamlImportLog.Printf("Detected copilot-setup-steps.yml - extracting steps from setup job")
 		stepsYAML, err := extractStepsFromCopilotSetup(workflow)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to extract steps from copilot-setup-steps.yml: %w", err)
+			return "", "", nil, fmt.Errorf("failed to extract steps from copilot-setup-steps.yml: %w", err)
 		}
-		return stepsYAML, "", nil
+		return stepsYAML, "", sourceVersions, nil
 	}
 
 	jobsJSON, jobsMap, err := extractJobsJSON(workflow)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	servicesJSON := extractServicesJSONFromJobs(jobsMap)
-	return jobsJSON, servicesJSON, nil
+	return jobsJSON, servicesJSON, sourceVersions, nil
 }
 
 func readYAMLWorkflowImportFile(filePath string) ([]byte, error) {
