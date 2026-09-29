@@ -16,6 +16,7 @@ Use this pattern when a workflow must perform a controlled write action after th
 - Respect staged mode by checking `GH_AW_SAFE_OUTPUTS_STAGED === 'true'`.
 - Preview in staged mode instead of performing the real side effect.
 - Use warnings for skippable invalid items and fail the job only for fatal errors.
+- If a step reads an agent-written file outside the compiler's built-in known paths, declare it under `artifacts:` (array of `/tmp/gh-aw/`-rooted paths — files, directories, or globs). Undeclared paths are silently dropped and never reach the job.
 
 ## Minimal Shape
 
