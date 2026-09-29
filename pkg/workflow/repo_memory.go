@@ -67,12 +67,12 @@ type RepoMemoryEntry struct {
 
 // RepoMemoryLedgerConfig enables the ledger projection for this memory.
 type RepoMemoryLedgerConfig struct {
-	Schema          string                           `yaml:"schema,omitempty"`
-	MaxShards       int                              `yaml:"max-shards,omitempty"`
-	MaxSegmentBytes int                              `yaml:"max-segment-bytes,omitempty"`
-	MaxRecordBytes  int                              `yaml:"max-record-bytes,omitempty"`
-	MaxPatchBytes   int                              `yaml:"max-patch-bytes,omitempty"`
-	Compactor       *RepoMemoryLedgerCompactorConfig `yaml:"compactor,omitempty"`
+	Schema       string                           `yaml:"schema,omitempty"`
+	MaxShards    int                              `yaml:"max-shards,omitempty"`
+	MaxSegmentKB int                              `yaml:"max-segment-kb,omitempty"`
+	MaxRecordKB  int                              `yaml:"max-record-kb,omitempty"`
+	MaxPatchKB   int                              `yaml:"max-patch-kb,omitempty"`
+	Compactor    *RepoMemoryLedgerCompactorConfig `yaml:"compactor,omitempty"`
 }
 
 // RepoMemoryLedgerCompactorConfig configures trusted deterministic ledger compaction.
@@ -789,14 +789,14 @@ func appendRepoMemoryLedgerCompactorEnv(step *strings.Builder, ledger *RepoMemor
 		fmt.Fprintf(step, "          LEDGER_COMPACTOR_SCRIPT_B64: %s\n", compactor)
 	}
 	if ledger != nil {
-		if ledger.MaxSegmentBytes > 0 {
-			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_SEGMENT_BYTES: %d\n", ledger.MaxSegmentBytes)
+		if ledger.MaxSegmentKB > 0 {
+			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_SEGMENT_KB: %d\n", ledger.MaxSegmentKB)
 		}
-		if ledger.MaxRecordBytes > 0 {
-			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_RECORD_BYTES: %d\n", ledger.MaxRecordBytes)
+		if ledger.MaxRecordKB > 0 {
+			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_RECORD_KB: %d\n", ledger.MaxRecordKB)
 		}
-		if ledger.MaxPatchBytes > 0 {
-			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_PATCH_BYTES: %d\n", ledger.MaxPatchBytes)
+		if ledger.MaxPatchKB > 0 {
+			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_PATCH_KB: %d\n", ledger.MaxPatchKB)
 		}
 	}
 }

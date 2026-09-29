@@ -33,10 +33,13 @@ var repoMemoryLedgerSchemaPathPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 var repoMemoryLedgerIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 const (
-	maxRepoMemoryLedgerShards       = 1024
-	maxRepoMemoryLedgerSegmentBytes = 10 * 1024 * 1024
-	maxRepoMemoryLedgerRecordBytes  = 32 * 1024
-	maxRepoMemoryLedgerPatchBytes   = 10 * 1024 * 1024
+	maxRepoMemoryLedgerShards      = 1024
+	defaultRepoMemoryLedgerSegment = defaultRepoMemoryMaxFileSize / 1024
+	defaultRepoMemoryLedgerRecord  = 32
+	defaultRepoMemoryLedgerPatch   = defaultRepoMemoryMaxPatchSize / 1024
+	maxRepoMemoryLedgerSegmentKB   = 10 * 1024
+	maxRepoMemoryLedgerRecordKB    = 32
+	maxRepoMemoryLedgerPatchKB     = maxRepoMemoryPatchSize / 1024
 )
 
 func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
@@ -75,7 +78,7 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 			continue
 		}
 		if key != "schema" {
-			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, max-segment-bytes, max-record-bytes, max-patch-bytes, and compactor are supported)", key)
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema, max-shards, max-segment-kb, max-record-kb, max-patch-kb, and compactor are supported)", key)
 		}
 		schema, ok := value.(string)
 		if !ok {
@@ -86,8 +89,16 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 		}
 		config.Schema = schema
 	}
-	if config.MaxSegmentBytes > 0 && config.MaxRecordBytes > config.MaxSegmentBytes {
-		return nil, errors.New("tools.repo-memory.ledger.max-record-bytes cannot exceed max-segment-bytes")
+	maxSegmentKB := config.MaxSegmentKB
+	if maxSegmentKB == 0 {
+		maxSegmentKB = defaultRepoMemoryLedgerSegment
+	}
+	maxRecordKB := config.MaxRecordKB
+	if maxRecordKB == 0 {
+		maxRecordKB = defaultRepoMemoryLedgerRecord
+	}
+	if maxRecordKB > maxSegmentKB {
+		return nil, errors.New("tools.repo-memory.ledger.max-record-kb cannot exceed max-segment-kb")
 	}
 	return config, nil
 }
@@ -97,9 +108,9 @@ func applyRepoMemoryLedgerLimit(config *RepoMemoryLedgerConfig, key string, raw 
 		target *int
 		max    int
 	}{
-		"max-segment-bytes": {&config.MaxSegmentBytes, maxRepoMemoryLedgerSegmentBytes},
-		"max-record-bytes":  {&config.MaxRecordBytes, maxRepoMemoryLedgerRecordBytes},
-		"max-patch-bytes":   {&config.MaxPatchBytes, maxRepoMemoryLedgerPatchBytes},
+		"max-segment-kb": {&config.MaxSegmentKB, maxRepoMemoryLedgerSegmentKB},
+		"max-record-kb":  {&config.MaxRecordKB, maxRepoMemoryLedgerRecordKB},
+		"max-patch-kb":   {&config.MaxPatchKB, maxRepoMemoryLedgerPatchKB},
 	}
 	limit, ok := limits[key]
 	if !ok {
@@ -120,6 +131,45 @@ func validateRepoMemoryLedgerSchemaPath(schema string) error {
 		return fmt.Errorf("tools.repo-memory.ledger.schema must be a repository-relative path without traversal or expressions, got %q", schema)
 	}
 	return nil
+}
+
+func repoMemoryLedgerLimitWarnings(config *RepoMemoryConfig) []string {
+	memory := config.ledgerEntry()
+	if memory == nil {
+		return nil
+	}
+	maxFileSize := memory.MaxFileSize
+	if maxFileSize <= 0 {
+		maxFileSize = defaultRepoMemoryMaxFileSize
+	}
+	maxPatchSize := memory.MaxPatchSize
+	if maxPatchSize <= 0 {
+		maxPatchSize = defaultRepoMemoryMaxPatchSize
+	}
+	maxSegmentKB := memory.Ledger.MaxSegmentKB
+	if maxSegmentKB <= 0 {
+		maxSegmentKB = defaultRepoMemoryLedgerSegment
+	}
+	maxRecordKB := memory.Ledger.MaxRecordKB
+	if maxRecordKB <= 0 {
+		maxRecordKB = defaultRepoMemoryLedgerRecord
+	}
+	maxPatchKB := memory.Ledger.MaxPatchKB
+	if maxPatchKB <= 0 {
+		maxPatchKB = defaultRepoMemoryLedgerPatch
+	}
+
+	var warnings []string
+	if maxSegmentKB*1024 > maxFileSize {
+		warnings = append(warnings, fmt.Sprintf("tools.repo-memory.ledger.max-segment-kb (%d KiB) exceeds repo-memory max-file-size (%d bytes); larger ledger segments may not persist", maxSegmentKB, maxFileSize))
+	}
+	if maxRecordKB*1024 > maxFileSize {
+		warnings = append(warnings, fmt.Sprintf("tools.repo-memory.ledger.max-record-kb (%d KiB) exceeds repo-memory max-file-size (%d bytes); larger ledger records may not persist", maxRecordKB, maxFileSize))
+	}
+	if maxPatchKB*1024 > maxPatchSize {
+		warnings = append(warnings, fmt.Sprintf("tools.repo-memory.ledger.max-patch-kb (%d KiB) exceeds repo-memory max-patch-size (%d bytes); the persistence job may reject larger patches", maxPatchKB, maxPatchSize))
+	}
+	return warnings
 }
 
 var repoMemValidationLog = logger.New("workflow:repo_memory_validation")

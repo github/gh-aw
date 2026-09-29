@@ -12,6 +12,11 @@ function parsePositiveInteger(value) {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
+function parseKilobytes(value) {
+  const parsed = parsePositiveInteger(value);
+  return parsed === undefined ? undefined : parsed * 1024;
+}
+
 function result(value) {
   return { content: [{ type: "text", text: JSON.stringify(value === undefined ? null : value) }] };
 }
@@ -59,9 +64,9 @@ function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPa
     memoryDir,
     schemaPath: resolveSchemaPath(schemaPath, schemaRoot),
     maxFiles: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_SHARDS),
-    maxSegmentBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_SEGMENT_BYTES),
-    maxRecordBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_RECORD_BYTES),
-    maxPatchBytes: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_PATCH_BYTES),
+    maxSegmentBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_SEGMENT_KB),
+    maxRecordBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_RECORD_KB),
+    maxPatchBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_PATCH_KB),
   });
   const server = createServer({ name: "ledger", version: "1.0.0" });
 

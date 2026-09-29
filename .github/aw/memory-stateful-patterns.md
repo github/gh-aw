@@ -136,10 +136,11 @@ and resolve conflicts using deterministic application rules; the ledger
 converges after branch merges but does not provide transactions.
 
 The ledger is experimental and bounded to 1024 shard files by default (set
-`ledger.max-shards` to choose a lower limit), 32 KiB per record and 10 MiB per
-shard, and 500 records per query. A new writer shard is created by each workflow
+`ledger.max-shards` to choose a lower limit), 32 KiB per record and 100 KiB per
+shard by default, and 500 records per query. A new writer shard is created by each workflow
 invocation. An optional trusted compactor can create verified replacement
 segments; runtime retirement is fail-open and excludes the current writer shard.
-Avoid it for replaceable snapshots or expiring baselines. Configure lower
-`max-segment-bytes`, `max-record-bytes`, and `max-patch-bytes` limits when daily
-volume needs tighter bounds.
+The default per-run append limit is 10 KiB. Configure `max-segment-kb`,
+`max-record-kb`, and `max-patch-kb` when daily volume needs tighter bounds;
+compilation warns if those limits exceed the repo-memory file or patch limits.
+Avoid it for replaceable snapshots or expiring baselines.

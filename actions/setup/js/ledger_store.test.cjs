@@ -196,7 +196,11 @@ describe("Ledger", () => {
   });
 
   it("uses a default shard limit of 1024", () => {
-    expect(new Ledger({ memoryDir }).maxFiles).toBe(1024);
+    const defaults = new Ledger({ memoryDir });
+    expect(defaults.maxFiles).toBe(1024);
+    expect(defaults.maxSegmentBytes).toBe(100 * 1024);
+    expect(defaults.maxRecordBytes).toBe(32 * 1024);
+    expect(defaults.maxPatchBytes).toBe(10 * 1024);
   });
 
   it("applies configurable record, segment, and patch bounds", () => {

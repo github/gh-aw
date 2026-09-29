@@ -756,15 +756,15 @@ async function main() {
         : [];
       const parseLedgerLimit = name => {
         const value = process.env[name];
-        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined;
+        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) * 1024 : undefined;
       };
       const ledger = new Ledger({
         memoryDir: destMemoryPath,
         excludeSegments: excludedSegments,
         maxFiles: parseLedgerLimit("GH_AW_LEDGER_MAX_SHARDS"),
-        maxSegmentBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_SEGMENT_BYTES"),
-        maxRecordBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_RECORD_BYTES"),
-        maxPatchBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_PATCH_BYTES"),
+        maxSegmentBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_SEGMENT_KB"),
+        maxRecordBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_RECORD_KB"),
+        maxPatchBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_PATCH_KB"),
       });
       const before = ledger.listSegments({ closed: true }).length;
       const compaction = await ledger.runCompactor(script);

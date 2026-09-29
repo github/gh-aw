@@ -144,6 +144,36 @@ describe("ledger MCP server", () => {
     });
   });
 
+  it("converts configured ledger size limits from KiB to bytes", () => {
+    withMemory(memoryDir => {
+      const names = ["GH_AW_LEDGER_MAX_SEGMENT_KB", "GH_AW_LEDGER_MAX_RECORD_KB", "GH_AW_LEDGER_MAX_PATCH_KB"];
+      const previous = names.map(name => process.env[name]);
+      process.env.GH_AW_LEDGER_MAX_SEGMENT_KB = "2";
+      process.env.GH_AW_LEDGER_MAX_RECORD_KB = "1";
+      process.env.GH_AW_LEDGER_MAX_PATCH_KB = "2";
+      try {
+        const server = createLedgerServer({ memoryDir });
+        const response = invoke(server, "ledger_append", { type: "build", payload: { data: "x".repeat(1500) } });
+        expect(response.isError).toBe(true);
+        expect(response.content[0].text).toContain("patch-size limit");
+        expect(require("node:fs").existsSync(path.join(memoryDir, "ledger", "shards"))).toBe(false);
+
+        process.env.GH_AW_LEDGER_MAX_RECORD_KB = "2";
+        process.env.GH_AW_LEDGER_MAX_PATCH_KB = "1";
+        const patchBounded = createLedgerServer({ memoryDir });
+        const patchResponse = invoke(patchBounded, "ledger_append", { type: "build", payload: { data: "x".repeat(1500) } });
+        expect(patchResponse.isError).toBe(true);
+        expect(patchResponse.content[0].text).toContain("patch-size limit");
+        expect(require("node:fs").existsSync(path.join(memoryDir, "ledger", "shards"))).toBe(false);
+      } finally {
+        names.forEach((name, index) => {
+          if (previous[index] === undefined) delete process.env[name];
+          else process.env[name] = previous[index];
+        });
+      }
+    });
+  });
+
   it("is copied into setup actions directory alongside its local dependencies", () => {
     const setup = readFileSync(path.join(__dirname, "../setup.sh"), "utf8");
     expect(setup).toContain('for file in "${JS_SOURCE_DIR}"/*.cjs; do');

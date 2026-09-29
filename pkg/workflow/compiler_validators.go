@@ -483,6 +483,10 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 	}
 
 	c.emitExperimentalFeatureWarnings(workflowData)
+	for _, warning := range repoMemoryLedgerLimitWarnings(workflowData.RepoMemoryConfig) {
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warning))
+		c.IncrementWarningCount()
+	}
 	c.emitSamplesCoverageWarnings(workflowData, markdownPath)
 	if len(workflowData.Command) > 0 && len(workflowData.Bots) > 0 {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",

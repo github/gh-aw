@@ -8,7 +8,9 @@ const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const MAX_FILES = 1024;
 const MAX_SEGMENT_BYTES = 10 * 1024 * 1024;
+const DEFAULT_SEGMENT_BYTES = 100 * 1024;
 const MAX_RECORD_BYTES = 32 * 1024;
+const DEFAULT_PATCH_BYTES = 10 * 1024;
 const MAX_SCHEMA_BYTES = 1024 * 1024;
 const MAX_PARENTS = 64;
 const MAX_QUERY_LIMIT = 500;
@@ -211,7 +213,7 @@ function sqlPayloadFilter(filters, type) {
 
 class Ledger {
   /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, maxSegmentBytes?: number, maxRecordBytes?: number, clock?: () => Date, excludeSegments?: string[]}} [options] */
-  constructor({ memoryDir, schemaPath, maxFiles = MAX_FILES, maxPatchBytes = MAX_SEGMENT_BYTES, maxSegmentBytes = MAX_SEGMENT_BYTES, maxRecordBytes = MAX_RECORD_BYTES, clock = () => new Date(), excludeSegments = [] } = {}) {
+  constructor({ memoryDir, schemaPath, maxFiles = MAX_FILES, maxPatchBytes = DEFAULT_PATCH_BYTES, maxSegmentBytes = DEFAULT_SEGMENT_BYTES, maxRecordBytes = MAX_RECORD_BYTES, clock = () => new Date(), excludeSegments = [] } = {}) {
     if (typeof memoryDir !== "string" || !memoryDir.trim()) throw new TypeError("memoryDir is required");
     if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || maxFiles > MAX_FILES) throw new RangeError("Invalid maxFiles");
     if (!Number.isSafeInteger(maxSegmentBytes) || maxSegmentBytes < 1 || maxSegmentBytes > MAX_SEGMENT_BYTES) throw new RangeError("Invalid maxSegmentBytes");

@@ -235,12 +235,14 @@ directly.
 
 The ledger is experimental and bounded: it inspects at most 1024 shard files
 (configurable with `ledger.max-shards`), each record is limited to 32 KiB, each
-shard is limited to 10 MiB, and each query returns at most 500 records. The
-`max-segment-bytes`, `max-record-bytes`, and `max-patch-bytes` fields can lower
-the storage limits for a workflow.
+shard defaults to 100 KiB, each run defaults to a 10 KiB append budget, and each
+query returns at most 500 records. Configure limits with
+`max-segment-kb`, `max-record-kb`, and `max-patch-kb`; defaults align with
+repo-memory's 100 KiB per-file and 10 KiB per-push defaults. Compilation warns
+when ledger limits exceed the corresponding repo-memory persistence limits.
 Each writing workflow invocation creates a shard, so a frequently running
 workflow can exhaust the shard limit. Use ordinary repo-memory files for
-replaceable snapshots, pruned baselines, or histories that need more than 100
+replaceable snapshots, pruned baselines, or histories that need more than 1024
 writer shards. An optional trusted `ledger.compactor.script` can create verified
 replacement segments; the runtime alone decides when stable covered sources are
 safe to retire. Compaction is fail-open and its counts are included in the

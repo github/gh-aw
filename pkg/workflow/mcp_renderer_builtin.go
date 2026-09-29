@@ -73,14 +73,14 @@ func ledgerMCPConfiguredEnvNames(workflowData *WorkflowData) []string {
 	if memory.Ledger.MaxShards > 0 {
 		names = append(names, "GH_AW_LEDGER_MAX_SHARDS")
 	}
-	if memory.Ledger.MaxSegmentBytes > 0 {
-		names = append(names, "GH_AW_LEDGER_MAX_SEGMENT_BYTES")
+	if memory.Ledger.MaxSegmentKB > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_SEGMENT_KB")
 	}
-	if memory.Ledger.MaxRecordBytes > 0 {
-		names = append(names, "GH_AW_LEDGER_MAX_RECORD_BYTES")
+	if memory.Ledger.MaxRecordKB > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_RECORD_KB")
 	}
-	if memory.Ledger.MaxPatchBytes > 0 {
-		names = append(names, "GH_AW_LEDGER_MAX_PATCH_BYTES")
+	if memory.Ledger.MaxPatchKB > 0 {
+		names = append(names, "GH_AW_LEDGER_MAX_PATCH_KB")
 	}
 	return names
 }
