@@ -302,11 +302,18 @@ func transformExperimentsExpression(expr string) string {
 // transformAwContextExpression rewrites github.aw.context.<field> references to
 // parsed aw_context access expressions.
 //
+// These expressions only ever appear in prompt content rendered by the activation
+// job's own steps (see generatePrompt), so they must read the normalized value from
+// the step that produces it (steps.generate_aw_info.outputs.aw_context) rather than
+// needs.activation.outputs.aw_context: a job cannot reference its own output via
+// needs.<self>, and the activation job is the one that both emits and consumes this
+// output.
+//
 // Example:
 //
-//	github.aw.context.item_number -> fromJSON(needs.activation.outputs.aw_context || '{}').item_number
+//	github.aw.context.item_number -> fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number
 func transformAwContextExpression(expr string) string {
-	return awContextExpressionRegex.ReplaceAllString(expr, "fromJSON(needs.activation.outputs.aw_context || '{}').$1$2")
+	return awContextExpressionRegex.ReplaceAllString(expr, "fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').$1$2")
 }
 
 // simpleIdentifierRegex matches simple JavaScript property access chains like

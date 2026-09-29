@@ -141,7 +141,7 @@ func TestExpressionExtractor_ExtractExpressions(t *testing.T) {
 			name:            "aw context syntax sugar gets transformed",
 			markdown:        "Issue: ${{ github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number) }}",
 			wantCount:       1,
-			wantExpressions: []string{"github.event.issue.number || (fromJSON(needs.activation.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(needs.activation.outputs.aw_context || '{}').item_number)"},
+			wantExpressions: []string{"github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number)"},
 		},
 		{
 			name:            "aw context syntax sugar with hyphenated field does not transform",
