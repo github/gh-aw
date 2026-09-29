@@ -1,0 +1,37 @@
+{
+ "githubnext/gh-aw-cao": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-29",
+  "score": 9,
+  "summary": "Policy-gated control plane running review-first agentic campaigns across repo fleets.",
+  "highlights": [
+   "docs/admission.md: pre-activation admission gates, narrow-only dispatch",
+   "docs/architecture-at-a-glance.md: catalog/control/orchestrator/worker split",
+   "skills/: Agent Plugin skills (setup-cao, debug-cao, ...)"
+  ],
+  "blogged": true
+ },
+ "rshade/gh-aw-fleet": {
+  "kind": "extension",
+  "reviewed": "2026-09-29",
+  "score": 7,
+  "summary": "Declarative fleet manager (fleet.json) that reconciles gh-aw installs via PRs and reports AIC consumption.",
+  "highlights": [
+   "Pin-per-profile refs, never main",
+   "Thin orchestrator over gh aw add/update/upgrade",
+   "consumption subcommand rolls up cost by repo/profile/workflow"
+  ],
+  "blogged": false
+ },
+ "AgentMeter/agentmeter-action": {
+  "kind": "tool",
+  "reviewed": "2026-09-29",
+  "score": 5,
+  "summary": "Action that records agent token usage/cost and comments on PRs; not gh-aw specific, SaaS-backed.",
+  "highlights": [
+   "Never fails the workflow on API errors",
+   "PR/issue cost summary comment"
+  ],
+  "blogged": false
+ }
+}

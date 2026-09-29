@@ -1,0 +1,20 @@
+{
+ "queries": [
+  {
+   "q": "topic:agentic-workflows",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "topic:gh-aw",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "topic:github-agentic-workflows",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "gh-aw extension agentic workflows in:description",
+   "last_run": "2026-09-29"
+  }
+ ]
+}
