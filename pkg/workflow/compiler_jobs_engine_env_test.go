@@ -56,6 +56,8 @@ func TestBuildMainJobEngineEnvNeedsExpression(t *testing.T) {
 	// references its outputs; without this, needs.provide_value_to_agent would be undefined.
 	assert.Contains(t, job.Needs, "provide_value_to_agent",
 		"agent job must directly depend on provide_value_to_agent referenced in engine.env")
+	assert.Contains(t, workflowData.AgentJobNeeds, "provide_value_to_agent",
+		"agent dependencies must be available while generating safe-outputs config")
 	assert.Contains(t, job.Needs, string(constants.ActivationJobName),
 		"agent job must also depend on activation")
 }
