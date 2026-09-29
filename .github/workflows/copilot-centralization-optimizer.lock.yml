@@ -884,7 +884,7 @@ jobs:
 
           # Generate JSON config for MCP gateway
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_047acdea53132e51_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_5646550767c814ab_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "github": {
@@ -910,6 +910,7 @@ jobs:
                 "entrypointArgs": ["${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs"],
                 "env": {
                   "GH_AW_MEMORY_DIR": "\${GH_AW_MEMORY_DIR}",
+                  "GITHUB_WORKSPACE": "\${GITHUB_WORKSPACE}",
                   "GITHUB_RUN_ID": "\${GITHUB_RUN_ID}"
                 }
               },
@@ -967,7 +968,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_047acdea53132e51_EOF
+          GH_AW_MCP_CONFIG_5646550767c814ab_EOF
 
           # Sync converter output to writable CODEX_HOME for Codex
           mkdir -p /tmp/gh-aw/mcp-config

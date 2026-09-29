@@ -83,5 +83,18 @@ func TestLedgerAuditMergeStepGeneration(t *testing.T) {
 
 	var noSafeOutputs strings.Builder
 	compiler.generateLedgerAuditMergeStep(&noSafeOutputs, &WorkflowData{RepoMemoryConfig: withLedger})
-	assert.Empty(t, noSafeOutputs.String())
+	assert.Contains(t, noSafeOutputs.String(), "Merge ledger audit entries")
+}
+
+func TestLedgerOnlyEnablesAuditWithoutIssueCreation(t *testing.T) {
+	data := &WorkflowData{RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{{ID: "events", Ledger: &RepoMemoryLedgerConfig{}}}}}
+	applyDefaultCreateIssue(data)
+	require.NotNil(t, data.SafeOutputs)
+	assert.Nil(t, data.SafeOutputs.CreateIssues)
+	assert.NotNil(t, data.SafeOutputs.NoOp)
+	assert.True(t, HasSafeOutputsEnabled(data.SafeOutputs))
+	assert.NotNil(t, data.SafeOutputs.ThreatDetection)
+	config, err := generateSafeOutputsConfigIfEnabled(data)
+	require.NoError(t, err)
+	assert.Contains(t, config, "ledger_mutation")
 }

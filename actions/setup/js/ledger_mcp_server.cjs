@@ -29,7 +29,9 @@ function toolHandler(operation) {
     } catch (error) {
       // Never return filesystem paths, raw records, or runtime exception details.
       let message = "Ledger operation failed. Check ledger_status for diagnostics.";
-      if (error instanceof RangeError && /patch size|message size/i.test(error.message)) {
+      if (error instanceof RangeError && /message size/i.test(error.message)) {
+        message = "Ledger append exceeds the configured record-size limit.";
+      } else if (error instanceof RangeError && /patch size/i.test(error.message)) {
         message = "Ledger append exceeds the configured patch-size limit.";
       } else if (error instanceof RangeError && /file-count/i.test(error.message)) {
         message = "Ledger file-count limit reached; no record was appended.";

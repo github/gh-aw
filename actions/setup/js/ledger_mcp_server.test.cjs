@@ -105,7 +105,7 @@ describe("ledger MCP server", () => {
       expect(invalid.content[0].text).not.toContain(memoryDir);
       const oversized = invoke(server, "ledger_append", { type: "build", payload: { data: "x".repeat(40 * 1024) } });
       expect(oversized.isError).toBe(true);
-      expect(oversized.content[0].text).toContain("patch-size limit");
+      expect(oversized.content[0].text).toContain("record-size limit");
       expect(oversized.content[0].text).not.toContain("xxx");
       const missing = invoke(server, "ledger_append", { type: "build", payload: true, runId: "untrusted" });
       expect(JSON.stringify(output(missing))).not.toContain("untrusted");
@@ -184,7 +184,7 @@ describe("ledger MCP server", () => {
         const server = createLedgerServer({ memoryDir });
         const response = invoke(server, "ledger_append", { type: "build", payload: { data: "x".repeat(1500) } });
         expect(response.isError).toBe(true);
-        expect(response.content[0].text).toContain("patch-size limit");
+        expect(response.content[0].text).toContain("record-size limit");
         expect(require("node:fs").existsSync(path.join(memoryDir, "ledger", "shards"))).toBe(false);
 
         process.env.GH_AW_LEDGER_MAX_RECORD_KB = "2";

@@ -141,7 +141,7 @@ converges after branch merges but does not provide transactions.
 The ledger is experimental and bounded to 1024 shard files by default (set
 `ledger.max-shards` to choose a lower limit), 32 KiB per record and 100 KiB per
 shard by default, and 500 records per query. A new writer shard is created by each workflow
-invocation. `ledger.compaction` defaults to compacting 32 stable closed shards
+invocation. When configured, `ledger.compaction` defaults to compacting 32 stable closed shards
 once that threshold is reached; the trusted runtime selects, validates,
 deduplicates, writes, verifies, and retires segments. Custom JavaScript
 compactor scripts are disabled because Node's in-process VM is not a security

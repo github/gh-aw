@@ -81,6 +81,16 @@ describe("ledger_mutation.cjs handler", () => {
     expect(result.record_type.endsWith("…")).toBe(true);
   });
 
+  it("neutralizes workflow commands and line breaks in untrusted audit fields", async () => {
+    const { main } = await import("./ledger_mutation.cjs");
+    const handler = await main({});
+    const entry = auditEntry();
+    entry.record.type = "note\n::error::spoofed\r::add-mask::hidden";
+    const result = await handler(entry);
+    expect(result.record_type).not.toMatch(/[\r\n]|::/);
+    expect(mockCore.info.mock.calls.flat().join("\n")).not.toContain("::error::");
+  });
+
   it("tolerates entries without record metadata", async () => {
     const { main } = await import("./ledger_mutation.cjs");
     const handler = await main({});

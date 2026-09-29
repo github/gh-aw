@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { TextDecoder } = require("node:util");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const MAX_FILES = 1024;
@@ -243,6 +244,7 @@ class Ledger {
     this.authorizedCoverage = new Set();
     /** @type {{db: import("node:sqlite").DatabaseSync, fingerprint: string} | null} */
     this.projection = null;
+    this.cachedState = null;
     if (schemaPath !== undefined) this.validate = compileSchema(schemaPath);
   }
 
@@ -302,8 +304,7 @@ class Ledger {
   }
 
   readRecords(segmentId) {
-    const segment = this.listSegments({ closed: false, excludeCurrent: false }).find(item => item.id === segmentId);
-    if (!segment) throw new TypeError("Unknown ledger segment");
+    if (!SEGMENT_ID.test(segmentId)) throw new TypeError("Unknown ledger segment");
     const fullPath = this.segmentPath(segmentId);
     const stat = fs.lstatSync(fullPath);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > this.maxSegmentBytes) throw new TypeError("Invalid ledger segment file");
@@ -313,19 +314,23 @@ class Ledger {
       const buffer = Buffer.alloc(this.maxSegmentBytes + 1);
       const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
       if (length > this.maxSegmentBytes) throw new RangeError("Ledger segment exceeds maximum size");
-      content = buffer.subarray(0, length).toString("utf8");
+      content = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
     } finally {
       fs.closeSync(fd);
     }
+    if (!content.endsWith("\n")) throw new TypeError("Ledger segment has an incomplete record");
     const records = [];
-    for (const line of content.split("\n")) {
-      if (!line) continue;
+    for (const line of content.slice(0, -1).split("\n")) {
+      let record;
       try {
-        const record = JSON.parse(line);
-        if (recordShape(record) && sha256(Object.fromEntries(Object.entries(record).filter(([key]) => key !== "sha"))) === record.sha) records.push(record);
+        record = JSON.parse(line);
       } catch {
-        // Ignore malformed records; reconstruction reports them through diagnostics.
+        throw new TypeError("Ledger segment contains an invalid record");
       }
+      if (!recordShape(record) || line !== canonicalJSON(record) || sha256(Object.fromEntries(Object.entries(record).filter(([key]) => key !== "sha"))) !== record.sha || (this.validate && !this.validate(record.payload))) {
+        throw new TypeError("Ledger segment contains an invalid record");
+      }
+      records.push(record);
     }
     return records.sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
   }
@@ -398,8 +403,13 @@ class Ledger {
 
   retireCovered() {
     if (!fs.existsSync(this.coverageDir)) return 0;
-    const state = this.reconstruct();
-    const available = new Map(this.listSegments({ closed: false, excludeCurrent: true }).map(segment => [segment.id, segment]));
+    const available = new Set(
+      fs
+        .readdirSync(this.shardDir)
+        .filter(file => file.endsWith(".jsonl") && SEGMENT_ID.test(file.slice(0, -6)))
+        .map(file => file.slice(0, -6))
+        .filter(id => id !== this.writerId && !this.excludeSegments.has(id))
+    );
     let retired = 0;
     let changed = false;
     for (const id of [...this.authorizedCoverage].sort()) {
@@ -429,8 +439,6 @@ class Ledger {
       )
         continue;
       const declarationFile = path.join(this.coverageDir, file);
-      const invalidFiles = new Set(state.diagnostics.filter(diagnostic => diagnostic.file && !["duplicate-id", "duplicate-id-conflict"].includes(diagnostic.code)).map(diagnostic => diagnostic.file));
-      if (declaration.sources.some(source => invalidFiles.has(`${source}.jsonl`)) || invalidFiles.has(`${declaration.replacement}.jsonl`)) continue;
       let replacementRecords;
       try {
         replacementRecords = this.readRecords(declaration.replacement);
@@ -457,6 +465,7 @@ class Ledger {
         const sourcePath = this.segmentPath(source);
         if (fs.existsSync(sourcePath)) {
           fs.unlinkSync(sourcePath);
+          available.delete(source);
           retired++;
           changed = true;
         }
@@ -512,7 +521,10 @@ class Ledger {
 
   reconstruct() {
     const diagnostics = [];
-    if (!checkShardDirectories(this.shardDir)) return emptyState();
+    if (!checkShardDirectories(this.shardDir)) {
+      this.cachedState = null;
+      return emptyState();
+    }
     let files;
     try {
       files = fs
@@ -523,6 +535,18 @@ class Ledger {
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return emptyState();
       throw error;
     }
+    let fingerprint;
+    try {
+      fingerprint = files.map(file => {
+        const stat = fs.lstatSync(path.join(this.shardDir, file), { bigint: true });
+        return [file, stat.dev.toString(), stat.ino.toString(), stat.mode.toString(), stat.size.toString(), stat.mtimeNs.toString(), stat.ctimeNs.toString()];
+      });
+    } catch {
+      // Reconstruct with diagnostics if an entry disappears during inspection.
+    }
+    const key = fingerprint && JSON.stringify(fingerprint);
+    const cached = this.cachedState;
+    if (key && cached && cached.key === key) return cached.state;
     if (files.length > this.maxFiles) {
       diagnostics.push({ code: "invalid-envelope", detail: `Only the first ${this.maxFiles} ledger shards were inspected` });
       files.length = this.maxFiles;
@@ -561,7 +585,7 @@ class Ledger {
             continue;
           }
           raw = buffer.subarray(0, length);
-          content = raw.toString("utf8");
+          content = new TextDecoder("utf-8", { fatal: true }).decode(raw);
         } finally {
           fs.closeSync(fd);
         }
@@ -608,7 +632,6 @@ class Ledger {
             continue;
           }
           if (bySha.has(sha)) {
-            diagnostics.push({ code: "duplicate-id", ...position });
             continue;
           }
           if (ids.has(record.id)) diagnostics.push({ code: ids.get(record.id) === sha ? "duplicate-id" : "duplicate-id-conflict", ...position, id: record.id });
@@ -641,7 +664,9 @@ class Ledger {
       .filter(record => !parents.has(record.sha))
       .map(record => record.sha)
       .sort();
-    return { records, heads, shard_count: files.length, diagnostics, shards, locations };
+    const state = { records, heads, shard_count: files.length, diagnostics, shards, locations };
+    this.cachedState = key ? { key, state } : null;
+    return state;
   }
 
   append(type, payload) {
@@ -745,21 +770,26 @@ class Ledger {
       }
     }
     this.writtenBytes += line.length;
+    this.cachedState = null;
     if (this.projection) {
       const previous = this.projection;
       this.projection = null;
       previous.db.close();
     }
-    this.auditMutation("append", {
-      record: {
-        id: record.id,
-        type: record.type,
-        timestamp: record.timestamp,
-        parents: record.parents,
-        sha: record.sha,
-        payload_sha: sha256(record.payload),
-      },
-    });
+    try {
+      this.auditMutation("append", {
+        record: {
+          id: record.id,
+          type: record.type,
+          timestamp: record.timestamp,
+          parents: record.parents,
+          sha: record.sha,
+          payload_sha: sha256(record.payload),
+        },
+      });
+    } catch {
+      process.stderr.write("Ledger audit failed after durable append\n");
+    }
     return record;
   }
 

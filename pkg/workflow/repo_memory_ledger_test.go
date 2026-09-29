@@ -137,6 +137,7 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	assert.Contains(t, rendered.String(), constants.DefaultGhAwMount)
 	assert.Contains(t, rendered.String(), constants.DefaultTmpGhAwMount)
 	assert.Contains(t, rendered.String(), `\${GH_AW_MEMORY_DIR}`)
+	assert.Contains(t, rendered.String(), `\${GITHUB_WORKSPACE}`)
 	assert.Contains(t, rendered.String(), `\${GH_AW_LEDGER_SCHEMA}`)
 	assert.NotContains(t, rendered.String(), "GH_AW_LEDGER_SCHEMA_ROOT")
 

@@ -48,6 +48,7 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 	yaml.WriteString("                \"entrypointArgs\": [\"${RUNNER_TEMP}/gh-aw/actions/ledger_mcp_server.cjs\"],\n")
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"GH_AW_MEMORY_DIR\": \"\\${GH_AW_MEMORY_DIR}\",\n")
+	yaml.WriteString("                  \"GITHUB_WORKSPACE\": \"\\${GITHUB_WORKSPACE}\",\n")
 	for _, name := range ledgerMCPConfiguredEnvNames(workflowData) {
 		yaml.WriteString("                  \"" + name + "\": \"\\${" + name + "}\",\n")
 	}

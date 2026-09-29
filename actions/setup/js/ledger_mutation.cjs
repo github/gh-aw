@@ -20,7 +20,7 @@ const MAX_FIELD_LENGTH = 128;
  */
 function renderField(value) {
   if (value === undefined || value === null) return "";
-  const text = Array.isArray(value) ? value.map(item => renderField(item)).join(", ") : String(value);
+  const text = (Array.isArray(value) ? value.map(item => renderField(item)).join(", ") : String(value)).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/::/g, ": :");
   return text.length > MAX_FIELD_LENGTH ? `${text.slice(0, MAX_FIELD_LENGTH)}…` : text;
 }
 

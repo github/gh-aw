@@ -133,11 +133,14 @@ returned record's SHA when more matches remain, and `null` otherwise. Each page
 uses the same query filters and limit. Pagination is not a snapshot: concurrent
 writes may add matches between requests.
 
-After a durable append, the server MUST serialize one `ledger_mutation` event
+After a durable append, the server MUST attempt to serialize one `ledger_mutation` event
 to the ledger transaction log. The event MUST identify the operation, record ID,
 record type, timestamp, parent hashes, record SHA, and a hash of the payload.
-Payload contents MUST NOT be copied into this audit event. A failed audit write
-MUST NOT be represented as a successful mutation.
+Payload contents MUST NOT be copied into this audit event. Once a shard is
+durable, an audit-write failure MUST NOT cause the append to report failure:
+the server reports the audit failure separately without exposing payloads or
+filesystem paths. Such failures leave a gap in the transaction log; the
+authoritative ledger remains the validated shards, not the audit trail.
 
 The ledger transaction log MUST be a dedicated file. It MUST NOT be the
 safe-output manifest, because the manifest records outputs the runtime executed,

@@ -36,6 +36,25 @@ describe("Ledger", () => {
     expect(() => ledger.append("note", { missing: undefined })).toThrow();
   });
 
+  it("reuses unchanged shard reconstruction but notices external edits and local appends", () => {
+    const first = ledger.append("note", { value: 1 });
+    const read = vi.spyOn(fs, "readSync");
+    try {
+      expect(ledger.query({ type: "note" }).rows).toHaveLength(1);
+      const inspected = read.mock.calls.length;
+      expect(ledger.query({ type: "note" }).rows).toHaveLength(1);
+      expect(read).toHaveBeenCalledTimes(inspected);
+      new Ledger({ memoryDir }).append("note", { value: 2 });
+      expect(ledger.query({ type: "note" }).rows).toHaveLength(2);
+      expect(read.mock.calls.length).toBeGreaterThan(inspected);
+      ledger.append("note", { value: 3 });
+      expect(ledger.get(first.sha)).toEqual(first);
+      expect(ledger.query({ type: "note" }).rows).toHaveLength(3);
+    } finally {
+      read.mockRestore();
+    }
+  });
+
   it("serializes successful agent mutations to the safe-output transaction log", () => {
     const transactionLogPath = path.join(memoryDir, "safe-output-items.jsonl");
     const audited = new Ledger({ memoryDir, transactionLogPath, clock: () => new Date("2026-09-29T00:00:00.000Z") });
@@ -48,6 +67,18 @@ describe("Ledger", () => {
       record: { id: record.id, type: "note", sha: record.sha, payload_sha: sha256(record.payload) },
     });
     expect(JSON.stringify(entry)).not.toContain("not copied into the audit event");
+  });
+
+  it("acknowledges durable appends when the audit transaction log cannot be written", () => {
+    const audited = new Ledger({ memoryDir, transactionLogPath: memoryDir });
+    const warning = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const record = audited.append("note", { value: 1 });
+      expect(audited.get(record.sha)).toEqual(record);
+      expect(warning).toHaveBeenCalledWith(expect.stringContaining("Ledger audit failed after durable append"));
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("reconstructs concurrent heads, preserves orphan records and quarantines corrupt lines", () => {
@@ -109,8 +140,8 @@ describe("Ledger", () => {
     expect(state.records.map(record => record.sha).sort()).toEqual([first.sha, next.sha, conflict.sha].sort());
     expect(validated.get(conflict.sha)).toEqual(conflict);
     expect(validated.get(first.id)).toEqual(first);
-    expect(state.diagnostics.map(entry => entry.code).sort()).toEqual(["duplicate-id", "duplicate-id-conflict", "invalid-envelope", "invalid-json", "invalid-schema", "unsupported-version"]);
-    expect(validated.status()).toMatchObject({ invalidRecords: 6, incompleteRecords: 0 });
+    expect(state.diagnostics.map(entry => entry.code).sort()).toEqual(["duplicate-id-conflict", "invalid-envelope", "invalid-json", "invalid-schema", "unsupported-version"]);
+    expect(validated.status()).toMatchObject({ invalidRecords: 5, incompleteRecords: 0 });
   });
 
   it("projects into disposable SQLite and bounds parameterized payload queries", () => {
@@ -256,6 +287,36 @@ describe("Ledger", () => {
     expect(compactor.get(first.sha)).toEqual(first);
     expect(compactor.get(secondLedger.status().heads[0])).toMatchObject({ type: "note" });
     expect(compactor.listSegments()).toHaveLength(1);
+  });
+
+  it("retires sources even when the replacement temporarily exceeds the shard limit", async () => {
+    ledger.append("note", { value: 1 });
+    new Ledger({ memoryDir }).append("note", { value: 2 });
+    const compactor = new Ledger({ memoryDir, maxFiles: 2 });
+    expect(await compactor.compact({ minSegments: 2, maxSegments: 2 })).toMatchObject({ changed: true, retired: 2, after: 1 });
+    expect(compactor.status()).toMatchObject({ shards: 1, validRecords: 2 });
+  });
+
+  it.each([
+    ["noncanonical JSON", record => `${JSON.stringify(record)}\n`],
+    ["truncated JSONL", record => canonicalJSON(record)],
+    ["invalid UTF-8", record => Buffer.concat([Buffer.from(`${canonicalJSON(record)}\n`), Buffer.from([0xff])])],
+    ["malformed record", record => `${canonicalJSON(record)}\n{}\n`],
+  ])("refuses to compact a source with %s", async (_name, change) => {
+    const record = ledger.append("note", { value: 1 });
+    const other = new Ledger({ memoryDir });
+    other.append("note", { value: 2 });
+    const shard = path.join(ledger.shardDir, `${ledger.writerId}.jsonl`);
+    fs.writeFileSync(shard, change(record));
+    const compactor = new Ledger({ memoryDir });
+    await expect(compactor.compact({ minSegments: 2, maxSegments: 2 })).rejects.toThrow();
+    expect(fs.readdirSync(compactor.shardDir).filter(file => file.endsWith(".jsonl"))).toHaveLength(2);
+  });
+
+  it("quarantines malformed UTF-8 instead of decoding it with replacement characters", () => {
+    ledger.append("note", { value: 1 });
+    fs.appendFileSync(path.join(ledger.shardDir, `${ledger.writerId}.jsonl`), Buffer.from([0xff]));
+    expect(ledger.status()).toMatchObject({ validRecords: 0, invalidRecords: 1 });
   });
 
   it("deduplicates and hashes compacted records deterministically", async () => {

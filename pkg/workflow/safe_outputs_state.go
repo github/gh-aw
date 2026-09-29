@@ -197,6 +197,15 @@ func applyDefaultCreateIssue(workflowData *WorkflowData) {
 	if workflowData.CommentMemoryConfig != nil || hasNonBuiltinSafeOutputsEnabled(workflowData.SafeOutputs) {
 		return
 	}
+	if repoMemoryLedgerEnabled(workflowData.RepoMemoryConfig) {
+		if workflowData.SafeOutputs == nil {
+			workflowData.SafeOutputs = &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}}
+		}
+		if workflowData.SafeOutputs.NoOp == nil {
+			workflowData.SafeOutputs.NoOp = &NoOpConfig{}
+		}
+		return
+	}
 	if workflowData.SafeOutputs == nil {
 		workflowData.SafeOutputs = &SafeOutputsConfig{}
 	}

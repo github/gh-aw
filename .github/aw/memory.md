@@ -367,7 +367,7 @@ Persist a baseline JSON file between runs to alert only on *new* findings — vu
 
 Keep this as a replaceable repo-memory snapshot by default. Use the experimental
 ledger only when the audit needs an append-only record of each scan or finding
-and its expected writer count fits the 100-shard limit; it does not replace,
+and its expected writer count fits the default 1024-shard limit; it does not replace,
 prune, or compact an existing baseline.
 
 > **Worked example** (nightly npm vulnerability scan, with key design decisions): [memory-stateful-patterns.md](memory-stateful-patterns.md#stateful-scanning-repo-memory).

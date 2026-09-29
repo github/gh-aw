@@ -47,7 +47,7 @@ func buildLedgerMutationHandlerConfig(repoMemoryConfig *RepoMemoryConfig) map[st
 // validated, bounded, and reported by the log-only `ledger_mutation` handler.
 // The merge runs on the runner after the agent step and never fails the workflow.
 func (c *Compiler) generateLedgerAuditMergeStep(yaml *strings.Builder, data *WorkflowData) {
-	if data == nil || data.SafeOutputs == nil || !repoMemoryLedgerEnabled(data.RepoMemoryConfig) {
+	if data == nil || !repoMemoryLedgerEnabled(data.RepoMemoryConfig) {
 		return
 	}
 	yaml.WriteString("      - name: Merge ledger audit entries\n")
