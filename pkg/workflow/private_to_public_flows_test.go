@@ -217,7 +217,7 @@ mcp-servers:
 }
 
 // TestPrivateToPublicFlowsStrictModeValidation verifies that strict mode rejects
-// private-to-public-flows: allow but permits the list form.
+// every form of private-to-public-flows.
 func TestPrivateToPublicFlowsStrictModeValidation(t *testing.T) {
 	makeWorkflow := func(ptpFlows string) string {
 		return `---
@@ -276,7 +276,7 @@ tools:
 		require.ErrorContains(t, err, "private-to-public-flows")
 	})
 
-	t.Run("list form is accepted in strict mode", func(t *testing.T) {
+	t.Run("list form is rejected in strict mode", func(t *testing.T) {
 		tmpFile, err := os.CreateTemp("", "test-ptp-strict-list-*.md")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
@@ -290,7 +290,115 @@ tools:
 		compiler.SetSkipValidation(false)
 
 		err = compiler.CompileWorkflow(tmpFile.Name())
-		require.NoError(t, err, "strict mode should accept list form of private-to-public-flows")
+		require.Error(t, err, "strict mode should reject list form of private-to-public-flows")
+		require.ErrorContains(t, err, "private-to-public-flows")
+	})
+}
+
+func TestPrivateToPublicFlowsParsedDataCompileUsesEffectiveStrictMode(t *testing.T) {
+	compileFunctions := []struct {
+		name    string
+		compile func(*Compiler, *WorkflowData, string) error
+	}{
+		{
+			name: "CompileWorkflowData",
+			compile: func(compiler *Compiler, workflowData *WorkflowData, markdownPath string) error {
+				return compiler.CompileWorkflowData(workflowData, markdownPath)
+			},
+		},
+		{
+			name: "CompileToYAML",
+			compile: func(compiler *Compiler, workflowData *WorkflowData, markdownPath string) error {
+				_, err := compiler.CompileToYAML(workflowData, markdownPath)
+				return err
+			},
+		},
+	}
+
+	for _, compileFunction := range compileFunctions {
+		t.Run(compileFunction.name, func(t *testing.T) {
+			markdown := `---
+name: parsed-private-to-public-flows
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: copilot
+network:
+  allowed:
+    - github.com
+strict: false
+tools:
+  github: {}
+---
+
+# Test workflow
+`
+			compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+			workflowData, err := compiler.ParseWorkflowString(markdown, "workflow.md")
+			require.NoError(t, err)
+
+			workflowData.RawFrontmatter["strict"] = true
+			require.NotNil(t, workflowData.ParsedTools)
+			require.NotNil(t, workflowData.ParsedTools.GitHub)
+			workflowData.ParsedTools.GitHub.PrivateToPublicFlows = "allow"
+
+			err = compileFunction.compile(compiler, workflowData, "workflow.md")
+			require.ErrorContains(t, err, "tools.github.private-to-public-flows")
+			require.ErrorContains(t, err, "strict mode")
+		})
+	}
+}
+
+func TestValidatePrivateToPublicFlowsPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       any
+		strictMode  bool
+		wantError   bool
+		wantWarning bool
+	}{
+		{name: "allow warns in non-strict mode", value: "allow", wantWarning: true},
+		{name: "list warns in non-strict mode", value: []any{"github"}, wantWarning: true},
+		{name: "allow errors in strict mode", value: "allow", strictMode: true, wantError: true},
+		{name: "list errors in strict mode", value: []any{"github"}, strictMode: true, wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.strictMode = tt.strictMode
+			initialWarnings := compiler.GetWarningCount()
+			workflowData := &WorkflowData{
+				RawFrontmatter: map[string]any{"strict": false},
+				ParsedTools: &Tools{
+					GitHub: &GitHubToolConfig{PrivateToPublicFlows: tt.value},
+				},
+			}
+
+			err := compiler.validatePrivateToPublicFlowsPolicy(workflowData)
+			if tt.wantError {
+				require.Error(t, err)
+				require.ErrorContains(t, err, "tools.github.private-to-public-flows")
+				require.ErrorContains(t, err, "public action logs")
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.wantWarning {
+				assert.Equal(t, initialWarnings+1, compiler.GetWarningCount())
+			} else {
+				assert.Equal(t, initialWarnings, compiler.GetWarningCount())
+			}
+		})
+	}
+
+	t.Run("absent setting has no warning", func(t *testing.T) {
+		compiler := NewCompiler()
+		initialWarnings := compiler.GetWarningCount()
+		require.NoError(t, compiler.validatePrivateToPublicFlowsPolicy(&WorkflowData{
+			ParsedTools: &Tools{GitHub: &GitHubToolConfig{}},
+		}))
+		assert.Equal(t, initialWarnings, compiler.GetWarningCount())
 	})
 }
 

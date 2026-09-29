@@ -265,7 +265,7 @@ Controls full Data Integrity and Flow Control (DIFC) proxy enforcement. When `to
 
 ### `private-to-public-flows` (`tools.github.private-to-public-flows`)
 
-A frontmatter field that opts a workflow out of cross-visibility protections enforced by the [MCP Gateway](#mcp-gateway). By default, workflows running in private repositories are prevented from writing to public repositories (the gateway enforces `sink-visibility="public"` which blocks agents with non-empty secrecy). Setting `private-to-public-flows: allow` disables this enforcement for all MCP servers; setting it to a list of server IDs disables it only for those servers. Incompatible with `guards_mode: strict` when using the blanket `allow` form. See [MCP Gateway Reference](/gh-aw/reference/mcp-gateway/).
+A frontmatter field that opts a workflow out of cross-visibility protections enforced by the [MCP Gateway](#mcp-gateway). By default, workflows running in private repositories are prevented from writing to public repositories (the gateway enforces `sink-visibility="public"` which blocks agents with non-empty secrecy). Setting `private-to-public-flows: allow` disables this enforcement for all MCP servers; setting it to a list of server IDs disables it only for those servers. Both forms are rejected in strict mode and warn in non-strict mode because GitHub Actions logs are public and agents may expose private data. See [MCP Gateway Reference](/gh-aw/reference/mcp-gateway/).
 
 ```aw wrap
 tools:

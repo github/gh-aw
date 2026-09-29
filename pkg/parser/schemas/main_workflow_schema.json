@@ -4696,7 +4696,7 @@
                   "description": "GitHub App configuration for token minting. When configured, a GitHub App installation access token is minted at workflow start and used instead of the default token. This token overrides any custom github-token setting and provides fine-grained permissions matching the agent job requirements."
                 },
                 "private-to-public-flows": {
-                  "description": "Opts out of cross-visibility protections for private-to-public data flows. Set to 'allow' for a blanket opt-out (disables forcePublicRepos and default sink-visibility enforcement), or provide an array of MCP server IDs to exempt only those servers from default sink-visibility enforcement. Incompatible with strict mode when set to 'allow'. See MCP Gateway Specification Section 10.9.",
+                  "description": "Opts out of cross-visibility protections for private-to-public data flows. Set to 'allow' for a blanket opt-out (disables forcePublicRepos and default sink-visibility enforcement), or provide an array of MCP server IDs to exempt only those servers from default sink-visibility enforcement. Both forms are rejected in strict mode and emit a warning in non-strict mode because action logs are public and agents may expose private data. See MCP Gateway Specification Section 10.9.",
                   "oneOf": [
                     {
                       "type": "string",
@@ -4705,7 +4705,7 @@
                     },
                     {
                       "type": "array",
-                      "description": "Selective exemption: disables default sink-visibility enforcement for the listed MCP server IDs only. Compatible with strict mode.",
+                      "description": "Selective exemption: disables default sink-visibility enforcement for the listed MCP server IDs only. Not allowed in strict mode.",
                       "items": {
                         "type": "string",
                         "minLength": 1,
