@@ -387,7 +387,7 @@ var versionCmd = &cobra.Command{
 	Long:    `Print the current version and build information for the gh aw CLI extension.`,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` version   # Print the current version`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Fprintf(os.Stderr, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", string(constants.CLIExtensionPrefix), version)
 		return nil
 	},
 }
@@ -696,7 +696,7 @@ func configureRootCommand() {
 	rootCmd.AddGroup(&cobra.Group{ID: "utilities", Title: "Utilities:"})
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output showing detailed information")
 	rootCmd.PersistentFlags().BoolVar(&bannerFlag, "banner", false, "Display ASCII logo banner with purple GitHub color theme")
-	rootCmd.SetOut(os.Stderr)
+	rootCmd.SetOut(os.Stdout)
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
 	rootCmd.SetVersionTemplate(string(constants.CLIExtensionPrefix) + " version {{.Version}}\n")
