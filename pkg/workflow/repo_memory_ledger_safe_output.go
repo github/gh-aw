@@ -14,6 +14,7 @@ const (
 	// ledgerMutationHandlerKey is the safe-output type and handler key for ledger audit entries.
 	ledgerMutationHandlerKey = "ledger_mutation"
 	// LedgerMutationDefaultMax bounds how many ledger audit entries one run may report.
+	// MAX_ENTRIES in actions/setup/js/merge_ledger_transactions.cjs mirrors this bound.
 	// Appends are already bounded by the ledger record, segment, patch, and shard limits;
 	// this bound only keeps the transaction log and step summary readable.
 	LedgerMutationDefaultMax = 1000

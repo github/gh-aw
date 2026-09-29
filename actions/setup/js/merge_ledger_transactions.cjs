@@ -27,7 +27,9 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 /** @type {number} Maximum transaction log size inspected, in bytes */
 const MAX_LOG_BYTES = 4 * 1024 * 1024;
 
-/** @type {number} Maximum audit entries merged into the safe-output file */
+/** @type {number} Maximum audit entries merged into the safe-output file.
+ * Mirrors `LedgerMutationDefaultMax` in pkg/workflow/repo_memory_ledger_safe_output.go,
+ * which bounds the same type during safe-output validation. */
 const MAX_ENTRIES = 1000;
 
 /** @type {RegExp} Accepted record and payload hash syntax */
