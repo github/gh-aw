@@ -214,11 +214,7 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 			configFileSetup += "\n" + updateScript
 		}
 	} else if config.WorkflowData != nil && config.WorkflowData.OTLPEndpoint != "" {
-		if config.WorkflowData.OTLPUsesEnterpriseDefaults {
-			configFileSetup += "\nif [ -n \"${OTEL_EXPORTER_OTLP_ENDPOINT:-}\" ]; then node \"${RUNNER_TEMP}/gh-aw/actions/update_network_allowed.cjs\"; fi"
-		} else {
-			configFileSetup += "\nnode \"${RUNNER_TEMP}/gh-aw/actions/update_network_allowed.cjs\""
-		}
+		configFileSetup += "\nnode \"${RUNNER_TEMP}/gh-aw/actions/update_network_allowed.cjs\""
 	}
 	if mkdirScript := buildCloudHypervisorFilesystemMkdirScript(config.WorkflowData); mkdirScript != "" {
 		configFileSetup = mkdirScript + "\n" + configFileSetup

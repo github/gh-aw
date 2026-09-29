@@ -1147,10 +1147,10 @@ function getOTLPIfMissingMode(value) {
  * the agent job's check_otlp_default_credentials.sh step runs, because that
  * step only runs in one job while this function runs in all of them.
  *
+ * @param {string} [raw]
  * @returns {OTLPEndpointEntry[]}
  */
-function parseOTLPEndpoints() {
-  const raw = process.env.GH_AW_OTLP_ENDPOINTS || "";
+function parseOTLPEndpoints(raw = process.env.GH_AW_OTLP_ENDPOINTS || "") {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);

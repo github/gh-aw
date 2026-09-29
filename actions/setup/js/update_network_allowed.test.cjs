@@ -34,6 +34,7 @@ describe("update_network_allowed.cjs", () => {
       GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
       GH_AW_OTLP_IF_MISSING: process.env.GH_AW_OTLP_IF_MISSING,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
     };
 
     process.env.RUNNER_TEMP = tempDir;
@@ -42,6 +43,7 @@ describe("update_network_allowed.cjs", () => {
     delete process.env.GH_AW_OTLP_ENDPOINTS;
     delete process.env.GH_AW_OTLP_IF_MISSING;
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
   });
 
   afterEach(() => {
@@ -156,6 +158,37 @@ describe("update_network_allowed.cjs", () => {
     await main();
 
     expect(JSON.parse(readFileSync(configPath, "utf8")).network.allowDomains).toEqual(["configured.example.com"]);
+  });
+
+  it("does not rewrite the config when an enterprise default is unset", async () => {
+    const original = '{ "network": { "allowDomains": [] } }\n';
+    writeFileSync(configPath, original);
+    process.env.GH_AW_OTLP_IF_MISSING = "ignore";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "", headers: "" }]);
+
+    await main();
+
+    expect(readFileSync(configPath, "utf8")).toBe(original);
+  });
+
+  it("allows a configured endpoint list when the primary endpoint is empty", async () => {
+    writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] } }) + "\n");
+    process.env.GH_AW_OTLP_IF_MISSING = "ignore";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://secondary.example.com", headers: "Authorization=test" }]);
+
+    await main();
+
+    expect(JSON.parse(readFileSync(configPath, "utf8")).network.allowDomains).toEqual(["secondary.example.com"]);
+  });
+
+  it("allows a user-overridden primary endpoint alongside the configured list", async () => {
+    writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] } }) + "\n");
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://configured.example.com" }]);
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://overridden.example.com";
+
+    await main();
+
+    expect(JSON.parse(readFileSync(configPath, "utf8")).network.allowDomains).toEqual(["configured.example.com", "overridden.example.com"]);
   });
 
   it("initialises network.allowDomains when not present", async () => {

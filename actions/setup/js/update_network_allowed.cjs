@@ -111,12 +111,15 @@ async function main() {
       }
     }
   };
-  if (process.env.GH_AW_OTLP_ENDPOINTS) {
-    for (const endpoint of parseOTLPEndpoints()) {
-      addEndpointDomain(endpoint.url);
-    }
-  } else if ((process.env.GH_AW_OTLP_IF_MISSING || "").trim().toLowerCase() !== "ignore") {
-    addEndpointDomain(process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "");
+  for (const endpoint of parseOTLPEndpoints()) {
+    addEndpointDomain(endpoint.url);
+  }
+  for (const endpoint of parseOTLPEndpoints(JSON.stringify([{ url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "", headers: process.env.OTEL_EXPORTER_OTLP_HEADERS || "" }]))) {
+    addEndpointDomain(endpoint.url);
+  }
+
+  if (tokens.length === 0 && endpointDomains.length === 0) {
+    return;
   }
 
   if (tokens.length > 0 || endpointDomains.length > 0) {
