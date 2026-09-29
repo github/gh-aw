@@ -13717,6 +13717,13 @@
           "type": "string",
           "minLength": 1,
           "description": "Repository-relative path to a JSON schema for ledger entries."
+        },
+        "max-shards": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 1024,
+          "description": "Maximum number of JSONL ledger shard files to inspect."
         }
       },
       "additionalProperties": false

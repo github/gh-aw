@@ -37,6 +37,9 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 		if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
 			yaml.WriteString(", \"GH_AW_LEDGER_SCHEMA\"")
 		}
+		if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.MaxShards > 0 {
+			yaml.WriteString(", \"GH_AW_LEDGER_MAX_SHARDS\"")
+		}
 		yaml.WriteString("]\n")
 		return
 	}
@@ -52,6 +55,9 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 	yaml.WriteString("                  \"GH_AW_MEMORY_DIR\": \"\\${GH_AW_MEMORY_DIR}\",\n")
 	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.Schema != "" {
 		yaml.WriteString("                  \"GH_AW_LEDGER_SCHEMA\": \"\\${GH_AW_LEDGER_SCHEMA}\",\n")
+	}
+	if memory := workflowData.RepoMemoryConfig.ledgerEntry(); memory != nil && memory.Ledger.MaxShards > 0 {
+		yaml.WriteString("                  \"GH_AW_LEDGER_MAX_SHARDS\": \"\\${GH_AW_LEDGER_MAX_SHARDS}\",\n")
 	}
 	yaml.WriteString("                  \"GITHUB_RUN_ID\": \"\\${GITHUB_RUN_ID}\"\n")
 	yaml.WriteString("                }\n")

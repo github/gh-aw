@@ -70,6 +70,7 @@ tools:
   repo-memory:
     ledger:
       schema: .github/schemas/ledger.schema.json
+      max-shards: 256          # default 1024
 ```
 
 The ledger is an eventually convergent append-only store, not a distributed transactional database. Applications must define their own deterministic conflict resolution for concurrent records.

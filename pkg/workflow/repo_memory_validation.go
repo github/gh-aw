@@ -42,8 +42,16 @@ func parseRepoMemoryLedgerConfig(raw any) (*RepoMemoryLedgerConfig, error) {
 	}
 	config := &RepoMemoryLedgerConfig{}
 	for key, value := range fields {
+		if key == "max-shards" {
+			maxShards, ok := value.(int)
+			if !ok || maxShards < 1 || maxShards > 1024 {
+				return nil, fmt.Errorf("tools.repo-memory.ledger.max-shards must be between 1 and 1024, got %v", value)
+			}
+			config.MaxShards = maxShards
+			continue
+		}
 		if key != "schema" {
-			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema is supported)", key)
+			return nil, fmt.Errorf("tools.repo-memory.ledger has unknown property %q (only schema and max-shards are supported)", key)
 		}
 		schema, ok := value.(string)
 		if !ok {

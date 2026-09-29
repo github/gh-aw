@@ -125,6 +125,25 @@ describe("ledger MCP server", () => {
     });
   });
 
+  it("passes the configured shard limit to the ledger", () => {
+    withMemory(memoryDir => {
+      const prior = process.env.GH_AW_LEDGER_MAX_SHARDS;
+      process.env.GH_AW_LEDGER_MAX_SHARDS = "1";
+      try {
+        const shardDir = path.join(memoryDir, "ledger", "shards");
+        require("node:fs").mkdirSync(shardDir, { recursive: true });
+        require("node:fs").writeFileSync(path.join(shardDir, "00000000-0000-4000-8000-000000000000.jsonl"), "");
+        const server = createLedgerServer({ memoryDir });
+        const result = invoke(server, "ledger_append", { type: "build", payload: true });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("file-count limit");
+      } finally {
+        if (prior === undefined) delete process.env.GH_AW_LEDGER_MAX_SHARDS;
+        else process.env.GH_AW_LEDGER_MAX_SHARDS = prior;
+      }
+    });
+  });
+
   it("is copied into setup actions directory alongside its local dependencies", () => {
     const setup = readFileSync(path.join(__dirname, "../setup.sh"), "utf8");
     expect(setup).toContain('for file in "${JS_SOURCE_DIR}"/*.cjs; do');

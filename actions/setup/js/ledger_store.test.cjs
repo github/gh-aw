@@ -193,6 +193,10 @@ describe("Ledger", () => {
     expect(() => defaultBudget.append("note", "x".repeat(1000))).toThrow("run exceeds maximum patch");
   });
 
+  it("uses a default shard limit of 1024", () => {
+    expect(new Ledger({ memoryDir }).maxFiles).toBe(1024);
+  });
+
   it("does not publish or project new files when file or directory fsync fails", () => {
     const original = fs.fsyncSync;
     for (const failingCall of [1, 2]) {

@@ -52,6 +52,7 @@ func TestRepoMemoryLedgerSchema(t *testing.T) {
 		{"empty object", map[string]any{"ledger": map[string]any{}}, true},
 		{"null value", map[string]any{"ledger": nil}, true},
 		{"schema object", map[string]any{"ledger": map[string]any{"schema": "schemas/events.json"}}, true},
+		{"max shards", map[string]any{"ledger": map[string]any{"max-shards": 256}}, true},
 		{"array entry", []any{map[string]any{"id": "events", "ledger": map[string]any{}}}, true},
 		{"invalid value", map[string]any{"ledger": true}, false},
 		{"invalid field", map[string]any{"ledger": map[string]any{"typo": true}}, false},
@@ -136,13 +137,15 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 
 func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		ledger any
-		schema string
+		name      string
+		ledger    any
+		schema    string
+		maxShards int
 	}{
-		{"null enabled defaults", nil, ""},
-		{"defaults", map[string]any{}, ""},
-		{"schema", map[string]any{"schema": "schemas/events.schema.json"}, "schemas/events.schema.json"},
+		{"null enabled defaults", nil, "", 0},
+		{"defaults", map[string]any{}, "", 0},
+		{"schema", map[string]any{"schema": "schemas/events.schema.json"}, "schemas/events.schema.json", 0},
+		{"max shards", map[string]any{"max-shards": 256}, "", 256},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": tc.ledger}})
@@ -152,6 +155,7 @@ func TestRepoMemoryLedgerConfiguration(t *testing.T) {
 			require.Len(t, config.Memories, 1)
 			require.NotNil(t, config.Memories[0].Ledger)
 			assert.Equal(t, tc.schema, config.Memories[0].Ledger.Schema)
+			assert.Equal(t, tc.maxShards, config.Memories[0].Ledger.MaxShards)
 			assert.Equal(t, "memory/ledger-test", config.Memories[0].BranchName)
 		})
 	}
@@ -202,6 +206,9 @@ func TestRepoMemoryLedgerRejectsInvalidConfiguration(t *testing.T) {
 		{"backslash", map[string]any{"schema": `schemas\events.json`}},
 		{"expression", map[string]any{"schema": "${{ inputs.schema }}"}},
 		{"newline", map[string]any{"schema": "events\n.json"}},
+		{"zero max shards", map[string]any{"max-shards": 0}},
+		{"too many max shards", map[string]any{"max-shards": 1025}},
+		{"non-integer max shards", map[string]any{"max-shards": "256"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tools, err := ParseToolsConfig(map[string]any{"repo-memory": map[string]any{"ledger": tc.value}})

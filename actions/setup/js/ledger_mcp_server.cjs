@@ -6,6 +6,12 @@ const path = require("node:path");
 const { createServer, registerTool, start } = require("./mcp_server_core.cjs");
 const { Ledger } = require("./ledger_store.cjs");
 
+function parsePositiveInteger(value) {
+  if (value === undefined || !/^[1-9][0-9]*$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
 function result(value) {
   return { content: [{ type: "text", text: JSON.stringify(value === undefined ? null : value) }] };
 }
@@ -49,7 +55,11 @@ function resolveSchemaPath(schemaPath, workspace) {
 }
 
 function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPath = process.env.GH_AW_LEDGER_SCHEMA, workspace = process.env.GITHUB_WORKSPACE, schemaRoot = process.env.GH_AW_LEDGER_SCHEMA_ROOT || workspace } = {}) {
-  const ledger = new Ledger({ memoryDir, schemaPath: resolveSchemaPath(schemaPath, schemaRoot) });
+  const ledger = new Ledger({
+    memoryDir,
+    schemaPath: resolveSchemaPath(schemaPath, schemaRoot),
+    maxFiles: parsePositiveInteger(process.env.GH_AW_LEDGER_MAX_SHARDS),
+  });
   const server = createServer({ name: "ledger", version: "1.0.0" });
 
   registerTool(server, {

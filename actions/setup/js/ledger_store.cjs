@@ -5,7 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
-const MAX_FILES = 100;
+const MAX_FILES = 1024;
 const MAX_BYTES = 8 * 1024;
 const MAX_SCHEMA_BYTES = 1024 * 1024;
 const MAX_PARENTS = 64;

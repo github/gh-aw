@@ -67,7 +67,8 @@ type RepoMemoryEntry struct {
 
 // RepoMemoryLedgerConfig enables the ledger projection for this memory.
 type RepoMemoryLedgerConfig struct {
-	Schema string `yaml:"schema,omitempty"`
+	Schema    string `yaml:"schema,omitempty"`
+	MaxShards int    `yaml:"max-shards,omitempty"`
 }
 
 // RepoMemoryToolConfig represents the configuration for repo-memory in tools

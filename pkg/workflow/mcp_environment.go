@@ -48,6 +48,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"strconv"
 
 	"slices"
 
@@ -160,6 +161,9 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GH_AW_MEMORY_DIR"] = constants.TmpRepoMemoryDir + memory.ID
 		if memory.Ledger.Schema != "" {
 			envVars["GH_AW_LEDGER_SCHEMA"] = memory.Ledger.Schema
+		}
+		if memory.Ledger.MaxShards > 0 {
+			envVars["GH_AW_LEDGER_MAX_SHARDS"] = strconv.Itoa(memory.Ledger.MaxShards)
 		}
 	}
 

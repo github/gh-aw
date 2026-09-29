@@ -233,7 +233,8 @@ conflicting application events deterministically, and use `ledger_status` to
 check for malformed or incomplete records. Do not edit ledger shard files
 directly.
 
-The ledger is experimental and bounded: it inspects at most 100 shard files,
+The ledger is experimental and bounded: it inspects at most 1024 shard files
+(configurable with `ledger.max-shards`),
 each record is limited to 8 KiB, and each query returns at most 500 records.
 Each writing workflow invocation creates a shard, so a frequently running
 workflow can exhaust the shard limit. Use ordinary repo-memory files for
@@ -249,7 +250,7 @@ writer shards; the ledger currently has no compaction or record-deletion API.
 | Survives cache invalidation | Not available for Copilot engine (requires GitHub tools) |
 | Human-readable via GitHub branch UI | More complex setup |
 | Can target a different repository | |
-| Ledger mode provides immutable structured records and queries | Experimental, append-only, and limited to 100 shard files |
+| Ledger mode provides immutable structured records and queries | Experimental, append-only, and limited to 1024 shard files by default |
 
 ---
 
