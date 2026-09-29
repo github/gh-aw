@@ -99,6 +99,9 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, safeOutputs.Footer, safeOutputs.BodyFooter); handlerConfig != nil {
 		config[commentMemoryHandlerKey] = handlerConfig
 	}
+	if handlerConfig := buildLedgerMutationHandlerConfig(data.RepoMemoryConfig); handlerConfig != nil {
+		config[ledgerMutationHandlerKey] = handlerConfig
+	}
 
 	// Include top-level mentions configuration so the handler manager can pass it to
 	// markdown-producing handlers that call sanitizeContent with allowed aliases.

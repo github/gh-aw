@@ -776,17 +776,22 @@ async function main() {
             .map(name => name.slice(0, -6))
             .filter(id => !existingLedgerSegments.has(id))
         : [];
-      const parseLedgerLimit = name => {
+      // Shard limits are counts; the remaining ledger limits are expressed in KiB.
+      const parseLedgerCount = name => {
         const value = process.env[name];
-        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) * 1024 : undefined;
+        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined;
+      };
+      const parseLedgerLimitKb = name => {
+        const parsed = parseLedgerCount(name);
+        return parsed === undefined ? undefined : parsed * 1024;
       };
       const ledger = new Ledger({
         memoryDir: destMemoryPath,
         excludeSegments: excludedSegments,
-        maxFiles: parseLedgerLimit("GH_AW_LEDGER_MAX_SHARDS"),
-        maxSegmentBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_SEGMENT_KB"),
-        maxRecordBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_RECORD_KB"),
-        maxPatchBytes: parseLedgerLimit("GH_AW_LEDGER_MAX_PATCH_KB"),
+        maxFiles: parseLedgerCount("GH_AW_LEDGER_MAX_SHARDS"),
+        maxSegmentBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_SEGMENT_KB"),
+        maxRecordBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_RECORD_KB"),
+        maxPatchBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_PATCH_KB"),
       });
       const before = ledger.listSegments({ closed: true, excludeCurrent: true }).length;
       const compaction = await ledger.compact(options);

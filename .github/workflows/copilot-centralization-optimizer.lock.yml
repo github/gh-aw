@@ -619,7 +619,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":720,\"labels\":[\"report\",\"ai-optimization\"],\"max\":1,\"title_prefix\":\"[copilot-centralization] \"},\"create_report_incomplete_issue\":{},\"max_bot_mentions\":1,\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.json *.jsonl ledger/shards/*.jsonl\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":10240}]},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":720,\"labels\":[\"report\",\"ai-optimization\"],\"max\":1,\"title_prefix\":\"[copilot-centralization] \"},\"create_report_incomplete_issue\":{},\"ledger_mutation\":{\"max\":1000},\"max_bot_mentions\":1,\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.json *.jsonl ledger/shards/*.jsonl\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":102400,\"max_patch_size\":10240}]},\"report_incomplete\":{}}"
         with:
           script: |
             const path = require('path');
@@ -675,6 +675,26 @@ jobs:
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 128
+                  }
+                }
+              },
+              "ledger_mutation": {
+                "defaultMax": 1000,
+                "fields": {
+                  "operation": {
+                    "required": true,
+                    "type": "string",
+                    "enum": [
+                      "append"
+                    ]
+                  },
+                  "record": {
+                    "required": true,
+                    "type": "object"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "maxLength": 64
                   }
                 }
               },
@@ -2537,7 +2557,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":720,\"labels\":[\"report\",\"ai-optimization\"],\"max\":1,\"title_prefix\":\"[copilot-centralization] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":720,\"labels\":[\"report\",\"ai-optimization\"],\"max\":1,\"title_prefix\":\"[copilot-centralization] \"},\"create_report_incomplete_issue\":{},\"ledger_mutation\":{\"max\":1000},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

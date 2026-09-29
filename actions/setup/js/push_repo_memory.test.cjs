@@ -1709,6 +1709,22 @@ describe("push_repo_memory.cjs - changed-file limit checks", () => {
   });
 });
 
+describe("push_repo_memory.cjs - ledger limit parsing", () => {
+  it("parses the shard limit as a count and only scales KiB limits (source check)", () => {
+    const nodeFs = require("fs");
+    const nodePath = require("path");
+    const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+    // GH_AW_LEDGER_MAX_SHARDS is a file count; scaling it by 1024 exceeds the Ledger
+    // shard bound, throws, and silently disables compaction through the fail-open catch.
+    expect(scriptContent).toContain('maxFiles: parseLedgerCount("GH_AW_LEDGER_MAX_SHARDS")');
+    expect(scriptContent).toContain('maxSegmentBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_SEGMENT_KB")');
+    expect(scriptContent).toContain('maxRecordBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_RECORD_KB")');
+    expect(scriptContent).toContain('maxPatchBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_PATCH_KB")');
+  });
+});
+
 describe("push_repo_memory.cjs - allowed-extensions persistence filter (regression: notes.json.new)", () => {
   it("filters ineligible files before validation/upload instead of hard-failing on them (source check)", () => {
     const nodeFs = require("fs");

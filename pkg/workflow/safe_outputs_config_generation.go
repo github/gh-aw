@@ -49,6 +49,10 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 	}
 	addMentionsConfig(safeOutputsConfig, data.SafeOutputs)
 	addPushRepoMemoryConfig(safeOutputsConfig, data.RepoMemoryConfig)
+	if ledgerConfig := buildLedgerMutationHandlerConfig(data.RepoMemoryConfig); ledgerConfig != nil {
+		safeOutputsConfig[ledgerMutationHandlerKey] = ledgerConfig
+		safeOutputsConfigLog.Print("Added ledger_mutation config so ledger audit entries are ingested")
+	}
 
 	if len(safeOutputsConfig) == 0 {
 		return "", nil
