@@ -303,19 +303,18 @@ func TestSpec_PublicAPI_ResolveActionPin_NilContext(t *testing.T) {
 		"nil ctx should resolve from embedded pins with correct SHA and format")
 }
 
-// TestSpec_PublicAPI_ResolveActionPin_UnknownFullSHAReturnsFormattedReference validates that
-// an unknown full SHA is returned in the formatted "repo@sha # sha" form when it does not
-// appear in the embedded pins.
-func TestSpec_PublicAPI_ResolveActionPin_UnknownFullSHAReturnsFormattedReference(t *testing.T) {
+// TestSpec_PublicAPI_ResolveActionPin_UnknownFullSHAReturnsBareReference validates that
+// an unknown full SHA does not acquire a SHA-as-version comment.
+func TestSpec_PublicAPI_ResolveActionPin_UnknownFullSHAReturnsBareReference(t *testing.T) {
 	t.Parallel()
 	unknownSHA := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 	result, err := actionpins.ResolveActionPin("actions/checkout", unknownSHA, nil)
 	require.NoError(t, err)
 	assert.Equal(t,
-		actionpins.FormatPinnedActionReference("actions/checkout", unknownSHA, unknownSHA),
+		"actions/checkout@"+unknownSHA,
 		result,
-		"unknown SHA should be returned as repo@sha # sha")
+		"unknown SHA should be returned as repo@sha")
 }
 
 // TestSpec_PublicAPI_ResolveActionPin_EnforcePinned validates unresolved pin handling in enforce mode.
