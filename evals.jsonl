@@ -1,0 +1,3 @@
+{"id":"memory_updated","question":"Did the agent update the repo-memory exploration state (backlog, reviewed entries, or run log)?","answer":"NO","model":"evals","timestamp":"2026-09-29T15:36:40.403Z","runid":"36590030727"}
+{"id":"systematic_exploration","question":"Did the agent explore new ecosystem candidates it had not reviewed before, rather than re-reviewing previously covered ones?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-29T15:36:40.403Z","runid":"36590030727"}
+{"id":"blog_grounded","question":"If a blog post was written, is it grounded in concrete evidence (repository links, README content, workflow files) about the featured extension or tool?","answer":"UNKNOWN","model":"evals","timestamp":"2026-09-29T15:36:40.403Z","runid":"36590030727"}
