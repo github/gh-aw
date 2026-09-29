@@ -17,6 +17,8 @@ import (
 // Analyzer is the close-error-unchecked analysis pass.
 var Analyzer = analyzerutil.New("closeerrorunchecked", "reports Close() method calls where the error return value is explicitly discarded, potentially hiding resource cleanup failures", run)
 
+var builtinErrorType = types.Universe.Lookup("error").Type()
+
 func run(pass *analysis.Pass) (any, error) {
 	noLintIndex, generatedFiles, err := analyzerutil.Indexes(pass)
 	if err != nil {
@@ -217,7 +219,7 @@ func isCloserInterface(t types.Type) bool {
 
 // isErrorType returns true if t is the error interface type.
 func isErrorType(t types.Type) bool {
-	return t.String() == "error"
+	return types.Identical(t, builtinErrorType)
 }
 
 // reportIfNotSkipped reports a diagnostic if the linter is not suppressed.

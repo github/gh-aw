@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"io"
 	"os"
+
+	"closeerrorunchecked/customerror"
 )
 
 // BadExprStmtClose is a bare Close() call with error ignored.
@@ -147,6 +149,11 @@ func (ArgumentCloser) Close(bool) error {
 func GoodCloseWithArgument() {
 	closer := ArgumentCloser{}
 	closer.Close(true)
+}
+
+func GoodCloseReturningNamedError() {
+	closer := customerror.Closer{}
+	closer.Close()
 }
 
 // GoodNonCloserNoError doesn't flag Close() methods without error return — not flagged.
