@@ -32,6 +32,7 @@ describe("update_network_allowed.cjs", () => {
       GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED: process.env.GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED,
       GH_AW_ECOSYSTEM_MAP_JSON: process.env.GH_AW_ECOSYSTEM_MAP_JSON,
       GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
+      GH_AW_OTLP_IF_MISSING: process.env.GH_AW_OTLP_IF_MISSING,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     };
 
@@ -39,6 +40,7 @@ describe("update_network_allowed.cjs", () => {
     process.env.GH_AW_ECOSYSTEM_MAP_JSON = JSON.stringify(ECOSYSTEM_MAP);
     delete process.env.GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED;
     delete process.env.GH_AW_OTLP_ENDPOINTS;
+    delete process.env.GH_AW_OTLP_IF_MISSING;
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   });
 
@@ -134,6 +136,26 @@ describe("update_network_allowed.cjs", () => {
 
     const result = JSON.parse(readFileSync(configPath, "utf8"));
     expect(result.network.allowDomains).toEqual([]);
+  });
+
+  it("allows IPv6 and gRPC collector hosts in firewall format", async () => {
+    writeFileSync(configPath, JSON.stringify({ network: { allowDomains: ["::1"] } }) + "\n");
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "http://[::1]:4318" }, { url: "grpc://traces.example.com:4317" }]);
+
+    await main();
+
+    expect(JSON.parse(readFileSync(configPath, "utf8")).network.allowDomains).toEqual(["::1", "traces.example.com"]);
+  });
+
+  it("does not allow enterprise-default collectors without credentials", async () => {
+    writeFileSync(configPath, JSON.stringify({ network: { allowDomains: [] } }) + "\n");
+    process.env.GH_AW_OTLP_IF_MISSING = "ignore";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://unconfigured.example.com";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://unconfigured.example.com" }, { url: "https://configured.example.com", headers: "Authorization=******" }]);
+
+    await main();
+
+    expect(JSON.parse(readFileSync(configPath, "utf8")).network.allowDomains).toEqual(["configured.example.com"]);
   });
 
   it("initialises network.allowDomains when not present", async () => {

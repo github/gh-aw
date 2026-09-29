@@ -28,6 +28,7 @@
 const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { parseOTLPEndpoints } = require("./send_otlp_span.cjs");
 
 const NETWORK_ALLOWED_ENV_VAR = "GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED";
 /** @typedef {{allowDomains?: string[]}} AWFNetworkConfig */
@@ -40,8 +41,8 @@ const NETWORK_ALLOWED_ENV_VAR = "GH_AW_WORKFLOW_CALL_NETWORK_ALLOWED";
 function getOTLPEndpointDomain(endpoint) {
   try {
     const parsed = new URL(endpoint);
-    if ((parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname) {
-      return parsed.hostname;
+    if (["http:", "https:", "grpc:"].includes(parsed.protocol) && parsed.hostname) {
+      return parsed.hostname.replace(/^\[|\]$/g, "");
     }
   } catch {
     // Ignore malformed endpoint values and leave firewall behavior unchanged.
@@ -110,20 +111,12 @@ async function main() {
       }
     }
   };
-  addEndpointDomain(process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "");
   if (process.env.GH_AW_OTLP_ENDPOINTS) {
-    try {
-      const endpoints = JSON.parse(process.env.GH_AW_OTLP_ENDPOINTS);
-      if (Array.isArray(endpoints)) {
-        for (const endpoint of endpoints) {
-          if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
-            addEndpointDomain(endpoint.url);
-          }
-        }
-      }
-    } catch {
-      // Intentionally ignore malformed endpoint-list JSON; primary endpoint handling continues.
+    for (const endpoint of parseOTLPEndpoints()) {
+      addEndpointDomain(endpoint.url);
     }
+  } else if ((process.env.GH_AW_OTLP_IF_MISSING || "").trim().toLowerCase() !== "ignore") {
+    addEndpointDomain(process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "");
   }
 
   if (tokens.length > 0 || endpointDomains.length > 0) {
