@@ -174,18 +174,7 @@ func frictionSummaryLine(f *FrictionCostSummary) string {
 		if uncertainty, ok := f.Uncertainty["aic"]; ok && uncertainty.LowerBound != nil && uncertainty.UpperBound != nil {
 			parts = append(parts, "range="+formatAICValue(*uncertainty.LowerBound)+"–"+formatAICValue(*uncertainty.UpperBound)+" AIC")
 		}
-		if f.Cost.Tokens.Total > 0 {
-			parts = append(parts, fmt.Sprintf("tokens=%d", f.Cost.Tokens.Total))
-		}
-		if f.Cost.Turns > 0 {
-			parts = append(parts, fmt.Sprintf("turns=%d", f.Cost.Turns))
-		}
-		if f.Cost.ToolCalls > 0 {
-			parts = append(parts, fmt.Sprintf("tool-calls=%d", f.Cost.ToolCalls))
-		}
-		if f.Cost.LatencyMS > 0 {
-			parts = append(parts, fmt.Sprintf("latency=%dms", f.Cost.LatencyMS))
-		}
+		parts = append(parts, frictionCostDimensionParts(f.Cost)...)
 	}
 	parts = append(parts, "state="+f.MeasurementState)
 	if rel := frictionRelativeError(f); rel != "" {
@@ -198,6 +187,23 @@ func frictionSummaryLine(f *FrictionCostSummary) string {
 		parts = append(parts, "derived-from-logs")
 	}
 	return strings.Join(parts, " ")
+}
+
+func frictionCostDimensionParts(cost FrictionCost) []string {
+	var parts []string
+	if cost.Tokens.Total > 0 {
+		parts = append(parts, fmt.Sprintf("tokens=%d", cost.Tokens.Total))
+	}
+	if cost.Turns > 0 {
+		parts = append(parts, fmt.Sprintf("turns=%d", cost.Turns))
+	}
+	if cost.ToolCalls > 0 {
+		parts = append(parts, fmt.Sprintf("tool-calls=%d", cost.ToolCalls))
+	}
+	if cost.LatencyMS > 0 {
+		parts = append(parts, fmt.Sprintf("latency=%dms", cost.LatencyMS))
+	}
+	return parts
 }
 
 // frictionRelativeError renders the canonical-dimension relative error as a

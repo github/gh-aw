@@ -18,6 +18,7 @@ engine:
 sandbox:
   agent:
     id: awf
+    runtime: cloud-hypervisor
 tools:
   cli-proxy: true
   github:
@@ -25,8 +26,11 @@ tools:
     toolsets: [default, issues, pull_requests]
   repo-memory:
     branch-name: memory/awf-feature-surfacing
-    file-glob: [".json", ".md"]
-    max-file-size: 65536
+    allowed-extensions: [".jsonl"]
+    ledger:
+      compaction:
+        min-segments: 32
+        max-segments: 32
   bash: true
 safe-outputs:
   create-issue:
@@ -68,27 +72,17 @@ Start with the main AWF schema, then expand to nearby specification/compiler sou
 - `pkg/parser/`
 - `pkg/workflow/`
 
-## Persistent Progress Tracking (repo-memory)
+## Persistent Review History (repo-memory ledger)
 
-Use repo-memory as the authoritative cross-run state in:
+Use the repo-memory ledger as the authoritative cross-run history. Query recent
+`awf_spec_surfacing_review` records and use the newest valid record's
+`payload.reviewed_sha` as the previous review cursor and its
+`payload.open_feature_ids` to avoid duplicate issues. If no valid record exists,
+use the last 7 days as the initial diff window.
 
-- `/tmp/gh-aw/repo-memory/default/awf-feature-surfacing/progress.json`
-- `/tmp/gh-aw/repo-memory/default/awf-feature-surfacing/latest-review.md`
-
-`default` is the repo-memory instance directory; `awf-feature-surfacing/` is this workflow's owned subdirectory.
-
-`progress.json` schema:
-
-```json
-{
-  "last_reviewed_sha": "",
-  "last_schema_sha256": "",
-  "open_feature_ids": [],
-  "updated_at": ""
-}
-```
-
-If `progress.json` is missing, initialize with empty values and continue.
+Each record contains the run ID, review timestamp, reviewed commit SHA, schema
+SHA-256, stable open feature IDs, and outcome (`issue_created` or `noop`). Do
+not store full diffs, source excerpts, or raw analysis notes in the ledger.
 
 ## Procedure
 
@@ -96,8 +90,8 @@ If `progress.json` is missing, initialize with empty values and continue.
 
 1. Get current commit SHA.
 2. Compute SHA-256 of `pkg/parser/schemas/main_workflow_schema.json`.
-3. Read `progress.json` from repo-memory.
-4. Build the diff window from `last_reviewed_sha` (if present) to `HEAD`; if absent, use the last 7 days.
+3. Query recent `awf_spec_surfacing_review` ledger records and inspect their stable feature IDs.
+4. Build the diff window from the newest valid `reviewed_sha` (if present) to `HEAD`; if absent, use the last 7 days.
 
 ### 2) Detect candidate AWF feature changes
 
@@ -134,12 +128,13 @@ Use `###` headings and `<details>` for verbose evidence.
 
 If no actionable gap exists, return `noop` with a brief explanation.
 
-### 5) Persist repo-memory state
+### 5) Persist the review event
 
-Before finishing, write:
-
-- updated `progress.json` (new `last_reviewed_sha`, schema hash, open feature IDs, timestamp)
-- `latest-review.md` with a compact review summary and decision
+After creating the issue or using `noop`, query for a record whose
+`payload.run_id` matches `${{ github.run_id }}`. If absent, append one
+`awf_spec_surfacing_review` record with the run ID, UTC timestamp, current
+commit SHA, schema SHA-256, stable open feature IDs, and outcome. Do not edit
+ledger shards directly or invoke compaction.
 
 ## Output Quality Bar
 

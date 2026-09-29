@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -38,20 +39,29 @@ func TestVersionIsSetDuringBuild(t *testing.T) {
 			t.Fatalf("Failed to build test binary: %v\nOutput: %s", err, output)
 		}
 
-		// Run the test binary to check its version
-		versionCmd := exec.Command(binaryPath, "version")
-		versionOutput, err := versionCmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("Failed to run version command: %v", err)
-		}
+		for _, args := range [][]string{{"version"}, {"--version"}} {
+			t.Run(strings.Join(args, " "), func(t *testing.T) {
+				var stderr bytes.Buffer
+				versionCmd := exec.Command(binaryPath, args...)
+				versionCmd.Stderr = &stderr
+				versionOutput, err := versionCmd.Output()
+				if err != nil {
+					t.Fatalf("Failed to run version command: %v\nStderr: %s", err, stderr.String())
+				}
 
-		outputStr := string(versionOutput)
-		if !strings.Contains(outputStr, testVersion) {
-			t.Errorf("Version output should contain '%s', got: %s", testVersion, outputStr)
-		}
+				outputStr := string(versionOutput)
+				if !strings.Contains(outputStr, testVersion) {
+					t.Errorf("Version output should contain '%s', got: %s", testVersion, outputStr)
+				}
 
-		if strings.Contains(outputStr, "dev") && !strings.Contains(testVersion, "dev") {
-			t.Errorf("Version output should not contain 'dev' when built with custom version, got: %s", outputStr)
+				if strings.Contains(outputStr, "dev") && !strings.Contains(testVersion, "dev") {
+					t.Errorf("Version output should not contain 'dev' when built with custom version, got: %s", outputStr)
+				}
+
+				if stderr.Len() != 0 {
+					t.Errorf("Version output should not be written to stderr, got: %s", stderr.String())
+				}
+			})
 		}
 	})
 
