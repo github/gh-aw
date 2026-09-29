@@ -533,11 +533,11 @@ func appendEvalsModelEnvLines(steps []string, engineID, model string) []string {
 func buildEvalsModelFallbackExpression(engineID string) string {
 	switch engineID {
 	case string(constants.CopilotEngine):
-		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelEvalsCopilot, compilerenv.DefaultModelCopilot, constants.CopilotBYOKDefaultModel)
+		return compilerenv.BuildModelOverrideExpressionEmptyFallback(constants.EnvVarModelEvalsCopilot, compilerenv.DefaultModelCopilot)
 	case string(constants.ClaudeEngine):
-		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelEvalsClaude, compilerenv.DefaultModelClaude, constants.SonnetDefaultModel)
+		return compilerenv.BuildModelOverrideExpressionEmptyFallback(constants.EnvVarModelEvalsClaude, compilerenv.DefaultModelClaude)
 	case string(constants.CodexEngine):
-		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelEvalsCodex, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
+		return compilerenv.BuildModelOverrideExpressionEmptyFallback(constants.EnvVarModelEvalsCodex, compilerenv.DefaultModelCodex)
 	default:
 		return ""
 	}

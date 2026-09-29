@@ -230,7 +230,7 @@ func TestClaudeEvalsModelEnvVarInjectionForEvalsPhase(t *testing.T) {
 		}
 		stepsContent := stepsStr.String()
 
-		expectedFallbackLine := constants.EnvVarModelFallback + ": ${{ vars." + constants.EnvVarModelEvalsClaude + " || vars." + compilerenv.DefaultModelClaude + " || '" + constants.SonnetDefaultModel + "' }}"
+		expectedFallbackLine := constants.EnvVarModelFallback + ": ${{ vars." + constants.EnvVarModelEvalsClaude + " || vars." + compilerenv.DefaultModelClaude + " || '' }}"
 		if !strings.Contains(stepsContent, expectedFallbackLine) {
 			t.Errorf("Expected evals fallback env line '%s' not found in steps:\n%s", expectedFallbackLine, stepsContent)
 		}
@@ -477,7 +477,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.model }}",
 			expectedModelEnvVar:  constants.CopilotCLIModelEnvVar,
 			expectedModelEnvVal:  "${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '" + constants.CopilotBYOKDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '' }}",
 			expectShellExpansion: false, // Copilot reads COPILOT_MODEL natively, no shell expansion needed
 		},
 		{
@@ -486,7 +486,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.provider }}/${{ inputs.model }}",
 			expectedModelEnvVar:  constants.CopilotCLIModelEnvVar,
 			expectedModelEnvVal:  "${{ inputs.provider }}/${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '" + constants.CopilotBYOKDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '' }}",
 			expectShellExpansion: false,
 		},
 		{
@@ -495,7 +495,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.model }}",
 			expectedModelEnvVar:  constants.ClaudeCLIModelEnvVar,
 			expectedModelEnvVal:  "${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentClaude + " || vars." + compilerenv.DefaultModelClaude + " || '" + constants.SonnetDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentClaude + " || vars." + compilerenv.DefaultModelClaude + " || '' }}",
 			expectShellExpansion: false, // Claude reads ANTHROPIC_MODEL natively, no shell expansion needed
 		},
 		{
@@ -504,7 +504,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.provider }}/${{ inputs.model }}",
 			expectedModelEnvVar:  constants.ClaudeCLIModelEnvVar,
 			expectedModelEnvVal:  "${{ inputs.provider }}/${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentClaude + " || vars." + compilerenv.DefaultModelClaude + " || '" + constants.SonnetDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentClaude + " || vars." + compilerenv.DefaultModelClaude + " || '' }}",
 			expectShellExpansion: false,
 		},
 		{
@@ -513,7 +513,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.provider }}/${{ inputs.model }}",
 			expectedModelEnvVar:  constants.EnvVarModelAgentCodex,
 			expectedModelEnvVal:  "${{ inputs.provider }}/${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '" + constants.CodexDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '' }}",
 			expectShellExpansion: true, // Codex has no native model env var, uses shell expansion
 		},
 	}
@@ -614,7 +614,7 @@ func TestExpressionModelDetectionJobUsesEnvVar(t *testing.T) {
 	if !strings.Contains(stepsContent, expectedModelEnvLine) {
 		t.Errorf("Expected env line '%s' not found in steps:\n%s", expectedModelEnvLine, stepsContent)
 	}
-	expectedFallbackEnvLine := constants.EnvVarModelFallback + ": ${{ vars." + constants.EnvVarModelDetectionCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '" + constants.CopilotBYOKDefaultModel + "' }}"
+	expectedFallbackEnvLine := constants.EnvVarModelFallback + ": ${{ vars." + constants.EnvVarModelDetectionCopilot + " || vars." + compilerenv.DefaultModelCopilot + " || '' }}"
 	if !strings.Contains(stepsContent, expectedFallbackEnvLine) {
 		t.Errorf("Expected fallback env line '%s' not found in steps:\n%s", expectedFallbackEnvLine, stepsContent)
 	}

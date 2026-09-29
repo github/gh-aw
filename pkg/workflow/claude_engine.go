@@ -549,7 +549,7 @@ func applyClaudeModelEnvVars(env map[string]string, workflowData *WorkflowData) 
 		claudeModelVar = constants.EnvVarModelAgentClaude
 	}
 	if containsExpression(workflowData.Model) {
-		env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpression(claudeModelVar, compilerenv.DefaultModelClaude, constants.SonnetDefaultModel)
+		env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpressionEmptyFallback(claudeModelVar, compilerenv.DefaultModelClaude)
 	}
 	claudeLog.Printf("Setting %s env var for model: %s", constants.ClaudeCLIModelEnvVar, workflowData.Model)
 	env[constants.ClaudeCLIModelEnvVar] = workflowData.Model

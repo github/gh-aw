@@ -320,21 +320,24 @@ func TestBuildParseEvalsResultsStepUsesExpressionModelAndFallbackEnv(t *testing.
 		engineID      string
 		modelEnvVar   string
 		defaultEnvVar string
-		defaultModel  string
 	}{
 		{
 			name:          "copilot evals expression model fallback",
 			engineID:      "copilot",
 			modelEnvVar:   constants.EnvVarModelEvalsCopilot,
 			defaultEnvVar: compilerenv.DefaultModelCopilot,
-			defaultModel:  constants.CopilotBYOKDefaultModel,
 		},
 		{
 			name:          "claude evals expression model fallback",
 			engineID:      "claude",
 			modelEnvVar:   constants.EnvVarModelEvalsClaude,
 			defaultEnvVar: compilerenv.DefaultModelClaude,
-			defaultModel:  constants.SonnetDefaultModel,
+		},
+		{
+			name:          "codex evals expression model fallback",
+			engineID:      "codex",
+			modelEnvVar:   constants.EnvVarModelEvalsCodex,
+			defaultEnvVar: compilerenv.DefaultModelCodex,
 		},
 	}
 
@@ -358,11 +361,10 @@ func TestBuildParseEvalsResultsStepUsesExpressionModelAndFallbackEnv(t *testing.
 				t.Errorf("expected parse step to preserve expression-backed evals model; got:\n%s", steps)
 			}
 			expectedFallbackEnvLine := fmt.Sprintf(
-				"%s: ${{ vars.%s || vars.%s || '%s' }}",
+				"%s: ${{ vars.%s || vars.%s || '' }}",
 				constants.EnvVarModelFallback,
 				tt.modelEnvVar,
 				tt.defaultEnvVar,
-				tt.defaultModel,
 			)
 			if !strings.Contains(steps, expectedFallbackEnvLine) {
 				t.Errorf("expected parse step to expose evals model fallback env %q; got:\n%s", expectedFallbackEnvLine, steps)
