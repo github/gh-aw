@@ -57,6 +57,14 @@ safe-outputs:
   add-labels:
     allowed: [spam, ai-generated, link-spam, ai-inspected]
     target: "*"
+    item-schema:
+      type: object
+      required: [name, rationale, confidence]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        rationale: { type: string }
+        confidence: { type: string, enum: [HIGH] }
   hide-comment:
     max: 5
     allowed-reasons: [spam]

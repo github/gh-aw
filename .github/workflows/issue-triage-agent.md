@@ -27,6 +27,14 @@ safe-outputs:
     reasoning: string
   add-labels:
     allowed: [bug, feature, enhancement, documentation, question, help-wanted, good-first-issue]
+    item-schema:
+      type: object
+      required: [name, rationale, confidence]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        rationale: { type: string }
+        confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
   add-comment: {}
 imports:
   - shared/github-guard-policy.md

@@ -66,6 +66,7 @@ type Compiler struct {
 	inlinePrompt            bool                     // If true, inline markdown content in YAML instead of using runtime-import macros (for Wasm builds)
 	priorManifests          map[string]*GHAWManifest // Pre-cached manifests keyed by lock file path; takes precedence over git HEAD / filesystem reads
 	requireDocker           bool                     // If true, fail validation when Docker is not available instead of silently skipping
+	requireSelfHosted       bool                     // If true, validate that every generated job selects a self-hosted runner
 	ghesCompatFromCLI       bool                     // If true, GHES compat was requested via --ghes CLI flag (takes precedence over aw.json)
 	ghesArtifactCompat      bool                     // If true, emit GHES-compatible v3 pins for artifact actions
 	ghesCompatConfigured    bool                     // True once GHES compatibility has been resolved from CLI/config

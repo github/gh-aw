@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"github.com/goccy/go-yaml"
 )
 
@@ -139,12 +141,23 @@ func shouldDowngradeDefaultToolsetPermissionError(githubTool *GitHubToolConfig) 
 		return true
 	}
 
-	return len(githubTool.Toolset) == 1 && githubTool.Toolset[0] == GitHubToolset("default")
+	return slices.Equal(githubTool.Toolset, []GitHubToolset{"default"})
 }
 
 // generateAndValidateYAML generates GitHub Actions YAML and validates
 // the output size and format.
 func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownPath string, lockFile string) (string, []string, []string, error) { //nolint:largefunc // Existing YAML generation and validation remains centralized.
+	requireSelfHostedRunners, err := compilerenv.ResolveRequireSelfHostedRunners()
+	if err != nil {
+		return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+	requireSelfHostedRunners = requireSelfHostedRunners || c.requireSelfHosted
+	if repoConfig, err := c.loadRepoConfig(); err != nil {
+		return "", nil, nil, formatCompilerError(markdownPath, "error", fmt.Sprintf("failed to load aw.json: %v", err), err)
+	} else if repoConfig != nil {
+		requireSelfHostedRunners = requireSelfHostedRunners || repoConfig.RequireSelfHostedRunners
+	}
+
 	// Generate the YAML content along with the collected body secrets and action refs
 	// (returned to avoid a second scan of the full YAML in the caller for safe update enforcement).
 	yamlContent, bodySecrets, bodyActions, err := c.generateYAML(workflowData, markdownPath)
@@ -175,16 +188,27 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	// used when schema validation is disabled (skipValidation=true), where targeted
 	// fast-path checks avoid an unnecessary yaml.Unmarshal.
 	needsSchemaCheck := !c.skipValidation
+	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners
 
 	var parsedWorkflow map[string]any
-	if needsSchemaCheck {
-		// Schema validation requires parsed YAML; parse once and share with the
-		// template injection validator below.
+	if needsWorkflowParse {
+		// Schema validation and runner policy checks require parsed YAML; share the
+		// parsed representation with the template injection validator below.
 		workflowLog.Print("Parsing compiled YAML for validation")
 		if parseErr := yaml.Unmarshal([]byte(yamlContent), &parsedWorkflow); parseErr != nil {
+			if requireSelfHostedRunners {
+				return "", nil, nil, formatCompilerError(markdownPath, "error",
+					fmt.Sprintf("self-hosted runner policy could not inspect compiled workflow: %v", parseErr), parseErr)
+			}
 			// If parsing fails here the subsequent validators would also fail; keep going
 			// so we surface the root error from the right validator.
 			parsedWorkflow = nil
+		}
+	}
+
+	if requireSelfHostedRunners {
+		if err := validateSelfHostedRunners(parsedWorkflow); err != nil {
+			return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 		}
 	}
 

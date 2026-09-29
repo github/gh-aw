@@ -110,7 +110,32 @@ const (
 	// remain runtime-compliant. Set to the string value "false" to disable the
 	// create_pull_request safe-output tool at runtime.
 	PolicyAllowCreatePullRequest = "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST"
+	// RequireSelfHostedRunners enables compile-time validation that every generated
+	// job selects a self-hosted runner.
+	RequireSelfHostedRunners = "GH_AW_REQUIRE_SELF_HOSTED_RUNNERS"
 )
+
+// ResolveRequireSelfHostedRunners reports whether self-hosted runner enforcement is
+// enabled. An unset value disables enforcement; any other value must be true or false.
+func (m *Manager) ResolveRequireSelfHostedRunners() (bool, error) {
+	raw := strings.TrimSpace(m.getenv(RequireSelfHostedRunners))
+	if raw == "" {
+		return false, nil
+	}
+	if strings.EqualFold(raw, "true") {
+		return true, nil
+	}
+	if strings.EqualFold(raw, "false") {
+		return false, nil
+	}
+	return false, fmt.Errorf("%s must be \"true\" or \"false\", got %q", RequireSelfHostedRunners, raw)
+}
+
+// ResolveRequireSelfHostedRunners is a convenience wrapper that delegates to the
+// default process-environment Manager.
+func ResolveRequireSelfHostedRunners() (bool, error) {
+	return defaultManager.ResolveRequireSelfHostedRunners()
+}
 
 // ResolveDefaultMaxTurns returns fallback when the env var is unset/invalid,
 // otherwise returns the parsed override as a string.

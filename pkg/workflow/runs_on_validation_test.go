@@ -278,6 +278,54 @@ func TestExtractRunnerLabels(t *testing.T) {
 	}
 }
 
+func TestValidateSelfHostedRunners(t *testing.T) {
+	tests := []struct {
+		name       string
+		jobs       map[string]any
+		wantErr    bool
+		errContain string
+	}{
+		{
+			name: "self-hosted label",
+			jobs: map[string]any{"agent": map[string]any{"runs-on": []any{"self-hosted", "linux"}}},
+		},
+		{
+			name: "runner group",
+			jobs: map[string]any{"safe_outputs": map[string]any{"runs-on": map[string]any{"group": "arc-pool", "labels": []any{"linux"}}}},
+		},
+		{
+			name:       "GitHub-hosted runner",
+			jobs:       map[string]any{"agent": map[string]any{"runs-on": "ubuntu-latest"}},
+			wantErr:    true,
+			errContain: `job "agent"`,
+		},
+		{
+			name:       "custom label without self-hosted proof",
+			jobs:       map[string]any{"agent": map[string]any{"runs-on": "my-runner"}},
+			wantErr:    true,
+			errContain: "self-hosted runner",
+		},
+		{
+			name:       "omitted runner",
+			jobs:       map[string]any{"safe_outputs": map[string]any{"steps": []any{}}},
+			wantErr:    true,
+			errContain: `job "safe_outputs" has no runs-on value`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSelfHostedRunners(map[string]any{"jobs": tt.jobs})
+			if tt.wantErr {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tt.errContain)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestValidateRunsOnValue(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -9,6 +9,7 @@
 //		{
 //		  "ghes": true,               // enables GHES-compatible v3 artifact pins
 //		  "help_command": false,      // disables builtin centralized /help comment handler
+//		  "require_self_hosted_runners": true, // requires self-hosted runners for every generated job
 //		  "utc": "-08:00", // project home UTC offset for rendered local times
 //		  "auto_upgrade": true, // set to true to generate agentic-auto-upgrade.yml with weekly schedule
 //		  "auto_upgrade": { "cron": "0 9 * * 1", "options": ["--pre-releases"] }, // or object form: configure schedule and upgrade options
@@ -151,6 +152,10 @@ type RepoConfig struct {
 	// When true, the compiler uses artifact action versions supported by GHES.
 	GHES bool
 
+	// RequireSelfHostedRunners requires every generated workflow job to select a
+	// self-hosted runner.
+	RequireSelfHostedRunners bool
+
 	// UTC is the project's home UTC offset used for rendering local times in CLI output.
 	// The value must be a numeric UTC offset such as "+00:00" or "-08:00".
 	UTC string
@@ -229,14 +234,15 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	// Use an intermediate struct with json.RawMessage to defer maintenance and
 	// auto_upgrade parsing.
 	var raw struct {
-		Strict        bool                          `json:"strict,omitempty"`
-		GHES          bool                          `json:"ghes,omitempty"`
-		HelpCommand   *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
-		UTC           string                        `json:"utc,omitempty"`
-		AutoUpgrade   json.RawMessage               `json:"auto_upgrade,omitempty"`
-		Maintenance   json.RawMessage               `json:"maintenance,omitempty"`
-		ActionPins    map[string]string             `json:"action_pins,omitempty"`
-		ContainerPins map[string]ContainerPinTarget `json:"container_pins,omitempty"`
+		Strict                   bool                          `json:"strict,omitempty"`
+		GHES                     bool                          `json:"ghes,omitempty"`
+		RequireSelfHostedRunners bool                          `json:"require_self_hosted_runners,omitempty"`
+		HelpCommand              *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
+		UTC                      string                        `json:"utc,omitempty"`
+		AutoUpgrade              json.RawMessage               `json:"auto_upgrade,omitempty"`
+		Maintenance              json.RawMessage               `json:"maintenance,omitempty"`
+		ActionPins               map[string]string             `json:"action_pins,omitempty"`
+		ContainerPins            map[string]ContainerPinTarget `json:"container_pins,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -244,6 +250,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 
 	r.Strict = raw.Strict
 	r.GHES = raw.GHES
+	r.RequireSelfHostedRunners = raw.RequireSelfHostedRunners
 	r.HelpCommand = raw.HelpCommand
 	r.UTC = strings.TrimSpace(raw.UTC)
 	r.ActionPins = raw.ActionPins

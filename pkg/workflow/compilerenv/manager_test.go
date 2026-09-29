@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestManager_WithInjectedGetter smoke-tests all Resolve* methods through a
@@ -55,12 +56,40 @@ func TestNew_NilGetterUsesProcessEnv(t *testing.T) {
 func TestManager_FallbackWhenEnvEmpty(t *testing.T) {
 	m := New(func(string) string { return "" })
 
+	requireSelfHosted, err := m.ResolveRequireSelfHostedRunners()
+	require.NoError(t, err)
+	assert.False(t, requireSelfHosted)
 	assert.Equal(t, "7", m.ResolveDefaultMaxTurns("7"))
 	assert.Equal(t, 20, m.ResolveDefaultTimeoutMinutes(20))
 	assert.Equal(t, 5, m.ResolveDefaultMaxTurnCacheMisses(5))
 	assert.Equal(t, "gpt-5.5-mini", m.ResolveDefaultDetectionModel("gpt-5.5-mini"))
 	assert.Equal(t, "gpt-5.5-nano", m.ResolveDefaultEvalsModel("gpt-5.5-nano"))
 	assert.Equal(t, "+00:00", m.ResolveDefaultUTC("+00:00"))
+}
+
+func TestManager_ResolveRequireSelfHostedRunners(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		value   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "true enables enforcement", value: "true", want: true},
+		{name: "case-insensitive true", value: " TRUE ", want: true},
+		{name: "false disables enforcement", value: "false"},
+		{name: "invalid value errors", value: "yes", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New(func(string) string { return tt.value })
+			got, err := m.ResolveRequireSelfHostedRunners()
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 // TestManager_PolicyModelsAllowed exercises ResolvePolicyModelsAllowed on a
