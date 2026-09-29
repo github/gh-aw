@@ -31,7 +31,10 @@ func (c *Compiler) parseAssignToAgentConfig(outputMap map[string]any) *AssignToA
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap["assign-to-agent"].(map[string]any)
+	var configData map[string]any
+	if data, ok := outputMap["assign-to-agent"].(map[string]any); ok {
+		configData = data
+	}
 
 	// Pre-process templatable int fields
 	if err := preprocessIntFieldAsString(configData, "max", assignToAgentLog); err != nil {

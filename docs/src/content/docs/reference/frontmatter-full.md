@@ -14359,6 +14359,12 @@ safe-outputs:
     # (optional)
     target: null
 
+    # Only assign an agent if all these labels are currently present on the target
+    # issue or pull request.
+    # (optional)
+    required-labels: []
+      # Array of strings
+
     # Target repository in format 'owner/repo' for cross-repository agent assignment.
     # Takes precedence over trial target repo settings.
     # (optional)
