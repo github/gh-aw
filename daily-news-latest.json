@@ -1,30 +1,15 @@
 {
-  "date": "2026-09-16",
-  "date_range": {
-    "start": "2026-08-18",
-    "end": "2026-09-16"
-  },
-  "highlights": [
-    "Merged fixes concentrated on daily AIC accounting, startup-failure handling, and test/lint stability.",
-    "Issues and PR activity peaked on 2026-09-16 with 147 combined events in the sampled 30-day window.",
-    "Commit activity peaked on 2026-09-12 with 22 commits, with 2-3 contributors active on the busiest recent days.",
-    "Recent discussion traffic is dominated by audit-style posts rather than roadmap or design threads."
-  ],
-  "counts": {
-    "issues": 200,
-    "prs": 99,
-    "commits": 100,
-    "discussions": 50,
-    "releases": 30,
-    "changesets": 666
-  },
-  "discussion_categories": {
-    "Announcements": 4,
-    "General": 5,
-    "Audits": 41
-  },
-  "data_limitations": [
-    "commits.json contained concatenated JSON after the first valid array; analysis used the first valid JSON document only",
-    "issues, PRs, and discussions were limited to the pre-downloaded snapshot sizes"
+  "date": "2026-09-29",
+  "title": "Daily Status - 2026-09-29",
+  "date_start": "2026-08-31",
+  "date_end": "2026-09-29",
+  "issues_analyzed": 200,
+  "prs_analyzed": 103,
+  "commits_analyzed": 17986,
+  "discussions_analyzed": 50,
+  "releases_analyzed": 30,
+  "charts": [
+    "issues_prs_trends.png",
+    "commit_trends.png"
   ]
 }
