@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createServer, registerTool, start } = require("./mcp_server_core.cjs");
 const { Ledger } = require("./ledger_store.cjs");
+const { LEDGER_TRANSACTION_LOG_PATH } = require("./constants.cjs");
 
 function parsePositiveInteger(value) {
   if (value === undefined || !/^[1-9][0-9]*$/.test(value)) return undefined;
@@ -67,7 +68,7 @@ function createLedgerServer({ memoryDir = process.env.GH_AW_MEMORY_DIR, schemaPa
     maxSegmentBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_SEGMENT_KB),
     maxRecordBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_RECORD_KB),
     maxPatchBytes: parseKilobytes(process.env.GH_AW_LEDGER_MAX_PATCH_KB),
-    transactionLogPath: process.env.GH_AW_LEDGER_TRANSACTION_LOG || "/tmp/gh-aw/safe-output-items.jsonl",
+    transactionLogPath: process.env.GH_AW_LEDGER_TRANSACTION_LOG || LEDGER_TRANSACTION_LOG_PATH,
   });
   const server = createServer({ name: "ledger", version: "1.0.0" });
 

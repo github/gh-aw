@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,4 +60,28 @@ func TestLedgerMutationValidationConfig(t *testing.T) {
 	configJSON, err := GetValidationConfigJSONWithDataSchema([]string{"ledger_mutation"}, nil, false, nil)
 	require.NoError(t, err)
 	assert.Contains(t, configJSON, "ledger_mutation")
+}
+
+func TestLedgerAuditMergeStepGeneration(t *testing.T) {
+	compiler := &Compiler{}
+	withLedger := &RepoMemoryConfig{Memories: []RepoMemoryEntry{{ID: "events", Ledger: &RepoMemoryLedgerConfig{}}}}
+
+	var enabled strings.Builder
+	compiler.generateLedgerAuditMergeStep(&enabled, &WorkflowData{
+		SafeOutputs:      &SafeOutputsConfig{},
+		RepoMemoryConfig: withLedger,
+	})
+	assert.Contains(t, enabled.String(), "Merge ledger audit entries")
+	assert.Contains(t, enabled.String(), "merge_ledger_transactions.cjs")
+
+	var noLedger strings.Builder
+	compiler.generateLedgerAuditMergeStep(&noLedger, &WorkflowData{
+		SafeOutputs:      &SafeOutputsConfig{},
+		RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{{ID: "notes"}}},
+	})
+	assert.Empty(t, noLedger.String())
+
+	var noSafeOutputs strings.Builder
+	compiler.generateLedgerAuditMergeStep(&noSafeOutputs, &WorkflowData{RepoMemoryConfig: withLedger})
+	assert.Empty(t, noSafeOutputs.String())
 }

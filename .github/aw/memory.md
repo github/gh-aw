@@ -258,7 +258,11 @@ The ledger is eventually convergent, not transactional or exactly-once. Record
 SHA-256 values are unkeyed checksums, not authentication; rely on the AWF write
 boundary, use stable application keys, and deterministically resolve duplicates
 and concurrent conflicts. Compaction, normalization, and save details appear in
-the persistence step summary.
+the persistence step summary. Every successful append also emits a redacted
+`ledger_mutation` audit entry to a dedicated ledger transaction log; a trusted
+post-agent step revalidates and merges those entries into the safe outputs for
+threat detection, and their safe-output handler only logs that metadata and
+performs no side effects.
 
 ### Tradeoffs
 

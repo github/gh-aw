@@ -15,8 +15,10 @@ sidebar:
 
 This specification defines the repository memory ledger: a bounded, deterministic,
 append-only JSONL record store with a disposable query projection. It specifies
-record identity, concurrent reconstruction, compaction, retirement, configuration
-limits, and the transaction log consumed by safe-output threat detection.
+record identity, per-job responsibilities, script extension points, concurrent
+reconstruction, compaction, retirement, configuration limits, the transaction log
+consumed by safe-output threat detection, and the adversarial review of the
+feature.
 
 ## 1. Conformance and terminology
 
@@ -65,6 +67,7 @@ implementation MUST NOT move a responsibility to a less trusted job.
 | Job | Trust | Ledger responsibilities | Credentials |
 | --- | --- | --- | --- |
 | Agent job | Untrusted | Runs the ledger MCP server; requests `ledger_append`, `ledger_get`, `ledger_query`, `ledger_status`; writes shards into the run's writer shard and audit entries into the transaction log | No memory-branch write token |
+| Agent job (post-agent steps) | Trusted | Merges the ledger transaction log into the safe-output file after revalidating, redacting, deduplicating, and bounding entries | Runner-side only; no memory-branch write token |
 | Safe-outputs job | Trusted | Ingests and validates `ledger_mutation` entries and reports them through the log-only handler | Safe-output tokens; no ledger storage access |
 | Persistence job | Trusted | Restores memory, reconstructs the DAG, runs compaction and retirement, normalizes files, selects the trusted copy set, commits and pushes | Memory-branch `contents: write` token |
 
@@ -123,10 +126,22 @@ validate arguments and MUST NOT expose filesystem paths or runtime exception
 details.
 
 After a durable append, the server MUST serialize one `ledger_mutation` event
-to the safe-output transaction log. The event MUST identify the operation,
-record ID, record type, timestamp, parent hashes, record SHA, and a hash of the
-payload. Payload contents MUST NOT be copied into this audit event. A failed
-audit write MUST NOT be represented as a successful mutation.
+to the ledger transaction log. The event MUST identify the operation, record ID,
+record type, timestamp, parent hashes, record SHA, and a hash of the payload.
+Payload contents MUST NOT be copied into this audit event. A failed audit write
+MUST NOT be represented as a successful mutation.
+
+The ledger transaction log MUST be a dedicated file. It MUST NOT be the
+safe-output manifest, because the manifest records outputs the runtime executed,
+while the transaction log records mutations an agent-facing server reports.
+
+After agent execution, a trusted runner step MUST merge the transaction log into
+the safe-output file so audit entries are ingested with every other safe output.
+The merge step MUST treat the log as untrusted input: it MUST keep only append
+entries whose identifiers and hashes match the required syntax, MUST drop
+unknown fields, MUST deduplicate by record SHA, MUST bound the number of merged
+entries, and MUST NOT fail the workflow when the log is missing, oversized, or
+malformed.
 
 When the workflow enables a ledger, the compiler MUST declare `ledger_mutation`
 as an ingested safe-output type so audit entries are validated and bounded rather
@@ -195,9 +210,44 @@ SHOULD consume the transaction log and ledger artifacts together; an audit
 event is evidence of an attempted or completed mutation, not authorization for
 that mutation.
 
+## 9. Adversarial review
+
+This section records the agentic threats considered for this feature and the
+required countermeasures. The adversary is a prompt-injected agent that can call
+ledger tools, write arbitrary files into the repository-memory staging directory,
+and append arbitrary lines to the safe-output file, but that holds no
+memory-branch write credential.
+
+| Threat | Required countermeasure |
+| --- | --- |
+| Forged replacement shard used to delete history | Retirement MUST only act on coverage declarations created by the current runtime run, and MUST verify that the replacement contains every source record SHA |
+| Forged coverage file dropped into the memory directory | Coverage files supplied by the agent MUST be excluded from the trusted copy set and MUST NOT be honoured during retirement |
+| Overwriting an existing shard with a truncated copy | Agent-supplied files whose path matches an already-trusted shard ID MUST be rejected during persistence |
+| Compacting the run's own writer shard or newly added shards | Compaction MUST exclude the writer shard and every shard added during the current run |
+| Record or segment identity forgery | Record SHA, canonical serialization, and duplicate identity MUST be revalidated on read; mismatches MUST be diagnostics, never silent acceptance |
+| Unbounded growth or denial of service | Record, segment, patch, and shard-count limits MUST be enforced before acknowledging a mutation, and file scanning MUST stop at the configured shard bound |
+| Path traversal, symlinks, or non-regular files | Ledger paths MUST be derived from validated UUIDs, opened without following symlinks, and rejected when not regular files |
+| Escaping the persistence job through scripted policy | Compactor scripts MUST NOT execute; policy is declarative (section 4.2) |
+| Forged `ledger_mutation` audit entries | The audit handler MUST be log-only, and authoritative state MUST be derived from validated shard content, never from the transaction log |
+| Agent-authored lines mixing into trusted output records | The ledger transaction log MUST be a dedicated file, and merged entries MUST be revalidated, redacted, deduplicated, and bounded before ingestion |
+| Durable prompt injection through stored payloads | Ledger payloads are untrusted content; consumers MUST treat `ledger_get` and `ledger_query` results as data, never as instructions |
+| Pre-creating a deterministic replacement shard ID to block compaction | A shard identity collision MUST fail open with a diagnostic and MUST NOT delete, overwrite, or retire any source shard |
+| Leaking payloads or credentials through audit or logs | Audit entries MUST carry hashes and identifiers only, ledger errors MUST NOT expose filesystem paths or exception details, and audit logging MUST truncate unexpected values |
+| Compaction failure blocking persistence | Compaction MUST fail open and report a diagnostic |
+| Silent limit misconfiguration | Count limits and size limits MUST be parsed with their own units; a misparsed limit that disables compaction through fail-open handling is a defect |
+
+Residual risks are accepted and documented rather than mitigated: records are
+integrity-checked but not authenticated, so a well-formed record proves only that
+its content hashes correctly, never who authored it; the agent can append
+semantically false but well-formed records, can consume its own configured
+budget, and can emit audit entries for mutations that a reviewer must correlate
+with shard content. Repository memory is not confidential; it MUST NOT be used
+for secrets.
+
 ## 10. Conformance tests
 
 A conforming implementation SHOULD test canonical serialization, hash
 verification, malformed-line isolation, concurrent-head convergence, all
 configured limits, deterministic compaction, forged and current-run coverage,
-safe retirement, transaction-log redaction, and projection rebuilds.
+safe retirement, transaction-log redaction, audit-entry merge validation,
+log-only audit handling, ledger limit unit parsing, and projection rebuilds.

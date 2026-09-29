@@ -662,6 +662,8 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add output collection step only if safe-outputs feature is used (GH_AW_SAFE_OUTPUTS functionality)
 	if data.SafeOutputs != nil {
+		// Merge redacted ledger audit entries before the safe-output file is copied and ingested.
+		c.generateLedgerAuditMergeStep(yaml, data)
 		if err := c.generateOutputCollectionStep(yaml, data); err != nil {
 			return nil, "", err
 		}

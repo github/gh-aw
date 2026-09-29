@@ -67,7 +67,10 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 		// 2. For auto-enabled handlers, include even with empty config
 		if handlerConfig != nil {
 			if safeOutputs.BodyFooter != "" {
-				handlerBodyFooter, _ := handlerConfig["body_footer"].(string)
+				handlerBodyFooter, isString := handlerConfig["body_footer"].(string)
+				if !isString {
+					handlerBodyFooter = ""
+				}
 				handlerConfig["body_footer"] = appendBodyFooters(handlerBodyFooter, safeOutputs.BodyFooter)
 			}
 			injectCurrentCheckoutPatchWorkspacePath(handlerName, handlerConfig, data)

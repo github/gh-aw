@@ -90,6 +90,16 @@ const RPC_MESSAGES_PATH = `${TMP_GH_AW_PATH}/mcp-logs/rpc-messages.jsonl`;
 const MANIFEST_FILE_PATH = `${TMP_GH_AW_PATH}/safe-output-items.jsonl`;
 
 /**
+ * Path to the ledger transaction log JSONL file.
+ * The ledger MCP server appends redacted `ledger_mutation` audit entries here during the
+ * agent run. A trusted step merges validated entries into the safe-output file before
+ * ingestion; the file is deliberately separate from the safe-output manifest so agent-run
+ * writes can never be mistaken for executed safe outputs.
+ * @type {string}
+ */
+const LEDGER_TRANSACTION_LOG_PATH = `${TMP_GH_AW_PATH}/ledger-transactions.jsonl`;
+
+/**
  * Path to the temporary ID map JSON file.
  * This file stores the mapping of temporary IDs (e.g., aw_abc123) to their resolved
  * GitHub resource references ({repo, number}) for review and audit purposes.
@@ -151,6 +161,7 @@ module.exports = {
   GATEWAY_JSONL_PATH,
   RPC_MESSAGES_PATH,
   MANIFEST_FILE_PATH,
+  LEDGER_TRANSACTION_LOG_PATH,
   TEMPORARY_ID_MAP_FILE_PATH,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   OTEL_JSONL_PATH,
