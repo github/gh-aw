@@ -18,11 +18,23 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
  */
 function findFiles(dir, extensions) {
   const results = [];
+  if (!fs.existsSync(dir)) {
+    return results;
+  }
+
+  let entries;
   try {
-    if (!fs.existsSync(dir)) {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    const errorCode = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (errorCode === "EACCES" || errorCode === "EPERM") {
+      core.warning(`Skipping unreadable directory during secret redaction: ${dir} (${errorCode})`);
       return results;
     }
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${dir}: ${getErrorMessage(error)}`, { cause: error });
+  }
+
+  try {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isSymbolicLink()) {

@@ -85,6 +85,36 @@ describe("redact_secrets.cjs", () => {
           expect(fs.existsSync(target)).toBe(true);
           expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Removed symbolic link before artifact upload"));
         }),
+        it("should skip permission-denied directories and continue scanning readable files", async () => {
+          const readableFile = path.join(tempDir, "readable.txt");
+          const unreadableDir = path.join(tempDir, "unreadable");
+          const secretValue = "secret-value-123";
+          fs.writeFileSync(readableFile, `Secret: ${secretValue}`);
+          fs.mkdirSync(unreadableDir);
+          process.env.GH_AW_SECRET_NAMES = "API_KEY";
+          process.env.SECRET_API_KEY = secretValue;
+
+          const originalReaddirSync = fs.readdirSync;
+          const readdirSpy = vi.spyOn(fs, "readdirSync").mockImplementation((dirPath, options) => {
+            if (dirPath === unreadableDir) {
+              const error = new Error(`EACCES: permission denied, scandir '${unreadableDir}'`);
+              error.code = "EACCES";
+              throw error;
+            }
+            return originalReaddirSync(dirPath, options);
+          });
+
+          try {
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          } finally {
+            readdirSpy.mockRestore();
+          }
+
+          expect(fs.readFileSync(readableFile, "utf8")).toBe("Secret: ***REDACTED***");
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(mockCore.warning).toHaveBeenCalledWith(`Skipping unreadable directory during secret redaction: ${unreadableDir} (EACCES)`);
+        }),
         it("should use core.info for logging hits", async () => {
           const testFile = path.join(tempDir, "test.txt"),
             secretValue = "sk-1234567890";
