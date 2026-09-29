@@ -37,12 +37,11 @@ func TestSharedPRDiffDataFetchValidatesHeadSHAForCacheHit(t *testing.T) {
 		"# Skip diff and metadata fetch",
 	}, "Shared PR prefetch should refresh review comments before checking cached diff data")
 	assert.NotContains(t, text, `-f /tmp/gh-aw/agent/pr-review-comments.json ]; then`, "Review comments should not control diff cache hits")
-	assert.Contains(t, text, "DIFF_EXIT=$?", "Shared PR prefetch should capture gh pr diff failures")
-	assert.Contains(t, text, `if [ "$DIFF_EXIT" -ne 0 ]; then`, "Shared PR prefetch should reject gh pr diff failures")
-	assert.NotContains(t, text, "|| true; } | head", "Shared PR prefetch should not suppress gh pr diff failures")
+	assert.Contains(t, text, "if ! gh api --paginate", "Shared PR prefetch should reject GitHub API failures")
+	assert.Contains(t, text, "Failed to fetch files for PR #${PR_NUMBER}", "Shared PR prefetch should report GitHub API failures")
 }
 
-func TestPRDataPrefetchRejectsDiffFailuresBeforeSavingCacheData(t *testing.T) {
+func TestPRDataPrefetchRejectsAPIFailuresBeforeSavingCacheData(t *testing.T) {
 	t.Parallel()
 	repoRoot, err := gitutil.FindGitRoot()
 	if err != nil {
@@ -58,15 +57,15 @@ func TestPRDataPrefetchRejectsDiffFailuresBeforeSavingCacheData(t *testing.T) {
 		require.NoError(t, readErr, "Should read %s", workflow)
 
 		text := string(content)
-		assert.Contains(t, text, "DIFF_EXIT=$?", "%s should capture gh pr diff failures", workflow)
-		assert.Contains(t, text, `if [ "$DIFF_EXIT" -ne 0 ]; then`, "%s should reject gh pr diff failures", workflow)
-		assert.NotContains(t, text, "|| true; } | head", "%s should not suppress gh pr diff failures", workflow)
+		assert.Contains(t, text, "if ! gh api --paginate", "%s should reject GitHub API failures", workflow)
+		assert.Contains(t, text, "Failed to fetch files for PR #${PR_NUMBER}", "%s should report GitHub API failures", workflow)
 		assertSubstringsInOrder(t, text, []string{
-			`if [ "$DIFF_EXIT" -ne 0 ]; then`,
-			"rm -f /tmp/gh-aw/agent/pr-diff.full /tmp/gh-aw/agent/pr-diff.err",
+			"if ! gh api --paginate",
+			`echo "::error::Failed to fetch files for PR #${PR_NUMBER}: $(cat /tmp/gh-aw/agent/pr-diff.err)" >&2`,
 			"exit 1",
+			`head -n "${PR_DIFF_MAX_LINES}" /tmp/gh-aw/agent/pr-diff.full > /tmp/gh-aw/agent/pr-diff.patch`,
 			"pr-data-head-sha.txt",
-		}, "%s should validate the diff before writing a valid cache head marker", workflow)
+		}, "%s should reject API failures before saving a valid cache head marker", workflow)
 	}
 }
 

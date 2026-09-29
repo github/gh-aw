@@ -130,15 +130,19 @@ func ValidArtifactSetNames() []string {
 
 func usageOnlyArtifactHintMessage() string {
 	examples := artifactHintExampleSets()
+	firstExample := ""
+	if len(examples) > 0 {
+		firstExample = examples[0]
+	}
 	switch len(examples) {
 	case 0:
 		return "Only the usage artifact was downloaded. Use --artifacts all to download all artifacts."
 	case 1:
-		return fmt.Sprintf("Only the usage artifact was downloaded. Use --artifacts all to download all artifacts, or a specific set such as --artifacts %s.", examples[0])
+		return fmt.Sprintf("Only the usage artifact was downloaded. Use --artifacts all to download all artifacts, or a specific set such as --artifacts %s.", firstExample)
 	default:
 		return fmt.Sprintf(
 			"Only the usage artifact was downloaded. Use --artifacts all to download all artifacts, or a specific set such as --artifacts %s, or combinations such as --artifacts %s.",
-			examples[0],
+			firstExample,
 			strings.Join(examples, ","),
 		)
 	}

@@ -104,37 +104,8 @@ func extractExperimentData(logsPath string) *ExperimentData {
 		experimentDataLog.Printf("Reading experiment state from: %s", statePath)
 		raw, err := os.ReadFile(statePath)
 		if err == nil {
-			state := parseExperimentState(raw)
-			if len(state.Counts) > 0 {
-				experimentDataLog.Printf("Found %d experiment(s) in state file", len(state.Counts))
-
-				// When per-run records are available, use the most recent run's assignments directly
-				// instead of inferring them from cumulative counts.
-				if len(state.Runs) > 0 {
-					lastRun := state.Runs[len(state.Runs)-1]
-					if len(lastRun.Assignments) > 0 {
-						experimentDataLog.Printf("Using run record from run_id=%s (timestamp=%s)", lastRun.RunID, lastRun.Timestamp)
-						return &ExperimentData{
-							Assignments:      lastRun.Assignments,
-							CumulativeCounts: state.Counts,
-						}
-					}
-				}
-
-				// Derive this-run assignments: the variant selected on the most-recent run is
-				// the one with the maximum count (ties resolved by sorted order).
-				assignments := make(map[string]string, len(state.Counts))
-				names := sliceutil.SortedKeys(state.Counts)
-				for _, name := range names {
-					variantCounts := state.Counts[name]
-					selected := deriveLastSelectedVariant(variantCounts)
-					assignments[name] = selected
-					experimentDataLog.Printf("Experiment %q: selected variant=%q", name, selected)
-				}
-				return &ExperimentData{
-					Assignments:      assignments,
-					CumulativeCounts: state.Counts,
-				}
+			if data := experimentDataFromState(parseExperimentState(raw)); data != nil {
+				return data
 			}
 		}
 	}
@@ -154,6 +125,38 @@ func extractExperimentData(logsPath string) *ExperimentData {
 
 	experimentDataLog.Print("No experiment data found")
 	return nil
+}
+
+func experimentDataFromState(state *ExperimentState) *ExperimentData {
+	if state == nil || len(state.Counts) == 0 {
+		return nil
+	}
+	experimentDataLog.Printf("Found %d experiment(s) in state file", len(state.Counts))
+	runs := state.Runs
+	lastRunIndex := len(runs) - 1
+	if lastRunIndex >= 0 && lastRunIndex < len(runs) {
+		lastRun := runs[lastRunIndex]
+		if len(lastRun.Assignments) > 0 {
+			experimentDataLog.Printf("Using run record from run_id=%s (timestamp=%s)", lastRun.RunID, lastRun.Timestamp)
+			return &ExperimentData{
+				Assignments:      lastRun.Assignments,
+				CumulativeCounts: state.Counts,
+			}
+		}
+	}
+
+	assignments := make(map[string]string, len(state.Counts))
+	names := sliceutil.SortedKeys(state.Counts)
+	for _, name := range names {
+		variantCounts := state.Counts[name]
+		selected := deriveLastSelectedVariant(variantCounts)
+		assignments[name] = selected
+		experimentDataLog.Printf("Experiment %q: selected variant=%q", name, selected)
+	}
+	return &ExperimentData{
+		Assignments:      assignments,
+		CumulativeCounts: state.Counts,
+	}
 }
 
 // formatExperimentLabel returns a compact, human-readable label summarising the
@@ -187,8 +190,11 @@ func firstExperimentAssignment(exp *ExperimentData) (name, variant string, ok bo
 		return "", "", false
 	}
 	names := sliceutil.SortedKeys(exp.Assignments)
-	name = names[0]
-	return name, exp.Assignments[name], true
+	if len(names) > 0 {
+		name = names[0]
+		return name, exp.Assignments[name], true
+	}
+	return "", "", false
 }
 
 // experimentMatchesFilter reports whether exp satisfies the given experiment/variant
@@ -228,16 +234,17 @@ func deriveLastSelectedVariant(variantCounts map[string]int) string {
 	if len(variantCounts) == 0 {
 		return ""
 	}
-
 	variants := sliceutil.SortedKeys(variantCounts)
-
-	selected := variants[0]
-	maxCount := variantCounts[selected]
-	for _, v := range variants[1:] {
-		if variantCounts[v] > maxCount {
-			maxCount = variantCounts[v]
-			selected = v
+	if len(variants) > 0 {
+		selected := variants[0]
+		maxCount := variantCounts[selected]
+		for _, v := range variants[1:] {
+			if variantCounts[v] > maxCount {
+				maxCount = variantCounts[v]
+				selected = v
+			}
 		}
+		return selected
 	}
-	return selected
+	return ""
 }
