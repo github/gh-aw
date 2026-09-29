@@ -9229,6 +9229,11 @@
                   "type": "boolean",
                   "description": "When true, automatically creates labels that don't already exist in the target repository. Default (omitted or false) rejects labels that don't already exist."
                 },
+                "item-schema": {
+                  "type": "object",
+                  "description": "Optional JSON Schema that narrows each labels item in the add_labels MCP tool. The schema must remain compatible with the built-in string or object label schema and may only tighten fields, required properties, or values.",
+                  "additionalProperties": true
+                },
                 "staged": {
                   "$ref": "#/$defs/templatable_boolean",
                   "description": "When true, emit step summary messages instead of making GitHub API calls for this specific output type (preview mode)",

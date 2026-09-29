@@ -286,7 +286,7 @@ async function main() {
   }
 
   // Load tools meta (description suffixes, repo params, dynamic tools)
-  /** @type {{description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<unknown>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>}} */
+  /** @type {{description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<unknown>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>, item_schemas?: Record<string, Record<string, unknown>>}} */
   let toolsMeta = { description_suffixes: {}, repo_params: {}, dynamic_tools: [] };
   if (fs.existsSync(toolsMetaPath)) {
     /** @type {string} */
@@ -442,6 +442,16 @@ async function main() {
         }
         for (const [propName, propSchema] of Object.entries(propertyInjections)) {
           enhancedTool.inputSchema.properties[propName] = propSchema;
+        }
+      }
+
+      const itemSchemas = toolsMeta.item_schemas?.[tool.name];
+      if (itemSchemas && typeof itemSchemas === "object") {
+        for (const [propertyName, itemSchema] of Object.entries(itemSchemas)) {
+          const propertySchema = enhancedTool.inputSchema?.properties?.[propertyName];
+          if (propertySchema?.type === "array") {
+            propertySchema.items = itemSchema;
+          }
         }
       }
 

@@ -189,6 +189,49 @@ describe("generate_safe_outputs_tools", () => {
     expect(createIssueTool.inputSchema.required).toEqual(expect.arrayContaining(["title", "temporary_id"]));
   });
 
+  it("replaces array item schemas when specified in tools_meta", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+            required: ["labels"],
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      required: ["name", "confidence"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string" },
+        confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result[0].inputSchema.properties.labels.items).toEqual(itemSchema);
+  });
+
   it("adds anyOf alternative requirements for assign_milestone", () => {
     fs.writeFileSync(
       toolsSourcePath,
