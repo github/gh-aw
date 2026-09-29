@@ -34,6 +34,18 @@ func BadDBClose() error {
 	return nil
 }
 
+type MultiResultCloser struct{}
+
+func (MultiResultCloser) Close() (int, error) {
+	return 0, nil
+}
+
+func BadMultiReturnClose() {
+	closer := MultiResultCloser{}
+	value, _ := closer.Close() // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	_ = value
+}
+
 // BadReaderClose flags io.Reader Close error ignored.
 func BadReaderClose() error {
 	r, _ := os.Open("file.txt")
@@ -124,6 +136,17 @@ type NonCloser struct {
 
 func (nc *NonCloser) Close() {
 	// returns void, not error
+}
+
+type ArgumentCloser struct{}
+
+func (ArgumentCloser) Close(bool) error {
+	return nil
+}
+
+func GoodCloseWithArgument() {
+	closer := ArgumentCloser{}
+	closer.Close(true)
 }
 
 // GoodNonCloserNoError doesn't flag Close() methods without error return — not flagged.

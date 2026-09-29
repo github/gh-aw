@@ -48,16 +48,20 @@ func analyzeCloseError(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 func analyzeAssignStmt(pass *analysis.Pass, assign *ast.AssignStmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	// Pattern 1: _ = file.Close()
 	if len(assign.Lhs) == 1 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[0].(*ast.Ident)
-		if !ok || blank.Name != "_" {
-			return
+		for _, lhs := range assign.Lhs {
+			blank, ok := lhs.(*ast.Ident)
+			if !ok || blank.Name != "_" {
+				return
+			}
 		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
-		if !ok {
-			return
-		}
-		if isCloseMethodCall(pass, call) {
-			reportIfNotSkipped(pass, call, generatedFiles, noLintIndex)
+		for _, rhs := range assign.Rhs {
+			call, ok := rhs.(*ast.CallExpr)
+			if !ok {
+				return
+			}
+			if isCloseMethodCall(pass, call) {
+				reportIfNotSkipped(pass, call, generatedFiles, noLintIndex)
+			}
 		}
 		return
 	}
@@ -65,16 +69,23 @@ func analyzeAssignStmt(pass *analysis.Pass, assign *ast.AssignStmt, generatedFil
 	// Pattern 2: x, _ := obj.Close() or similar multi-return with ignored error
 	// Only flag if the call itself returns exactly 2 values where the second is error
 	if len(assign.Lhs) == 2 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[1].(*ast.Ident)
-		if !ok || blank.Name != "_" {
-			return
+		for i, lhs := range assign.Lhs {
+			if i != len(assign.Lhs)-1 {
+				continue
+			}
+			blank, ok := lhs.(*ast.Ident)
+			if !ok || blank.Name != "_" {
+				return
+			}
 		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
-		if !ok {
-			return
-		}
-		if isCloseMethodCall(pass, call) {
-			reportIfNotSkipped(pass, call, generatedFiles, noLintIndex)
+		for _, rhs := range assign.Rhs {
+			call, ok := rhs.(*ast.CallExpr)
+			if !ok {
+				return
+			}
+			if isCloseMethodCall(pass, call) {
+				reportIfNotSkipped(pass, call, generatedFiles, noLintIndex)
+			}
 		}
 		return
 	}
@@ -96,10 +107,10 @@ func analyzeExprStmt(pass *analysis.Pass, exprStmt *ast.ExprStmt, generatedFiles
 }
 
 // isCloseMethodCall returns true if call is of the form receiver.Close() where
-// Close() returns error as the only return value or second return value.
+// Close() returns error as its only return value or as its second return value.
 func isCloseMethodCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Close" {
+	if !ok || sel.Sel.Name != "Close" || len(call.Args) != 0 {
 		return false
 	}
 
@@ -132,17 +143,11 @@ func isCloseMethodCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 
 	// Check the function signature via the selection
 	funcType, ok := methodObj.Type().(*types.Signature)
-	if !ok {
+	if !ok || funcType.Params().Len() != 0 {
 		return false
 	}
 
-	// Close() should return exactly one value of type error
-	results := funcType.Results()
-	if results.Len() != 1 {
-		return false
-	}
-
-	return isErrorType(results.At(0).Type())
+	return hasCloseErrorResult(funcType)
 }
 
 // hasCloseMethodReturningError checks if type t has a Close() method that returns error.
@@ -159,26 +164,29 @@ func hasCloseMethodReturningError(pass *analysis.Pass, t types.Type) bool {
 	}
 
 	// Look for Close method
-	for i := 0; i < named.NumMethods(); i++ {
-		method := named.Method(i)
+	for method := range named.Methods() {
 		if method.Name() != "Close" {
 			continue
 		}
 
 		funcType, ok := method.Type().(*types.Signature)
-		if !ok {
+		if !ok || funcType.Params().Len() != 0 {
 			continue
 		}
 
-		// Check if it returns exactly one error
-		results := funcType.Results()
-		if results.Len() == 1 && isErrorType(results.At(0).Type()) {
+		if hasCloseErrorResult(funcType) {
 			return true
 		}
 	}
 
 	// Also check interface implementations
 	return isCloserInterface(t)
+}
+
+func hasCloseErrorResult(funcType *types.Signature) bool {
+	results := funcType.Results()
+	return results.Len() == 1 && isErrorType(results.At(0).Type()) ||
+		results.Len() == 2 && isErrorType(results.At(1).Type())
 }
 
 // isCloserInterface returns true if t implements io.Closer.
@@ -190,17 +198,15 @@ func isCloserInterface(t types.Type) bool {
 
 	// For interface types, check if they have a Close() method
 	if iface, ok := t.(*types.Interface); ok {
-		for i := 0; i < iface.NumMethods(); i++ {
-			method := iface.Method(i)
+		for method := range iface.Methods() {
 			if method.Name() != "Close" {
 				continue
 			}
 			funcType, ok := method.Type().(*types.Signature)
-			if !ok {
+			if !ok || funcType.Params().Len() != 0 {
 				continue
 			}
-			results := funcType.Results()
-			if results.Len() == 1 && isErrorType(results.At(0).Type()) {
+			if hasCloseErrorResult(funcType) {
 				return true
 			}
 		}
