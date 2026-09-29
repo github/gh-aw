@@ -1384,6 +1384,37 @@ describe("add_labels", () => {
       expect(result.error).toContain("received 11");
     });
 
+    it("should allow more than MAX_LABELS labels per operation when max is higher", async () => {
+      const handler = await main({ max: 25 });
+      const labels = Array.from({ length: 16 }, (_, i) => `label${i + 1}`);
+
+      const result = await handler({ item_number: 100, labels }, {});
+
+      expect(result.success).toBe(true);
+      expect(result.labelsAdded).toEqual(labels);
+    });
+
+    it("should reject labels exceeding a max higher than MAX_LABELS", async () => {
+      const handler = await main({ max: 12 });
+      const labels = Array.from({ length: 13 }, (_, i) => `label${i + 1}`);
+
+      const result = await handler({ item_number: 100, labels }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Cannot add more than 12 labels");
+      expect(result.error).toContain("received 13");
+    });
+
+    it("should warn when labels are trimmed to max", async () => {
+      const handler = await main({ max: 2 });
+
+      const result = await handler({ item_number: 100, labels: ["a", "b", "c"] }, {});
+
+      expect(result.success).toBe(true);
+      expect(result.labelsAdded).toEqual(["a", "b"]);
+      expect(mockCore.warnings.some(w => w.includes("Too many labels (3), limiting to 2"))).toBe(true);
+    });
+
     it("should resolve temporary ID in item_number to real issue number", async () => {
       const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];

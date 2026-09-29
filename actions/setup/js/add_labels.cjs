@@ -407,8 +407,11 @@ const main = createCountGatedHandler({
         };
       }
 
-      // Enforce max limits on labels before validation
-      const limitResult = tryEnforceArrayLimit(requestedLabelNames, MAX_LABELS, "labels");
+      // Enforce max limits on labels before validation.
+      // The configured max (add-labels.max) is advertised to the agent as the label limit,
+      // so it raises the default per-call cap when it is larger than MAX_LABELS.
+      const perCallLabelLimit = Math.max(MAX_LABELS, maxCount);
+      const limitResult = tryEnforceArrayLimit(requestedLabelNames, perCallLabelLimit, "labels");
       if (!limitResult.success) {
         core.warning(`Label limit exceeded: ${limitResult.error}`);
         return { success: false, error: limitResult.error };

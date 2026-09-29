@@ -208,7 +208,7 @@ describe("safe_output_validator.cjs", () => {
 
       expect(result.valid).toBe(true);
       expect(result.value).toHaveLength(3);
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("limiting to 3"));
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("limiting to 3"));
     });
 
     it("should deduplicate labels", () => {

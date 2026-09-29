@@ -137,7 +137,7 @@ function validateLabels(labels, allowedLabels = undefined, maxCount = 3, blocked
 
   // Apply max count limit
   if (uniqueLabels.length > maxCount) {
-    core.info(`Too many labels (${uniqueLabels.length}), limiting to ${maxCount}`);
+    core.warning(`Too many labels (${uniqueLabels.length}), limiting to ${maxCount}. Dropped labels: ${uniqueLabels.slice(maxCount).join(", ")}`);
     return { valid: true, value: uniqueLabels.slice(0, maxCount) };
   }
 
