@@ -137,6 +137,7 @@ type WorkflowData struct {
 	TopLevelGitHubApp              *GitHubAppConfig                // top-level github-app fallback for all nested github-app token minting operations
 	LockForAgent                   bool                            // whether to lock the issue during agent workflow execution
 	Jobs                           map[string]any                  // custom job configurations with dependencies
+	AgentJobNeeds                  []string                        // resolved direct dependencies of the agent job
 	Cache                          string                          // cache configuration
 	NeedsTextOutput                bool                            // whether the workflow uses ${{ needs.task.outputs.text }}
 	NetworkPermissions             *NetworkPermissions             // parsed network permissions
