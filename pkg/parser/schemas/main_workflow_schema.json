@@ -5486,7 +5486,7 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Use an empty object or schema/limit properties for one default ledger, or name independent ledgers under this object.",
+          "description": "Standalone Git-backed ledger configuration. Use an empty object or type, key, schema, replay, and limit properties for one default ledger, or name independent ledgers under this object. Collection-and-replay is the default; type: table projects the last payload per string key.",
           "type": "object",
           "additionalProperties": true
         },

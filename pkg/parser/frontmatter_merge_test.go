@@ -356,6 +356,12 @@ func TestMergeToolsPreservesDefaultLedger(t *testing.T) {
 			additional: map[string]any{"ledger": map[string]any{"max-segment-kb": 20}},
 			expected:   map[string]any{"max-record-kb": 10, "max-segment-kb": 20},
 		},
+		{
+			name:       "typed default and named ledger",
+			base:       map[string]any{"ledger": map[string]any{"type": "table", "key": "subject"}},
+			additional: map[string]any{"ledger": map[string]any{"findings": map[string]any{}}},
+			expected:   map[string]any{"default": map[string]any{"type": "table", "key": "subject"}, "findings": map[string]any{}},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			merged, err := MergeTools(tc.base, tc.additional)

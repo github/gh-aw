@@ -121,4 +121,12 @@ test("table ledger rejects missing and invalid keys and excessive output", () =>
       ),
     /Too many replay rows/
   );
+  assert.throws(
+    () =>
+      replayTable(
+        Array.from({ length: 80 }, (_, i) => ({ payload: { subject: String(i), data: "x".repeat(60000) } })),
+        "subject"
+      ),
+    /size limit/
+  );
 });

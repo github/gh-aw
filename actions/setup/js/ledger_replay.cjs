@@ -127,6 +127,7 @@ function replayTable(records, key) {
     rows.set(value, { key: value, payload: record.payload });
   }
   const output = { version: 1, tables: { items: { columns: { key: "text", payload: "json" }, primaryKey: ["key"], rows: [...rows.values()] } } };
+  if (Buffer.byteLength(JSON.stringify(output)) > 4 * 1024 * 1024) throw new RangeError("Table replay output exceeds size limit");
   validateReplayOutput(output);
   return output;
 }
