@@ -5,12 +5,14 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
+const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
  * @typedef {Object} PromptRenderItem
  * @property {string} [content_env]
  * @property {string} [file]
  * @property {string} [condition_env]
+ * @property {boolean} [ledger_replay]
  */
 
 /**
@@ -99,9 +101,10 @@ function writePromptFile(promptPath, content) {
  * @param {PromptRenderConfig} config
  * @param {NodeJS.ProcessEnv} env
  * @param {string} promptsDir
+ * @param {string} [replayPromptPath]
  * @returns {string}
  */
-function renderPrompt(config, env, promptsDir) {
+function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_PROMPT) {
   let result = "";
 
   for (const item of config.items) {
@@ -109,6 +112,12 @@ function renderPrompt(config, env, promptsDir) {
       throw new Error(`${ERR_CONFIG}: Prompt render item must be an object`);
     }
     if (item.condition_env && env[item.condition_env] !== "true") {
+      continue;
+    }
+    if (item.ledger_replay === true && item.content_env === undefined && item.file === undefined) {
+      const stat = fs.lstatSync(replayPromptPath);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 65536) throw new Error(`${ERR_CONFIG}: Invalid ledger replay prompt`);
+      result += fs.readFileSync(replayPromptPath, "utf8");
       continue;
     }
 

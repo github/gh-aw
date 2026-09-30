@@ -7,6 +7,7 @@ const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -61,7 +62,7 @@ function materializeLedger({ refName, workspaceDir, sourceDir, config }) {
   }
 }
 
-function createProjection({ sourceDir, databasePath, config }) {
+function createProjection({ sourceDir, databasePath, config, onReplayError = () => {} }) {
   const limits = configuredLedgerLimits(config);
   const ledger = new Ledger({
     memoryDir: sourceDir,
@@ -83,10 +84,21 @@ function createProjection({ sourceDir, databasePath, config }) {
     }
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
+    let tables = null;
+    if (config.replay) {
+      try {
+        const output = executeReplay(config.replay.script, state.records, config.replay.config || {});
+        materializeReplay(database, config.name, config.replay.script, state.records, output);
+        tables = output.tables;
+      } catch (error) {
+        onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);
+      }
+    }
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     fs.rmSync(databasePath, { force: true });
     database.exec(`VACUUM INTO '${databasePath.replaceAll("'", "''")}'`);
     fs.chmodSync(databasePath, 0o444);
+    return tables;
   } finally {
     ledger.close();
   }
@@ -102,6 +114,7 @@ async function main(options = {}) {
   const sourceRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "ledger-source");
   fs.rmSync(sourceRoot, { recursive: true, force: true });
   fs.mkdirSync(PROJECTION_ROOT, { recursive: true });
+  const replayGuidance = [];
 
   try {
     for (const ledger of config) {
@@ -123,10 +136,20 @@ async function main(options = {}) {
       });
       if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
       else fs.mkdirSync(sourceDir, { recursive: true });
-      createProjection({ sourceDir, databasePath, config: ledger });
+      const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
+      if (ledger.replay) {
+        replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
+        if (tables) {
+          replayGuidance.push(...Object.entries(tables).map(([name, table]) => `- ${name}(${Object.keys(table.columns).join(", ")})`));
+          replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through ledger append safe output. Do not update replay tables.");
+        } else {
+          replayGuidance.push("Replay failed; only generic ledger tables are available. Use records for immutable event history.");
+        }
+      }
       fs.chmodSync(projectionDir, 0o555);
       fs.rmSync(sourceDir, { recursive: true, force: true });
     }
+    if (replayGuidance.length) fs.writeFileSync(path.join(PROJECTION_ROOT, "replay-prompt.txt"), `${replayGuidance.join("\n")}\n`, { mode: 0o444 });
     fs.chmodSync(PROJECTION_ROOT, 0o555);
   } finally {
     fs.rmSync(sourceRoot, { recursive: true, force: true });
