@@ -34,6 +34,10 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	awfConfig := AWFConfigFile{
 		Schema: buildAWFConfigSchemaURL(firewallConfig),
 	}
+	routingConfig := configuredModelRouting(config.WorkflowData)
+	if routingConfig != nil {
+		awfConfig.Experimental = &AWFExperimentalConfig{ModelRouting: true}
+	}
 	if config.WorkflowData != nil {
 		awfConfig.Enclaves = buildAWFEnclavesConfig(config.WorkflowData.Enclaves)
 	}
@@ -137,6 +141,13 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		MaxAICredits:        maxAICredits,
 		EnableTokenSteering: tokenSteeringEnabled,
 	}
+	if routingConfig != nil {
+		apiProxy.Routing = &AWFModelRoutingConfig{
+			Objective: AWFModelRoutingObjective{Goal: routingConfig.Goal, Mode: routingConfig.Mode},
+			Task:      AWFModelRoutingTask{ConversationFile: awfRoutingConversationFile},
+		}
+		apiProxy.AllowedModels = qualifyRoutedModels(routingConfig.AllowedModels)
+	}
 	if hostedWeb := buildHostedWebConfig(config.EngineName, config.EngineRuntimeID, config.WorkflowData, firewallConfig); hostedWeb != nil {
 		apiProxy.HostedWeb = hostedWeb
 		awfConfigLog.Printf("API proxy: hosted web policy configured for %s", config.EngineName)
@@ -148,7 +159,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfigLog.Printf("Skipping apiProxy.enableTokenSteering: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFTokenSteeringMinVersion)
 	}
 
-	if mf := extractModelFallback(config.WorkflowData); mf != nil {
+	if mf := extractModelFallback(config.WorkflowData); mf != nil && routingConfig == nil {
 		apiProxy.ModelFallback = mf
 		enabledDisplay := "<unset>"
 		if mf.Enabled != nil {
@@ -252,12 +263,12 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 
 	// ── Models section (nested under apiProxy per AWF config schema) ──────────
-	if config.WorkflowData != nil && len(config.WorkflowData.ModelMappings) > 0 {
+	if config.WorkflowData != nil && len(config.WorkflowData.ModelMappings) > 0 && routingConfig == nil {
 		apiProxy.Models = config.WorkflowData.ModelMappings
 		awfConfigLog.Printf("Models section: %d alias entries", len(config.WorkflowData.ModelMappings))
 	}
 	allowedModels, disallowedModels := resolveModelPolicyForAWFConfig(config.WorkflowData)
-	if len(allowedModels) > 0 {
+	if len(allowedModels) > 0 && routingConfig == nil {
 		apiProxy.AllowedModels = allowedModels
 		awfConfigLog.Printf("Models policy: %d allowed model pattern(s)", len(allowedModels))
 	}
@@ -283,6 +294,9 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	// references. AWF rejects it alongside imageTag, which would select a different
 	// effective image, so the compiler-owned tag is suppressed when it is configured.
 	containerImages := getSandboxAgentImages(config.WorkflowData)
+	if routingConfig != nil && len(containerImages) == 0 {
+		containerImages = copyDefaultModelRoutingImages()
+	}
 	if len(containerImages) > 0 {
 		awfImageTag = ""
 	}

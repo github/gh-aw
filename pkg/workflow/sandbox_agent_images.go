@@ -105,6 +105,9 @@ func isKnownAWFImageRole(role string) bool {
 // manifest for the workflow's enabled feature set.
 func requiredAWFImageRoles(workflowData *WorkflowData) []string {
 	required := []string{awfImageRoleSquid, awfImageRoleAgent, awfImageRoleAPIProxy}
+	if configuredModelRouting(workflowData) != nil {
+		required = append(required, awfImageRoleRouter)
+	}
 	args := customAWFArgs(workflowData)
 	if isCliProxyNeeded(workflowData) || hasEnabledAWFArg(args, "--difc-proxy-host") {
 		required = append(required, awfImageRoleCliProxy)

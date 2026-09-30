@@ -2171,6 +2171,51 @@ func TestValidateAWFConfigJSON_ModelRoutingGate(t *testing.T) {
 	assert.Contains(t, err.Error(), "modelRouting")
 }
 
+func TestBuildAWFConfigJSON_ModelRouting(t *testing.T) {
+	config := AWFCommandConfig{
+		EngineName: "copilot",
+		WorkflowData: &WorkflowData{
+			ValidateAWFConfig: true,
+			EngineConfig: &EngineConfig{
+				ID: "copilot",
+				ModelRouting: &ModelRoutingConfig{
+					Goal:          "cost",
+					Mode:          "balanced",
+					AllowedModels: []string{"claude-haiku-4.5", "github-copilot/gpt-5.4-mini"},
+				},
+			},
+			ModelMappings: map[string][]string{"gpt-5.4-mini": {"compile-time-alias"}},
+			SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		},
+	}
+
+	configJSON, err := BuildAWFConfigJSON(config)
+	require.NoError(t, err)
+	var emitted map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &emitted))
+
+	require.Equal(t, true, emitted["experimental"].(map[string]any)["modelRouting"])
+	apiProxy := emitted["apiProxy"].(map[string]any)
+	require.Equal(t, []any{"github-copilot/claude-haiku-4.5", "github-copilot/gpt-5.4-mini"}, apiProxy["allowedModels"])
+	assert.NotContains(t, apiProxy, "models")
+	assert.Equal(t, map[string]any{
+		"objective": map[string]any{"goal": "cost", "mode": "balanced"},
+		"task":      map[string]any{"conversationFile": awfRoutingConversationFile},
+	}, apiProxy["routing"])
+	images := emitted["container"].(map[string]any)["images"].(map[string]any)
+	for role, digest := range map[string]string{
+		"agent":    "sha256:edcf17ae63dd74366bc911a74678b9e264d66ac51c48ec156c80e2619892ebbb",
+		"apiProxy": "sha256:5cc683af8156b39c15bd2370615a85775a8b179bed9f49c490a3068d667dfa2b",
+		"router":   "sha256:d1612d0eaec3fa8f14c38bbd0a6a0682732fc9f83b7fec94219d3e757a048270",
+		"squid":    "sha256:1d5e169c4df14e87fc826261b94cf4ddaf2f08aca2a5b88701100ec193968193",
+	} {
+		assert.Contains(t, images[role], digest)
+	}
+	setup := buildAWFConfigFileSetup(config, configJSON)
+	assert.Contains(t, setup, "process.env.GH_AW_PROMPT")
+	assert.Contains(t, setup, awfRoutingConversationFile)
+}
+
 // TestBuildAWFConfigJSON_ValidateFlag verifies that schema validation runs when
 // WorkflowData.ValidateAWFConfig is true (--validate mode) and is skipped otherwise.
 func TestBuildAWFConfigJSON_ValidateFlag(t *testing.T) {

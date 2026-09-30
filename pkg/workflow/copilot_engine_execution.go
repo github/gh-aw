@@ -666,6 +666,10 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 }
 
 func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {
+	if configuredModelRouting(workflowData) != nil {
+		copilotExecLog.Print("Skipping compile-time COPILOT_MODEL for AWF-routed workflow")
+		return
+	}
 	// Set the model environment variable.
 	// The model is always passed via the native COPILOT_MODEL env var, which the Copilot CLI reads directly.
 	// When model is not configured, map the GitHub org variable to COPILOT_MODEL so users can set a default.
@@ -681,9 +685,15 @@ func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *
 }
 
 func (e *CopilotEngine) addCopilotFinalStepEnv(env map[string]string, workflowData *WorkflowData) {
+	if configuredModelRouting(workflowData) != nil {
+		env["AWF_MODEL_ROUTING_ENABLED"] = "1"
+	}
 	// Inject GH_AW_ENGINE_CWD when engine.cwd is configured.
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, copilotExecLog)
+	if configuredModelRouting(workflowData) != nil {
+		delete(env, constants.CopilotCLIModelEnvVar)
+	}
 	// Always inject the Copilot integration ID for agentic workflows after all env merges
 	// so user-supplied env does not override this value.
 	env[constants.CopilotCLIIntegrationIDEnvVar] = constants.CopilotCLIIntegrationIDValue

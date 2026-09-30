@@ -14411,6 +14411,30 @@
               "enum": ["github", "anthropic", "openai"],
               "description": "Optional inference provider override for this engine. Defaults to the engine's native provider (copilot: github, claude: anthropic, codex: openai, pi: github)."
             },
+            "model-routing": {
+              "type": "object",
+              "description": "Opt in to AWF task-level model routing for the Copilot engine.",
+              "required": ["goal", "mode", "allowed-models"],
+              "properties": {
+                "goal": {
+                  "type": "string",
+                  "enum": ["cost", "cost-speed"]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": ["economy", "balanced", "robust", "auto"]
+                },
+                "allowed-models": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
             "permission-mode": {
               "type": "string",
               "enum": ["auto", "acceptEdits", "plan", "bypassPermissions"],

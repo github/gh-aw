@@ -65,6 +65,7 @@ const ENGINE_RATE_LIMIT_429_RE =
   /(?:\b429\b[\s\S]{0,120}(?:too many requests|rate[\s-]*limit)|\brate_limit_(?:error|exceeded)\b|capierror:\s*429|failed to get response from the ai model[\s\S]{0,120}\b429\b|exceeded your rate limit for utility models)/i;
 const ENGINE_MAX_RUNS_EXCEEDED_RE = /(?:\bmax_runs_exceeded\b|\bmaximum\s+llm\s+invocations\s+exceeded\b)/i;
 const COPILOT_ORG_BILLING_MODE_RE = /API proxy enabled:[^\n]*Copilot=true \(github-token\)/i;
+const AWF_MODEL_ROUTING_FAILURE_RE = /model_routing_mismatch|model routing|exit(?:ing|ed)?(?:\s+with)?\s+(?:status|code)\s*[:=]?\s*78/i;
 // Host allowlist kept aligned with isLikelyAWFAPIProxyURL in copilot_harness.cjs:
 // awf_reflect rewrites api-proxy to host-bridge addresses for host execution.
 const AWF_API_PROXY_HOST_RE_SOURCE = "(?:api-proxy|host\\.docker\\.internal|localhost|127(?:\\.\\d{1,3}){3}|10(?:\\.\\d{1,3}){3}|192\\.168(?:\\.\\d{1,3}){2}|172\\.(?:1[6-9]|2\\d|3[01])(?:\\.\\d{1,3}){2})";
@@ -283,6 +284,7 @@ function parseHTMLCommentMetadata(body, markerKey) {
 function buildFailureMatchCategories(options) {
   const categories = [];
 
+  if (options.hasModelRoutingFailure) categories.push("model_routing_failure");
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
   if (options.hasAssignCopilotFailures) categories.push("assign_copilot_failures");
@@ -346,6 +348,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.hasStaleLockFileFailed
  * @param {boolean} options.hasDailyAICExceeded
  * @param {boolean} options.hasDailyAICGuardrailError
+ * @param {boolean} [options.hasModelRoutingFailure]
  * @param {boolean} options.aiCreditsRateLimitError
  * @param {boolean} options.hasEngineRateLimit429
  * @param {boolean} options.maxAICreditsExceeded
@@ -361,6 +364,7 @@ function buildFailureMatchCategories(options) {
  */
 function buildFailureIssueTitle(options) {
   const { workflowName } = options;
+  if (options.hasModelRoutingFailure) return `[aw] ${workflowName} failed AWF model routing`;
   if (options.hasDailyAICExceeded) return `[aw] ${workflowName} exceeded daily AI credits budget`;
   if (options.hasDailyAICGuardrailError) return `[aw] ${workflowName} could not verify daily AI credits`;
   if (options.maxAICreditsExceeded) return `[aw] ${workflowName} exceeded max AI credits`;
@@ -397,6 +401,16 @@ function buildFailureIssueTitle(options) {
   if (options.hasMissingData) return `[aw] ${workflowName} is missing required data`;
   if (options.hasAssignmentErrors) return `[aw] ${workflowName} failed to assign agent`;
   return `[aw] ${workflowName} failed`;
+}
+
+function detectAWFModelRoutingFailure() {
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  try {
+    return AWF_MODEL_ROUTING_FAILURE_RE.test(fs.readFileSync(stdioLogPath, "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -3159,6 +3173,17 @@ function buildEngineFailureContext(options = {}) {
     if (errorMessages.size > 0) {
       core.info(`Found ${errorMessages.size} engine error message(s) in agent-stdio.log`);
 
+      const hasModelRoutingFailure = Array.from(errorMessages).some(msg => AWF_MODEL_ROUTING_FAILURE_RE.test(msg));
+      if (hasModelRoutingFailure) {
+        let context =
+          buildWarningAlertLine("AWF Model Routing Failure", "The task-level model router failed or the Copilot request did not match its selected model, effort, or endpoint. This is terminal and was not retried.") +
+          "\n**Error details:**\n";
+        for (const message of errorMessages) {
+          context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
+        }
+        return context + "\n";
+      }
+
       // Check for cyber_policy_violation specifically and return a dedicated message
       const hasCyberPolicyViolation = Array.from(errorMessages).some(msg => msg.includes("cyber_policy_violation"));
       if (hasCyberPolicyViolation) {
@@ -3720,6 +3745,7 @@ async function main() {
     const { aiCredits, maxAICredits, aiCreditsRateLimitError: detectedAICreditsRateLimitError, maxAICreditsExceeded } = resolveAICreditsFailureState();
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
+    const hasModelRoutingFailure = agentConclusion === "failure" && detectAWFModelRoutingFailure();
     const copilotOrgBillingError = detectCopilotOrgBillingErrorFromLog();
     const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
@@ -4162,6 +4188,7 @@ async function main() {
       hasDailyAICGuardrailError: dailyAICGuardrailErrorIsFailure,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
+      hasModelRoutingFailure,
       maxAICreditsExceeded,
       shellExpansionGuardRejected,
       hasAssignmentErrors,
@@ -4197,6 +4224,7 @@ async function main() {
       http400ResponseError,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
+      hasModelRoutingFailure,
       unknownModelAICredits,
       missingModelPricingError,
       maxAICreditsExceeded,

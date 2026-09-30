@@ -203,9 +203,13 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 	maxAICreditsExportLine, updatedAWFConfigJSON := buildMaxAICreditsExport(config, awfConfigJSON)
 	printfArg := buildAWFConfigPrintfArg(updatedAWFConfigJSON, maxAICreditsExportLine != "")
 	configFileSetup := buildConfigFilePrintfLine(printfArg)
+	if configuredModelRouting(config.WorkflowData) != nil {
+		configFileSetup = buildAWFRoutingConversationFileSetup() + "\n" + configFileSetup
+	}
 	if maxAICreditsExportLine != "" {
 		configFileSetup = maxAICreditsExportLine + "\n" + configFileSetup
 	}
+
 	if shouldUseWorkflowCallNetworkAllowedInput(config.WorkflowData) {
 		updateScript, updateErr := buildWorkflowCallNetworkAllowedUpdateScript()
 		if updateErr != nil {
@@ -218,6 +222,13 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 		configFileSetup = mkdirScript + "\n" + configFileSetup
 	}
 	return configFileSetup + fmt.Sprintf("\ncp %q %s", awfConfigRuntimePathExpr, constants.AWFConfigFilePath)
+}
+
+func buildAWFRoutingConversationFileSetup() string {
+	return fmt.Sprintf(
+		`node -e 'const fs=require("node:fs");const prompt=fs.readFileSync(process.env.GH_AW_PROMPT,"utf8");fs.writeFileSync(%q,JSON.stringify([{role:"user",parts:[{text:prompt}]}]));'`,
+		awfRoutingConversationFile,
+	)
 }
 
 // buildCloudHypervisorFilesystemMkdirScript returns a shell command that creates, on the

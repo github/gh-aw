@@ -21,7 +21,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Gemini CLI", DefaultGeminiVersion, "0.62.0"},
 		{"Pi CLI", DefaultPiVersion, "0.99.1"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
-		{"Firewall", DefaultFirewallVersion, "v0.28.27"},
+		{"Firewall", DefaultFirewallVersion, "v0.28.29"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.27"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.2"},
 	}

@@ -189,6 +189,10 @@ describe("handle_agent_failure", () => {
       shellExpansionGuardRejected: false,
     };
 
+    it("uses a dedicated title for AWF model routing failures", () => {
+      expect(buildFailureIssueTitle({ ...baseOptions, hasModelRoutingFailure: true })).toBe("[aw] Test Workflow failed AWF model routing");
+    });
+
     const cases = [
       { flag: "hasDailyAICExceeded", expected: "[aw] Test Workflow exceeded daily AI credits budget" },
       { flag: "hasDailyAICGuardrailError", expected: "[aw] Test Workflow could not verify daily AI credits" },
@@ -5990,6 +5994,15 @@ describe("handle_agent_failure", () => {
         isAWFFirewallStartupFailed: true,
       });
       expect(categories).toContain("awf_firewall_startup_failed");
+      expect(categories).not.toContain("agent_failure");
+    });
+
+    it("returns a distinct model_routing_failure category", () => {
+      const categories = buildFailureMatchCategories({
+        agentConclusion: "failure",
+        hasModelRoutingFailure: true,
+      });
+      expect(categories).toContain("model_routing_failure");
       expect(categories).not.toContain("agent_failure");
     });
 

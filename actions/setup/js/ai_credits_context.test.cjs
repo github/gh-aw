@@ -511,6 +511,11 @@ describe("ai_credits_context parseAPIProxyGuardRejectionFromEventLog", () => {
     expect(parseAPIProxyGuardRejectionFromEventLog()?.guard).toBe("permission_denied_limit_exceeded");
   });
 
+  it("detects AWF model-routing mismatches from proxy events", () => {
+    writeEventLog([{ type: "model_routing_mismatch" }]);
+    expect(parseAPIProxyGuardRejectionFromEventLog()?.guard).toBe("model_routing_mismatch");
+  });
+
   it("returns null when no guard rejection is present", () => {
     writeEventLog([{ type: "response", status: 200 }]);
     expect(parseAPIProxyGuardRejectionFromEventLog()).toBeNull();

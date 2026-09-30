@@ -27,7 +27,7 @@ const MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE = "max_cache_misses_exceeded";
 // deliberate policy decision by the proxy — never a credential problem — so retrying the
 // same request against the same (already spent) proxy counter can never succeed.
 // Engine-agnostic: all engines share the same proxy guardrails.
-const API_PROXY_GUARD_REJECTION_EVENT_TYPES = [MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE, "effective_tokens_limit_exceeded", "permission_denied_limit_exceeded", "model_policy_violation"];
+const API_PROXY_GUARD_REJECTION_EVENT_TYPES = [MAX_CACHE_MISSES_EXCEEDED_EVENT_TYPE, "effective_tokens_limit_exceeded", "permission_denied_limit_exceeded", "model_policy_violation", "model_routing_mismatch"];
 // Counter fields carried by proxy guard rejection events, reported alongside the guard name
 // so the step log states what limit was hit and at which value.
 const API_PROXY_GUARD_COUNTER_FIELDS = ["consecutive_cache_misses", "max_cache_misses", "effective_tokens", "max_effective_tokens", "permission_denied_count", "max_permission_denied", "model"];

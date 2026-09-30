@@ -324,9 +324,15 @@ async function runWithCopilotSDK({
     });
 
     // Build session config using the multi-provider surface.
+    const configuredReasoningEffort = process.env.GH_AW_COPILOT_REASONING_EFFORT;
+    const reasoningEffort =
+      configuredReasoningEffort === "low" || configuredReasoningEffort === "medium" || configuredReasoningEffort === "high" || configuredReasoningEffort === "xhigh" || configuredReasoningEffort === "max"
+        ? configuredReasoningEffort
+        : undefined;
     /** @type {import("@github/copilot-sdk").SessionConfig} */
     const sessionConfig = {
       model: model || resolveModelWithFallback(process.env, "COPILOT_MODEL") || undefined,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       providers,
       models: providerModels,
       onPermissionRequest,

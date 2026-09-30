@@ -89,7 +89,8 @@ type EngineConfig struct {
 	// CopilotSDK enables the GitHub Copilot SDK integration.
 	// When true the compiler enables a harness-managed Copilot CLI headless sidecar
 	// and sets COPILOT_SDK_URI on child processes so the SDK can connect to it.
-	CopilotSDK bool
+	CopilotSDK   bool
+	ModelRouting *ModelRoutingConfig
 
 	// Cwd is a templatable string that overrides the working directory for the engine's
 	// spawned process. When set, it is passed as GH_AW_ENGINE_CWD to the execution
@@ -108,6 +109,13 @@ type EngineConfig struct {
 	HarnessBackoffMultiplier string // engine.harness.backoff-multiplier → GH_AW_HARNESS_BACKOFF_MULTIPLIER
 	HarnessMaxDelayMs        string // engine.harness.max-delay-ms       → GH_AW_HARNESS_MAX_DELAY_MS
 	HarnessWatchdogTimeoutMs string // engine.harness.watchdog-timeout (seconds) → GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS
+}
+
+// ModelRoutingConfig opts a Copilot workflow into AWF task-level model routing.
+type ModelRoutingConfig struct {
+	Goal          string   `json:"goal"`
+	Mode          string   `json:"mode"`
+	AllowedModels []string `json:"allowed-models"`
 }
 
 // InlineEngineDriver represents an inline engine.driver source block that gh-aw materializes
@@ -412,6 +420,7 @@ func applyInlineEngineFields(config *EngineConfig, engineObj map[string]any, top
 	applyEngineBareField(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
 	applyEngineContextWindowField(config, engineObj)
+	applyEngineModelRouting(config, engineObj)
 	config.MaxTurns = topLevel.maxTurns
 	config.MaxToolDenials = topLevel.maxToolDenials
 	config.MaxRuns = topLevel.maxRuns
@@ -447,7 +456,21 @@ func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any,
 	applyEngineMCPField(config, engineObj)
 	applyEngineExtensionsField(config, engineObj)
 	applyEngineBooleanFields(config, engineObj)
+	applyEngineModelRouting(config, engineObj)
 	applyEngineTopLevelOverrides(config, topLevel)
+}
+
+func applyEngineModelRouting(config *EngineConfig, engineObj map[string]any) {
+	routing, ok := engineObj["model-routing"].(map[string]any)
+	if !ok {
+		return
+	}
+	parsed := &ModelRoutingConfig{}
+	if err := decodeEngineConfig(routing, parsed); err != nil {
+		engineLog.Printf("Ignoring invalid engine.model-routing configuration: %v", err)
+		return
+	}
+	config.ModelRouting = parsed
 }
 
 func resolveEngineModel(engineObj map[string]any, topLevel engineTopLevelConfig, fallback string) string {

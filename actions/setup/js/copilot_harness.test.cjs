@@ -59,6 +59,7 @@ const {
   crashSignalNameForExitCode,
   writeCopilotOutputs,
   parseCopilotSDKServerArgsFromEnv,
+  applyAWFModelRoutingSelection,
   applyCopilotWireAPI,
   applyCopilotModelAliasResolution,
   formatInferenceEndpointForLog,
@@ -670,6 +671,19 @@ describe("copilot_harness.cjs", () => {
 
       it("classifies an AWF API proxy guardrail rejection distinctly", () => {
         expect(classifyCopilotFailure({ hasOutput: true, isAPIProxyGuardRejected: true })).toBe("api_proxy_guard_rejected");
+      });
+
+      it("classifies AWF model-routing exit 78 as terminal and does not retry it", () => {
+        expect(classifyCopilotFailure({ hasOutput: true, isModelRoutingFailure: true, isAuthenticationFailed: true })).toBe("model_routing_failure");
+        expect(
+          shouldRetryFailedExecution({
+            exitCode: 78,
+            hasOutput: true,
+            output: "AWF Model routing failed (model_routing_mismatch)",
+            attempt: 0,
+            maxRetries: 3,
+          })
+        ).toBe(false);
       });
 
       it("api_proxy_guard_rejected outranks authentication_failed", () => {
@@ -3317,6 +3331,65 @@ process.exit(1);`,
       expect(result.status).toBe(0);
       expect(result.stderr).toContain("failureClass=ai_credits_exhausted");
       expect(result.stderr).toContain("AI credits budget exceeded");
+    });
+  });
+
+  describe("applyAWFModelRoutingSelection", () => {
+    it("overrides model and wire API from the selected Copilot route and applies effort", () => {
+      const env = {
+        AWF_MODEL_ROUTING_ENABLED: "1",
+        COPILOT_MODEL: "compile-time-model",
+        COPILOT_PROVIDER_WIRE_API: "completions",
+      };
+      const logger = vi.fn();
+
+      const selection = applyAWFModelRoutingSelection(
+        {
+          routing: {
+            status: "selected",
+            selection: {
+              provider: "copilot",
+              wire_model: "gpt-5.4-mini",
+              effort: "xhigh",
+              endpoint: "/responses",
+            },
+          },
+        },
+        env,
+        logger
+      );
+
+      expect(selection).toEqual({ model: "gpt-5.4-mini", effort: "xhigh", wireApi: "responses" });
+      expect(env.COPILOT_MODEL).toBe("gpt-5.4-mini");
+      expect(env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(env.GH_AW_COPILOT_REASONING_EFFORT).toBe("xhigh");
+      expect(env.COPILOT_REASONING_EFFORT).toBe("xhigh");
+      expect(logger).toHaveBeenCalledWith("inference routing: mode=awf-routed model=gpt-5.4-mini effort=xhigh wire_api=responses");
+    });
+
+    it("clears compile-time effort when the selected route has no effort", () => {
+      const env = {
+        COPILOT_REASONING_EFFORT: "high",
+        GH_AW_COPILOT_REASONING_EFFORT: "high",
+      };
+      applyAWFModelRoutingSelection(
+        {
+          routing: {
+            status: "selected",
+            selection: { provider: "copilot", wire_model: "claude-haiku-4.5", endpoint: "/chat/completions", effort: null },
+          },
+        },
+        env,
+        () => {}
+      );
+      expect(env.COPILOT_REASONING_EFFORT).toBeUndefined();
+      expect(env.GH_AW_COPILOT_REASONING_EFFORT).toBeUndefined();
+      expect(env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+    });
+
+    it("rejects missing or non-selected routing data before starting the CLI", () => {
+      expect(() => applyAWFModelRoutingSelection(null, { AWF_MODEL_ROUTING_ENABLED: "1" }, () => {})).toThrow(/did not return a routing selection/);
+      expect(() => applyAWFModelRoutingSelection({ routing: { status: "pending" } }, {}, () => {})).toThrow(/selection is pending/);
     });
   });
 
