@@ -37,17 +37,19 @@ tools:
 ```
 
 The script receives deep-frozen `records` and optional `replay.config` (an empty
-object by default). The config must be a bounded JSON object. Replay scripts are
-trusted workflow-authored code and must be reviewed like other executable workflow
-code. Do not derive them from untrusted input: Node's VM is not a security boundary,
-and the worker's resource limits are not protection against hostile scripts.
+object by default). The config must be a bounded JSON object. The serialized
+configuration for all ledgers is limited to 96 KiB after base64 encoding.
 Records follow the ledger's canonical reconstruction order: topological parent
 order, with SHA-256 lexical order for simultaneously ready records. This order
 depends on logical history, not shard names or physical layout; equivalent
-history after compaction gives the same replay input. Scripts should be deterministic.
-The worker applies execution, memory, and input/output limits. Scripts return data only;
-the runtime validates it before writing replay tables and does not expose SQL writes
-through the replay interface.
+history after compaction gives the same replay input. Replay scripts are executable
+workflow configuration; only use trusted scripts. They run in a separate Node.js
+process with an empty environment and restrictive Node.js permissions as defense
+in depth, but the JavaScript `vm` context is not a security boundary and must not
+be used to execute hostile scripts. The context omits process, filesystem, network,
+module-loading, wall-clock, and random APIs, but this is not a security guarantee.
+The runtime provides no database handle or SQL interface. Treat ledger records as
+untrusted data and never execute payload content.
 
 Replay output must contain `tables` and may specify `version: 1` (the default).
 Each table has `columns`, a nonempty `primaryKey`, and `rows`. Column types are
@@ -63,9 +65,10 @@ Trusted preparation validates canonical records before replay. A replay failure
 produces a bounded warning and leaves the generic ledger projection intact,
 without partial replay tables. The per-ledger SQLite database at
 `/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. The generated
-agent prompt lists materialized replay tables and their column names and types (or
-reports that replay fell back); exceptionally large lists are abbreviated. Query
-`replay_metadata` for generated table names, columns, ledger name, record count,
-script SHA-256, and projection/output versions; query `records` for event history.
+agent prompt lists materialized replay tables and their column names and types
+(or reports that replay fell back); exceptionally large lists are abbreviated.
+Query `replay_metadata` for generated table names, columns, ledger name, record
+count, script SHA-256, and projection/output versions; query `records` for event
+history.
 Each ledger runs replay independently. Change the replay script to reinterpret
 older payload versions without rewriting past records.
