@@ -74,6 +74,10 @@ const DefaultFirewallVersion Version = "v0.28.27"
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
 const AWFExcludeEnvMinVersion Version = "v0.25.3"
 
+// AWFSessionStateDirMinVersion is the minimum AWF version that supports the
+// --session-state-dir flag used to persist Copilot session artifacts.
+const AWFSessionStateDirMinVersion Version = "v0.25.15"
+
 // AWFCliProxyMinVersion is the minimum supported AWF version for emitting the CLI proxy flags
 // (--difc-proxy-host, --difc-proxy-ca-cert). Workflows pinning an older AWF version than
 // v0.25.17 must not emit CLI proxy flags or the run will fail.

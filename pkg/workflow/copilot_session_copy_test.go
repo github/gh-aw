@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -47,5 +48,23 @@ func TestCopilotSessionFileCopyStep(t *testing.T) {
 	// Verify it uses the RUNNER_TEMP-based actions path
 	if !strings.Contains(stepContent, "${RUNNER_TEMP}/gh-aw/actions/") {
 		t.Error("Expected step to reference script via ${RUNNER_TEMP}/gh-aw/actions/")
+	}
+}
+
+func TestCopilotSessionCopyScriptUsesAWFManagedDirectory(t *testing.T) {
+	content, err := os.ReadFile("../../actions/setup/sh/copy_copilot_session_state.sh")
+	if err != nil {
+		t.Fatalf("Failed to read Copilot session copy script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, `AWF_SESSION_STATE_DIR="/tmp/gh-aw/sandbox/agent/session-state"`) {
+		t.Error("Expected script to read from the AWF-managed session-state directory")
+	}
+	if !strings.Contains(script, `LEGACY_SESSION_STATE_DIR="$HOME/.copilot/session-state"`) {
+		t.Error("Expected script to retain the legacy host HOME fallback")
+	}
+	if !strings.Contains(script, `LOGS_DIR="/tmp/gh-aw/sandbox/agent/logs/copilot-session-state"`) {
+		t.Error("Expected script to copy session state into the parser's log directory")
 	}
 }

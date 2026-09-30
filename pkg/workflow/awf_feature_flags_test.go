@@ -64,6 +64,25 @@ func TestAWFSupportsExcludeEnv(t *testing.T) {
 	}
 }
 
+func TestAWFSupportsSessionStateDir(t *testing.T) {
+	tests := []struct {
+		name           string
+		firewallConfig *FirewallConfig
+		want           bool
+	}{
+		{name: "default version", firewallConfig: nil, want: true},
+		{name: "exact minimum", firewallConfig: &FirewallConfig{Version: "v0.25.15"}, want: true},
+		{name: "older version", firewallConfig: &FirewallConfig{Version: "v0.25.14"}, want: false},
+		{name: "latest", firewallConfig: &FirewallConfig{Version: "latest"}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, awfSupportsSessionStateDir(tt.firewallConfig))
+		})
+	}
+}
+
 func TestAWFSupportsCliProxy(t *testing.T) {
 	tests := []struct {
 		name           string

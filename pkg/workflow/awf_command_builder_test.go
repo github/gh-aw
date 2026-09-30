@@ -70,6 +70,43 @@ func TestBuildAWFArgsAuditDir(t *testing.T) {
 	})
 }
 
+func TestBuildAWFArgsCopilotSessionStateDir(t *testing.T) {
+	tests := []struct {
+		name       string
+		engineName string
+		runtimeID  string
+		awfVersion string
+		expected   bool
+	}{
+		{name: "copilot engine", engineName: "copilot", expected: true},
+		{name: "copilot runtime alias", engineName: "custom-copilot", runtimeID: "copilot", expected: true},
+		{name: "copilot with older AWF", engineName: "copilot", awfVersion: "v0.25.14", expected: false},
+		{name: "non-copilot engine", engineName: "claude", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := BuildAWFArgs(AWFCommandConfig{
+				EngineName:      tt.engineName,
+				EngineRuntimeID: tt.runtimeID,
+				WorkflowData: &WorkflowData{
+					Name:         "test-workflow",
+					EngineConfig: &EngineConfig{ID: tt.engineName},
+					NetworkPermissions: &NetworkPermissions{
+						Firewall: &FirewallConfig{Version: tt.awfVersion},
+					},
+				},
+			})
+
+			if tt.expected {
+				assert.Equal(t, copilotAWFSessionStateDir, argValue(args, "--session-state-dir"))
+			} else {
+				assert.NotContains(t, args, "--session-state-dir")
+			}
+		})
+	}
+}
+
 // TestBuildAWFArgsAllowHostPorts tests that BuildAWFArgs includes --allow-host-ports
 // with port 80, 443, and the MCP gateway port so the AWF agent container can reach
 // the gateway through the firewall's iptables rules.

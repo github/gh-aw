@@ -10,6 +10,12 @@ func awfSupportsExcludeEnv(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFExcludeEnvMinVersion)
 }
 
+// awfSupportsSessionStateDir returns true when the effective AWF version supports
+// --session-state-dir (introduced in AWF v0.25.15).
+func awfSupportsSessionStateDir(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFSessionStateDirMinVersion)
+}
+
 // awfVersionAtLeast returns true when the effective AWF version is at or above minVersion.
 //
 // If firewallConfig has no version set, DefaultFirewallVersion is used. "latest" always
