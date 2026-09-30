@@ -87,6 +87,7 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, config.Ledgers[0].Replay)
 	require.Equal(t, "return {tables: {}}", config.Ledgers[1].Replay.Script)
+	require.Contains(t, buildLedgerPromptSection(config).Content, "not a sandbox for hostile scripts")
 	require.NotContains(t, buildLedgerPromptSection(config).Content, "replay_metadata")
 	require.Contains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
 	encoded, err := encodeLedgerConfigBase64(config)
@@ -160,6 +161,16 @@ func TestLedgerConfigEncodingErrors(t *testing.T) {
 
 	_, err = NewCompiler().buildPushLedgerChangesJob(data, false)
 	require.ErrorContains(t, err, "failed to encode ledger persistence configuration")
+}
+
+func TestLedgerConfigEncodingEnforcesEnvironmentLimit(t *testing.T) {
+	config := &LedgerToolConfig{Ledgers: []LedgerConfig{
+		{Name: "first", Replay: &LedgerReplayConfig{Script: "return {};" + strings.Repeat(" ", 25*1024)}},
+		{Name: "second", Replay: &LedgerReplayConfig{Script: "return {};" + strings.Repeat(" ", 25*1024)}},
+	}}
+
+	_, err := encodeLedgerConfigBase64(config)
+	require.ErrorContains(t, err, "exceeds the 65536-byte environment limit")
 }
 
 func TestLegacyRepoMemoryLedgerDetection(t *testing.T) {

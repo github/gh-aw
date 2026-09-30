@@ -37,14 +37,19 @@ tools:
 ```
 
 The script receives deep-frozen `records` and optional `replay.config` (an empty
-object by default). The config must be a bounded JSON object.
+object by default). The config must be a bounded JSON object. The serialized
+configuration for all ledgers is limited to 64 KiB after base64 encoding.
 Records follow the ledger's canonical reconstruction order: topological parent
 order, with SHA-256 lexical order for simultaneously ready records. This order
 depends on logical history, not shard names or physical layout; equivalent
-history after compaction gives the same replay input. Scripts must be deterministic:
-the constrained subprocess receives no credentials and can read only its worker file,
-and its JavaScript context provides no process, filesystem, network, module-loading,
-wall-clock, or random APIs. Scripts cannot execute SQL or write SQLite.
+history after compaction gives the same replay input. Replay scripts are executable
+workflow configuration; only use trusted scripts. They run in a separate Node.js
+process with an empty environment and restrictive Node.js permissions as defense
+in depth, but the JavaScript `vm` context is not a security boundary and must not
+be used to execute hostile scripts. The context omits process, filesystem, network,
+module-loading, wall-clock, and random APIs, but this is not a security guarantee.
+The runtime provides no database handle or SQL interface. Treat ledger records as
+untrusted data and never execute payload content.
 
 Replay output must contain `tables` and may specify `version: 1` (the default).
 Each table has `columns`, a nonempty `primaryKey`, and `rows`. Column types are
@@ -59,11 +64,11 @@ rows total, and 64 KiB per cell.
 Trusted preparation validates canonical records before replay. A replay failure
 produces a bounded warning and leaves the generic ledger projection intact,
 without partial replay tables. The per-ledger SQLite database at
-`/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. Query
-The generated agent prompt lists materialized replay tables and their columns
+`/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. The generated
+agent prompt lists materialized replay tables and their column names and types
 (or reports that replay fell back); exceptionally large lists are abbreviated.
-Query `replay_metadata` for
-generated table names, columns, ledger name, record count, script SHA-256, and
-projection/output versions; query `records` for event history.
+Query `replay_metadata` for generated table names, columns, ledger name, record
+count, script SHA-256, and projection/output versions; query `records` for event
+history.
 Each ledger runs replay independently. Change the replay script to reinterpret
 older payload versions without rewriting past records.
