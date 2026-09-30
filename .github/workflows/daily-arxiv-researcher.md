@@ -30,6 +30,8 @@ tools:
     - "ls *"
     - "curl *"
     - "base64 *"
+    - "jq *"
+    - "python3 -c *"
 
 network:
   allowed:
@@ -198,6 +200,8 @@ For each top-ranked paper (max 3), invoke the `opportunity-extractor` sub-agent 
 Collect the returned opportunity objects.
 
 ## Step 4: Update the Paper Ledger
+
+Use `python3 -c` to update the ledger, index and dedup cache as one standalone shell command. Read paper data from `new-papers.json` as data, not as shell commands; do not chain shell commands or create a separate script.
 
 Load `/tmp/gh-aw/repo-memory/default/paper-ledger.md` if it exists; otherwise start with:
 ```markdown
