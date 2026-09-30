@@ -73,8 +73,7 @@ safe-outputs:
 engine: claude
 strict: false
 ---`,
-			description: "Create pull request job checkout should include persist-credentials: true in safe_outputs job",
-			expectTrue:  []string{"safe_outputs"},
+			description: "Create pull request job checkout should include persist-credentials: false",
 		},
 		{
 			name: "safe output push-to-pull-request-branch checkout includes persist-credentials false",
@@ -92,8 +91,7 @@ safe-outputs:
 engine: claude
 strict: false
 ---`,
-			description: "Push to PR branch job checkout should include persist-credentials: true in safe_outputs job",
-			expectTrue:  []string{"safe_outputs"},
+			description: "Push to PR branch job checkout should include persist-credentials: false",
 		},
 		{
 			name: "safe output upload_assets checkout includes persist-credentials false",

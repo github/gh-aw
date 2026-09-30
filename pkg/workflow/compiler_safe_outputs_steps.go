@@ -35,21 +35,10 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	// Build the same CheckoutManager the agent job builds from the workflow's checkout: config.
 	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
 
-	// Unlike the agent job, the safe_outputs job performs git fetch/push against the
-	// checked-out repositories (create_pull_request, push_to_pull_request_branch), so its
-	// checkouts must retain credentials (persist-credentials: true) instead of stripping
-	// them. This keeps the push-capable token on disk for the handlers; the trusted
-	// safe_outputs handler code (not the untrusted agent) is the only consumer.
-	checkoutMgr.SetKeepCredentialsForPush(true)
-
-	// Persist the resolved PR push token (not just the default GITHUB_TOKEN) into
-	// .git/config so the retained credential matches the token the handlers use to
-	// fetch/push. This keeps a single, correct Authorization header on the wire and
-	// removes the need for the handlers to inject a separate http.extraheader. The
-	// same token is reused below for the "Configure Git credentials" step so both the
-	// persisted checkout credential and the push remote agree on a single token.
+	// Resolve the PR push token for the dedicated Git credential configuration step.
+	// Checkout credentials are not persisted because that step configures the credentials
+	// used by the handlers to fetch and push.
 	prCheckoutToken, _ := resolvePRCheckoutToken(data.SafeOutputs, checkoutMgr)
-	checkoutMgr.SetPushToken(resolveStaticCheckoutToken(data.SafeOutputs, checkoutMgr))
 
 	// The default workspace checkout is skipped below when permissions.contents: none
 	// signals a target-only checkout; suppress its app-token minting step too.
@@ -94,8 +83,7 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	)...)
 
 	// Configure Git credentials so the safe_outputs job can push. The agent job never
-	// pushes, so this step has no agent-job equivalent. Reuse the token resolved above so
-	// the push remote and the persisted checkout credential use the same token.
+	// pushes, so this step has no agent-job equivalent.
 	steps = append(steps, checkoutMgr.GenerateConfigureGitCredentialsSteps(prCheckoutToken, condition)...)
 
 	consolidatedSafeOutputsStepsLog.Printf("Built shared PR checkout steps with condition: %s", condition.Render())

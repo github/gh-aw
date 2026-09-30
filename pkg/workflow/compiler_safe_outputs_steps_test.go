@@ -32,8 +32,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 			checkContains: []string{
 				"name: Checkout repository",
 				"uses: actions/checkout@",
-				// safe_outputs job retains credentials so the handlers can git fetch/push.
-				"persist-credentials: true",
+				"persist-credentials: false",
 				"name: Configure Git credentials",
 				"configure_git_credentials.sh",
 				"GITHUB_REPOSITORY: ${{ github.repository }}",
@@ -44,8 +43,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 				"trusted default branch for comment events",
 				"ref: ${{ github.event.repository.default_branch }}",
 				"steps.extract-base-branch.outputs.base-branch",
-				// Credentials must NOT be stripped in the safe_outputs job.
-				"persist-credentials: false",
+				"persist-credentials: true",
 			},
 		},
 		{
@@ -96,7 +94,6 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 			},
 			checkContains: []string{
 				"id: checkout-safe-output-app-token-0",
-				"token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
 				"GIT_TOKEN: ${{ steps.checkout-safe-output-app-token-0.outputs.token }}",
 			},
 			checkNotContains: []string{
