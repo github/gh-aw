@@ -2579,6 +2579,21 @@
           ],
           "additionalProperties": false
         },
+        "ledger": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "transactions_added": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "transactions_added"
+          ],
+          "additionalProperties": false
+        },
         "friction": {
           "type": [
             "null",
