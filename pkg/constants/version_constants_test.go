@@ -15,9 +15,9 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.280"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.285"},
 		{"Copilot CLI", DefaultCopilotVersion, "1.0.89"},
-		{"Codex", DefaultCodexVersion, "0.159.1"},
+		{"Codex", DefaultCodexVersion, "0.159.2"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.62.0"},
 		{"Pi CLI", DefaultPiVersion, "0.99.1"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
@@ -68,7 +68,7 @@ func TestDefaultThreatDetectReleasePins(t *testing.T) {
 func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	t.Parallel()
 	const (
-		expectedVersion    Version = "0.1.19"
+		expectedVersion    Version = "0.1.22"
 		publishedAtRFC3339         = "2026-09-01T16:19:56.878Z"
 		minReleaseAge              = 72 * time.Hour
 	)

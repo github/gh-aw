@@ -7,7 +7,7 @@ package constants
 //
 // Example usage:
 //
-//	const DefaultCopilotVersion Version = "0.0.369"
+//	const DefaultCopilotVersion Version = "1.0.89"
 //	func InstallTool(name string, version Version) error { ... }
 type Version string
 
@@ -32,7 +32,7 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.280"
+const DefaultClaudeCodeVersion Version = "2.1.285"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
@@ -49,7 +49,7 @@ const CopilotWebSearchMinVersion Version = "1.0.87"
 const DefaultCopilotSDKVersion Version = "1.0.13"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.159.1"
+const DefaultCodexVersion Version = "0.159.2"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.62.0"
@@ -252,7 +252,7 @@ const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.19"
 // Used when tools.playwright is enabled.
 // Keep this version outside the default 3-day npm release-age cooldown window enforced by
 // generated Playwright CLI install steps. See TestDefaultPlaywrightCLIVersionOutsideCooldownWindow.
-const DefaultPlaywrightCLIVersion Version = "0.1.19"
+const DefaultPlaywrightCLIVersion Version = "0.1.22"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.30.0"
