@@ -77,6 +77,35 @@ tools:
         additionalProperties: false
       max-record-kb: 8
       max-patch-kb: 10
+      replay:
+        script: |
+          return {
+            tables: {
+              snapshots: {
+                columns: {
+                  ordinal: "integer",
+                  run_id: "text",
+                  generated_at: "text",
+                  repository: "text",
+                  overall_stats: "json",
+                  intent_buckets: "json",
+                  workflow_opportunities: "json"
+                },
+                primaryKey: ["run_id"],
+                rows: records
+                  .filter(record => record.payload.record_type === "centralization_snapshot")
+                  .map(({ payload }, index) => ({
+                    ordinal: index + 1,
+                    run_id: payload.run_id,
+                    generated_at: payload.generated_at,
+                    repository: payload.repository,
+                    overall_stats: payload.overall_stats,
+                    intent_buckets: payload.intent_buckets,
+                    workflow_opportunities: payload.workflow_opportunities
+                  }))
+              }
+            }
+          };
   repo-memory:
     branch-name: memory/copilot-centralization-optimizer
     description: Long-lived centralization trend snapshots and history
@@ -427,13 +456,14 @@ Investigate whether repeated cross-user prompting suggests centralizing intellig
 
 Before drafting the report:
 - If `/tmp/gh-aw/repo-memory/default/centralization-baseline.json` exists, recompute `/tmp/gh-aw/data/trend-analysis.json` by comparing that baseline to `/tmp/gh-aw/data/current-snapshot.json`.
-- Query `centralization_snapshot` records to identify recent runs and avoid strong trend claims based on a single snapshot:
+- Query the replay projection to identify recent snapshots and avoid strong trend claims based on a single run:
 
   ```sql
-  SELECT payload FROM records
-  WHERE json_extract(payload, '$.record_type') = 'centralization_snapshot'
-  ORDER BY ordinal DESC LIMIT 100;
+  SELECT run_id, generated_at, overall_stats, intent_buckets, workflow_opportunities
+  FROM snapshots ORDER BY ordinal DESC LIMIT 100;
   ```
+
+  If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
 
 - Persist the sanitized current snapshot for the next run:
   - write `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
