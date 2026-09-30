@@ -544,7 +544,7 @@ jobs:
       - name: Install GitHub Copilot SDK (Node.js)
         run: cd "${GITHUB_WORKSPACE}" && npm install --ignore-scripts --no-save @github/copilot-sdk@1.0.13 undici@6.28.0
       - name: Install Playwright CLI
-        run: npm install -g @playwright/cli@0.1.19
+        run: npm install -g @playwright/cli@0.1.22
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10
