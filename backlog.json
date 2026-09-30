@@ -24,12 +24,6 @@
   "discovered": "2026-09-29"
  },
  {
-  "id": "petermefrandsen/gh-aw-inspector",
-  "kind": "extension",
-  "source": "topic:gh-aw",
-  "discovered": "2026-09-29"
- },
- {
   "id": "Hack23/European-Parliament-MCP-Server",
   "kind": "mcp-server",
   "source": "topic:gh-aw",
@@ -51,18 +45,6 @@
   "id": "Htkym/workflowVisualEditor",
   "kind": "extension",
   "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "githubnext/agentics",
-  "kind": "workflow-collection",
-  "source": "well-known",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "githubnext/agentic-ops",
-  "kind": "workflow-collection",
-  "source": "well-known",
   "discovered": "2026-09-29"
  }
 ]

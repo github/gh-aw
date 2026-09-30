@@ -33,5 +33,39 @@
    "PR/issue cost summary comment"
   ],
   "blogged": false
+ },
+ "githubnext/agentics": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-30",
+  "score": 7,
+  "summary": "Official sample family of reusable workflows (triage, CI Doctor, Repo Assist, reviewers); very active, 969 stars.",
+  "highlights": [
+   "README.md: categorized catalog with docs/ per workflow",
+   "Community-maintained entries linked (Log Watcher)",
+   "Cost Tracker uses firewall token-usage.jsonl"
+  ],
+  "blogged": false
+ },
+ "githubnext/agentic-ops": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-30",
+  "score": 6,
+  "summary": "Installable bundle (gh aw add) for daily AIC spend audit and conservative optimization.",
+  "highlights": [
+   "Single root package, no extra secrets",
+   "Shared snapshots for trend analysis"
+  ],
+  "blogged": false
+ },
+ "petermefrandsen/gh-aw-inspector": {
+  "kind": "extension",
+  "reviewed": "2026-09-30",
+  "score": 5,
+  "summary": "VS Code extension to discover, run and evaluate gh-aw workflows; low activity since Feb 2026.",
+  "highlights": [
+   "Sidebar workflow discovery",
+   "Evaluation reports with verbosity modes"
+  ],
+  "blogged": false
  }
 }
