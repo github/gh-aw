@@ -9,6 +9,7 @@
 //   integrity: aggregate DIFC filtering counts from gateway/RPC logs
 //   steering: aggregate AWF steering-event counts by event type
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
+//   ledger: number of recorded ledger append transactions
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
 //   friction: precomputed cost of wasted work (AIC canonical) with attribution states
@@ -21,6 +22,7 @@ const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { computeFrictionCost } = require("./friction_cost_metrics.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { parseDetectionLog, parseStructuredResultFile } = require("./parse_threat_detection_results.cjs");
 
 require("./shim.cjs");
 
@@ -34,6 +36,8 @@ const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
+const DETECTION_DIR = "/tmp/gh-aw/threat-detection";
+const DETECTION_USAGE_RESULT_PATH = "/tmp/gh-aw/usage/detection/detection_result.json";
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 const API_PROXY_EVENT_LOG_PATHS = [
   "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl",
@@ -954,6 +958,8 @@ function parseGatewayLogs() {
   return parseGatewayActivity().gateway;
 }
 
+const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
+
 /**
  * Parse the safe-output-items manifest and aggregate item counts by type.
  * Reads the JSONL file written by the safe_outputs job and downloaded into
@@ -968,8 +974,6 @@ function parseGatewayLogs() {
  * @param {string} [manifestPath] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
  * @returns {{ total_items: number, items_by_type: Record<string, number>, items: Array<Record<string, any>> } | null}
  */
-const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
-
 function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   if (!fs.existsSync(manifestPath)) {
     return null;
@@ -1018,6 +1022,45 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   };
 }
 
+function parseLedgerCompaction(value = process.env.GH_AW_LEDGER_COMPACTION) {
+  if (!value) return null;
+  try {
+    const compaction = JSON.parse(value);
+    if (
+      !compaction ||
+      typeof compaction !== "object" ||
+      !["before", "after", "selected", "records", "retired"].every(key => Number.isSafeInteger(compaction[key]) && compaction[key] >= 0) ||
+      !(compaction.replacement === null || typeof compaction.replacement === "string") ||
+      typeof compaction.changed !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      before: compaction.before,
+      after: compaction.after,
+      selected: compaction.selected,
+      records: compaction.records,
+      replacement: compaction.replacement,
+      retired: compaction.retired,
+      changed: compaction.changed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function ledgerActivityFromSafeOutputs(safeOutputs, compaction = parseLedgerCompaction()) {
+  if (safeOutputs === null && compaction === null) return null;
+  const activity = {};
+  if (safeOutputs !== null) {
+    activity.transactions_added = safeOutputs.items_by_type.ledger_mutation || 0;
+  }
+  if (compaction !== null) {
+    activity.compaction = compaction;
+  }
+  return activity;
+}
+
 /**
  * Parse A/B experiment assignments for the current run.
  * Reads the assignments.json file written by pick_experiment.cjs.
@@ -1036,7 +1079,47 @@ function parseExperimentsData() {
 /**
  * Main function to generate usage activity summary
  */
+function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DETECTION_USAGE_RESULT_PATH) {
+  const jobResult = process.env.GH_AW_DETECTION_JOB_RESULT || "";
+  if (!["success", "failure", "cancelled", "skipped"].includes(jobResult)) {
+    return;
+  }
+
+  const result = {
+    job_result: jobResult,
+    conclusion: ["success", "failure", "warning", "skipped"].includes(process.env.GH_AW_DETECTION_CONCLUSION || "") ? process.env.GH_AW_DETECTION_CONCLUSION : "",
+    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped"].includes(process.env.GH_AW_DETECTION_REASON || "") ? process.env.GH_AW_DETECTION_REASON : "",
+  };
+  if (jobResult !== "skipped") {
+    const structured = parseStructuredResultFile(path.join(detectionDir, "detection_result.json"));
+    let parsed = structured;
+    if (!parsed?.verdict) {
+      const logPath = path.join(detectionDir, "detection.log");
+      if (fs.existsSync(logPath)) {
+        try {
+          parsed = parseDetectionLog(fs.readFileSync(logPath, "utf8"));
+        } catch {
+          parsed = null;
+        }
+      }
+    }
+    if (parsed?.verdict) {
+      const { prompt_injection, secret_leak, malicious_patch } = parsed.verdict;
+      result.prompt_injection = prompt_injection;
+      result.secret_leak = secret_leak;
+      result.malicious_patch = malicious_patch;
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(result), "utf8");
+  } catch (err) {
+    throw new Error(`Failed to write detection usage result at ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
+  }
+}
+
 async function main() {
+  writeDetectionUsageResult();
   const summary = { schema: "usage-activity-summary/v1" };
 
   // Parse firewall logs
@@ -1077,8 +1160,10 @@ async function main() {
   //   • safe_outputs.total_items > 0  → manifest present with N items
   // A read error is kept separate: it logs a warning but omits safe_outputs so
   // the consumer cannot mistake a broken artifact for a legitimately empty one.
+  /** @type {ReturnType<typeof parseSafeOutputsManifest>} */
+  let safeOutputs = null;
   try {
-    const safeOutputs = parseSafeOutputsManifest();
+    safeOutputs = parseSafeOutputsManifest();
     if (safeOutputs === null) {
       core.info(`safe-output-items manifest not found at ${MANIFEST_FILE_PATH} — safe-outputs-items artifact may not have been downloaded`);
     } else {
@@ -1091,6 +1176,10 @@ async function main() {
     }
   } catch (err) {
     core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${getErrorMessage(err)} — safe_outputs omitted from summary`);
+  }
+  const ledger = ledgerActivityFromSafeOutputs(safeOutputs);
+  if (ledger) {
+    summary.ledger = ledger;
   }
 
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
@@ -1149,12 +1238,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+  writeDetectionUsageResult,
   parseFirewallLogs,
   parseSessionLogs,
   parseSteeringEvents,
   parseGatewayLogs,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  parseLedgerCompaction,
+  ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,

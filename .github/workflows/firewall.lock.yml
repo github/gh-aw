@@ -1165,6 +1165,7 @@ jobs:
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/experiment/state.jsonl
@@ -1196,6 +1197,7 @@ jobs:
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/experiment/state.jsonl

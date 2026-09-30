@@ -205,9 +205,14 @@ The `usage` artifact is a compact conclusion-job artifact with workflow-run meta
 
 Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. The optional activity sections are additive; the `working_set` and `friction` sections are always written when the calculation step executes. Runs produced before a section shipped simply omit it, and every consumer treats a missing section as unmeasured:
 
+The `ledger.transactions_added` count covers repo-memory ledger appends recorded as `ledger_mutation` items in the downloaded safe-outputs manifest; queued `ledger_append` safe outputs are not counted because they are persisted later in a separate job. It is zero when that manifest is present without ledger mutations and absent when the manifest is unavailable. When ledger compaction runs, `ledger.compaction` also records shard and record counts, the replacement segment, retired sources, and whether storage changed.
+
 ```json
 {
   "schema": "usage-activity-summary/v1",
+  "ledger": {
+    "transactions_added": 3
+  },
   "firewall": {
     "total_requests": 12,
     "allowed_requests": 10,
@@ -477,6 +482,7 @@ The `usage` artifact also carries experiment and evals data when the workflow de
 
 - `experiment/state.jsonl`, `experiment/state.json`, `experiment/assignments.json` — A/B experiment state and the current run's variant assignments
 - `evals.jsonl`, `evals/token_usage.jsonl`, `evals/execution.json` — BinEval results, evals token usage, and evals execution evidence
+- `detection/detection_result.json` — When threat detection is enabled, the detection job result, conclusion, categorized failure reason, and validated threat verdict flags (when available). Raw detector reasons and logs are not copied into this file. `gh aw audit --artifacts usage` reports failed or warned detection and detected threats as security findings.
 
 ### Accessing usage data
 

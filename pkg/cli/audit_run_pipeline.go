@@ -216,6 +216,11 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 		hasThreatDetectionArtifact(cfg.outputDir) {
 		return false
 	}
+	if len(cfg.artifactFilter) == 0 {
+		if _, found := readDetectionUsageResult(cfg.outputDir); found {
+			return false
+		}
+	}
 	for _, job := range summary.JobDetails {
 		if normalizeJobName(job.Name) == string(constants.DetectionJobName) {
 			return true
@@ -225,6 +230,11 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	if summary.Ledger == nil {
+		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
+			summary.Ledger = activity.Ledger
+		}
+	}
 	gatewaySteeringEvents := summary.GatewaySteeringEvents
 	if len(gatewaySteeringEvents) == 0 {
 		if events, err := extractGatewaySteeringEvents(runOutputDir); err == nil && len(events) > 0 {
@@ -250,6 +260,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		TokenUsage:              summary.TokenUsage,
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,
+		Ledger:                  summary.Ledger,
 		Friction:                summary.Friction,
 		GitHubRateLimitUsage:    summary.GitHubRateLimitUsage,
 		JobDetails:              summary.JobDetails,

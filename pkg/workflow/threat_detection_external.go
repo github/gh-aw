@@ -388,6 +388,8 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 		filteredInstallSteps = append([]GitHubActionStep{GenerateNodeJsSetupStep()}, filteredInstallSteps...)
 	}
 
+	filteredInstallSteps = applyNodeSetupActionOverride(filteredInstallSteps, data)
+
 	var yaml strings.Builder
 	arcDind := isArcDindTopology(threatDetectionData)
 	if arcDind && installStepsContainNodeSetup(filteredInstallSteps) {

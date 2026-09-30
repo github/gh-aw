@@ -100,6 +100,7 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 		wantInstallStep      string
 		wantArcDindSetup     bool
 		wantCopilotInstalled bool
+		wantNodeActionRef    string
 	}{
 		{
 			name: "copilot on standard topology",
@@ -158,11 +159,50 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 			},
 			wantInstallStep: "Install Codex CLI",
 		},
+		{
+			name: "copilot injected node setup honors runtimes.node action override",
+			data: &WorkflowData{
+				AI:          "copilot",
+				Runtimes:    map[string]any{"node": map[string]any{"action-repo": "myorg/myrepo/.github/actions/setup-node", "action-version": "main"}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:      "Install GitHub Copilot CLI",
+			wantCopilotInstalled: true,
+			wantNodeActionRef:    "myorg/myrepo/.github/actions/setup-node@main",
+		},
+		{
+			name: "claude bundled node setup honors runtimes.node action override",
+			data: &WorkflowData{
+				AI:          "claude",
+				Runtimes:    map[string]any{"node": map[string]any{"action-repo": "myorg/myrepo/.github/actions/setup-node", "action-version": "main"}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:   "Install Claude Code CLI",
+			wantNodeActionRef: "myorg/myrepo/.github/actions/setup-node@main",
+		},
+		{
+			name: "codex bundled node setup honors runtimes.node action override",
+			data: &WorkflowData{
+				AI:          "codex",
+				Runtimes:    map[string]any{"node": map[string]any{"action-repo": "myorg/myrepo/.github/actions/setup-node", "action-version": "main"}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:   "Install Codex CLI",
+			wantNodeActionRef: "myorg/myrepo/.github/actions/setup-node@main",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			steps := strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(tt.data), "")
+
+			wantNodeActionRef := tt.wantNodeActionRef
+			if wantNodeActionRef == "" {
+				wantNodeActionRef = getActionPin("actions/setup-node")
+			}
+			if !strings.Contains(steps, "uses: "+wantNodeActionRef+"\n") {
+				t.Errorf("expected Setup Node.js to use %q:\n%s", wantNodeActionRef, steps)
+			}
 
 			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
 				t.Fatalf("expected exactly one Setup Node.js step, got %d:\n%s", count, steps)

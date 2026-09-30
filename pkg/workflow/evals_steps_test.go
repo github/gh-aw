@@ -29,7 +29,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 			t.Errorf("evals accounting transport missing %q", expected)
 		}
 	}
-	usage := strings.Join(buildUsageArtifactUploadSteps("", true, "", func(action string) string { return action }), "")
+	usage := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, false, func(action string) string { return action }), "")
 	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("conclusion must publish evals token usage")
 	}
@@ -105,6 +105,40 @@ func TestDailyAICEvalsCollectorTopology(t *testing.T) {
 					(topology == "arc-dind" && strings.Contains(collector, "/tmp/gh-aw/sandbox/firewall")) {
 					t.Errorf("collector must not fall back to stale agent paths:\n%s", collector)
 				}
+			}
+		})
+	}
+}
+
+// TestBuildEvalsEngineStepsHonorsNodeActionOverride verifies that the evals job's
+// Setup Node.js step honors runtimes.node.action-repo / action-version.
+func TestBuildEvalsEngineStepsHonorsNodeActionOverride(t *testing.T) {
+	compiler := NewCompiler()
+	const customRef = "myorg/myrepo/.github/actions/setup-node@main"
+
+	for _, engineID := range []string{"copilot", "claude"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: engineID,
+				Runtimes: map[string]any{
+					"node": map[string]any{
+						"action-repo":    "myorg/myrepo/.github/actions/setup-node",
+						"action-version": "main",
+					},
+				},
+				Evals: &EvalsConfig{
+					Questions: []EvalDefinition{
+						{ID: "test", Question: "Does the code work?"},
+					},
+				},
+			}
+
+			allSteps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+			if !strings.Contains(allSteps, "uses: "+customRef) {
+				t.Errorf("expected Setup Node.js to use %q;\ngot:\n%s", customRef, allSteps)
+			}
+			if strings.Contains(allSteps, "uses: actions/setup-node@") {
+				t.Errorf("expected no default actions/setup-node reference;\ngot:\n%s", allSteps)
 			}
 		})
 	}

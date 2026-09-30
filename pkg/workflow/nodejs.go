@@ -33,6 +33,100 @@ func GenerateNodeJsSetupStep() GitHubActionStep {
 	}
 }
 
+// resolveNodeSetupActionOverride returns the runtimes.node.action-repo and
+// runtimes.node.action-version overrides configured for the workflow, if any.
+// When the merged runtimes map (which includes imported runtimes) has a node
+// entry, it is authoritative; the typed frontmatter view is only a fallback.
+func resolveNodeSetupActionOverride(data *WorkflowData) (string, string) {
+	if data == nil {
+		return "", ""
+	}
+	if nodeConfig, ok := data.Runtimes["node"].(map[string]any); ok {
+		var actionRepo, actionVersion string
+		if v, ok := nodeConfig["action-repo"].(string); ok {
+			actionRepo = v
+		}
+		if v, ok := nodeConfig["action-version"].(string); ok {
+			actionVersion = v
+		}
+		// The merged entry is authoritative even when it omits action overrides:
+		// an imported node entry replaces the top-level entry wholesale.
+		return actionRepo, actionVersion
+	}
+	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.RuntimesTyped != nil && data.ParsedFrontmatter.RuntimesTyped.Node != nil {
+		node := data.ParsedFrontmatter.RuntimesTyped.Node
+		return node.ActionRepo, node.ActionVersion
+	}
+	return "", ""
+}
+
+// resolveNodeSetupActionRef returns the `uses:` reference for the Setup Node.js
+// step when a runtimes.node.action-repo / action-version override is configured,
+// mirroring generateSetupStep. Returns "" when no override is configured.
+func resolveNodeSetupActionRef(data *WorkflowData) string {
+	actionRepo, actionVersion := resolveNodeSetupActionOverride(data)
+	if actionRepo == "" && actionVersion == "" {
+		return ""
+	}
+	runtime := cloneRuntimeWithActionOverrides(findRuntimeByID("node"), actionRepo, actionVersion)
+	if runtime == nil {
+		return ""
+	}
+	actionRef := getActionPin(runtime.ActionRepo)
+	if actionRef == "" {
+		if runtime.ActionVersion != "" {
+			actionRef = fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
+		} else {
+			actionRef = runtime.ActionRepo
+		}
+	}
+	return actionRef
+}
+
+// generateNodeJsSetupStepForWorkflow creates the Setup Node.js step for jobs that
+// bypass DetectRuntimeRequirements (e.g. threat detection and evals jobs), honoring
+// the runtimes.node.action-repo / action-version frontmatter override the same way
+// the main agent job does (see applyRuntimeOverrides and generateSetupStep).
+func generateNodeJsSetupStepForWorkflow(data *WorkflowData) GitHubActionStep {
+	return rewriteNodeSetupStepUses(GenerateNodeJsSetupStep(), resolveNodeSetupActionRef(data))
+}
+
+// rewriteNodeSetupStepUses returns a copy of step with its `uses:` line replaced
+// by actionRef. The step is returned unchanged when actionRef is empty.
+func rewriteNodeSetupStepUses(step GitHubActionStep, actionRef string) GitHubActionStep {
+	if actionRef == "" {
+		return step
+	}
+	rewritten := make(GitHubActionStep, 0, len(step))
+	for _, line := range step {
+		if strings.HasPrefix(strings.TrimSpace(line), "uses:") {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			line = indent + "uses: " + actionRef
+		}
+		rewritten = append(rewritten, line)
+	}
+	return rewritten
+}
+
+// applyNodeSetupActionOverride rewrites the `uses:` line of any "Setup Node.js"
+// step in steps to honor the runtimes.node action override. Steps are returned
+// unchanged when no override is configured.
+func applyNodeSetupActionOverride(steps []GitHubActionStep, data *WorkflowData) []GitHubActionStep {
+	actionRef := resolveNodeSetupActionRef(data)
+	if actionRef == "" {
+		return steps
+	}
+	nodejsLog.Printf("Applying runtimes.node action override to Setup Node.js step: %s", actionRef)
+	result := make([]GitHubActionStep, 0, len(steps))
+	for _, step := range steps {
+		if extractStepName(strings.Join(step, "\n")) == "Setup Node.js" {
+			step = rewriteNodeSetupStepUses(step, actionRef)
+		}
+		result = append(result, step)
+	}
+	return result
+}
+
 // installStepsContainNodeSetup reports whether any of the provided steps is already
 // a "Setup Node.js" step. Uses the same extractStepName matcher as
 // JobManager.ValidateDuplicateSteps so the guard cannot drift from what the
