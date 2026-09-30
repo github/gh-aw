@@ -296,6 +296,7 @@ touch %s
 		"GITHUB_WORKSPACE":      "${{ github.workspace }}",
 		"RUNNER_TEMP":           "${{ runner.temp }}",
 		"GH_AW_TIMEOUT_MINUTES": resolveStepTimeoutValue(workflowData),
+		"GEMINI_CLI_HOME":       constants.TmpGhAwDir + "/agent/gemini",
 		// Override GITHUB_STEP_SUMMARY with a path that exists inside the sandbox.
 		// The runner's original path is unreachable within the AWF isolated filesystem;
 		// we create this file before the agent starts and append it to the real

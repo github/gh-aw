@@ -84,6 +84,8 @@ engine:
       env:
         CRUSH_DISABLE_DEFAULT_PROVIDERS: "1"
         CRUSH_DISABLE_PROVIDER_AUTO_UPDATE: "1"
+        XDG_DATA_HOME: /tmp/gh-aw/agent/crush-data
+        CRUSH_GLOBAL_DATA: /tmp/gh-aw/agent/crush-data
     mcp:
       config-path: .crush.json
       config-adapter: |

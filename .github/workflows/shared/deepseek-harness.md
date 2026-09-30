@@ -127,7 +127,7 @@ engine:
           throw new Error("DeepSeek Harness requires AWF endpoint discovery or OPENAI_BASE_URL");
         }
 
-        const dshHome = join(workspace, ".dsh");
+        const dshHome = join("/tmp/gh-aw/agent", "deepseek-harness");
         mkdirSync(dshHome, { recursive: true, mode: 0o700 });
         // dsh's settings provider picks the document format from the file
         // extension, so `settings.yaml` must hold YAML. Every value written here

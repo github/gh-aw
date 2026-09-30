@@ -93,7 +93,7 @@ engine:
       write-timestamp: true
       provider-env-mode: universal-llm-consumer
       env:
-        XDG_DATA_HOME: /tmp/opencode-data
+        XDG_DATA_HOME: /tmp/gh-aw/agent/opencode-data
     mcp:
       config-path: opencode.jsonc
     log-parser: |

@@ -43,6 +43,7 @@ steps:
     run: genaiscript run /tmp/gh-aw/agent/aw-prompts/prompt.genai.md --mcp-config "$GH_AW_MCP_CONFIG" --out /tmp/gh-aw/agent/genaiscript-output.md
     env:
       DEBUG: genaiscript:*
+      HOME: /tmp/gh-aw/agent/genaiscript-home
       GH_AW_PROMPT: ${{ env.GH_AW_PROMPT }}
       GH_AW_MCP_CONFIG: ${{ env.GH_AW_MCP_CONFIG }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

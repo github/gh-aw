@@ -64,6 +64,10 @@ engine:
         - --no-pretty
         - --no-stream
         - --no-fancy-input
+        - --input-history-file
+        - /tmp/gh-aw/agent/aider-input-history.txt
+        - --chat-history-file
+        - /tmp/gh-aw/agent/aider-chat-history.md
         - --analytics-disable
         - --openai-api-base
         - http://172.30.0.30:10002

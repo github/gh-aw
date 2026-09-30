@@ -557,6 +557,26 @@ func TestBehaviorDefinedEnginePluginInstallation(t *testing.T) {
 		assert.Contains(t, strings.Join(steps[1], "\n"), `cp -R "./.gh-aw-plugins/plugin-0" "$HOME/.cursor/plugins/local/plugin-0-octo-org__agent-plugin"`)
 	})
 
+	t.Run("stages home-relative plugins in the configured execution home", func(t *testing.T) {
+		engine, err := NewBehaviorDefinedEngine(&EngineDefinition{
+			ID:          "cursor",
+			DisplayName: "Cursor",
+			Behaviors: &EngineBehaviorDefinition{
+				Plugins:   &EnginePluginsDefinition{Directory: "~/.cursor/plugins/local"},
+				Execution: &EngineExecutionDefinition{CommandName: "cursor-agent", Env: map[string]string{"HOME": "/tmp/gh-aw/agent/cursor-home"}},
+			},
+		})
+		require.NoError(t, err)
+
+		steps := engine.GetPluginInstallationSteps(&WorkflowData{
+			Plugins: []string{"octo-org/agent-plugin@" + testPluginSHA},
+		})
+
+		require.Len(t, steps, 2)
+		assert.Contains(t, strings.Join(steps[1], "\n"), "HOME: /tmp/gh-aw/agent/cursor-home")
+		assert.Contains(t, strings.Join(steps[1], "\n"), `"$HOME/.cursor/plugins/local/plugin-0-octo-org__agent-plugin"`)
+	})
+
 	t.Run("installs plugins through the engine CLI", func(t *testing.T) {
 		engine := newEngine(t, &EnginePluginsDefinition{InstallArgs: []string{"plugin", "install"}})
 

@@ -37,6 +37,8 @@ type pluginInstallSpec struct {
 	// workspace-relative (for example ".kiro/powers") or home-relative
 	// (for example "~/.cursor/plugins/local").
 	Directory string
+	// HomeDir overrides HOME for plugin staging when the engine runs with an isolated home.
+	HomeDir string
 	// CustomInstall, when set, replaces the Directory/Command handling above and is
 	// invoked once per checked-out plugin to produce any additional installation steps.
 	CustomInstall func(parsed parsedSkillRefSpec, checkoutPath, installPath string, index int) []GitHubActionStep
@@ -236,7 +238,11 @@ func generatePluginInstallationSteps(workflowData *WorkflowData, spec pluginInst
 					fmt.Sprintf("cp -R %q %q", "./"+installPath, targetPath),
 				}, "\n")
 				stageStep := []string{"      - name: Stage agent plugin " + parsed.repoPath}
-				steps = append(steps, FormatStepWithCommandAndEnv(stageStep, stageCommand, nil))
+				var stageEnv map[string]string
+				if spec.HomeDir != "" {
+					stageEnv = map[string]string{"HOME": spec.HomeDir}
+				}
+				steps = append(steps, FormatStepWithCommandAndEnv(stageStep, stageCommand, stageEnv))
 			}
 		}
 
