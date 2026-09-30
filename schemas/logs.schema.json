@@ -241,6 +241,63 @@
                 ],
                 "additionalProperties": false
               },
+              "ledger": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "transactions_added": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "compaction": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "before": {
+                        "type": "integer"
+                      },
+                      "after": {
+                        "type": "integer"
+                      },
+                      "selected": {
+                        "type": "integer"
+                      },
+                      "records": {
+                        "type": "integer"
+                      },
+                      "replacement": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "retired": {
+                        "type": "integer"
+                      },
+                      "changed": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "before",
+                      "after",
+                      "selected",
+                      "records",
+                      "replacement",
+                      "retired",
+                      "changed"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "friction": {
                 "type": [
                   "null",

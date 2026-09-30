@@ -54,7 +54,6 @@ func TestApplyUsageSummaryToAuditResultsBackfillsMCPPayloadMetrics(t *testing.T)
 }
 
 func TestAuditLedgerActivityFromUsageSummary(t *testing.T) {
-	t.Parallel()
 	runDir := t.TempDir()
 	activityDir := filepath.Join(runDir, "usage", "activity")
 	require.NoError(t, os.MkdirAll(activityDir, 0o755))

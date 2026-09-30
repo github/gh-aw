@@ -14,6 +14,8 @@ import (
 
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizeJobNamePreservesPeriods(t *testing.T) {
@@ -979,6 +981,19 @@ func TestRunDataJSONIncludesZeroTokenUsageAndAIC(t *testing.T) {
 	if aic != float64(0) {
 		t.Fatalf("expected aic = 0, got %v", aic)
 	}
+}
+
+func TestBuildLogsDataIncludesLedgerActivity(t *testing.T) {
+	transactionsAdded := 3
+	data := buildLogsData([]ProcessedRun{{
+		Run:    WorkflowRun{DatabaseID: 42},
+		Ledger: &LedgerActivity{TransactionsAdded: &transactionsAdded},
+	}}, t.TempDir(), nil)
+
+	require.Len(t, data.Runs, 1)
+	require.NotNil(t, data.Runs[0].Ledger)
+	require.NotNil(t, data.Runs[0].Ledger.TransactionsAdded)
+	assert.Equal(t, 3, *data.Runs[0].Ledger.TransactionsAdded)
 }
 
 // TestBuildFirewallLogSummaryWithSharedHelper tests firewall log summary with shared helper

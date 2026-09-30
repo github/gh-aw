@@ -832,6 +832,7 @@ func TestPrepareLogsDataAuditUsesCachedDataBestEffort(t *testing.T) {
 }
 
 func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
+	transactionsAdded := 3
 	cached := RunData{
 		RunID:                      42,
 		WorkflowName:               "cached-workflow",
@@ -850,6 +851,7 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 		DelegatedTempTargetCount:   1,
 		TemporaryIDMapStatus:       temporaryIDMapStatusMissing,
 		EngineID:                   "copilot",
+		Ledger:                     &LedgerActivity{TransactionsAdded: &transactionsAdded},
 		CreatedAt:                  time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC),
 		LogsPath:                   "/previous/run-42",
 		Classification:             "normal",
@@ -858,6 +860,7 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 
 	outputDir := t.TempDir()
 	processedRun := processedRunFromCachedData(cached, nil, outputDir)
+	require.Equal(t, cached.Ledger, processedRun.Ledger)
 	assert.Equal(t, filepath.Join(outputDir, "run-42"), processedRun.Run.LogsPath)
 
 	data := buildLogsData([]ProcessedRun{processedRun}, outputDir, nil)
@@ -877,4 +880,17 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 	assert.Equal(t, 2, data.Summary.TotalChainedFollowupActions)
 	assert.Equal(t, map[string]int{"copilot": 1}, data.Summary.EngineCounts)
 	assert.Equal(t, 1, data.Summary.IntentionalFailureRuns)
+}
+
+func TestHydrateProcessedRunWithCachedAuditLedger(t *testing.T) {
+	transactionsAdded := 2
+	processedRun := processedRunFromCachedData(RunData{RunID: 42}, &AuditData{
+		Ledger: &LedgerActivity{TransactionsAdded: &transactionsAdded},
+	}, t.TempDir())
+
+	hydrated := hydrateProcessedRunWithCachedAudit(processedRun)
+
+	require.NotNil(t, hydrated.Ledger)
+	require.NotNil(t, hydrated.Ledger.TransactionsAdded)
+	assert.Equal(t, 2, *hydrated.Ledger.TransactionsAdded)
 }

@@ -853,6 +853,7 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 		AgenticAssessments:  data.AgenticAssessments,
 		TokenUsage:          data.TokenUsageSummary,
 		WorkingSet:          data.WorkingSet,
+		Ledger:              data.Ledger,
 		Friction:            data.Friction,
 		cachedData:          &data,
 		cachedAudit:         audit,
