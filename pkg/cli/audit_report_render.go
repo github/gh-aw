@@ -28,6 +28,20 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleComparison(data.Comparison)
 	renderConsoleFingerprint(data.BehaviorFingerprint)
 	renderConsoleMetrics(data.Metrics)
+	if data.Ledger != nil {
+		if data.Ledger.TransactionsAdded != nil {
+			fmt.Fprintf(os.Stderr, "  ledger: transactions_added=%d\n", *data.Ledger.TransactionsAdded)
+		}
+		if data.Ledger.Compaction != nil {
+			compaction := data.Ledger.Compaction
+			replacement := "none"
+			if compaction.Replacement != nil && *compaction.Replacement != "" {
+				replacement = *compaction.Replacement
+			}
+			fmt.Fprintf(os.Stderr, "    compaction: before=%d after=%d selected=%d records=%d replacement=%s retired=%d changed=%t\n",
+				compaction.Before, compaction.After, compaction.Selected, compaction.Records, replacement, compaction.Retired, compaction.Changed)
+		}
+	}
 	renderConsoleSession(data.SessionAnalysis)
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleGitHubAPIUsage(data.GitHubRateLimitUsage)

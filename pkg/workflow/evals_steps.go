@@ -242,12 +242,12 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 	var steps []string
 
 	// Install the engine binary (fresh runner has no engine installed).
-	installSteps := engine.GetInstallationSteps(evalsData)
+	installSteps := applyNodeSetupActionOverride(engine.GetInstallationSteps(evalsData), data)
 
 	// Ensure Node.js is on PATH when the engine harness requires it.
 	// Guard against engines whose install steps already bundle Setup Node.js.
 	if engineRequiresNodeHarness(engine) && !installStepsContainNodeSetup(installSteps) {
-		for _, line := range GenerateNodeJsSetupStep() {
+		for _, line := range generateNodeJsSetupStepForWorkflow(data) {
 			steps = append(steps, line+"\n")
 		}
 	}
@@ -388,9 +388,9 @@ await main();`
 	}
 	if len(secretReferences) > 0 {
 		steps = append(steps, "        env:\n")
-		escapedRefs := make([]string, len(secretReferences))
-		for i, ref := range secretReferences {
-			escapedRefs[i] = escapeSingleQuoteBackslash(ref)
+		escapedRefs := make([]string, 0, len(secretReferences))
+		for _, ref := range secretReferences {
+			escapedRefs = append(escapedRefs, escapeSingleQuoteBackslash(ref))
 		}
 		steps = append(steps, fmt.Sprintf("          GH_AW_SECRET_NAMES: '%s'\n", strings.Join(escapedRefs, ",")))
 		for _, secretName := range secretReferences {

@@ -126,6 +126,9 @@ func hydrateProcessedRunWithCachedAudit(processedRun ProcessedRun) ProcessedRun 
 	if processedRun.Run.Turns == 0 {
 		processedRun.Run.Turns = audit.Metrics.Turns
 	}
+	if processedRun.Ledger == nil {
+		processedRun.Ledger = audit.Ledger
+	}
 	if len(processedRun.SafeOutputs) == 0 {
 		processedRun.SafeOutputs = audit.CreatedItems
 	}

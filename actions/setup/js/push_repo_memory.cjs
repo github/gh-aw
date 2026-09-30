@@ -814,6 +814,7 @@ async function main() {
         retired: compaction.retired,
         changed: compaction.changed,
       };
+      core.setOutput("ledger_compaction", JSON.stringify(ledgerActivity.compaction));
     } catch (error) {
       core.warning(`Ledger compaction failed open; continuing without compaction: ${getErrorMessage(error)}`);
     }

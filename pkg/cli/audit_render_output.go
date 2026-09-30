@@ -39,6 +39,9 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 			}
 		}
 	}
+	if auditData.Ledger == nil {
+		auditData.Ledger = processedRun.Ledger
+	}
 	if opts.Group {
 		parseAuditLogsIfRequested(runID, runOutputDir, opts)
 		return nil
@@ -57,6 +60,9 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceLogs)
 	if !ok {
 		return buildRenderedAuditData(ctx, processedRun, metrics, mcpToolUsage, runOutputDir, opts)
+	}
+	if auditData.Ledger == nil {
+		auditData.Ledger = processedRun.Ledger
 	}
 	createdItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	addAuditOutcomeSummary(ctx, &auditData, createdItems)

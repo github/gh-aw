@@ -78,6 +78,7 @@ type auditAnalysisResults struct {
 	mcpToolUsage            *MCPToolUsageData
 	tokenUsageSummary       *TokenUsageSummary
 	workingSet              *WorkingSetMetrics
+	ledger                  *LedgerActivity
 	friction                *FrictionCostSummary
 	redactedDomainsAnalysis *RedactedDomainsAnalysis
 	rateLimitUsage          *GitHubRateLimitUsage
