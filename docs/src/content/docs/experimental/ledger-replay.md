@@ -3,7 +3,8 @@ title: Standalone ledger replay projections
 description: Build disposable read-only SQLite materialized views from immutable ledger history
 ---
 
-Standalone `tools.ledger` ledgers may declare an inline JavaScript `replay.script`.
+Standalone `tools.ledger` ledgers default to collection-and-replay and may declare
+an inline JavaScript `replay.script`.
 Replay interprets the **logical, ordered record stream** and returns a declarative
 table model. Ledger JSONL records remain authoritative; replay tables are derived
 and can always be rebuilt. Replay never writes back to Git or canonical ledger
@@ -35,6 +36,26 @@ tools:
             }
           }
 ```
+
+For a simple keyed collection where the last record for each item wins, use
+the built-in `table` ledger type instead of writing a replay script:
+
+```yaml
+tools:
+  ledger:
+    findings:
+      type: table
+      key: subject
+```
+
+Every payload must contain a nonempty string `subject`. The disposable
+`items` table exposes `key` (text, primary key) and `payload` (JSON text).
+Replay walks canonical records in logical order and retains the last payload
+for each key; history remains available in `records`. For example, query
+`json_extract(payload, '$.status')` to inspect a field. Invalid keys or
+oversized projections fall back to generic tables with a warning. A `table`
+ledger cannot also declare `replay.script`. The optional explicit
+`type: collection-and-replay` keeps the existing script-based behavior.
 
 The script receives deep-frozen `records` and optional `replay.config` (an empty
 object by default). The config must be a bounded JSON object. The serialized

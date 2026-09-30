@@ -117,6 +117,20 @@ function executeReplay(script, records, config = {}) {
   return output;
 }
 
+function replayTable(records, key) {
+  const rows = new Map();
+  for (const record of records) {
+    const value = record.payload?.[key];
+    if (typeof value !== "string" || !value || Buffer.byteLength(value) > 65536) {
+      throw new TypeError("Table ledger record has an invalid key");
+    }
+    rows.set(value, { key: value, payload: record.payload });
+  }
+  const output = { version: 1, tables: { items: { columns: { key: "text", payload: "json" }, primaryKey: ["key"], rows: [...rows.values()] } } };
+  validateReplayOutput(output);
+  return output;
+}
+
 function materializeReplay(db, ledgerName, script, records, output) {
   const tables = validateReplayOutput(output);
   db.exec("BEGIN");
@@ -147,4 +161,4 @@ function materializeReplay(db, ledgerName, script, records, output) {
   }
 }
 
-module.exports = { executeReplay, materializeReplay, validateReplayOutput };
+module.exports = { executeReplay, materializeReplay, replayTable, validateReplayOutput };

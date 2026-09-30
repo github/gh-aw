@@ -159,6 +159,34 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 	}
 }
 
+func TestStandaloneLedgerTypes(t *testing.T) {
+	collection, err := parseLedgerToolConfig(map[string]any{"type": "collection-and-replay", "replay": map[string]any{"script": "return {tables: {}}"}})
+	require.NoError(t, err)
+	require.Equal(t, "collection-and-replay", collection.Ledgers[0].Type)
+	require.NotNil(t, collection.Ledgers[0].Replay)
+
+	table, err := parseLedgerToolConfig(map[string]any{"type": "table", "key": "subject"})
+	require.NoError(t, err)
+	require.Equal(t, "subject", table.Ledgers[0].Key)
+	encoded, err := encodeLedgerConfigBase64(table)
+	require.NoError(t, err)
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	require.NoError(t, err)
+	require.Contains(t, string(decoded), `"type":"table","key":"subject"`)
+	require.Contains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: table}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+
+	for _, raw := range []map[string]any{
+		{"type": "unknown"},
+		{"type": "table"},
+		{"type": "table", "key": "../subject"},
+		{"type": "table", "key": "subject", "replay": map[string]any{"script": "return {tables: {}}"}},
+		{"key": "subject"},
+	} {
+		_, err := parseLedgerToolConfig(raw)
+		require.Error(t, err)
+	}
+}
+
 func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T) {
 	config := &LedgerToolConfig{Ledgers: []LedgerConfig{{
 		Name:         "findings",

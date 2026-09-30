@@ -96,6 +96,33 @@ test("replay materializes state alongside immutable records and trusted metadata
   }
 });
 
+test("table ledger projects the latest payload per key without a replay script", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-table-"));
+  const sourceDir = path.join(root, "source");
+  const databasePath = path.join(root, "projection", "ledger.db");
+  fs.mkdirSync(sourceDir);
+  const ledger = new Ledger({ memoryDir: sourceDir });
+  try {
+    ledger.append("finding", { subject: "a", status: "open" });
+    ledger.append("finding", { subject: "a", status: "closed" });
+    ledger.append("finding", { subject: "b", status: "open" });
+    const tables = createProjection({ sourceDir, databasePath, config: { name: "findings", type: "table", key: "subject", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 } });
+    assert.deepEqual(Object.keys(tables), ["items"]);
+    const db = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 3);
+      assert.equal(db.prepare("SELECT count(*) AS n FROM items").get().n, 2);
+      assert.equal(JSON.parse(db.prepare("SELECT payload FROM items WHERE key = ?").get("a").payload).status, "closed");
+      assert.equal(db.prepare("SELECT table_name FROM replay_metadata").get().table_name, "items");
+    } finally {
+      db.close();
+    }
+  } finally {
+    ledger.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("invalid replay preserves generic records without partial tables", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-fallback-"));
   const sourceDir = path.join(root, "source");

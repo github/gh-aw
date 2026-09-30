@@ -4,7 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { executeReplay, materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
+import { executeReplay, materializeReplay, replayTable, validateReplayOutput } from "./ledger_replay.cjs";
 
 const table = (rows = [{ id: "a" }]) => ({ columns: { id: "text" }, primaryKey: ["id"], rows });
 const output = tables => ({ version: 1, tables });
@@ -79,6 +79,7 @@ test("trusted materialization encodes booleans and JSON without executing SQL", 
         rows: [{ id: "a", count: 2, score: 0.5, active: true, data: { query: "DROP TABLE records" } }],
       },
     });
+
     materializeReplay(db, "findings", "return {}", [], replay);
     const row = db.prepare("SELECT * FROM facts").get();
     assert.equal(row.active, 1);
@@ -88,4 +89,36 @@ test("trusted materialization encodes booleans and JSON without executing SQL", 
   } finally {
     db.close();
   }
+});
+
+test("table ledger retains the last value for each key in logical replay order", () => {
+  const records = [{ payload: { subject: "a", status: "open" } }, { payload: { subject: "b", status: "open" } }, { payload: { subject: "a", status: "closed" } }];
+  const replay = replayTable(records, "subject");
+  assert.deepEqual(replay.tables.items.rows, [
+    { key: "a", payload: { subject: "a", status: "closed" } },
+    { key: "b", payload: { subject: "b", status: "open" } },
+  ]);
+  const db = new DatabaseSync(":memory:");
+  try {
+    materializeReplay(db, "findings", "builtin:table:subject", records, replay);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM items").get().count, 2);
+    assert.deepEqual(JSON.parse(db.prepare("SELECT payload FROM items WHERE key = ?").get("a").payload), records[2].payload);
+  } finally {
+    db.close();
+  }
+});
+
+test("table ledger rejects missing and invalid keys and excessive output", () => {
+  for (const value of [null, "", 1, {}, "a".repeat(65537)]) {
+    assert.throws(() => replayTable([{ payload: { subject: value } }], "subject"), /invalid key/);
+  }
+  assert.throws(() => replayTable([{ payload: {} }], "subject"), /invalid key/);
+  assert.throws(
+    () =>
+      replayTable(
+        Array.from({ length: 10001 }, (_, i) => ({ payload: { subject: String(i) } })),
+        "subject"
+      ),
+    /Too many replay rows/
+  );
 });

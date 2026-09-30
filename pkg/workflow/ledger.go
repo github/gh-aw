@@ -37,6 +37,8 @@ type LedgerConfig struct {
 	MaxSegmentKB int                 `json:"max_segment_kb"`
 	MaxPatchKB   int                 `json:"max_patch_kb"`
 	BranchName   string              `json:"branch_name"`
+	Type         string              `json:"type,omitempty"`
+	Key          string              `json:"key,omitempty"`
 	Replay       *LedgerReplayConfig `json:"replay,omitempty"`
 }
 
@@ -81,7 +83,7 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 	single := false
 	for key := range root {
 		switch key {
-		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
+		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb", "type", "key":
 			single = true
 		case "replay":
 			if replay, ok := root[key].(map[string]any); ok {
@@ -125,20 +127,21 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 	cfg := LedgerConfig{Name: name, BranchName: ledgerBranchName(name), MaxRecordKB: defaultLedgerRecordKB, MaxSegmentKB: defaultLedgerSegmentKB, MaxPatchKB: defaultLedgerPatchKB}
 	for key, value := range raw {
 		switch key {
+		case "type":
+			kind, ok := value.(string)
+			if !ok || (kind != "collection-and-replay" && kind != "table") {
+				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.type must be collection-and-replay or table", name)
+			}
+			cfg.Type = kind
+		case "key":
+			field, ok := value.(string)
+			if !ok || !ledgerNamePattern.MatchString(field) {
+				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.key must be a payload field name", name)
+			}
+			cfg.Key = field
 		case "schema":
-			switch schema := value.(type) {
-			case string:
-				if schema == "" || !filepath.IsLocal(schema) || strings.ContainsAny(schema, `\${{}`) {
-					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema must be a repository-relative path without expressions or traversal", name)
-				}
-				cfg.SchemaPath = schema
-			case map[string]any:
-				if err := validateLedgerSchema(schema); err != nil {
-					return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema: %w", name, err)
-				}
-				cfg.Schema = schema
-			default:
-				return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.schema must be a path or JSON Schema object", name)
+			if err := parseLedgerSchema(&cfg, value); err != nil {
+				return LedgerConfig{}, err
 			}
 		case "replay":
 			replay, err := parseLedgerReplayConfig(name, value)
@@ -169,7 +172,42 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 	if cfg.MaxRecordKB > cfg.MaxSegmentKB {
 		return LedgerConfig{}, fmt.Errorf("tools.ledger.%s.max-record-kb cannot exceed max-segment-kb", name)
 	}
+	if err := validateLedgerType(cfg); err != nil {
+		return LedgerConfig{}, err
+	}
 	return cfg, nil
+}
+
+func parseLedgerSchema(cfg *LedgerConfig, value any) error {
+	switch schema := value.(type) {
+	case string:
+		if schema == "" || !filepath.IsLocal(schema) || strings.ContainsAny(schema, `\${{}`) {
+			return fmt.Errorf("tools.ledger.%s.schema must be a repository-relative path without expressions or traversal", cfg.Name)
+		}
+		cfg.SchemaPath = schema
+	case map[string]any:
+		if err := validateLedgerSchema(schema); err != nil {
+			return fmt.Errorf("tools.ledger.%s.schema: %w", cfg.Name, err)
+		}
+		cfg.Schema = schema
+	default:
+		return fmt.Errorf("tools.ledger.%s.schema must be a path or JSON Schema object", cfg.Name)
+	}
+	return nil
+}
+
+func validateLedgerType(cfg LedgerConfig) error {
+	if cfg.Type == "table" {
+		if cfg.Replay != nil {
+			return fmt.Errorf("tools.ledger.%s.table cannot configure a replay script", cfg.Name)
+		}
+		if cfg.Key == "" {
+			return fmt.Errorf("tools.ledger.%s.table requires a key payload field", cfg.Name)
+		}
+	} else if cfg.Key != "" {
+		return fmt.Errorf("tools.ledger.%s.key is only supported for table ledgers", cfg.Name)
+	}
+	return nil
 }
 
 func parseLedgerReplayConfig(name string, value any) (*LedgerReplayConfig, error) {

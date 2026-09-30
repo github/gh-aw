@@ -7,7 +7,7 @@ const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
-const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
+const { executeReplay, materializeReplay, replayTable } = require("./ledger_replay.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -106,10 +106,11 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
     let tables = null;
-    if (config.replay) {
+    if (config.replay || config.type === "table") {
       try {
-        const output = executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.replay.script, state.records, output);
+        const output = config.type === "table" ? replayTable(state.records, config.key) : executeReplay(config.replay.script, state.records, config.replay.config || {});
+        const identity = config.type === "table" ? `builtin:table:${config.key}` : config.replay.script;
+        materializeReplay(database, config.name, identity, state.records, output);
         tables = output.tables;
       } catch (error) {
         onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);
@@ -158,7 +159,7 @@ async function main(options = {}) {
       if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
       else fs.mkdirSync(sourceDir, { recursive: true });
       const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
-      if (ledger.replay) {
+      if (ledger.replay || ledger.type === "table") {
         replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
         if (tables && Object.keys(tables).length) {
           replayGuidance.push(...Object.entries(tables).map(([name, table]) => formatReplayTable(name, table)));
