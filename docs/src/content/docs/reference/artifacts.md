@@ -477,6 +477,7 @@ The `usage` artifact also carries experiment and evals data when the workflow de
 
 - `experiment/state.jsonl`, `experiment/state.json`, `experiment/assignments.json` — A/B experiment state and the current run's variant assignments
 - `evals.jsonl`, `evals/token_usage.jsonl`, `evals/execution.json` — BinEval results, evals token usage, and evals execution evidence
+- `detection/detection_result.json` — When threat detection is enabled, the detection job result, conclusion, categorized failure reason, and validated threat verdict flags (when available). Raw detector reasons and logs are not copied into this file. `gh aw audit --artifacts usage` reports failed or warned detection and detected threats as security findings.
 
 ### Accessing usage data
 

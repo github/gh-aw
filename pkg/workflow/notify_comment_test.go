@@ -1289,6 +1289,27 @@ func TestConclusionJobReportFailureAsIssueTemplatableExpression(t *testing.T) {
 	}
 }
 
+func TestConclusionUsageArtifactIncludesDetectionOutcome(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}}}
+	job, err := compiler.buildConclusionJob(data, string(constants.AgentJobName), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := strings.Join(job.Steps, "")
+	for _, expected := range []string{
+		"Download detection artifact",
+		"GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}",
+		"GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}",
+		"GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}",
+		"/tmp/gh-aw/usage/detection/detection_result.json",
+	} {
+		if !strings.Contains(steps, expected) {
+			t.Errorf("expected conclusion step to contain %q", expected)
+		}
+	}
+}
+
 func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	compiler := NewCompiler()
 	workflowData := &WorkflowData{
@@ -1623,7 +1644,7 @@ func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
 }
 
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", func(string) string {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
 	}), "")
 

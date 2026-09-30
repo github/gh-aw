@@ -21,6 +21,7 @@ const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { computeFrictionCost } = require("./friction_cost_metrics.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { parseDetectionLog, parseStructuredResultFile } = require("./parse_threat_detection_results.cjs");
 
 require("./shim.cjs");
 
@@ -34,6 +35,8 @@ const PLACEHOLDER_DOMAIN_KEY = "-";
 const PLACEHOLDER_DEST_KEY = "-:-";
 const ERROR_DOMAIN_PREFIX = "error:";
 const AGENT_TOKEN_USAGE_PATH = "/tmp/gh-aw/usage/agent/token_usage.jsonl";
+const DETECTION_DIR = "/tmp/gh-aw/threat-detection";
+const DETECTION_USAGE_RESULT_PATH = "/tmp/gh-aw/usage/detection/detection_result.json";
 const RPC_EVENT_TO_TYPE = { rpc_request: "REQUEST", rpc_response: "RESPONSE", difc_filtered: "DIFC_FILTERED" };
 const API_PROXY_EVENT_LOG_PATHS = [
   "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl",
@@ -1036,7 +1039,47 @@ function parseExperimentsData() {
 /**
  * Main function to generate usage activity summary
  */
+function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DETECTION_USAGE_RESULT_PATH) {
+  const jobResult = process.env.GH_AW_DETECTION_JOB_RESULT;
+  if (!["success", "failure", "cancelled", "skipped"].includes(jobResult)) {
+    return;
+  }
+
+  const result = {
+    job_result: jobResult,
+    conclusion: ["success", "failure", "warning", "skipped"].includes(process.env.GH_AW_DETECTION_CONCLUSION) ? process.env.GH_AW_DETECTION_CONCLUSION : "",
+    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped"].includes(process.env.GH_AW_DETECTION_REASON) ? process.env.GH_AW_DETECTION_REASON : "",
+  };
+  if (jobResult !== "skipped") {
+    const structured = parseStructuredResultFile(path.join(detectionDir, "detection_result.json"));
+    let parsed = structured;
+    if (!parsed?.verdict) {
+      const logPath = path.join(detectionDir, "detection.log");
+      if (fs.existsSync(logPath)) {
+        try {
+          parsed = parseDetectionLog(fs.readFileSync(logPath, "utf8"));
+        } catch {
+          parsed = null;
+        }
+      }
+    }
+    if (parsed?.verdict) {
+      const { prompt_injection, secret_leak, malicious_patch } = parsed.verdict;
+      result.prompt_injection = prompt_injection;
+      result.secret_leak = secret_leak;
+      result.malicious_patch = malicious_patch;
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(result), "utf8");
+  } catch (err) {
+    throw new Error(`Failed to write detection usage result at ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
+  }
+}
+
 async function main() {
+  writeDetectionUsageResult();
   const summary = { schema: "usage-activity-summary/v1" };
 
   // Parse firewall logs
@@ -1149,6 +1192,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  writeDetectionUsageResult,
   parseFirewallLogs,
   parseSessionLogs,
   parseSteeringEvents,

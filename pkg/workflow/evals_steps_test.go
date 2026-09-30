@@ -29,7 +29,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 			t.Errorf("evals accounting transport missing %q", expected)
 		}
 	}
-	usage := strings.Join(buildUsageArtifactUploadSteps("", true, "", func(action string) string { return action }), "")
+	usage := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, func(action string) string { return action }), "")
 	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/token_usage.jsonl") {
 		t.Fatal("conclusion must publish evals token usage")
 	}

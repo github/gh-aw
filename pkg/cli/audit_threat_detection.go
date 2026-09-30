@@ -37,6 +37,12 @@ type detectionExecutionEvidence struct {
 	State      string `json:"state"`
 }
 
+type detectionUsageResult struct {
+	JobResult  string `json:"job_result"`
+	Conclusion string `json:"conclusion"`
+	Reason     string `json:"reason"`
+}
+
 func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	detectionJobFailed := false
 	detectionJobSkipped := false
@@ -50,14 +56,16 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			}
 		}
 	}
-
 	verdict, found := findThreatDetectionVerdict(processedRun.Run.LogsPath)
+	usageResult, hasUsageResult := readDetectionUsageResult(processedRun.Run.LogsPath)
 	detectionExecutionNotStarted := !detectionJobSkipped && threatDetectionExecutionNotStarted(processedRun.Run)
 	threatKinds := verdict.threatKinds()
 	findings := make([]AuditFinding, 0, 2)
-	if detectionJobFailed || detectionExecutionNotStarted {
+	detectionFailed := hasUsageResult && failedDetectionUsageResult(usageResult)
+	if detectionJobFailed || detectionExecutionNotStarted || detectionFailed {
 		description := "The threat-detection job failed before producing a threat verdict"
 		impact := "Safe outputs may have been blocked because the security control did not complete"
+		title := "Threat Detection Job Failed"
 		if detectionExecutionNotStarted && !detectionJobFailed {
 			description = "Usage artifact evidence indicates the threat-detection job did not start"
 			impact = "Safe outputs may have been blocked because the security control did not run"
@@ -65,11 +73,22 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			description = "The threat-detection job concluded with failure"
 			impact = "Safe outputs were blocked by the failed security gate"
 		}
+		if detectionFailed && !detectionJobFailed && usageResult.Conclusion == "warning" {
+			title = "Threat Detection Warning"
+			description = "Threat detection reported a warning"
+			impact = "The security control did not complete successfully; review detection results before applying agent output"
+		}
+		if detectionFailed {
+			switch usageResult.Reason {
+			case "agent_failure", "parse_error", "threat_detected":
+				description += " (" + usageResult.Reason + ")"
+			}
+		}
 		findings = append(findings, AuditFinding{
 			Code:        AuditFindingDetectionJobFailed,
 			Category:    "security",
 			Severity:    "high",
-			Title:       "Threat Detection Job Failed",
+			Title:       title,
 			Description: description,
 			Impact:      impact,
 		})
@@ -85,6 +104,28 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 		})
 	}
 	return findings
+}
+
+func failedDetectionUsageResult(result detectionUsageResult) bool {
+	return result.JobResult == "failure" || result.JobResult == "cancelled" ||
+		result.Conclusion == "failure" || result.Conclusion == "warning"
+}
+
+func readDetectionUsageResult(runDir string) (detectionUsageResult, bool) {
+	if runDir == "" {
+		return detectionUsageResult{}, false
+	}
+	file, err := os.Open(filepath.Join(runDir, constants.UsageArtifactName.String(), "detection", "detection_result.json"))
+	if err != nil {
+		return detectionUsageResult{}, false
+	}
+	defer file.Close()
+	var result detectionUsageResult
+	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&result); err != nil {
+		return detectionUsageResult{}, false
+	}
+	return result, result.JobResult == "success" || result.JobResult == "failure" ||
+		result.JobResult == "cancelled" || result.JobResult == "skipped"
 }
 
 func (v threatDetectionVerdict) threatKinds() []string {

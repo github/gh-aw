@@ -26,6 +26,13 @@ func TestAuditNeedsDetectionArtifact(t *testing.T) {
 	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
 
 	cfg.artifactFilter = nil
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage", "detection"), 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(runDir, "usage", "detection", "detection_result.json"),
+		[]byte(`{"job_result":"success","conclusion":"success"}`), 0o600,
+	))
+	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
+	require.NoError(t, os.Remove(filepath.Join(runDir, "usage", "detection", "detection_result.json")))
 	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "detection"), 0o700))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(runDir, "detection", "detection_result.json"),

@@ -1400,6 +1400,10 @@ jobs:
       - name: Collect usage artifact files
         if: always()
         continue-on-error: true
+        env:
+          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}
+          GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
+          GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
       - name: Upload usage artifact
         id: upload-usage-artifact
@@ -1422,6 +1426,7 @@ jobs:
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/experiment/state.jsonl
@@ -1453,6 +1458,7 @@ jobs:
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
             /tmp/gh-aw/usage/experiment/state.jsonl

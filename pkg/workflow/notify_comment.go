@@ -235,19 +235,14 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // buildUsageArtifactUploadSteps creates steps that collect and upload a compact usage artifact.
 // The artifact includes aw_info.json, aw-info.jsonl, agent_usage.json, agent_usage.jsonl, detection_usage.jsonl,
 // evals.jsonl, evals token usage and execution evidence, A/B experiment state and assignments,
-// grader results, and agent/detection token usage JSONL files (when present), so the audit
-// command can mine experiments and evals data from the usage artifact alone.
+// grader results, threat-detection outcome/verdict, and agent/detection token usage JSONL files
+// (when present), so the audit command can mine these results from the usage artifact alone.
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
-func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, pinAction func(string) string) []string {
+func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, hasDetection bool, pinAction func(string) string) []string {
 	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
-	steps = append(steps,
-		"      - name: Collect usage artifact files\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell),
-	)
+	steps = append(steps, buildUsageArtifactCollectionStep(hasDetection)...)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
@@ -266,6 +261,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 		"            /tmp/gh-aw/usage/agent/execution.json\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
+		"            /tmp/gh-aw/usage/detection/detection_result.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
 		"            /tmp/gh-aw/usage/experiment/state.jsonl\n",
@@ -300,6 +296,24 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 	)
 	steps = append(steps, retryUsageArtifactUploadWithLines...)
 	return steps
+}
+
+func buildUsageArtifactCollectionStep(hasDetection bool) []string {
+	collectionStep := []string{
+		"      - name: Collect usage artifact files\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+	}
+	if hasDetection {
+		collectionStep = append(collectionStep,
+			"        env:\n",
+			"          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}\n",
+			"          GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}\n",
+			"          GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}\n",
+		)
+	}
+	collectionStep = append(collectionStep, fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell))
+	return collectionStep
 }
 
 // isGroupConcurrencyQueueEnabled reports whether compiler-generated concurrency groups

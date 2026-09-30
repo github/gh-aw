@@ -120,6 +120,40 @@ func TestGenerateThreatDetectionFindingsUsesUsageExecutionEvidence(t *testing.T)
 	assert.Contains(t, findings[0].Description, "Usage artifact")
 }
 
+func TestGenerateThreatDetectionFindingsFromUsageResult(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		payload string
+		title   string
+		count   int
+	}{
+		{"warning without verdict", `{"job_result":"success","conclusion":"warning","reason":"parse_error"}`, "Threat Detection Warning", 1},
+		{"failed before conclusion", `{"job_result":"failure","conclusion":""}`, "Threat Detection Job Failed", 1},
+		{"detected threat", `{"job_result":"failure","conclusion":"failure","reason":"threat_detected","prompt_injection":true,"secret_leak":false,"malicious_patch":false}`, "Threat Detection Job Failed", 2},
+		{"skipped", `{"job_result":"skipped","conclusion":""}`, "", 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			runDir := t.TempDir()
+			usageDir := filepath.Join(runDir, "usage", "detection")
+			require.NoError(t, os.MkdirAll(usageDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(usageDir, "detection_result.json"), []byte(tt.payload), 0o600))
+			findings := generateThreatDetectionFindings(ProcessedRun{Run: WorkflowRun{LogsPath: runDir}})
+			require.Len(t, findings, tt.count)
+			if tt.count > 0 {
+				assert.Equal(t, tt.title, findings[0].Title)
+				if tt.name == "warning without verdict" {
+					assert.Contains(t, findings[0].Description, "parse_error")
+				}
+			}
+			if tt.count == 2 {
+				assert.Equal(t, AuditFindingThreatDetected, findings[1].Code)
+			}
+		})
+	}
+}
+
 func TestGenerateThreatDetectionFindingsIgnoresSkippedDetectionJob(t *testing.T) {
 	t.Parallel()
 

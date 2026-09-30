@@ -23,7 +23,91 @@ const {
   writeFrictionStepSummary,
   readTokenUsageContent,
   MANIFEST_FILE_PATH,
+  writeDetectionUsageResult,
 } = req("./generate_usage_activity_summary.cjs");
+
+describe("writeDetectionUsageResult", () => {
+  const original = {
+    job: process.env.GH_AW_DETECTION_JOB_RESULT,
+    conclusion: process.env.GH_AW_DETECTION_CONCLUSION,
+    reason: process.env.GH_AW_DETECTION_REASON,
+  };
+  afterEach(() => {
+    for (const [key, name] of [
+      ["job", "GH_AW_DETECTION_JOB_RESULT"],
+      ["conclusion", "GH_AW_DETECTION_CONCLUSION"],
+      ["reason", "GH_AW_DETECTION_REASON"],
+    ]) {
+      if (original[key] === undefined) delete process.env[name];
+      else process.env[name] = original[key];
+    }
+  });
+
+  it("stores only verdict flags and trusted outcomes, not detector reasons", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "detection-usage-"));
+    try {
+      const output = path.join(dir, "usage", "detection_result.json");
+      fs.writeFileSync(
+        path.join(dir, "detection_result.json"),
+        JSON.stringify({
+          prompt_injection: true,
+          secret_leak: false,
+          malicious_patch: false,
+          reasons: ["sensitive secret"],
+        })
+      );
+      process.env.GH_AW_DETECTION_JOB_RESULT = "failure";
+      process.env.GH_AW_DETECTION_CONCLUSION = "failure";
+      process.env.GH_AW_DETECTION_REASON = "threat_detected";
+      writeDetectionUsageResult(dir, output);
+      expect(JSON.parse(fs.readFileSync(output, "utf8"))).toEqual({
+        job_result: "failure",
+        conclusion: "failure",
+        reason: "threat_detected",
+        prompt_injection: true,
+        secret_leak: false,
+        malicious_patch: false,
+      });
+      expect(fs.readFileSync(output, "utf8")).not.toContain("sensitive secret");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves warnings without a verdict and excludes untrusted output fields", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "detection-usage-"));
+    try {
+      const output = path.join(dir, "usage", "detection_result.json");
+      process.env.GH_AW_DETECTION_JOB_RESULT = "success";
+      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+      process.env.GH_AW_DETECTION_REASON = "private value";
+      writeDetectionUsageResult(dir, output);
+      expect(JSON.parse(fs.readFileSync(output, "utf8"))).toEqual({
+        job_result: "success",
+        conclusion: "warning",
+        reason: "",
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("extracts a verdict from the inline detector log without copying log content", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "detection-usage-"));
+    try {
+      const output = path.join(dir, "usage", "detection_result.json");
+      fs.writeFileSync(path.join(dir, "detection.log"), 'sensitive transcript\nTHREAT_DETECTION_RESULT:{"prompt_injection":false,"secret_leak":true,"malicious_patch":false,"reasons":["sensitive transcript"]}\n');
+      process.env.GH_AW_DETECTION_JOB_RESULT = "failure";
+      process.env.GH_AW_DETECTION_CONCLUSION = "failure";
+      process.env.GH_AW_DETECTION_REASON = "threat_detected";
+      writeDetectionUsageResult(dir, output);
+      expect(JSON.parse(fs.readFileSync(output, "utf8"))).toMatchObject({ secret_leak: true });
+      expect(fs.readFileSync(output, "utf8")).not.toContain("sensitive transcript");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("generate_usage_activity_summary.cjs", () => {
   /** Unique directory for each test to avoid cross-test interference */
