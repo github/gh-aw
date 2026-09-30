@@ -130,6 +130,7 @@ func TestGenerateThreatDetectionFindingsFromUsageResult(t *testing.T) {
 	}{
 		{"warning without verdict", `{"job_result":"success","conclusion":"warning","reason":"parse_error"}`, "Threat Detection Warning", 1},
 		{"failed before conclusion", `{"job_result":"failure","conclusion":""}`, "Threat Detection Job Failed", 1},
+		{"threat without verdict", `{"job_result":"failure","conclusion":"failure","reason":"threat_detected"}`, "Threat Detection Job Failed", 2},
 		{"detected threat", `{"job_result":"failure","conclusion":"failure","reason":"threat_detected","prompt_injection":true,"secret_leak":false,"malicious_patch":false}`, "Threat Detection Job Failed", 2},
 		{"skipped", `{"job_result":"skipped","conclusion":""}`, "", 0},
 	} {
@@ -149,6 +150,10 @@ func TestGenerateThreatDetectionFindingsFromUsageResult(t *testing.T) {
 			}
 			if tt.count == 2 {
 				assert.Equal(t, AuditFindingThreatDetected, findings[1].Code)
+				if tt.name == "threat without verdict" {
+					assert.Equal(t, "critical", string(findings[1].Severity))
+					assert.Contains(t, findings[1].Description, "no specific threat category")
+				}
 			}
 		})
 	}
@@ -216,6 +221,21 @@ func TestThreatDetectionVerdictIgnoresComparisonArtifacts(t *testing.T) {
 
 	_, found := findThreatDetectionVerdict(runDir)
 	assert.False(t, found)
+	assert.False(t, hasThreatDetectionArtifact(runDir))
+}
+
+func TestHasThreatDetectionArtifactIgnoresUsageResult(t *testing.T) {
+	t.Parallel()
+
+	runDir := t.TempDir()
+	usageDir := filepath.Join(runDir, "usage", "detection")
+	require.NoError(t, os.MkdirAll(usageDir, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(usageDir, "detection_result.json"),
+		[]byte(`{"job_result":"success","conclusion":"success"}`),
+		0o600,
+	))
+
 	assert.False(t, hasThreatDetectionArtifact(runDir))
 }
 

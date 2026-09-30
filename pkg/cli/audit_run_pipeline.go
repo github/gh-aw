@@ -216,6 +216,11 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 		hasThreatDetectionArtifact(cfg.outputDir) {
 		return false
 	}
+	if len(cfg.artifactFilter) == 0 {
+		if _, found := readDetectionUsageResult(cfg.outputDir); found {
+			return false
+		}
+	}
 	for _, job := range summary.JobDetails {
 		if normalizeJobName(job.Name) == string(constants.DetectionJobName) {
 			return true

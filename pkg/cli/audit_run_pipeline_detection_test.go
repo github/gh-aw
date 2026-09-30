@@ -32,6 +32,8 @@ func TestAuditNeedsDetectionArtifact(t *testing.T) {
 		[]byte(`{"job_result":"success","conclusion":"success"}`), 0o600,
 	))
 	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
+	cfg.artifactFilter = []string{"detection"}
+	assert.True(t, auditNeedsDetectionArtifact(cfg, summary))
 	require.NoError(t, os.Remove(filepath.Join(runDir, "usage", "detection", "detection_result.json")))
 	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "detection"), 0o700))
 	require.NoError(t, os.WriteFile(
@@ -39,6 +41,7 @@ func TestAuditNeedsDetectionArtifact(t *testing.T) {
 		[]byte(`{"prompt_injection":false,"secret_leak":false,"malicious_patch":false}`),
 		0o600,
 	))
+	cfg.artifactFilter = nil
 	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
 }
 

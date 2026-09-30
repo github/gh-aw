@@ -59,7 +59,6 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 	verdict, found := findThreatDetectionVerdict(processedRun.Run.LogsPath)
 	usageResult, hasUsageResult := readDetectionUsageResult(processedRun.Run.LogsPath)
 	detectionExecutionNotStarted := !detectionJobSkipped && threatDetectionExecutionNotStarted(processedRun.Run)
-	threatKinds := verdict.threatKinds()
 	findings := make([]AuditFinding, 0, 2)
 	detectionFailed := hasUsageResult && failedDetectionUsageResult(usageResult)
 	if detectionJobFailed || detectionExecutionNotStarted || detectionFailed {
@@ -93,6 +92,13 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			Impact:      impact,
 		})
 	}
+	findings = append(findings, threatDetectionVerdictFindings(verdict, found, usageResult, hasUsageResult)...)
+	return findings
+}
+
+func threatDetectionVerdictFindings(verdict threatDetectionVerdict, found bool, usageResult detectionUsageResult, hasUsageResult bool) []AuditFinding {
+	threatKinds := verdict.threatKinds()
+	findings := make([]AuditFinding, 0, 1)
 	if found && len(threatKinds) > 0 {
 		findings = append(findings, AuditFinding{
 			Code:        AuditFindingThreatDetected,
@@ -100,6 +106,15 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			Severity:    "critical",
 			Title:       "Security Threat Detected",
 			Description: "Threat detection identified: " + strings.Join(threatKinds, ", "),
+			Impact:      "Agent output may be unsafe and should not be applied without review",
+		})
+	} else if hasUsageResult && usageResult.Reason == "threat_detected" {
+		findings = append(findings, AuditFinding{
+			Code:        AuditFindingThreatDetected,
+			Category:    "security",
+			Severity:    "critical",
+			Title:       "Security Threat Detected",
+			Description: "Threat detection identified a threat, but no specific threat category was available",
 			Impact:      "Agent output may be unsafe and should not be applied without review",
 		})
 	}
@@ -221,24 +236,38 @@ func hasThreatDetectionArtifact(runDir string) bool {
 	if runDir == "" {
 		return false
 	}
-	found := false
-	_ = filepath.WalkDir(runDir, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.Type()&os.ModeSymlink != 0 {
-			return nil
+	entries, err := os.ReadDir(runDir)
+	if err != nil {
+		return false
+	}
+	for _, artifactDir := range entries {
+		if !artifactDir.IsDir() ||
+			(artifactDir.Name() != string(constants.DetectionArtifactName) &&
+				!strings.HasSuffix(artifactDir.Name(), "-"+string(constants.DetectionArtifactName))) {
+			continue
 		}
-		if entry.IsDir() {
-			if entry.Name() == "base" || strings.HasPrefix(entry.Name(), "baseline-") {
-				return filepath.SkipDir
+		found := false
+		_ = filepath.WalkDir(filepath.Join(runDir, artifactDir.Name()), func(_ string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.Type()&os.ModeSymlink != 0 {
+				return nil
+			}
+			if entry.IsDir() {
+				if entry.Name() == "base" || strings.HasPrefix(entry.Name(), "baseline-") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if entry.Name() == "detection_result.json" || entry.Name() == "detection.log" {
+				found = true
+				return fs.SkipAll
 			}
 			return nil
+		})
+		if found {
+			return true
 		}
-		if entry.Name() == "detection_result.json" || entry.Name() == "detection.log" {
-			found = true
-			return fs.SkipAll
-		}
-		return nil
-	})
-	return found
+	}
+	return false
 }
 
 func readThreatDetectionResult(path string) (threatDetectionVerdict, bool) {
