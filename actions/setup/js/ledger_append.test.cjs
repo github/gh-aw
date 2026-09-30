@@ -12,8 +12,10 @@ test("collects validated appends and writes the versioned artifact", async () =>
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-"));
   const previousRunnerTemp = process.env.RUNNER_TEMP;
   const previousRunId = process.env.GITHUB_RUN_ID;
+  const previousRunAttempt = process.env.GITHUB_RUN_ATTEMPT;
   process.env.RUNNER_TEMP = runnerTemp;
   process.env.GITHUB_RUN_ID = "42";
+  process.env.GITHUB_RUN_ATTEMPT = "1";
   try {
     const handler = await main({
       ledgers: [
@@ -39,6 +41,8 @@ test("collects validated appends and writes the versioned artifact", async () =>
     else process.env.RUNNER_TEMP = previousRunnerTemp;
     if (previousRunId === undefined) delete process.env.GITHUB_RUN_ID;
     else process.env.GITHUB_RUN_ID = previousRunId;
+    if (previousRunAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT;
+    else process.env.GITHUB_RUN_ATTEMPT = previousRunAttempt;
     fs.rmSync(runnerTemp, { recursive: true, force: true });
   }
 });

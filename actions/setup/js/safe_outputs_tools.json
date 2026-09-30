@@ -8,7 +8,7 @@
       "properties": {
         "ledger": { "type": "string", "description": "Configured ledger name." },
         "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
-        "record": { "type": "object", "description": "Record envelope and payload." }
+        "record": { "type": "object", "description": "Ledger record payload matching its configured schema, e.g. {\"severity\":\"high\",\"subject\":\"cache miss\"}." }
       },
       "additionalProperties": false
     }

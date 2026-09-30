@@ -568,6 +568,26 @@ describe("mcp_scripts_validation.cjs", () => {
       });
       expect(validateArgumentsAgainstSchema({ labels: [{ name: "bug", confidence: "HIGH" }] }, schema)).toBeNull();
     });
+
+    it("rejects inherited property names as undeclared schema properties", async () => {
+      const { validateValueAgainstSchema } = await import("./mcp_scripts_validation.cjs");
+      const schema = { type: "object", properties: { subject: { type: "string" } }, additionalProperties: false };
+
+      for (const key of ["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty"]) {
+        const value = JSON.parse(`{"${key}":"unvalidated"}`);
+        expect(validateValueAgainstSchema(value, schema)).toMatchObject({ path: key, message: "is not allowed by the schema" });
+      }
+    });
+
+    it("requires required properties to be own properties", async () => {
+      const { validateValueAgainstSchema } = await import("./mcp_scripts_validation.cjs");
+      const value = Object.create({ subject: "inherited" });
+
+      expect(validateValueAgainstSchema(value, { type: "object", required: ["subject"] })).toMatchObject({
+        path: "subject",
+        message: "is required",
+      });
+    });
   });
 
   describe("formatSchemaValidationError", () => {
