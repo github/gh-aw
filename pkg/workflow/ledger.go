@@ -20,6 +20,7 @@ const (
 	defaultLedgerSegmentKB         = 100
 	defaultLedgerPatchKB           = 10
 	maxLedgerReplayScriptBytes     = 64 * 1024
+	maxLedgerConfigBase64Bytes     = 96 * 1024
 	ledgerProjectionRoot           = "/tmp/gh-aw/ledgers"
 	ledgerReplayPromptFile         = ledgerProjectionRoot + "/replay-prompt.txt"
 	ledgerTransactionsArtifactName = "gh-aw-ledger-transactions"
@@ -58,7 +59,11 @@ func encodeLedgerConfigBase64(config *LedgerToolConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize ledger configuration: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(encoded), nil
+	encodedConfig := base64.StdEncoding.EncodeToString(encoded)
+	if len(encodedConfig) > maxLedgerConfigBase64Bytes {
+		return "", fmt.Errorf("encoded ledger configuration exceeds the %d KiB environment limit", maxLedgerConfigBase64Bytes/1024)
+	}
+	return encodedConfig, nil
 }
 
 func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {

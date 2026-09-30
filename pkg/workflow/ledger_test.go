@@ -162,6 +162,22 @@ func TestLedgerConfigEncodingErrors(t *testing.T) {
 	require.ErrorContains(t, err, "failed to encode ledger persistence configuration")
 }
 
+func TestLedgerConfigEncodingEnforcesAggregateEnvironmentLimit(t *testing.T) {
+	script := strings.Repeat("a", maxLedgerReplayScriptBytes)
+	config := &LedgerToolConfig{Ledgers: []LedgerConfig{{
+		Name: "findings", Replay: &LedgerReplayConfig{Script: script},
+	}}}
+	encoded, err := encodeLedgerConfigBase64(config)
+	require.NoError(t, err)
+	require.LessOrEqual(t, len(encoded), maxLedgerConfigBase64Bytes)
+
+	config.Ledgers = append(config.Ledgers, LedgerConfig{
+		Name: "experiments", Replay: &LedgerReplayConfig{Script: script},
+	})
+	_, err = encodeLedgerConfigBase64(config)
+	require.ErrorContains(t, err, "encoded ledger configuration exceeds the 96 KiB environment limit")
+}
+
 func TestLegacyRepoMemoryLedgerDetection(t *testing.T) {
 	require.True(t, containsLegacyRepoMemoryLedger(map[string]any{"ledger": map[string]any{}}))
 	require.False(t, containsLegacyRepoMemoryLedger(map[string]any{"schema": "record.json"}))

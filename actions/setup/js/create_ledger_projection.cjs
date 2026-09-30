@@ -29,6 +29,15 @@ function formatReplayPrompt(lines) {
   return `${retained.join("\n")}\n`;
 }
 
+function formatReplayTableGuidance(tables) {
+  return Object.entries(tables).map(
+    ([name, table]) =>
+      `- ${name}(${Object.entries(table.columns)
+        .map(([column, type]) => `${column}: ${type}`)
+        .join(", ")})`
+  );
+}
+
 function hasStatus(error, status) {
   return error && typeof error === "object" && Reflect.get(error, "status") === status;
 }
@@ -155,8 +164,9 @@ async function main(options = {}) {
       const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
       if (ledger.replay) {
         replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
+        replayGuidance.push("Replay scripts are trusted workflow-authored code; worker restrictions are not a security boundary.");
         if (tables && Object.keys(tables).length) {
-          replayGuidance.push(...Object.entries(tables).map(([name, table]) => `- ${name}(${Object.keys(table.columns).join(", ")})`));
+          replayGuidance.push(...formatReplayTableGuidance(tables));
           replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through ledger append safe output. Do not update replay tables.");
         } else if (tables) {
           replayGuidance.push("Replay produced no tables; use generic records for immutable event history.");
@@ -181,4 +191,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createProjection, fetchLedgerBranch, formatReplayPrompt, main, materializeLedger };
+module.exports = { createProjection, fetchLedgerBranch, formatReplayPrompt, formatReplayTableGuidance, main, materializeLedger };
