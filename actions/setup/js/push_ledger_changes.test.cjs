@@ -9,6 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { finalId } from "./ledger_transactions.cjs";
 import { execGitSync } from "./git_helpers.cjs";
+import { Ledger } from "./ledger_store.cjs";
 import { main, persistLedgerAppends, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
 
 const ledgerConfigs = [
@@ -135,6 +136,82 @@ test("appends canonical ledger state and delegates the upstream push", async () 
     assert.equal(pushCalls[0].branchName, "ledgers/findings");
     assert.match(shard, /^ledger\/shards\//);
     assert.equal(JSON.parse(canonical.trim()).payload.id, largeTransaction.ledgers.findings.appends[0].record.id);
+  } finally {
+    if (previousCore === undefined) delete global.core;
+    else global.core = previousCore;
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("persists compaction controls and replacement records idempotently", async () => {
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-persist-compaction-"));
+  const previousCore = global.core;
+  const warnings = [];
+  global.core = { debug: () => {}, info: () => {}, warning: message => warnings.push(message), setFailed: () => {} };
+  const transactionId = "run-43:1";
+  const targetId = finalId("seed", 0);
+  const compactions = [
+    { ledger: "findings", transaction_id: transactionId, index: 0, operation: "drop", id: targetId },
+    { ledger: "findings", transaction_id: transactionId, index: 1, operation: "insert", record: { subject: "Consolidated finding", id: finalId(transactionId, 1) } },
+  ];
+  const pushCalls = [];
+  try {
+    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base && git checkout -b ledgers/findings", {
+      cwd: workspaceDir,
+      stdio: "pipe",
+    });
+    const seedLedger = new Ledger({ memoryDir: workspaceDir });
+    seedLedger.append("ledger_append", { id: targetId, subject: "Obsolete finding" });
+    seedLedger.close();
+    execGitSync(["add", "-A", "--", "ledger"], { cwd: workspaceDir, stdio: "pipe" });
+    execGitSync(["commit", "-m", "seed ledger"], { cwd: workspaceDir, stdio: "pipe" });
+
+    const options = {
+      appends: [],
+      compactions,
+      config: ledgerConfigs[0],
+      githubClient: {},
+      owner: "octo",
+      repo: "repo",
+      token: "test-token",
+      serverHost: "github.com",
+      workspaceDir,
+      checkoutLedgerBranchFn: async ({ branchName }) => {
+        execGitSync(["checkout", branchName], { cwd: workspaceDir, stdio: "pipe" });
+        return execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
+      },
+      pushChangesFn: async options => {
+        pushCalls.push(options);
+        return true;
+      },
+    };
+    const first = await persistLedgerAppends(options);
+    assert.equal(first.compacted, 2);
+    assert.equal(pushCalls.length, 1);
+
+    const shardPaths = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings", "--", "ledger/shards"], { cwd: workspaceDir, encoding: "utf8" }).trim().split("\n");
+    const canonical = shardPaths.flatMap(shard =>
+      execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" })
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line))
+    );
+    assert.ok(canonical.some(record => record.type === "ledger_append" && record.payload.id === targetId));
+    assert.ok(canonical.some(record => record.type === "ledger_append" && record.payload.id === finalId(transactionId, 1)));
+    assert.ok(canonical.some(record => record.type === "ledger_compact" && record.payload.operation === "drop" && record.payload.id === targetId));
+
+    const repeated = await persistLedgerAppends(options);
+    assert.equal(repeated.compacted, 0);
+    assert.equal(repeated.persisted, 0);
+    assert.equal(pushCalls.length, 1);
+
+    const conflicting = await persistLedgerAppends({
+      ...options,
+      compactions: [{ ledger: "findings", transaction_id: "run-44:1", index: 0, operation: "drop", id: finalId("missing", 0) }],
+    });
+    assert.equal(conflicting.compacted, 0);
+    assert.equal(pushCalls.length, 1);
+    assert.ok(warnings.some(message => message.includes("targets conflict")));
   } finally {
     if (previousCore === undefined) delete global.core;
     else global.core = previousCore;

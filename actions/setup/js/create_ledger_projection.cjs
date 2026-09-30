@@ -113,11 +113,11 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
       try {
         database.exec("CREATE TABLE records_history AS SELECT * FROM records; CREATE TABLE parents_history AS SELECT * FROM parents");
         const removeRecord = database.prepare("DELETE FROM records WHERE sha = ?");
-        const removeParents = database.prepare("DELETE FROM parents WHERE child_sha = ?");
+        const removeParents = database.prepare("DELETE FROM parents WHERE child_sha = ? OR parent_sha = ?");
         for (const record of state.records) {
           if (visible.has(record.sha)) continue;
           removeRecord.run(record.sha);
-          removeParents.run(record.sha);
+          removeParents.run(record.sha, record.sha);
         }
         database.exec("COMMIT");
       } catch (error) {

@@ -74,6 +74,7 @@ test("rewrites temporary IDs only within the selected ledger and only for explic
 test("normalizes bounded logical drop and insert compactions with deterministic IDs", () => {
   const options = { transactionId: "tx-1", ledgerNames: new Set(["findings"]), ledgers: { findings: { max_record_kb: 1, max_patch_kb: 1 } }, startIndex: 2 };
   const request = {
+    type: "ledger_compact",
     operations: [
       { op: "drop", id: finalId("older", 0) },
       { op: "insert", record: { subject: "summary" } },
@@ -84,6 +85,7 @@ test("normalizes bounded logical drop and insert compactions with deterministic 
   assert.equal(operations[1].record.id, finalId("tx-1", 3));
   assert.deepEqual(operations, normalizeLedgerCompactions([request], options));
   assert.throws(() => normalizeLedgerCompactions([{ operations: [{ op: "drop", id: "../not-a-record" }] }], options), /Invalid ledger compaction/);
+  assert.throws(() => normalizeLedgerCompactions([{ operations: [{ op: "drop", id: finalId("older", 0) }], unexpected: true }], options), /Invalid ledger compaction/);
   assert.throws(() => normalizeLedgerCompactions([{ operations: [{ op: "insert", record: { id: "forged" } }] }], options), /reserved field/);
   assert.throws(() => normalizeLedgerCompactions([{ operations: [{ op: "insert", record: { subject: "x".repeat(1024) } }] }], options), /max-record-kb/);
 });

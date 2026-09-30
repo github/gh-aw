@@ -153,6 +153,7 @@ test("logical compactions update generic and replay tables while preserving raw 
       assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 1);
       assert.equal(db.prepare("SELECT count(*) AS n FROM records_history").get().n, 3);
       assert.equal(db.prepare("SELECT count(*) AS n FROM parents_history").get().n, 2);
+      assert.equal(db.prepare("SELECT count(*) AS n FROM parents").get().n, 0);
       assert.deepEqual(
         db
           .prepare("SELECT subject FROM summary")

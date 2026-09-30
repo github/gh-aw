@@ -72,8 +72,9 @@ without partial replay tables. The per-ledger SQLite database at
 agent prompt lists materialized replay tables and their column names and types
 (or reports that replay fell back); exceptionally large lists are abbreviated.
 Query `replay_metadata` for generated table names, columns, ledger name, record
-count, script SHA-256, and projection/output versions; query `records` for event
-history.
+count, script SHA-256, and projection/output versions. Query `records` for the
+current logical view. When compaction hides records, `records_history` and
+`parents_history` preserve the unfiltered record and parent-edge history.
 Each ledger runs replay independently. Compaction transactions are applied to
 the logical record stream before replay and reapplied when the persistence job
 merges ledger changes. A conflicting compaction is skipped rather than risking

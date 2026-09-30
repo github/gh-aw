@@ -6,8 +6,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { main, transactionPath } from "./ledger_append.cjs";
-import { main as compact } from "./ledger_compact.cjs";
+import { compact, main, transactionPath } from "./ledger_append.cjs";
 
 test("collects validated appends and writes the versioned artifact", async () => {
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-"));

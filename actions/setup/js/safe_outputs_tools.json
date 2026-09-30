@@ -15,7 +15,7 @@
   },
   {
     "name": "ledger_compact",
-    "description": "Request bounded logical ledger compaction. Drop records by ID or insert replacement records; changes take effect after validated persistence and replay.",
+    "description": "Use this to logically compact a configured ledger by dropping obsolete records by ID or inserting a consolidated replacement. Changes take effect after validated persistence and replay.",
     "inputSchema": {
       "type": "object",
       "required": ["operations"],
@@ -23,6 +23,7 @@
         "ledger": { "type": "string", "description": "Configured ledger name; required when multiple ledgers are configured." },
         "operations": {
           "type": "array",
+          "description": "Ordered drop or insert operations to apply to the configured ledger, e.g. [{\"op\":\"drop\",\"id\":\"ldg-...\"},{\"op\":\"insert\",\"record\":{\"subject\":\"Consolidated\"}}].",
           "minItems": 1,
           "maxItems": 100,
           "items": {

@@ -84,7 +84,7 @@ function normalizeLedgerCompactions(requests, { transactionId, ledgerNames, ledg
   const patchBytes = new Map(startPatchBytes);
   const entries = [];
   for (const request of requests) {
-    if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some(key => !["ledger", "operations"].includes(key)) || !Array.isArray(request.operations) || !request.operations.length)
+    if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some(key => !["ledger", "operations", "type"].includes(key)) || !Array.isArray(request.operations) || !request.operations.length)
       throw new TypeError("Invalid ledger compaction request");
     const ledger = request.ledger || (ledgerNames.size === 1 ? [...ledgerNames][0] : undefined);
     if (!ledger || !ledgerNames.has(ledger)) throw new TypeError("Unknown target ledger");

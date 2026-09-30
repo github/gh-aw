@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { normalizeLedgerAppends, normalizeLedgerCompactions } = require("./ledger_transactions.cjs");
 
+/** @type {{appends: Array<{ledger?: string, temp_id?: string, record: object}>, compactions: Array<{ledger?: string, operations: Array<{op: "drop", id: string} | {op: "insert", record: object}>}>}} */
 const requests = { appends: [], compactions: [] };
 let ledgerConfigs = {};
 
