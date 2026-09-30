@@ -56,6 +56,15 @@ describe("create_prompt", () => {
     expect(renderPrompt(config, env, tempDir)).toBe("<system>\nfile content\n</system>\nuser prompt\n");
   });
 
+  it("includes only a bounded trusted replay projection prompt", () => {
+    const replayFile = path.join(tempDir, "replay-prompt.txt");
+    fs.writeFileSync(replayFile, "Ledger findings: items(id, status)\n");
+    expect(renderPrompt({ items: [{ content_env: "START" }, { ledger_replay: true }] }, { START: "<system>\n" }, tempDir, replayFile)).toBe("<system>\nLedger findings: items(id, status)\n");
+    fs.rmSync(replayFile);
+    fs.symlinkSync(path.join(tempDir, "missing"), replayFile);
+    expect(() => renderPrompt({ items: [{ ledger_replay: true }] }, {}, tempDir, replayFile)).toThrow();
+  });
+
   it("only includes conditional content for the exact true value", () => {
     const config = {
       items: [{ content_env: "ALWAYS" }, { content_env: "CONDITIONAL", condition_env: "INCLUDE" }],

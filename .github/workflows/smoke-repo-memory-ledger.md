@@ -30,6 +30,22 @@ tools:
           result:
             enum: [passed]
         additionalProperties: false
+      replay:
+        script: |
+          return {
+            tables: {
+              runs: {
+                columns: { workflow_run_id: "text", result: "text" },
+                primaryKey: ["workflow_run_id"],
+                rows: records
+                  .filter(record => record.payload.record_type === "repo_memory_ledger_smoke")
+                  .map(({ payload }) => ({
+                    workflow_run_id: payload.workflow_run_id,
+                    result: payload.result
+                  }))
+              }
+            }
+          };
       max-record-kb: 4
       max-patch-kb: 10
 safe-outputs:
@@ -53,7 +69,7 @@ evals:
 
 # Git-Backed Ledger Smoke Test
 
-Exercise the read-only SQLite projection and safe-output append without editing ledger files directly.
+Exercise the replayed read-only SQLite projection and safe-output append without editing ledger files directly.
 
 1. Query the projection at `/tmp/gh-aw/ledgers/smoke/ledger.db` for diagnostics.
    Report malformed or incomplete records, but do not fail solely because of
@@ -61,9 +77,8 @@ Exercise the read-only SQLite projection and safe-output append without editing 
 2. Query the projection for the current run:
 
    ```sql
-   SELECT payload FROM records
-   WHERE json_extract(payload, '$.record_type') = 'repo_memory_ledger_smoke'
-     AND json_extract(payload, '$.workflow_run_id') = '${{ github.run_id }}'
+   SELECT workflow_run_id, result FROM runs
+   WHERE workflow_run_id = '${{ github.run_id }}'
    LIMIT 1;
    ```
 
@@ -77,7 +92,7 @@ Exercise the read-only SQLite projection and safe-output append without editing 
    }
    ```
 
-4. Query the same run ID again. Verify the payload contains the expected run ID
+4. Query `runs` for the same run ID again. Verify it contains the expected run ID
    and result. On reruns, reuse the existing record instead of appending a duplicate.
 5. Do not inspect or modify ledger shard files directly.
 

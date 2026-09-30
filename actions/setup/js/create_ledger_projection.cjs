@@ -7,11 +7,32 @@ const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
 const SHARD_PATH = /^ledger\/shards\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jsonl$/;
 const COVERAGE_PATH = /^ledger\/coverage\/[0-9a-f]{64}\.jsonl$/;
+
+function formatReplayPrompt(lines) {
+  const retained = [];
+  let bytes = 0;
+  for (const line of lines) {
+    const size = Buffer.byteLength(`${line}\n`);
+    if (bytes + size > 60 * 1024) {
+      retained.push("Additional replay tables or ledgers are not listed here. Query each ledger's replay_metadata for table names and columns; if absent, only generic records are available.");
+      break;
+    }
+    retained.push(line);
+    bytes += size;
+  }
+  return `${retained.join("\n")}\n`;
+}
+
+function formatReplayTable(name, table) {
+  const columns = Object.entries(table.columns).map(([column, type]) => `${column}: ${type}`);
+  return `- ${name}(${columns.join(", ")})`;
+}
 
 function hasStatus(error, status) {
   return error && typeof error === "object" && Reflect.get(error, "status") === status;
@@ -61,7 +82,8 @@ function materializeLedger({ refName, workspaceDir, sourceDir, config }) {
   }
 }
 
-function createProjection({ sourceDir, databasePath, config }) {
+/** @param {{sourceDir: string, databasePath: string, config: any, onReplayError?: (message: string) => void}} options */
+function createProjection({ sourceDir, databasePath, config, onReplayError = () => {} }) {
   const limits = configuredLedgerLimits(config);
   const ledger = new Ledger({
     memoryDir: sourceDir,
@@ -83,10 +105,21 @@ function createProjection({ sourceDir, databasePath, config }) {
     }
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
+    let tables = null;
+    if (config.replay) {
+      try {
+        const output = executeReplay(config.replay.script, state.records, config.replay.config || {});
+        materializeReplay(database, config.name, config.replay.script, state.records, output);
+        tables = output.tables;
+      } catch (error) {
+        onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);
+      }
+    }
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     fs.rmSync(databasePath, { force: true });
     database.exec(`VACUUM INTO '${databasePath.replaceAll("'", "''")}'`);
     fs.chmodSync(databasePath, 0o444);
+    return tables;
   } finally {
     ledger.close();
   }
@@ -102,6 +135,7 @@ async function main(options = {}) {
   const sourceRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "ledger-source");
   fs.rmSync(sourceRoot, { recursive: true, force: true });
   fs.mkdirSync(PROJECTION_ROOT, { recursive: true });
+  const replayGuidance = [];
 
   try {
     for (const ledger of config) {
@@ -123,10 +157,22 @@ async function main(options = {}) {
       });
       if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
       else fs.mkdirSync(sourceDir, { recursive: true });
-      createProjection({ sourceDir, databasePath, config: ledger });
+      const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
+      if (ledger.replay) {
+        replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
+        if (tables && Object.keys(tables).length) {
+          replayGuidance.push(...Object.entries(tables).map(([name, table]) => formatReplayTable(name, table)));
+          replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through ledger append safe output. Do not update replay tables.");
+        } else if (tables) {
+          replayGuidance.push("Replay produced no tables; use generic records for immutable event history.");
+        } else {
+          replayGuidance.push("Replay failed; only generic ledger tables are available. Use records for immutable event history.");
+        }
+      }
       fs.chmodSync(projectionDir, 0o555);
       fs.rmSync(sourceDir, { recursive: true, force: true });
     }
+    if (replayGuidance.length) fs.writeFileSync(path.join(PROJECTION_ROOT, "replay-prompt.txt"), formatReplayPrompt(replayGuidance), { mode: 0o444 });
     fs.chmodSync(PROJECTION_ROOT, 0o555);
   } finally {
     fs.rmSync(sourceRoot, { recursive: true, force: true });
@@ -140,4 +186,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createProjection, fetchLedgerBranch, main, materializeLedger };
+module.exports = { createProjection, fetchLedgerBranch, formatReplayPrompt, formatReplayTable, main, materializeLedger };

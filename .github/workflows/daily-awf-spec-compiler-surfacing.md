@@ -47,6 +47,42 @@ tools:
           outcome:
             enum: [issue_created, noop]
         additionalProperties: false
+      replay:
+        script: |
+          const reviews = records
+            .filter(record => record.payload.record_type === "awf_spec_surfacing_review")
+            .map(({ payload }, index) => ({
+              ordinal: index + 1,
+              run_id: payload.run_id,
+              reviewed_at: payload.reviewed_at,
+              reviewed_sha: payload.reviewed_sha,
+              schema_sha256: payload.schema_sha256,
+              open_feature_ids: payload.open_feature_ids,
+              outcome: payload.outcome
+            }));
+          const latest = reviews.at(-1);
+          return {
+            tables: {
+              reviews: {
+                columns: {
+                  ordinal: "integer",
+                  run_id: "text",
+                  reviewed_at: "text",
+                  reviewed_sha: "text",
+                  schema_sha256: "text",
+                  open_feature_ids: "json",
+                  outcome: "text"
+                },
+                primaryKey: ["run_id"],
+                rows: reviews
+              },
+              open_features: {
+                columns: { feature_id: "text" },
+                primaryKey: ["feature_id"],
+                rows: (latest?.open_feature_ids ?? []).map(feature_id => ({ feature_id }))
+              }
+            }
+          };
       max-record-kb: 8
       max-patch-kb: 10
   bash: true
@@ -92,10 +128,9 @@ Start with the main AWF schema, then expand to nearby specification/compiler sou
 
 ## Persistent Review History
 
-Use the read-only SQLite projection at `/tmp/gh-aw/ledgers/awf-feature-reviews/ledger.db` as the authoritative cross-run history. Query recent
-`awf_spec_surfacing_review` records and use the newest valid record's
-`payload.reviewed_sha` as the previous review cursor and its
-`payload.open_feature_ids` to avoid duplicate issues. If no valid record exists,
+Use the replay projection at `/tmp/gh-aw/ledgers/awf-feature-reviews/ledger.db` as the authoritative cross-run history. Query recent
+review rows and use the newest valid row's `reviewed_sha` as the previous review cursor and
+`open_features` to avoid duplicate issues. If no valid record exists,
 use the last 7 days as the initial diff window.
 
 Each record contains the run ID, review timestamp, reviewed commit SHA, schema
@@ -108,13 +143,13 @@ not store full diffs, source excerpts, or raw analysis notes in the ledger.
 
 1. Get current commit SHA.
 2. Compute SHA-256 of `pkg/parser/schemas/main_workflow_schema.json`.
-3. Query recent `awf_spec_surfacing_review` records and inspect their stable feature IDs:
+3. Query recent reviews and inspect their stable feature IDs:
 
    ```sql
-   SELECT payload FROM records
-   WHERE json_extract(payload, '$.record_type') = 'awf_spec_surfacing_review'
-   ORDER BY ordinal DESC LIMIT 100;
+   SELECT run_id, reviewed_at, reviewed_sha, schema_sha256, open_feature_ids, outcome
+   FROM reviews ORDER BY ordinal DESC LIMIT 100;
    ```
+   If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
 4. Build the diff window from the newest valid `reviewed_sha` (if present) to `HEAD`; if absent, use the last 7 days.
 
 ### 2) Detect candidate AWF feature changes

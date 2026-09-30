@@ -130,6 +130,12 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	}
 	if section := buildLedgerPromptSection(data.LedgerConfig); section != nil {
 		sections = append(sections, *section)
+		for _, ledger := range data.LedgerConfig.Ledgers {
+			if ledger.Replay != nil {
+				sections = append(sections, PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+				break
+			}
+		}
 	}
 
 	// 7. Repo memory instructions (if enabled)
@@ -359,6 +365,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	type promptRenderItem struct {
 		ContentEnvVar   string `json:"content_env,omitempty"`
 		File            string `json:"file,omitempty"`
+		LedgerReplay    bool   `json:"ledger_replay,omitempty"`
 		ConditionEnvVar string `json:"condition_env,omitempty"`
 	}
 	type promptRenderConfig struct {
@@ -389,6 +396,10 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	}
 	for _, section := range builtinSections {
 		if section.IsFile {
+			if section.Content == ledgerReplayPromptFile {
+				renderConfig.Items = append(renderConfig.Items, promptRenderItem{LedgerReplay: true})
+				continue
+			}
 			appendFile(section.Content, section.ConditionEnvVar)
 			continue
 		}

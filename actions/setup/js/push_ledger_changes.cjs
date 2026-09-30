@@ -1,4 +1,5 @@
 // @ts-check
+// @safe-outputs-exempt SEC-005: workflow callers invoke main() without target overrides, so writes use only the current GitHub Actions repository context.
 "use strict";
 
 const fs = require("node:fs");
