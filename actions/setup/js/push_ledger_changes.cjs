@@ -92,7 +92,8 @@ function validateTransactions(artifact, ledgerConfigs) {
   let total = 0;
   for (const [name, ledger] of Object.entries(artifact.ledgers)) {
     const config = configs.get(name);
-    if (!config || !ledger || !Array.isArray(ledger.appends) || Object.keys(ledger).some(key => key !== "appends")) throw new TypeError("Invalid ledger transaction list");
+    if (!config || !ledger || !Array.isArray(ledger.appends) || (ledger.compactions !== undefined && !Array.isArray(ledger.compactions)) || Object.keys(ledger).some(key => !["appends", "compactions"].includes(key)))
+      throw new TypeError("Invalid ledger transaction list");
     for (const append of ledger.appends) {
       total++;
       if (
@@ -131,6 +132,45 @@ function validateTransactions(artifact, ledgerConfigs) {
       if (recordBytes > config.max_record_kb * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
       const currentPatchBytes = (patchBytes.get(name) || 0) + recordBytes;
       if (currentPatchBytes > config.max_patch_kb * 1024) throw new RangeError("Ledger append batch exceeds max-patch-kb");
+      patchBytes.set(name, currentPatchBytes);
+    }
+    for (const operation of ledger.compactions || []) {
+      total++;
+      if (
+        total > 100 ||
+        !operation ||
+        operation.ledger !== name ||
+        operation.transaction_id !== artifact.transaction_id ||
+        !Number.isSafeInteger(operation.index) ||
+        operation.index < 0 ||
+        operation.index >= 100 ||
+        seenIndices.has(operation.index)
+      )
+        throw new TypeError("Invalid validated ledger compaction");
+      seenIndices.add(operation.index);
+      if (operation.operation === "drop") {
+        if (Object.keys(operation).sort().join(",") !== "id,index,ledger,operation,transaction_id" || !/^ldg-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(operation.id))
+          throw new TypeError("Invalid ledger drop");
+      } else if (operation.operation === "insert") {
+        if (
+          Object.keys(operation).sort().join(",") !== "index,ledger,operation,record,transaction_id" ||
+          !operation.record ||
+          typeof operation.record !== "object" ||
+          Array.isArray(operation.record) ||
+          operation.record.id !== finalId(artifact.transaction_id, operation.index) ||
+          seenIds.has(operation.record.id)
+        )
+          throw new TypeError("Invalid ledger insert");
+        seenIds.add(operation.record.id);
+        if (Object.keys(operation.record).some(key => RESERVED_RECORD_KEYS.has(key))) throw new TypeError("Invalid ledger insert record");
+        const payload = { ...operation.record };
+        delete payload.id;
+        validateRecordShape(payload);
+        if (config.schema && validateValueAgainstSchema(payload, config.schema)) throw new TypeError("Ledger record does not match configured schema");
+        if (Buffer.byteLength(JSON.stringify(operation.record)) > config.max_record_kb * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
+      } else throw new TypeError("Invalid ledger compaction operation");
+      const currentPatchBytes = (patchBytes.get(name) || 0) + Buffer.byteLength(JSON.stringify(operation));
+      if (currentPatchBytes > config.max_patch_kb * 1024) throw new RangeError("Ledger compaction batch exceeds max-patch-kb");
       patchBytes.set(name, currentPatchBytes);
     }
   }
@@ -191,14 +231,14 @@ async function checkoutLedgerBranch({ githubClient, owner, repo, branchName, wor
   return baseRef || execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
 }
 
-async function persistLedgerAppends({ appends, config, githubClient, owner, repo, token, serverHost, workspaceDir, checkoutLedgerBranchFn = checkoutLedgerBranch, pushChangesFn = pushRepoMemoryChangesWithRetry }) {
+async function persistLedgerAppends({ appends, compactions = [], config, githubClient, owner, repo, token, serverHost, workspaceDir, checkoutLedgerBranchFn = checkoutLedgerBranch, pushChangesFn = pushRepoMemoryChangesWithRetry }) {
   const originalHead = execGitSync(["rev-parse", "HEAD"], { cwd: workspaceDir, stdio: "pipe" }).trim();
   const branchName = `ledgers/${config.name}`;
   let ledger;
   try {
     const baseRef = await checkoutLedgerBranchFn({ githubClient, owner, repo, branchName, workspaceDir, token, serverHost });
     configureRepoMemoryMergePolicy(workspaceDir);
-    const limits = configuredLedgerLimits(config, appends.length);
+    const limits = configuredLedgerLimits(config, appends.length + compactions.length);
     ledger = new Ledger({
       memoryDir: workspaceDir,
       maxSegmentBytes: config.max_segment_kb * 1024,
@@ -217,12 +257,45 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       ledger.append("ledger_append", append.record);
       persisted++;
     }
+    let compacted = 0;
+    const operations = [...compactions].sort((a, b) => a.index - b.index);
+    if (operations.length) {
+      const state = ledger.reconstruct();
+      const ids = new Set(state.records.filter(record => record.type !== "ledger_compact").flatMap(record => [record.id, ...(typeof record.payload?.id === "string" ? [record.payload.id] : [])]));
+      const existingPayloads = new Map(state.records.filter(record => record.type === "ledger_append").map(record => [record.payload?.id, record.payload]));
+      const applied = new Set(state.records.filter(record => record.type === "ledger_compact").map(record => `${record.payload?.transaction_id}:${record.payload?.index}`));
+      let valid = state.diagnostics.length === 0;
+      const insertedIds = new Set(operations.filter(item => item.operation === "insert").map(item => item.record.id));
+      for (const operation of operations) {
+        if (applied.has(`${operation.transaction_id}:${operation.index}`)) continue;
+        if (operation.operation === "drop") {
+          if (!ids.has(operation.id) || insertedIds.has(operation.id)) valid = false;
+          ids.delete(operation.id);
+        } else if (ids.has(operation.record.id) && JSON.stringify(existingPayloads.get(operation.record.id)) !== JSON.stringify(operation.record)) {
+          valid = false;
+        } else ids.add(operation.record.id);
+      }
+      if (valid) {
+        try {
+          for (const operation of [...operations.filter(item => item.operation === "insert"), ...operations.filter(item => item.operation === "drop")]) {
+            if (applied.has(`${operation.transaction_id}:${operation.index}`)) continue;
+            if (operation.operation === "insert") {
+              if (existingPayloads.has(operation.record.id)) continue;
+              ledger.append("ledger_append", operation.record);
+            } else ledger.append("ledger_compact", { operation: "drop", id: operation.id, transaction_id: operation.transaction_id, index: operation.index });
+            compacted++;
+          }
+        } catch (error) {
+          core.warning(`Ledger logical compaction was skipped after ${compacted} operation(s): ${error instanceof Error ? error.message : "unknown error"}`);
+        }
+      } else core.warning("Ledger compaction targets conflict with current records; skipping compaction without discarding appends");
+    }
     ledger.close();
     ledger = null;
-    if (!persisted) return { persisted: 0, already_present: alreadyPresent, reconciled: alreadyPresent };
+    if (!persisted && !compacted) return { persisted: 0, already_present: alreadyPresent, reconciled: alreadyPresent, compacted: 0 };
 
-    execGitSync(["add", "--", "ledger/shards"], { cwd: workspaceDir, stdio: "pipe" });
-    execGitSync(["commit", "-m", `Append ${persisted} ledger record(s) from workflow run ${process.env.GITHUB_RUN_ID || "unknown"}`], {
+    execGitSync(["add", "-A", "--", "ledger"], { cwd: workspaceDir, stdio: "pipe" });
+    execGitSync(["commit", "-m", `Apply ${persisted} append(s) and ${compacted} compaction(s) from workflow run ${process.env.GITHUB_RUN_ID || "unknown"}`], {
       cwd: workspaceDir,
       stdio: "pipe",
     });
@@ -239,7 +312,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       originUrlForPush: repoUrl(serverHost, owner, repo),
     });
     if (!pushed) throw new Error(`Failed to persist records to ${branchName}`);
-    return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent };
+    return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent, compacted };
   } finally {
     if (ledger) ledger.close();
     execGitSync(["checkout", "--detach", originalHead], { cwd: workspaceDir, stdio: "pipe", suppressLogs: true });
@@ -258,18 +331,21 @@ async function main(options = {}) {
   const result = { version: 1, ledgers: {} };
   for (const config of ledgerConfigs) {
     const appends = artifact.ledgers[config.name]?.appends || [];
-    const persisted = appends.length
-      ? await (options.persistLedger || persistLedgerAppends)({
-          appends,
-          config,
-          githubClient: options.githubClient || github,
-          owner: options.owner || context.repo.owner,
-          repo: options.repo || context.repo.repo,
-          token: options.token || process.env.GH_TOKEN,
-          serverHost: options.serverHost || new URL(process.env.GITHUB_SERVER_URL || "https://github.com").host,
-          workspaceDir: options.workspaceDir || process.env.GITHUB_WORKSPACE || process.cwd(),
-        })
-      : { persisted: 0, already_present: 0, reconciled: 0 };
+    const compactions = artifact.ledgers[config.name]?.compactions || [];
+    const persisted =
+      appends.length || compactions.length
+        ? await (options.persistLedger || persistLedgerAppends)({
+            appends,
+            compactions,
+            config,
+            githubClient: options.githubClient || github,
+            owner: options.owner || context.repo.owner,
+            repo: options.repo || context.repo.repo,
+            token: options.token || process.env.GH_TOKEN,
+            serverHost: options.serverHost || new URL(process.env.GITHUB_SERVER_URL || "https://github.com").host,
+            workspaceDir: options.workspaceDir || process.env.GITHUB_WORKSPACE || process.cwd(),
+          })
+        : { persisted: 0, already_present: 0, reconciled: 0 };
     result.ledgers[config.name] = {
       requested: appends.length,
       validated: appends.length,
@@ -277,6 +353,8 @@ async function main(options = {}) {
       already_present: persisted.already_present,
       reconciled: persisted.reconciled,
       rejected: 0,
+      compactions_requested: compactions.length,
+      compactions_applied: persisted.compacted || 0,
       branch: `ledgers/${config.name}`,
     };
   }

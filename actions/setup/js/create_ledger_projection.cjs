@@ -7,7 +7,7 @@ const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
-const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
+const { applyLedgerCompactions, executeReplay, materializeReplay } = require("./ledger_replay.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -96,6 +96,7 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     if (state.diagnostics.length) throw new TypeError("Ledger branch contains invalid canonical records");
     if (config.schema) {
       for (const record of state.records) {
+        if (record.type === "ledger_compact") continue;
         const payload = { ...record.payload };
         delete payload.id;
         if (validateValueAgainstSchema(payload, config.schema)) {
@@ -105,11 +106,30 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     }
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
+    const logicalRecords = applyLedgerCompactions(state.records);
+    if (logicalRecords.length !== state.records.length) {
+      const visible = new Set(logicalRecords.map(record => record.sha));
+      database.exec("BEGIN");
+      try {
+        database.exec("CREATE TABLE records_history AS SELECT * FROM records; CREATE TABLE parents_history AS SELECT * FROM parents");
+        const removeRecord = database.prepare("DELETE FROM records WHERE sha = ?");
+        const removeParents = database.prepare("DELETE FROM parents WHERE child_sha = ?");
+        for (const record of state.records) {
+          if (visible.has(record.sha)) continue;
+          removeRecord.run(record.sha);
+          removeParents.run(record.sha);
+        }
+        database.exec("COMMIT");
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    }
     let tables = null;
     if (config.replay) {
       try {
-        const output = executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.replay.script, state.records, output);
+        const output = executeReplay(config.replay.script, logicalRecords, config.replay.config || {});
+        materializeReplay(database, config.name, config.replay.script, logicalRecords, output);
         tables = output.tables;
       } catch (error) {
         onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);

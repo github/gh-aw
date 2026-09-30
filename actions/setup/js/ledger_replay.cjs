@@ -7,8 +7,32 @@ const path = require("node:path");
 
 const WORKER = path.join(__dirname, "ledger_replay_worker.cjs");
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
-const RESERVED = new Set(["records", "parents", "shards", "diagnostics", "replay_metadata", "records_by_id", "records_by_type_time", "records_by_shard_offset", "parents_by_parent", "diagnostics_by_code"]);
+const RESERVED = new Set([
+  "records",
+  "records_history",
+  "parents",
+  "parents_history",
+  "shards",
+  "diagnostics",
+  "replay_metadata",
+  "records_by_id",
+  "records_by_type_time",
+  "records_by_shard_offset",
+  "parents_by_parent",
+  "diagnostics_by_code",
+]);
 const TYPES = new Set(["text", "integer", "real", "boolean", "json"]);
+
+function applyLedgerCompactions(records) {
+  const dropped = new Set();
+  for (const record of records) {
+    if (record.type === "ledger_compact") {
+      const operation = record.payload;
+      if (operation && operation.operation === "drop" && typeof operation.id === "string") dropped.add(operation.id);
+    }
+  }
+  return records.filter(record => record.type !== "ledger_compact" && !dropped.has(record.id) && !dropped.has(record.payload?.id));
+}
 
 function validateReplayOutput(output) {
   if (
@@ -147,4 +171,4 @@ function materializeReplay(db, ledgerName, script, records, output) {
   }
 }
 
-module.exports = { executeReplay, materializeReplay, validateReplayOutput };
+module.exports = { applyLedgerCompactions, executeReplay, materializeReplay, validateReplayOutput };

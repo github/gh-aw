@@ -7,7 +7,11 @@ Standalone `tools.ledger` ledgers may declare an inline JavaScript `replay.scrip
 Replay interprets the **logical, ordered record stream** and returns a declarative
 table model. Ledger JSONL records remain authoritative; replay tables are derived
 and can always be rebuilt. Replay never writes back to Git or canonical ledger
-files. Persist new events only through the ledger append safe output.
+files. Persist new events through the `ledger_append` safe output. To replace
+obsolete logical rows, submit a `ledger_compact` safe output with an `operations`
+array of `{op: "drop", id: "..."}` or `{op: "insert", record: {...}}` entries.
+Set `ledger` when more than one ledger is configured. Drops and inserts are
+validated and replayed as ledger transactions; do not edit JSONL files directly.
 
 ```yaml
 tools:
@@ -70,5 +74,8 @@ agent prompt lists materialized replay tables and their column names and types
 Query `replay_metadata` for generated table names, columns, ledger name, record
 count, script SHA-256, and projection/output versions; query `records` for event
 history.
-Each ledger runs replay independently. Change the replay script to reinterpret
-older payload versions without rewriting past records.
+Each ledger runs replay independently. Compaction transactions are applied to
+the logical record stream before replay and reapplied when the persistence job
+merges ledger changes. A conflicting compaction is skipped rather than risking
+append loss. Change the replay script to reinterpret older payload versions
+without rewriting past records.

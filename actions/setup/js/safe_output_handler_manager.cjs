@@ -89,6 +89,7 @@ const HANDLER_MAP = {
   create_missing_data_issue: "./create_missing_data_issue.cjs",
   missing_data: "./missing_data.cjs",
   ledger_append: "./ledger_append.cjs",
+  ledger_compact: "./ledger_compact.cjs",
   ledger_mutation: "./ledger_mutation.cjs",
   noop: "./noop_handler.cjs",
   report_incomplete: "./report_incomplete_handler.cjs",
@@ -218,6 +219,7 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "upload_asset",
   "upload_artifact",
   "upload_code_coverage",
+  "ledger_compact",
   "dispatch_workflow",
   "dispatch_repository",
   "call_workflow",
@@ -1767,7 +1769,7 @@ async function main() {
 
     // Process all messages in order of appearance
     const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
-    const ledgerAppendHandler = messageHandlers.get("ledger_append");
+    const ledgerAppendHandler = messageHandlers.get("ledger_append") || messageHandlers.get("ledger_compact");
     if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
       ledgerAppendHandler.finalize();
     }

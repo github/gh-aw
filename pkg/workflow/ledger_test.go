@@ -174,11 +174,14 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	var safeOutputConfig map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configJSON), &safeOutputConfig))
 	ledgerAppendConfig := safeOutputConfig["ledger_append"].(map[string]any)
+	ledgerCompactConfig := safeOutputConfig["ledger_compact"].(map[string]any)
 	ledgerDefinitions := ledgerAppendConfig["ledgers"].([]any)
 	require.Equal(t, "findings", ledgerDefinitions[0].(map[string]any)["name"])
 	require.InDelta(t, 16, ledgerDefinitions[0].(map[string]any)["max_record_kb"], 0)
+	require.Equal(t, ledgerAppendConfig["ledgers"], ledgerCompactConfig["ledgers"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
+	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_compact")
 	require.True(t, hasHandlerManagerTypes(data))
 
 	job, err := NewCompiler().buildPushLedgerChangesJob(data, false)

@@ -66,6 +66,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 			})
 		}
 		safeOutputsConfig["ledger_append"] = map[string]any{"max": 100, "ledgers": ledgerConfigs}
+		safeOutputsConfig["ledger_compact"] = map[string]any{"max": 100, "ledgers": ledgerConfigs}
 	}
 
 	if len(safeOutputsConfig) == 0 {

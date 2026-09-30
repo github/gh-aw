@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { main, transactionPath } from "./ledger_append.cjs";
+import { main as compact } from "./ledger_compact.cjs";
 
 test("collects validated appends and writes the versioned artifact", async () => {
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-"));
@@ -29,6 +30,10 @@ test("collects validated appends and writes the versioned artifact", async () =>
     });
     await handler({ ledger: "findings", temp_id: "first", record: { subject: "initial" } });
     await handler({ ledger: "findings", record: { subject: "follow-up", related_to: "#first" } });
+    const compactHandler = await compact({
+      ledgers: [{ name: "findings", schema: { type: "object", required: ["subject"], properties: { subject: { type: "string" }, related_to: { type: "string" } }, additionalProperties: false }, max_record_kb: 1, max_patch_kb: 1 }],
+    });
+    await compactHandler({ ledger: "findings", operations: [{ op: "insert", record: { subject: "summary" } }] });
     handler.finalize();
 
     const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
@@ -36,6 +41,8 @@ test("collects validated appends and writes the versioned artifact", async () =>
     assert.equal(artifact.transaction_id, "42:1");
     assert.equal(artifact.ledgers.findings.appends.length, 2);
     assert.equal(artifact.ledgers.findings.appends[1].record.related_to, artifact.ledgers.findings.appends[0].record.id);
+    assert.equal(artifact.ledgers.findings.compactions[0].index, 2);
+    assert.equal(artifact.ledgers.findings.compactions[0].record.subject, "summary");
   } finally {
     if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
     else process.env.RUNNER_TEMP = previousRunnerTemp;

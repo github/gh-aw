@@ -4,10 +4,24 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { executeReplay, materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
+import { applyLedgerCompactions, executeReplay, materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
 
 const table = (rows = [{ id: "a" }]) => ({ columns: { id: "text" }, primaryKey: ["id"], rows });
 const output = tables => ({ version: 1, tables });
+
+test("logical compaction drops selected rows and retains inserted data in replay order", () => {
+  const records = [
+    { id: "old", type: "ledger_append", payload: { id: "old", subject: "raw" } },
+    { id: "new", type: "ledger_append", payload: { id: "new", subject: "summary" } },
+    { id: "control", type: "ledger_compact", payload: { operation: "drop", id: "old" } },
+  ];
+  assert.deepEqual(applyLedgerCompactions(records), [records[1]]);
+  assert.equal(records.length, 3);
+  const envelope = { id: "ldg-envelope", type: "ledger_append", payload: { id: "ldg-payload" } };
+  assert.deepEqual(applyLedgerCompactions([envelope, { type: "ledger_compact", payload: { operation: "drop", id: envelope.id } }]), []);
+  assert.deepEqual(applyLedgerCompactions([envelope, { type: "ledger_compact", payload: { operation: "drop", id: envelope.payload.id } }]), []);
+  assert.deepEqual(applyLedgerCompactions([{ type: "ledger_compact", payload: { operation: "drop", id: envelope.id } }, envelope]), []);
+});
 
 test("replay receives frozen logical order and can interpret historical versions", () => {
   const records = [{ payload: { id: "a", version: 1, state: "open" } }, { payload: { id: "a", version: 2, status: "closed" } }];
@@ -39,6 +53,8 @@ test("replay rejects malformed and excessive output", () => {
     [],
     { tables: [] },
     output({ records: table() }),
+    output({ records_history: table() }),
+    output({ parents_history: table() }),
     output({ sqlite_shadow: table() }),
     output({ records_by_id: table() }),
     output({ Items: table(), items: table() }),

@@ -73,6 +73,49 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
   return { version: 1, transaction_id: transactionId, appends: normalized };
 }
 
+/**
+ * Normalize bounded, declarative edits to the logical ledger view. Source records
+ * remain immutable; drops are resolved by record ID during replay.
+ */
+function normalizeLedgerCompactions(requests, { transactionId, ledgerNames, ledgers = {}, startIndex = 0, startPatchBytes = new Map() }) {
+  if (typeof transactionId !== "string" || !transactionId || transactionId.length > 128) throw new TypeError("Invalid ledger transaction ID");
+  if (!(ledgerNames instanceof Set) || !ledgerNames.size) throw new TypeError("No ledgers are configured");
+  if (!Array.isArray(requests) || !Number.isSafeInteger(startIndex) || startIndex < 0) throw new RangeError("Invalid ledger compaction batch");
+  const patchBytes = new Map(startPatchBytes);
+  const entries = [];
+  for (const request of requests) {
+    if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some(key => !["ledger", "operations"].includes(key)) || !Array.isArray(request.operations) || !request.operations.length)
+      throw new TypeError("Invalid ledger compaction request");
+    const ledger = request.ledger || (ledgerNames.size === 1 ? [...ledgerNames][0] : undefined);
+    if (!ledger || !ledgerNames.has(ledger)) throw new TypeError("Unknown target ledger");
+    const config = ledgers[ledger] || {};
+    for (const operation of request.operations) {
+      if (entries.length + startIndex >= 100) throw new RangeError("Invalid ledger compaction batch");
+      const index = startIndex + entries.length;
+      let entry;
+      if (operation && operation.op === "drop" && Object.keys(operation).sort().join(",") === "id,op" && /^ldg-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(operation.id)) {
+        entry = { ledger, transaction_id: transactionId, index, operation: "drop", id: operation.id };
+      } else if (operation && operation.op === "insert" && Object.keys(operation).sort().join(",") === "op,record" && operation.record && typeof operation.record === "object" && !Array.isArray(operation.record)) {
+        const record = sanitizeRecord(operation.record);
+        if (config.schema) {
+          const schemaError = validateValueAgainstSchema(record, config.schema);
+          if (schemaError) throw new TypeError("Ledger record does not match schema");
+        }
+        entry = { ledger, transaction_id: transactionId, index, operation: "insert", record: { ...record, id: finalId(transactionId, index) } };
+        if (Buffer.byteLength(JSON.stringify(entry.record)) > (config.max_record_kb || 32) * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
+      } else {
+        throw new TypeError("Invalid ledger compaction operation");
+      }
+      const bytes = Buffer.byteLength(JSON.stringify(entry));
+      const total = (patchBytes.get(ledger) || 0) + bytes;
+      if (total > (config.max_patch_kb || 10) * 1024) throw new RangeError("Ledger compaction batch exceeds max-patch-kb");
+      patchBytes.set(ledger, total);
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
 function sanitizeRecord(record) {
   if (Object.getPrototypeOf(record) !== Object.prototype && Object.getPrototypeOf(record) !== null) throw new TypeError("Ledger record must be a plain object");
   const stack = [{ value: record, depth: 0 }];
@@ -98,4 +141,4 @@ function sanitizeRecord(record) {
   return structuredClone(record);
 }
 
-module.exports = { finalId, normalizeLedgerAppends };
+module.exports = { finalId, normalizeLedgerAppends, normalizeLedgerCompactions };

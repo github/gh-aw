@@ -4,31 +4,38 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { normalizeLedgerAppends } = require("./ledger_transactions.cjs");
+const { normalizeLedgerAppends, normalizeLedgerCompactions } = require("./ledger_transactions.cjs");
+
+const requests = { appends: [], compactions: [] };
+let ledgerConfigs = {};
 
 function transactionPath() {
   return path.join(process.env.RUNNER_TEMP || os.tmpdir(), "gh-aw", "ledger-transactions.json");
 }
 
-async function main(config = {}) {
+function configure(config = {}) {
   const ledgers = Array.isArray(config.ledgers) ? config.ledgers : [];
-  const ledgerConfigs = Object.fromEntries(ledgers.map(ledger => [ledger.name, ledger]));
+  ledgerConfigs = Object.fromEntries(ledgers.map(ledger => [ledger.name, ledger]));
   const ledgerNames = new Set(Object.keys(ledgerConfigs));
-  if (!ledgerNames.size) throw new TypeError("ledger_append has no configured ledgers");
+  if (!ledgerNames.size) throw new TypeError("Ledger safe output has no configured ledgers");
+}
 
-  const requests = [];
-  const handleLedgerAppend = async message => {
-    requests.push(message);
-    return { success: true, queued: true };
-  };
-
-  handleLedgerAppend.finalize = () => {
+function finalize() {
+  try {
     const transactionId = `${process.env.GITHUB_RUN_ID || "local"}:${process.env.GITHUB_RUN_ATTEMPT || "1"}`;
-    const transaction = normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers: ledgerConfigs });
+    const ledgerNames = new Set(Object.keys(ledgerConfigs));
+    const transaction = normalizeLedgerAppends(requests.appends, { transactionId, ledgerNames, ledgers: ledgerConfigs });
+    const patchBytes = new Map();
+    for (const append of transaction.appends) patchBytes.set(append.ledger, (patchBytes.get(append.ledger) || 0) + Buffer.byteLength(JSON.stringify(append.record)));
+    const compactions = normalizeLedgerCompactions(requests.compactions, { transactionId, ledgerNames, ledgers: ledgerConfigs, startIndex: transaction.appends.length, startPatchBytes: patchBytes });
     const artifact = { version: 1, transaction_id: transaction.transaction_id, ledgers: {} };
     for (const append of transaction.appends) {
-      artifact.ledgers[append.ledger] ||= { appends: [] };
+      artifact.ledgers[append.ledger] ||= { appends: [], compactions: [] };
       artifact.ledgers[append.ledger].appends.push(append);
+    }
+    for (const compact of compactions) {
+      artifact.ledgers[compact.ledger] ||= { appends: [], compactions: [] };
+      artifact.ledgers[compact.ledger].compactions.push(compact);
     }
     const file = transactionPath();
     const directory = path.dirname(file);
@@ -48,9 +55,31 @@ async function main(config = {}) {
     } finally {
       fs.closeSync(fd);
     }
+  } finally {
+    requests.appends.length = 0;
+    requests.compactions.length = 0;
+  }
+}
+
+async function main(config = {}) {
+  configure(config);
+  const handleLedgerAppend = async message => {
+    requests.appends.push(message);
+    return { success: true, queued: true };
   };
+  handleLedgerAppend.finalize = finalize;
 
   return handleLedgerAppend;
 }
 
-module.exports = { main, transactionPath };
+async function compact(config = {}) {
+  configure(config);
+  const handleLedgerCompact = async message => {
+    requests.compactions.push(message);
+    return { success: true, queued: true };
+  };
+  handleLedgerCompact.finalize = finalize;
+  return handleLedgerCompact;
+}
+
+module.exports = { main, compact, transactionPath };

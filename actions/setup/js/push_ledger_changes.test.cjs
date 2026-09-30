@@ -54,6 +54,20 @@ test("revalidates record schemas, reserved envelope fields, and record sizes", (
   assert.throws(() => validateTransactions(transaction({ subject: "x".repeat(32 * 1024) }), ledgerConfigs), /max-record-kb/);
 });
 
+test("revalidates compaction entries and prevents forged operations", () => {
+  const artifact = transaction();
+  artifact.ledgers.findings.compactions = [
+    { ledger: "findings", transaction_id: artifact.transaction_id, index: 1, operation: "drop", id: finalId("previous", 0) },
+    { ledger: "findings", transaction_id: artifact.transaction_id, index: 2, operation: "insert", record: { subject: "summary", id: finalId(artifact.transaction_id, 2) } },
+  ];
+  assert.doesNotThrow(() => validateTransactions(artifact, ledgerConfigs));
+  artifact.ledgers.findings.compactions[0].id = "untrusted";
+  assert.throws(() => validateTransactions(artifact, ledgerConfigs), /Invalid ledger drop/);
+  artifact.ledgers.findings.compactions[0].id = finalId("previous", 0);
+  artifact.ledgers.findings.compactions[1].record.id = "forged";
+  assert.throws(() => validateTransactions(artifact, ledgerConfigs), /Invalid ledger insert/);
+});
+
 test("main reports records only after the trusted persister succeeds", async () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-push-"));
   const outputFile = path.join(outputDir, "output");

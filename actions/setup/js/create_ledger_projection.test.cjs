@@ -126,6 +126,49 @@ test("invalid replay preserves generic records without partial tables", () => {
   }
 });
 
+test("logical compactions update generic and replay tables while preserving raw history", () => {
+  const root = fs.mkdtempSync(path.join(process.cwd(), "ledger-logical-compaction-"));
+  const sourceDir = path.join(root, "source");
+  const databasePath = path.join(root, "projection.db");
+  const ledger = new Ledger({ memoryDir: sourceDir });
+  try {
+    fs.mkdirSync(sourceDir);
+    const original = ledger.append("finding", { subject: "old" });
+    ledger.append("ledger_append", { id: "ldg-inserted", subject: "summary" });
+    ledger.append("ledger_compact", { operation: "drop", id: original.id });
+    createProjection({
+      sourceDir,
+      databasePath,
+      config: {
+        name: "findings",
+        schema: { type: "object", required: ["subject"], properties: { subject: { type: "string" } } },
+        max_record_kb: 32,
+        max_segment_kb: 100,
+        max_patch_kb: 10,
+        replay: { script: `return { tables: { summary: { columns: { subject: "text" }, primaryKey: ["subject"], rows: records.map(record => ({ subject: record.payload.subject })) } } }` },
+      },
+    });
+    const db = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 1);
+      assert.equal(db.prepare("SELECT count(*) AS n FROM records_history").get().n, 3);
+      assert.equal(db.prepare("SELECT count(*) AS n FROM parents_history").get().n, 2);
+      assert.deepEqual(
+        db
+          .prepare("SELECT subject FROM summary")
+          .all()
+          .map(row => row.subject),
+        ["summary"]
+      );
+    } finally {
+      db.close();
+    }
+  } finally {
+    ledger.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("compaction preserves replay's ordered logical history", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-compaction-"));
   const sourceDir = path.join(root, "source");
