@@ -9,7 +9,7 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { Ledger } from "./ledger_store.cjs";
-import { createProjection } from "./create_ledger_projection.cjs";
+import { createProjection, formatReplayPrompt } from "./create_ledger_projection.cjs";
 
 test("creates a read-only SQLite projection from canonical ledger shards", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-projection-"));
@@ -41,6 +41,14 @@ test("creates a read-only SQLite projection from canonical ledger shards", () =>
     ledger.close();
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("replay guidance remains bounded for many valid tables and ledgers", () => {
+  const lines = Array.from({ length: 1024 }, (_, index) => `- table_${index}(${Array.from({ length: 32 }, (_, column) => `column_${column}_${"a".repeat(48)}`).join(", ")})`);
+  const prompt = formatReplayPrompt(lines);
+  assert.ok(Buffer.byteLength(prompt) <= 65536);
+  assert.match(prompt, /Additional replay tables or ledgers/);
+  assert.match(prompt, /replay_metadata/);
 });
 
 test("replay materializes state alongside immutable records and trusted metadata", () => {

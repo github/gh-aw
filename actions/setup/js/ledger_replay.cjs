@@ -98,15 +98,15 @@ function executeReplay(script, records, config = {}) {
   if (typeof script !== "string" || !script.trim() || Buffer.byteLength(script) > 65536) throw new TypeError("Invalid replay script");
   const input = JSON.stringify({ script, records, config });
   if (Buffer.byteLength(input) > 16 * 1024 * 1024) throw new RangeError("Replay input exceeds size limit");
-  const proc = cp.spawnSync(process.execPath, ["--permission", `--allow-fs-read=${WORKER}`, WORKER], {
+  const proc = cp.spawnSync(process.execPath, ["--permission", "--max-old-space-size=256", `--allow-fs-read=${WORKER}`, WORKER], {
     input,
     encoding: "utf8",
-    timeout: 4000,
+    timeout: 6000,
     maxBuffer: 4 * 1024 * 1024 + 1024,
     env: {},
     cwd: "/tmp",
   });
-  if (proc.error || proc.status !== 0) throw new Error(proc.error?.code === "ETIMEDOUT" ? "Replay timed out" : "Replay worker failed");
+  if (proc.error || proc.status !== 0) throw new Error(proc.error && Reflect.get(proc.error, "code") === "ETIMEDOUT" ? "Replay timed out" : "Replay worker failed");
   let output;
   try {
     output = JSON.parse(proc.stdout);

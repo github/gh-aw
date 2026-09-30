@@ -28,6 +28,10 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, multiple.Ledgers, 2)
 	require.Equal(t, []string{"experiments", "findings"}, []string{multiple.Ledgers[0].Name, multiple.Ledgers[1].Name})
+
+	namedReplay, err := parseLedgerToolConfig(map[string]any{"replay": map[string]any{}})
+	require.NoError(t, err)
+	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
 func TestStandaloneLedgerRejectsUnsafeSchemas(t *testing.T) {
@@ -83,7 +87,7 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, config.Ledgers[0].Replay)
 	require.Equal(t, "return {tables: {}}", config.Ledgers[1].Replay.Script)
-	require.Contains(t, buildLedgerPromptSection(config).Content, "replay_metadata")
+	require.NotContains(t, buildLedgerPromptSection(config).Content, "replay_metadata")
 	require.Contains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
 	encoded, err := encodeLedgerConfigBase64(config)
 	require.NoError(t, err)
