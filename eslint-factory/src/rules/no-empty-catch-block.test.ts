@@ -27,6 +27,8 @@ describe("no-empty-catch-block", () => {
         `try { optional(); } catch { /* swallowed because feature probing can fail */ }`,
         `try { remove(); } catch { /* no-op when cache file is absent */ }`,
         `try { risky(); } catch (err) { throw err; }`,
+        `try { close(); } catch { /* Closing after fsync must not turn a durable append into a reported failure. */ }`,
+        `try { close(); } catch { /* Closing after the directory sync must not reject a published shard. */ }`,
         `try { risky(); } catch (err) {\n  // intentional no-op: file may not exist on first run\n}`,
         `try { risky(); } catch { /* intentional ignore: optional file is absent */ }`,
         `run().catch((err) => { core.warning(getErrorMessage(err)); });`,
