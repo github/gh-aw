@@ -144,10 +144,12 @@ func (e *ExpressionExtractor) ExtractExpressions(markdown string) ([]*Expression
 	expressionExtractionLog.Printf("Found %d expression matches", len(matches))
 
 	for _, match := range matches {
-		if len(match) < 2 {
+		originalExpr, hasOriginal := regexSubmatchAt(match, 0)
+		content, hasContent := regexSubmatchAt(match, 1)
+		if !hasOriginal || !hasContent {
 			continue
 		}
-		e.processMatch(match[0], match[1])
+		e.processMatch(originalExpr, content)
 	}
 
 	// Convert map to sorted slice for consistent ordering
@@ -220,7 +222,7 @@ func transformActivationOutputs(expr string) string {
 			// Check if this is a complete token (not part of a larger identifier)
 			// Look at the character after the match (if any)
 			endIdx := idx + len(oldExpr)
-			if endIdx < len(expr) {
+			if endIdx >= 0 && endIdx < len(expr) {
 				nextChar := expr[endIdx]
 				// If the next character is alphanumeric or underscore, this is a partial match
 				if (nextChar >= 'a' && nextChar <= 'z') ||
@@ -285,18 +287,32 @@ func ExperimentEnvVarName(experimentName string) string {
 // context, causing the expression to always evaluate to false.
 func transformExperimentsExpression(expr string) string {
 	if m := experimentNameRegex.FindStringSubmatch(expr); m != nil {
-		return "steps.pick-experiment.outputs." + m[1]
+		if name, ok := regexSubmatchAt(m, 1); ok {
+			return "steps.pick-experiment.outputs." + name
+		}
 	}
 	if m := experimentComparisonRegex.FindStringSubmatch(expr); m != nil {
+		name, hasName := regexSubmatchAt(m, 1)
+		remainder, hasRemainder := regexSubmatchAt(m, 2)
+		if !hasName || !hasRemainder {
+			return expr
+		}
 		// Convert double quotes to single quotes: GitHub Actions expressions only
 		// support single-quoted string literals, not double-quoted ones.
 		// This replacement is safe because experimentComparisonRegex guarantees
 		// that quotes only appear as delimiters around the string literal value;
 		// no embedded quotes of the same kind are allowed by the pattern.
-		remainder := strings.ReplaceAll(m[2], `"`, `'`)
-		return "steps.pick-experiment.outputs." + m[1] + remainder
+		remainder = strings.ReplaceAll(remainder, `"`, `'`)
+		return "steps.pick-experiment.outputs." + name + remainder
 	}
 	return expr
+}
+
+func regexSubmatchAt(matches []string, index int) (string, bool) {
+	if index < 0 || index >= len(matches) {
+		return "", false
+	}
+	return matches[index], true
 }
 
 // transformAwContextExpression rewrites github.aw.context.<field> references to
@@ -495,10 +511,10 @@ func SubstituteImportInputs(content string, importInputs map[string]any) string 
 	substituteFunc := func(regex *regexp.Regexp, inputCategory string) func(string) string {
 		return func(match string) string {
 			matches := regex.FindStringSubmatch(match)
-			if len(matches) < 2 {
+			path, ok := regexSubmatchAt(matches, 1)
+			if !ok {
 				return match
 			}
-			path := matches[1]
 			// Resolve potentially dotted path (e.g. "config.apiKey" for object inputs)
 			if value, found := resolveImportInputByPath(importInputs, path); found {
 				strValue := marshalImportInputValue(value)

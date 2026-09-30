@@ -139,7 +139,10 @@ func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data 
 		BuildEventTypeEquals("workflow_dispatch"),
 	)
 	RenderConditionAsIf(yaml, condition, "          ")
+	writePRReadyForReviewCheckoutAction(yaml, data, useRequire)
+}
 
+func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowData, useRequire bool) {
 	// Use actions/github-script instead of shell script
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 
