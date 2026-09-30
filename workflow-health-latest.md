@@ -49,3 +49,6 @@ row recommending they be prioritized over filing more duplicate findings.
   tracker comment.
 
 > Last updated: 2026-09-28T04:50Z
+
+## Run 2026-09-30T04:40Z
+No material delta: same 4 failing entries as prior run, all already tracked; no issues created. 300 workflows listed, compile-validate clean.
