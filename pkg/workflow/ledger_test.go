@@ -67,6 +67,50 @@ func TestResolveLedgerSchemas(t *testing.T) {
 	require.ErrorContains(t, resolveLedgerSchemas(config, filepath.Join(root, ".github", "workflows")), "cannot resolve")
 }
 
+func TestImportLedgerFromSharedWorkflow(t *testing.T) {
+	root := t.TempDir()
+	workflowsDir := filepath.Join(root, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
+	sharedPath := filepath.Join(workflowsDir, "shared.md")
+	require.NoError(t, os.WriteFile(sharedPath, []byte(`---
+tools:
+  ledger:
+    findings:
+      schema:
+        type: object
+        properties:
+          subject:
+            type: string
+---
+`), 0o600))
+	mainPath := filepath.Join(workflowsDir, "main.md")
+	require.NoError(t, os.WriteFile(mainPath, []byte(`---
+on: workflow_dispatch
+imports:
+  - shared.md
+tools:
+  ledger: {}
+---
+
+# Main workflow
+
+Inspect findings.
+`), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(mainPath)
+	require.NoError(t, err)
+	require.NotNil(t, data.LedgerConfig)
+	require.Len(t, data.LedgerConfig.Ledgers, 2)
+	require.Equal(t, "default", data.LedgerConfig.Ledgers[0].Name)
+	require.Equal(t, "findings", data.LedgerConfig.Ledgers[1].Name)
+	require.Equal(t, "object", data.LedgerConfig.Ledgers[1].Schema["type"])
+	require.NoError(t, NewCompiler().CompileWorkflow(mainPath))
+	lock, err := os.ReadFile(strings.TrimSuffix(mainPath, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	require.Contains(t, string(lock), "push_ledger_changes:")
+	require.Contains(t, string(lock), "ledgers/findings")
+}
+
 func TestStandaloneLedgerPrompt(t *testing.T) {
 	config, err := parseLedgerToolConfig(map[string]any{"findings": map[string]any{}})
 	require.NoError(t, err)

@@ -130,6 +130,9 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 		return nil, false, nil
 	}
 
+	if key == "ledger" {
+		existingMap, newMap = normalizeLedgerMaps(existingMap, newMap)
+	}
 	if mergedMap, merged, err := mergeMCPIfApplicable(key, existingMap, newMap); merged || err != nil {
 		return mergedMap, merged, err
 	}
@@ -141,6 +144,42 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 		return nil, false, err
 	}
 	return recursiveMerged, true, nil
+}
+
+// normalizeLedgerMaps preserves the default ledger when merging the concise
+// single-ledger form with named ledgers from another workflow.
+func normalizeLedgerMaps(existing, additional map[string]any) (map[string]any, map[string]any) {
+	existingSingle := isSingleLedgerMap(existing)
+	additionalSingle := isSingleLedgerMap(additional)
+	if existingSingle == additionalSingle {
+		return existing, additional
+	}
+	if existingSingle {
+		return map[string]any{"default": existing}, additional
+	}
+	return existing, map[string]any{"default": additional}
+}
+
+func isSingleLedgerMap(config map[string]any) bool {
+	if len(config) == 0 {
+		return true
+	}
+	for key, value := range config {
+		switch key {
+		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
+			return true
+		case "replay":
+			if replay, ok := value.(map[string]any); ok {
+				if _, hasScript := replay["script"]; hasScript {
+					return true
+				}
+				if _, hasConfig := replay["config"]; hasConfig {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func mergeMCPIfApplicable(key string, existingMap, newMap map[string]any) (map[string]any, bool, error) {
@@ -163,7 +202,10 @@ func hasMCPType(tool map[string]any) bool {
 	if !ok {
 		return false
 	}
-	mcpType, _ := mcpMap["type"].(string)
+	mcpType, ok := mcpMap["type"].(string)
+	if !ok {
+		return false
+	}
 	return IsMCPType(mcpType)
 }
 

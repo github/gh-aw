@@ -330,6 +330,44 @@ func TestMergeTools(t *testing.T) {
 	}
 }
 
+func TestMergeToolsPreservesDefaultLedger(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		base       map[string]any
+		additional map[string]any
+		expected   map[string]any
+	}{
+		{
+			name:       "local default and imported named",
+			base:       map[string]any{"ledger": map[string]any{}},
+			additional: map[string]any{"ledger": map[string]any{"findings": map[string]any{}}},
+			expected:   map[string]any{"default": map[string]any{}, "findings": map[string]any{}},
+		},
+		{
+			name:       "local named and imported default",
+			base:       map[string]any{"ledger": map[string]any{"findings": map[string]any{}}},
+			additional: map[string]any{"ledger": map[string]any{"schema": map[string]any{"type": "object"}}},
+			expected:   map[string]any{"default": map[string]any{"schema": map[string]any{"type": "object"}}, "findings": map[string]any{}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			merged, err := MergeTools(tc.base, tc.additional)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, ok := merged["ledger"].(map[string]any)
+			if !ok {
+				t.Fatalf("ledger is not an object: %v", merged["ledger"])
+			}
+			gotJSON, _ := json.Marshal(got)
+			wantJSON, _ := json.Marshal(tc.expected)
+			if string(gotJSON) != string(wantJSON) {
+				t.Fatalf("merged ledger = %s, want %s", gotJSON, wantJSON)
+			}
+		})
+	}
+}
+
 func TestMergeToolsFromJSON(t *testing.T) {
 	tests := []struct {
 		name     string
