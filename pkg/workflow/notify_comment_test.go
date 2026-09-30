@@ -1644,7 +1644,7 @@ func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
 }
 
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, func(string) string {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, false, func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
 	}), "")
 
@@ -1658,6 +1658,25 @@ func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T)
 	}
 	if strings.Contains(steps, "merge-multiple: true") {
 		t.Errorf("Expected download-artifact v3 usage downloads not to use merge-multiple.\nGenerated steps:\n%s", steps)
+	}
+}
+
+func TestUsageArtifactReceivesLedgerCompactionOutput(t *testing.T) {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", false, "", false, true, func(action string) string { return action }), "")
+	if !strings.Contains(steps, "GH_AW_LEDGER_COMPACTION: ${{ needs.push_repo_memory.outputs.ledger_compaction }}") {
+		t.Fatalf("expected usage collection to receive repo-memory compaction stats:\n%s", steps)
+	}
+}
+
+func TestUsageArtifactCollectionCombinesDetectionAndLedgerEnvironment(t *testing.T) {
+	steps := strings.Join(buildUsageArtifactCollectionStep(true, true), "")
+	if strings.Count(steps, "        env:\n") != 1 {
+		t.Fatalf("expected one environment mapping for collection inputs:\n%s", steps)
+	}
+	for _, key := range []string{"GH_AW_DETECTION_JOB_RESULT", "GH_AW_DETECTION_CONCLUSION", "GH_AW_DETECTION_REASON", "GH_AW_LEDGER_COMPACTION"} {
+		if !strings.Contains(steps, key+":") {
+			t.Errorf("expected collection environment to include %s:\n%s", key, steps)
+		}
 	}
 }
 

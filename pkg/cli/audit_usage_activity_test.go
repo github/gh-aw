@@ -3,8 +3,13 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,4 +51,86 @@ func TestApplyUsageSummaryToAuditResultsBackfillsMCPPayloadMetrics(t *testing.T)
 	assert.Equal(t, 600, results.mcpToolUsage.Summary[0].MaxOutputSize)
 	require.Len(t, results.mcpToolUsage.Servers, 1)
 	assert.Equal(t, 200, results.mcpToolUsage.Servers[0].MaxInputSize)
+}
+
+func TestAuditLedgerActivityFromUsageSummary(t *testing.T) {
+	runDir := t.TempDir()
+	activityDir := filepath.Join(runDir, "usage", "activity")
+	require.NoError(t, os.MkdirAll(activityDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(`{"schema":"usage-activity-summary/v1","ledger":{"transactions_added":3,"compaction":{"before":4,"after":2,"selected":3,"records":12,"replacement":"abc123","retired":3,"changed":true}}}`), 0o600))
+
+	summary, err := loadUsageActivitySummary(runDir)
+	require.NoError(t, err)
+	results := auditAnalysisResults{}
+	applyUsageSummaryToAuditResults(summary, &results)
+	run := WorkflowRun{DatabaseID: 42}
+	processed := buildProcessedAuditRun(run, results)
+	require.NotNil(t, processed.Ledger.TransactionsAdded)
+	require.Equal(t, 3, *processed.Ledger.TransactionsAdded)
+	require.Equal(t, &LedgerCompactionActivity{
+		Before: 4, After: 2, Selected: 3, Records: 12, Replacement: new("abc123"), Retired: 3, Changed: true,
+	}, processed.Ledger.Compaction)
+	require.Equal(t, 3, *buildAuditRunSummary(run, processed, results).Ledger.TransactionsAdded)
+
+	data := buildAuditData(context.Background(), processed, workflow.LogMetrics{}, nil)
+	raw, err := json.Marshal(data)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"transactions_added":3`)
+	console := captureFrictionStderr(t, func() { renderConsole(data, runDir) })
+	assert.Contains(t, console, "ledger: transactions_added=3")
+	assert.Contains(t, console, "compaction: before=4 after=2 selected=3 records=12")
+}
+
+func TestAuditLedgerActivityMissingVersusZero(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name    string
+		ledger  *LedgerActivity
+		want    string
+		notWant string
+	}{
+		{name: "missing", want: `"ledger"`},
+		{name: "zero", ledger: &LedgerActivity{TransactionsAdded: new(0)}, want: `"ledger":{"transactions_added":0}`},
+		{name: "compaction only", ledger: &LedgerActivity{Compaction: &LedgerCompactionActivity{}}, want: `"compaction":`, notWant: `"transactions_added"`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			results := auditAnalysisResults{}
+			applyUsageSummaryToAuditResults(&usageActivitySummary{Ledger: test.ledger}, &results)
+			raw, err := json.Marshal(buildAuditRunSummary(WorkflowRun{}, buildProcessedAuditRun(WorkflowRun{}, results), results))
+			require.NoError(t, err)
+			if test.ledger == nil {
+				assert.NotContains(t, string(raw), test.want)
+			} else {
+				assert.Contains(t, string(raw), test.want)
+				if test.notWant != "" {
+					assert.NotContains(t, string(raw), test.notWant)
+				}
+			}
+		})
+	}
+}
+
+func TestCachedAuditBackfillsLedgerActivity(t *testing.T) {
+	runDir := t.TempDir()
+	activityDir := filepath.Join(runDir, "usage", "activity")
+	require.NoError(t, os.MkdirAll(activityDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(`{"schema":"usage-activity-summary/v1","ledger":{"transactions_added":2,"compaction":{"before":4,"after":2,"selected":3,"records":12,"replacement":null,"retired":3,"changed":true}}}`), 0o600))
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+	require.NoError(t, writeAuditData(runDir, AuditData{
+		CacheSource: auditCacheSourceFull,
+		Overview:    buildAuditOverview(run, nil),
+	}))
+
+	processed := processedRunFromSummary(&RunSummary{RunAnalysis: RunAnalysis{Run: run}}, runDir)
+	require.NotNil(t, processed.Ledger)
+	require.NotNil(t, processed.Ledger.Compaction)
+	stdout, _ := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), processed, LogMetrics{}, nil, AuditOptions{
+			OutputDir:  runDir,
+			JSONOutput: true,
+		})
+	})
+	assert.Contains(t, stdout, `"ledger": {`)
+	assert.Contains(t, stdout, `"transactions_added": 2`)
+	assert.Contains(t, stdout, `"compaction": {`)
 }

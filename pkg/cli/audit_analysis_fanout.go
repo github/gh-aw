@@ -56,6 +56,7 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 
 func applyUsageSummaryToAuditResults(summary *usageActivitySummary, results *auditAnalysisResults) {
 	results.workingSet = summary.WorkingSet
+	results.ledger = summary.Ledger
 	results.friction = summary.Friction
 	applyUsageActivitySteeringSummary(summary.Steering, &results.tokenUsageSummary)
 	usageResult := &DownloadResult{RunAnalysis: RunAnalysis{MCPToolUsage: results.mcpToolUsage}}

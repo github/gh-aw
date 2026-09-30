@@ -837,5 +837,9 @@ func buildPushRepoMemoryOutputs(memories []RepoMemoryEntry) map[string]string {
 		outputs["validation_error_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.validation_error }}", stepID)
 		outputs["patch_size_exceeded_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.patch_size_exceeded }}", stepID)
 	}
+	if ledgerEntry := (&RepoMemoryConfig{Memories: memories}).ledgerEntry(); ledgerEntry != nil && ledgerEntry.Ledger.Compaction != nil {
+		stepID := "push_repo_memory_" + ledgerEntry.ID
+		outputs["ledger_compaction"] = fmt.Sprintf("${{ steps.%s.outputs.ledger_compaction }}", stepID)
+	}
 	return outputs
 }

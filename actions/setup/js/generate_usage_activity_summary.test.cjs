@@ -15,6 +15,8 @@ const {
   parseSteeringEvents,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  parseLedgerCompaction,
+  ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,
@@ -505,12 +507,14 @@ describe("generate_usage_activity_summary.cjs", () => {
     it("returns null when the manifest file does not exist", () => {
       const result = parseSafeOutputsManifest(manifestPath);
       expect(result).toBeNull();
+      expect(ledgerActivityFromSafeOutputs(result)).toBeNull();
     });
 
     it("returns zero-item result when the manifest file is empty", () => {
       fs.writeFileSync(manifestPath, "");
       const result = parseSafeOutputsManifest(manifestPath);
       expect(result).toEqual({ total_items: 0, items_by_type: {}, items: [] });
+      expect(ledgerActivityFromSafeOutputs(result)).toEqual({ transactions_added: 0 });
     });
 
     it("returns zero-item result when the manifest contains only blank lines", () => {
@@ -544,6 +548,32 @@ describe("generate_usage_activity_summary.cjs", () => {
       expect(result.total_items).toBe(3);
       expect(result.items_by_type).toEqual({ create_issue: 2, add_comment: 1 });
       expect(result.items).toEqual(lines.split("\n").map(line => JSON.parse(line)));
+      expect(ledgerActivityFromSafeOutputs(result)).toEqual({ transactions_added: 0 });
+    });
+
+    it("counts only recorded ledger mutations as added transactions", () => {
+      const lines = [{ type: "ledger_mutation" }, { type: "ledger_append" }, { type: "create_issue" }, { type: "ledger_mutation" }, { type: "ledger_mutation" }];
+      fs.writeFileSync(manifestPath, lines.map(JSON.stringify).join("\n"));
+      expect(ledgerActivityFromSafeOutputs(parseSafeOutputsManifest(manifestPath))).toEqual({ transactions_added: 3 });
+    });
+
+    it("collects compaction stats independently of the safe-output manifest", () => {
+      const compaction = {
+        before: 4,
+        after: 2,
+        selected: 3,
+        records: 12,
+        replacement: "abc123",
+        retired: 3,
+        changed: true,
+      };
+      expect(parseLedgerCompaction(JSON.stringify(compaction))).toEqual(compaction);
+      expect(ledgerActivityFromSafeOutputs(null, compaction)).toEqual({ compaction });
+      expect(ledgerActivityFromSafeOutputs({ items_by_type: {} }, compaction)).toEqual({
+        transactions_added: 0,
+        compaction,
+      });
+      expect(parseLedgerCompaction('{"before":-1}')).toBeNull();
     });
 
     it("skips lines with missing or empty type field", () => {

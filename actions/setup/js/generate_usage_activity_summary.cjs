@@ -9,6 +9,7 @@
 //   integrity: aggregate DIFC filtering counts from gateway/RPC logs
 //   steering: aggregate AWF steering-event counts by event type
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
+//   ledger: number of recorded ledger append transactions
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
 //   friction: precomputed cost of wasted work (AIC canonical) with attribution states
@@ -957,6 +958,8 @@ function parseGatewayLogs() {
   return parseGatewayActivity().gateway;
 }
 
+const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
+
 /**
  * Parse the safe-output-items manifest and aggregate item counts by type.
  * Reads the JSONL file written by the safe_outputs job and downloaded into
@@ -971,8 +974,6 @@ function parseGatewayLogs() {
  * @param {string} [manifestPath] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
  * @returns {{ total_items: number, items_by_type: Record<string, number>, items: Array<Record<string, any>> } | null}
  */
-const MANIFEST_FILE_PATH = "/tmp/gh-aw/safe-output-items.jsonl";
-
 function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   if (!fs.existsSync(manifestPath)) {
     return null;
@@ -1019,6 +1020,45 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
     items_by_type: itemsByType,
     items,
   };
+}
+
+function parseLedgerCompaction(value = process.env.GH_AW_LEDGER_COMPACTION) {
+  if (!value) return null;
+  try {
+    const compaction = JSON.parse(value);
+    if (
+      !compaction ||
+      typeof compaction !== "object" ||
+      !["before", "after", "selected", "records", "retired"].every(key => Number.isSafeInteger(compaction[key]) && compaction[key] >= 0) ||
+      !(compaction.replacement === null || typeof compaction.replacement === "string") ||
+      typeof compaction.changed !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      before: compaction.before,
+      after: compaction.after,
+      selected: compaction.selected,
+      records: compaction.records,
+      replacement: compaction.replacement,
+      retired: compaction.retired,
+      changed: compaction.changed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function ledgerActivityFromSafeOutputs(safeOutputs, compaction = parseLedgerCompaction()) {
+  if (safeOutputs === null && compaction === null) return null;
+  const activity = {};
+  if (safeOutputs !== null) {
+    activity.transactions_added = safeOutputs.items_by_type.ledger_mutation || 0;
+  }
+  if (compaction !== null) {
+    activity.compaction = compaction;
+  }
+  return activity;
 }
 
 /**
@@ -1120,8 +1160,10 @@ async function main() {
   //   • safe_outputs.total_items > 0  → manifest present with N items
   // A read error is kept separate: it logs a warning but omits safe_outputs so
   // the consumer cannot mistake a broken artifact for a legitimately empty one.
+  /** @type {ReturnType<typeof parseSafeOutputsManifest>} */
+  let safeOutputs = null;
   try {
-    const safeOutputs = parseSafeOutputsManifest();
+    safeOutputs = parseSafeOutputsManifest();
     if (safeOutputs === null) {
       core.info(`safe-output-items manifest not found at ${MANIFEST_FILE_PATH} — safe-outputs-items artifact may not have been downloaded`);
     } else {
@@ -1134,6 +1176,10 @@ async function main() {
     }
   } catch (err) {
     core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${getErrorMessage(err)} — safe_outputs omitted from summary`);
+  }
+  const ledger = ledgerActivityFromSafeOutputs(safeOutputs);
+  if (ledger) {
+    summary.ledger = ledger;
   }
 
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
@@ -1199,6 +1245,8 @@ module.exports = {
   parseGatewayLogs,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  parseLedgerCompaction,
+  ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,

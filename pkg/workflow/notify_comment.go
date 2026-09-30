@@ -239,10 +239,10 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // (when present), so the audit command can mine these results from the usage artifact alone.
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
-func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, hasDetection bool, pinAction func(string) string) []string {
+func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, hasDetection, hasLedgerCompaction bool, pinAction func(string) string) []string {
 	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
-	steps = append(steps, buildUsageArtifactCollectionStep(hasDetection)...)
+	steps = append(steps, buildUsageArtifactCollectionStep(hasDetection, hasLedgerCompaction)...)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
@@ -298,19 +298,26 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 	return steps
 }
 
-func buildUsageArtifactCollectionStep(hasDetection bool) []string {
+func buildUsageArtifactCollectionStep(hasDetection, hasLedgerCompaction bool) []string {
 	collectionStep := []string{
 		"      - name: Collect usage artifact files\n",
 		"        if: always()\n",
 		"        continue-on-error: true\n",
 	}
+	var env []string
 	if hasDetection {
-		collectionStep = append(collectionStep,
-			"        env:\n",
+		env = append(env,
 			"          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}\n",
 			"          GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}\n",
 			"          GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}\n",
 		)
+	}
+	if hasLedgerCompaction {
+		env = append(env, "          GH_AW_LEDGER_COMPACTION: ${{ needs.push_repo_memory.outputs.ledger_compaction }}\n")
+	}
+	if len(env) > 0 {
+		collectionStep = append(collectionStep, "        env:\n")
+		collectionStep = append(collectionStep, env...)
 	}
 	collectionStep = append(collectionStep, fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell))
 	return collectionStep

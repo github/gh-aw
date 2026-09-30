@@ -10,6 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildPushRepoMemoryOutputsIncludesLedgerCompaction(t *testing.T) {
+	outputs := buildPushRepoMemoryOutputs([]RepoMemoryEntry{
+		{ID: "default", Ledger: &RepoMemoryLedgerConfig{Compaction: &RepoMemoryLedgerCompactionConfig{MinSegments: 2, MaxSegments: 4}}},
+	})
+
+	assert.Equal(t, "${{ steps.push_repo_memory_default.outputs.ledger_compaction }}", outputs["ledger_compaction"])
+}
+
 // TestRepoMemoryConfigDefault tests basic repo-memory configuration with boolean true
 func TestRepoMemoryConfigDefault(t *testing.T) {
 	toolsMap := map[string]any{
