@@ -1019,8 +1019,43 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   };
 }
 
-function ledgerActivityFromSafeOutputs(safeOutputs) {
-  return safeOutputs === null ? null : { transactions_added: safeOutputs.items_by_type.ledger_mutation || 0 };
+function parseLedgerCompaction(value = process.env.GH_AW_LEDGER_COMPACTION) {
+  if (!value) return null;
+  try {
+    const compaction = JSON.parse(value);
+    if (
+      !compaction ||
+      typeof compaction !== "object" ||
+      !["before", "after", "selected", "records", "retired"].every(key => Number.isSafeInteger(compaction[key]) && compaction[key] >= 0) ||
+      !(compaction.replacement === null || typeof compaction.replacement === "string") ||
+      typeof compaction.changed !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      before: compaction.before,
+      after: compaction.after,
+      selected: compaction.selected,
+      records: compaction.records,
+      replacement: compaction.replacement,
+      retired: compaction.retired,
+      changed: compaction.changed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function ledgerActivityFromSafeOutputs(safeOutputs, compaction = parseLedgerCompaction()) {
+  if (safeOutputs === null && compaction === null) return null;
+  const activity = {};
+  if (safeOutputs !== null) {
+    activity.transactions_added = safeOutputs.items_by_type.ledger_mutation || 0;
+  }
+  if (compaction !== null) {
+    activity.compaction = compaction;
+  }
+  return activity;
 }
 
 /**
@@ -1082,13 +1117,13 @@ async function main() {
   //   • safe_outputs.total_items > 0  → manifest present with N items
   // A read error is kept separate: it logs a warning but omits safe_outputs so
   // the consumer cannot mistake a broken artifact for a legitimately empty one.
+  let safeOutputs = null;
   try {
-    const safeOutputs = parseSafeOutputsManifest();
+    safeOutputs = parseSafeOutputsManifest();
     if (safeOutputs === null) {
       core.info(`safe-output-items manifest not found at ${MANIFEST_FILE_PATH} — safe-outputs-items artifact may not have been downloaded`);
     } else {
       summary.safe_outputs = safeOutputs;
-      summary.ledger = ledgerActivityFromSafeOutputs(safeOutputs);
       if (safeOutputs.total_items === 0) {
         core.info(`safe-output-items manifest: 0 item(s) logged (file present but contained no loggable items)`);
       } else {
@@ -1097,6 +1132,10 @@ async function main() {
     }
   } catch (err) {
     core.warning(`safe-output-items manifest could not be read from ${MANIFEST_FILE_PATH}: ${getErrorMessage(err)} — safe_outputs omitted from summary`);
+  }
+  const ledger = ledgerActivityFromSafeOutputs(safeOutputs);
+  if (ledger) {
+    summary.ledger = ledger;
   }
 
   // Include A/B experiment assignments so the CLI can read them from the usage artifact.
@@ -1161,6 +1200,7 @@ module.exports = {
   parseGatewayLogs,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  parseLedgerCompaction,
   ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,

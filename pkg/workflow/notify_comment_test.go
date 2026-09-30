@@ -1625,7 +1625,7 @@ func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
 	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
-	}), "")
+	}, false), "")
 
 	for _, artifactName := range []string{constants.SafeOutputItemsArtifactName.String(), constants.EvalsArtifactName.String()} {
 		if !strings.Contains(steps, "name: "+artifactName) {
@@ -1637,6 +1637,13 @@ func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T)
 	}
 	if strings.Contains(steps, "merge-multiple: true") {
 		t.Errorf("Expected download-artifact v3 usage downloads not to use merge-multiple.\nGenerated steps:\n%s", steps)
+	}
+}
+
+func TestUsageArtifactReceivesLedgerCompactionOutput(t *testing.T) {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", false, "", func(action string) string { return action }, true), "")
+	if !strings.Contains(steps, "GH_AW_LEDGER_COMPACTION: ${{ needs.push_repo_memory.outputs.ledger_compaction }}") {
+		t.Fatalf("expected usage collection to receive repo-memory compaction stats:\n%s", steps)
 	}
 }
 

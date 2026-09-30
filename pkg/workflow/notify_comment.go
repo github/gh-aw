@@ -239,15 +239,10 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // command can mine experiments and evals data from the usage artifact alone.
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
-func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, pinAction func(string) string) []string {
+func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, pinAction func(string) string, hasLedgerCompaction bool) []string {
 	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
-	steps = append(steps,
-		"      - name: Collect usage artifact files\n",
-		"        if: always()\n",
-		"        continue-on-error: true\n",
-		fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell),
-	)
+	steps = append(steps, buildUsageActivityCollectionStep(hasLedgerCompaction)...)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
@@ -300,6 +295,22 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 	)
 	steps = append(steps, retryUsageArtifactUploadWithLines...)
 	return steps
+}
+
+func buildUsageActivityCollectionStep(hasLedgerCompaction bool) []string {
+	step := []string{
+		"      - name: Collect usage artifact files\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+	}
+	if hasLedgerCompaction {
+		step = append(step,
+			"        env:\n",
+			"          GH_AW_LEDGER_COMPACTION: ${{ needs.push_repo_memory.outputs.ledger_compaction }}\n",
+		)
+	}
+	step = append(step, fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell))
+	return step
 }
 
 // isGroupConcurrencyQueueEnabled reports whether compiler-generated concurrency groups

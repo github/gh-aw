@@ -15,6 +15,7 @@ const {
   parseSteeringEvents,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  parseLedgerCompaction,
   ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,
@@ -470,6 +471,25 @@ describe("generate_usage_activity_summary.cjs", () => {
       const lines = [{ type: "ledger_mutation" }, { type: "ledger_append" }, { type: "create_issue" }, { type: "ledger_mutation" }, { type: "ledger_mutation" }];
       fs.writeFileSync(manifestPath, lines.map(JSON.stringify).join("\n"));
       expect(ledgerActivityFromSafeOutputs(parseSafeOutputsManifest(manifestPath))).toEqual({ transactions_added: 3 });
+    });
+
+    it("collects compaction stats independently of the safe-output manifest", () => {
+      const compaction = {
+        before: 4,
+        after: 2,
+        selected: 3,
+        records: 12,
+        replacement: "abc123",
+        retired: 3,
+        changed: true,
+      };
+      expect(parseLedgerCompaction(JSON.stringify(compaction))).toEqual(compaction);
+      expect(ledgerActivityFromSafeOutputs(null, compaction)).toEqual({ compaction });
+      expect(ledgerActivityFromSafeOutputs({ items_by_type: {} }, compaction)).toEqual({
+        transactions_added: 0,
+        compaction,
+      });
+      expect(parseLedgerCompaction('{"before":-1}')).toBeNull();
     });
 
     it("skips lines with missing or empty type field", () => {

@@ -54,7 +54,9 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
-	steps = append(steps, buildUsageArtifactUploadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)
+	ledgerEntry := data.RepoMemoryConfig.ledgerEntry()
+	hasLedgerCompaction := ledgerEntry != nil && ledgerEntry.Ledger != nil && ledgerEntry.Ledger.Compaction != nil
+	steps = append(steps, buildUsageArtifactUploadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin, hasLedgerCompaction)...)
 	return steps
 }
 

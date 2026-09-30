@@ -205,7 +205,7 @@ The `usage` artifact is a compact conclusion-job artifact with workflow-run meta
 
 Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. The optional activity sections are additive; the `working_set` and `friction` sections are always written when the calculation step executes. Runs produced before a section shipped simply omit it, and every consumer treats a missing section as unmeasured:
 
-The `ledger.transactions_added` count covers repo-memory ledger appends recorded as `ledger_mutation` items in the downloaded safe-outputs manifest; queued `ledger_append` safe outputs are not counted because they are persisted later in a separate job. It is zero when that manifest is present without ledger mutations and absent when the manifest is unavailable.
+The `ledger.transactions_added` count covers repo-memory ledger appends recorded as `ledger_mutation` items in the downloaded safe-outputs manifest; queued `ledger_append` safe outputs are not counted because they are persisted later in a separate job. It is zero when that manifest is present without ledger mutations and absent when the manifest is unavailable. When ledger compaction runs, `ledger.compaction` also records shard and record counts, the replacement segment, retired sources, and whether storage changed.
 
 ```json
 {

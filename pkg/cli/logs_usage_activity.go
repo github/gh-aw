@@ -32,9 +32,20 @@ type usageActivitySummary struct {
 	Friction    *FrictionCostSummary      `json:"friction,omitempty"`
 }
 
-// LedgerActivity records ledger append transactions reported by the conclusion job.
+// LedgerActivity records ledger mutations and repo-memory compaction statistics.
 type LedgerActivity struct {
-	TransactionsAdded int `json:"transactions_added"`
+	TransactionsAdded *int                      `json:"transactions_added,omitempty"`
+	Compaction        *LedgerCompactionActivity `json:"compaction,omitempty"`
+}
+
+type LedgerCompactionActivity struct {
+	Before      int     `json:"before"`
+	After       int     `json:"after"`
+	Selected    int     `json:"selected"`
+	Records     int     `json:"records"`
+	Replacement *string `json:"replacement"`
+	Retired     int     `json:"retired"`
+	Changed     bool    `json:"changed"`
 }
 
 // WorkingSetMetrics describes cumulative model-input traffic relative to the
