@@ -2415,6 +2415,13 @@ These extensions apply to safe-output processor messages for `add_comment` (incl
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 
+**Security Requirements**:
+
+- Body undergoes full sanitization; `@mentions` are neutralized except for the parent item's author and configured mention aliases
+- Length, mention, and link limits (see Enforced Constraints) validated before and after footer injection
+- Cross-repo validation against `allowed-repos`
+- Agent-supplied `comment_id` rejected unless `target` is `"*"` and the ID is listed in `allows-comment-ids`; never honored for discussion comments
+
 **Required Permissions**:
 
 *GitHub Actions Token*:
