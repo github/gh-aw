@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-12",
-    "workflow_name": "CLI Consistency Checker",
-    "workflow_file": "cli-consistency-checker",
-    "total_aic_analyzed": 1265.04606,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 145
-  },
-  {
     "date": "2026-06-14",
     "workflow_name": "jsweep - JavaScript Unbloater",
     "workflow_file": "jsweep",
@@ -286,5 +277,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 10
+  },
+  {
+    "date": "2026-09-30",
+    "workflow_name": "Matt Pocock Skills Reviewer",
+    "workflow_file": "mattpocock-skills-reviewer",
+    "total_aic_analyzed": 310.09,
+    "runs_audited": 4,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 60
   }
 ]
