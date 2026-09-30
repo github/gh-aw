@@ -68,6 +68,10 @@ func TestResolveLedgerSchemas(t *testing.T) {
 }
 
 func TestImportLedgerFromSharedWorkflow(t *testing.T) {
+	singleLedgerConfig, err := parseLedgerToolConfig(map[string]any{})
+	require.NoError(t, err)
+	require.Len(t, singleLedgerConfig.Ledgers, 1)
+
 	root := t.TempDir()
 	workflowsDir := filepath.Join(root, ".github", "workflows")
 	require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
@@ -102,6 +106,8 @@ Inspect findings.
 	require.NotNil(t, data.LedgerConfig)
 	require.Len(t, data.LedgerConfig.Ledgers, 2)
 	require.Equal(t, "default", data.LedgerConfig.Ledgers[0].Name)
+	require.Equal(t, singleLedgerConfig.Ledgers[0].Name, data.LedgerConfig.Ledgers[0].Name)
+	require.Equal(t, singleLedgerConfig.Ledgers[0].BranchName, data.LedgerConfig.Ledgers[0].BranchName)
 	require.Equal(t, "findings", data.LedgerConfig.Ledgers[1].Name)
 	require.Equal(t, "object", data.LedgerConfig.Ledgers[1].Schema["type"])
 	require.NoError(t, NewCompiler().CompileWorkflow(mainPath))
