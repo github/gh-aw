@@ -14,9 +14,9 @@ set +o histexpand
 
 set -euo pipefail
 
-AWF_SESSION_STATE_DIR="/tmp/gh-aw/sandbox/agent/session-state"
-LEGACY_SESSION_STATE_DIR="$HOME/.copilot/session-state"
-LOGS_DIR="/tmp/gh-aw/sandbox/agent/logs/copilot-session-state"
+AWF_SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-/tmp/gh-aw/sandbox/agent/session-state}"
+LEGACY_SESSION_STATE_DIR="${GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR:-$HOME/.copilot/session-state}"
+LOGS_DIR="${GH_AW_COPILOT_SESSION_LOGS_DIR:-/tmp/gh-aw/sandbox/agent/logs/copilot-session-state}"
 
 SESSION_STATE_DIR=""
 if [ -d "$AWF_SESSION_STATE_DIR" ] && [ -n "$(find "$AWF_SESSION_STATE_DIR" -type f -print -quit)" ]; then
