@@ -1040,15 +1040,15 @@ function parseExperimentsData() {
  * Main function to generate usage activity summary
  */
 function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DETECTION_USAGE_RESULT_PATH) {
-  const jobResult = process.env.GH_AW_DETECTION_JOB_RESULT;
+  const jobResult = process.env.GH_AW_DETECTION_JOB_RESULT || "";
   if (!["success", "failure", "cancelled", "skipped"].includes(jobResult)) {
     return;
   }
 
   const result = {
     job_result: jobResult,
-    conclusion: ["success", "failure", "warning", "skipped"].includes(process.env.GH_AW_DETECTION_CONCLUSION) ? process.env.GH_AW_DETECTION_CONCLUSION : "",
-    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped"].includes(process.env.GH_AW_DETECTION_REASON) ? process.env.GH_AW_DETECTION_REASON : "",
+    conclusion: ["success", "failure", "warning", "skipped"].includes(process.env.GH_AW_DETECTION_CONCLUSION || "") ? process.env.GH_AW_DETECTION_CONCLUSION : "",
+    reason: ["threat_detected", "agent_failure", "parse_error", "detection_skipped"].includes(process.env.GH_AW_DETECTION_REASON || "") ? process.env.GH_AW_DETECTION_REASON : "",
   };
   if (jobResult !== "skipped") {
     const structured = parseStructuredResultFile(path.join(detectionDir, "detection_result.json"));
