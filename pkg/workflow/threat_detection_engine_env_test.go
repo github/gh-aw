@@ -316,6 +316,16 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			}}},
 			expectedUses: "uses: myorg/setup-node@v2",
 		},
+		{
+			name: "merged node entry without action override supersedes typed override",
+			data: &WorkflowData{
+				Runtimes: map[string]any{"node": map[string]any{"version": "22"}},
+				ParsedFrontmatter: &FrontmatterConfig{RuntimesTyped: &RuntimesConfig{
+					Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2"},
+				}},
+			},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+		},
 	}
 
 	for _, tt := range tests {

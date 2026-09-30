@@ -35,8 +35,8 @@ func GenerateNodeJsSetupStep() GitHubActionStep {
 
 // resolveNodeSetupActionOverride returns the runtimes.node.action-repo and
 // runtimes.node.action-version overrides configured for the workflow, if any.
-// The merged runtimes map (which includes imported runtimes) takes precedence
-// over the typed frontmatter view.
+// When the merged runtimes map (which includes imported runtimes) has a node
+// entry, it is authoritative; the typed frontmatter view is only a fallback.
 func resolveNodeSetupActionOverride(data *WorkflowData) (string, string) {
 	if data == nil {
 		return "", ""
@@ -49,9 +49,9 @@ func resolveNodeSetupActionOverride(data *WorkflowData) (string, string) {
 		if v, ok := nodeConfig["action-version"].(string); ok {
 			actionVersion = v
 		}
-		if actionRepo != "" || actionVersion != "" {
-			return actionRepo, actionVersion
-		}
+		// The merged entry is authoritative even when it omits action overrides:
+		// an imported node entry replaces the top-level entry wholesale.
+		return actionRepo, actionVersion
 	}
 	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.RuntimesTyped != nil && data.ParsedFrontmatter.RuntimesTyped.Node != nil {
 		node := data.ParsedFrontmatter.RuntimesTyped.Node
