@@ -8,8 +8,11 @@ const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const MAX_FILES = 1024;
 const MAX_SEGMENT_BYTES = 10 * 1024 * 1024;
+const MAX_PATCH_BYTES = 11 * 1024 * 1024;
 const DEFAULT_SEGMENT_BYTES = 100 * 1024;
-const MAX_RECORD_BYTES = 32 * 1024;
+const MAX_RECORD_BYTES = 40 * 1024;
+const DEFAULT_RECORD_BYTES = 32 * 1024;
+const LEDGER_RECORD_OVERHEAD_BYTES = 5 * 1024;
 const DEFAULT_PATCH_BYTES = 10 * 1024;
 const MAX_SCHEMA_BYTES = 1024 * 1024;
 const MAX_PARENTS = 64;
@@ -18,6 +21,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const RECORD_ID = /^ldg-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HASH = /^sha256:[0-9a-f]{64}$/;
 const SEGMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function configuredLedgerLimits(config, appendCount = 0) {
+  return {
+    maxRecordBytes: Math.min(MAX_RECORD_BYTES, config.max_record_kb * 1024 + LEDGER_RECORD_OVERHEAD_BYTES, config.max_segment_kb * 1024),
+    maxPatchBytes: Math.min(MAX_PATCH_BYTES, config.max_patch_kb * 1024 + appendCount * LEDGER_RECORD_OVERHEAD_BYTES),
+  };
+}
 
 function canonicalJSON(value) {
   const seen = new Set();
@@ -219,7 +229,7 @@ class Ledger {
     maxFiles = MAX_FILES,
     maxPatchBytes = DEFAULT_PATCH_BYTES,
     maxSegmentBytes = DEFAULT_SEGMENT_BYTES,
-    maxRecordBytes = MAX_RECORD_BYTES,
+    maxRecordBytes = DEFAULT_RECORD_BYTES,
     clock = () => new Date(),
     excludeSegments = [],
     transactionLogPath,
@@ -228,7 +238,7 @@ class Ledger {
     if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || maxFiles > MAX_FILES) throw new RangeError("Invalid maxFiles");
     if (!Number.isSafeInteger(maxSegmentBytes) || maxSegmentBytes < 1 || maxSegmentBytes > MAX_SEGMENT_BYTES) throw new RangeError("Invalid maxSegmentBytes");
     if (!Number.isSafeInteger(maxRecordBytes) || maxRecordBytes < 1 || maxRecordBytes > MAX_RECORD_BYTES || maxRecordBytes > maxSegmentBytes) throw new RangeError("Invalid maxRecordBytes");
-    if (!Number.isSafeInteger(maxPatchBytes) || maxPatchBytes < 1 || maxPatchBytes > MAX_SEGMENT_BYTES) throw new RangeError("Invalid maxPatchBytes");
+    if (!Number.isSafeInteger(maxPatchBytes) || maxPatchBytes < 1 || maxPatchBytes > MAX_PATCH_BYTES) throw new RangeError("Invalid maxPatchBytes");
     this.shardDir = path.join(memoryDir, "ledger", "shards");
     this.coverageDir = path.join(memoryDir, "ledger", "coverage");
     this.maxFiles = maxFiles;
@@ -930,4 +940,4 @@ class Ledger {
   }
 }
 
-module.exports = { Ledger, canonicalJSON, sha256 };
+module.exports = { Ledger, canonicalJSON, configuredLedgerLimits, sha256 };

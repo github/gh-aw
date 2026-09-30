@@ -83,6 +83,8 @@ test("main reports records only after the trusted persister succeeds", async () 
 
 test("appends canonical ledger state and delegates the upstream push", async () => {
   const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-persist-"));
+  const largeTransaction = transaction({ subject: "x".repeat(32500) });
+  const config = { ...ledgerConfigs[0], max_patch_kb: 100 };
   const pushCalls = [];
   const previousCore = global.core;
   global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
@@ -92,9 +94,10 @@ test("appends canonical ledger state and delegates the upstream push", async () 
       stdio: "pipe",
     });
     const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+    assert.doesNotThrow(() => validateTransactions(largeTransaction, [config]));
     const persisted = await persistLedgerAppends({
-      appends: transaction().ledgers.findings.appends,
-      config: ledgerConfigs[0],
+      appends: largeTransaction.ledgers.findings.appends,
+      config,
       githubClient: {},
       owner: "octo",
       repo: "repo",
@@ -117,7 +120,7 @@ test("appends canonical ledger state and delegates the upstream push", async () 
     assert.equal(pushCalls[0].baseRef, baseRef);
     assert.equal(pushCalls[0].branchName, "ledgers/findings");
     assert.match(shard, /^ledger\/shards\//);
-    assert.equal(JSON.parse(canonical.trim()).payload.id, transaction().ledgers.findings.appends[0].record.id);
+    assert.equal(JSON.parse(canonical.trim()).payload.id, largeTransaction.ledgers.findings.appends[0].record.id);
   } finally {
     if (previousCore === undefined) delete global.core;
     else global.core = previousCore;

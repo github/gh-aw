@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { Ledger } = require("./ledger_store.cjs");
+const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { pushRepoMemoryChangesWithRetry, configureRepoMemoryMergePolicy } = require("./push_repo_memory.cjs");
 const { finalId } = require("./ledger_transactions.cjs");
@@ -197,11 +197,12 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
   try {
     const baseRef = await checkoutLedgerBranchFn({ githubClient, owner, repo, branchName, workspaceDir, token, serverHost });
     configureRepoMemoryMergePolicy(workspaceDir);
+    const limits = configuredLedgerLimits(config, appends.length);
     ledger = new Ledger({
       memoryDir: workspaceDir,
       maxSegmentBytes: config.max_segment_kb * 1024,
-      maxRecordBytes: Math.min(32 * 1024, config.max_record_kb * 1024 + 1024),
-      maxPatchBytes: config.max_patch_kb * 1024,
+      maxRecordBytes: limits.maxRecordBytes,
+      maxPatchBytes: limits.maxPatchBytes,
     });
 
     let persisted = 0;

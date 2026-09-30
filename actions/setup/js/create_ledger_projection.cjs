@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { Ledger } = require("./ledger_store.cjs");
+const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
@@ -62,11 +62,12 @@ function materializeLedger({ refName, workspaceDir, sourceDir, config }) {
 }
 
 function createProjection({ sourceDir, databasePath, config }) {
+  const limits = configuredLedgerLimits(config);
   const ledger = new Ledger({
     memoryDir: sourceDir,
-    maxRecordBytes: Math.min(32 * 1024, config.max_record_kb * 1024 + 1024),
+    maxRecordBytes: limits.maxRecordBytes,
     maxSegmentBytes: config.max_segment_kb * 1024,
-    maxPatchBytes: config.max_patch_kb * 1024,
+    maxPatchBytes: limits.maxPatchBytes,
   });
   try {
     const state = ledger.reconstruct();
