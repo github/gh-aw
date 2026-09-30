@@ -28,6 +28,9 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleComparison(data.Comparison)
 	renderConsoleFingerprint(data.BehaviorFingerprint)
 	renderConsoleMetrics(data.Metrics)
+	if data.Ledger != nil {
+		fmt.Fprintf(os.Stderr, "  ledger: transactions_added=%d\n", data.Ledger.TransactionsAdded)
+	}
 	renderConsoleSession(data.SessionAnalysis)
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleGitHubAPIUsage(data.GitHubRateLimitUsage)

@@ -26,9 +26,15 @@ type usageActivitySummary struct {
 	Steering    *usageActivitySteering    `json:"steering,omitempty"`
 	Skills      *usageActivitySkills      `json:"skills,omitempty"`
 	SafeOutputs *usageActivitySafeOutputs `json:"safe_outputs,omitempty"`
+	Ledger      *LedgerActivity           `json:"ledger,omitempty"`
 	Experiments *usageActivityExperiments `json:"experiments,omitempty"`
 	WorkingSet  *WorkingSetMetrics        `json:"working_set,omitempty"`
 	Friction    *FrictionCostSummary      `json:"friction,omitempty"`
+}
+
+// LedgerActivity records ledger append transactions reported by the conclusion job.
+type LedgerActivity struct {
+	TransactionsAdded int `json:"transactions_added"`
 }
 
 // WorkingSetMetrics describes cumulative model-input traffic relative to the
@@ -202,6 +208,9 @@ func applyUsageActivitySummaryToResult(summary *usageActivitySummary, result *Do
 
 	if summary.WorkingSet != nil {
 		result.WorkingSet = summary.WorkingSet
+	}
+	if summary.Ledger != nil {
+		result.Ledger = summary.Ledger
 	}
 
 	// Friction is precomputed in the conclusion job: prefer it verbatim and never

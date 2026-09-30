@@ -9,6 +9,7 @@
 //   integrity: aggregate DIFC filtering counts from gateway/RPC logs
 //   steering: aggregate AWF steering-event counts by event type
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
+//   ledger: number of recorded ledger append transactions
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
 //   friction: precomputed cost of wasted work (AIC canonical) with attribution states
@@ -1018,6 +1019,10 @@ function parseSafeOutputsManifest(manifestPath = MANIFEST_FILE_PATH) {
   };
 }
 
+function ledgerActivityFromSafeOutputs(safeOutputs) {
+  return safeOutputs === null ? null : { transactions_added: safeOutputs.items_by_type.ledger_mutation || 0 };
+}
+
 /**
  * Parse A/B experiment assignments for the current run.
  * Reads the assignments.json file written by pick_experiment.cjs.
@@ -1083,6 +1088,7 @@ async function main() {
       core.info(`safe-output-items manifest not found at ${MANIFEST_FILE_PATH} — safe-outputs-items artifact may not have been downloaded`);
     } else {
       summary.safe_outputs = safeOutputs;
+      summary.ledger = ledgerActivityFromSafeOutputs(safeOutputs);
       if (safeOutputs.total_items === 0) {
         core.info(`safe-output-items manifest: 0 item(s) logged (file present but contained no loggable items)`);
       } else {
@@ -1155,6 +1161,7 @@ module.exports = {
   parseGatewayLogs,
   parseGatewayActivity,
   parseSafeOutputsManifest,
+  ledgerActivityFromSafeOutputs,
   parseExperimentsData,
   calculateWorkingSetFromJSONL,
   parseWorkingSetMetrics,

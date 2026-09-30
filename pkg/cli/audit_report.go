@@ -69,6 +69,7 @@ type AuditData struct {
 	OutcomeSummary          *OutcomeSummary          `json:"outcome_summary,omitempty"`
 	Experiments             *ExperimentData          `json:"experiments,omitempty"`
 	Graders                 *GradersData             `json:"graders,omitempty"`
+	Ledger                  *LedgerActivity          `json:"ledger,omitempty"`
 	Friction                *FrictionCostSummary     `json:"friction,omitempty"`
 }
 
@@ -558,6 +559,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		AgenticAssessments:      inputs.agenticAssessments,
 		Metrics:                 metricsData,
 		Friction:                inputs.processedRun.Friction,
+		Ledger:                  inputs.processedRun.Ledger,
 		KeyFindings:             inputs.findings,
 		Recommendations:         inputs.recommendations,
 		ObservabilityInsights:   inputs.observabilityInsights,

@@ -205,9 +205,14 @@ The `usage` artifact is a compact conclusion-job artifact with workflow-run meta
 
 Its `activity/summary.json` file uses the `usage-activity-summary/v1` schema. The optional activity sections are additive; the `working_set` and `friction` sections are always written when the calculation step executes. Runs produced before a section shipped simply omit it, and every consumer treats a missing section as unmeasured:
 
+The `ledger.transactions_added` count comes from recorded `ledger_mutation` items in the downloaded safe-outputs manifest. It is zero when that manifest is present without ledger mutations and absent when the manifest is unavailable.
+
 ```json
 {
   "schema": "usage-activity-summary/v1",
+  "ledger": {
+    "transactions_added": 3
+  },
   "firewall": {
     "total_requests": 12,
     "allowed_requests": 10,

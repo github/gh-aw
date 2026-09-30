@@ -3,8 +3,13 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,4 +51,51 @@ func TestApplyUsageSummaryToAuditResultsBackfillsMCPPayloadMetrics(t *testing.T)
 	assert.Equal(t, 600, results.mcpToolUsage.Summary[0].MaxOutputSize)
 	require.Len(t, results.mcpToolUsage.Servers, 1)
 	assert.Equal(t, 200, results.mcpToolUsage.Servers[0].MaxInputSize)
+}
+
+func TestAuditLedgerActivityFromUsageSummary(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	activityDir := filepath.Join(runDir, "usage", "activity")
+	require.NoError(t, os.MkdirAll(activityDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(`{"schema":"usage-activity-summary/v1","ledger":{"transactions_added":3}}`), 0o600))
+
+	summary, err := loadUsageActivitySummary(runDir)
+	require.NoError(t, err)
+	results := auditAnalysisResults{}
+	applyUsageSummaryToAuditResults(summary, &results)
+	run := WorkflowRun{DatabaseID: 42}
+	processed := buildProcessedAuditRun(run, results)
+	require.Equal(t, 3, processed.Ledger.TransactionsAdded)
+	require.Equal(t, 3, buildAuditRunSummary(run, processed, results).Ledger.TransactionsAdded)
+
+	data := buildAuditData(context.Background(), processed, workflow.LogMetrics{}, nil)
+	raw, err := json.Marshal(data)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"ledger":{"transactions_added":3}`)
+	assert.Contains(t, captureFrictionStderr(t, func() { renderConsole(data, runDir) }), "ledger: transactions_added=3")
+}
+
+func TestAuditLedgerActivityMissingVersusZero(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name   string
+		ledger *LedgerActivity
+		want   string
+	}{
+		{name: "missing", want: `"ledger"`},
+		{name: "zero", ledger: &LedgerActivity{}, want: `"ledger":{"transactions_added":0}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			results := auditAnalysisResults{}
+			applyUsageSummaryToAuditResults(&usageActivitySummary{Ledger: test.ledger}, &results)
+			raw, err := json.Marshal(buildAuditRunSummary(WorkflowRun{}, buildProcessedAuditRun(WorkflowRun{}, results), results))
+			require.NoError(t, err)
+			if test.ledger == nil {
+				assert.NotContains(t, string(raw), test.want)
+			} else {
+				assert.Contains(t, string(raw), test.want)
+			}
+		})
+	}
 }
