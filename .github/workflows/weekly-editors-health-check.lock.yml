@@ -548,7 +548,7 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.27 --rootless
       - name: Install Playwright CLI
-        run: npm install -g @playwright/cli@0.1.22
+        run: npm install -g @playwright/cli@0.1.21
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
         timeout-minutes: 10
