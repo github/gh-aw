@@ -89,6 +89,7 @@ func TestOperationalValueGraderScopesActionsReadToActivation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, job)
 	assert.Contains(t, job.Permissions, "actions: read")
+	assert.Equal(t, "${{ steps.generate_aw_info.outputs.aw_context }}", job.Outputs["aw_context"])
 	assert.Equal(t, "${{ steps.generate_aw_info.outputs.run_created_at }}", job.Outputs["run_created_at"])
 
 	steps := strings.Join(job.Steps, "")

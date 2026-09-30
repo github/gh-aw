@@ -167,6 +167,7 @@ async function main(core, ctx, githubClient) {
   // orchestration context via workflow inputs or repository_dispatch client payload.
   // Validates JSON format and structure before populating the context key in aw_info.json.
   const awContextRaw = ctx.payload?.inputs?.aw_context ?? ctx.payload?.client_payload?.aw_context;
+  let expressionAwContext = "{}";
   if (awContextRaw != null) {
     try {
       const parsed = typeof awContextRaw === "string" ? JSON.parse(awContextRaw) : awContextRaw;
@@ -182,6 +183,7 @@ async function main(core, ctx, githubClient) {
         if (nestedKeys.length > 0) {
           core.warning(`aw_context contains nested objects for keys: ${nestedKeys.join(", ")}. Ignoring aw_context.`);
         } else {
+          expressionAwContext = JSON.stringify(parsed);
           // Validate: required fields must be present
           const requiredFields = ["run_id", "repo", "workflow_id"];
           const missingFields = requiredFields.filter(f => !(f in parsed));
@@ -196,6 +198,7 @@ async function main(core, ctx, githubClient) {
       core.warning(`Failed to parse aw_context input as JSON: ${String(awContextRaw)}`);
     }
   }
+  core.setOutput("aw_context", expressionAwContext);
 
   // Write to /tmp/gh-aw directory to avoid inclusion in PR
   try {

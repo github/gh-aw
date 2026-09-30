@@ -129,22 +129,20 @@ func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data 
 	// OR github.event.issue.pull_request exists (for issue_comment events on PRs).
 	// Note: issue_comment events on PRs do NOT set github.event.pull_request; instead
 	// github.event.issue.pull_request is set to indicate the issue is a PR.
-	dispatchPRContextCondition := BuildAnd(
-		BuildEventTypeEquals("workflow_dispatch"),
-		BuildEquals(
-			BuildPropertyAccess("fromJSON(github.event.inputs.aw_context || '{}').item_type"),
-			BuildStringLiteral("pull_request"),
-		),
-	)
+	// The checkout script parses aw_context and skips dispatches without valid PR
+	// context; parsing free-text input in an if expression can fail the whole job.
 	condition := BuildOr(
 		BuildOr(
 			BuildPropertyAccess("github.event.pull_request"),
 			BuildPropertyAccess("github.event.issue.pull_request"),
 		),
-		dispatchPRContextCondition,
+		BuildEventTypeEquals("workflow_dispatch"),
 	)
 	RenderConditionAsIf(yaml, condition, "          ")
+	writePRReadyForReviewCheckoutAction(yaml, data, useRequire)
+}
 
+func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowData, useRequire bool) {
 	// Use actions/github-script instead of shell script
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 

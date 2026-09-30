@@ -54,7 +54,7 @@ on:
     inputs:
       aw_context:
         default: ""
-        description: "Agent caller context (used internally by Agentic Workflows)."
+        description: "Agent caller context (Reserved for Agentic Workflows)."
         required: false
         type: string
 
@@ -84,6 +84,7 @@ jobs:
       GH_AW_MAX_DAILY_AI_CREDITS: "10000"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
+      aw_context: ${{ steps.generate_aw_info.outputs.aw_context }}
       comment_id: ""
       comment_repo: ""
       daily_ai_credits_exceeded: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_exceeded == 'true' }}
@@ -475,7 +476,7 @@ jobs:
       - name: Checkout PR branch
         id: checkout-pr
         if: |
-          github.event.pull_request || github.event.issue.pull_request || github.event_name == 'workflow_dispatch' && fromJSON(github.event.inputs.aw_context || '{}').item_type == 'pull_request'
+          github.event.pull_request || github.event.issue.pull_request || github.event_name == 'workflow_dispatch'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
