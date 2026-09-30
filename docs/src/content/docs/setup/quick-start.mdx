@@ -150,6 +150,8 @@ If organization billing is enabled in your organization, you can choose **Use co
 
 To avoid a long-lived key, configure [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif).
 
+A Claude subscription token from `claude login` (`CLAUDE_CODE_OAUTH_TOKEN`) is not supported. It is silently ignored, and the run fails with a Claude CLI authentication error that does not mention the token.
+
 Follow [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/) for the complete setup.
 
 **Codex**
