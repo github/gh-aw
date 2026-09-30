@@ -14,6 +14,45 @@
     }
   },
   {
+    "name": "ledger_compact",
+    "description": "Request bounded logical ledger compaction. Drop records by ID or insert replacement records; changes take effect after validated persistence and replay.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["operations"],
+      "properties": {
+        "ledger": { "type": "string", "description": "Configured ledger name; required when multiple ledgers are configured." },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["op", "id"],
+                "properties": {
+                  "op": { "const": "drop" },
+                  "id": { "type": "string", "description": "ID of an existing ledger record to drop." }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["op", "record"],
+                "properties": {
+                  "op": { "const": "insert" },
+                  "record": { "type": "object", "description": "Replacement record payload matching the configured ledger schema." }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "linear_create_issue",
     "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team UUID/key/name, and project ID are trusted workflow configuration and are not agent inputs.",
     "inputSchema": {

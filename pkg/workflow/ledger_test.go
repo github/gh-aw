@@ -182,6 +182,14 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_compact")
+	var ledgerCompactToolFound bool
+	for _, tool := range GetSafeOutputToolOptions() {
+		if tool.Name == "ledger_compact" {
+			ledgerCompactToolFound = true
+			break
+		}
+	}
+	require.True(t, ledgerCompactToolFound, "ledger_compact must have a tool definition")
 	require.True(t, hasHandlerManagerTypes(data))
 
 	job, err := NewCompiler().buildPushLedgerChangesJob(data, false)
