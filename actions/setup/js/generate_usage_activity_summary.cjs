@@ -1117,6 +1117,7 @@ async function main() {
   //   • safe_outputs.total_items > 0  → manifest present with N items
   // A read error is kept separate: it logs a warning but omits safe_outputs so
   // the consumer cannot mistake a broken artifact for a legitimately empty one.
+  /** @type {ReturnType<typeof parseSafeOutputsManifest>} */
   let safeOutputs = null;
   try {
     safeOutputs = parseSafeOutputsManifest();
