@@ -99,3 +99,26 @@ func TestAuditLedgerActivityMissingVersusZero(t *testing.T) {
 		})
 	}
 }
+
+func TestCachedAuditBackfillsLedgerActivity(t *testing.T) {
+	runDir := t.TempDir()
+	activityDir := filepath.Join(runDir, "usage", "activity")
+	require.NoError(t, os.MkdirAll(activityDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(`{"schema":"usage-activity-summary/v1","ledger":{"transactions_added":2}}`), 0o600))
+	run := WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success", LogsPath: runDir}
+	require.NoError(t, writeAuditData(runDir, AuditData{
+		CacheSource: auditCacheSourceFull,
+		Overview:    buildAuditOverview(run, nil),
+	}))
+
+	processed := processedRunFromSummary(&RunSummary{RunAnalysis: RunAnalysis{Run: run}}, runDir)
+	require.NotNil(t, processed.Ledger)
+	stdout, _ := captureOutput(t, func() error {
+		return renderAuditReport(context.Background(), processed, LogMetrics{}, nil, AuditOptions{
+			OutputDir:  runDir,
+			JSONOutput: true,
+		})
+	})
+	assert.Contains(t, stdout, `"ledger": {`)
+	assert.Contains(t, stdout, `"transactions_added": 2`)
+}

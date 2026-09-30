@@ -225,6 +225,11 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
+	if summary.Ledger == nil {
+		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
+			summary.Ledger = activity.Ledger
+		}
+	}
 	gatewaySteeringEvents := summary.GatewaySteeringEvents
 	if len(gatewaySteeringEvents) == 0 {
 		if events, err := extractGatewaySteeringEvents(runOutputDir); err == nil && len(events) > 0 {
