@@ -41,7 +41,7 @@ func TestRunSetupAuthWithRuntime_JSONOutput(t *testing.T) {
 }
 
 func TestRunSetupRepositoryCheck_AttachedCheckout(t *testing.T) {
-	t.Parallel()
+	// The attached checkout path changes the process-wide working directory.
 	repoDir := initBootstrapGitRepo(t)
 	err := runSetupRepositoryCheckWithRuntime(normalizeSetupRepositoryCheckOptions(SetupRepositoryCheckOptions{
 		Ctx:  context.Background(),
@@ -123,7 +123,7 @@ func TestRunSetupRepositoryCheck_RequiresExistingRepository(t *testing.T) {
 }
 
 func TestRunSetupRepositoryCheck_PropagatesCleanWorktreeError(t *testing.T) {
-	t.Parallel()
+	// The attached checkout path changes the process-wide working directory.
 	repoDir := initBootstrapGitRepo(t)
 	wantErr := errors.New("working directory has uncommitted changes, please commit or stash them first")
 
