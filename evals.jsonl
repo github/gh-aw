@@ -20,3 +20,5 @@
 {"id":"content-accurate","question":"Does the changeset accurately summarize the changes described in the pull request?","answer":"UNKNOWN","model":"gpt-5.4","timestamp":"2026-08-28T03:15:45.248Z","runid":"33138018891"}
 {"id":"changeset-created","question":"Did the agent create a valid changeset file for the labeled pull request?","answer":"NO","model":"gpt-5.4","timestamp":"2026-08-29T17:06:22.216Z","runid":"33264487304"}
 {"id":"content-accurate","question":"Does the changeset accurately summarize the changes described in the pull request?","answer":"UNKNOWN","model":"gpt-5.4","timestamp":"2026-08-29T17:06:22.216Z","runid":"33264487304"}
+{"id":"changeset-created","question":"Did the agent create a valid changeset file for the labeled pull request?","answer":"NO","model":"openai/gpt-5.3-codex","timestamp":"2026-09-30T16:43:06.634Z","runid":"36745457629"}
+{"id":"content-accurate","question":"Does the changeset accurately summarize the changes described in the pull request?","answer":"UNKNOWN","model":"openai/gpt-5.3-codex","timestamp":"2026-09-30T16:43:06.634Z","runid":"36745457629"}
