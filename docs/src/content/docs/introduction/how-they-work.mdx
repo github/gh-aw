@@ -33,7 +33,7 @@ Each engine authenticates with its own secret or permission:
 | [Claude Code](/gh-aw/engines/claude/) | `claude` | [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) or [Anthropic WIF](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif) |
 | [OpenAI Codex](/gh-aw/engines/codex/) | `codex` | `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) |
 | [Google Gemini](/gh-aw/engines/gemini/) | `gemini` | [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) or [Google WIF](/gh-aw/reference/auth/#google-workload-identity-federation-wif) |
-| [Pi](/gh-aw/engines/pi/) | `pi` | Copilot, Anthropic, or OpenAI/Codex authentication |
+| [Pi](/gh-aw/engines/pi/) | `pi` | Copilot, Anthropic, or OpenAI/Codex authentication, selected by the provider prefix in `model:` (see [Quick Start](/gh-aw/setup/quick-start/)) |
 
 See [Authentication](/gh-aw/reference/auth/) for the full setup instructions for each engine.
 
