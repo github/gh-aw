@@ -147,6 +147,8 @@ steps:
     with:
       name: purelock-bundle-${{ github.run_id }}
       path: /tmp/gh-aw/purelock
+  - name: Add standard system utilities to PATH
+    run: printf '%s\n' /usr/local/bin /usr/bin /bin >> "$GITHUB_PATH"
 safe-outputs:
   steer: true
   create-pull-request:
