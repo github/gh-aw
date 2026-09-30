@@ -257,6 +257,80 @@ func TestBuildDetectionEngineExecutionStepEmitsNodeSetupForCopilot(t *testing.T)
 	}
 }
 
+func TestBuildDetectionEngineExecutionStepHonorsNodeActionOverride(t *testing.T) {
+	compiler := NewCompiler()
+	const customRef = "myorg/myrepo/.github/actions/setup-node@main"
+
+	for _, engineID := range []string{"copilot", "claude", "codex"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: engineID,
+				Runtimes: map[string]any{
+					"node": map[string]any{
+						"action-repo":    "myorg/myrepo/.github/actions/setup-node",
+						"action-version": "main",
+					},
+				},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			}
+			s := strings.Join(compiler.buildDetectionEngineExecutionStep(data), "")
+			if c := strings.Count(s, "- name: Setup Node.js"); c != 1 {
+				t.Fatalf("want exactly one Setup Node.js, got %d.\n%s", c, s)
+			}
+			if !strings.Contains(s, "uses: "+customRef) {
+				t.Errorf("expected Setup Node.js to use %q, got:\n%s", customRef, s)
+			}
+			if strings.Contains(s, "uses: actions/setup-node@") {
+				t.Errorf("expected no default actions/setup-node reference, got:\n%s", s)
+			}
+		})
+	}
+}
+
+func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
+	defaultStep := strings.Join(GenerateNodeJsSetupStep(), "\n")
+
+	tests := []struct {
+		name         string
+		data         *WorkflowData
+		expectedUses string
+	}{
+		{
+			name:         "nil data uses default",
+			data:         nil,
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+		},
+		{
+			name: "runtimes map override",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"action-repo": "myorg/setup-node", "action-version": "v1"},
+			}},
+			expectedUses: "uses: myorg/setup-node@v1",
+		},
+		{
+			name: "typed frontmatter override",
+			data: &WorkflowData{ParsedFrontmatter: &FrontmatterConfig{RuntimesTyped: &RuntimesConfig{
+				Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2"},
+			}}},
+			expectedUses: "uses: myorg/setup-node@v2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := strings.Join(generateNodeJsSetupStepForWorkflow(tt.data), "\n")
+			if !strings.Contains(step, tt.expectedUses) {
+				t.Errorf("expected %q in step:\n%s", tt.expectedUses, step)
+			}
+			if tt.data == nil && step != defaultStep {
+				t.Errorf("expected default step, got:\n%s", step)
+			}
+		})
+	}
+}
+
 func TestInstallStepsContainNodeSetup(t *testing.T) {
 	tests := []struct {
 		name     string
