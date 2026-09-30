@@ -76,7 +76,8 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 	}
 	result := &LedgerToolConfig{}
 	// A schema/limit property identifies the concise single-ledger form. All
-	// other properties are names, which keeps the two forms unambiguous.
+	// other properties are names, which keeps the two forms unambiguous. Keep
+	// these discriminator keys synchronized with isSingleLedgerMap in pkg/parser/tools_merger.go.
 	single := false
 	for key := range root {
 		switch key {

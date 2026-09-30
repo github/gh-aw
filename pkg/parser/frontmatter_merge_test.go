@@ -4,6 +4,7 @@ package parser
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -349,6 +350,12 @@ func TestMergeToolsPreservesDefaultLedger(t *testing.T) {
 			additional: map[string]any{"ledger": map[string]any{"schema": map[string]any{"type": "object"}}},
 			expected:   map[string]any{"default": map[string]any{"schema": map[string]any{"type": "object"}}, "findings": map[string]any{}},
 		},
+		{
+			name:       "both concise single-ledger forms",
+			base:       map[string]any{"ledger": map[string]any{"max-record-kb": 10}},
+			additional: map[string]any{"ledger": map[string]any{"max-segment-kb": 20}},
+			expected:   map[string]any{"max-record-kb": 10, "max-segment-kb": 20},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			merged, err := MergeTools(tc.base, tc.additional)
@@ -363,6 +370,32 @@ func TestMergeToolsPreservesDefaultLedger(t *testing.T) {
 			wantJSON, _ := json.Marshal(tc.expected)
 			if string(gotJSON) != string(wantJSON) {
 				t.Fatalf("merged ledger = %s, want %s", gotJSON, wantJSON)
+			}
+		})
+	}
+}
+
+func TestMergeToolsRejectsDefaultLedgerNameCollision(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		base       map[string]any
+		additional map[string]any
+	}{
+		{
+			name:       "concise base and named additional",
+			base:       map[string]any{"ledger": map[string]any{"schema": map[string]any{"type": "object"}}},
+			additional: map[string]any{"ledger": map[string]any{"default": map[string]any{"max-record-kb": 5}, "findings": map[string]any{}}},
+		},
+		{
+			name:       "named base and concise additional",
+			base:       map[string]any{"ledger": map[string]any{"default": map[string]any{"max-record-kb": 5}, "findings": map[string]any{}}},
+			additional: map[string]any{"ledger": map[string]any{"schema": map[string]any{"type": "object"}}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := MergeTools(tc.base, tc.additional)
+			if err == nil || !strings.Contains(err.Error(), "ledger name 'default' conflicts") {
+				t.Fatalf("MergeTools() error = %v, want default ledger name collision", err)
 			}
 		})
 	}

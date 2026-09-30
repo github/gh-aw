@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -131,7 +132,11 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 	}
 
 	if key == "ledger" {
-		existingMap, newMap = normalizeLedgerMaps(existingMap, newMap)
+		var err error
+		existingMap, newMap, err = normalizeLedgerMaps(existingMap, newMap)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	if mergedMap, merged, err := mergeMCPIfApplicable(key, existingMap, newMap); merged || err != nil {
 		return mergedMap, merged, err
@@ -148,18 +153,25 @@ func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool,
 
 // normalizeLedgerMaps preserves the default ledger when merging the concise
 // single-ledger form with named ledgers from another workflow.
-func normalizeLedgerMaps(existing, additional map[string]any) (map[string]any, map[string]any) {
+func normalizeLedgerMaps(existing, additional map[string]any) (map[string]any, map[string]any, error) {
 	existingSingle := isSingleLedgerMap(existing)
 	additionalSingle := isSingleLedgerMap(additional)
 	if existingSingle == additionalSingle {
-		return existing, additional
+		return existing, additional, nil
 	}
 	if existingSingle {
-		return map[string]any{"default": existing}, additional
+		if _, hasDefault := additional["default"]; hasDefault {
+			return nil, nil, errors.New("ledger name 'default' conflicts with the synthesized default ledger from a concise single-ledger config")
+		}
+		return map[string]any{"default": existing}, additional, nil
 	}
-	return existing, map[string]any{"default": additional}
+	if _, hasDefault := existing["default"]; hasDefault {
+		return nil, nil, errors.New("ledger name 'default' conflicts with the synthesized default ledger from a concise single-ledger config")
+	}
+	return existing, map[string]any{"default": additional}, nil
 }
 
+// Keep these discriminator keys synchronized with parseLedgerToolConfig in pkg/workflow/ledger.go.
 func isSingleLedgerMap(config map[string]any) bool {
 	if len(config) == 0 {
 		return true
