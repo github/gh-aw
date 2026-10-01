@@ -221,6 +221,34 @@ function sqlPayloadFilter(filters, type) {
   return { where: clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "", params };
 }
 
+/**
+ * Build the deterministic content-addressed representation of a ledger segment without
+ * touching the filesystem. The identity depends only on the deduplicated record set and
+ * metadata, so independent parties (for example the untrusted compaction planner and the
+ * trusted apply job) derive the same segment ID and bytes for the same records.
+ * @param {any[]} records
+ * @param {{metadata?: any, maxSegmentBytes?: number, validate?: (payload: any) => boolean}} [options]
+ * @returns {{id: string, content: Buffer, records: any[]}}
+ */
+function buildSegment(records, { metadata = {}, maxSegmentBytes = DEFAULT_SEGMENT_BYTES, validate } = {}) {
+  if (!Array.isArray(records) || records.length === 0) throw new TypeError("Ledger segment records are required");
+  const unique = new Map();
+  for (const input of records) {
+    const record = JSON.parse(JSON.stringify(input));
+    if (!recordShape(record) || sha256(Object.fromEntries(Object.entries(record).filter(([key]) => key !== "sha"))) !== record.sha || (validate && !validate(record.payload))) {
+      throw new TypeError("Ledger segment contains an invalid record");
+    }
+    unique.set(record.sha, record);
+  }
+  const ordered = [...unique.values()].sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
+  const body = { records: ordered, metadata: canonicalJSON(JSON.parse(JSON.stringify(metadata))) };
+  const digest = crypto.createHash("sha256").update(canonicalJSON(body)).digest("hex");
+  const id = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-${((parseInt(digest.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0")}${digest.slice(18, 20)}-${digest.slice(20, 32)}`;
+  const content = Buffer.from(ordered.map(record => `${canonicalJSON(record)}\n`).join(""));
+  if (content.length > maxSegmentBytes) throw new RangeError("Ledger segment exceeds maximum size");
+  return { id, content, records: ordered };
+}
+
 class Ledger {
   /** @param {{memoryDir?: string, schemaPath?: string, maxFiles?: number, maxPatchBytes?: number, maxSegmentBytes?: number, maxRecordBytes?: number, clock?: () => Date, excludeSegments?: string[], transactionLogPath?: string}} [options] */
   constructor({
@@ -346,21 +374,7 @@ class Ledger {
   }
 
   createSegment(records, metadata = {}) {
-    if (!Array.isArray(records) || records.length === 0) throw new TypeError("Ledger segment records are required");
-    const unique = new Map();
-    for (const input of records) {
-      const record = JSON.parse(JSON.stringify(input));
-      if (!recordShape(record) || sha256(Object.fromEntries(Object.entries(record).filter(([key]) => key !== "sha"))) !== record.sha || (this.validate && !this.validate(record.payload))) {
-        throw new TypeError("Ledger segment contains an invalid record");
-      }
-      unique.set(record.sha, record);
-    }
-    const ordered = [...unique.values()].sort((left, right) => (left.sha < right.sha ? -1 : left.sha > right.sha ? 1 : 0));
-    const body = { records: ordered, metadata: canonicalJSON(JSON.parse(JSON.stringify(metadata))) };
-    const digest = crypto.createHash("sha256").update(canonicalJSON(body)).digest("hex");
-    const id = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-${((parseInt(digest.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0")}${digest.slice(18, 20)}-${digest.slice(20, 32)}`;
-    const content = Buffer.from(ordered.map(record => `${canonicalJSON(record)}\n`).join(""));
-    if (content.length > this.maxSegmentBytes) throw new RangeError("Ledger segment exceeds maximum size");
+    const { id, content, records: ordered } = buildSegment(records, { metadata, maxSegmentBytes: this.maxSegmentBytes, validate: this.validate });
     checkShardDirectories(this.shardDir, true);
     const destination = this.segmentPath(id);
     if (fs.existsSync(destination)) {
@@ -501,32 +515,6 @@ class Ledger {
       }
     }
     return retired;
-  }
-
-  async compact({ minSegments = 32, maxSegments = 32 } = {}) {
-    if (!Number.isSafeInteger(minSegments) || minSegments < 2 || minSegments > MAX_FILES) throw new RangeError("Invalid minSegments");
-    if (!Number.isSafeInteger(maxSegments) || maxSegments < minSegments || maxSegments > MAX_FILES) throw new RangeError("Invalid maxSegments");
-    const eligible = this.listSegments({ closed: true, excludeCurrent: true });
-    if (eligible.length < minSegments) {
-      return { changed: false, selected: 0, records: 0, replacement: null, retired: 0, before: eligible.length, after: eligible.length };
-    }
-    const selected = eligible.slice(0, maxSegments);
-    const records = (await Promise.all(selected.map(segment => this.readRecords(segment.id)))).flat();
-    if (!records.length) {
-      return { changed: false, selected: selected.length, records: 0, replacement: null, retired: 0, before: eligible.length, after: eligible.length };
-    }
-    const replacement = this.createSegment(records);
-    this.markCovered(
-      selected.map(segment => segment.id),
-      replacement.id
-    );
-    const retired = this.retireCovered();
-    const after = this.listSegments({ closed: true, excludeCurrent: true }).length;
-    return { changed: retired > 0, selected: selected.length, records: replacement.records, replacement: replacement.id, retired, before: eligible.length, after };
-  }
-
-  async runCompactor() {
-    throw new Error("Custom compactor scripts are disabled until a least-privilege worker is available; use declarative ledger compaction options.");
   }
 
   reconstruct() {
@@ -940,4 +928,4 @@ class Ledger {
   }
 }
 
-module.exports = { Ledger, canonicalJSON, configuredLedgerLimits, sha256 };
+module.exports = { Ledger, buildSegment, canonicalJSON, configuredLedgerLimits, sha256, SEGMENT_ID, MAX_FILES };

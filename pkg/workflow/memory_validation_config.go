@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -119,14 +118,6 @@ func memoryValidationScriptBase64(config *MemoryValidationConfig) string {
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString([]byte(config.Script))
-}
-
-func ledgerCompactionOptionsBase64(config *RepoMemoryLedgerConfig) string {
-	if config == nil || config.Compaction == nil {
-		return ""
-	}
-	encoded, _ := json.Marshal(config.Compaction) //nolint:jsonmarshalignoredeerror // This struct contains only integer fields.
-	return base64.StdEncoding.EncodeToString(encoded)
 }
 
 func memoryValidationStepID(prefix, memoryID string) string {

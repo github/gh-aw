@@ -200,8 +200,9 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 
 	// Scan workflows for expires fields and track the minimum expires value
 	hasExpires, minExpires, triggerReason := scanWorkflowsForExpires(workflowDataList, repoConfig)
+	compactionLedgers := collectMaintenanceCompactionLedgers(workflowDataList)
 
-	if !hasExpires {
+	if !hasExpires && len(compactionLedgers) == 0 {
 		maintenanceLog.Print("No workflows use expires field, skipping maintenance workflow generation")
 
 		// No maintenance workflow means no scheduled close-expired-issues consumer.
@@ -253,6 +254,9 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		})
 	}
 
+	if triggerReason == "" {
+		triggerReason = fmt.Sprintf("%d compaction-enabled ledger(s)", len(compactionLedgers))
+	}
 	maintenanceLog.Printf("Maintenance workflow generation triggered: %s", triggerReason)
 	maintenanceLog.Printf("Generating maintenance workflow for expired discussions, issues, and pull requests (minimum expires: %d hours)", minExpires)
 
@@ -262,8 +266,14 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		minExpiresDays++ // Round up partial days
 	}
 
-	// Generate cron schedule based on minimum expires value
-	cronSchedule, scheduleDesc := generateMaintenanceCron(minExpiresDays)
+	// Generate cron schedule based on minimum expires value. Without expiring safe outputs,
+	// ledger compaction only needs daily maintenance (ledgers default to a daily schedule and the
+	// compaction plan job no-ops when a ledger is not yet due).
+	cronDays := minExpiresDays
+	if !hasExpires {
+		cronDays = 7
+	}
+	cronSchedule, scheduleDesc := generateMaintenanceCron(cronDays)
 	maintenanceLog.Printf("Maintenance schedule: %s (%s)", cronSchedule, scheduleDesc)
 
 	// Fetch the default branch for the push trigger (dev mode only)
@@ -293,6 +303,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		compileGitHubToken:  getEffectiveMaintenanceGitHubToken(compileGitHubTokenSecret),
 		createCompilePR:     enableCompileCreatePullRequest,
 		copilotOrgBilling:   copilotOrgBilling,
+		compactionLedgers:   compactionLedgers,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)
@@ -382,6 +393,13 @@ func handleMaintenanceDisabled(workflowDataList []*WorkflowData, workflowDir str
 				fmt.Sprintf("Workflow '%s' uses the 'expires' field but maintenance is disabled in aw.json. "+
 					"Expiration will not run until maintenance is re-enabled.", workflowData.Name)))
 		}
+	}
+
+	// Ledger compaction is owned by maintenance; without it ledgers grow until they reach shard limits.
+	for _, ledger := range collectMaintenanceCompactionLedgers(workflowDataList) {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Sprintf("Ledger '%s' has compaction enabled but maintenance is disabled in aw.json. "+
+				"Ledger compaction will not run until maintenance is re-enabled.", ledger.Name)))
 	}
 
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")

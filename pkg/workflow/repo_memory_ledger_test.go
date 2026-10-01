@@ -117,7 +117,7 @@ func TestRepoMemoryLedgerGeneratedMCPAndPrompt(t *testing.T) {
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_SEGMENT_KB: 1024")
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_RECORD_KB: 16")
 	assert.Contains(t, pushStep, "GH_AW_LEDGER_MAX_PATCH_KB: 512")
-	assert.Contains(t, pushStep, "LEDGER_COMPACTION_OPTIONS_B64:")
+	assert.NotContains(t, pushStep, "LEDGER_COMPACTION_OPTIONS_B64")
 	assert.NotContains(t, pushStep, "LEDGER_COMPACTOR_SCRIPT_B64")
 
 	var setup strings.Builder

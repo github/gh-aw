@@ -28,6 +28,7 @@ type buildMaintenanceWorkflowYAMLOptions struct {
 	compileGitHubToken  string
 	createCompilePR     bool
 	copilotOrgBilling   bool // all Copilot workflows use copilot-requests: write (GITHUB_TOKEN); COPILOT_GITHUB_TOKEN is not required
+	compactionLedgers   []LedgerConfig
 }
 
 // buildMaintenanceWorkflowYAML generates the complete YAML content for the
@@ -58,6 +59,11 @@ func buildMaintenanceWorkflowYAML(
 	yaml.WriteString(buildMaintenanceValidateWorkflowsJob(ctx, opts, setupActionRef))
 	yaml.WriteString(buildMaintenanceLabelTriggeredJobs(opts, setupActionRef))
 	yaml.WriteString(buildMaintenanceDevOnlyJobs(ctx, opts, setupActionRef))
+	ledgerJobs, err := buildMaintenanceLedgerCompactionJobs(opts, setupActionRef)
+	if err != nil {
+		return "", err
+	}
+	yaml.WriteString(ledgerJobs)
 	finalYAML, err := finalizeRunnerTempSafety(yaml.String())
 	if err != nil {
 		return "", fmt.Errorf("runner temp safety: %w", err)
@@ -79,8 +85,9 @@ func buildMaintenanceWorkflowHeaderYAML(opts buildMaintenanceWorkflowYAMLOptions
 	customInstructions := `This file defines the generated agentic maintenance workflow for this repository.
 It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 
-This workflow is generated automatically when workflows use expiring safe outputs
-or when repository maintenance features are enabled in .github/workflows/aw.json.
+This workflow is generated automatically when workflows use expiring safe outputs,
+when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+maintenance features are enabled in .github/workflows/aw.json.
 
 To disable maintenance workflow generation, set in .github/workflows/aw.json:
   {"maintenance": false}
@@ -88,11 +95,15 @@ To disable maintenance workflow generation, set in .github/workflows/aw.json:
 Agentic maintenance docs:
   https://github.github.com/gh-aw/reference/ephemerals/#manual-maintenance-operations`
 
+	scheduleBasis := "based on minimum expires: " + strconv.Itoa(opts.minExpiresDays) + " days"
+	if opts.minExpiresDays <= 0 {
+		scheduleBasis = "for ledger compaction"
+	}
 	return GenerateWorkflowHeader("", "pkg/workflow/maintenance_workflow.go", customInstructions) + `name: Agentic Maintenance
 
 on:
   schedule:
-    - cron: "` + opts.cronSchedule + `"  # ` + opts.scheduleDesc + ` (based on minimum expires: ` + strconv.Itoa(opts.minExpiresDays) + ` days)
+    - cron: "` + opts.cronSchedule + `"  # ` + opts.scheduleDesc + ` (` + scheduleBasis + `)
 `
 }
 
@@ -112,14 +123,30 @@ func buildMaintenanceWorkflowTriggerYAML(
 		maintenanceWorkflowYAMLLog.Print("Adding issues:labeled trigger for label-triggered maintenance jobs")
 		yaml.WriteString("  issues:\n    types: [labeled]\n")
 	}
-	yaml.WriteString(buildMaintenanceDispatchInputsYAML())
-	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue))
+	hasLedgers := len(opts.compactionLedgers) > 0
+	yaml.WriteString(buildMaintenanceDispatchInputsYAML(hasLedgers))
+	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers))
 	yaml.WriteString("\npermissions: {}\n\njobs:\n")
 	return yaml.String()
 }
 
+// maintenanceLedgerInputDescription documents the ledger input used by compact_ledger.
+const maintenanceLedgerInputDescription = "Ledger name to compact when operation is compact_ledger (empty compacts every due ledger)."
+
 // buildMaintenanceDispatchInputsYAML returns the workflow_dispatch trigger block.
-func buildMaintenanceDispatchInputsYAML() string {
+// When compaction-enabled ledgers exist, it adds the compact_ledger operation and a ledger input.
+func buildMaintenanceDispatchInputsYAML(hasLedgers bool) string {
+	ledgerOption := ""
+	ledgerInput := ""
+	if hasLedgers {
+		ledgerOption = "          - '" + maintenanceCompactLedgerOperation + "'\n"
+		ledgerInput = `      ledger:
+        description: '` + maintenanceLedgerInputDescription + `'
+        required: false
+        type: string
+        default: ''
+`
+	}
 	return fmt.Sprintf(`  workflow_dispatch:
     inputs:
       operation:
@@ -141,20 +168,31 @@ func buildMaintenanceDispatchInputsYAML() string {
           - 'update_pull_request_branches'
           - 'validate'
           - 'forecast'
-      run_url:
+%[2]s      run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
         required: false
         type: string
         default: ''
-`, maintenanceNoOperationValue)
+%[3]s`, maintenanceNoOperationValue, ledgerOption, ledgerInput)
 }
 
 // buildMaintenanceWorkflowCallYAML returns the workflow_call trigger block.
-func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string) string {
+func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers bool) string {
+	operations := "disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast"
+	ledgerInput := ""
+	if hasLedgers {
+		operations += ", " + maintenanceCompactLedgerOperation
+		ledgerInput = `      ledger:
+        description: '` + maintenanceLedgerInputDescription + `'
+        required: false
+        type: string
+        default: ''
+`
+	}
 	return `  workflow_call:
     inputs:
       operation:
-        description: 'Optional maintenance operation to run (disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast)'
+        description: 'Optional maintenance operation to run (` + operations + `)'
         required: false
         type: string
         default: ''
@@ -163,7 +201,7 @@ func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLVal
         required: false
         type: string
         default: ''
-    outputs:
+` + ledgerInput + `    outputs:
       operation_completed:
         description: 'The maintenance operation that was completed (empty when none ran or a scheduled job ran)'
         value: ${{ jobs.run_operation.outputs.operation || inputs.operation }}

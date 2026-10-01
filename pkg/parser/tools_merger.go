@@ -180,6 +180,18 @@ func isSingleLedgerMap(config map[string]any) bool {
 		switch key {
 		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
 			return true
+		case "compaction":
+			switch compaction := value.(type) {
+			case bool:
+				return true
+			case map[string]any:
+				for compactionKey := range compaction {
+					switch compactionKey {
+					case "schedule", "min-segments", "max-segments", "script":
+						return true
+					}
+				}
+			}
 		case "replay":
 			if replay, ok := value.(map[string]any); ok {
 				if _, hasScript := replay["script"]; hasScript {

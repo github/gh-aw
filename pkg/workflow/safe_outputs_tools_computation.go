@@ -17,6 +17,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
 			enabledTools["ledger_append"] = struct{}{}
 		}
+		if len(data.LedgerConfig.compactionEnabledLedgers()) > 0 {
+			enabledTools[ledgerRequestCompactionHandlerKey] = struct{}{}
+		}
 		safeOutputsToolsComputationLog.Print("No safe outputs configuration, returning empty tool set")
 		return enabledTools
 	}
@@ -238,6 +241,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 	}
 	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
 		enabledTools["ledger_append"] = struct{}{}
+	}
+	if len(data.LedgerConfig.compactionEnabledLedgers()) > 0 {
+		enabledTools[ledgerRequestCompactionHandlerKey] = struct{}{}
 	}
 
 	safeOutputsToolsComputationLog.Printf("Computed %d enabled safe output tool names", len(enabledTools))
