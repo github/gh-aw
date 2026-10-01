@@ -88,6 +88,7 @@ const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSi
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
+const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -507,7 +508,7 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false) {
     return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
   }
   const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
-  if (effort && !["minimal", "low", "medium", "high", "xhigh"].includes(effort)) {
+  if (effort && !isRoutingReasoningEffort(effort)) {
     return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
   }
   return { selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint }, error: null };
@@ -528,7 +529,7 @@ function applyCopilotRoutingSelection(selection, logger = log) {
   } else {
     delete process.env.GH_AW_COPILOT_ROUTING_EFFORT;
   }
-  logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "none"} wire_api=${wireApi}`);
+  logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "(unset)"} wire_api=${wireApi}`);
 }
 
 /**
