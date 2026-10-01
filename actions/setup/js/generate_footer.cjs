@@ -173,6 +173,38 @@ function generateWorkflowCallIdMarker(callerWorkflowId) {
 }
 
 /**
+ * GitHub strips HTML comments from review bodies, but retains Markdown reference
+ * definitions. Encode the caller ID so it cannot alter the reference syntax.
+ * @param {string} callerWorkflowId
+ * @returns {string}
+ */
+function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
+  return `[gh-aw-workflow-call-id]: # "${encodeURIComponent(callerWorkflowId)}"`;
+}
+
+/**
+ * Match only a complete provenance line, including legacy review markers.
+ * @param {string|null|undefined} body
+ * @param {string} callerWorkflowId
+ * @returns {boolean}
+ */
+function matchesWorkflowCallIdReviewMarker(body, callerWorkflowId) {
+  if (!body || !callerWorkflowId) return false;
+  const legacyMarker = generateWorkflowCallIdMarker(callerWorkflowId);
+  return body.split(/\r?\n/).some(line => {
+    const marker = line.trim();
+    if (marker === legacyMarker) return true;
+    const match = marker.match(/^\[gh-aw-workflow-call-id\]: # "([^"]+)"$/);
+    if (!match) return false;
+    try {
+      return decodeURIComponent(match[1]) === callerWorkflowId;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
  * Normalizes a user-supplied close-older-key to identifier style.
  * Converts to lowercase, replaces runs of non-alphanumeric/dash/underscore characters
  * with a single dash, then trims leading and trailing dashes and underscores.
@@ -294,6 +326,8 @@ module.exports = {
   generateXMLMarker,
   generateWorkflowIdMarker,
   generateWorkflowCallIdMarker,
+  generateWorkflowCallIdReviewMarker,
+  matchesWorkflowCallIdReviewMarker,
   getWorkflowIdMarkerContent,
   matchesWorkflowId,
   isValidWorkflowId,
