@@ -136,6 +136,7 @@ The `checkout:` frontmatter key is parsed by `ParseCheckoutConfigs` into one or 
 | `PermissionMode` | `string` | `engine.permission-mode` | Agent permission mode |
 | `MaxTurns` | `string` | `engine.max-turns` | Maximum agent turns |
 | `MaxToolDenials` | `string` | `engine.max-tool-denials` | Max repeated tool denials before stopping (Copilot SDK mode only) |
+| `MaxToolCalls` | `string` | `max-tool-calls` | Aggregate run-wide tool dispatch budget (built-in Copilot SDK driver only) |
 | `MaxRuns` | `int` | `engine.max-runs` | Maximum LLM invocations per run (AWF `apiProxy.maxRuns`) |
 | `MaxContinuations` | `int` | `engine.max-continuations` | Maximum autopilot continuations (copilot engine; `> 1` enables `--autopilot`) |
 | `MaxAICredits` | `int64` | `engine.max-ai-credits` | Maximum AI credits per run for AWF API-proxy firewall enforcement |

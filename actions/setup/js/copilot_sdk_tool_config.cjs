@@ -25,6 +25,7 @@ const COPILOT_SDK_EDIT_BUILTIN_TOOLS = Object.freeze(["apply_patch", "edit", "cr
  *   version: number,
  *   capabilities: CopilotSDKToolCapabilities,
  *   permissions: {allowedTools: string[]},
+ *   maxToolCalls?: number,
  *   explicitlyDisabledTools: string[],
  * }} CopilotSDKToolConfig
  */
@@ -167,12 +168,14 @@ function parseCopilotSDKToolConfig(value) {
   if (allowedTools.length === 0) {
     throw new Error("permissions.allowedTools must not be empty");
   }
+  const maxToolCalls = Object.hasOwn(parsed, "maxToolCalls") ? require("./copilot_sdk_tool_budget.cjs").parseMaxToolCalls(parsed.maxToolCalls) : undefined;
   const config = {
     version: COPILOT_SDK_TOOL_CONFIG_VERSION,
     capabilities: parseCapabilities(parsed.capabilities),
     permissions: {
       allowedTools,
     },
+    ...(maxToolCalls === undefined ? {} : { maxToolCalls }),
     explicitlyDisabledTools: parsed.explicitlyDisabledTools == null ? [] : parseStringArray(parsed.explicitlyDisabledTools, "explicitlyDisabledTools"),
   };
   validateToolPermissionParity(config);

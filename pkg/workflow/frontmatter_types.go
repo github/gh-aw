@@ -365,6 +365,7 @@ type FrontmatterConfig struct {
 	MaxTurnCacheMisses          *int32                       `json:"max-turn-cache-misses,omitempty"`
 	MaxDailyAICredits           *TemplatableInt32            `json:"max-daily-ai-credits,omitempty"`
 	MaxToolDenials              *TemplatableInt32            `json:"max-tool-denials,omitempty"`
+	MaxToolCalls                *TemplatableInt32            `json:"max-tool-calls,omitempty"`
 	Strict                      *bool                        `json:"strict,omitempty"`  // Pointer to distinguish unset from false
 	Private                     *bool                        `json:"private,omitempty"` // If true, workflow cannot be added to other repositories
 	Labels                      []string                     `json:"labels,omitempty"`

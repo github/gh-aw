@@ -4363,6 +4363,11 @@
       "default": 5,
       "examples": [5, "${{ inputs.max-tool-denials }}"]
     },
+    "max-tool-calls": {
+      "$ref": "#/$defs/templatable_positive_integer",
+      "description": "Maximum aggregate number of tool dispatches for the workflow run, including subagents. Enforced before execution only by the built-in Copilot SDK driver. Supports GitHub Actions expressions. Not supported by other engines or custom Copilot SDK drivers/harnesses.",
+      "examples": [100, "${{ inputs.max-tool-calls }}"]
+    },
     "max-ai-credits": {
       "$ref": "#/$defs/max_ai_credits_limit",
       "default": 1000,
