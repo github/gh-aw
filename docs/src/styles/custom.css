@@ -16,30 +16,62 @@
   }
 }
 
-/* Light Theme Body Background */
-:root[data-theme='light'] body {
-  background: linear-gradient(180deg, #ffffff 0%, #f6f8fa 100%) !important;
-  background-attachment: fixed !important;
+/* Page background */
+body {
+  background: linear-gradient(180deg, var(--aw-color-bg) 0%, var(--aw-color-bg-page-end) 100%);
+  background-attachment: fixed;
+  font-family: var(--sl-font);
 }
 
-/* Light Theme Landing Glow */
-:root[data-theme='light'] body::before {
+/* Homepage glow. WorkflowHero exposes [data-slide-hero] as the trigger contract. */
+body::before {
   content: '';
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(ellipse 900px 620px at 16% 8%, rgba(130, 80, 223, 0.16), transparent 60%),
-    radial-gradient(ellipse 760px 520px at 92% 20%, rgba(168, 139, 250, 0.12), transparent 62%),
-    linear-gradient(180deg, rgba(130, 80, 223, 0.06), transparent 38%);
-  background-size: 100% 100%, 100% 100%, 100% 100%;
+  inset: 0;
+  background: var(--aw-landing-glow);
   z-index: 0;
   pointer-events: none;
-  animation: none;
   opacity: 0;
 }
+
+body:has([data-slide-hero])::before {
+  animation: glow-move 24s ease-in-out infinite;
+  opacity: 1;
+}
+
+@keyframes glow-move {
+  0%, 100% {
+    background-position: 0% 0%, 100% 100%, 50% 100%, 0% 0%;
+  }
+  25% {
+    background-position: 10% 20%, 90% 80%, 40% 90%, 0% 0%;
+  }
+  50% {
+    background-position: 20% 30%, 80% 70%, 60% 80%, 0% 0%;
+  }
+  75% {
+    background-position: 10% 40%, 90% 60%, 50% 90%, 0% 0%;
+  }
+}
+
+/* Let the page background show through Starlight's frames on desktop */
+@media (min-width: 769px) {
+  .page,
+  .main-frame,
+  main,
+  .content-panel,
+  #starlight__sidebar,
+  .sidebar,
+  .sidebar-content,
+  .sidebar-pane {
+    background: transparent;
+  }
+}
+
+#starlight__sidebar, .sidebar {
+  border-right: 1px solid var(--aw-color-hairline);
+}
+
 
 /* Skip to Content Link - Enhanced Accessibility (WCAG 2.4.1) */
 /* The .skip-link is visually hidden until focused via keyboard, then revealed. */
@@ -81,136 +113,35 @@
   border: 0 !important;
 }
 
-/* Mermaid diagram colors
-   We style Mermaid nodes by their class (tracked, notTracked, workflow, external)
-   so we can use lighter colors in light mode and darker colors in dark mode. */
-
-/* Default (dark theme): stronger fills with light text */
+/* Mermaid diagram colours, by node class. Values per theme live in tokens.css. */
 .mermaid .tracked rect,
 .mermaid .tracked polygon {
-  fill: #6b46c1;
-  stroke: #5b3da3;
-}
-.mermaid .tracked text {
-  fill: #ffffff;
+  fill: var(--aw-diagram-tracked-fill);
+  stroke: var(--aw-diagram-tracked-stroke);
 }
 
 .mermaid .notTracked rect,
 .mermaid .notTracked polygon {
-  fill: #424a53;
-  stroke: #2d333b;
-}
-.mermaid .notTracked text {
-  fill: #ffffff;
+  fill: var(--aw-diagram-untracked-fill);
+  stroke: var(--aw-diagram-untracked-stroke);
 }
 
 .mermaid .workflow rect,
 .mermaid .workflow polygon {
-  fill: #0969da;
-  stroke: #0753b6;
-}
-.mermaid .workflow text {
-  fill: #ffffff;
+  fill: var(--aw-diagram-workflow-fill);
+  stroke: var(--aw-diagram-workflow-stroke);
 }
 
 .mermaid .external rect,
 .mermaid .external polygon {
-  fill: #bf3989;
-  stroke: #7d2457;
-}
-.mermaid .external text {
-  fill: #ffffff;
+  fill: var(--aw-diagram-external-fill);
+  stroke: var(--aw-diagram-external-stroke);
 }
 
-/* Light theme: pastel fills with dark text */
-:root[data-theme='light'] .mermaid .tracked rect,
-:root[data-theme='light'] .mermaid .tracked polygon {
-  fill: #e3d5ff;
-  stroke: #6b46c1;
-}
-:root[data-theme='light'] .mermaid .tracked text {
-  fill: #000000;
+.mermaid :is(.tracked, .notTracked, .workflow, .external) text {
+  fill: var(--aw-diagram-text);
 }
 
-:root[data-theme='light'] .mermaid .notTracked rect,
-:root[data-theme='light'] .mermaid .notTracked polygon {
-  fill: #e1e4e8;
-  stroke: #8d96a0;
-}
-:root[data-theme='light'] .mermaid .notTracked text {
-  fill: #000000;
-}
-
-:root[data-theme='light'] .mermaid .workflow rect,
-:root[data-theme='light'] .mermaid .workflow polygon {
-  fill: #c6e6ff;
-  stroke: #0969da;
-}
-:root[data-theme='light'] .mermaid .workflow text {
-  fill: #000000;
-}
-
-:root[data-theme='light'] .mermaid .external rect,
-:root[data-theme='light'] .mermaid .external polygon {
-  fill: #ffd6e8;
-  stroke: #bf3989;
-}
-:root[data-theme='light'] .mermaid .external text {
-  fill: #000000;
-}
-
-:root[data-theme='light'] body:has([data-slide-hero])::before {
-  opacity: 1;
-}
-
-/* Light Theme Transparent Backgrounds - Desktop only */
-@media (min-width: 769px) {
-  :root[data-theme='light'] .page {
-    background: transparent !important;
-  }
-
-  :root[data-theme='light'] .main-frame {
-    background: transparent !important;
-  }
-
-  :root[data-theme='light'] main {
-    background: transparent !important;
-  }
-
-  :root[data-theme='light'] .content-panel {
-    background: transparent !important;
-  }
-}
-
-/* Light Theme Glow Animation */
-@keyframes light-glow-move {
-  0%, 100% {
-    background-position: 0% 0%, 100% 100%, 50% 100%, 0% 0%;
-  }
-  25% {
-    background-position: 10% 20%, 90% 80%, 40% 90%, 0% 0%;
-  }
-  50% {
-    background-position: 20% 30%, 80% 70%, 60% 80%, 0% 0%;
-  }
-  75% {
-    background-position: 10% 40%, 90% 60%, 50% 90%, 0% 0%;
-  }
-}
-
-/* Light Theme Sidebar */
-
-
-:root[data-theme='light'] .sidebar {
-  border-right: 1px solid #d0d7de;
-}
-
-/* Light Theme Sidebar - Desktop only transparent */
-@media (min-width: 769px) {
-  :root[data-theme='light'] .sidebar {
-    background: transparent !important;
-  }
-}
 
 /* Light Theme Hero */
 :root[data-theme='light'] .hero {
@@ -334,97 +265,6 @@
 
 :root[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
   background: rgba(175, 184, 193, 0.7);
-}
-
-/* Dark Theme Body Background with Gradient */
-body {
-  background: linear-gradient(180deg, #0d1117 0%, #11161d 100%) !important;
-  background-attachment: fixed !important;
-  font-family: var(--sl-font) !important;
-}
-
-/* Dark Theme Landing Glow */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(ellipse 880px 640px at 16% 8%, rgba(139, 92, 246, 0.2), transparent 58%),
-    radial-gradient(ellipse 720px 540px at 92% 18%, rgba(192, 132, 252, 0.14), transparent 62%),
-    linear-gradient(180deg, rgba(76, 29, 149, 0.3), transparent 42%);
-  background-size: 100% 100%, 100% 100%, 100% 100%;
-  z-index: 0;
-  pointer-events: none;
-  animation: none;
-  opacity: 0;
-}
-
-/* WorkflowHero exposes [data-slide-hero] as the homepage glow trigger contract. */
-body:has([data-slide-hero])::before {
-  animation: glow-move 24s ease-in-out infinite;
-  opacity: 1;
-}
-
-:root[data-theme='light'] body:has([data-slide-hero])::before {
-  animation: light-glow-move 24s ease-in-out infinite;
-}
-
-/* Dark Theme Transparent Backgrounds - Desktop only */
-@media (min-width: 769px) {
-  .page {
-    background: transparent !important;
-  }
-
-  .main-frame {
-    background: transparent !important;
-  }
-
-  main {
-    background: transparent !important;
-  }
-
-  .content-panel {
-    background: transparent !important;
-  }
-}
-
-/* Dark Theme Glow Animation */
-@keyframes glow-move {
-  0%, 100% {
-    background-position: 0% 0%, 100% 100%, 50% 100%, 0% 0%;
-  }
-  25% {
-    background-position: 10% 20%, 90% 80%, 40% 90%, 0% 0%;
-  }
-  50% {
-    background-position: 20% 30%, 80% 70%, 60% 80%, 0% 0%;
-  }
-  75% {
-    background-position: 10% 40%, 90% 60%, 50% 90%, 0% 0%;
-  }
-}
-
-/* Dark Theme Sidebar */
-#starlight__sidebar, .sidebar {
-  border-right: 1px solid rgba(48, 54, 61, 0.25);
-}
-
-/* Only make sidebar transparent on desktop */
-@media (min-width: 769px) {
-  #starlight__sidebar, .sidebar {
-    background-color: transparent !important;
-  }
-
-  .sidebar-content {
-    background: transparent !important;
-  }
-
-  .sidebar-pane {
-    background: transparent !important;
-  }
 }
 
 /* Sidebar Navigation Styling */

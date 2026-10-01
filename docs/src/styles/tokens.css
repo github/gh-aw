@@ -57,6 +57,14 @@
   --aw-purple-8: #5a32a3;
   --aw-purple-9: #2f234a;
 
+  --aw-blue-2: #c6e6ff;
+  --aw-blue-6: #0969da;
+  --aw-blue-7: #0753b6;
+
+  --aw-pink-2: #ffd6e8;
+  --aw-pink-6: #bf3989;
+  --aw-pink-8: #7d2457;
+
   --aw-amber-9: #6a4500;
 
   --aw-font-sans: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -70,6 +78,25 @@
   --aw-color-bg-subtle: var(--aw-gray-11);
   --aw-color-bg-raised: rgba(22, 27, 34, 0.88);
   --aw-color-bg-overlay: rgba(13, 17, 23, 0.78);
+
+  --aw-color-bg-page-end: var(--aw-gray-11);
+
+  /* Homepage-only ambient glow (shown when WorkflowHero is on the page) */
+  --aw-landing-glow:
+    radial-gradient(ellipse 880px 640px at 16% 8%, rgba(139, 92, 246, 0.2), transparent 58%),
+    radial-gradient(ellipse 720px 540px at 92% 18%, rgba(192, 132, 252, 0.14), transparent 62%),
+    linear-gradient(180deg, rgba(76, 29, 149, 0.3), transparent 42%);
+
+  /* Mermaid node categories */
+  --aw-diagram-tracked-fill: var(--aw-purple-7);
+  --aw-diagram-tracked-stroke: var(--aw-purple-8);
+  --aw-diagram-untracked-fill: var(--aw-gray-8);
+  --aw-diagram-untracked-stroke: var(--aw-gray-9);
+  --aw-diagram-workflow-fill: var(--aw-blue-6);
+  --aw-diagram-workflow-stroke: var(--aw-blue-7);
+  --aw-diagram-external-fill: var(--aw-pink-6);
+  --aw-diagram-external-stroke: var(--aw-pink-8);
+  --aw-diagram-text: var(--aw-gray-0);
 
   --aw-color-text: var(--aw-gray-1);
   --aw-color-text-muted: var(--aw-gray-4);
@@ -109,6 +136,23 @@
   --aw-color-bg-subtle: var(--aw-gray-1);
   --aw-color-bg-raised: rgba(255, 255, 255, 0.88);
   --aw-color-bg-overlay: rgba(246, 248, 250, 0.82);
+
+  --aw-color-bg-page-end: var(--aw-gray-1);
+
+  --aw-landing-glow:
+    radial-gradient(ellipse 900px 620px at 16% 8%, rgba(130, 80, 223, 0.16), transparent 60%),
+    radial-gradient(ellipse 760px 520px at 92% 20%, rgba(168, 139, 250, 0.12), transparent 62%),
+    linear-gradient(180deg, rgba(130, 80, 223, 0.06), transparent 38%);
+
+  --aw-diagram-tracked-fill: var(--aw-purple-2);
+  --aw-diagram-tracked-stroke: var(--aw-purple-7);
+  --aw-diagram-untracked-fill: var(--aw-gray-2);
+  --aw-diagram-untracked-stroke: var(--aw-gray-5);
+  --aw-diagram-workflow-fill: var(--aw-blue-2);
+  --aw-diagram-workflow-stroke: var(--aw-blue-6);
+  --aw-diagram-external-fill: var(--aw-pink-2);
+  --aw-diagram-external-stroke: var(--aw-pink-6);
+  --aw-diagram-text: var(--aw-gray-13);
 
   --aw-color-text: var(--aw-gray-13);
   --aw-color-text-muted: var(--aw-gray-7);
