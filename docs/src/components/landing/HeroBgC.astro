@@ -1,12 +1,357 @@
 ---
-// Hero background variant C (placeholder)
+// Hero background variant C: topographic contours.
+// A WebGL fragment shader draws iso-lines of a slowly morphing, domain-warped
+// noise height field. Lines are densest at the top edge and fade out toward the
+// headline. One index contour near the peaks is drawn in coral.
 ---
 
-<div class="hero-bg"></div>
+<div class="hero-bg-c" data-hero-bg-c>
+  <canvas class="hero-bg-c-canvas"></canvas>
+</div>
 
 <style>
-  .hero-bg {
+  .hero-bg-c {
     position: absolute;
     inset: 0;
+    overflow: hidden;
+    /* Static fallback (no JS / no WebGL): a faint wash at the top edge. */
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--aw-color-accent) 9%, transparent),
+      transparent 45%
+    );
+  }
+  .hero-bg-c.is-live {
+    background: none;
+  }
+  .hero-bg-c-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 600ms ease-out;
+  }
+  .hero-bg-c.is-live .hero-bg-c-canvas {
+    opacity: 1;
   }
 </style>
+
+<script>
+  const VERT = `
+    attribute vec2 aPos;
+    void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+  `;
+
+  const FRAG = `
+    #extension GL_OES_standard_derivatives : enable
+    precision highp float;
+
+    uniform vec2 uRes;       // drawing-buffer size in px
+    uniform float uPx;       // drawing-buffer px per CSS px
+    uniform float uTime;
+    uniform float uDark;     // 0 light, 1 dark
+    uniform vec3 uLine;      // main contour colour
+    uniform vec3 uLineHi;    // saturated contour colour near the top
+    uniform vec3 uWashA;
+    uniform vec3 uWashB;
+    uniform vec3 uCoral;
+
+    vec2 hash2(vec2 p) {
+      p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+      return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+    }
+    float hash1(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+    // Gradient noise, range ~[-1, 1]
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+      float a = dot(hash2(i), f);
+      float b = dot(hash2(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+      float c = dot(hash2(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+      float d = dot(hash2(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+      return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    }
+    float fbm(vec2 p) {
+      float s = 0.0;
+      float a = 0.5;
+      mat2 r = mat2(0.8, 0.6, -0.6, 0.8);
+      for (int i = 0; i < 3; i++) {
+        s += a * noise(p);
+        p = r * p * 2.03 + 11.7;
+        a *= 0.5;
+      }
+      return s;
+    }
+
+    // Summit drifts slowly near the top-right corner.
+    vec2 summitCenter(vec2 size, float t) {
+      return vec2(size.x * (0.74 + 0.04 * sin(t * 1.3)), -30.0 + 30.0 * cos(t * 1.1));
+    }
+
+    // Height field: warped noise + a ridge along the top + one summit.
+    float field(vec2 css, vec2 size, vec2 summitPx, float t) {
+      vec2 p = css / 520.0;
+      vec2 q = vec2(
+        fbm(p + vec2(0.0, t)),
+        fbm(p + vec2(5.2, 1.3) - vec2(t * 0.7, 0.0))
+      );
+      float n = fbm(p + 0.9 * q + vec2(t * 0.4, -t * 0.25));
+      float yN = css.y / size.y;
+      float ridge = exp(-yN * 2.4) * 0.9;
+      vec2 d = (css - summitPx) / 420.0;
+      float summit = exp(-dot(d, d) * 1.6) * 0.9;
+      return n * 0.75 + ridge + summit;
+    }
+
+    void main() {
+      // CSS-pixel coords, y = 0 at the top edge.
+      vec2 frag = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+      vec2 css = frag / uPx;
+      vec2 size = uRes / uPx;
+      float yN = css.y / size.y;           // 0 top .. 1 bottom
+      float xN = css.x / size.x;           // 0 left .. 1 right
+
+      float t = uTime * 0.02;
+      vec2 summitPx = summitCenter(size, t);
+      float h = field(css, size, summitPx, t);
+      // Height at the summit, so the coral index line always rings a peak.
+      float hPeak = field(summitPx, size, summitPx, t);
+
+      // Contours
+      float levels = 10.0;
+      float v = h * levels;
+      float fw = max(fwidth(v), 1e-4);
+      float f = fract(v);
+      float dist = min(f, 1.0 - f) / fw;            // distance to line in buffer px
+      float halfW = 0.5 * uPx;                      // ~1 CSS px wide line
+      float line = 1.0 - smoothstep(halfW - 0.5, halfW + 0.75, dist);
+
+      // Index contour near the peaks, in coral.
+      float lvl = floor(v + 0.5);
+      float coralLvl = floor(hPeak * levels) - 1.0;
+      float isCoral = 1.0 - step(0.5, abs(lvl - coralLvl));
+
+      // Visibility mask: strong at top, gentle on the right, calm over headline.
+      // On narrow screens the headline sits near the top, so fade much sooner.
+      float wide = smoothstep(480.0, 1000.0, size.x);
+      float fall = mix(120.0, 0.52 * size.y, wide);
+      float top = 1.0 - smoothstep(0.0, fall, css.y);
+      top = top * top;
+      float right = smoothstep(0.55, 1.0, xN) * (1.0 - smoothstep(0.2, 0.95, yN)) * 0.45 * wide;
+      float mask = clamp(top + right, 0.0, 1.0);
+
+      // Lines get more saturated toward the top.
+      vec3 lineCol = mix(uLine, uLineHi, top);
+      float lineA = line * mask * mix(0.55, 0.62, uDark);
+      // Coral is a thin accent: slightly thinner, slightly weaker.
+      float coralA = line * isCoral * mask * mix(0.7, 0.65, uDark);
+
+      // Soft tonal wash between lines (hypsometric tint per band).
+      float band = smoothstep(0.0, 1.0, fract(v * 0.5 + 0.5));
+      float bandIdx = clamp(h / max(hPeak, 0.01), 0.0, 1.0);
+      vec3 wash = mix(uWashA, uWashB, bandIdx);
+      float washA = mask * (0.10 + 0.40 * bandIdx * bandIdx) * (0.8 + 0.2 * band) * mix(1.0, 0.8, uDark);
+
+      // Composite over a transparent canvas (premultiplied alpha), so the
+      // section's own background shows through where the effect fades out.
+      vec4 o = vec4(wash * washA, washA);
+      float la = lineA * (1.0 - isCoral);
+      o = vec4(lineCol * la, la) + o * (1.0 - la);
+      o = vec4(uCoral * coralA, coralA) + o * (1.0 - coralA);
+
+      // Fine grain against banding.
+      float g = hash1(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5;
+      o.rgb += g * (1.5 / 255.0) * o.a;
+
+      gl_FragColor = o;
+    }
+  `;
+
+  type Colors = {
+    line: number[];
+    lineHi: number[];
+    washA: number[];
+    washB: number[];
+    coral: number[];
+    dark: number;
+  };
+
+  function init(root: HTMLElement) {
+    const canvas = root.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const gl = canvas.getContext('webgl', {
+      antialias: false,
+      alpha: true,
+      premultipliedAlpha: true,
+      powerPreference: 'low-power',
+    });
+    if (!gl || !gl.getExtension('OES_standard_derivatives')) return;
+
+    const compile = (type: number, src: string) => {
+      const s = gl.createShader(type)!;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        gl.deleteShader(s);
+        return null;
+      }
+      return s;
+    };
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    const u = (n: string) => gl.getUniformLocation(prog, n);
+    const U = {
+      res: u('uRes'), px: u('uPx'), time: u('uTime'), dark: u('uDark'),
+      line: u('uLine'), lineHi: u('uLineHi'),
+      washA: u('uWashA'), washB: u('uWashB'), coral: u('uCoral'),
+    };
+
+    // Resolve any CSS colour (hex, rgb, color-mix…) to linear-ish 0..1 RGB.
+    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+    const toRgb = (css: string, fallback: string) => {
+      probe.fillStyle = fallback;
+      probe.fillStyle = css.trim() || fallback;
+      probe.clearRect(0, 0, 1, 1);
+      probe.fillRect(0, 0, 1, 1);
+      const d = probe.getImageData(0, 0, 1, 1).data;
+      return [d[0] / 255, d[1] / 255, d[2] / 255];
+    };
+
+    let colors: Colors;
+    const readColors = () => {
+      const cs = getComputedStyle(document.documentElement);
+      const v = (n: string) => cs.getPropertyValue(n);
+      const dark = document.documentElement.dataset.theme !== 'light';
+      colors = dark
+        ? {
+            line: toRgb(v('--aw-purple-6'), '#7458b5'),
+            lineHi: toRgb(v('--aw-purple-4'), '#a693d4'),
+            washA: toRgb(v('--aw-purple-9'), '#25203a'),
+            washB: toRgb(v('--aw-purple-8'), '#4b397a'),
+            coral: toRgb(v('--aw-coral-4'), '#f0845f'),
+            dark: 1,
+          }
+        : {
+            line: toRgb(v('--aw-purple-4'), '#a693d4'),
+            lineHi: toRgb(v('--aw-purple-6'), '#7458b5'),
+            washA: toRgb(v('--aw-purple-1'), '#f3f0f9'),
+            washB: toRgb(v('--aw-purple-2'), '#e0d8f1'),
+            coral: toRgb(v('--aw-coral-4'), '#f0845f'),
+            dark: 0,
+          };
+      gl.uniform3fv(U.line, colors.line);
+      gl.uniform3fv(U.lineHi, colors.lineHi);
+      gl.uniform3fv(U.washA, colors.washA);
+      gl.uniform3fv(U.washB, colors.washB);
+      gl.uniform3fv(U.coral, colors.coral);
+      gl.uniform1f(U.dark, colors.dark);
+    };
+    readColors();
+
+    let pxRatio = 1;
+    const resize = () => {
+      const w = root.clientWidth;
+      const h = root.clientHeight;
+      if (!w || !h) return false;
+      pxRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const bw = Math.round(w * pxRatio);
+      const bh = Math.round(h * pxRatio);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
+      }
+      gl.viewport(0, 0, bw, bh);
+      gl.uniform2f(U.res, bw, bh);
+      gl.uniform1f(U.px, pxRatio);
+      return true;
+    };
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Start partway into the morph so the first frame isn't the noise origin.
+    const t0 = performance.now() - 40_000;
+    let staticTime = 40;
+
+    const draw = (time: number) => {
+      gl.uniform1f(U.time, time);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+
+    const isShown = () => root.offsetParent !== null && root.clientWidth > 0;
+
+    let onScreen = true;
+    let raf = 0;
+    let last = 0;
+    const FRAME = 1000 / 30;
+
+    const frame = (now: number) => {
+      raf = 0;
+      if (!running()) return;
+      if (now - last >= FRAME) {
+        last = now;
+        draw((now - t0) / 1000);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    const running = () => onScreen && !document.hidden && !reduce.matches && isShown();
+
+    const update = () => {
+      if (!isShown()) return;
+      if (!resize()) return;
+      root.classList.add('is-live');
+      if (reduce.matches) {
+        draw(staticTime);
+        return;
+      }
+      if (running() && !raf) raf = requestAnimationFrame(frame);
+      else draw((performance.now() - t0) / 1000);
+    };
+
+    new ResizeObserver(update).observe(root);
+    new IntersectionObserver((entries) => {
+      onScreen = entries.some((e) => e.isIntersecting);
+      update();
+    }).observe(root);
+    document.addEventListener('visibilitychange', update);
+    reduce.addEventListener('change', update);
+    new MutationObserver(() => {
+      readColors();
+      update();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    // Variant switching toggles display on an ancestor; watch for it.
+    const group = root.closest('[data-variant-group]');
+    if (group) {
+      new MutationObserver(update).observe(group, {
+        attributes: true,
+        attributeFilter: ['data-active'],
+      });
+    }
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      root.classList.remove('is-live');
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    });
+
+    update();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-hero-bg-c]').forEach(init);
+</script>
