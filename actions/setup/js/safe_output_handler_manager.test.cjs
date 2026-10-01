@@ -632,6 +632,20 @@ describe("Safe Output Handler Manager", () => {
       }
     });
 
+    it("does not query collaborators for handlers that do not use mention aliases", async () => {
+      const addLabelsModule = require("./add_labels.cjs");
+      const addLabelsMainSpy = vi.spyOn(addLabelsModule, "main").mockImplementation(async () => async () => ({ success: true }));
+      global.context = { eventName: "issues", payload: {}, repo: { owner: "workflow-org", repo: "workflow-repo" } };
+      global.github = { rest: { repos: { listCollaborators: vi.fn() } } };
+
+      try {
+        await loadHandlers({ add_labels: { "target-repo": "target-org/target-repo" }, mentions: {} });
+        expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalled();
+      } finally {
+        addLabelsMainSpy.mockRestore();
+      }
+    });
+
     it("injects GH_AW_PROJECT_GITHUB_TOKEN for project handlers when github-token is missing", async () => {
       process.env.GH_AW_PROJECT_GITHUB_TOKEN = "projects-token";
       global.getOctokit = vi.fn().mockReturnValue({ client: "project-client" });
