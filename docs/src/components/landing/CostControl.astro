@@ -114,10 +114,10 @@ const fmt = (n: number) => `${n.toFixed(1)}s`;
   .aw-trace {
     margin: 0;
     min-width: 0;
-    background: var(--aw-color-bg);
+    background: var(--aw-color-surface);
     border: 1px solid var(--aw-color-border);
     border-radius: 12px;
-    box-shadow: var(--aw-shadow);
+    box-shadow: var(--aw-shadow-raised);
     overflow: hidden;
   }
   .aw-trace-head {
@@ -127,7 +127,7 @@ const fmt = (n: number) => `${n.toFixed(1)}s`;
     justify-content: space-between;
     gap: 0.75rem 1.5rem;
     padding: 0.875rem 1.25rem;
-    background: var(--aw-color-bg-subtle);
+    background: var(--aw-color-surface-header);
     border-bottom: 1px solid var(--aw-color-border);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-secondary);
