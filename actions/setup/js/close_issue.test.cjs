@@ -175,6 +175,41 @@ describe("close_issue", () => {
       expect(requestCalls[0].params.headers).toBeUndefined();
     });
 
+    it.each([403, 422, 500])("should fail without a legacy close when the intent request returns %i", async status => {
+      const handler = await main({ max: 10 });
+      let updateCalled = false;
+      mockGithub.request = async () => {
+        throw Object.assign(new Error("Intent rejected"), { status });
+      };
+      mockGithub.rest.issues.update = async () => {
+        updateCalled = true;
+        throw new Error("Legacy close must not be called");
+      };
+
+      const result = await handler({ issue_number: 456, body: "Closing this issue", rationale: "Confirmed" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Intent rejected");
+      expect(updateCalled).toBe(false);
+    });
+
+    it.each([404, 501])("should fall back to a legacy close when the intent endpoint returns %i", async status => {
+      const handler = await main({ max: 10 });
+      let updateCalled = false;
+      mockGithub.request = async () => {
+        throw Object.assign(new Error("Intent endpoint unavailable"), { status });
+      };
+      mockGithub.rest.issues.update = async params => {
+        updateCalled = true;
+        return { data: { number: params.issue_number, title: "Test Issue", html_url: "https://github.com/test-owner/test-repo/issues/456" } };
+      };
+
+      const result = await handler({ issue_number: 456, body: "Closing this issue", rationale: "Confirmed" }, {});
+
+      expect(result.success).toBe(true);
+      expect(updateCalled).toBe(true);
+    });
+
     it("should skip issue-intent metadata when explicitly disabled", async () => {
       const handler = await main({ max: 10, issue_intent: false });
       const updateCalls = [];

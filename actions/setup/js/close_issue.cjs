@@ -180,6 +180,10 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
       });
       return issue;
     } catch (error) {
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      if (status !== 404 && status !== 501) {
+        throw error;
+      }
       core.warning(`Issue-intent close path unavailable, falling back to legacy close path: ${getErrorMessage(error)}`);
     }
   }
