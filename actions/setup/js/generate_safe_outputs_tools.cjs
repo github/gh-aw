@@ -317,7 +317,9 @@ async function main() {
       .map(normalizeToolName)
       .filter(name => sourceToolNames.has(name))
   );
-  const configuredLedgers = /** @type {Array<{name: string, type?: string}> | undefined} */ /** @type {any} */ config.ledger_append?.ledgers;
+  /** @type {{ledger_append?: {ledgers?: Array<{name: string, type?: string}>}}} */
+  const ledgerConfig = config;
+  const configuredLedgers = ledgerConfig.ledger_append?.ledgers;
   if (Array.isArray(configuredLedgers) && configuredLedgers.length > 0 && configuredLedgers.every(ledger => ledger.type === "map" || ledger.type === "work-pool")) {
     enabledToolNames.delete("ledger_append");
   }
