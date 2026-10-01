@@ -30,6 +30,15 @@ describe("setup action Windows support", () => {
   });
 });
 
+describe("setup.sh Copilot runtime files", () => {
+  it("copies the shared routing effort dependency alongside Copilot runtime scripts", () => {
+    expect(setupShContent).toContain('for file in "${JS_SOURCE_DIR}"/*.cjs; do');
+    expect(setupShContent).toContain('cp "$file" "${DESTINATION}/${filename}"');
+    expect(getDirectLocalRequires("copilot_harness.cjs")).toContain("copilot_routing_effort.cjs");
+    expect(getDirectLocalRequires("copilot_sdk_driver.cjs")).toContain("copilot_routing_effort.cjs");
+  });
+});
+
 /**
  * Parse a bash array from setup.sh, e.g.:
  *   MCP_SCRIPTS_FILES=(
