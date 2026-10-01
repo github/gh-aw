@@ -1,4 +1,6 @@
 ---
+import octicons from '@primer/octicons';
+
 const TRIFECTA_URL = 'https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents';
 
 interface Props {
@@ -6,41 +8,107 @@ interface Props {
   noun?: string;
 }
 const { noun = 'layers' } = Astro.props;
+
+const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+
+// Geometry (viewBox units; HTML labels are positioned with the same numbers as percentages).
+const W = 448;
+const H = 408;
+const C = { x: 224, y: 236 };
+const nodes = [
+  { id: 'data', x: 224, y: 36, icon: 'lock', label: 'Private data', cut: 'Credential isolation', t: 0.5, gap: 22 },
+  { id: 'untrusted', x: 44, y: 330, icon: 'alert', label: 'Untrusted content', cut: 'Integrity filtering', t: 0.56, gap: 22 },
+  { id: 'outbound', x: 404, y: 330, icon: 'globe', label: 'Outbound access', cut: 'Sandboxed agent', t: 0.56, gap: 22 },
+] as const;
+
+const spokes = nodes.map((n) => {
+  const dx = C.x - n.x;
+  const dy = C.y - n.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  const cx = n.x + dx * n.t;
+  const cy = n.y + dy * n.t;
+  const end = len - 46; // stop short of the centre label
+  const f = (v: number) => v.toFixed(1);
+  return {
+    ...n,
+    cx,
+    cy,
+    before: { x1: n.x, y1: n.y, x2: cx - ux * n.gap, y2: cy - uy * n.gap },
+    after: { x1: cx + ux * n.gap, y1: cy + uy * n.gap, x2: n.x + ux * end, y2: n.y + uy * end },
+    pct: { x: (n.x / W) * 100, y: (n.y / H) * 100, cx: (cx / W) * 100, cy: (cy / H) * 100 },
+    f,
+  };
+});
+const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 ---
 
 <div class="tri">
   <p class="tri-text">
     An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
     Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six {noun} between
-    the agent and your repository.
+    the agent and your repository, and three of them each block one leg of it.
   </p>
 
   <figure class="tri-fig">
-    <div class="tri-art" aria-hidden="true">
-      <svg viewBox="0 0 320 150" focusable="false">
-        <polygon class="tri-area" points="160,16 60,100 260,100"></polygon>
-        <circle class="tri-node" cx="160" cy="16" r="5"></circle>
-        <circle class="tri-node" cx="60" cy="100" r="5"></circle>
-        <circle class="tri-node" cx="260" cy="100" r="5"></circle>
-        <circle class="tri-core" cx="160" cy="60" r="4"></circle>
+    <div class="tri-art" aria-hidden="true" style={`aspect-ratio: ${W} / ${H}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
+        <polygon class="tri-outline" points={outline}></polygon>
+        {spokes.map((s, i) => (
+          <>
+            <line class="tri-line" x1={s.f(s.before.x1)} y1={s.f(s.before.y1)} x2={s.f(s.before.x2)} y2={s.f(s.before.y2)}></line>
+            <line class="tri-line tri-cut-line" style={`--i:${i}`} x1={s.f(s.after.x1)} y1={s.f(s.after.y1)} x2={s.f(s.after.x2)} y2={s.f(s.after.y2)}></line>
+          </>
+        ))}
       </svg>
-      <span class="tri-label tri-top">Private data</span>
-      <span class="tri-label tri-bl">Untrusted content</span>
-      <span class="tri-label tri-br">Outbound access</span>
-      <span class="tri-core-label">the lethal trifecta</span>
+      {spokes.map((s) => (
+        <span class={`tri-node tri-node-${s.id}`} style={`left:${s.pct.x.toFixed(2)}%;top:${s.pct.y.toFixed(2)}%`}>
+          <span class="tri-badge" set:html={icon(s.icon, 18)} />
+          <span class="tri-label">{s.label}</span>
+        </span>
+      ))}
+      {spokes.map((s, i) => (
+        <span class="tri-cut" style={`--i:${i};left:${s.pct.cx.toFixed(2)}%;top:${s.pct.cy.toFixed(2)}%`}>
+          <span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />
+          <span class="tri-cut-name">{s.cut}</span>
+        </span>
+      ))}
+      <span class="tri-core" style={`left:${(C.x / W) * 100}%;top:${(C.y / H) * 100}%`}>the lethal trifecta</span>
     </div>
     <figcaption class="tri-sr">
-      Private data, untrusted content and outbound access, all present together, make up the lethal trifecta.
+      The lethal trifecta is private data, untrusted content and outbound access present together. gh-aw cuts each
+      side: credential isolation keeps private data away from the agent, integrity filtering screens untrusted
+      content, and the sandboxed agent restricts outbound access.
     </figcaption>
   </figure>
 </div>
+
+<script>
+  // Entrance: the cut markers settle in once the diagram scrolls into view.
+  // Without JS, or with reduced motion, everything is simply shown.
+  const art = document.querySelector<HTMLElement>('.tri-art');
+  if (art && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    art.classList.add('is-armed');
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          art.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(art);
+  }
+</script>
 
 <style>
   .tri {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 1.5rem 3rem;
+    gap: 2rem 3.5rem;
   }
   .tri-text {
     flex: 1 1 22rem;
@@ -61,13 +129,13 @@ const { noun = 'layers' } = Astro.props;
   }
   .tri-fig {
     margin: 0;
-    flex: none;
+    flex: 0 1 28rem;
+    min-width: 0;
+    max-width: 100%;
   }
   .tri-art {
     position: relative;
-    width: 20rem;
-    max-width: 100%;
-    aspect-ratio: 320 / 150;
+    width: 100%;
   }
   .tri-art svg {
     position: absolute;
@@ -76,52 +144,160 @@ const { noun = 'layers' } = Astro.props;
     height: 100%;
     overflow: visible;
   }
-  .tri-area {
-    fill: var(--aw-color-complement-low);
-    stroke: var(--aw-color-border-strong);
-    stroke-width: 1;
+  .tri-outline {
+    fill: none;
+    stroke: var(--aw-color-divider);
+    stroke-width: 1.5;
     stroke-linejoin: round;
   }
-  .tri-node {
-    fill: var(--aw-color-surface);
-    stroke: var(--aw-color-text-muted);
+  .tri-line {
+    stroke: var(--aw-color-border-strong);
     stroke-width: 1.5;
+    stroke-linecap: round;
   }
+  /* The side of the spoke beyond the cut is neutralised: dashed and quiet. */
+  .tri-cut-line {
+    stroke-dasharray: 3 4;
+  }
+
+  .tri-node,
+  .tri-cut,
   .tri-core {
-    fill: var(--aw-color-complement);
-  }
-  .tri-label,
-  .tri-core-label {
     position: absolute;
+    transform: translate(-50%, -50%);
+  }
+  .tri-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    width: 0;
+  }
+  .tri-badge {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    color: var(--aw-color-text-strong);
+  }
+  .tri-badge :global(svg) {
+    fill: currentColor;
+  }
+  .tri-label {
     white-space: nowrap;
     font-size: var(--aw-step--1);
     line-height: 1.2;
-  }
-  .tri-label {
-    color: var(--aw-color-text-strong);
     font-weight: 500;
+    color: var(--aw-color-text-strong);
   }
-  .tri-top {
-    left: calc(50% + 0.875rem);
-    top: 0;
+  /* Top node: label sits beside the badge. Bottom nodes: label below, kept inside the figure. */
+  .tri-node-data {
+    flex-direction: row;
+    width: auto;
+    gap: 0.625rem;
   }
-  .tri-bl {
-    left: 18.75%;
-    top: calc(66.7% + 0.75rem);
-    transform: translateX(-50%);
+  .tri-node-data .tri-label {
+    position: absolute;
+    left: calc(100% + 0.625rem);
+    top: 50%;
+    transform: translateY(-50%);
   }
-  .tri-br {
-    left: 81.25%;
-    top: calc(66.7% + 0.75rem);
-    transform: translateX(-50%);
+  .tri-node-data .tri-badge {
+    margin: 0;
   }
-  .tri-core-label {
-    left: 50%;
-    top: calc(40% + 0.75rem);
-    transform: translateX(-50%);
-    font-weight: 560;
-    color: var(--tri-core-text, var(--aw-color-complement));
+  .tri-node-untrusted {
+    align-items: flex-start;
+    transform: translate(-1.25rem, -1.25rem);
+    width: auto;
   }
+  .tri-node-outbound {
+    align-items: flex-end;
+    transform: translate(calc(-100% + 1.25rem), -1.25rem);
+    width: auto;
+  }
+  .tri-node-untrusted .tri-badge {
+    margin-left: 0;
+  }
+  .tri-node-data {
+    transform: translate(-1.25rem, -1.25rem);
+  }
+
+  .tri-cut {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+    padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    color: var(--aw-color-text-strong);
+    font-size: var(--aw-step--1);
+    line-height: 1.15;
+    font-weight: 500;
+    width: max-content;
+  }
+  .tri-cut-icon {
+    display: inline-flex;
+    color: var(--aw-color-danger);
+  }
+  .tri-cut-icon :global(svg) {
+    fill: currentColor;
+  }
+  .tri-core {
+    width: 7rem;
+    text-align: center;
+    font-size: var(--aw-step-0);
+    line-height: 1.25;
+    font-weight: 600;
+    color: var(--aw-color-text-strong);
+    text-wrap: balance;
+  }
+
+  @media (max-width: 30rem) {
+    .tri-cut {
+      white-space: normal;
+      text-align: center;
+      max-width: 6.5rem;
+    }
+    .tri-cut-icon {
+      display: none;
+    }
+    .tri-core {
+      width: 5.5rem;
+      font-size: var(--aw-step--1);
+      margin-top: -0.75rem;
+    }
+  }
+
+  /* Entrance */
+  .tri-art.is-armed .tri-cut {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  .tri-art.is-armed .tri-cut-line {
+    opacity: 0;
+  }
+  .tri-art.is-armed.is-in .tri-cut {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  .tri-art.is-armed.is-in .tri-cut-line {
+    opacity: 1;
+  }
+  .tri-art.is-in .tri-cut,
+  .tri-art.is-in .tri-cut-line {
+    transition:
+      opacity 0.5s ease-out,
+      transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 120ms);
+  }
+
   .tri-sr {
     position: absolute;
     width: 1px;
