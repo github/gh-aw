@@ -1,27 +1,12 @@
 ---
 import CtaRow from './CtaRow.astro';
 import HeroExample from './HeroExample.astro';
-import VariantGroup from './VariantGroup.astro';
-import HeroBgA from './HeroBgA.astro';
-import HeroBgC from './HeroBgC.astro';
-import HeroBgD from './HeroBgD.astro';
+import HeroBackground from './HeroBackground.astro';
 ---
 
 <section class="aw-hero not-content">
   <div class="aw-hero-bg" aria-hidden="true">
-    <VariantGroup
-      id="hero-bg"
-      label="Hero background"
-      variants={[
-        { key: 'a', name: 'A · clouds' },
-        { key: 'c', name: 'C · waves' },
-        { key: 'd', name: 'D · columns' },
-      ]}
-    >
-      <div data-variant="a"><HeroBgA /></div>
-      <div data-variant="c"><HeroBgC /></div>
-      <div data-variant="d"><HeroBgD /></div>
-    </VariantGroup>
+    <HeroBackground />
   </div>
   <div class="aw-hero-inner">
     <div class="aw-hero-text">
@@ -48,10 +33,6 @@ import HeroBgD from './HeroBgD.astro';
     inset: 0;
     z-index: -1;
     pointer-events: none;
-  }
-  .aw-hero-bg :global(.aw-variant-group),
-  .aw-hero-bg :global([data-variant]) {
-    height: 100%;
   }
   .aw-hero-inner {
     display: grid;

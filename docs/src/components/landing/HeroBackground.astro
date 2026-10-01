@@ -1,5 +1,5 @@
 ---
-// Hero background variant A: "dithered field".
+// Hero background: "dithered field".
 // Domain-warped fbm noise across the top band (heavier on the right),
 // quantised with an 8x8 Bayer ordered dither into a few purple steps, with
 // small sparse coral clusters drifting through the denser cloud. Rendered at low resolution and scaled up with
@@ -210,7 +210,7 @@
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
         : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
-      gl.uniform3fv(uCoral, parseColor(probe, cs.getPropertyValue(dark ? '--aw-coral-4' : '--aw-coral-6')));
+      gl.uniform3fv(uCoral, parseColor(probe, cs.getPropertyValue('--aw-coral-4')));
       gl.uniform1f(uStrength, dark ? 0.9 : 0.86);
     }
 
