@@ -35,6 +35,23 @@ describe("safe_outputs_tools_loader", () => {
     delete process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH;
   });
 
+  it("routes dedicated ledger tools to the shared handler without registering a generic ledger_append", () => {
+    const handler = vi.fn();
+    const handlers = { defaultHandler: vi.fn(() => vi.fn()), ledgerBuiltinHandler: vi.fn(() => handler) };
+    const tools = attachHandlers([{ name: "ledger_map_put", _ledger_type: "map", _ledger_operation: "put", inputSchema: { type: "object", properties: { key: {} }, additionalProperties: false } }], handlers, mockServer);
+    const register = vi.fn((server, tool) => {
+      server.tools[tool.name] = tool;
+    });
+    const normalize = name => name.replace(/-/g, "_");
+    const config = { ledger_append: { ledgers: [{ name: "cache", type: "map" }] } };
+    registerPredefinedTools(mockServer, tools, config, register, normalize);
+    registerDynamicTools(mockServer, tools, config, testToolsPath, register, normalize);
+    expect(register).toHaveBeenCalledTimes(1);
+    tools[0].handler({ key: "k", ignored: "stripped" });
+    expect(handlers.ledgerBuiltinHandler).toHaveBeenCalledWith("map", "put");
+    expect(handler).toHaveBeenCalledWith({ key: "k" });
+  });
+
   describe("loadTools", () => {
     it("should load tools from valid JSON file", () => {
       const toolsDir = path.dirname(testToolsPath);

@@ -82,6 +82,9 @@ const NON_TOOL_CONFIG_KEYS = new Set(["create_report_incomplete_issue", "create_
  * @returns {boolean} True when a tool of the same family is already defined
  */
 function isConfigKeyCoveredByDynamicTool(tools, normalizedKey) {
+  if (normalizedKey === "ledger_append" && tools.some(tool => tool?._ledger_type && tool?._ledger_operation)) {
+    return true;
+  }
   const metadataKey = DYNAMIC_TOOL_METADATA_BY_CONFIG_KEY[normalizedKey];
   if (!metadataKey) {
     return false;
@@ -212,6 +215,9 @@ function attachHandlers(tools, handlers, logger) {
     } else if (typeof handlers.defaultHandler === "function") {
       tool.handler = handlers.defaultHandler(tool.name);
     }
+    if (tool._ledger_type && tool._ledger_operation && typeof handlers.ledgerBuiltinHandler === "function") {
+      tool.handler = handlers.ledgerBuiltinHandler(tool._ledger_type, tool._ledger_operation);
+    }
 
     // Check if this is a dispatch_workflow tool (dynamic tool with workflow metadata)
     if (hasValidWorkflowMetadataName(tool._workflow_name)) {
@@ -286,6 +292,12 @@ function registerPredefinedTools(server, tools, config, registerTool, normalizeT
   tools.forEach(tool => {
     // Check if this is a regular tool matching a config key
     const normalizedToolName = normalizeTool(tool.name);
+    if (tool._ledger_type && tool._ledger_operation) {
+      if (Array.isArray(config.ledger_append?.ledgers) && config.ledger_append.ledgers.some(ledger => ledger.type === tool._ledger_type)) {
+        registerTool(server, tool);
+      }
+      return;
+    }
     if (Object.keys(config).find(configKey => normalizeTool(configKey) === normalizedToolName)) {
       let toolToRegister = tool;
       const safetyWarning = toolSafetyWarnings[normalizedToolName];

@@ -103,6 +103,7 @@ function readJSONFile(filePath) {
 const safeOutputsTools = readJSONFile(path.join(__dirname, "safe_outputs_tools.json"));
 
 const safeOutputsToolMap = new Map(safeOutputsTools.map(tool => [tool.name.replace(/-/g, "_"), tool]));
+const { validateOperation } = require("./ledger_builtin.cjs");
 
 /**
  * @param {string} error
@@ -592,6 +593,22 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         },
       ],
     };
+  };
+
+  const ledgerBuiltinHandler = (ledgerType, operation) => args => {
+    const ledgers = config.ledger_append?.ledgers || [];
+    const candidates = ledgers.filter(ledger => ledger.type === ledgerType);
+    const target = args?.ledger === undefined && candidates.length === 1 ? candidates[0] : candidates.find(ledger => ledger.name === args?.ledger);
+    if (!target) return buildIntentErrorResponse("Specify a configured ledger of the correct built-in type.");
+    const { ledger: _ledger, temp_id, ...fields } = args || {};
+    if (Object.hasOwn(fields, "operation")) return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
+    const record = { operation, ...fields };
+    try {
+      validateOperation(record, target);
+    } catch {
+      return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
+    }
+    return defaultHandler("ledger_append")({ ledger: target.name, ...(temp_id !== undefined && { temp_id }), ...record });
   };
 
   const createIssueConfig = config.create_issue || {};
@@ -3272,6 +3289,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
   return {
     defaultHandler,
+    ledgerBuiltinHandler,
     uploadAssetHandler,
     uploadArtifactHandler,
     uploadCodeCoverageHandler,

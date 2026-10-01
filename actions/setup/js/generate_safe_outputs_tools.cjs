@@ -317,6 +317,10 @@ async function main() {
       .map(normalizeToolName)
       .filter(name => sourceToolNames.has(name))
   );
+  const configuredLedgers = /** @type {Array<{name: string, type?: string}> | undefined} */ /** @type {any} */ config.ledger_append?.ledgers;
+  if (Array.isArray(configuredLedgers) && configuredLedgers.length > 0 && configuredLedgers.every(ledger => ledger.type === "map" || ledger.type === "work-pool")) {
+    enabledToolNames.delete("ledger_append");
+  }
   // Filter predefined tools to those enabled in config and apply enhancements
   const filteredTools = allTools
     .filter(tool => enabledToolNames.has(normalizeToolName(tool.name)))
@@ -330,6 +334,15 @@ async function main() {
         enhancedTool = structuredClone(tool);
       } catch (err) {
         throw new Error(`${ERR_CONFIG}: ` + "Failed to deep-copy tool " + tool.name + ": " + getErrorMessage(err), { cause: err });
+      }
+      if (tool.name === "ledger_append" && Array.isArray(configuredLedgers)) {
+        const generalNames = configuredLedgers.filter(ledger => ledger.type !== "map" && ledger.type !== "work-pool").map(ledger => ledger.name);
+        if (generalNames.length < configuredLedgers.length) {
+          enhancedTool.inputSchema.properties.ledger.enum = generalNames;
+          if (configuredLedgers.length > 1) {
+            enhancedTool.inputSchema.required = [...new Set([...(enhancedTool.inputSchema.required || []), "ledger"])];
+          }
+        }
       }
 
       // Apply description suffix if available (e.g., " CONSTRAINTS: Maximum 5 issues.")

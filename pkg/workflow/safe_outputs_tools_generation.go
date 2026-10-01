@@ -36,6 +36,57 @@ import (
 func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string]any, error) {
 	var dynamicTools []map[string]any
 
+	if data.LedgerConfig != nil {
+		types := make(map[string]struct{})
+		for _, ledger := range data.LedgerConfig.Ledgers {
+			types[ledger.Type] = struct{}{}
+		}
+		for _, spec := range []struct {
+			name, ledgerType, operation, field string
+			required                           bool
+		}{
+			{"ledger_map_put", "map", "put", "value", true},
+			{"ledger_map_delete", "map", "delete", "", false},
+			{"ledger_work_pool_submit", "work-pool", "submit", "work", true},
+			{"ledger_work_pool_cancel", "work-pool", "cancel", "work", true},
+			{"ledger_work_pool_acquire", "work-pool", "acquire", "work", true},
+			{"ledger_work_pool_acquire_next", "work-pool", "acquire-next", "filter", false},
+			{"ledger_work_pool_finish", "work-pool", "finish", "result", false},
+			{"ledger_work_pool_abandon", "work-pool", "abandon", "reason", false},
+		} {
+			if _, enabled := types[spec.ledgerType]; !enabled {
+				continue
+			}
+			properties := map[string]any{
+				"ledger":  map[string]any{"type": "string", "description": "Target ledger name; optional when there is only one ledger of this type."},
+				"temp_id": map[string]any{"type": "string", "description": "Optional temporary ID for same-batch references."},
+			}
+			required := []string{}
+			if spec.ledgerType == "map" {
+				properties["key"] = map[string]any{"type": "string"}
+				required = append(required, "key")
+			}
+			if spec.field != "" {
+				fieldSchema := map[string]any{}
+				switch spec.field {
+				case "work", "filter":
+					fieldSchema["type"] = "object"
+				case "reason":
+					fieldSchema["type"] = "string"
+				}
+				properties[spec.field] = fieldSchema
+				if spec.required {
+					required = append(required, spec.field)
+				}
+			}
+			dynamicTools = append(dynamicTools, map[string]any{
+				"name": spec.name, "description": fmt.Sprintf("%s a %s ledger entry. Persistence follows trusted validation.", spec.operation, spec.ledgerType),
+				"_ledger_type": spec.ledgerType, "_ledger_operation": spec.operation,
+				"inputSchema": map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false},
+			})
+		}
+	}
+
 	// Add custom job tools from SafeOutputs.Jobs
 	if len(data.SafeOutputs.Jobs) > 0 {
 		safeOutputsConfigLog.Printf("Adding %d custom job tools", len(data.SafeOutputs.Jobs))
@@ -397,7 +448,7 @@ func computePropertyInjections(safeOutputs *SafeOutputsConfig) map[string]map[st
 //
 //nolint:largefunc // Tool metadata assembly is intentionally kept as one flow.
 func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, error) {
-	if data.SafeOutputs == nil {
+	if data.SafeOutputs == nil && !data.LedgerConfig.Enabled() {
 		empty := ToolsMeta{
 			DescriptionSuffixes: map[string]string{},
 			RepoParams:          map[string]map[string]any{},
@@ -408,6 +459,9 @@ func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, err
 			return "", fmt.Errorf("unable to marshal empty tools meta to JSON; expected the empty ToolsMeta struct (with empty maps/slices) to be serializable: %w", err)
 		}
 		return string(result), nil
+	}
+	if data.SafeOutputs == nil {
+		data.SafeOutputs = &SafeOutputsConfig{}
 	}
 
 	safeOutputsConfigLog.Print("Generating tools meta JSON for workflow")

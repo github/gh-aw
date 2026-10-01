@@ -270,6 +270,7 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.Equal(t, []any{"task"}, workPoolLedger["identity"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
+	require.NotContains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: workPoolConfig}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))
 
 	job, err := NewCompiler().buildPushLedgerChangesJob(data, false)
@@ -285,6 +286,33 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.NoError(t, NewCompiler().generateLedgerProjectionStep(&projectionStep, data))
 	require.Contains(t, projectionStep.String(), "Create read-only ledger projections")
 	require.Contains(t, projectionStep.String(), "create_ledger_projection.cjs")
+}
+
+func TestBuiltinLedgerTools(t *testing.T) {
+	config := &LedgerToolConfig{Ledgers: []LedgerConfig{
+		{Name: "cache", Type: "map"},
+		{Name: "queue", Type: "work-pool"},
+	}}
+	data := &WorkflowData{LedgerConfig: config}
+	metaJSON, err := generateToolsMetaJSON(data, "")
+	require.NoError(t, err)
+	var meta ToolsMeta
+	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
+	names := make(map[string]bool)
+	for _, tool := range meta.DynamicTools {
+		names[tool["name"].(string)] = true
+		require.Contains(t, []string{"map", "work-pool"}, tool["_ledger_type"])
+		require.NotEmpty(t, tool["_ledger_operation"])
+	}
+	for _, name := range []string{"ledger_map_put", "ledger_map_delete", "ledger_work_pool_submit",
+		"ledger_work_pool_cancel", "ledger_work_pool_acquire", "ledger_work_pool_acquire_next",
+		"ledger_work_pool_finish", "ledger_work_pool_abandon"} {
+		require.True(t, names[name], name)
+	}
+	require.NotContains(t, computeEnabledToolNames(data), "ledger_append")
+
+	config.Ledgers = append(config.Ledgers, LedgerConfig{Name: "events", Type: "log"})
+	require.Contains(t, computeEnabledToolNames(data), "ledger_append")
 }
 
 func TestLedgerConfigEncodingErrors(t *testing.T) {

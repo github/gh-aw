@@ -15,7 +15,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 	})
 	if data.SafeOutputs == nil {
 		if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
-			enabledTools["ledger_append"] = struct{}{}
+			if data.LedgerConfig.hasGeneralAppendTool() {
+				enabledTools["ledger_append"] = struct{}{}
+			}
 			if len(data.LedgerConfig.compactionEnabledLedgers()) > 0 {
 				enabledTools[ledgerRequestCompactionHandlerKey] = struct{}{}
 			}
@@ -240,7 +242,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		}{}
 	}
 	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
-		enabledTools["ledger_append"] = struct{}{}
+		if data.LedgerConfig.hasGeneralAppendTool() {
+			enabledTools["ledger_append"] = struct{}{}
+		}
 		if len(data.LedgerConfig.compactionEnabledLedgers()) > 0 {
 			enabledTools[ledgerRequestCompactionHandlerKey] = struct{}{}
 		}

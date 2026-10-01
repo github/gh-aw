@@ -40,8 +40,15 @@ tools:
       type: counter
 ```
 
-All writes use the **same** `ledger_append` safe output. For built-ins, provide
-`ledger` and `operation` instead of `record`, plus the indicated fields:
+The `map` and `work-pool` built-ins expose dedicated safe-output tools:
+`ledger_map_put`, `ledger_map_delete`, and `ledger_work_pool_submit`,
+`ledger_work_pool_cancel`, `ledger_work_pool_acquire`,
+`ledger_work_pool_acquire_next`, `ledger_work_pool_finish`, and
+`ledger_work_pool_abandon`. Supply the operation's fields and a `ledger` name
+when more than one ledger of that type is configured. These tools produce
+`ledger_append` entries internally; they do not expose the low-level operation
+envelope to the agent. Other ledger types continue to use `ledger_append`
+with `ledger` and `operation` instead of `record`, plus the indicated fields:
 
 | Type | Operations | Materialized `state` columns |
 | --- | --- | --- |
@@ -62,7 +69,7 @@ Without a schema, Work properties are unrestricted, but the full payload is
 pinned to its identity: submitting a different payload for the same identity
 is invalid.
 
-`ledger_append` is a **deferred** safe output: its immediate response only confirms
+Ledger writes are **deferred** safe outputs: their immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome
 later, after the agent has finished. In particular, a queued acquisition is **not**
 an authorization to do work; this interface does not yet support the interactive

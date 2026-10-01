@@ -98,6 +98,32 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("missing_tool");
   });
 
+  it("mounts dedicated built-in ledger tools without exposing the low-level append tool", () => {
+    fs.writeFileSync(toolsSourcePath, JSON.stringify([...sampleSourceTools, { name: "ledger_append", inputSchema: { type: "object", properties: { ledger: { type: "string" } } } }]));
+    const builtin = { name: "ledger_map_put", _ledger_type: "map", _ledger_operation: "put", inputSchema: { type: "object", properties: { key: { type: "string" } } } };
+    fs.writeFileSync(configPath, JSON.stringify({ ledger_append: { ledgers: [{ name: "cache", type: "map" }] } }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ dynamic_tools: [builtin] }));
+    runScript();
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8")).map((/** @type {{name: string}} */ tool) => tool.name)).toEqual(["ledger_map_put"]);
+
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        ledger_append: {
+          ledgers: [
+            { name: "cache", type: "map" },
+            { name: "events", type: "log" },
+          ],
+        },
+      })
+    );
+    runScript();
+    const mixed = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(mixed.map((/** @type {{name: string}} */ tool) => tool.name)).toEqual(["ledger_append", "ledger_map_put"]);
+    expect(mixed[0].inputSchema.properties.ledger.enum).toEqual(["events"]);
+    expect(mixed[0].inputSchema.required).toContain("ledger");
+  });
+
   it("preserves namespaced public names", () => {
     fs.writeFileSync(
       toolsSourcePath,
