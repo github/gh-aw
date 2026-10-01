@@ -416,6 +416,33 @@ describe("add_comment", () => {
       expect(capturedRepo).toBe("other-repo");
     });
 
+    it("does not reuse default-repo mention aliases for a cross-repo comment", async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+      const collaboratorLookups = [];
+      let postedBody;
+      mockGithub.rest.repos = {
+        listCollaborators: async params => {
+          collaboratorLookups.push(params);
+          return { data: [] };
+        },
+      };
+      mockGithub.rest.issues.createComment = async params => {
+        postedBody = params.body;
+        return { data: { id: 12345, html_url: "https://github.com/target-org/target-repo/issues/5#issuecomment-12345" } };
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({
+        "target-repo": "*", target: "*",
+        mentions: { allowContext: false, allowed: ["target-user"] },
+        allowedMentionAliases: ["workflow-user"]
+      }); })()`);
+      const result = await handler({ type: "add_comment", repo: "target-org/target-repo", item_number: 5, body: "Hi @workflow-user and @target-user" }, {});
+
+      expect(result.success).toBe(true);
+      expect(postedBody).toContain("`@workflow-user` and @target-user");
+      expect(collaboratorLookups).toEqual([expect.objectContaining({ owner: "target-org", repo: "target-repo" })]);
+    });
+
     it("should return skipped (not failed) when target is 'triggering' but running in schedule context", async () => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 

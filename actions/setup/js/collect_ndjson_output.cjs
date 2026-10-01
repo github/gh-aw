@@ -7,7 +7,7 @@ const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
 const { isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
-const { parseAllowedRepos, validateTargetRepo } = require("./repo_helpers.cjs");
+const { getDefaultTargetRepo, parseAllowedRepos, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { isProbingNoopMessage } = require("./intent_probe.cjs");
 
 async function main() {
@@ -37,9 +37,8 @@ async function main() {
     const mentionsConfig = validationConfig?.mentions || null;
     const maxMentions = parseIntTemplatable(mentionsConfig?.max, 50);
 
-    // Resolve allowed mentions for the output collector
-    // This determines which @mentions are allowed in the agent output
-    const allowedMentions = await resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig);
+    // Resolve mentions for each output's destination before sanitizing it.
+    let allowedMentions = [];
 
     // maxBotMentions is populated after safeOutputsConfig is read below
     /** @type {number | undefined} */
@@ -254,14 +253,16 @@ async function main() {
     // indentation/pretty-printing, parsing will fail.
     const lines = outputContent.trim().split("\n");
 
-    // Resolve allowed repos for cross-repo targeting validation in the pre-scan loop.
-    // The triggering repository is always allowed; additional repos come from config.
-    const defaultTargetRepo = `${context.repo.owner}/${context.repo.repo}`;
-    const allowedRepos = parseAllowedRepos(safeOutputsConfig?.allowed_repos || safeOutputsConfig?.["allowed-repos"]);
+    function resolveMentionRepo(item, itemType) {
+      const typeConfig = expectedOutputTypes[itemType];
+      const defaultTargetRepo = getDefaultTargetRepo(typeConfig && typeof typeConfig === "object" ? typeConfig : undefined);
+      const allowedRepos = parseAllowedRepos(typeConfig?.allowed_repos ?? safeOutputsConfig?.allowed_repos);
+      return resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, "mention");
+    }
 
     // Pre-scan: collect target issue authors from add_comment items with explicit item_number
-    // so they are included in the first sanitization pass.
-    // We do this before the main loop so the allowed mentions array can be extended.
+    // so they are included when sanitizing the corresponding comment.
+    const targetIssueAuthors = new Map();
     for (const line of lines) {
       const trimmedLine = line.trim();
       if (!trimmedLine) continue;
@@ -269,35 +270,19 @@ async function main() {
         const preview = JSON.parse(trimmedLine);
         const previewType = (preview?.type || "").replace(/-/g, "_");
         if (previewType === "add_comment" && preview.item_number != null && typeof preview.item_number === "number") {
-          // Determine which repo to query (use explicit repo field or fall back to triggering repo)
-          let targetOwner = context.repo.owner;
-          let targetRepo = context.repo.repo;
-          if (typeof preview.repo === "string") {
-            const candidateRepo = preview.repo.trim();
-            if (candidateRepo.includes("/")) {
-              // Validate the user-supplied repo against allowedRepos before making API calls
-              const repoValidation = validateTargetRepo(candidateRepo, defaultTargetRepo, allowedRepos);
-              if (repoValidation.valid) {
-                const parts = candidateRepo.split("/");
-                targetOwner = parts[0];
-                targetRepo = parts[1];
-              } else {
-                core.info(`[MENTIONS] Skipping cross-repo mention lookup for '${candidateRepo}': ${repoValidation.error}`);
-              }
-            }
+          const repoResult = resolveMentionRepo(preview, "add_comment");
+          if (!repoResult.success) {
+            core.info(`[MENTIONS] Skipping target issue author lookup: ${repoResult.error}`);
+            continue;
           }
           try {
             const { data: issueData } = await github.rest.issues.get({
-              owner: targetOwner,
-              repo: targetRepo,
+              owner: repoResult.repoParts.owner,
+              repo: repoResult.repoParts.repo,
               issue_number: preview.item_number,
             });
             if (issueData.user?.login && !isPayloadUserBot(issueData.user)) {
-              const issueAuthor = issueData.user.login;
-              if (!allowedMentions.some(m => m.toLowerCase() === issueAuthor.toLowerCase())) {
-                allowedMentions.push(issueAuthor);
-                core.info(`[MENTIONS] Added target issue #${preview.item_number} author '${issueAuthor}' to allowed mentions`);
-              }
+              targetIssueAuthors.set(`${repoResult.repo.toLowerCase()}#${preview.item_number}`, issueData.user.login);
             }
           } catch (fetchErr) {
             core.info(`[MENTIONS] Could not fetch issue #${preview.item_number} author for mention allowlist: ${getErrorMessage(fetchErr)}`);
@@ -339,6 +324,17 @@ async function main() {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
+        const repoResult = resolveMentionRepo(item, itemType);
+        allowedMentions = repoResult.success
+          ? await resolveAllowedMentionsFromPayload(
+              context,
+              github,
+              core,
+              mentionsConfig,
+              itemType === "add_comment" ? [targetIssueAuthors.get(`${repoResult.repo.toLowerCase()}#${item.item_number}`)].filter(Boolean) : undefined,
+              repoResult.repoParts
+            )
+          : [];
         const typeCount = parsedItems.filter(existing => existing.type === itemType).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
