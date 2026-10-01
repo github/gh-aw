@@ -1411,6 +1411,38 @@ describe("pr_review_buffer (factory pattern)", () => {
       }
     });
 
+    it.each([
+      ["", false],
+      ["Updated review", true],
+    ])("does not treat dropped inline findings as a clean review with body %j", async (reviewBody, shouldSubmit) => {
+      const previousCallerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID;
+      process.env.GH_AW_CALLER_WORKFLOW_ID = "owner/repo/CallerA";
+      try {
+        buffer.setSupersedeOlderReviews(true);
+        buffer.setFooterMode("none");
+        buffer.setReviewMetadata(reviewBody, "COMMENT");
+        buffer.addComment({ path: "missing.js", line: 1, body: "Finding" });
+        buffer.setReviewContext({
+          repo: "owner/repo",
+          repoParts: { owner: "owner", repo: "repo" },
+          pullRequestNumber: 42,
+          pullRequest: { head: { sha: "abc123" } },
+        });
+        mockGithub.rest.pulls.listFiles.mockResolvedValue({ data: [{ filename: "changed.js" }] });
+        mockGithub.rest.pulls.createReview.mockResolvedValue({ data: { id: 901, html_url: "review-url" } });
+        mockGithub.rest.pulls.listReviews.mockResolvedValue({
+          data: [{ id: 100, state: "CHANGES_REQUESTED", user: { type: "Bot" }, body: '[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerA"' }],
+        });
+
+        expect((await buffer.submitReview()).success).toBe(shouldSubmit);
+        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(shouldSubmit ? 1 : 0);
+        expect(mockGithub.rest.pulls.dismissReview).not.toHaveBeenCalled();
+      } finally {
+        if (previousCallerWorkflowId === undefined) delete process.env.GH_AW_CALLER_WORKFLOW_ID;
+        else process.env.GH_AW_CALLER_WORKFLOW_ID = previousCallerWorkflowId;
+      }
+    });
+
     it("should warn and continue when stale review dismissal fails", async () => {
       const previousWorkflowId = process.env.GH_AW_WORKFLOW_ID;
       process.env.GH_AW_WORKFLOW_ID = "test-workflow";

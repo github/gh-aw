@@ -372,6 +372,7 @@ function createReviewBuffer() {
         body = body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
     }
+    const hasReviewBody = Boolean(body);
     // GitHub strips HTML comments from review bodies. A Markdown reference
     // survives even when the visible footer is disabled.
     const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
@@ -460,7 +461,7 @@ function createReviewBuffer() {
 
     // Sub-pattern A: Guard against empty review submission (no body and no inline comments).
     // GitHub returns 422 "Unprocessable Entity" when both are absent.
-    if (comments.length === 0 && !body) {
+    if (comments.length === 0 && !hasReviewBody) {
       const errorMsg = "Empty review: review body is empty and no inline comments are present" + (bufferedComments.length > 0 ? " (all comment paths were outside the PR diff)" : "") + ". Skipping POST to avoid 422.";
       core.warning(errorMsg);
       return { success: false, error: errorMsg };
@@ -524,7 +525,7 @@ function createReviewBuffer() {
      */
     async function maybeSupersedeOlderReviews(currentReviewId) {
       // A blocking review or a review with inline findings is not a clean replacement.
-      if (!supersedeOlderReviews || event !== "COMMENT" || comments.length > 0) {
+      if (!supersedeOlderReviews || event !== "COMMENT" || bufferedComments.length > 0) {
         return;
       }
 
