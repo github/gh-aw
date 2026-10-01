@@ -14,7 +14,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { ERR_NOT_FOUND } = require("./error_codes.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
-const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
+const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 
@@ -172,14 +172,14 @@ async function main(config = {}) {
   const githubClient = await createAuthenticatedGitHubClient(config);
   const allowBody = config.allow_body !== false; // default true; false only when explicitly set to false
   const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
-  let allowedMentionAliases = [];
+  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
+  let defaultMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
-    allowedMentionAliases = config.allowedMentionAliases;
+    defaultMentionAliases = config.allowedMentionAliases;
   } else if (config.mentions != null) {
-    allowedMentionAliases = await resolveAllowedMentionsFromPayload(context, githubClient, core, config.mentions);
+    defaultMentionAliases = await resolveDefaultMentions(context, githubClient, core, config.mentions, defaultTargetRepo);
   }
 
-  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   if (defaultTargetRepo) {
     core.info(`Target repository: ${defaultTargetRepo}`);
   }
@@ -225,6 +225,7 @@ async function main(config = {}) {
     }
     const discussionOwner = repoResult.repoParts.owner;
     const discussionRepo = repoResult.repoParts.repo;
+    const allowedMentionAliases = await resolveMentionsForItem(context, githubClient, core, config.mentions, defaultMentionAliases, defaultTargetRepo, repoResult);
 
     // Determine discussion number
     let discussionNumber;
