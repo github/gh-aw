@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 
 const MAX_LOG_BYTES = 10 * 1024 * 1024;
 const MAX_TRANSACTION_BYTES = 64 * 1024;
+const MAX_TRANSACTIONS = 100000;
 const MAX_VALUE_DEPTH = 32;
 const AUTHORITY_FIELDS = new Set(["work_id", "claim_id", "claimant", "generation"]);
 const TRANSACTION_FIELDS = {
@@ -134,6 +135,7 @@ function parseTransactionLog(contents) {
   if (contents === "") return [];
   const lines = contents.split("\n");
   if (lines.at(-1) === "") lines.pop();
+  if (lines.length > MAX_TRANSACTIONS) throw new RangeError("Coordinator transaction log contains too many records");
   if (lines.some(line => line.trim() === "")) throw new TypeError("Coordinator transaction log contains an empty record");
   return lines.map(line => {
     let parsed;
@@ -241,12 +243,12 @@ function replayTransactions(input) {
       work_id: workId,
       work: structuredClone(transaction.work),
       state,
-      effective_claim_id: effectiveClaim?.claim_id || null,
+      effective_claim_id: cancelled ? null : effectiveClaim?.claim_id || null,
       claims: workClaims.map(claim => ({
         claim_id: claim.claim_id,
         run_id: claim.run_id,
         workflow_id: claim.workflow_id,
-        state: cancellations.has(claim.claim_id) ? "cancelled" : claim === effectiveClaim ? "effective" : "superseded",
+        state: cancellations.has(claim.claim_id) ? "cancelled" : !cancelled && claim === effectiveClaim ? "effective" : "superseded",
       })),
       completion: completion ? structuredClone(completion.outcome ?? null) : null,
     });
@@ -267,7 +269,9 @@ function replayTransactions(input) {
 }
 
 function serializeTransactions(transactions) {
-  return stableTransactions(transactions).map(canonicalJSON).join("\n") + (transactions.length ? "\n" : "");
+  const content = stableTransactions(transactions).map(canonicalJSON).join("\n") + (transactions.length ? "\n" : "");
+  if (Buffer.byteLength(content, "utf8") > MAX_LOG_BYTES) throw new RangeError("Coordinator transaction log exceeds the size limit");
+  return content;
 }
 
 function compactTransactions(transactions) {
