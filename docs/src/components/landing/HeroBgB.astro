@@ -1,13 +1,15 @@
 ---
-// Hero background variant B: halftone dot field.
-// A regular grid of dots whose radius is driven by a slow, swelling noise
-// field anchored on the right (top on narrow screens). Dots are computed in a
-// WebGL fragment shader with a cell-local distance, so they stay crisp at any
-// DPR. A rare coral dot appears where the field peaks.
+// Hero background variant B: "rays".
+// Soft light shafts falling from the top edge across the full width, all
+// leaning ~20deg, each with its own width and intensity. They breathe and
+// drift sideways slowly, fade out as they come down, and are quantised with
+// an 8x8 Bayer ordered dither into a few purple steps. Rare GitHub-green
+// glints sit in the brightest beams near the top. Rendered at low resolution
+// and scaled up with `image-rendering: pixelated`.
 ---
 
 <div class="hero-bg-b" data-hero-bg-b>
-  <canvas class="hero-bg-b__canvas"></canvas>
+  <canvas class="hero-bg-b-canvas"></canvas>
 </div>
 
 <style>
@@ -16,36 +18,22 @@
     inset: 0;
     overflow: hidden;
   }
-  .hero-bg-b__canvas {
+  .hero-bg-b-canvas {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    right: 0;
     display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
     opacity: 0;
-    transition: opacity 600ms ease-out;
+    transition: opacity 900ms ease-out;
   }
-  .hero-bg-b.is-ready .hero-bg-b__canvas {
+  .hero-bg-b-canvas.is-ready {
     opacity: 1;
   }
-  /* Static fallback (no JS / no WebGL): a faint dot grid fading in from the right. */
-  .hero-bg-b:not(.is-ready)::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--aw-purple-4) 45%, transparent) 1.6px,
-      transparent 2px
-    );
-    background-size: 12px 12px;
-    mask-image: linear-gradient(to left, black 0%, transparent 55%);
-    -webkit-mask-image: linear-gradient(to left, black 0%, transparent 55%);
-  }
-  @media (max-width: 1023px) {
-    .hero-bg-b:not(.is-ready)::before {
-      mask-image: linear-gradient(to bottom, black 0%, transparent 35%);
-      -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 35%);
+  @media (prefers-reduced-motion: reduce) {
+    .hero-bg-b-canvas {
+      transition: none;
     }
   }
 </style>
@@ -58,41 +46,19 @@
 
   const FRAG = `
     precision highp float;
-    uniform vec2 u_res;      // canvas size in device px
-    uniform float u_dpr;
+    uniform vec2 u_res;      // canvas size in cells
+    uniform float u_cell;    // CSS px per cell
     uniform float u_time;
-    uniform float u_pitch;   // grid pitch in device px
-    uniform float u_stacked; // 1.0 when the layout is stacked (narrow)
-    uniform float u_gain;    // overall intensity per theme
-    uniform vec3 u_lo;       // faint dot colour
-    uniform vec3 u_mid;
-    uniform vec3 u_hi;       // strongest purple
-    uniform vec3 u_coral;
+    uniform float u_strength;
+    uniform vec3 u_p1;
+    uniform vec3 u_p2;
+    uniform vec3 u_p3;
+    uniform vec3 u_p4;
+    uniform vec3 u_green;
 
-    // 2D simplex noise (Ashima / Stefan Gustavson, MIT)
-    vec3 permute(vec3 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
-    float snoise(vec2 v) {
-      const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                          -0.577350269189626, 0.024390243902439);
-      vec2 i = floor(v + dot(v, C.yy));
-      vec2 x0 = v - i + dot(i, C.xx);
-      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-      vec4 x12 = x0.xyxy + C.xxzz;
-      x12.xy -= i1;
-      i = mod(i, 289.0);
-      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-      vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-      m = m * m; m = m * m;
-      vec3 x = 2.0 * fract(p * C.www) - 1.0;
-      vec3 h = abs(x) - 0.5;
-      vec3 ox = floor(x + 0.5);
-      vec3 a0 = x - ox;
-      m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-      vec3 g;
-      g.x = a0.x * x0.x + h.x * x0.y;
-      g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-      return 130.0 * dot(m, g);
-    }
+    float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+    float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    float bayer8(vec2 a) { return bayer4(0.5 * a) * 0.25 + bayer2(a); }
 
     float hash(vec2 p) {
       p = fract(p * vec2(123.34, 456.21));
@@ -100,76 +66,105 @@
       return fract(p.x * p.y);
     }
 
+    const float SLANT = 0.36;  // tan(~20deg): beams lean down and to the right
+    const int BEAMS = 11;
+
     void main() {
-      // Top-left origin, in device px.
-      vec2 frag = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y);
-      vec2 cell = floor(frag / u_pitch);
-      vec2 center = (cell + 0.5) * u_pitch;
-      vec2 uv = center / u_res;            // 0..1 at the cell centre
-      vec2 css = center / u_dpr;           // CSS px, so the field scale is DPR-independent
-
+      vec2 cell = gl_FragCoord.xy;            // cell coords, y up
+      vec2 size = u_res * u_cell;             // CSS px
+      float x = cell.x * u_cell;
+      float y = size.y - cell.y * u_cell;     // CSS px from the top edge
       float t = u_time;
-      // Soft cloud: two drifting octaves plus a slow diagonal swell.
-      float n = snoise(css * 0.0032 + vec2(t * 0.035, -t * 0.022)) * 0.65
-              + snoise(css * 0.0075 + vec2(-t * 0.05, t * 0.04)) * 0.35;
-      float swell = sin(dot(css, vec2(0.0062, 0.0036)) - t * 0.55);
-      float field = 0.5 + 0.38 * n + 0.18 * swell;
+      bool narrow = size.x < 720.0;
 
-      // Anchor: right side on wide layouts, top on stacked ones.
-      float right = smoothstep(0.30, 1.0, uv.x);
-      right *= mix(0.75, 1.0, smoothstep(1.0, 0.2, uv.y));
-      // Stacked: a band hugging the top edge (CSS px), heavier to the right, gone before the h1.
-      float top = smoothstep(150.0, 0.0, css.y) * mix(0.25, 1.0, smoothstep(0.0, 1.0, uv.x));
-      float anchor = mix(right, top, u_stacked);
+      // Vertical reach of the light: calm from the h1 down. A little longer
+      // on the right, where the hero visual sits at desktop widths.
+      float xr = x / size.x;
+      float reach = narrow
+        ? mix(42.0, 96.0, smoothstep(0.3, 1.0, xr))  // h1 starts ~50px down
+        : mix(min(size.y * 0.24, 210.0), min(size.y * 0.5, 420.0), smoothstep(0.4, 0.95, xr));
 
-      float v = clamp(field * anchor * 1.35, 0.0, 1.0);
-      v = pow(v, 1.25);
+      // Position across the beams: shear x by depth so every beam leans.
+      float margin = reach * SLANT + 220.0;
+      float span = size.x + margin * 2.0;
+      float u = x - y * SLANT + margin;
+      float drift = t * 6.0 + sin(t * 0.07) * 40.0;  // slow sideways wander
 
-      // Dot radius from value; cell-local distance with 1 device px AA.
-      float maxR = u_pitch * 0.42;
-      float r = maxR * v;
-      float d = length(frag - center);
-      float aa = 0.75;
-      float cover = 1.0 - smoothstep(r - aa, r + aa, d);
-      // Fade out the tiniest dots rather than letting them flicker.
-      cover *= smoothstep(0.06, 0.16, v);
+      float light = 0.0;
+      float peak = 0.0;
+      for (int i = 0; i < BEAMS; i++) {
+        float fi = float(i);
+        float r1 = hash(vec2(fi, 3.1));
+        float r2 = hash(vec2(fi, 7.7));
+        float r3 = hash(vec2(fi, 1.9));
+        float c = mod((fi + 0.15 + r1 * 0.7) / float(BEAMS) * span + drift, span);
+        float w = mix(18.0, 90.0, r2) * (0.75 + 0.35 * sin(t * (0.21 + r3 * 0.2) + fi * 2.3));
+        w *= 1.0 + 0.6 * y / reach;  // shafts spread slightly as they fall
+        float k = mix(0.45, 1.0, r3) * (0.6 + 0.4 * sin(t * (0.17 + r1 * 0.15) + fi * 1.7));
+        float d = abs(u - c) / w;
+        float b = 1.0 - smoothstep(0.15, 1.0, d);
+        // Each beam reaches a slightly different depth.
+        float len = reach * mix(0.8, 1.2, r1);
+        float fall = 1.0 - smoothstep(-0.15 * len, len, y);
+        float v = b * k * fall;
+        light += v;
+        peak = max(peak, v);
+      }
 
-      vec3 col = mix(u_lo, u_mid, smoothstep(0.1, 0.55, v));
-      col = mix(col, u_hi, smoothstep(0.55, 0.95, v));
+      // Faint wash along the very top so the band reads across the full width.
+      float wash = (1.0 - smoothstep(0.0, reach * 0.45, y)) * 0.18;
+      float v = clamp(light * 0.9 + wash, 0.0, 1.0) * u_strength;
+      float th = bayer8(cell);
 
-      // Sparse coral where the field peaks.
-      float h = hash(cell);
-      float coral = step(h, 0.03) * smoothstep(0.68, 0.82, v);
-      col = mix(col, u_coral, coral);
+      // Rare green glints in the brightest beams, close to the top edge.
+      float g = hash(cell + floor(t * 1.5) * 17.0);
+      if (peak > 0.55 && y < reach * 0.45 && g < (peak - 0.55) * 0.1) {
+        gl_FragColor = vec4(u_green, 1.0);
+        return;
+      }
 
-      float a = cover * u_gain * mix(0.55, 1.0, v);
-      gl_FragColor = vec4(col * a, a);
+      float level = floor(v * 4.0 + th);
+      if (level < 1.0) { gl_FragColor = vec4(0.0); return; }
+      vec3 col = level < 2.0 ? u_p1 : level < 3.0 ? u_p2 : level < 4.0 ? u_p3 : u_p4;
+      gl_FragColor = vec4(col, 1.0);
     }
   `;
 
-  type RGB = [number, number, number];
+  const CELL = 3; // CSS px per dither cell
+  const FRAME_MS = 1000 / 30;
+
+  function parseColor(ctx: CanvasRenderingContext2D, value: string): [number, number, number] {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = value.trim() || '#000';
+    ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0] / 255, d[1] / 255, d[2] / 255];
+  }
+
+  function compile(gl: WebGLRenderingContext, type: number, src: string) {
+    const s = gl.createShader(type);
+    if (!s) return null;
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      gl.deleteShader(s);
+      return null;
+    }
+    return s;
+  }
 
   function init(root: HTMLElement) {
-    const canvas = root.querySelector('canvas');
+    const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-b-canvas');
     if (!canvas) return;
-    const gl = canvas.getContext('webgl', {
-      alpha: true,
-      premultipliedAlpha: true,
-      antialias: false,
-      powerPreference: 'low-power',
-    });
+    const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
     if (!gl) return;
 
-    const compile = (type: number, src: string) => {
-      const s = gl.createShader(type)!;
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
-    };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
     if (!vs || !fs) return;
-    const prog = gl.createProgram()!;
+    const prog = gl.createProgram();
+    if (!prog) return;
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
@@ -183,126 +178,107 @@
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-    const u = (n: string) => gl.getUniformLocation(prog, n);
-    const U = {
-      res: u('u_res'), dpr: u('u_dpr'), time: u('u_time'), pitch: u('u_pitch'),
-      stacked: u('u_stacked'), gain: u('u_gain'),
-      lo: u('u_lo'), mid: u('u_mid'), hi: u('u_hi'), coral: u('u_coral'),
-    };
+    const u = (name: string) => gl.getUniformLocation(prog, name);
+    const uRes = u('u_res');
+    const uCell = u('u_cell');
+    const uTime = u('u_time');
+    const uStrength = u('u_strength');
+    const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
+    const uGreen = u('u_green');
+    gl.uniform1f(uCell, CELL);
 
-    // Normalise any CSS colour string to RGB via a 1x1 2D canvas.
-    const probe = document.createElement('canvas').getContext('2d');
-    const toRGB = (value: string, fallback: RGB): RGB => {
-      if (!probe || !value) return fallback;
-      probe.fillStyle = '#000';
-      probe.fillStyle = value.trim();
-      probe.clearRect(0, 0, 1, 1);
-      probe.fillRect(0, 0, 1, 1);
-      const d = probe.getImageData(0, 0, 1, 1).data;
-      return [d[0] / 255, d[1] / 255, d[2] / 255];
-    };
+    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
 
-    const readColours = () => {
+    function readColors() {
+      if (!probe || !gl) return;
       const cs = getComputedStyle(document.documentElement);
-      const v = (n: string) => cs.getPropertyValue(n);
-      const dark = document.documentElement.dataset.theme !== 'light';
-      if (dark) {
-        gl.uniform3fv(U.lo, toRGB(v('--aw-purple-8'), [0.29, 0.22, 0.48]));
-        gl.uniform3fv(U.mid, toRGB(v('--aw-purple-7'), [0.37, 0.28, 0.6]));
-        gl.uniform3fv(U.hi, toRGB(v('--aw-purple-4'), [0.65, 0.58, 0.83]));
-        gl.uniform3fv(U.coral, toRGB(v('--aw-coral-4'), [0.94, 0.52, 0.37]));
-        gl.uniform1f(U.gain, 0.72);
-      } else {
-        gl.uniform3fv(U.lo, toRGB(v('--aw-purple-2'), [0.88, 0.85, 0.95]));
-        gl.uniform3fv(U.mid, toRGB(v('--aw-purple-3'), [0.76, 0.71, 0.89]));
-        gl.uniform3fv(U.hi, toRGB(v('--aw-purple-4'), [0.65, 0.58, 0.83]));
-        gl.uniform3fv(U.coral, toRGB(v('--aw-coral-4'), [0.94, 0.52, 0.37]));
-        gl.uniform1f(U.gain, 0.9);
+      const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+      const steps = dark
+        ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
+        : ['--aw-purple-3', '--aw-purple-4', '--aw-purple-6', '--aw-purple-7'];
+      steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
+      gl.uniform3fv(uGreen, parseColor(probe, cs.getPropertyValue('--aw-green-6')));
+      gl.uniform1f(uStrength, dark ? 1.0 : 0.72);
+    }
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Random phase so the field doesn't always start from the same shape.
+    const t0 = performance.now() - Math.random() * 60000;
+    let raf = 0;
+    let last = 0;
+    let onScreen = true;
+
+    function visible() {
+      return onScreen && !document.hidden && root.offsetParent !== null && root.clientWidth > 0;
+    }
+
+    function resize() {
+      const w = root.clientWidth;
+      const h = root.clientHeight;
+      if (!w || !h || !gl || !canvas) return false;
+      const cw = Math.ceil(w / CELL);
+      const ch = Math.ceil(h / CELL);
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+        canvas.style.width = `${cw * CELL}px`;
+        canvas.style.height = `${ch * CELL}px`;
+        gl.viewport(0, 0, cw, ch);
+        gl.uniform2f(uRes, cw, ch);
       }
-    };
+      return true;
+    }
 
-    let dpr = 1;
-    let w = 0;
-    let h = 0;
-    const resize = () => {
-      const rect = root.getBoundingClientRect();
-      w = rect.width;
-      h = rect.height;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, Math.round(w * dpr));
-      canvas.height = Math.max(1, Math.round(h * dpr));
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(U.res, canvas.width, canvas.height);
-      gl.uniform1f(U.dpr, dpr);
-      // Pitch snapped to whole device px keeps dots evenly spaced and crisp.
-      const pitchCss = w < 640 ? 10 : 12;
-      gl.uniform1f(U.pitch, Math.round(pitchCss * dpr));
-      gl.uniform1f(U.stacked, w < 1024 ? 1 : 0);
-    };
-
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const start = performance.now() - 20000; // start mid-drift, not at t=0
-    let time = 20;
-    const draw = () => {
-      gl.uniform1f(U.time, time);
+    function draw(now: number) {
+      if (!gl || !canvas) return;
+      gl.uniform1f(uTime, (now - t0) / 1000);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-    };
+      canvas.classList.add('is-ready');
+    }
 
-    let inView = true;
-    let raf = 0;
-    let last = 0;
-    const FRAME_MS = 1000 / 30;
-    const visible = () => w > 0 && h > 0 && root.offsetParent !== null;
-    const shouldRun = () => inView && !document.hidden && visible() && !reduced.matches;
-
-    const loop = (now: number) => {
+    function tick(now: number) {
       raf = 0;
-      if (!shouldRun()) return;
-      raf = requestAnimationFrame(loop);
-      if (now - last < FRAME_MS) return;
-      last = now;
-      time = (now - start) / 1000;
-      draw();
-    };
-    const update = () => {
       if (!visible()) return;
-      if (shouldRun()) {
-        if (!raf) raf = requestAnimationFrame(loop);
-      } else {
-        draw(); // one static frame (reduced motion, or to refresh after resize/theme)
+      if (now - last >= FRAME_MS) {
+        last = now;
+        draw(now);
       }
-    };
+      raf = requestAnimationFrame(tick);
+    }
 
-    resize();
-    readColours();
-    if (visible()) draw();
-    root.classList.add('is-ready');
-    update();
+    function update() {
+      if (!visible()) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        return;
+      }
+      if (!resize()) return;
+      if (reduceMotion.matches) {
+        draw(t0 + 20000);
+        return;
+      }
+      if (!raf) raf = requestAnimationFrame(tick);
+    }
 
-    new ResizeObserver(() => {
-      resize();
-      if (visible()) draw();
-      update();
-    }).observe(root);
+    readColors();
+
+    new ResizeObserver(update).observe(root);
+
     new IntersectionObserver((entries) => {
-      inView = entries[entries.length - 1].isIntersecting;
+      onScreen = entries.some((e) => e.isIntersecting);
       update();
     }).observe(root);
-    document.addEventListener('visibilitychange', update);
-    reduced.addEventListener('change', update);
+
     new MutationObserver(() => {
-      readColours();
-      if (visible()) draw();
+      readColors();
+      if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-    canvas.addEventListener('webglcontextlost', (e) => {
-      e.preventDefault();
-      cancelAnimationFrame(raf);
-      raf = 0;
-      root.classList.remove('is-ready');
-    });
+    document.addEventListener('visibilitychange', update);
+    reduceMotion.addEventListener('change', update);
+    update();
   }
 
   document.querySelectorAll<HTMLElement>('[data-hero-bg-b]').forEach(init);

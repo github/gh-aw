@@ -1,25 +1,24 @@
 ---
-// Hero background variant C: "waves".
-// Four travelling sine waves with different wavelengths, speeds and slight
-// angles are summed into horizontal interference bands across the full width
-// of the hero's top edge. Their beating makes moiré swells and ribbons that
-// drift left to right. The field is quantised with an 8x8 Bayer ordered
-// dither into a few purple steps (3 CSS px cells, upscaled with
-// `image-rendering: pixelated`). Rare green glints sit on the constructive
-// interference peaks.
+// Hero background variant D: "columns".
+// Vertical columns hang from the top edge across the full width, like an
+// equaliser or rain streaks. Each column's length breathes on smooth noise
+// sampled along x, so neighbours move together as gentle waves. Columns fade
+// from strong at the top to nothing at the tip through an 8x8 Bayer dither,
+// and a rare GitHub-green cell lights up at a tip like a finished run.
+// Rendered at low resolution and upscaled with `image-rendering: pixelated`.
 ---
 
-<div class="hero-bg-c" data-hero-bg-c>
-  <canvas class="hero-bg-c-canvas"></canvas>
+<div class="hero-bg-d" data-hero-bg-d>
+  <canvas class="hero-bg-d-canvas"></canvas>
 </div>
 
 <style>
-  .hero-bg-c {
+  .hero-bg-d {
     position: absolute;
     inset: 0;
     overflow: hidden;
   }
-  .hero-bg-c-canvas {
+  .hero-bg-d-canvas {
     position: absolute;
     top: 0;
     left: 0;
@@ -29,11 +28,11 @@
     opacity: 0;
     transition: opacity 900ms ease-out;
   }
-  .hero-bg-c-canvas.is-ready {
+  .hero-bg-d-canvas.is-ready {
     opacity: 1;
   }
   @media (prefers-reduced-motion: reduce) {
-    .hero-bg-c-canvas {
+    .hero-bg-d-canvas {
       transition: none;
     }
   }
@@ -51,63 +50,90 @@
     uniform float u_cell;    // CSS px per cell
     uniform float u_time;
     uniform float u_strength;
+    uniform float u_calm;    // CSS px from the top where the h1 starts
+    uniform float u_wide;    // 1.0 when the hero visual sits on the right
     uniform vec3 u_p1;
     uniform vec3 u_p2;
     uniform vec3 u_p3;
     uniform vec3 u_p4;
-    uniform vec3 u_glint;
+    uniform vec3 u_green;
 
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
     float bayer8(vec2 a) { return bayer4(0.5 * a) * 0.25 + bayer2(a); }
 
-    // One travelling ribbon: horizontal bands (phase mostly along y) with a
-    // slight tilt, whose vertical position undulates as a wave moving right.
-    float ribbon(vec2 p, float ky, float tilt, float kx, float amp, float speed, float ph, float t) {
-      float wobble = amp * sin(p.x * kx - t * speed + ph);
-      return sin(p.y * ky + p.x * tilt + wobble - t * speed * 0.35);
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      float a = hash(i);
+      float b = hash(i + vec2(1.0, 0.0));
+      float c = hash(i + vec2(0.0, 1.0));
+      float d = hash(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     }
 
+    const float SLOT = 12.0; // cells per slot; each slot splits into 2-4 columns
+
     void main() {
-      vec2 cell = gl_FragCoord.xy;            // cell coords, y up
-      vec2 size = u_res * u_cell;             // CSS px
-      // CSS px with y = 0 at the top edge.
-      vec2 p = vec2(cell.x * u_cell, size.y - cell.y * u_cell);
+      vec2 cell = floor(gl_FragCoord.xy);     // cell coords, y up
+      float row = u_res.y - 1.0 - cell.y;     // cell rows from the top
+      float fromTop = (row + 0.5) * u_cell;   // CSS px from the top
       float t = u_time;
 
-      // Four waves. Two fine carriers with close wavelengths multiply into
-      // moiré stripes whose contrast beats in slow swells; the tilts make the
-      // beats wander across the width. Two broad waves add ribbons of swell.
-      float w1 = ribbon(p, 1.0 / 5.2,   0.0030, 1.0 / 230.0, 6.5, 0.55, 0.0, t);
-      float w2 = ribbon(p, 1.0 / 4.6,  -0.0045, 1.0 / 340.0, 8.0, 0.40, 1.7, t);
-      float w3 = ribbon(p, 1.0 / 22.0,  0.0020, 1.0 / 150.0, 1.2, 0.70, 3.1, t);
-      float w4 = ribbon(p, 1.0 / 48.0,  0.0026, 1.0 / 420.0, 1.6, 0.24, 4.4, t);
-      float weave = w1 * w2;                       // -1 .. 1, fine moiré
-      float swell = 0.5 + 0.25 * w3 + 0.25 * w4;   //  0 .. 1, broad ribbons
-      float n = swell * (0.55 + 0.45 * weave);
-      n = clamp(n * 1.25, 0.0, 1.0);
+      // Split the width into columns of 2-6 cells with a 1-cell gap after each.
+      float slot = floor(cell.x / SLOT);
+      float local = cell.x - slot * SLOT;
+      float start = 0.0;
+      float size = SLOT;
+      float idx = 0.0;
+      for (int k = 0; k < 4; k++) {
+        float s = 3.0 + floor(hash(vec2(slot, float(k) + 0.5)) * 5.0);
+        if (SLOT - (start + s) < 3.0 || k == 3) s = SLOT - start;
+        if (local < start + s) { size = s; idx = float(k); break; }
+        start += s;
+      }
+      if (local >= start + size - 1.0) { gl_FragColor = vec4(0.0); return; }
+      float colId = slot * 4.0 + idx;
+      float centerX = (slot * SLOT + start + (size - 1.0) * 0.5) * u_cell;
+      float xn = centerX / (u_res.x * u_cell);
 
-      // Falloff: a band hanging from the top edge across the full width.
-      // Desktop: gone by ~40% of the height (where the h1 starts), reaching a
-      // little lower on the right behind the hero visual. Narrow screens: the
-      // headline starts near the top, so keep it a thin strip.
-      float wide = smoothstep(560.0, 1000.0, size.x);
-      float fall = mix(105.0, 0.38 * size.y, wide);
-      float xN = p.x / size.x;
-      fall *= 1.0 + 0.55 * wide * smoothstep(0.5, 0.95, xN);
-      float m = 1.0 - smoothstep(0.0, fall, p.y);
-      m = m * m * (1.0 + 0.15 * m);
+      // Column length: a slow wave along x shared by neighbours, plus a
+      // smaller per-column wobble so the skyline isn't perfectly smooth.
+      float wave = vnoise(vec2(centerX / 210.0 + t * 0.05, t * 0.11));
+      float own = vnoise(vec2(colId * 7.31, t * 0.23 + hash(vec2(colId, 3.1)) * 9.0));
+      float len = clamp(wave * 0.78 + own * 0.32, 0.0, 1.0);
+      len = 0.18 + 0.82 * len * len * (3.0 - 2.0 * len);
 
-      float v = n * m * u_strength;
+      // Reach: stop short of the h1, longer on the right behind the visual.
+      float reach = u_calm * 0.92;
+      float right = smoothstep(0.5, 0.85, xn) * u_wide;
+      reach = mix(reach, max(reach, u_calm * 1.75), right);
+      float L = len * reach;
+
+      float f = fromTop / L;
+      if (f >= 1.0) { gl_FragColor = vec4(0.0); return; }
+
       float th = bayer8(cell);
 
-      // Green glints only at the strongest constructive peaks near the top.
-      float hot = n * m;
-      if (hot > 0.88 && (hot - 0.88) * 2.5 > th) {
-        gl_FragColor = vec4(u_glint, 1.0);
+      // Rare green glint: one or two cells at the tip of a few columns, each
+      // lit for a moment as if a run just finished.
+      float tipRow = floor(L / u_cell);
+      float epoch = floor(t * 0.45 + hash(vec2(colId, 8.7)) * 7.0);
+      float lit = hash(vec2(colId, epoch));
+      float centerCell = slot * SLOT + start + floor((size - 1.0) * 0.5);
+      if (lit < 0.03 && len > 0.45 && cell.x == centerCell && row >= tipRow - 2.0 && row <= tipRow - 1.0) {
+        gl_FragColor = vec4(u_green, 1.0);
         return;
       }
 
+      float amp = 0.68 + 0.3 * hash(vec2(colId, 1.7));
+      float v = pow(1.0 - f, 1.6) * amp * u_strength;
       float level = floor(v * 4.0 + th);
       if (level < 1.0) { gl_FragColor = vec4(0.0); return; }
       vec3 col = level < 2.0 ? u_p1 : level < 3.0 ? u_p2 : level < 4.0 ? u_p3 : u_p4;
@@ -117,6 +143,7 @@
 
   const CELL = 3; // CSS px per dither cell
   const FRAME_MS = 1000 / 30;
+  const WIDE_MIN = 960; // hero visual sits beside the text from about here
 
   function parseColor(ctx: CanvasRenderingContext2D, value: string): [number, number, number] {
     ctx.clearRect(0, 0, 1, 1);
@@ -140,7 +167,7 @@
   }
 
   function init(root: HTMLElement) {
-    const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-c-canvas');
+    const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-d-canvas');
     if (!canvas) return;
     const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
     if (!gl) return;
@@ -168,8 +195,10 @@
     const uCell = u('u_cell');
     const uTime = u('u_time');
     const uStrength = u('u_strength');
+    const uCalm = u('u_calm');
+    const uWide = u('u_wide');
     const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
-    const uGlint = u('u_glint');
+    const uGreen = u('u_green');
     gl.uniform1f(uCell, CELL);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
@@ -182,12 +211,12 @@
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
         : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
-      gl.uniform3fv(uGlint, parseColor(probe, cs.getPropertyValue('--aw-green-6')));
-      gl.uniform1f(uStrength, dark ? 1.0 : 1.05);
+      gl.uniform3fv(uGreen, parseColor(probe, cs.getPropertyValue('--aw-green-6')));
+      gl.uniform1f(uStrength, 1.0);
     }
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    // Random phase so the bands don't always start from the same shape.
+    // Random phase so the skyline doesn't always start from the same shape.
     const t0 = performance.now() - Math.random() * 60000;
     let raf = 0;
     let last = 0;
@@ -195,6 +224,14 @@
 
     function visible() {
       return onScreen && !document.hidden && root.offsetParent !== null && root.clientWidth > 0;
+    }
+
+    // Where the headline starts, so the columns stop short of it.
+    function measureCalm(w: number, h: number) {
+      const h1 = root.closest('section, .aw-hero')?.querySelector('h1');
+      if (!h1) return h * 0.35;
+      const top = h1.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      return top > 40 ? top : Math.min(h * 0.35, w * 0.4);
     }
 
     function resize() {
@@ -211,6 +248,8 @@
         gl.viewport(0, 0, cw, ch);
         gl.uniform2f(uRes, cw, ch);
       }
+      gl.uniform1f(uCalm, measureCalm(w, h));
+      gl.uniform1f(uWide, w >= WIDE_MIN ? 1 : 0);
       return true;
     }
 
@@ -261,20 +300,10 @@
       if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-    // Variant switching toggles display on an ancestor; resume when shown.
-    const group = root.closest('[data-variant-group]');
-    if (group) {
-      new MutationObserver(update).observe(group, {
-        attributes: true,
-        subtree: true,
-        attributeFilter: ['data-active', 'hidden', 'style', 'class'],
-      });
-    }
-
     document.addEventListener('visibilitychange', update);
     reduceMotion.addEventListener('change', update);
     update();
   }
 
-  document.querySelectorAll<HTMLElement>('[data-hero-bg-c]').forEach(init);
+  document.querySelectorAll<HTMLElement>('[data-hero-bg-d]').forEach(init);
 </script>

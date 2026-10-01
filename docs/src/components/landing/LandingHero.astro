@@ -5,6 +5,7 @@ import VariantGroup from './VariantGroup.astro';
 import HeroBgA from './HeroBgA.astro';
 import HeroBgB from './HeroBgB.astro';
 import HeroBgC from './HeroBgC.astro';
+import HeroBgD from './HeroBgD.astro';
 ---
 
 <section class="aw-hero not-content">
@@ -13,14 +14,16 @@ import HeroBgC from './HeroBgC.astro';
       id="hero-bg"
       label="Hero background"
       variants={[
-        { key: 'a', name: 'A' },
-        { key: 'b', name: 'B' },
-        { key: 'c', name: 'C' },
+        { key: 'a', name: 'A · clouds' },
+        { key: 'b', name: 'B · rays' },
+        { key: 'c', name: 'C · waves' },
+        { key: 'd', name: 'D · columns' },
       ]}
     >
       <div data-variant="a"><HeroBgA /></div>
       <div data-variant="b"><HeroBgB /></div>
       <div data-variant="c"><HeroBgC /></div>
+      <div data-variant="d"><HeroBgD /></div>
     </VariantGroup>
   </div>
   <div class="aw-hero-inner">
