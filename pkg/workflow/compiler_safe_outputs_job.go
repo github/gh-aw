@@ -128,6 +128,10 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		permissions.Set(PermissionIdToken, PermissionWrite)
 	}
+	// ledger_request_compaction dispatches the Agentic Maintenance workflow.
+	if buildLedgerRequestCompactionHandlerConfig(data.LedgerConfig) != nil {
+		permissions.Set(PermissionActions, PermissionWrite)
+	}
 	threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
 
 	// Compute artifact prefix once; it is referenced in all three phases.

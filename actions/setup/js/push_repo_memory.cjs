@@ -14,7 +14,6 @@ const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligib
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
-const { Ledger } = require("./ledger_store.cjs");
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
@@ -27,7 +26,7 @@ const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
  */
 function isUntrustedLedgerArtifact(relativePath, trustedSegments) {
   const normalizedPath = relativePath.replace(/\\/g, "/");
-  if (normalizedPath.startsWith("ledger/coverage/")) return true;
+  if (normalizedPath.startsWith("ledger/coverage/") || normalizedPath.startsWith("ledger/compaction/")) return true;
   const match = /^ledger\/shards\/([0-9a-f-]{36})\.jsonl$/.exec(normalizedPath);
   return Boolean(match && trustedSegments.has(match[1]));
 }
@@ -120,6 +119,7 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
  * @param {(delay: number) => Promise<void>} [opts.sleepFn]
  * @param {string} [opts.originUrlForPush]
  * @param {string} [opts.repoUrlForRetry]
+ * @param {() => void} [opts.validateBeforePush]
  */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
@@ -136,6 +136,7 @@ async function pushRepoMemoryChangesWithRetry({
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   originUrlForPush,
   repoUrlForRetry,
+  validateBeforePush,
 }) {
   const retryUrl = repoUrlForRetry || `https://${serverHost}/${targetRepo}.git`;
 
@@ -155,6 +156,9 @@ async function pushRepoMemoryChangesWithRetry({
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     core.info(`Pushing changes to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+    // A typed ledger must revalidate the merged history after a concurrent
+    // writer moves the branch; validation errors must not enter the retry loop.
+    if (validateBeforePush) validateBeforePush();
     try {
       await pushSignedCommitsFn({
         githubClient,
@@ -164,6 +168,8 @@ async function pushRepoMemoryChangesWithRetry({
         baseRef: currentBaseRef,
         cwd: workspaceDir,
         gitAuthEnv: getGitAuthEnv(ghToken),
+        allowGitPushFallback: !validateBeforePush,
+        requireBaseRefMatch: Boolean(validateBeforePush),
       });
       core.info(`Successfully pushed changes to ${branchName} branch`);
       return true;
@@ -320,29 +326,14 @@ async function main() {
   const formatJSON = process.env.FORMAT_JSON === "true";
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
-  const compactionOptionsBase64 = process.env.LEDGER_COMPACTION_OPTIONS_B64 || "";
-  /** @type {{compaction: {before: number, after: number, selected: number, records: number, replacement: string | null, retired: number, changed: boolean} | null, normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
+  /** @type {{normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
   const ledgerActivity = {
-    compaction: null,
     normalized: [],
     saving: { changedFiles: 0, patchBytes: 0, pushed: false },
   };
   const writeLedgerSummary = async () => {
-    if (!compactionOptionsBase64 && !formatJSON && ledgerActivity.normalized.length === 0) return;
-    const lines = ["<details>", "<summary>Repo-memory ledger activity</summary>", "", "### Compaction"];
-    if (ledgerActivity.compaction) {
-      lines.push(
-        `- ${ledgerActivity.compaction.before} stable shard(s) before compaction`,
-        `- ${ledgerActivity.compaction.after} shard(s) after compaction`,
-        `- ${ledgerActivity.compaction.selected} shard(s) selected; ${ledgerActivity.compaction.records} record(s) copied`,
-        `- Replacement: ${ledgerActivity.compaction.replacement || "none"}`,
-        `- ${ledgerActivity.compaction.retired} source shard(s) retired`,
-        `- ${ledgerActivity.compaction.changed ? "Compaction changed storage." : "Compaction was a no-op."}`
-      );
-    } else {
-      lines.push("- Not configured or not run.");
-    }
-    lines.push("", "### Normalizing");
+    if (!formatJSON && ledgerActivity.normalized.length === 0) return;
+    const lines = ["<details>", "<summary>Repo-memory ledger activity</summary>", "", "### Normalizing"];
     lines.push(ledgerActivity.normalized.length ? `- Formatted ${ledgerActivity.normalized.length} JSON file(s).` : "- No JSON normalization requested.");
     lines.push("", "### Saving");
     lines.push(`- ${ledgerActivity.saving.changedFiles} managed file(s) changed; ${ledgerActivity.saving.patchBytes} staged patch byte(s).`, `- ${ledgerActivity.saving.pushed ? "Changes pushed." : "No changes pushed."}`, "", "</details>");
@@ -729,7 +720,7 @@ async function main() {
     return;
   }
 
-  if (filesToCopy.length === 0 && !compactionOptionsBase64 && !formatJSON) {
+  if (filesToCopy.length === 0 && !formatJSON) {
     core.info("No eligible files to copy from artifact (all files were filtered out or none present)");
     return;
   }
@@ -772,52 +763,6 @@ async function main() {
   } catch (error) {
     core.setFailed(`Failed to apply temporary ID substitutions to repo-memory files: ${getErrorMessage(error)}`);
     return;
-  }
-
-  if (compactionOptionsBase64) {
-    try {
-      const options = JSON.parse(Buffer.from(compactionOptionsBase64, "base64").toString("utf8"));
-      const shardDir = path.join(destMemoryPath, "ledger", "shards");
-      const excludedSegments = fs.existsSync(shardDir)
-        ? fs
-            .readdirSync(shardDir)
-            .filter(name => name.endsWith(".jsonl"))
-            .map(name => name.slice(0, -6))
-            .filter(id => !existingLedgerSegments.has(id))
-        : [];
-      // Shard limits are counts; the remaining ledger limits are expressed in KiB.
-      const parseLedgerCount = name => {
-        const value = process.env[name];
-        return value && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined;
-      };
-      const parseLedgerLimitKb = name => {
-        const parsed = parseLedgerCount(name);
-        return parsed === undefined ? undefined : parsed * 1024;
-      };
-      const ledger = new Ledger({
-        memoryDir: destMemoryPath,
-        excludeSegments: excludedSegments,
-        maxFiles: parseLedgerCount("GH_AW_LEDGER_MAX_SHARDS"),
-        maxSegmentBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_SEGMENT_KB"),
-        maxRecordBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_RECORD_KB"),
-        maxPatchBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_PATCH_KB"),
-      });
-      const before = ledger.listSegments({ closed: true, excludeCurrent: true }).length;
-      const compaction = await ledger.compact(options);
-      core.info(`Ledger compaction ${compaction.changed ? "retired source segments" : "was a no-op"}: ` + `${compaction.selected} selected, ${compaction.records} records copied, ${compaction.retired} retired.`);
-      ledgerActivity.compaction = {
-        before,
-        after: ledger.listSegments({ closed: true, excludeCurrent: true }).length,
-        selected: compaction.selected,
-        records: compaction.records,
-        replacement: compaction.replacement,
-        retired: compaction.retired,
-        changed: compaction.changed,
-      };
-      core.setOutput("ledger_compaction", JSON.stringify(ledgerActivity.compaction));
-    } catch (error) {
-      core.warning(`Ledger compaction failed open; continuing without compaction: ${getErrorMessage(error)}`);
-    }
   }
 
   // Format JSON files if requested
@@ -873,7 +818,6 @@ async function main() {
   // preventing glob expansion or pathspec-magic interpretation (e.g. :(top),
   // wildcards) even when a filename happens to contain those characters.
   const literalPathspecs = Array.from(new Set(filesToCopy.map(file => `:(literal)${file.relativePath}`))).sort();
-  if (compactionOptionsBase64) literalPathspecs.push(":(glob)ledger/shards/*.jsonl");
 
   // Check if we have any changes to commit, scoped to managed memory files only.
   let changedFileCount = 0;

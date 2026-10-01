@@ -34,6 +34,43 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
+func TestBuiltinLedgerDeclarations(t *testing.T) {
+	named, err := parseLedgerToolConfig(map[string]any{
+		"type": map[string]any{},
+		"key":  map[string]any{},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
+	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
+		t.Run(kind, func(t *testing.T) {
+			declaration := map[string]any{"type": kind}
+			if kind == "table" {
+				declaration["key"] = "id"
+				declaration["schema"] = map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}
+			}
+			cfg, err := parseLedgerToolConfig(map[string]any{"records": declaration})
+			require.NoError(t, err)
+			require.Equal(t, kind, cfg.Ledgers[0].Type)
+			section := buildLedgerPromptSection(cfg)
+			require.Contains(t, section.Content, "records ("+kind+")")
+			require.Contains(t, section.Content, "ledger append safe output")
+			if kind == "table" {
+				require.Contains(t, section.Content, "primary key: id")
+			}
+		})
+	}
+	for _, declaration := range []map[string]any{
+		{"type": "unknown"},
+		{"type": "log", "key": "id"},
+		{"type": "table"},
+		{"type": "counter", "schema": map[string]any{"type": "number"}},
+		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
+	} {
+		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
+		require.Error(t, err)
+	}
+}
+
 func TestStandaloneLedgerRejectsUnsafeSchemas(t *testing.T) {
 	_, err := parseLedgerToolConfig(map[string]any{
 		"schema": map[string]any{"properties": map[string]any{"${{ inputs.name }}": map[string]any{}}},
@@ -176,7 +213,18 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	ledgerAppendConfig := safeOutputConfig["ledger_append"].(map[string]any)
 	ledgerDefinitions := ledgerAppendConfig["ledgers"].([]any)
 	require.Equal(t, "findings", ledgerDefinitions[0].(map[string]any)["name"])
+	require.Empty(t, ledgerDefinitions[0].(map[string]any)["type"])
+	require.Empty(t, ledgerDefinitions[0].(map[string]any)["key"])
 	require.InDelta(t, 16, ledgerDefinitions[0].(map[string]any)["max_record_kb"], 0)
+
+	typedConfig := &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "rows", Type: "table", Key: "id"}}}
+	typedJSON, err := generateSafeOutputsConfig(&WorkflowData{SafeOutputs: &SafeOutputsConfig{}, LedgerConfig: typedConfig})
+	require.NoError(t, err)
+	var typedSafeOutput map[string]any
+	require.NoError(t, json.Unmarshal([]byte(typedJSON), &typedSafeOutput))
+	typedLedger := typedSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
+	require.Equal(t, "table", typedLedger["type"])
+	require.Equal(t, "id", typedLedger["key"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))

@@ -24,8 +24,9 @@
 # This file defines the generated agentic maintenance workflow for this repository.
 # It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 #
-# This workflow is generated automatically when workflows use expiring safe outputs
-# or when repository maintenance features are enabled in .github/workflows/aw.json.
+# This workflow is generated automatically when workflows use expiring safe outputs,
+# when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+# maintenance features are enabled in .github/workflows/aw.json.
 #
 # To disable maintenance workflow generation, set in .github/workflows/aw.json:
 # {"maintenance": false}
@@ -66,20 +67,31 @@ on:
           - 'update_pull_request_branches'
           - 'validate'
           - 'forecast'
+          - 'compact_ledger'
       run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
+        required: false
+        type: string
+        default: ''
+      ledger:
+        description: 'Ledger name to compact when operation is compact_ledger (empty compacts every due ledger).'
         required: false
         type: string
         default: ''
   workflow_call:
     inputs:
       operation:
-        description: 'Optional maintenance operation to run (disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast)'
+        description: 'Optional maintenance operation to run (disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast, compact_ledger)'
         required: false
         type: string
         default: ''
       run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
+        required: false
+        type: string
+        default: ''
+      ledger:
+        description: 'Ledger name to compact when operation is compact_ledger (empty compacts every due ledger).'
         required: false
         type: string
         default: ''
@@ -213,7 +225,7 @@ jobs:
             await main();
 
   run_operation:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && (!(github.event.repository.fork)) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && inputs.operation != 'compact_ledger' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     permissions:
       actions: write
@@ -948,3 +960,985 @@ jobs:
           path: secret-validation-report.md
           retention-days: 30
           if-no-files-found: warn
+
+  ledger_compaction_plan:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    outputs:
+      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+      plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
+      plan_0_created: ${{ steps.plan_0.outputs.plan_created }}
+      plan_1_created: ${{ steps.plan_1.outputs.plan_created }}
+      plan_2_created: ${{ steps.plan_2.outputs.plan_created }}
+      plan_3_created: ${{ steps.plan_3.outputs.plan_created }}
+      plan_4_created: ${{ steps.plan_4.outputs.plan_created }}
+      plan_5_created: ${{ steps.plan_5.outputs.plan_created }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (audit-history, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'audit-history' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/audit-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 16,
+              "max_segment_kb": 100,
+              "name": "audit-history",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "aggregate_metrics": {
+                    "type": "object"
+                  },
+                  "anomaly_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "audit_window": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "audited_at": {
+                    "type": "string"
+                  },
+                  "finding_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "findings_reported",
+                      "noop"
+                    ]
+                  },
+                  "recommendation_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "record_type": {
+                    "enum": [
+                      "workflow_run_audit"
+                    ]
+                  },
+                  "recurring_finding_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "runs_reviewed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "audited_at",
+                  "audit_window",
+                  "runs_reviewed",
+                  "aggregate_metrics",
+                  "finding_ids",
+                  "recommendation_ids",
+                  "anomaly_ids",
+                  "recurring_finding_ids",
+                  "outcome"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Plan ledger compaction (awf-feature-reviews, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'awf-feature-reviews' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/awf-feature-reviews",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "awf-feature-reviews"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Plan ledger compaction (caveman-run-history, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'caveman-run-history' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_2
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/caveman-run-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "caveman-run-history",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "files_optimized": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "files_processed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "planned_outcome": {
+                    "enum": [
+                      "pull_request_requested",
+                      "noop"
+                    ]
+                  },
+                  "record_type": {
+                    "enum": [
+                      "caveman_run"
+                    ]
+                  },
+                  "run_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "date",
+                  "files_processed",
+                  "files_optimized",
+                  "planned_outcome"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Plan ledger compaction (centralization, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'centralization' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/centralization",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "centralization",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "generated_at": {
+                    "type": "string"
+                  },
+                  "intent_buckets": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "avg_sessions": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "distinct_users": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "fallback_rate": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "intent_bucket": {
+                          "type": "string"
+                        },
+                        "task_count": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "intent_bucket",
+                        "task_count",
+                        "distinct_users",
+                        "avg_sessions",
+                        "fallback_rate"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  },
+                  "overall_stats": {
+                    "type": "object"
+                  },
+                  "record_type": {
+                    "enum": [
+                      "centralization_snapshot"
+                    ]
+                  },
+                  "repository": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "workflow_opportunities": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "artifact_types": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "centralization_score": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "distinct_users": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "intent_bucket": {
+                          "type": "string"
+                        },
+                        "recommendation_kind": {
+                          "type": "string"
+                        },
+                        "start_context_guess": {
+                          "type": "string"
+                        },
+                        "task_count": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "intent_bucket",
+                        "artifact_types",
+                        "start_context_guess",
+                        "task_count",
+                        "distinct_users",
+                        "centralization_score",
+                        "recommendation_kind"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "generated_at",
+                  "repository",
+                  "overall_stats",
+                  "intent_buckets",
+                  "workflow_opportunities"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Plan ledger compaction (concurrency-audits, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'concurrency-audits' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_4
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/concurrency-audits",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "concurrency-audits"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Plan ledger compaction (smoke, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_5
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/smoke",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "workflow_run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "smoke",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "record_type": {
+                    "enum": [
+                      "repo_memory_ledger_smoke"
+                    ]
+                  },
+                  "result": {
+                    "enum": [
+                      "passed"
+                    ]
+                  },
+                  "workflow_run_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "workflow_run_id",
+                  "result"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plans
+        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+        id: upload_plans
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plans
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+          retention-days: 1
+          if-no-files-found: error
+      - name: Report ledger compaction planning failures
+        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' }}
+        run: exit 1
+
+  ledger_compaction_apply:
+    needs: ledger_compaction_plan
+    if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plans
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plans
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (audit-history, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_0_created == 'true' }}
+        id: apply_0
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/audit-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 16,
+              "max_segment_kb": 100,
+              "name": "audit-history",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "aggregate_metrics": {
+                    "type": "object"
+                  },
+                  "anomaly_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "audit_window": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "audited_at": {
+                    "type": "string"
+                  },
+                  "finding_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "findings_reported",
+                      "noop"
+                    ]
+                  },
+                  "recommendation_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "record_type": {
+                    "enum": [
+                      "workflow_run_audit"
+                    ]
+                  },
+                  "recurring_finding_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "runs_reviewed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "audited_at",
+                  "audit_window",
+                  "runs_reviewed",
+                  "aggregate_metrics",
+                  "finding_ids",
+                  "recommendation_ids",
+                  "anomaly_ids",
+                  "recurring_finding_ids",
+                  "outcome"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (awf-feature-reviews, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_1_created == 'true' }}
+        id: apply_1
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/awf-feature-reviews",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "awf-feature-reviews"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (caveman-run-history, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_2_created == 'true' }}
+        id: apply_2
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/caveman-run-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "caveman-run-history",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "files_optimized": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "files_processed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "planned_outcome": {
+                    "enum": [
+                      "pull_request_requested",
+                      "noop"
+                    ]
+                  },
+                  "record_type": {
+                    "enum": [
+                      "caveman_run"
+                    ]
+                  },
+                  "run_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "date",
+                  "files_processed",
+                  "files_optimized",
+                  "planned_outcome"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (centralization, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
+        id: apply_3
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/centralization",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "centralization",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "generated_at": {
+                    "type": "string"
+                  },
+                  "intent_buckets": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "avg_sessions": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "distinct_users": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "fallback_rate": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "intent_bucket": {
+                          "type": "string"
+                        },
+                        "task_count": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "intent_bucket",
+                        "task_count",
+                        "distinct_users",
+                        "avg_sessions",
+                        "fallback_rate"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  },
+                  "overall_stats": {
+                    "type": "object"
+                  },
+                  "record_type": {
+                    "enum": [
+                      "centralization_snapshot"
+                    ]
+                  },
+                  "repository": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "workflow_opportunities": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "artifact_types": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "centralization_score": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "distinct_users": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "intent_bucket": {
+                          "type": "string"
+                        },
+                        "recommendation_kind": {
+                          "type": "string"
+                        },
+                        "start_context_guess": {
+                          "type": "string"
+                        },
+                        "task_count": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "intent_bucket",
+                        "artifact_types",
+                        "start_context_guess",
+                        "task_count",
+                        "distinct_users",
+                        "centralization_score",
+                        "recommendation_kind"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "run_id",
+                  "generated_at",
+                  "repository",
+                  "overall_stats",
+                  "intent_buckets",
+                  "workflow_opportunities"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (concurrency-audits, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
+        id: apply_4
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/concurrency-audits",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "concurrency-audits"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (smoke, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
+        id: apply_5
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/smoke",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "workflow_run_id",
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "smoke",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "record_type": {
+                    "enum": [
+                      "repo_memory_ledger_smoke"
+                    ]
+                  },
+                  "result": {
+                    "enum": [
+                      "passed"
+                    ]
+                  },
+                  "workflow_run_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "record_type",
+                  "workflow_run_id",
+                  "result"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+      - name: Report ledger compaction application failures
+        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
+        run: exit 1

@@ -10,7 +10,7 @@ const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const RESERVED = new Set(["records", "parents", "shards", "diagnostics", "replay_metadata", "records_by_id", "records_by_type_time", "records_by_shard_offset", "parents_by_parent", "diagnostics_by_code"]);
 const TYPES = new Set(["text", "integer", "real", "boolean", "json"]);
 
-function validateReplayOutput(output) {
+function validateReplayOutput(output, maxRows = 10000) {
   if (
     !output ||
     typeof output !== "object" ||
@@ -57,7 +57,7 @@ function validateReplayOutput(output) {
     )
       throw new TypeError("Invalid replay columns or primary key");
     totalRows += table.rows.length;
-    if (totalRows > 10000) throw new RangeError("Too many replay rows");
+    if (totalRows > maxRows) throw new RangeError("Too many replay rows");
     const keys = new Set();
     for (const row of table.rows) {
       if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).some(column => !Object.hasOwn(table.columns, column))) throw new TypeError("Invalid replay row");
@@ -117,8 +117,8 @@ function executeReplay(script, records, config = {}) {
   return output;
 }
 
-function materializeReplay(db, ledgerName, script, records, output) {
-  const tables = validateReplayOutput(output);
+function materializeReplay(db, ledgerName, script, records, output, maxRows = 10000) {
+  const tables = validateReplayOutput(output, maxRows);
   db.exec("BEGIN");
   try {
     db.exec(

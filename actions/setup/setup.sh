@@ -306,6 +306,8 @@ SAFE_OUTPUTS_FILES=(
   "safe_outputs_handlers.cjs"
   "ledger_append.cjs"
   "ledger_transactions.cjs"
+  "ledger_builtin.cjs"
+  "ledger_store.cjs"
   "symlink_guard.cjs"
   "intent_probe.cjs"
   "allowed_extensions_helpers.cjs"

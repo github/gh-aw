@@ -39,6 +39,8 @@ tools:
   agentic-workflows:
   ledger:
     audit-history:
+      type: table
+      key: run_id
       schema:
         type: object
         required: [record_type, run_id, audited_at, audit_window, runs_reviewed, aggregate_metrics, finding_ids, recommendation_ids, anomaly_ids, recurring_finding_ids, outcome]
@@ -81,43 +83,6 @@ tools:
           outcome:
             enum: [findings_reported, noop]
         additionalProperties: false
-      replay:
-        script: |
-          return {
-            tables: {
-              audits: {
-                columns: {
-                  ordinal: "integer",
-                  run_id: "text",
-                  audited_at: "text",
-                  audit_window: "json",
-                  runs_reviewed: "integer",
-                  aggregate_metrics: "json",
-                  finding_ids: "json",
-                  recommendation_ids: "json",
-                  anomaly_ids: "json",
-                  recurring_finding_ids: "json",
-                  outcome: "text"
-                },
-                primaryKey: ["run_id"],
-                rows: records
-                  .filter(record => record.payload.record_type === "workflow_run_audit")
-                  .map(({ payload }, index) => ({
-                    ordinal: index + 1,
-                    run_id: payload.run_id,
-                    audited_at: payload.audited_at,
-                    audit_window: payload.audit_window,
-                    runs_reviewed: payload.runs_reviewed,
-                    aggregate_metrics: payload.aggregate_metrics,
-                    finding_ids: payload.finding_ids,
-                    recommendation_ids: payload.recommendation_ids,
-                    anomaly_ids: payload.anomaly_ids,
-                    recurring_finding_ids: payload.recurring_finding_ids,
-                    outcome: payload.outcome
-                  }))
-              }
-            }
-          };
       max-record-kb: 16
       max-patch-kb: 10
   timeout: 300
@@ -223,14 +188,13 @@ Before writing the final report, verify recommendations are concrete and evidenc
 **Audit history**: Use the replay projection at `/tmp/gh-aw/ledgers/audit-history/ledger.db` as the durable record of each audit. Query recent audit summaries before analysis to compare stable finding, recommendation, and anomaly IDs, and query by run ID before appending to avoid duplicate records:
 
 ```sql
-SELECT run_id, audited_at, finding_ids, recommendation_ids, anomaly_ids, recurring_finding_ids, outcome
-FROM audits ORDER BY ordinal DESC LIMIT 100;
+SELECT key, value FROM state ORDER BY key DESC LIMIT 100;
 ```
 
 If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
 Use run logs as the source for the 30-day charts and rollups; do not maintain a second copy of those metrics in mutable memory files.
 
-After completing the report, query `audits` for the current run ID, then submit one `ledger_append` record with `record_type: workflow_run_audit` if absent. Include the run ID, UTC audit timestamp, audit window, number of runs reviewed, compact aggregate metrics, stable IDs for findings/recommendations/anomalies, recurring finding IDs, and the outcome (`findings_reported` or `noop`). Keep records structured and bounded; never store logs, prompts, raw tool output, or other sensitive content. Query the projection's `diagnostics` table to inspect malformed or incomplete records. Ledger branches are append-only: do not edit them directly or invoke compaction.
+After completing the report, query `state` for the current run ID, then submit one `ledger_append` operation `upsert` with the run ID as `key` and a `value` containing `record_type: workflow_run_audit`, the UTC audit timestamp, audit window, number of runs reviewed, compact aggregate metrics, stable IDs for findings/recommendations/anomalies, recurring finding IDs, and the outcome (`findings_reported` or `noop`) if absent. Keep records structured and bounded; never store logs, prompts, raw tool output, or other sensitive content. Query the projection's `diagnostics` table to inspect malformed or incomplete records. Ledger branches are append-only: do not edit them directly or invoke compaction.
 
 ## Guidelines
 

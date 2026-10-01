@@ -74,11 +74,38 @@ test("main reports records only after the trusted persister succeeds", async () 
         return { persisted: 1, already_present: 0, reconciled: 0 };
       },
     });
+
     assert.equal(result.ledgers.findings.persisted, 1);
     assert.match(fs.readFileSync(outputFile, "utf8"), /"persisted":1/);
   } finally {
     fs.rmSync(outputDir, { recursive: true, force: true });
   }
+});
+
+test("built-in persistence reports redacted transaction audit metadata", async () => {
+  const config = { ...ledgerConfigs[0], type: "set", schema: undefined };
+  const artifact = transaction({ operation: "add", value: { secret: "not-in-audit" } });
+  const result = await main({
+    artifact,
+    ledgerConfigs: [config],
+    outputFile: "",
+    owner: "octo",
+    repo: "repo",
+    serverHost: "github.com",
+    token: "test-token",
+    githubClient: {},
+    persistLedger: async () => ({ persisted: 1, already_present: 0, reconciled: 0 }),
+  });
+  assert.deepEqual(result.ledgers.findings.transactions, [
+    {
+      id: finalId("run-42:1", 0),
+      transaction_id: "run-42:1",
+      operation: "add",
+      validated: true,
+    },
+  ]);
+  assert.equal(result.ledgers.findings.type, "set");
+  assert.doesNotMatch(JSON.stringify(result), /not-in-audit/);
 });
 
 test("appends canonical ledger state and delegates the upstream push", async () => {

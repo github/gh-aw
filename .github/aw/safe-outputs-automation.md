@@ -172,6 +172,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
       custom-agent: "agent-id"        # Optional: custom agent ID
       custom-instructions: "..."      # Optional: additional instructions for the agent
       allowed: [copilot]              # Optional: restrict to specific agent names
+      required-labels: [copilot-ready] # Optional: ALL of these labels must be present on the issue/PR for assignment to run
       max: 1                          # Optional: max assignments (default: 1)
       target: "*"                     # Optional: "triggering" (default), "*", or number
       target-repo: "owner/repo"       # Optional: where the issue lives (cross-repository)

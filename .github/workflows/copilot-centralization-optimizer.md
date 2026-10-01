@@ -11,6 +11,8 @@ permissions:
 tools:
   ledger:
     centralization:
+      type: table
+      key: run_id
       schema:
         type: object
         required: [record_type, run_id, generated_at, repository, overall_stats, intent_buckets, workflow_opportunities]
@@ -77,35 +79,6 @@ tools:
         additionalProperties: false
       max-record-kb: 8
       max-patch-kb: 10
-      replay:
-        script: |
-          return {
-            tables: {
-              snapshots: {
-                columns: {
-                  ordinal: "integer",
-                  run_id: "text",
-                  generated_at: "text",
-                  repository: "text",
-                  overall_stats: "json",
-                  intent_buckets: "json",
-                  workflow_opportunities: "json"
-                },
-                primaryKey: ["run_id"],
-                rows: records
-                  .filter(record => record.payload.record_type === "centralization_snapshot")
-                  .map(({ payload }, index) => ({
-                    ordinal: index + 1,
-                    run_id: payload.run_id,
-                    generated_at: payload.generated_at,
-                    repository: payload.repository,
-                    overall_stats: payload.overall_stats,
-                    intent_buckets: payload.intent_buckets,
-                    workflow_opportunities: payload.workflow_opportunities
-                  }))
-              }
-            }
-          };
   repo-memory:
     branch-name: memory/copilot-centralization-optimizer
     description: Long-lived centralization trend snapshots and history
@@ -459,8 +432,7 @@ Before drafting the report:
 - Query the replay projection to identify recent snapshots and avoid strong trend claims based on a single run:
 
   ```sql
-  SELECT run_id, generated_at, overall_stats, intent_buckets, workflow_opportunities
-  FROM snapshots ORDER BY ordinal DESC LIMIT 100;
+  SELECT key, value FROM state ORDER BY key DESC LIMIT 100;
   ```
 
   If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
@@ -468,7 +440,7 @@ Before drafting the report:
 - Persist the sanitized current snapshot for the next run:
   - write `/tmp/gh-aw/repo-memory/default/centralization-baseline.json`
   - strip `top_exact_repeats[].sample_prompt` before persisting the snapshot or ledger record.
-- Submit one `ledger_append` record per run with `record_type: centralization_snapshot`, `run_id`, `generated_at`, `repository`, `overall_stats`, up to 10 `intent_buckets`, and up to 10 `workflow_opportunities`. For intent buckets, include only `intent_bucket`, `task_count`, `distinct_users`, `avg_sessions`, and `fallback_rate`; for opportunities, include only `intent_bucket`, `artifact_types`, `start_context_guess`, `task_count`, `distinct_users`, `centralization_score`, and `recommendation_kind`. Never include prompts, samples, or other raw user input. Use the `run_id` as the stable application key, and skip the append if that run ID is already present.
+- Submit one `ledger_append` operation `upsert` per run with the `run_id` as `key` and a `value` containing `record_type: centralization_snapshot`, `run_id`, `generated_at`, `repository`, `overall_stats`, up to 10 `intent_buckets`, and up to 10 `workflow_opportunities`. For intent buckets, include only `intent_bucket`, `task_count`, `distinct_users`, `avg_sessions`, and `fallback_rate`; for opportunities, include only `intent_bucket`, `artifact_types`, `start_context_guess`, `task_count`, `distinct_users`, `centralization_score`, and `recommendation_kind`. Never include prompts, samples, or other raw user input. Use the `run_id` as the stable application key, and skip the append if that run ID is already present.
 - Keep the ledger record compact and below the 8 KiB record limit. The existing `centralization-baseline.json` remains the replaceable snapshot used for detailed trend comparison; do not append to `centralization-history.jsonl`.
 
 Focus on:

@@ -766,7 +766,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 		fmt.Fprintf(&step, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))
 		fmt.Fprintf(&step, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation))
 	}
-	appendRepoMemoryLedgerCompactionEnv(&step, memory.Ledger)
+	appendRepoMemoryLedgerLimitsEnv(&step, memory.Ledger)
 	step.WriteString("        with:\n")
 	step.WriteString("          script: |\n")
 	step.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
@@ -782,10 +782,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	return step.String()
 }
 
-func appendRepoMemoryLedgerCompactionEnv(step *strings.Builder, ledger *RepoMemoryLedgerConfig) {
-	if compaction := ledgerCompactionOptionsBase64(ledger); compaction != "" {
-		fmt.Fprintf(step, "          LEDGER_COMPACTION_OPTIONS_B64: %s\n", compaction)
-	}
+func appendRepoMemoryLedgerLimitsEnv(step *strings.Builder, ledger *RepoMemoryLedgerConfig) {
 	if ledger != nil {
 		if ledger.MaxSegmentKB > 0 {
 			fmt.Fprintf(step, "          GH_AW_LEDGER_MAX_SEGMENT_KB: %d\n", ledger.MaxSegmentKB)
@@ -836,10 +833,6 @@ func buildPushRepoMemoryOutputs(memories []RepoMemoryEntry) map[string]string {
 		outputs["validation_failed_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.validation_failed }}", stepID)
 		outputs["validation_error_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.validation_error }}", stepID)
 		outputs["patch_size_exceeded_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.patch_size_exceeded }}", stepID)
-	}
-	if ledgerEntry := (&RepoMemoryConfig{Memories: memories}).ledgerEntry(); ledgerEntry != nil && ledgerEntry.Ledger.Compaction != nil {
-		stepID := "push_repo_memory_" + ledgerEntry.ID
-		outputs["ledger_compaction"] = fmt.Sprintf("${{ steps.%s.outputs.ledger_compaction }}", stepID)
 	}
 	return outputs
 }

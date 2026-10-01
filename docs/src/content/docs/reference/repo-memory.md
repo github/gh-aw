@@ -74,16 +74,13 @@ tools:
       max-segment-kb: 100   # default 100 KiB (repo-memory max-file-size default)
       max-record-kb: 32     # default 32 KiB
       max-patch-kb: 10      # default 10 KiB (repo-memory max-patch-size default)
-      compaction:
-        min-segments: 32     # default 32 stable closed segments
-        max-segments: 32     # default 32 segments compacted per run
 ```
 
 The ledger is an eventually convergent append-only store, not a distributed transactional database. Applications must define their own deterministic conflict resolution for concurrent records.
 
 Ledger segment and record limits should stay within repo-memory's `max-file-size` limit, and the per-run ledger patch limit should stay within `max-patch-size`. If a ledger limit exceeds its corresponding repo-memory limit, compilation emits a warning because persistence may reject the ledger files or patch.
 
-Compaction is declarative: when the number of stable closed shards reaches `min-segments`, the trusted persistence job deterministically selects up to `max-segments` shards in lexical segment-ID order. The runtime deduplicates records by SHA, validates and sorts them, writes an immutable replacement, and retires sources only after verifying that the replacement contains each source record. It excludes the current run's shard. Compaction failures are fail-open, and selection, record, replacement, retirement, normalization, and save details appear in the persistence step summary. Custom JavaScript compactor scripts are disabled because an in-process Node VM is not a security boundary.
+Ledger compaction never runs in the agent or persistence job. Standalone `tools.ledger` ledgers are compacted by Agentic Maintenance through an untrusted plan job and a trusted apply job; see [Ledger compaction](/gh-aw/experimental/ledger-compaction/).
 
 Ledger workflows require AWF's Cloud Hypervisor runtime. The compiler withholds repo-memory ledger paths from `filesystem.allowWrite` and rejects allow-write paths that overlap the ledger directory; agents append only through ledger MCP tools. The persistence job also ignores agent artifacts that overwrite existing trusted shards or supply coverage declarations. Record SHA-256 values detect accidental corruption, not malicious forgery, so do not treat the ledger as tamper-proof if its write boundary is bypassed. Cloud Hypervisor is a preview runtime and is limited to supported GitHub-hosted Linux x86_64 runners.
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
-const { Ledger, canonicalJSON, sha256 } = require("./ledger_store.cjs");
+const { Ledger, buildSegment, canonicalJSON, sha256 } = require("./ledger_store.cjs");
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 let memoryDir;
 let ledger;
@@ -344,43 +344,17 @@ describe("Ledger", () => {
     expect(() => bounded.append("note", "x".repeat(1024))).toThrow("maximum message size");
   });
 
-  it("compacts deterministic batches of stable closed segments and retires covered sources", async () => {
-    const first = ledger.append("note", { value: 1 });
-    const secondLedger = new Ledger({ memoryDir });
-    secondLedger.append("note", { value: 2 });
-    const compactor = new Ledger({ memoryDir });
-    const segments = compactor.listSegments();
-    expect(segments).toHaveLength(2);
-    const result = await compactor.compact({ minSegments: 2, maxSegments: 2 });
-    expect(result).toMatchObject({ changed: true, selected: 2, records: 2, retired: 2, before: 2, after: 1 });
-    expect(result.replacement).toMatch(/^[0-9a-f-]{36}$/);
-    expect(compactor.get(first.sha)).toEqual(first);
-    expect(compactor.get(secondLedger.status().heads[0])).toMatchObject({ type: "note" });
-    expect(compactor.listSegments()).toHaveLength(1);
-  });
-
-  it("retires sources even when the replacement temporarily exceeds the shard limit", async () => {
-    ledger.append("note", { value: 1 });
-    new Ledger({ memoryDir }).append("note", { value: 2 });
-    const compactor = new Ledger({ memoryDir, maxFiles: 2 });
-    expect(await compactor.compact({ minSegments: 2, maxSegments: 2 })).toMatchObject({ changed: true, retired: 2, after: 1 });
-    expect(compactor.status()).toMatchObject({ shards: 1, validRecords: 2 });
-  });
-
   it.each([
     ["noncanonical JSON", record => `${JSON.stringify(record)}\n`],
     ["truncated JSONL", record => canonicalJSON(record)],
     ["invalid UTF-8", record => Buffer.concat([Buffer.from(`${canonicalJSON(record)}\n`), Buffer.from([0xff])])],
     ["malformed record", record => `${canonicalJSON(record)}\n{}\n`],
-  ])("refuses to compact a source with %s", async (_name, change) => {
+  ])("refuses to read a segment with %s as a compaction source", (_name, change) => {
     const record = ledger.append("note", { value: 1 });
-    const other = new Ledger({ memoryDir });
-    other.append("note", { value: 2 });
     const shard = path.join(ledger.shardDir, `${ledger.writerId}.jsonl`);
     fs.writeFileSync(shard, change(record));
-    const compactor = new Ledger({ memoryDir });
-    await expect(compactor.compact({ minSegments: 2, maxSegments: 2 })).rejects.toThrow();
-    expect(fs.readdirSync(compactor.shardDir).filter(file => file.endsWith(".jsonl"))).toHaveLength(2);
+    const reader = new Ledger({ memoryDir });
+    expect(() => reader.readRecords(ledger.writerId)).toThrow();
   });
 
   it("quarantines malformed UTF-8 instead of decoding it with replacement characters", () => {
@@ -389,7 +363,7 @@ describe("Ledger", () => {
     expect(ledger.status()).toMatchObject({ validRecords: 0, invalidRecords: 1 });
   });
 
-  it("deduplicates and hashes compacted records deterministically", async () => {
+  it("deduplicates and hashes compacted records deterministically", () => {
     const first = ledger.append("note", { value: 1 });
     const secondLedger = new Ledger({ memoryDir });
     const second = secondLedger.append("note", { value: 2 });
@@ -398,31 +372,10 @@ describe("Ledger", () => {
     const reverse = compactor.createSegment([second, first, first]);
     expect(reverse).toEqual(forward);
     expect(compactor.readRecords(forward.id)).toHaveLength(2);
-    await expect(compactor.compact({ minSegments: 1 })).rejects.toThrow("Invalid minSegments");
-    await expect(compactor.compact({ minSegments: 3, maxSegments: 2 })).rejects.toThrow("Invalid maxSegments");
-  });
-
-  it("does not compact below threshold or include excluded current-run segments", async () => {
-    ledger.append("note", { value: 1 });
-    const secondLedger = new Ledger({ memoryDir });
-    secondLedger.append("note", { value: 2 });
-    const currentLedger = new Ledger({ memoryDir });
-    currentLedger.append("note", { value: 3 });
-    const excluded = currentLedger.writerId;
-    const compactor = new Ledger({ memoryDir, excludeSegments: [excluded] });
-    expect(await compactor.compact({ minSegments: 3, maxSegments: 3 })).toMatchObject({
-      changed: false,
-      selected: 0,
-      before: 2,
-      after: 2,
-    });
-    expect(await compactor.compact({ minSegments: 2, maxSegments: 2 })).toMatchObject({
-      changed: true,
-      selected: 2,
-      before: 2,
-      after: 1,
-    });
-    expect(fs.existsSync(path.join(compactor.shardDir, `${excluded}.jsonl`))).toBe(true);
+    const built = buildSegment([second, first], { maxSegmentBytes: compactor.maxSegmentBytes });
+    expect(built.id).toBe(forward.id);
+    expect(built.content.equals(fs.readFileSync(path.join(compactor.shardDir, `${forward.id}.jsonl`)))).toBe(true);
+    expect(buildSegment([first], { metadata: { compaction: "v1" } }).id).not.toBe(buildSegment([first]).id);
   });
 
   it("does not retire a source containing malformed ledger records", () => {
@@ -479,8 +432,9 @@ describe("Ledger", () => {
     expect(fs.existsSync(path.join(compactor.shardDir, `${compactor.writerId}.jsonl`))).toBe(true);
   });
 
-  it("rejects JavaScript compactor scripts instead of running them in-process", async () => {
-    await expect(ledger.runCompactor("ledger.log.constructor('return process')()")).rejects.toThrow("disabled until a least-privilege worker");
+  it("does not expose agent-side compaction (owned by agentic maintenance)", () => {
+    expect(Reflect.get(ledger, "compact")).toBeUndefined();
+    expect(Reflect.get(ledger, "runCompactor")).toBeUndefined();
   });
 
   it("does not publish or project new files when file or directory fsync fails", () => {

@@ -4,6 +4,79 @@ description: Build disposable read-only SQLite materialized views from immutable
 ---
 
 Standalone `tools.ledger` ledgers may declare an inline JavaScript `replay.script`.
+For common state models, use a built-in `type` instead: gh-aw validates each
+operation and replays it in trusted code, without a custom script.
+
+| Need | Type |
+| --- | --- |
+| Ordered history | `log` |
+| Unique membership | `set` |
+| Latest value by key | `map` |
+| Mutable structured rows | `table` |
+| Numeric accumulation | `counter` |
+
+```yaml
+tools:
+  ledger:
+    history:
+      type: log
+      schema: { type: string }
+    processed:
+      type: set
+    repositories:
+      type: map
+      schema: { type: object }
+    findings:
+      type: table
+      key: id
+      schema:
+        type: object
+        required: [id, severity]
+        properties:
+          id: { type: string }
+          severity: { type: string }
+    metrics:
+      type: counter
+```
+
+All writes use the **same** `ledger_append` safe output. For built-ins, provide
+`ledger` and `operation` instead of `record`, plus the indicated fields:
+
+| Type | Operations | Materialized `state` columns |
+| --- | --- | --- |
+| `log` | `append(value)` | `position`, `value` |
+| `set` | `add(value)`, `remove(value)` | `identity`, `value` |
+| `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
+| `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
+| `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+
+The declared schema validates **values**, not operation envelopes. `table` rows
+must be objects with a string primary key. `insert` rejects duplicate keys;
+`update` requires an existing row and shallowly merges the object `patch`,
+without changing the primary key. The resulting row is schema-validated.
+`upsert` **replaces** the entire row; `delete` of an absent key is harmless.
+`map` keys and counter names are strings; map puts replace earlier values.
+`counter` amounts are nonnegative safe integers (including zero), with no
+coercion; arithmetic must remain within the safe-integer range. Counter names
+start at zero. A `set` add/remove is idempotent: equality is the canonical
+JSON serialization of finite, acyclic JSON values, with object keys sorted
+recursively. Thus arrays retain order, object key order does not affect
+membership, and strings, numbers, booleans, and null retain their JSON types.
+The `state.value` column stores canonical JSON **text** for all types except
+`counter`, whose `value` is an SQLite integer. Key columns remain directly
+queryable. The generic `records` table still exposes immutable provenance.
+The trusted persistence result reports ledger type, operation, deterministic
+record ID, transaction ID, and validation status without echoing values.
+
+Built-in projections replay canonical transaction order and cannot be combined
+with a custom `replay.script`. Domain concepts should be expressed as schemas
+on generic ledger types, not as new built-in types; custom replay remains an
+escape hatch. Existing maintenance compaction is deliberately lossless: it
+merges verified source segments while preserving every record ID, hash, and
+parent relation. This preserves set/map/counter state deterministically but
+does **not** fold away historical operations, because doing so would violate
+the current compaction integrity contract.
+
 Replay interprets the **logical, ordered record stream** and returns a declarative
 table model. Ledger JSONL records remain authoritative; replay tables are derived
 and can always be rebuilt. Replay never writes back to Git or canonical ledger
