@@ -132,6 +132,16 @@ test("table requires an existing row for update and rejects duplicate and invali
   assert.deepEqual(reducer.output().tables.state.rows, [{ key: "a", value: '{"id":"a","score":9}' }]);
 });
 
+test("table rejects oversized merged rows during updates", () => {
+  const reducer = createReducer({
+    type: "table",
+    key: "id",
+    schema: { type: "object", required: ["id", "data"], properties: { id: { type: "string" }, data: { type: "string" } }, additionalProperties: false },
+  });
+  reducer.apply({ operation: "insert", value: { id: "a", data: "x" } });
+  assert.throws(() => reducer.apply({ operation: "update", key: "a", patch: { data: "x".repeat(65530) } }), /Replay cell exceeds size limit/);
+});
+
 test("counter rejects coercion, nonfinite and unsafe arithmetic without changing state", () => {
   const reducer = createReducer(configs.counter);
   for (const amount of ["2", NaN, Infinity, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {

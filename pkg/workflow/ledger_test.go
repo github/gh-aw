@@ -213,7 +213,18 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	ledgerAppendConfig := safeOutputConfig["ledger_append"].(map[string]any)
 	ledgerDefinitions := ledgerAppendConfig["ledgers"].([]any)
 	require.Equal(t, "findings", ledgerDefinitions[0].(map[string]any)["name"])
+	require.Empty(t, ledgerDefinitions[0].(map[string]any)["type"])
+	require.Empty(t, ledgerDefinitions[0].(map[string]any)["key"])
 	require.InDelta(t, 16, ledgerDefinitions[0].(map[string]any)["max_record_kb"], 0)
+
+	typedConfig := &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "rows", Type: "table", Key: "id"}}}
+	typedJSON, err := generateSafeOutputsConfig(&WorkflowData{SafeOutputs: &SafeOutputsConfig{}, LedgerConfig: typedConfig})
+	require.NoError(t, err)
+	var typedSafeOutput map[string]any
+	require.NoError(t, json.Unmarshal([]byte(typedJSON), &typedSafeOutput))
+	typedLedger := typedSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
+	require.Equal(t, "table", typedLedger["type"])
+	require.Equal(t, "id", typedLedger["key"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))

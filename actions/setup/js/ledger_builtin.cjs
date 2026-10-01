@@ -11,6 +11,7 @@ const OPERATIONS = Object.freeze({
   table: ["insert", "update", "upsert", "delete"],
   counter: ["increment", "decrement"],
 });
+const MAX_REPLAY_CELL_BYTES = 65536;
 
 function checkSchema(value, schema) {
   if (!schema) return;
@@ -87,6 +88,7 @@ function createReducer(config) {
         else {
           const row = operation === "update" ? { ...state.get(primary), ...record.patch } : value;
           checkSchema(row, config.schema);
+          if (Buffer.byteLength(canonicalJSON(row)) > MAX_REPLAY_CELL_BYTES) throw new RangeError("Replay cell exceeds size limit");
           state.set(primary, row);
         }
         break;
