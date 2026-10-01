@@ -74,6 +74,7 @@ const layers = [
                 <span class="aw-ico aw-row-icon" set:html={icon(l.icon)} />
                 <span class="aw-row-name">{l.name}</span>
                 <span class="aw-ico aw-chev" set:html={icon('chevron-down', 12)} />
+                <span class="aw-progress" aria-hidden="true" />
               </button>
               <div class="aw-detail" id={`safe-${l.id}`} role="region" aria-labelledby={`safe-${l.id}-btn`}>
                 <h3>{l.name}</h3>
@@ -97,8 +98,13 @@ const layers = [
 </LandingSection>
 
 <style>
+  /* Tight to the heading + lede so the trifecta paragraph reads as part of that group. */
   .aw-safe {
-    margin-top: clamp(2rem, 4vw, 3rem);
+    --aw-safe-stack: 23rem;
+    --aw-safe-gap: 3rem;
+    --aw-safe-panel: 28rem;
+    --aw-safe-step: 4500ms;
+    margin-top: 1.25rem;
   }
   .aw-ico {
     display: inline-flex;
@@ -118,7 +124,7 @@ const layers = [
   }
 
   .aw-defence-intro {
-    margin: 0;
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
     max-width: 52ch;
     font-size: var(--aw-step-0);
     line-height: 1.6;
@@ -174,6 +180,7 @@ const layers = [
     padding: 0.75rem 1rem;
     border: 1px solid var(--aw-color-border);
     border-radius: 10px;
+    overflow: hidden;
     background: var(--aw-color-surface);
     color: var(--aw-color-text);
     font-size: var(--aw-step-0);
@@ -188,6 +195,29 @@ const layers = [
   .aw-row:focus-visible {
     outline: 2px solid var(--aw-color-accent);
     outline-offset: 2px;
+  }
+  /* Auto-advance cue: a hairline filling along the bottom edge of the active row. */
+  .aw-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--aw-color-accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .aw-layout[data-auto] .aw-layer.is-active .aw-progress {
+    animation: aw-safe-progress var(--aw-safe-step) linear forwards;
+  }
+  .aw-layout[data-auto][data-paused] .aw-layer.is-active .aw-progress {
+    animation-play-state: paused;
+  }
+  @keyframes aw-safe-progress {
+    to {
+      transform: scaleX(1);
+    }
   }
   .aw-row-icon {
     color: var(--aw-color-text-muted);
@@ -233,7 +263,7 @@ const layers = [
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    font-size: var(--aw-step--1);
+    font-size: var(--aw-step-0);
   }
   /* h3 is redundant next to the row on small screens */
   [data-enhanced] .aw-detail h3 {
@@ -249,29 +279,44 @@ const layers = [
     transform: rotate(180deg);
   }
 
-  /* Desktop: diagram left, detail panel right */
+  /* Desktop: stack + detail panel as one centred unit */
   @media (min-width: 52rem) {
-    .aw-layout[data-enhanced] {
-      max-width: none;
-      min-height: 26rem;
+    .aw-defence-intro,
+    .aw-layout[data-enhanced],
+    .aw-safe:has(.aw-layout[data-enhanced]) .aw-foot {
+      width: calc(var(--aw-safe-stack) + var(--aw-safe-gap) + var(--aw-safe-panel));
+      max-width: 100%;
+      margin-inline: auto;
     }
     .aw-layout[data-enhanced] .aw-stack {
-      width: 24rem;
+      width: var(--aw-safe-stack);
     }
     .aw-layout[data-enhanced] .aw-chev {
       display: none;
     }
-    .aw-layout[data-enhanced] .aw-detail {
+    /* Every panel sits in the same spot; only the active one is shown, so they cross-fade. */
+    .aw-layout[data-enhanced] .aw-detail,
+    .aw-layout[data-enhanced] .aw-layer:not(.is-active) .aw-detail {
+      display: block;
       position: absolute;
-      top: 3.25rem;
-      left: 28rem;
+      top: 50%;
+      left: calc(var(--aw-safe-stack) + var(--aw-safe-gap));
       right: 0;
-      max-width: 34rem;
       padding: 1.5rem 1.75rem;
       border: 1px solid var(--aw-color-border);
       border-radius: 12px;
       background: var(--aw-color-surface);
       box-shadow: var(--aw-shadow-raised);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(calc(-50% + 6px));
+      transition: opacity 0.45s ease, transform 0.45s ease, visibility 0s linear 0.45s;
+    }
+    .aw-layout[data-enhanced] .aw-layer.is-active .aw-detail {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(-50%);
+      transition: opacity 0.45s ease 0.1s, transform 0.45s ease 0.1s, visibility 0s;
     }
     .aw-layout[data-enhanced] .aw-detail h3 {
       display: block;
@@ -281,7 +326,7 @@ const layers = [
   /* Foot */
   .aw-foot {
     margin: clamp(2rem, 4vw, 3rem) 0 0;
-    font-size: var(--aw-step--1);
+    font-size: var(--aw-step-0);
     line-height: 1.7;
     color: var(--aw-color-text-muted);
   }
@@ -301,7 +346,9 @@ const layers = [
 
   @media (prefers-reduced-motion: reduce) {
     .aw-row,
-    .aw-chev {
+    .aw-chev,
+    .aw-layout[data-enhanced] .aw-detail,
+    .aw-layout[data-enhanced] .aw-layer.is-active .aw-detail {
       transition: none;
     }
   }
@@ -325,8 +372,44 @@ const layers = [
 
     root.setAttribute('data-enhanced', '');
 
+    // Auto-advance: desktop only, in view, no reduced motion. Paused on hover/focus,
+    // stopped for good once the user picks a layer. The progress bar's animation
+    // is the timer, so pausing it pauses the cycle too.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let userTookOver = false;
+    let inView = false;
+    let hovering = false;
+    const updateAuto = () => {
+      const on = !userTookOver && inView && desktop.matches && !reduced.matches;
+      root.toggleAttribute('data-auto', on);
+      root.toggleAttribute('data-paused', hovering || root.contains(document.activeElement));
+    };
+    const takeOver = () => {
+      userTookOver = true;
+      updateAuto();
+    };
+
+    root.addEventListener('animationend', (e) => {
+      if (!(e.target as HTMLElement).classList.contains('aw-progress')) return;
+      if (!root.hasAttribute('data-auto')) return;
+      setActive((current() + 1) % layers.length);
+    });
+    root.addEventListener('pointerenter', () => { hovering = true; updateAuto(); });
+    root.addEventListener('pointerleave', () => { hovering = false; updateAuto(); });
+    root.addEventListener('focusin', updateAuto);
+    root.addEventListener('focusout', () => requestAnimationFrame(updateAuto));
+    new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+        updateAuto();
+      },
+      { threshold: 0.35 },
+    ).observe(root);
+    reduced.addEventListener('change', updateAuto);
+
     buttons.forEach((b, i) => {
       b.addEventListener('click', () => {
+        takeOver();
         if (desktop.matches) setActive(i);
         else setActive(current() === i ? null : i);
       });
@@ -339,6 +422,7 @@ const layers = [
         };
         if (!(e.key in keys)) return;
         e.preventDefault();
+        takeOver();
         const next = keys[e.key];
         buttons[next].focus();
         if (desktop.matches) setActive(next);
@@ -348,6 +432,7 @@ const layers = [
     // Desktop always shows one detail.
     const sync = () => {
       if (desktop.matches && current() === -1) setActive(0);
+      updateAuto();
     };
     desktop.addEventListener('change', sync);
     sync();
