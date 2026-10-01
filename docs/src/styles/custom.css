@@ -242,14 +242,12 @@ header::after {
 .sl-markdown-content {
   color: var(--aw-color-text);
   overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;
   max-width: 100%;
 }
 
 .sl-markdown-content p,
 .sl-markdown-content li {
-  font-size: var(--aw-text-base);
+  font-size: var(--aw-step-0);
   line-height: var(--aw-leading-body);
   color: var(--aw-color-text-body);
 }
@@ -261,7 +259,7 @@ header::after {
 /* Page title (Starlight renders it outside .sl-markdown-content) and body h1 */
 .content-panel h1#_top,
 .sl-markdown-content h1 {
-  font-size: var(--aw-text-3xl);
+  font-size: var(--aw-step-4);
   font-weight: 400;
   line-height: var(--aw-leading-tight);
   letter-spacing: var(--aw-tracking-tight);
@@ -308,7 +306,7 @@ header::after {
 }
 
 .sl-markdown-content h2 {
-  font-size: var(--aw-text-xl);
+  font-size: var(--aw-step-2);
   font-weight: 400;
   line-height: var(--aw-leading-snug);
   letter-spacing: var(--aw-tracking-snug);
@@ -319,7 +317,7 @@ header::after {
 }
 
 .sl-markdown-content h3 {
-  font-size: var(--aw-text-lg);
+  font-size: var(--aw-step-1);
   font-weight: 600;
   line-height: var(--aw-leading-snug);
   border-bottom: none;
@@ -331,7 +329,7 @@ header::after {
 .sl-markdown-content h4,
 .sl-markdown-content h5,
 .sl-markdown-content h6 {
-  font-size: var(--aw-text-base);
+  font-size: var(--aw-step-0);
   font-weight: 600;
   line-height: var(--aw-leading-snug);
   border-bottom: none;
@@ -340,32 +338,46 @@ header::after {
   margin-bottom: 0.5rem;
 }
 
-/* Code Blocks */
+/* Code Blocks: frames are styled by Expressive Code (see astro.config.mjs styleOverrides) */
 .sl-markdown-content pre {
-  background-color: var(--aw-color-bg-subtle);
-  border: 1px solid var(--aw-color-border);
-  border-radius: 6px;
-  overflow-x: auto;
   max-width: 100%;
 }
 
-.sl-markdown-content code {
-  background-color: var(--aw-color-code-bg);
-  border-radius: 4px;
-  font-size: 85%;
-  font-family: var(--sl-font-mono);
-  overflow-wrap: break-word;
-  word-wrap: break-word;
+/* Starlight's frame rule reads --code-background rather than EC's codeBackground override */
+.expressive-code .frame {
+  --code-background: var(--aw-color-bg-subtle);
 }
 
-.sl-markdown-content pre code {
-  background-color: transparent;
-  border-radius: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  white-space: pre;
+/* Copy button: compact and quiet (overrides Expressive Code's larger touch sizing) */
+.expressive-code .copy button {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0.375rem;
+  border: 1px solid var(--aw-color-border);
+  border-radius: 6px;
+  background: var(--aw-color-bg-subtle);
+  color: var(--aw-color-text-muted);
+}
+
+.expressive-code .copy button:hover,
+.expressive-code .copy button:focus-visible {
+  color: var(--aw-color-text);
+  border-color: var(--aw-color-border-strong);
+}
+
+/* Inline code */
+.sl-markdown-content :not(pre) > code {
+  background-color: var(--aw-color-code-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  font-family: var(--aw-font-mono, var(--sl-font-mono));
+  overflow-wrap: anywhere;
+}
+
+.sl-markdown-content td code:not(pre code) {
+  white-space: nowrap;
   overflow-wrap: normal;
-  word-wrap: normal;
 }
 
 /* Tables - scroll wrapper (no-JS fallback; mirrors what responsive-tables.ts would inject) */
@@ -384,32 +396,39 @@ header::after {
   margin: 0;
 }
 
-/* Tables - Desktop styles */
+/* Tables - Desktop styles (open table: no outer border, hairline row dividers) */
 .sl-markdown-content table {
   width: 100%;
   max-width: 100%;
   table-layout: auto;
-  border: 1px solid var(--aw-color-border);
-  border-radius: 6px;
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
+  border: none;
+  border-collapse: collapse;
 }
 
 .sl-markdown-content th {
-  background-color: var(--aw-color-bg-subtle);
+  background-color: transparent;
   border-bottom: 1px solid var(--aw-color-border);
+  color: var(--aw-color-text-secondary);
+  font-size: var(--aw-step--1);
   font-weight: 600;
+  text-align: start;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  padding: 0.75rem 1rem;
+  padding: 0.625rem 1rem;
 }
 
 .sl-markdown-content td {
   border-bottom: 1px solid var(--aw-color-hairline-light);
+  color: var(--aw-color-text-body);
+  font-size: var(--aw-step-0);
   word-wrap: break-word;
   overflow-wrap: break-word;
   padding: 0.75rem 1rem;
+}
+
+.sl-markdown-content th:first-child,
+.sl-markdown-content td:first-child {
+  padding-inline-start: 0;
 }
 
 .sl-markdown-content tbody tr:last-child td {
@@ -417,7 +436,7 @@ header::after {
 }
 
 .sl-markdown-content tbody tr:hover {
-  background-color: var(--aw-color-bg-subtle);
+  background-color: transparent;
 }
 
 /* Tables - Responsive card layout for mobile */
@@ -460,34 +479,33 @@ header::after {
     display: block;
     padding: 0.5rem 0;
     border: none;
-    text-align: right;
-    position: relative;
-    padding-left: 50%;
-    min-height: 2.75rem;
+    text-align: left;
+    padding-left: 0;
   }
 
   .sl-markdown-content td:first-child {
     padding-top: 0;
+    padding-inline-start: 0;
+  }
+
+  .sl-markdown-content td code:not(pre code) {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .sl-markdown-content td:last-child {
     padding-bottom: 0;
   }
 
-  /* Add label before each cell using CSS counters and nth-child positioning */
-  /* This works for tables with consistent column structure */
+  /* Label above the value, both left-aligned */
   .sl-markdown-content td::before {
     content: attr(data-label);
-    position: absolute;
-    left: 0;
-    width: 45%;
-    padding-right: 1rem;
+    display: block;
+    margin-bottom: 0.125rem;
+    font-size: var(--aw-step--1);
     font-weight: 600;
     text-align: left;
-    color: var(--aw-color-accent-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--aw-color-text-muted);
   }
 
   /* Fallback: if data-label is not present, just display cells stacked */
@@ -496,7 +514,6 @@ header::after {
   }
 
   .sl-markdown-content td:not([data-label]) {
-    padding-left: 0;
     text-align: left;
   }
 }
@@ -557,7 +574,7 @@ nav a[aria-current="page"] {
 }
 
 /* Buttons */
-.sl-markdown-content button,
+.sl-markdown-content button:not(.expressive-code *),
 .sl-markdown-content .button,
 a.button {
   background: var(--aw-color-bg-subtle);
@@ -568,7 +585,7 @@ a.button {
   transition: border-color 0.2s ease;
 }
 
-.sl-markdown-content button:hover,
+.sl-markdown-content button:not(.expressive-code *):hover,
 .sl-markdown-content .button:hover,
 a.button:hover {
   border-color: rgba(var(--aw-accent-rgb), 0.45);
@@ -1026,19 +1043,7 @@ main,
   max-width: 100%;
 }
 
-/* Mobile-specific: Enable text wrapping for code snippets */
 @media (max-width: 768px) {
-  .sl-markdown-content pre code {
-    white-space: pre-wrap;
-    word-break: break-word;
-    overflow-wrap: break-word;
-  }
-
-  /* Also wrap inline code on mobile to avoid horizontal overflow */
-  .sl-markdown-content code {
-    word-break: break-word;
-  }
-
   /* Disable heavy background animation on mobile to reduce CPU/battery usage */
   body::before {
     animation: none;
