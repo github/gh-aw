@@ -59,8 +59,13 @@
 
   --aw-blue-2: #c6e6ff;
   --aw-blue-4: #79c0ff;
+  --aw-blue-5: #4fc0ff;
   --aw-blue-6: #0969da;
   --aw-blue-7: #0753b6;
+
+  --aw-green-6: #2ea043;
+  --aw-amber-5: #dba82b;
+  --aw-red-5: #f85149;
 
   --aw-pink-2: #ffd6e8;
   --aw-pink-6: #bf3989;
@@ -117,6 +122,13 @@
   --aw-accent-rgb: 168, 139, 250;
 
   --aw-color-link: var(--aw-blue-4);
+
+  /* Status colours (same in both themes) */
+  --aw-color-note: var(--aw-blue-5);
+  --aw-color-success: var(--aw-green-6);
+  --aw-color-caution: var(--aw-amber-5);
+  --aw-color-danger: var(--aw-red-5);
+
   --aw-color-code-bg: rgba(110, 118, 129, 0.4);
   --aw-color-scrollbar: rgba(48, 54, 61, 0.4);
   --aw-color-scrollbar-hover: rgba(72, 79, 88, 0.6);

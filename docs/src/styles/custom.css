@@ -69,7 +69,7 @@ body:has([data-slide-hero])::before {
 }
 
 #starlight__sidebar, .sidebar {
-  border-right: 1px solid var(--aw-color-hairline);
+  border-right: 1px solid var(--aw-color-hairline-light);
 }
 
 
@@ -148,42 +148,33 @@ body:has([data-slide-hero])::before {
 .sidebar .top-level > li > a {
   font-weight: 600;
   font-size: 0.8125rem;
-  color: var(--aw-text-muted);
+  color: var(--aw-color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-radius: 0;
-  background: none !important;
+  background: none;
   transition: color 0.15s ease;
 }
 
 .sidebar .top-level > li > details > summary:hover,
 .sidebar .top-level > li > a:hover {
-  color: #d0d7de;
-  background: none !important;
+  color: var(--aw-color-text);
 }
 
 .sidebar nav li li a {
   transition: color 0.15s ease, border-color 0.15s ease;
-  color: var(--aw-text-muted);
+  color: var(--aw-color-text-muted);
   font-size: 0.875rem;
   line-height: 1.6;
   border-left: 2px solid transparent;
   font-weight: 400;
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
+  background: transparent;
 }
 
 /* Mobile-specific: Increase touch targets for sidebar navigation */
 @media (max-width: 768px) {
   .sidebar .top-level > li > details > summary,
-  .sidebar .top-level > li > a {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-  }
-  
+  .sidebar .top-level > li > a,
   .sidebar nav li li a {
     min-height: 44px;
     display: flex;
@@ -192,76 +183,20 @@ body:has([data-slide-hero])::before {
   }
 }
 
-.sidebar nav li li a:hover {
-  color: #f0f6fc;
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
+.sidebar nav li li a:hover,
+.sidebar nav li li a[aria-current="page"] {
+  color: var(--aw-color-text);
 }
 
 .sidebar nav li li a[aria-current="page"] {
-  color: #f0f6fc;
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
   font-weight: 500;
-  border-left-color: rgba(216, 150, 255, 0.5);
+  border-left-color: rgba(var(--aw-accent-rgb), 0.5);
 }
 
+/* Starlight fills the current page link with the accent colour; keep it plain. */
 .sidebar a[aria-current="page"],
-.sidebar a[aria-current="page"]:hover,
-.sidebar a[aria-current="page"]:focus,
-a[aria-current="page"].link,
-a[aria-current="page"].link:hover {
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
-}
-
-/* Light Theme Sidebar Navigation */
-:root[data-theme='light'] .sidebar {
-  border-right-color: rgba(208, 215, 222, 0.2);
-}
-
-:root[data-theme='light'] .sidebar .top-level > li > details > summary,
-:root[data-theme='light'] .sidebar .top-level > li > a {
-  color: #656d76;
-}
-
-:root[data-theme='light'] .sidebar .top-level > li > details > summary:hover,
-:root[data-theme='light'] .sidebar .top-level > li > a:hover {
-  color: #010409;
-  background: none !important;
-}
-
-:root[data-theme='light'] .sidebar nav li li a {
-  color: #656d76;
-}
-
-:root[data-theme='light'] .sidebar nav li li a:hover {
-  color: #010409;
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
-}
-
-:root[data-theme='light'] .sidebar nav li li a[aria-current="page"] {
-  color: #010409;
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
-  font-weight: 500;
-  border-left-color: rgba(91, 61, 163, 0.4);
-}
-
-:root[data-theme='light'] .sidebar a[aria-current="page"],
-:root[data-theme='light'] .sidebar a[aria-current="page"]:hover,
-:root[data-theme='light'] .sidebar a[aria-current="page"]:focus,
-:root[data-theme='light'] a[aria-current="page"].link,
-:root[data-theme='light'] a[aria-current="page"].link:hover {
-  background-color: transparent !important;
-  background-image: none !important;
-  background: transparent !important;
+a[aria-current="page"].link {
+  background: transparent;
 }
 
 /* Header Theme */
@@ -618,48 +553,26 @@ nav a[aria-current="page"] {
 .sl-markdown-content button,
 .sl-markdown-content .button,
 a.button {
-  background: linear-gradient(180deg, rgba(48, 54, 61, 0.9), rgba(33, 38, 45, 0.9));
-  border: 1px solid var(--aw-border-strong);
-  color: #f0f6fc;
+  background: var(--aw-color-bg-subtle);
+  border: 1px solid var(--aw-color-border-strong);
+  color: var(--aw-color-text);
   border-radius: 6px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .sl-markdown-content button:hover,
 .sl-markdown-content .button:hover,
 a.button:hover {
-  background: linear-gradient(180deg, rgba(66, 74, 83, 0.95), rgba(48, 54, 61, 0.95));
   border-color: rgba(var(--aw-accent-rgb), 0.45);
-}
-
-:root[data-theme='light'] .sl-markdown-content button,
-:root[data-theme='light'] .sl-markdown-content .button,
-:root[data-theme='light'] a.button {
-  background: linear-gradient(180deg, #f6f8fa, #eef2f6);
-  border-color: var(--aw-border);
-  color: #1f2328;
-}
-
-:root[data-theme='light'] .sl-markdown-content button:hover,
-:root[data-theme='light'] .sl-markdown-content .button:hover,
-:root[data-theme='light'] a.button:hover {
-  background: linear-gradient(180deg, #f6f8fa, #e7ecf2);
-  border-color: rgba(var(--aw-accent-rgb), 0.42);
 }
 
 /* Cards and Panels */
 .card,
 .panel {
-  background-color: var(--aw-bg-elevated);
-  border: 1px solid var(--aw-border);
+  background-color: var(--aw-color-bg-raised);
+  border: 1px solid var(--aw-color-border);
   border-radius: 6px;
-  box-shadow: var(--aw-shadow);
-}
-
-:root[data-theme='light'] .card,
-:root[data-theme='light'] .panel {
-  background-color: var(--aw-bg-elevated);
   box-shadow: var(--aw-shadow);
 }
 
@@ -690,14 +603,9 @@ a.button:hover {
 
 /* Right Sidebar (TOC) */
 @media (min-width: 769px) {
-  :root[data-theme='light'] .right-sidebar,
-  :root[data-theme='light'] .right-sidebar[class*="astro-"] {
-    border-left-color: rgba(208, 215, 222, 0.4);
-  }
-
   .right-sidebar,
   .right-sidebar[class*="astro-"] {
-    border-left: 1px solid rgba(48, 54, 61, 0.25);
+    border-left: 1px solid var(--aw-color-hairline-light);
   }
 }
 
@@ -707,7 +615,7 @@ starlight-toc nav {
 }
 
 starlight-toc a {
-  color: #8d96a0;
+  color: var(--aw-color-text-muted);
   text-decoration: none;
   border-left: none;
   transition: none;
@@ -715,42 +623,18 @@ starlight-toc a {
   font-weight: 400;
 }
 
-starlight-toc a:hover {
-  color: #f0f6fc;
-  background: none !important;
-}
-
+starlight-toc a:hover,
 starlight-toc a[aria-current="true"] {
-  color: #f0f6fc;
-  font-weight: 400;
-  background: none !important;
+  color: var(--aw-color-text);
+  background: none;
 }
 
 starlight-toc h2 {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #8d96a0;
+  color: var(--aw-color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-:root[data-theme='light'] starlight-toc a {
-  color: #656d76;
-}
-
-:root[data-theme='light'] starlight-toc a:hover {
-  color: #010409;
-  background: none !important;
-}
-
-:root[data-theme='light'] starlight-toc a[aria-current="true"] {
-  color: #010409;
-  font-weight: 400;
-  background: none !important;
-}
-
-:root[data-theme='light'] starlight-toc h2 {
-  color: #656d76;
 }
 
 /* Hide blog plugin's card-grid pagination (uses reverse chronological order) */
@@ -783,15 +667,6 @@ starlight-toc h2 {
   gap: 0.5rem 0.75rem; /* Tighter vertical gap for better single-line layout */
 }
 
-/* Light theme overrides */
-:root[data-theme='light'] .metadata .authors .author[href] .name {
-  color: var(--sl-color-text);
-}
-
-:root[data-theme='light'] .metadata .authors .author[href]:hover .name {
-  color: var(--sl-color-text-accent);
-}
-
 /* Add vertical spacing between blog metadata (authors, date) and content */
 .sl-markdown-content > .metadata {
   margin-bottom: 2.5rem; /* Increased from default for cleaner look */
@@ -799,16 +674,21 @@ starlight-toc h2 {
 
 /* Pagination Links */
 .pagination-links {
-  border-top: 1px solid #30363d;
+  border-top: 1px solid var(--aw-color-border);
 }
 
 .pagination-links a {
-  border: 1px solid #444c56;
+  border: 1px solid var(--aw-color-border-strong);
   border-radius: 6px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(139, 92, 246, 0.03));
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.06), rgba(var(--aw-accent-rgb), 0.03));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   text-decoration: none;
+}
+
+.pagination-links a:hover {
+  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.12), rgba(var(--aw-accent-rgb), 0.05));
+  border-color: var(--aw-color-accent);
+  box-shadow: 0 4px 12px rgba(var(--aw-accent-rgb), 0.12);
 }
 
 .pagination-links a .meta {
@@ -816,80 +696,23 @@ starlight-toc h2 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #8d96a0;
+  color: var(--aw-color-text-muted);
   transition: color 0.2s ease;
+}
+
+.pagination-links a:hover .meta {
+  color: var(--aw-color-text-secondary);
 }
 
 .pagination-links .link-title {
   font-weight: 600;
   font-size: 0.9375rem;
-  color: #f0f6fc;
+  color: var(--aw-color-text);
   transition: color 0.2s ease;
 }
 
-.pagination-links a::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), transparent);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.pagination-links a:hover::before {
-  opacity: 1;
-}
-
-.pagination-links a:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05));
-  border-color: #8b5cf6;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.12), 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
 .pagination-links a:hover .link-title {
-  color: #d896ff;
-}
-
-.pagination-links a:hover .meta {
-  color: #c9d1d9;
-}
-
-:root[data-theme='light'] .pagination-links {
-  border-top-color: #d0d7de;
-}
-
-:root[data-theme='light'] .pagination-links a {
-  border-color: #d0d7de;
-  background: linear-gradient(135deg, rgba(91, 61, 163, 0.06), rgba(91, 61, 163, 0.03));
-}
-
-:root[data-theme='light'] .pagination-links a::before {
-  background: linear-gradient(135deg, rgba(91, 61, 163, 0.1), transparent);
-}
-
-:root[data-theme='light'] .pagination-links a:hover {
-  background: linear-gradient(135deg, rgba(91, 61, 163, 0.1), rgba(91, 61, 163, 0.05));
-  border-color: #6639ba;
-  box-shadow: 0 4px 12px rgba(91, 61, 163, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-:root[data-theme='light'] .pagination-links .link-title {
-  color: #010409;
-}
-
-:root[data-theme='light'] .pagination-links a:hover .link-title {
-  color: #5b3da3;
-}
-
-:root[data-theme='light'] .pagination-links a .meta {
-  color: #656d76;
-}
-
-:root[data-theme='light'] .pagination-links a:hover .meta {
-  color: #424a53;
+  color: var(--aw-color-accent-text);
 }
 
 /* Aside/Callout Blocks */
@@ -899,40 +722,20 @@ starlight-toc h2 {
   border-left: none;
 }
 
-.sl-markdown-content aside::before,
-.sl-markdown-content .starlight-aside::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  background: currentColor;
-  opacity: 0.5;
-  border-radius: 2px;
-}
-
-.sl-markdown-content aside.note,
 .sl-markdown-content .starlight-aside--note {
-  background: rgba(79, 192, 255, 0.1);
-  border-left-color: #4fc0ff;
+  background: color-mix(in srgb, var(--aw-color-note) 10%, transparent);
 }
 
-.sl-markdown-content aside.tip,
 .sl-markdown-content .starlight-aside--tip {
-  background: rgba(46, 160, 67, 0.1);
-  border-left-color: #2ea043;
+  background: color-mix(in srgb, var(--aw-color-success) 10%, transparent);
 }
 
-.sl-markdown-content aside.caution,
 .sl-markdown-content .starlight-aside--caution {
-  background: rgba(219, 168, 43, 0.1);
-  border-left-color: #dba82b;
+  background: color-mix(in srgb, var(--aw-color-caution) 10%, transparent);
 }
 
-.sl-markdown-content aside.danger,
 .sl-markdown-content .starlight-aside--danger {
-  background: rgba(248, 81, 73, 0.1);
-  border-left-color: #f85149;
+  background: color-mix(in srgb, var(--aw-color-danger) 10%, transparent);
 }
 
 /* Horizontal Rules */
@@ -1147,8 +950,8 @@ a:hover {
 
 /* Badges */
 .sl-badge {
-  background-color: #2ea043;
-  color: #ffffff;
+  background-color: var(--aw-color-success);
+  color: var(--aw-gray-0);
 }
 
 /* Action status badges — uniform height so all rows have consistent sizing */
