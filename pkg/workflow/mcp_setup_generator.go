@@ -211,6 +211,9 @@ func collectMCPTools(workflowData *WorkflowData) []string {
 	if workflowData.RepoMemoryConfig.ledgerEntry() != nil {
 		mcpTools = append(mcpTools, "ledger")
 	}
+	if workflowData.DispatchWorkCoordinator != nil {
+		mcpTools = append(mcpTools, "dispatch-work-coordinator")
+	}
 	if IsMCPScriptsEnabled(workflowData.MCPScripts) {
 		mcpTools = append(mcpTools, "mcp-scripts")
 	}

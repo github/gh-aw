@@ -62,6 +62,41 @@ func (r *MCPConfigRendererUnified) RenderLedgerMCP(yaml *strings.Builder, workfl
 
 }
 
+// RenderDispatchWorkCoordinatorMCP registers the durable Work coordinator server.
+func (r *MCPConfigRendererUnified) RenderDispatchWorkCoordinatorMCP(yaml *strings.Builder, workflowData *WorkflowData) {
+	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
+	if r.options.Format == "toml" {
+		yaml.WriteString("          \n")
+		yaml.WriteString("          [mcp_servers.dispatch-work-coordinator]\n")
+		yaml.WriteString("          container = \"" + image + "\"\n")
+		yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
+		yaml.WriteString("          entrypoint = \"node\"\n")
+		yaml.WriteString("          entrypointArgs = [\"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs\"]\n")
+		yaml.WriteString("          env_vars = [\"GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN\", \"GITHUB_API_URL\", \"GITHUB_REPOSITORY\", \"GITHUB_RUN_ID\", \"GITHUB_WORKFLOW_REF\"]\n")
+		return
+	}
+	yaml.WriteString("              \"dispatch-work-coordinator\": {\n")
+	if r.options.IncludeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+	}
+	yaml.WriteString("                \"container\": \"" + image + "\",\n")
+	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
+	yaml.WriteString("                \"entrypoint\": \"node\",\n")
+	yaml.WriteString("                \"entrypointArgs\": [\"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs\"],\n")
+	yaml.WriteString("                \"env\": {\n")
+	yaml.WriteString("                  \"GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN\": \"\\${GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN}\",\n")
+	yaml.WriteString("                  \"GITHUB_API_URL\": \"\\${GITHUB_API_URL}\",\n")
+	yaml.WriteString("                  \"GITHUB_REPOSITORY\": \"\\${GITHUB_REPOSITORY}\",\n")
+	yaml.WriteString("                  \"GITHUB_RUN_ID\": \"\\${GITHUB_RUN_ID}\",\n")
+	yaml.WriteString("                  \"GITHUB_WORKFLOW_REF\": \"\\${GITHUB_WORKFLOW_REF}\"\n")
+	yaml.WriteString("                }\n")
+	if r.options.IsLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}
+
 func ledgerMCPConfiguredEnvNames(workflowData *WorkflowData) []string {
 	memory := workflowData.RepoMemoryConfig.ledgerEntry()
 	if memory == nil {

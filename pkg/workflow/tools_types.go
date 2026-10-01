@@ -70,20 +70,21 @@ var toolsTypesLog = logger.New("workflow:tools_types")
 //   - Type alias Tools = ToolsConfig provides backward compatibility for existing code
 type ToolsConfig struct {
 	// Built-in tools - using pointers to distinguish between "not set" and "set to nil/empty"
-	GitHub           *GitHubToolConfig           `yaml:"github,omitempty"`
-	Bash             *BashToolConfig             `yaml:"bash,omitempty"`
-	WebFetch         *WebFetchToolConfig         `yaml:"web-fetch,omitempty"`
-	WebSearch        *WebSearchToolConfig        `yaml:"web-search,omitempty"`
-	Edit             *EditToolConfig             `yaml:"edit,omitempty"`
-	Playwright       *PlaywrightToolConfig       `yaml:"playwright,omitempty"`
-	AgenticWorkflows *AgenticWorkflowsToolConfig `yaml:"agentic-workflows,omitempty"`
-	CacheMemory      *CacheMemoryToolConfig      `yaml:"cache-memory,omitempty"`
-	DriveMemory      *DriveMemoryToolConfig      `yaml:"drive-memory,omitempty"`
-	CommentMemory    *CommentMemoryToolConfig    `yaml:"comment-memory,omitempty"`
-	RepoMemory       *RepoMemoryToolConfig       `yaml:"repo-memory,omitempty"`
-	Ledger           *LedgerToolConfig           `yaml:"ledger,omitempty"`
-	Timeout          *TemplatableInt32           `yaml:"timeout,omitempty"`
-	StartupTimeout   *TemplatableInt32           `yaml:"startup-timeout,omitempty"`
+	GitHub                  *GitHubToolConfig              `yaml:"github,omitempty"`
+	Bash                    *BashToolConfig                `yaml:"bash,omitempty"`
+	WebFetch                *WebFetchToolConfig            `yaml:"web-fetch,omitempty"`
+	WebSearch               *WebSearchToolConfig           `yaml:"web-search,omitempty"`
+	Edit                    *EditToolConfig                `yaml:"edit,omitempty"`
+	Playwright              *PlaywrightToolConfig          `yaml:"playwright,omitempty"`
+	AgenticWorkflows        *AgenticWorkflowsToolConfig    `yaml:"agentic-workflows,omitempty"`
+	CacheMemory             *CacheMemoryToolConfig         `yaml:"cache-memory,omitempty"`
+	DriveMemory             *DriveMemoryToolConfig         `yaml:"drive-memory,omitempty"`
+	CommentMemory           *CommentMemoryToolConfig       `yaml:"comment-memory,omitempty"`
+	RepoMemory              *RepoMemoryToolConfig          `yaml:"repo-memory,omitempty"`
+	Ledger                  *LedgerToolConfig              `yaml:"ledger,omitempty"`
+	DispatchWorkCoordinator *DispatchWorkCoordinatorConfig `yaml:"dispatch-work-coordinator,omitempty"`
+	Timeout                 *TemplatableInt32              `yaml:"timeout,omitempty"`
+	StartupTimeout          *TemplatableInt32              `yaml:"startup-timeout,omitempty"`
 
 	// Custom MCP tools (anything not in the above list)
 	Custom map[string]MCPServerConfig `yaml:",inline"`
@@ -97,8 +98,9 @@ type ToolsConfig struct {
 	CLIProxy bool `yaml:"cli-proxy,omitempty"`
 
 	// Raw map for backwards compatibility
-	raw            map[string]any
-	ledgerParseErr error
+	raw                             map[string]any
+	ledgerParseErr                  error
+	dispatchWorkCoordinatorParseErr error
 }
 
 // Tools is a type alias for ToolsConfig for backward compatibility.
@@ -116,12 +118,20 @@ func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 			return nil, err
 		}
 	}
+	if raw, ok := toolsMap["dispatch-work-coordinator"]; ok {
+		if _, err := parseDispatchWorkCoordinatorConfig(raw); err != nil {
+			return nil, err
+		}
+	}
 	config := NewTools(toolsMap)
 	if config.GitHub != nil && config.GitHub.reposParseErr != nil {
 		return nil, config.GitHub.reposParseErr
 	}
 	if config.ledgerParseErr != nil {
 		return nil, config.ledgerParseErr
+	}
+	if config.dispatchWorkCoordinatorParseErr != nil {
+		return nil, config.dispatchWorkCoordinatorParseErr
 	}
 	toolNames := config.GetToolNames()
 	toolsTypesLog.Printf("Parsed tools configuration: result_count=%d, tools=%v", len(toolNames), toolNames)
@@ -132,7 +142,10 @@ func (t *ToolsConfig) ParseError() error {
 	if t == nil {
 		return nil
 	}
-	return t.ledgerParseErr
+	if t.ledgerParseErr != nil {
+		return t.ledgerParseErr
+	}
+	return t.dispatchWorkCoordinatorParseErr
 }
 
 // mcpServerConfigToMap converts an MCPServerConfig to map[string]any for backward compatibility
@@ -248,6 +261,9 @@ func (t *ToolsConfig) ToMap() map[string]any { //nolint:largefunc // Existing co
 	}
 	if t.RepoMemory != nil {
 		result["repo-memory"] = t.RepoMemory.Raw
+	}
+	if t.DispatchWorkCoordinator != nil {
+		result["dispatch-work-coordinator"] = map[string]any{}
 	}
 	if t.Timeout != nil {
 		result["timeout"] = t.Timeout.ToValue()
@@ -662,6 +678,9 @@ func (t *Tools) GetToolNames() []string {
 	}
 	if t.Ledger != nil {
 		names = append(names, "ledger")
+	}
+	if t.DispatchWorkCoordinator != nil {
+		names = append(names, "dispatch-work-coordinator")
 	}
 	if t.Timeout != nil {
 		names = append(names, "timeout")

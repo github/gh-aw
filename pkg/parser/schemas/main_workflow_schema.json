@@ -5505,6 +5505,11 @@
           },
           "additionalProperties": true
         },
+        "dispatch-work-coordinator": {
+          "description": "Enable the durable Dispatch Work Coordinator MCP tools. The coordinator stores immutable Work and Claim transactions on a dedicated branch.",
+          "type": "object",
+          "additionalProperties": false
+        },
         "repo-memory": {
           "description": "Repo memory configuration for git-based persistent storage",
           "oneOf": [

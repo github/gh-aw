@@ -42,6 +42,8 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 			add(constants.SafeOutputsMCPServerID.String(), collectSafeOutputsManifestTools(data.SafeOutputs))
 		case "ledger":
 			add("ledger", []string{"ledger_append", "ledger_get", "ledger_query", "ledger_status"})
+		case "dispatch-work-coordinator":
+			add("dispatch-work-coordinator", []string{"dispatch_work_submit", "dispatch_work_get", "dispatch_work_list", "dispatch_work_status", "dispatch_work_claim", "dispatch_work_claim_next", "dispatch_work_cancel"})
 		case "mcp-scripts":
 			add(constants.MCPScriptsMCPServerID.String(), sliceutil.SortedKeys(data.MCPScripts.Tools))
 		case enclaveMCPServerName:

@@ -497,6 +497,12 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.RepoMemoryConfig = repoMemoryConfig
 	ensureRepoMemoryWritePaths(workflowData.SandboxConfig, repoMemoryConfig)
 	workflowData.LedgerConfig = toolsConfig.Ledger
+	workflowData.DispatchWorkCoordinator = toolsConfig.DispatchWorkCoordinator
+	if workflowData.DispatchWorkCoordinator != nil {
+		if err := validateDispatchWorkCoordinatorPermissions(workflowData); err != nil {
+			return err
+		}
+	}
 	if workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {
 		if workflowData.CheckoutDisabled || workflowData.CheckoutSkipDefault || workflowData.Permissions == "permissions: {}" {
 			return errors.New("tools.ledger requires the workflow repository checkout and contents: read permission")

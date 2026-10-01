@@ -90,22 +90,23 @@ func toAnySlice(ss []string) []any {
 // knownTools is the set of built-in tool names that NewTools handles explicitly.
 // It is a package-level variable to avoid re-allocating this map on every call.
 var knownTools = map[string]struct{}{
-	"github":            {},
-	"bash":              {},
-	"web-fetch":         {},
-	"web-search":        {},
-	"edit":              {},
-	"playwright":        {},
-	"agentic-workflows": {},
-	"cache-memory":      {},
-	"drive-memory":      {},
-	"comment-memory":    {},
-	"repo-memory":       {},
-	"ledger":            {},
-	"safety-prompt":     {},
-	"timeout":           {},
-	"startup-timeout":   {},
-	"cli-proxy":         {},
+	"github":                    {},
+	"bash":                      {},
+	"web-fetch":                 {},
+	"web-search":                {},
+	"edit":                      {},
+	"playwright":                {},
+	"agentic-workflows":         {},
+	"cache-memory":              {},
+	"drive-memory":              {},
+	"comment-memory":            {},
+	"repo-memory":               {},
+	"ledger":                    {},
+	"dispatch-work-coordinator": {},
+	"safety-prompt":             {},
+	"timeout":                   {},
+	"startup-timeout":           {},
+	"cli-proxy":                 {},
 }
 
 func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing tool parsing remains centralized.
@@ -169,6 +170,14 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 			tools.ledgerParseErr = err
 		} else {
 			tools.Ledger = ledger
+		}
+	}
+	if val, exists := toolsMap["dispatch-work-coordinator"]; exists {
+		coordinator, err := parseDispatchWorkCoordinatorConfig(val)
+		if err != nil {
+			tools.dispatchWorkCoordinatorParseErr = err
+		} else {
+			tools.DispatchWorkCoordinator = coordinator
 		}
 	}
 	if val, exists := toolsMap["timeout"]; exists {

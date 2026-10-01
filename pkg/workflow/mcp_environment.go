@@ -162,6 +162,9 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		if memory.Ledger.Schema != "" {
 			envVars["GH_AW_LEDGER_SCHEMA"] = memory.Ledger.Schema
 		}
+		if workflowData.DispatchWorkCoordinator != nil {
+			envVars["GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
+		}
 		if memory.Ledger.MaxShards > 0 {
 			envVars["GH_AW_LEDGER_MAX_SHARDS"] = strconv.Itoa(memory.Ledger.MaxShards)
 		}

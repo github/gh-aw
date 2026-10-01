@@ -552,6 +552,7 @@ func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPref
 	containerCmd.WriteString(" -e GITHUB_MCP_GUARD_REPOS")
 	containerCmd.WriteString(" -e " + sinkVisibilityEnvVar)
 	containerCmd.WriteString(" -e GITHUB_REPOSITORY")
+	containerCmd.WriteString(" -e GITHUB_API_URL")
 	containerCmd.WriteString(" -e GITHUB_SERVER_URL")
 	containerCmd.WriteString(" -e GITHUB_SHA")
 	containerCmd.WriteString(" -e GITHUB_WORKSPACE")
