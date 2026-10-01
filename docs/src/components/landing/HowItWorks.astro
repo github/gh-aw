@@ -5,7 +5,7 @@ import { engineLogos } from './HowItWorksEngineLogos';
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
 const engines = [
-  { id: 'copilot', name: 'GitHub Copilot', maker: 'Default', href: '/gh-aw/engines/copilot/' },
+  { id: 'copilot', name: 'GitHub Copilot', maker: 'GitHub', href: '/gh-aw/engines/copilot/' },
   { id: 'claude', name: 'Claude Code', maker: 'Anthropic', href: '/gh-aw/engines/claude/' },
   { id: 'codex', name: 'Codex', maker: 'OpenAI', href: '/gh-aw/engines/codex/' },
   { id: 'gemini', name: 'Gemini CLI', maker: 'Google', href: '/gh-aw/engines/gemini/' },
@@ -252,11 +252,6 @@ Label new issues by type and priority.</pre>
     padding: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    border: 1px solid var(--aw-color-border);
-    border-radius: 12px;
-    background: var(--aw-color-surface);
-    box-shadow: var(--aw-shadow-raised);
-    overflow: hidden;
   }
   .aw-engine-list li {
     margin: 0;
@@ -276,7 +271,7 @@ Label new issues by type and priority.</pre>
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0;
     height: 100%;
     padding: 1.75rem 1rem 1.5rem;
     color: var(--aw-color-text-secondary);
@@ -285,7 +280,6 @@ Label new issues by type and priority.</pre>
     transition: background-color 0.15s, color 0.15s;
   }
   .aw-engine-list a:hover {
-    background: var(--aw-color-bg-subtle);
     color: var(--aw-color-text-strong);
   }
   .aw-engine-list a:focus-visible {
@@ -305,6 +299,7 @@ Label new issues by type and priority.</pre>
     color: var(--aw-color-text-strong);
   }
   .aw-engine-maker {
+    margin-top: 0.125rem;
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-muted);
   }
